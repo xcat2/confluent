@@ -18,6 +18,7 @@ import multiprocessing
 import sys
 import os
 
+pluginmap = {}
 def _load_plugins():
     # To know our plugins directory, we get the parent path of 'bin'
     path=os.path.dirname(os.path.realpath(__file__))
@@ -28,5 +29,9 @@ def _load_plugins():
     for plugin in os.listdir(plugindir):
         plugin = os.path.splitext(plugin)[0]
         plugins.add(plugin)
+    for plugin in plugins:
+        tmpmod = __import__(plugin)
+        
 
-if __name__ == "__main__":
+def run():
+    _load_plugins()
