@@ -9,19 +9,24 @@ import confluent.util as util
 import eventlet
 import os
 import string
+import urlparse
 scgi = eventlet.import_patched('flup.server.scgi')
 
 
 consolesessions = {}
 
 
-def _get_query_dict(qstring):
+def _get_query_dict(qstring, reqbody, reqtype):
     qdict = {}
     if not qstring:
         return qdict
     for qpair in qstring.split('&'):
         qkey, qvalue = qpair.split('=')
         qdict[qkey] = qvalue
+    if reqbody is not None:
+        if reqtype == "application/x-www-form-urlencoded":
+            
+
     return qdict
 
 
@@ -39,19 +44,15 @@ def _authorize_request(env):
     return 200
 
 
-def _format_response(response):
-
-
 def _pick_mimetype(env):
     """Detect the http indicated mime to send back.
 
     Note that as it gets into the ACCEPT header honoring, it only looks for
     application/json and else gives up and assumes html.  This is because
-    browsers are too terrible.  It is assumed that
+    browsers are very chaotic about ACCEPT header.  It is assumed that
     XMLHttpRequest.setRequestHeader will be used by clever javascript
     if the '.json' scheme doesn't cut it.
     """
-    # TODO(jbjohnso): will this scheme actually play nice with shellinabox?
     if env['PATH_INFO'].endswith('.json'):
         return 'application/json'
     elif env['PATH_INFO'].endswith('.html'):
@@ -74,12 +75,18 @@ def resourcehandler(env, start_response):
     """
     authorized = _authorize_request(env)
     mimetype = _pick_mimetype(env)
-    print repr(env)
+    reqbody = None
+    reqtype = None
+    if 'CONTENT_LENGTH' in env and env['CONTENT_LENGTH']:
+        reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
+        reqtype = env['CONTENT_TYPE']
+    print env
     if authorized in (401, 403):
         start_response(authorized, [])
         return
-    querydict = _get_query_dict(env['QUERY_STRING'])
+    querydict = _get_query_dict(env['QUERY_STRING'], reqbody, reqtype)
     if '/console/session' in env['PATH_INFO']:
+        #hard bake JSON into this path, do not support other incarnations
         prefix, _, _ = env['PATH_INFO'].partition('/console/session')
         _, _, nodename = prefix.rpartition('/')
         if 'session' not in querydict.keys() or not querydict['session']:
@@ -90,9 +97,9 @@ def resourcehandler(env, start_response):
                 return
             sessid = _assign_consessionid(consession)
             start_response('200 OK', [('Content-Type', 'application/json; charset=utf-8')])
-            return [d+'","data":""}']
+            return ['{"session":"%s","data":""}' % sessid]
     start_response('404 Not Found', [])
-    return []
+    return ["Unrecognized directive (404)"]
 
 class HttpApi(object):
     def start(self):

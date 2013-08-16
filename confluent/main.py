@@ -11,7 +11,7 @@
 # Things like heartbeating and discovery
 # It also will optionally snoop SLP DA requests
 
-import confluent.webapi as webapi
+import confluent.httpapi as httpapi
 import eventlet
 from eventlet.green import socket
 from eventlet import wsgi
@@ -32,12 +32,12 @@ def _load_plugins():
         plugins.add(plugin)
     for plugin in plugins:
         tmpmod = __import__(plugin)
-        
+
 
 def run():
     _load_plugins()
-    httpapi = webapi.HttpApi()
-    httpapi.start()
+    webservice = httpapi.HttpApi()
+    webservice.start()
     while (1):
         eventlet.sleep(100)
 
