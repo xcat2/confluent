@@ -49,7 +49,7 @@ def _pick_mimetype(env):
 
     Note that as it gets into the ACCEPT header honoring, it only looks for
     application/json and else gives up and assumes html.  This is because
-    browsers are very chaotic about ACCEPT header.  It is assumed that
+    browsers are very chaotic about ACCEPT HEADER.  It is assumed that
     XMLHttpRequest.setRequestHeader will be used by clever javascript
     if the '.json' scheme doesn't cut it.
     """

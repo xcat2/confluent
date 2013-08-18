@@ -75,23 +75,23 @@ def _format_key(key, passphrase=None):
         return {"unencryptedvalue": key}
 
 
-def _init_masterkey(passphrase=None):
-    if 'master_privacy_key' in _cfgstore['globals']:
+def init_masterkey(cfgstore, passphrase=None, cfgstore):
+    if 'master_privacy_key' in cfgstore['globals']:
         _masterkey = _get_protected_key(
-            _cfgstore['globals']['master_privacy_key'],
+            cfgstore['globals']['master_privacy_key'],
             passphrase=passphrase)
     else:
         _masterkey = os.urandom(32)
-        _cfgstore['globals']['master_privacy_key'] = _format_key(_masterkey,
+        cfgstore['globals']['master_privacy_key'] = _format_key(_masterkey,
             passphrase=passphrase)
-    if 'master_integrity_key' in _cfgstore['globals']:
+    if 'master_integrity_key' in cfgstore['globals']:
         _masterintegritykey = _get_protected_key(
-            _cfgstore['globals']['master_integrity_key'],
+            cfgstore['globals']['master_integrity_key'],
             passphrase=passphrase
             )
     else:
         _masterintegritykey = os.urandom(64)
-        _cfgstore['globals']['master_integrity_key'] = _format_key(
+        cfgstore['globals']['master_integrity_key'] = _format_key(
             _masterintegritykey,
             passphrase=passphrase
         )
