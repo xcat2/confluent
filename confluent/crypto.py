@@ -8,6 +8,7 @@
 # by passphrase and optionally TPM
 
 import array
+import confluent.config
 import math
 import os
 
@@ -18,10 +19,6 @@ from Crypto.Hash import SHA256
 _masterkey = None
 _masterintegritykey = None
 
-
-
-def unlock_config_keys(passphrase=None):
-    _init_masterkey(passphrase)
 
 
 def _pbkdf2(passphrase, salt, iterations, size):
@@ -60,7 +57,7 @@ def _get_protected_key(keydict, passphrase):
         for pp in keydict['passphraseprotected']:
             salt = pp[0]
             privkey, integkey = _derive_keys(passphrase, salt)
-            return _decrypt_value(pp[1:], key=privkey, integritykey=integkey)
+            return decrypt_value(pp[1:], key=privkey, integritykey=integkey)
     else:
         raise Exception("No available decryption key")
 
@@ -69,46 +66,46 @@ def _format_key(key, passphrase=None):
     if passphrase is not None:
         salt = os.urandom(32)
         privkey, integkey = _derive_keys(passphrase, salt)
-        cval = _crypt_value(key, key=privkey, integritykey=integkey)
+        cval = crypt_value(key, key=privkey, integritykey=integkey)
         return {"passphraseprotected": cval}
     else:
         return {"unencryptedvalue": key}
 
 
-def init_masterkey(cfgstore, passphrase=None, cfgstore):
-    if 'master_privacy_key' in cfgstore['globals']:
-        _masterkey = _get_protected_key(
-            cfgstore['globals']['master_privacy_key'],
-            passphrase=passphrase)
+def init_masterkey(passphrase=None):
+    global _masterkey
+    global _masterintegritykey
+    cfgn = confluent.config.get_global('master_privacy_key')
+
+    if cfgn:
+        _masterkey = _get_protected_key(cfgn, passphrase=passphrase)
     else:
         _masterkey = os.urandom(32)
-        cfgstore['globals']['master_privacy_key'] = _format_key(_masterkey,
-            passphrase=passphrase)
-    if 'master_integrity_key' in cfgstore['globals']:
-        _masterintegritykey = _get_protected_key(
-            cfgstore['globals']['master_integrity_key'],
-            passphrase=passphrase
-            )
+        confluent.config.set_global('master_privacy_key', _format_key(
+            _masterkey,
+            passphrase=passphrase))
+    cfgn = confluent.config.get_global('master_integrity_key')
+    if cfgn:
+        _masterintegritykey = _get_protected_key(cfgn, passphrase=passphrase)
     else:
         _masterintegritykey = os.urandom(64)
-        cfgstore['globals']['master_integrity_key'] = _format_key(
+        confluent.config.set_global('master_integrity_key', _format_key(
             _masterintegritykey,
-            passphrase=passphrase
-        )
+            passphrase=passphrase))
 
 
 
-def _decrypt_value(cryptvalue,
+def decrypt_value(cryptvalue,
                    key=_masterkey,
                    integritykey=_masterintegritykey):
     iv, cipherdata, hmac = cryptvalue
     if _masterkey is None or _masterintegritykey is None:
-        _init_masterkey()
-    check_hmac = HMAC.new(_masterintegritykey, cryptvalue, SHA256).digest()
+        init_masterkey()
+    check_hmac = HMAC.new(_masterintegritykey, cipherdata, SHA256).digest()
     if hmac != check_hmac:
         raise Exception("bad HMAC value on crypted value")
     decrypter = AES.new(_masterkey, AES.MODE_CBC, iv)
-    value = decrypter.decrypt(cryptvalue)
+    value = decrypter.decrypt(cipherdata)
     padsize = ord(value[-1])
     pad = value[-padsize:]
     # Note that I cannot grasp what could be done with a subliminal
@@ -119,18 +116,18 @@ def _decrypt_value(cryptvalue,
     return value[0:-padsize]
 
 
-def _crypt_value(value,
+def crypt_value(value,
                  key=_masterkey,
                  integritykey=_masterintegritykey):
     # encrypt given value
     # PKCS7 is the padding scheme to employ, if no padded needed, pad with 16
     # check HMAC prior to attempting decrypt
     if key is None or integritykey is None:
-        _init_masterkey()
+        init_masterkey()
         key=_masterkey
         integritykey=_masterintegritykey
     iv = os.urandom(16)
-    crypter = AES.new(key, ASE.MOD_CBC, iv)
+    crypter = AES.new(key, AES.MODE_CBC, iv)
     neededpad = 16 - (len(value) % 16)
     pad = chr(neededpad) * neededpad
     value = value + pad

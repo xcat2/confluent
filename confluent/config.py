@@ -35,13 +35,32 @@
 import array
 import ast
 import collections
+import confluent.crypto
 import copy
+import cPickle
+import fcntl
 import math
 import operator
 import os
 import re
 import string
 
+_cfgstore = None
+
+def get_global(varname):
+    if (_cfgstore is None or 'globals' not in _cfgstore or
+            varname not in _cfgstore['globals']):
+        return None
+    return _cfgstore['globals'][varname]
+
+def set_global(varname, value):
+    if _cfgstore is None:
+        raise Exception("set_global called before config initted")
+    if 'globals' not in _cfgstore:
+        _cfgstore['globals'] = { varname: value }
+    else:
+        _cfgstore['globals'][varname] = value
+    ConfigData._sync_to_file()
 
 
 class _ExpressionFormat(string.Formatter):
@@ -69,12 +88,20 @@ class _ExpressionFormat(string.Formatter):
 
     def _handle_ast_node(self, node):
         if isinstance(node, ast.Num):
+            if '_expressionkeys' not in self._nodeobj:
+                self._nodeobj['_expressionkeys'] = set(['name'])
+            else:
+                self._nodeobj['_expressionkeys'].add('name')
             return node.n
         elif isinstance(node, ast.Attribute):
             #ok, we have something with a dot
             left = node.value.id
             right = node.attr
             key = left + '.' + right
+            if '_expressionkeys' not in self._nodeobj:
+                self._nodeobj['_expressionkeys'] = set([key])
+            else:
+                self._nodeobj['_expressionkeys'] .add([key])
             val = _decode_attribute(key, self._nodeobj,
                                     formatter=self)
             return val['value'] if 'value' in val else ""
@@ -88,6 +115,10 @@ class _ExpressionFormat(string.Formatter):
                 return int(self._numbers[idx - 1])
             else:
                 if var in self._nodeobj:
+                    if '_expressionkeys' not in self._nodeobj:
+                        self._nodeobj['_expressionkeys'] = set([key])
+                    else:
+                        self._nodeobj['_expressionkeys'].add(var)
                     val = _decode_attribute(var, self._nodeobj,
                                             formatter=self)
                     return val['value'] if 'value' in val else ""
@@ -100,86 +131,25 @@ class _ExpressionFormat(string.Formatter):
                self._handle_ast_node(node.right))
 
 
-def _decode_attribute(attribute, nodeobj, formatter, decrypt=False):
+def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
     if attribute not in nodeobj:
         return None
-    if 'value' in nodeobj[attribute]:
-        return nodeobj[attribute]
-    elif 'expression' in  nodeobj[attribute]:
+    # if we have an expression and a formatter, that overrides 'value'
+    # which may be out of date
+    # get methods will skip the formatter allowing value to come on through
+    # set methods induce recalculation as appropriate to get a cached value
+    if 'expression' in nodeobj[attribute] and formatter is not None:
         retdict = copy.deepcopy(nodeobj[attribute])
         retdict['value'] = formatter.format(retdict['expression'])
         return retdict
+    elif 'value' in nodeobj[attribute]:
+        return nodeobj[attribute]
     elif 'cryptvalue' in nodeobj[attribute] and decrypt:
         retdict = copy.deepcopy(nodeobj[attribute])
-        retdict['value'] = crypto.decrypt_value(
+        retdict['value'] = confluent.crypto.decrypt_value(
                                 nodeobj[attribute]['cryptvalue'])
+        return retdict
     return nodeobj[attribute]
-
-
-def _expand_expression(attribute, nodeobj, decrypt=False):
-    # here is where we may avail ourselves of string.Formatter or
-    # string.Template
-    # we would then take the string that is identifier and do
-    # a little ast magic
-    # {(n1+1)/12+1} would take first number from nodename
-    # {enclosure.id * 8} would take enclosure.id value
-    # ast scheme would envolve the operator module and ast
-    # modules, with a mapping from ast operator classes to
-    # valid operator functions
-    # ast.parse gives a body array, and value is where we kick off
-    # ast.Num has an 'n' member to give the number
-    # ast.Attribute o
-#>>> import ast
-#>>> b=ast.parse("enclosure.id+n0+1/2")
-#>>> b.body[0].value
-#<_ast.BinOp object at 0x7ff449ff0090>
-#>>> b.body[0].value.op
-#<_ast.Add object at 0x7ff4500faf90>
-#>>> b.body[0].value.left
-#<_ast.BinOp object at 0x7ff449ff00d0>
-#>>> b.body[0].value.left.op
-#<_ast.Add object at 0x7ff4500faf90>
-#>>> b.body[0].value.left.left
-#<_ast.Attribute object at 0x7ff449ff0110>
-#>>> b.body[0].value.left.left.value.id
-#'enclosure'
-#>>> b.body[0].value.left.right
-#<_ast.Name object at 0x7ff449ff0190>
-#>>> b.body[0].value.left.right.id
-#'n0'
-#>>> b.body[0].value.left.left.id
-#Traceback (most recent call last):
-#  File "<stdin>", line 1, in <module>
-#AttributeError: 'Attribute' object has no attribute 'id'
-#>>> b.body[0].value.left.left.attr
-#'id'
-#import ast
-#import operator as op
-# supported operators
-#operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
-#            ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor}
-#ef eval_expr(expr):
-#   """
-#   >>> eval_expr('2^6')
-#   4
-#   >>> eval_expr('2**6')
-#   64
-#   >>> eval_expr('1 + 2*3**(4^5) / (6 + -7)')
-#   -5.0
-#   """
-#   return eval_(ast.parse(expr).body[0].value) # Module(body=[Expr(value=...)])
-#ef eval_(node):
-#   if isinstance(node, ast.Num): # <number>
-#       return node.n
-#   elif isinstance(node, ast.operator): # <operator>
-#       return operators[type(node)]
-#   elif isinstance(node, ast.BinOp): # <left> <operator> <right>
-#       return eval_(node.op)(eval_(node.left), eval_(node.right))
-#   else:
-#       raise TypeError(node)
-    pass
-
-_cfgstore = {}
 
 # my thinking at this point is that noderange and configdata  objects
 # will be constructed and passed as part of a context object to plugins
@@ -188,21 +158,28 @@ _cfgstore = {}
 # most of the time as things are automatic
 
 class ConfigData(object):
+    _cfgfilename = "/etc/confluent/cfgdb"
     def __init__(self, tenant=0, decrypt=False):
-        self._tenant = tenant
+        global _cfgstore
+        if _cfgstore is None:
+            self._read_from_file()
         self.decrypt = decrypt
+        if 'tenant' not in _cfgstore:
+            _cfgstore['tenant'] = {}
+        if tenant not in _cfgstore['tenant']:
+            _cfgstore['tenant'][tenant] = {'id': tenant}
+        self._cfgstore = _cfgstore['tenant'][tenant]
 
     def get_node_attributes(self, nodelist, attributes=[]):
-        if 'node' not in _cfgstore:
+        if 'nodes' not in self._cfgstore:
             return None
         retdict = {}
         if isinstance(nodelist,str):
             nodelist = [nodelist]
         for node in nodelist:
-            if (self._tenant,node) not in _cfgstore['node']:
+            if node not in self._cfgstore['nodes']:
                 continue
-            cfgnodeobj = _cfgstore['node'][(self._tenant,node)]
-            exprmgr = _ExpressionFormat(cfgnodeobj)
+            cfgnodeobj = self._cfgstore['nodes'][node]
             nodeobj = {}
             if len(attributes) == 0:
                 attributes = cfgnodeobj.keys()
@@ -210,27 +187,111 @@ class ConfigData(object):
                 if attribute not in cfgnodeobj:
                     continue
                 nodeobj[attribute] = _decode_attribute(attribute, cfgnodeobj,
-                                                       formatter=exprmgr,
                                                        decrypt=self.decrypt)
             retdict[node] = nodeobj
         return retdict
 
+    def _sync_groups_to_node(self, groups, node):
+        if 'groups' not in self._cfgstore:
+            self._cfgstore['groups'] = {}
+        for group in self._cfgstore['groups'].keys():
+            if group not in groups:
+                self._cfgstore['groups'][group]['nodes'].discard(node)
+        for group in groups:
+            if group not in self._cfgstore['groups']:
+                self._cfgstore['groups'][group] = {'name': {'value': group},
+                                                      'nodes': set([node]) }
+            elif 'nodes' not in self._cfgstore['groups'][group]:
+                self._cfgstore['groups'][group]['nodes'] = set([node])
+            else:
+                self._cfgstore['groups'][group]['nodes'].add(node)
+            if 'grouplist' not in self._cfgstore:
+                self._cfgstore['grouplist'] = [group]
+            elif group not in self._cfgstore['grouplist']:
+                self._cfgstore['grouplist'].append(group)
+
+    def _sync_nodes_to_group(self, nodes, group):
+        if 'nodes' not in self._cfgstore:
+            self._cfgstore['nodes'] = {}
+        for node in self._cfgstore['nodes'].keys():
+            if node not in nodes and 'groups' in self._cfgstore['nodes'][node]:
+                self._cfgstore['nodes'][node]['groups'].discard(group)
+        for node in nodes:
+            if node not in self._cfgstore['nodes']:
+                self._cfgstore['nodes'][node] = {'name': {'value': node},
+                                                 'groups': set([group]) }
+            elif 'groups' not in self._cfgstore['nodes'][node]:
+                self._cfgstore['nodes'][node]['groups'] = set([group])
+            else:
+                self._cfgstore['nodes'][node]['groups'].add(group)
+
     def set_node_attributes(self, attribmap):
-        if 'node' not in _cfgstore:
-            _cfgstore['node'] = {}
+        if 'nodes' not in self._cfgstore:
+            self._cfgstore['nodes'] = {}
+        # TODO(jbjohnso): multi mgr support, here if we have peers,
+        # pickle the arguments and fire them off in eventlet
+        # flows to peers, all should have the same result
         for node in attribmap.keys():
-            key = (self._tenant, node)
-            if key not in _cfgstore['node']:
-                _cfgstore['node'][key] = {'name': {'value': node}}
+            if node not in self._cfgstore['nodes']:
+                self._cfgstore['nodes'][node] = {'name': {'value': node}}
+            cfgobj = self._cfgstore['nodes'][node]
+            exprmgr = _ExpressionFormat(cfgobj)
+            recalcexpressions = False
             for attrname in attribmap[node].keys():
                 newdict = {}
-                if isinstance(attribmap[node][attrname], dict):
+                if (isinstance(attribmap[node][attrname], dict) or
+                        isinstance(attribmap[node][attrname], set)):
                     newdict = attribmap[node][attrname]
                 else:
                     newdict = {'value': attribmap[node][attrname] }
-                if 'value' in newdict and attrname.startswith("credential"):
+                if attrname == 'groups':
+                    self._sync_groups_to_node(node=node,
+                    groups=attribmap[node]['groups'])
+                if 'value' in newdict and attrname.startswith("secret."):
                     newdict['cryptvalue' ] = \
-                        crypto.crypt_value(newdict['value'])
+                        confluent.crypto.crypt_value(newdict['value'])
                     del newdict['value']
-                _cfgstore['node'][key][attrname] = newdict
+                cfgobj[attrname] = newdict
+                if ('_expressionkeys' in cfgobj and
+                        attrname in cfgobj['_expressionkeys']):
+                    recalcexpressions = True
+                if 'expression' in cfgobj[attrname]:  # evaluate now
+                    cfgobj[attrname] = _decode_attribute(attrname, cfgobj,
+                                                         formatter=exprmgr)
+            if recalcexpressions:
+                exprmgr = _ExpressionFormat(cfgobj)
+                self._recalculate_expressions(cfgobj, formatter=exprmgr)
+        self._sync_to_file()
+        #TODO: wait for synchronization to suceed/fail??)
 
+    @classmethod
+    def _read_from_file(cls):
+        global _cfgstore
+        nhandle = open(cls._cfgfilename, 'rb')
+        fcntl.lockf(nhandle, fcntl.LOCK_SH)
+        _cfgstore = cPickle.load(nhandle)
+        fcntl.lockf(nhandle, fcntl.LOCK_UN)
+
+    @classmethod
+    def _sync_to_file(cls):
+        nfn = cls._cfgfilename + '.new'
+        nhandle = open(nfn, 'wb')
+        fcntl.lockf(nhandle, fcntl.LOCK_EX)
+        cPickle.dump(_cfgstore, nhandle, protocol=2)
+        fcntl.lockf(nhandle, fcntl.LOCK_UN)
+        nhandle.close()
+        os.rename(cls._cfgfilename, cls._cfgfilename + '.old')
+        os.rename(nfn, cls._cfgfilename)
+
+    def _recalculate_expressions(self, cfgobj, formatter):
+        for key in cfgobj.keys():
+            if not isinstance(cfgobj[key],dict):
+                continue
+            if 'expression' in cfgobj[key]:
+                cfgobj[key] = _decode_attribute(key, cfgobj,
+                                                formatter=formatter)
+            elif ('cryptvalue' not in cfgobj[key] and
+                    'value' not in cfgobj[key]):
+                # recurse for nested structures, with some hint tha
+                # it might indeed be a nested structure
+                _recalculate_expressions(cfgobj[key], formatter)
