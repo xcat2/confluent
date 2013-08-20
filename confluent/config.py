@@ -38,6 +38,7 @@ import collections
 import confluent.crypto
 import copy
 import cPickle
+import eventlet
 import fcntl
 import math
 import operator
@@ -60,7 +61,7 @@ def set_global(varname, value):
         _cfgstore['globals'] = { varname: value }
     else:
         _cfgstore['globals'][varname] = value
-    ConfigData._sync_to_file()
+    ConfigData._bg_sync_to_file()
 
 
 class _ExpressionFormat(string.Formatter):
@@ -159,6 +160,8 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
 
 class ConfigData(object):
     _cfgfilename = "/etc/confluent/cfgdb"
+    _cfgwriter = None
+    _writepending = False
     def __init__(self, tenant=0, decrypt=False):
         global _cfgstore
         if _cfgstore is None:
@@ -261,7 +264,7 @@ class ConfigData(object):
             if recalcexpressions:
                 exprmgr = _ExpressionFormat(cfgobj)
                 self._recalculate_expressions(cfgobj, formatter=exprmgr)
-        self._sync_to_file()
+        self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
     @classmethod
@@ -273,7 +276,37 @@ class ConfigData(object):
         fcntl.lockf(nhandle, fcntl.LOCK_UN)
 
     @classmethod
+    def _bg_sync_to_file(cls):
+        if cls._writepending:
+            # already have a write scheduled
+            return
+        elif cls._cfgwriter is not None:
+            #write in progress, request write when done
+            cls._writepending = True
+        else:
+            cls._cfgwriter = eventlet.spawn(cls._sync_to_file)
+            cls._cfgwriter.link(cls._write_complete)
+
+    @classmethod
+    def _write_complete(cls, gt):
+        if cls._writepending:
+            cls._writepending = False
+            cls._cfgwriter = eventlet.spawn(cls._sync_to_file)
+            cls._cfgwriter.link(cls._write_complete)
+        else:
+            cls._cfgwriter = None
+
+    @classmethod
     def _sync_to_file(cls):
+        # TODO: this is a pretty nasty performance penalty to pay
+        # as much as it is mitigated and deferred, still need to do better
+        # possibilities include:
+        # threading this out (take it out of greenthread), GIL in theory should
+        # not penalize this sort of threading, able to hide a great deal of
+        # sins there...
+        # doing dbm for the major trees, marking the objects that need update
+        # and only doing changes for those
+        # the in memory facet seems serviceable though
         nfn = cls._cfgfilename + '.new'
         nhandle = open(nfn, 'wb')
         fcntl.lockf(nhandle, fcntl.LOCK_EX)
