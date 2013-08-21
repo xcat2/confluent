@@ -22,6 +22,8 @@ _masterintegritykey = None
 
 
 def _pbkdf2(passphrase, salt, iterations, size):
+    # Implement the PBKDF2 standard algorithm for deriving key data
+    # from a passphrase.  See internet for details
     blocks = int(math.ceil(size/32.0))  # Hardcoded to SHA256 behavior
     retkey = ""
     for block in xrange(blocks):
@@ -42,6 +44,8 @@ def _pbkdf2(passphrase, salt, iterations, size):
 
 
 def _derive_keys(passphrase, salt):
+    #implement our specific combination of pbkdf2 transforms to get at
+    #key.  We bump the iterations up because we can afford to
     tmpkey = _pbkdf2(passphrase, salt, 50000, 32)
     finalkey = _pbkdf2(tmpkey, salt, 50000, 96)
     return (finalkey[:32],finalkey[32:])

@@ -7,42 +7,42 @@
 
 # 'nic', meant to be a nested structure under node
 nic = {
-    'Name': {
+    'name': {
         'description': 'Name in ip/ifconfig as desired by administrator',
     },
-    'Port': {
+    'port': {
         'description': 'Port that this nic connects to',
     },
-    'Switch': {
+    'switch': {
         'description': 'Switch that this nic connects to',
     },
-    'ManagedHardwareAddress': {
+    'customhardwareaddress': {
         'description': 'Mac address to push to nic',
     },
-    'DNSSuffix': {
+    'dnssuffix': {
         'description': ('String to place after nodename, but before'
                         'Network.Domain to derive FQDN for this NIC'),
     },
-    'HardwareAddress': {
-        'description': 'Hardware address discovered on nic',
+    'hardwareaddress': {
+        'description': 'Active mac address on this nic (factory or custom)'
     },
-    'IPAddresses': {
-        'description': 'IPv4 and IPv6 addresses in CIDR format'
+    'ipaddresses': {
+        'description': 'Set of IPv4 and IPv6 addresses in CIDR format'
     },
-    'PVID': {
+    'pvid': {
         'description': 'PVID of port on switch this nic connects to',
     },
-    'MTU': {
+    'mtu': {
         'description': 'Requested MTU to configure on this interface',
     },
-    'VLANs': {
+    'vlans': {
         'description': 'Tagged VLANs to apply to nic/switch',
     },
-    'DHCPv4Enabled': {
+    'dhcpv4enabled': {
         'description':  ('Whether DHCP should be attempted to acquire IPv4'
                          'address on this interface'),
     },
-    'DHCPv6Enabled': {
+    'dhcpv6enabled': {
         'description':  ('Whether DHCP should be attempted to acquire IPv6'
                          'address on this interface'),
     },
@@ -51,175 +51,186 @@ nic = {
 
 # 'node', which can be considered a 'system' or a 'vm'
 node = {
-    'Groups': {
+    'groups': {
         'default': 'all',
         'description': ('List of static groups for which this node is'
                         'considered a member'),
     },
-    'Type': {
-        'hidden': True,
-        # This is used to ascertain if this is a 'system', 'vm', etc...
+    'type': {
+        'description': ('Classification of node as system, vm, etc')
     },
-    'Numeric': {
-        'hidden':  True,
-        # a number for use in substitutions, not guaranteed to be unique
+    'id': {
+        'description': ('Numeric identifier for node')
     },
-    'TimeZone': {
+    'location.timezone': {
         'description': 'POSIX timezone to apply to this node',
     },
-    'Operators': {
-        'description': 'User(s) granted operator privilege over this node',
+    'status.summary': {
+        'description': ('An assessment of the overall health of the node.  It'
+                        'can be "optimal", "warning", "critical"'),
     },
-    'Status.HealthSummary': {
-        'description': ('An assessment of the overall health of the node.  It
-                        'can be "optimal", "warning", "critical'"),
+    'status.lastheartbeat': {
+        'description': 'Timestamp of last received heartbeat',
     },
-    'Status.LastHeartbeat': {
-        'description': "Timestamp of last received heartbeat",
+    'status.heartbeatexpiry': {
+        'description': 'Time when Heartbeat will be considered expired',
     },
-    'Status.HeartbeatDeadline': {
-        'description': "Time when Heartbeat will be considered expired",
+    'status.deployment': {
+        'description': 'State of any deployment activity in progress',
     },
-    'Status.DeploymentState': {
-        'description': "State of any deployment activity in progress",
+    'status.faultdetails': {
+        'description': 'Detailed problem data, if any',
     },
-    'Network.Gateway': {
-        'description': ''''Default gateway to configure node with''',
+    'network.gateway': {
+        'description': 'Default gateway to configure node with',
     },
-    'Network.NameServers': {
+    'network.nameservers': {
         'description': '''DNS servers for node to use''',
     },
-    'Network.Domain': {
+    'network.domain': {
         'description': 'Value to append to nodename, if any, to get FQDN',
     },
-    'Network.Interfaces': {
-        'listof': 'nic',
-        'description': 'List of network interfaces to configure on node',
+    'network.interfaces': {
+        'dictof': 'nic',
+        'description': ('Dict of network interfaces to configure on node. '
+                       'Keyed on hardware address.'),
     },
-    'Storage.OSVolume': {
+    'storage.osvolume': {
         'default': 'auto',
         'description': 'Description of storage to target when deploying OS',
     },
-    'Storage.ClientIQN': {
+    'storage.clientiqn': {
         'description': ('Indicates IQN used by this node when communicating'
                         'with iSCSI servers'),
     },
-    'Storage.iSCSIServer': {
+    'storage.iscsiserver': {
         'description': 'Address of iSCSI server used for boot if applicable',
     },
-    'Storage.Pool': {
+    'storage.pool': {
         'description': ('For scenarios like SAN boot and virtualization, this'
                         'describes the pool to allocate boot volume from'),
     },
-    'OS.ImageName': {
+    'os.imagename': {
         'description': 'The OS Image applied or to be applied to node',
     },
-    'Console.Speed': {
+    'console.speed': {
         'default': 'auto',
-        'description': '''Indicate the speed at which to run serial port.
-Default behavior is to autodetect the appropriate value as possible''',
+        'description': ('Indicate the speed at which to run serial port.'
+                        'Default behavior is to autodetect the appropriate'
+                        'value as possible')
     },
-    'Console.Port': {
+    'console.port': {
         'default': 'auto',
-        'description': '''Indicate which port to use for text console.  Default
-behavior is to auto detect the value appropriate for the platform.  'Disable'
-can be used to suppress serial console configuration'''
+        'description': ('Indicate which port to use for text console.  Default'
+                        'behavior is to auto detect the value appropriate for'
+                        'the platform.  "Disable" can be used to suppress'
+                        'serial console configuration')
     },
-    'Console.Method': {
-        'description': '''Indicate the method used to access the console of
-The managed node.'''
+    'console.method': {
+        'description': ('Indicate the method used to access the console of'
+                       'The managed node.')
     },
-    'Virtualization.Host': {
-        'description': 'Hypervisor where this node does/should reside',
+    'virtualization.host': {
+        'description': ('Hypervisor where this node does/should reside',
         'appliesto': ['vm'],
     },
-    'Virtualization.ComputePool': {
+    'virtualization.computepool': {
         'description': ('Set of compute resources this node is permitted to'
                         ' be created on/be migrated to'),
         'appliesto': ['vm'],
     },
-    'Virtualization.StorageModel': {
+    'virtualization.storagemodel': {
         'description': ('The model of storage adapter to emulate in a virtual'
                         'machine.  Defaults to virtio-blk for KVM, vmscsi for'
                         'VMware'),
         'appliesto': ['vm'],
     },
-    'Virtualization.NicModel': {
+    'virtualization.nicmodel': {
         'description': ('The model of NIC adapter to emulate in a virtual'
                         'machine.  Defaults to virtio-net for KVM, vmxnet3 for'
                         'VMware'),
         'appliesto': ['vm'],
     },
-    'HardwareManagement.Method': {
-        'default': 'ipmi',
-        'description': '''The method used to perform operations such as power
-control. '''
+    'hardwaremanagement.method': {
+        'description': 'The method used to perform operations such as power '
+                       'control, get sensor data, get inventory, and so on. '
     },
-    'Enclosure.Manager': {
+    'enclosure.manager': {
         'description': "The management device for this node's chassis",
         'appliesto': ['system'],
     },
-    'Enclosure.Bay': {
+    'enclosure.bay': {
         'description': 'The bay in the enclosure, if any',
         'appliesto': ['system'],
     },
-    'Enclosure.Type': {
+    'enclosure.type': {
         'description': '''The type of enclosure in use (e.g. IBM BladeCenter,
 IBM Flex)''',
         'appliesto': ['system'],
     },
-    'Identity.SerialNumber': {
+    'inventory.serialnumber': {
         'description': 'The manufacturer serial number of node',
     },
-    'Identity.UUID': {
+    'inventory.uuid': {
         'description': 'The UUID of the node as presented in DMI',
     },
-    'Identity.ModelNumber': {
+    'inventory.modelnumber': {
         'description': 'The manufacturer dictated  model number for the node',
     },
-    'Identity.SNMPEngineId': {
+    'inventory.snmpengineid': {
         'description': 'The SNMP Engine id used by this node',
     },
-    'Credentials.SNMPUser': {
+    'secret.snmpuser': {
         'description': 'The user to use for SNMPv3 access to this node',
     },
-    'Credentials.SNMPPassword': {
+    'secret.snmppassword': {
         'description': 'The password to use for SNMPv3 access to this node',
     },
-    'Credentials.SNMPLocalizedKey': {
-        'description': "SNMPv3 key localized to this node's SNMP Engine id",
+    'secret.snmplocalizedkey': {
+        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
+                        'This can be used in lieu of snmppassword to avoid'
+                        'retaining the password TODO: document procedure'
+                        'to commit password to localized key'),
     },
-    'Credentials.SNMPCommunity': {
-        'description': 'SNMPv1 community string',
+    'secret.snmpcommunity': {
+        'description': ('SNMPv1 community string, it is highly recommended to'
+                        'step up to SNMPv3'),
     },
-    'Credentials.RootPassword': {
-        'description': '''The password to apply to local root account.
-The value may be in the clear or already crypted as it would appear in
-/etc/shadow''',
+    'secret.localadminpassword': {
+        'description': ('The password to apply to local root/administrator '
+                        'account. '
+                        'If the environment is 100% Linux, the value may be '
+                        'one-way crypted as in /etc/shadow.  For Windows, if '
+                        'the value is not set or is one-way crypted, the '
+                        'local '
+                        'Administrator account will be disabled, requiring AD')
     },
-    'Credentials.AdministratorPassword': {
-        'description': '''The password to apply to local Administrator account.
-Due to limitations, this value must be stored in the clear.  A blank value
-indicates local Administrrator account be disabled, allowing only AD accounts
-access'''
+    'secret.ipmiuser': {
+        'description': ('The username to use to log into IPMI device related '
+                        'to the node.  For setting username, default behavior '
+                        'is to randomize username, for using username if not '
+                        'set, USERID is assumed'),
     },
-    'Credentials.IPMIUser': {
-        'description': '''Username to use by ipmi plugin. If unspecified, the
-client behavior will default to USERID. BMC configuration will default to
-setting a randomized username.''',
+    'secret.ipmipassword': {
+        'description': ('The key to use to authenticate to IPMI device related '
+                        'to the node.  For setting password, default behavior '
+                        'is to randomize password and store it here.  If going '
+                        'to connect over the network and value is not set, '
+                        'PASSW0RD is attempted')
     },
-    'Credentials.IPMIPassword': {
-        'description': '''Password to use by ipmi plugin.  If unspecified, the
-client behavior defaults to PASSW0RD.  BMC configuration defaults to randomized
-password to mitigate offline attack risk and eliminate storing a clear text
-credential of import on the BMC.'''
+    'secret.managementuser': {
+        'description': ('Username to be set and used by protocols like SSH and '
+                        'HTTP where client provides password over the network.'
+                        'Given the distinct security models betwen this class '
+                        'of protocols and SNMP and IPMI, snmp and ipmi utilize '
+                        'dedicated values.'),
     },
-    'Credentials.ManagementUser': {
-        'description': ('Username to be set and used by protocols like SSH and'
-                        ' HTTP'),
-    },
-    'Credentials.ManagementPassword': {
-        'description': ('Password to be set and used by protocols like SSH and'
-                        ' HTTP'),
+    'secret.managementpassword': {
+        'description': ('Password to be set and used by protocols like SSH '
+                        'and HTTP, where client sends password over the '
+                        'network.  Given distinct security models between '
+                        'this class of protocols, SNMP, and IPMI, SNMP and '
+                        'IPMI are given their own settings with distinct '
+                        'behaviors'),
     },
 }
