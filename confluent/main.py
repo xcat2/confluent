@@ -32,6 +32,9 @@ def _load_plugins():
         plugins.add(plugin)
     for plugin in plugins:
         tmpmod = __import__(plugin)
+        if 'plugin_names' in tmpmod.__dict__:
+            for name in tmpmod.plugin_names:
+                pluginmap[name] = tmpmod
 
 
 def run():

@@ -1,0 +1,39 @@
+Each layer has API implications.
+
+For now, I'll start with plugin api.
+The practice is for plugin entry points to have a **kwargs argument to allow
+future optional arguments.
+Arguments are always passed in keyword style
+
+plugins should implement:
+create(nodes, element, configmanager, **kwargs)
+retrieve(nodes, element, configmanager, **kwargs)
+update(nodes, element, configmanager, **kwargs)
+delete(nodes, element, configmanager, **kwargs)
+
+For the element '_console/session', the return should be an object
+implementing:
+open(callback, **kwargs)
+read(**kwargs)
+write(data, **kwargs)
+close(**kwargs)
+
+For all other elements for now, the caller should get an iterable.
+This means a plugin may elect to return a tuple, list,
+class of their design implementing the iterator interface,
+or elect to use 'yield' in their function for a generator
+
+Northbound of confluent, the interface is straightforward.
+API is presented as a tree of resources.
+
+TLS socket resembles the SMASH CLP syntax, but does not actually implement
+SMASH CLP.  Notably, client should assume case sensitivity, strings can
+exceed 255 characters, input can be more complex than spec allows,
+and no relationship to CIM is defined.  The SMASH CLP prompt -> is used and the
+paradigm of navigating targets like a filesystem is used as well as the
+verb names set, create, start, stop, show, etc.
+
+
+HTTP presents a mostly RESTful interface (noderange, consoles,
+and optional multi-request, comet behavior)
+

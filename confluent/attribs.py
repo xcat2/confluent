@@ -151,6 +151,9 @@ node = {
                         'VMware'),
         'appliesto': ['vm'],
     },
+    'hardwaremanagement.manager': {
+        'description': 'The management address dedicated to this node',
+    },
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
@@ -183,21 +186,21 @@ IBM Flex)''',
     'secret.snmpuser': {
         'description': 'The user to use for SNMPv3 access to this node',
     },
-    'secret.snmppassword': {
-        'description': 'The password to use for SNMPv3 access to this node',
+    'secret.snmppassphrase': {
+        'description': 'The passphrase to use for SNMPv3 access to this node',
     },
     'secret.snmplocalizedkey': {
         'description': ("SNMPv3 key localized to this node's SNMP Engine id"
-                        'This can be used in lieu of snmppassword to avoid'
-                        'retaining the password TODO: document procedure'
-                        'to commit password to localized key'),
+                        'This can be used in lieu of snmppassphrase to avoid'
+                        'retaining the passphrase TODO: document procedure'
+                        'to commit passphrase to localized key'),
     },
     'secret.snmpcommunity': {
         'description': ('SNMPv1 community string, it is highly recommended to'
                         'step up to SNMPv3'),
     },
-    'secret.localadminpassword': {
-        'description': ('The password to apply to local root/administrator '
+    'secret.localadminpassphrase': {
+        'description': ('The passphrase to apply to local root/administrator '
                         'account. '
                         'If the environment is 100% Linux, the value may be '
                         'one-way crypted as in /etc/shadow.  For Windows, if '
@@ -205,29 +208,32 @@ IBM Flex)''',
                         'local '
                         'Administrator account will be disabled, requiring AD')
     },
+    'secret.ipmikg': {
+        'description': 'Optional Integrity key for IPMI communication'
+    },
     'secret.ipmiuser': {
         'description': ('The username to use to log into IPMI device related '
                         'to the node.  For setting username, default behavior '
                         'is to randomize username, for using username if not '
                         'set, USERID is assumed'),
     },
-    'secret.ipmipassword': {
+    'secret.ipmipassphrase': {
         'description': ('The key to use to authenticate to IPMI device related '
-                        'to the node.  For setting password, default behavior '
-                        'is to randomize password and store it here.  If going '
+                        'to the node.  For setting passphrase, default behavior '
+                        'is to randomize passphrase and store it here.  If going '
                         'to connect over the network and value is not set, '
                         'PASSW0RD is attempted')
     },
     'secret.managementuser': {
         'description': ('Username to be set and used by protocols like SSH and '
-                        'HTTP where client provides password over the network.'
+                        'HTTP where client provides passphrase over the network.'
                         'Given the distinct security models betwen this class '
                         'of protocols and SNMP and IPMI, snmp and ipmi utilize '
                         'dedicated values.'),
     },
-    'secret.managementpassword': {
-        'description': ('Password to be set and used by protocols like SSH '
-                        'and HTTP, where client sends password over the '
+    'secret.managementpassphrase': {
+        'description': ('Passphrase to be set and used by protocols like SSH '
+                        'and HTTP, where client sends passphrase over the '
                         'network.  Given distinct security models between '
                         'this class of protocols, SNMP, and IPMI, SNMP and '
                         'IPMI are given their own settings with distinct '
