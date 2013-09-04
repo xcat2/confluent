@@ -11,6 +11,7 @@
 # Things like heartbeating and discovery
 # It also will optionally snoop SLP DA requests
 
+import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
 import eventlet
 from eventlet.green import socket
@@ -19,26 +20,8 @@ import multiprocessing
 import sys
 import os
 
-pluginmap = {}
-def _load_plugins():
-    # To know our plugins directory, we get the parent path of 'bin'
-    path=os.path.dirname(os.path.realpath(__file__))
-    plugindir = os.path.realpath(os.path.join(path,'..','plugins'))
-    sys.path.append(plugindir)
-    plugins = set()
-    #two passes, to avoid adding both py and pyc files
-    for plugin in os.listdir(plugindir):
-        plugin = os.path.splitext(plugin)[0]
-        plugins.add(plugin)
-    for plugin in plugins:
-        tmpmod = __import__(plugin)
-        if 'plugin_names' in tmpmod.__dict__:
-            for name in tmpmod.plugin_names:
-                pluginmap[name] = tmpmod
-
-
 def run():
-    _load_plugins()
+    pluginapi.load_plugins()
     webservice = httpapi.HttpApi()
     webservice.start()
     while (1):

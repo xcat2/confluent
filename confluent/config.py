@@ -45,8 +45,11 @@ import operator
 import os
 import re
 import string
+import threading
+
 
 _cfgstore = None
+
 
 def get_global(varname):
     if (_cfgstore is None or 'globals' not in _cfgstore or
@@ -61,7 +64,7 @@ def set_global(varname, value):
         _cfgstore['globals'] = { varname: value }
     else:
         _cfgstore['globals'][varname] = value
-    ConfigData._bg_sync_to_file()
+    ConfigManager._bg_sync_to_file()
 
 
 class _ExpressionFormat(string.Formatter):
@@ -152,20 +155,46 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
         return retdict
     return nodeobj[attribute]
 
+
+def get_tenant_id(tenantname):
+    for tenant in _cfgstore['tenant'].iterkeys():
+        if ('name' in _cfgstore['tenant'][tenant] and
+                _cfgstore['tenant'][tenant]['name'] == tenantname):
+            return tenant
+
+
+def get_tenant_names():
+    global _cfgstore
+    if _cfgstore is None or 'tenant' not in _cfgstore:
+        return
+    for tenant in _cfgstore['tenant'].iterkeys():
+        if 'name' in _cfgstore['tenant'][tenant]:
+            yield _cfgstore['tenant'][tenant]['name']
+
+def get_user(name, tenant):
+    global _cfgstore
+    for user in _cfgstore['tenant'][tenant]['users'].iterkeys():
+        if _cfgstore['tenant'][tenant]['users'][user]['name'] == user:
+            return _cfgstore['tenant'][tenant]['users'][user]
+
 # my thinking at this point is that noderange and configdata  objects
 # will be constructed and passed as part of a context object to plugins
 # reasoning being that the main program will handle establishing the
 # tenant context and then modules need not consider the current tenant
 # most of the time as things are automatic
 
-class ConfigData(object):
+class ConfigManager(object):
     _cfgfilename = "/etc/confluent/cfgdb"
     _cfgwriter = None
     _writepending = False
-    def __init__(self, tenant=0, decrypt=False):
+
+    def __init__(self, tenant, decrypt=False):
         global _cfgstore
         if _cfgstore is None:
-            self._read_from_file()
+            try:
+                self._read_from_file()
+            except IOError:
+                _cfgstore = {}
         self.decrypt = decrypt
         if 'tenant' not in _cfgstore:
             _cfgstore['tenant'] = {}
@@ -280,30 +309,18 @@ class ConfigData(object):
         if cls._writepending:
             # already have a write scheduled
             return
-        elif cls._cfgwriter is not None:
+        elif cls._cfgwriter is not None and cls._cfgwriter.isAlive():
             #write in progress, request write when done
             cls._writepending = True
         else:
-            cls._cfgwriter = eventlet.spawn(cls._sync_to_file)
-            cls._cfgwriter.link(cls._write_complete)
-
-    @classmethod
-    def _write_complete(cls, gt):
-        if cls._writepending:
-            cls._writepending = False
-            cls._cfgwriter = eventlet.spawn(cls._sync_to_file)
-            cls._cfgwriter.link(cls._write_complete)
-        else:
-            cls._cfgwriter = None
+            cls._cfgwriter = threading.Thread(target=cls._sync_to_file)
+            cls._cfgwriter.start()
 
     @classmethod
     def _sync_to_file(cls):
         # TODO: this is a pretty nasty performance penalty to pay
         # as much as it is mitigated and deferred, still need to do better
         # possibilities include:
-        # threading this out (take it out of greenthread), GIL in theory should
-        # not penalize this sort of threading, able to hide a great deal of
-        # sins there...
         # doing dbm for the major trees, marking the objects that need update
         # and only doing changes for those
         # the in memory facet seems serviceable though
@@ -313,8 +330,14 @@ class ConfigData(object):
         cPickle.dump(_cfgstore, nhandle, protocol=2)
         fcntl.lockf(nhandle, fcntl.LOCK_UN)
         nhandle.close()
-        os.rename(cls._cfgfilename, cls._cfgfilename + '.old')
+        try:
+            os.rename(cls._cfgfilename, cls._cfgfilename + '.old')
+        except OSError:
+            pass
         os.rename(nfn, cls._cfgfilename)
+        if cls._writepending:
+            cls._writepending = False
+            return cls._sync_to_file()
 
     def _recalculate_expressions(self, cfgobj, formatter):
         for key in cfgobj.keys():

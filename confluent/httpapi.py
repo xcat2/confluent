@@ -5,6 +5,7 @@
 # shillinabox javascript
 import base64
 import confluent.console as console
+import confluent.auth as auth
 import confluent.util as util
 import eventlet
 import os
@@ -25,8 +26,7 @@ def _get_query_dict(qstring, reqbody, reqtype):
         qdict[qkey] = qvalue
     if reqbody is not None:
         if reqtype == "application/x-www-form-urlencoded":
-            
-
+            print reqbody
     return qdict
 
 
@@ -34,6 +34,17 @@ def _authorize_request(env):
     """Grant/Deny access based on data from wsgi env
 
     """
+    if 'REMOTE_USER' in env:  # HTTP Basic auth passed
+        user = env['REMOTE_USER']
+        #TODO: actually pass in the element
+        authdata = auth.authorize(user, element=None)
+        if authdata is None:
+            return {'code': 401}
+        else:
+            return {'code': 200,
+                    'tenant': authdata[0],
+                    'user': authdata[1]}
+
     # TODO(jbjohnso): actually evaluate the request for authorization
     # In theory, the x509 or http auth stuff will get translated and then
     # passed on to the core authorization function in an appropriate form
@@ -41,7 +52,6 @@ def _authorize_request(env):
     # 401 if there is no known identity
     # 403 if valid identity, but no access
     # going to run 200 just to get going for now
-    return 200
 
 
 def _pick_mimetype(env):
@@ -77,13 +87,23 @@ def resourcehandler(env, start_response):
     mimetype = _pick_mimetype(env)
     reqbody = None
     reqtype = None
-    if 'CONTENT_LENGTH' in env and env['CONTENT_LENGTH']:
+    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
     print env
-    if authorized in (401, 403):
-        start_response(authorized, [])
-        return
+    if authorized['code'] == 401:
+        start_response('401 Authentication Required',
+            [('Content-type', 'text/plain'),
+             ('WWW-Authenticate', 'Basic realm="confluent"')])
+        return 'authentication required'
+    if authorized['code'] == 403:
+        start_response('403 Forbidden',
+            [('Content-type', 'text/plain'),
+             ('WWW-Authenticate', 'Basic realm="confluent"')])
+        return 'authorization failed'
+    if authorized['code'] != 200:
+        raise Exception("Unrecognized code from auth engine")
+    cfgmgr = config.ConfigManager(authorized['tenant'])
     querydict = _get_query_dict(env['QUERY_STRING'], reqbody, reqtype)
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
@@ -91,12 +111,14 @@ def resourcehandler(env, start_response):
         _, _, nodename = prefix.rpartition('/')
         if 'session' not in querydict.keys() or not querydict['session']:
             # Request for new session
-            consession = console.ConsoleSession(node=nodename)
+            consession = console.ConsoleSession(node=nodename,
+                                                configmanager=cfgmgr)
             if not consession:
                 start_response("500 Internal Server Error", [])
                 return
             sessid = _assign_consessionid(consession)
-            start_response('200 OK', [('Content-Type', 'application/json; charset=utf-8')])
+            start_response('200 OK', [('Content-Type',
+                'application/json; charset=utf-8')])
             return ['{"session":"%s","data":""}' % sessid]
     start_response('404 Not Found', [])
     return ["Unrecognized directive (404)"]
