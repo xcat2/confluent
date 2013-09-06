@@ -42,8 +42,8 @@ def _authorize_request(env):
             return {'code': 401}
         else:
             return {'code': 200,
-                    'tenant': authdata[0],
-                    'user': authdata[1]}
+                    'cfgmgr': authdata[1],
+                    'userdata': authdata[0]}
 
     # TODO(jbjohnso): actually evaluate the request for authorization
     # In theory, the x509 or http auth stuff will get translated and then
@@ -103,7 +103,7 @@ def resourcehandler(env, start_response):
         return 'authorization failed'
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
-    cfgmgr = config.ConfigManager(authorized['tenant'])
+    cfgmgr = authorized['cfgmgr']
     querydict = _get_query_dict(env['QUERY_STRING'], reqbody, reqtype)
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations

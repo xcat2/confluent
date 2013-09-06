@@ -49,8 +49,12 @@ import string
 import threading
 
 
-_cfgstore = None
 
+def is_tenant(tenant):
+    try:
+        return tenant in _cfgstore['tenant']
+    except:
+        return False
 
 def get_global(globalname):
     """Get a global variable
@@ -197,16 +201,13 @@ class ConfigManager(object):
 
     def __init__(self, tenant, decrypt=False):
         global _cfgstore
-        if _cfgstore is None:
-            try:
-                self._read_from_file()
-            except IOError:
-                _cfgstore = {}
         self.decrypt = decrypt
         if 'tenant' not in _cfgstore:
-            _cfgstore['tenant'] = {}
-        if tenant not in _cfgstore['tenant']:
+            _cfgstore['tenant'] = {tenant: {'id': tenant}}
+            self._bg_sync_to_file()
+        elif tenant not in _cfgstore['tenant']:
             _cfgstore['tenant'][tenant] = {'id': tenant}
+            self._bg_sync_to_file()
         self.tenant = tenant
         self._cfgstore = _cfgstore['tenant'][tenant]
 
@@ -407,3 +408,10 @@ class ConfigManager(object):
                 # recurse for nested structures, with some hint tha
                 # it might indeed be a nested structure
                 _recalculate_expressions(cfgobj[key], formatter)
+
+
+try:
+    ConfigManager._read_from_file()
+except IOError:
+    _cfgstore = {}
+
