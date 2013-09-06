@@ -16,12 +16,13 @@
 # For multi-node operation, each instance opens and retains a TLS connection
 # to each other instance.  'set' operations push to queue for writeback and
 # returns.  The writeback thread writes to local disk and to other instances.
-# A function is provided to wait for pending output to disk and peers to complete
-# to assure that aa neww requesst to  peer does not beat configuration data to
-# the target
+# A function is provided to wait for pending output to disk and peers
+# to complete to assure that a new requesst to  peer does not beat
+# configuration data to  the target
 
 # on disk format is cpickle.  No data shall be in the configuration db required
 # to get started.  For example, argv shall indicate ports rather than cfg store
+# TODO(jbjohnso): change to 'anydbm' scheme and actually tie things down
 
 # Note on the cryptography.  Default behavior is mostly just to pave the
 # way to meaningful security.  Root all potentially sensitive data in
@@ -31,11 +32,11 @@
 #   - TPM sealing (which would forgo the interactive assuming risk of
 #           physical attack on TPM is not a concern)
 
-
 import array
 import ast
 import collections
 import confluent.crypto
+import confluent.util
 import copy
 import cPickle
 import eventlet
@@ -51,23 +52,50 @@ import threading
 _cfgstore = None
 
 
-def get_global(varname):
-    if (_cfgstore is None or 'globals' not in _cfgstore or
-            varname not in _cfgstore['globals']):
-        return None
-    return _cfgstore['globals'][varname]
+def get_global(globalname):
+    """Get a global variable
 
-def set_global(varname, value):
-    if _cfgstore is None:
-        raise Exception("set_global called before config initted")
+
+    :param globalname: The global parameter name to read
+    """
+    try:
+        return _cfgstore['globals'][globalname]
+    except:
+        return None
+
+def set_global(globalname, value):
+    """Set a global variable.
+
+    Globals should be rarely ever used.  Almost everything should be under a
+    tenant scope.  Some things like master key and socket numbers/paths can be
+    reasonably considered global in nature.
+
+    :param globalname:  The global parameter name to store
+    :param value: The value to set the global parameter to.
+    """
     if 'globals' not in _cfgstore:
-        _cfgstore['globals'] = { varname: value }
+        _cfgstore['globals'] = { globalname: value }
     else:
-        _cfgstore['globals'][varname] = value
+        _cfgstore['globals'][globalname] = value
     ConfigManager._bg_sync_to_file()
 
 
+def _generate_new_id():
+    # generate a random id outside the usual ranges used for norml users in
+    # /etc/passwd.  Leave an equivalent amount of space near the end disused,
+    # just in case
+    id = confluent.util.securerandomnumber(65537, 4294901759)
+    if 'idmap' not in _cfgstore:
+        return id
+    while id in _cfgstore['idmap']:
+        id = confluent.util.securerandomnumber(65537, 4294901759)
+    return id
+
 class _ExpressionFormat(string.Formatter):
+    # This class is used to extract the literal value from an expression
+    # in the db
+    # This is made easier by subclassing one of the 'fprintf' mechanisms
+    # baked into python
     posmatch = re.compile('^n([0-9]*)$')
     nummatch = re.compile('[0-9]+')
     _supported_ops = {
@@ -105,7 +133,7 @@ class _ExpressionFormat(string.Formatter):
             if '_expressionkeys' not in self._nodeobj:
                 self._nodeobj['_expressionkeys'] = set([key])
             else:
-                self._nodeobj['_expressionkeys'] .add([key])
+                self._nodeobj['_expressionkeys'].add([key])
             val = _decode_attribute(key, self._nodeobj,
                                     formatter=self)
             return val['value'] if 'value' in val else ""
@@ -156,27 +184,6 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
     return nodeobj[attribute]
 
 
-def get_tenant_id(tenantname):
-    for tenant in _cfgstore['tenant'].iterkeys():
-        if ('name' in _cfgstore['tenant'][tenant] and
-                _cfgstore['tenant'][tenant]['name'] == tenantname):
-            return tenant
-
-
-def get_tenant_names():
-    global _cfgstore
-    if _cfgstore is None or 'tenant' not in _cfgstore:
-        return
-    for tenant in _cfgstore['tenant'].iterkeys():
-        if 'name' in _cfgstore['tenant'][tenant]:
-            yield _cfgstore['tenant'][tenant]['name']
-
-def get_user(name, tenant):
-    global _cfgstore
-    for user in _cfgstore['tenant'][tenant]['users'].iterkeys():
-        if _cfgstore['tenant'][tenant]['users'][user]['name'] == user:
-            return _cfgstore['tenant'][tenant]['users'][user]
-
 # my thinking at this point is that noderange and configdata  objects
 # will be constructed and passed as part of a context object to plugins
 # reasoning being that the main program will handle establishing the
@@ -200,7 +207,56 @@ class ConfigManager(object):
             _cfgstore['tenant'] = {}
         if tenant not in _cfgstore['tenant']:
             _cfgstore['tenant'][tenant] = {'id': tenant}
+        self.tenant = tenant
         self._cfgstore = _cfgstore['tenant'][tenant]
+
+
+    def get_user(self, name):
+        """Get user information from DB
+
+        :param name: Name of the user
+
+        Returns a dictionary describing parameters of a user.  These parameters
+        may include numeric id (id), certificate thumbprint (certthumb),
+        password hash (passhash, which currently is going to be PBKDF2 derived)
+        full name (displayname), ...
+
+        """
+        try:
+            return copy.deepcopy(self._cfgstore['users'][name])
+        except:
+            return None
+
+
+    def create_user(self, name, role="Administrator", id=None, displayname=None):
+        """Create a new user
+
+        :param name: The login name of the user
+        :param role: The role the user should be considered.  Can be
+                     "Administrator" or "Technician", defaults to
+                     "Administrator"
+        :param id: Custom identifier number if desired.  Defaults to random.
+        :param displayname: Optional long format name for UI consumption
+        """
+        if id is None:
+            id = _generate_new_id()
+        else:
+            if id in _cfgstore['idmap']:
+                raise Exception("Duplicate id requested")
+        if 'users' not in self._cfgstore:
+            self._cfgstore['users'] = { }
+        if name in self._cfgstore['users']:
+            raise Exception("Duplicate username requested")
+        self._cfgstore['users'][name] = {'id': id}
+        if displayname is not None:
+            self._cfgstore['users'][name]['displayname'] = displayname
+        if 'idmap' not in _cfgstore:
+            _cfgstore['idmap'] = {}
+        _cfgstore['idmap'][id] = {
+            'tenant': self.tenant,
+            'username': name
+            }
+        self._bg_sync_to_file()
 
     def get_node_attributes(self, nodelist, attributes=[]):
         if 'nodes' not in self._cfgstore:
