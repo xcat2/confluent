@@ -19,7 +19,7 @@ def get_conn_params(node, config):
         username = 'USERID'
     if 'secret.ipmipassphrase' in configdata:
         passphrase = configddata['secret.ipmi.passphrase']['value']
-    elif 'secret.managementpassphrase' in configdata
+    elif 'secret.managementpassphrase' in configdata:
         passphrase = configdata['secret.managementpassphrase']
     else:
         passphrase = 'PASSW0RD' # for lack of a better guess
