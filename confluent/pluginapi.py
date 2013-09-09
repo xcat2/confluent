@@ -86,8 +86,8 @@ def handle_path(path, operation, configmanager):
             nodeattr = configmanager.get_node_attributes(
                 [node], plugroute['pluginattrs'])
             for attrname in plugroute['pluginattrs']:
-                if attrname in nodeattr:
-                    return pluginmap[nodeattr[attrname]].__dict__[operation](
+                if attrname in nodeattr[node]:
+                    return pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
                         node=(node), operation=operation,
                         configmanager=configmanager)
 
