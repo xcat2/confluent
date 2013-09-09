@@ -78,7 +78,7 @@ def handle_path(path, operation, configmanager):
             path.startswith("/vm/")):
         nodeidx = path.find("/",1) + 1
         node = path[nodeidx:]
-        node, _, element = path.partition("/")
+        node, _, element = node.partition("/")
         if element not in nodeelements:
             raise Exception("Invalid element requested")
         plugroute = nodeelements[element]
