@@ -43,14 +43,14 @@ def get_conn_params(node, config):
 
 
 class Console(object):
-    def __init__(node, config, **kwargs):
+    def __init__(node, config):
         crypt = config.decrypt
         config.decrypt = True
         configdata = config.get_node_attributes([node],
             ['secret.ipmiuser', 'secret.ipmipassphrase',
              'secret.managementuser', 'secret.managementpassphrase',
              'hardwaremanagement.manager'])
-        connparams = get_conn_params(node, configdata)
+        connparams = get_conn_params(node, configdata[node])
         self.username = connparams['username']
         self.password = connparams['passphrase']
         self.kg = connparams['kg']
@@ -58,7 +58,7 @@ class Console(object):
         self.port = connparams['port']
         # Cannot actually create console until 'connect', when we get callback
 
-    def connect(callback, **kwargs):
+    def connect(self,callback):
         self.solconnection = console.Console(bmc=self.bmc,
                                              port=self.port,
                                              username=self.username,
@@ -68,11 +68,11 @@ class Console(object):
         if _loopthread is None:
             _loopthread = eventlet.spawn(_ipmi_evtloop)
 
-    def write(self, data, **kwargs):
+    def write(self, data):
         self.solconnection.send_data(data)
 
 
-def create(nodes, element, configmanager, **kwargs):
+def create(nodes, element, configmanager):
     if element == '_console/session':
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
@@ -82,5 +82,5 @@ def create(nodes, element, configmanager, **kwargs):
             "TODO(jbjohnso): ipmi api implementation of %s" % element)
 
 
-def retrieve(nodes, element, configmanager, **kwargs):
+def retrieve(nodes, element, configmanager):
     raise Exception("TODO(jbjohnso): ipmi get implementation of %s" % element)
