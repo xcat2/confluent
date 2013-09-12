@@ -19,14 +19,14 @@ consolesessions = {}
 
 def _get_query_dict(qstring, reqbody, reqtype):
     qdict = {}
-    if not qstring:
-        return qdict
-    for qpair in qstring.split('&'):
-        qkey, qvalue = qpair.split('=')
-        qdict[qkey] = qvalue
+    if qstring:
+        for qpair in qstring.split('&'):
+            qkey, qvalue = qpair.split('=')
+            qdict[qkey] = qvalue
     if reqbody is not None:
-        if reqtype == "application/x-www-form-urlencoded":
+        if "application/x-www-form-urlencoded" in reqtype:
             print reqbody
+            raise(Exception("TODO: must actually do url form encode parse here"))
     return qdict
 
 
@@ -120,6 +120,21 @@ def resourcehandler(env, start_response):
             start_response('200 OK', [('Content-Type',
                 'application/json; charset=utf-8')])
             return ['{"session":"%s","data":""}' % sessid]
+        elif 'keys' in querydict.keys():
+            # client wishes to push some keys into the remote console
+            input = ""
+            for idx in xrange(0, len(querydict['keys'])):
+                input += chr(int(querydict['keys'][idx:idx+2]))
+            print "taking in "+input
+            sessid = querydict['session']
+            consolesessions[sessid].write(input)
+            start_response('200 OK', [('Content-Type',
+                'application/json; charset=utf-8')])
+            return # client has requests to send or receive, not both...
+        else: #no keys, but a session, means it's hooking to receive data
+             outdata = consolesessions[sessid].get_next_output(timeout=45)
+             json = '{"session":"%s","data":"%s"}'%(querydict['session'],
+                                                    outdata)
     start_response('404 Not Found', [])
     return ["Unrecognized directive (404)"]
 

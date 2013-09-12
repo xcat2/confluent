@@ -72,6 +72,20 @@ class Console(object):
     def write(self, data):
         self.solconnection.send_data(data)
 
+    def wait_for_data(self, timeout=600):
+        """Wait for some network event.
+
+        This is currently not guaranteed to actually have data when
+        return.  This is supposed to be something more appropriate
+        than sleep(0), but only marginally so.
+        """
+        # reason for this is that we currently nicely pass through the callback
+        # straight to ipmi library.  To implement this accurately, easiest path
+        # would be to add a layer through the callback.  IMO there isn't enough
+        # value in assuring data coming back to bother with making the stack
+        # taller than it has to be
+        console.session.Session.wait_for_rsp(timeout=timeout)
+
 
 def create(nodes, element, configmanager):
     if element == '_console/session':
