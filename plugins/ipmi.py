@@ -1,16 +1,16 @@
 import eventlet
-console = eventlet.import_patched('pyghmi.ipmi.console')
-ipmisession = eventlet.import_patched('pyghmi.ipmi.private.session')
+import pyghmi.ipmi.console as console
+console.session.select = eventlet.green.select
 
 _loopthread = None
 
 
 def _ipmi_evtloop():
     while (1):
-        ipmisession.Session.wait_for_rsp(timeout=600)
+        console.session.Session.wait_for_rsp(timeout=600)
 
 
-def get_conn_params(node, config):
+def get_conn_params(node, configdata):
     if 'secret.ipmiuser' in configdata:
         username = configdata['secret.ipmiuser']['value']
     elif 'secret.managementuser' in configdata:
@@ -18,13 +18,13 @@ def get_conn_params(node, config):
     else:
         username = 'USERID'
     if 'secret.ipmipassphrase' in configdata:
-        passphrase = configddata['secret.ipmi.passphrase']['value']
+        passphrase = configdata['secret.ipmipassphrase']['value']
     elif 'secret.managementpassphrase' in configdata:
-        passphrase = configdata['secret.managementpassphrase']
+        passphrase = configdata['secret.managementpassphrase']['value']
     else:
         passphrase = 'PASSW0RD' # for lack of a better guess
-    if configdata['hardwaremanagement.manager']:
-        bmc = configdata['hardwaremanagement.manager']
+    if 'hardwaremanagement.manager' in configdata:
+        bmc = configdata['hardwaremanagement.manager']['value']
     else:
         bmc = node
     if 'secret.ipmikg' in configdata:
@@ -43,7 +43,7 @@ def get_conn_params(node, config):
 
 
 class Console(object):
-    def __init__(node, config):
+    def __init__(self, node, config):
         crypt = config.decrypt
         config.decrypt = True
         configdata = config.get_node_attributes([node],
@@ -59,9 +59,10 @@ class Console(object):
         # Cannot actually create console until 'connect', when we get callback
 
     def connect(self,callback):
+        global _loopthread
         self.solconnection = console.Console(bmc=self.bmc,
                                              port=self.port,
-                                             username=self.username,
+                                             userid=self.username,
                                              password=self.password,
                                              kg=self.kg,
                                              iohandler=callback)
