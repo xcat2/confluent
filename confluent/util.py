@@ -34,3 +34,13 @@ def securerandomnumber(min=0, max=4294967295):
         number = struct.unpack("I",os.urandom(4))[0]
     return number
 
+def monotonic_time():
+    """Return a monotoc time value
+
+    In scenarios like timeouts and such, monotonic timing is preferred.
+    """
+    if (os.name == "posix"):
+        return os.times()[4]
+    else:
+        return time.time()
+    #TODO: windows?
