@@ -25,8 +25,9 @@ def _get_query_dict(qstring, reqbody, reqtype):
             qdict[qkey] = qvalue
     if reqbody is not None:
         if "application/x-www-form-urlencoded" in reqtype:
-            print reqbody
-            raise(Exception("TODO: must actually do url form encode parse here"))
+            pbody = urlparse.parse_qs(reqbody)
+            for ky in pbody.iterkeys():
+                qdict[ky] = pbody[ky][0]
     return qdict
 
 
@@ -132,8 +133,9 @@ def resourcehandler(env, start_response):
                 'application/json; charset=utf-8')])
             return # client has requests to send or receive, not both...
         else: #no keys, but a session, means it's hooking to receive data
-             outdata = consolesessions[sessid].get_next_output(timeout=45)
-             json = '{"session":"%s","data":"%s"}'%(querydict['session'],
+            sessid = querydict['session']
+            outdata = consolesessions[sessid].get_next_output(timeout=45)
+            json = '{"session":"%s","data":"%s"}'%(querydict['session'],
                                                     outdata)
     start_response('404 Not Found', [])
     return ["Unrecognized directive (404)"]
