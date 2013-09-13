@@ -35,7 +35,7 @@ class _ConsoleHandler(object):
 
 #this represents some api view of a console handler.  This handles things like
 #holding the caller specific queue data, for example, when http api should be
-#sending data, but there is no outstanding POST request to hold it, 
+#sending data, but there is no outstanding POST request to hold it,
 # this object has the job of holding the data
 class ConsoleSession(object):
     """Create a new socket to converse with node console
@@ -68,7 +68,7 @@ class ConsoleSession(object):
         deadline = currtime + 45
         while len(self.databuffer) == 0 and currtime < deadline:
             timeo = deadline - currtime
-            self.conshdl.wait_for_data(timeout=timeo)
+            self.conshdl._console.wait_for_data(timeout=timeo)
             currtime = util.monotonic_time()
         retval = self.databuffer
         self.databuffer = ""

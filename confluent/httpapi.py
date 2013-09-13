@@ -8,6 +8,7 @@ import confluent.console as console
 import confluent.auth as auth
 import confluent.util as util
 import eventlet
+import json
 import os
 import string
 import urlparse
@@ -124,19 +125,20 @@ def resourcehandler(env, start_response):
         elif 'keys' in querydict.keys():
             # client wishes to push some keys into the remote console
             input = ""
-            for idx in xrange(0, len(querydict['keys'])):
-                input += chr(int(querydict['keys'][idx:idx+2]))
-            print "taking in "+input
+            for idx in xrange(0, len(querydict['keys']), 2):
+                input += chr(int(querydict['keys'][idx:idx+2],16))
             sessid = querydict['session']
             consolesessions[sessid].write(input)
             start_response('200 OK', [('Content-Type',
                 'application/json; charset=utf-8')])
-            return # client has requests to send or receive, not both...
+            return [] # client has requests to send or receive, not both...
         else: #no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             outdata = consolesessions[sessid].get_next_output(timeout=45)
-            json = '{"session":"%s","data":"%s"}'%(querydict['session'],
-                                                    outdata)
+            rsp = json.dumps({'session': querydict['session'], 'data': outdata})
+            start_response('200 OK', [('Content-Type',
+                'application/json; charset=utf-8')])
+            return [rsp]
     start_response('404 Not Found', [])
     return ["Unrecognized directive (404)"]
 
