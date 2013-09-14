@@ -24,6 +24,8 @@ def run():
     pluginapi.load_plugins()
     webservice = httpapi.HttpApi()
     webservice.start()
+    sockapi = sockapi.SockApi()
+    sockapi.start()
     while (1):
         eventlet.sleep(100)
 

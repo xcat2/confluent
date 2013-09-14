@@ -47,15 +47,23 @@ class ConsoleSession(object):
     :param node: Name of the node for which this session will be created
     """
 
-    def __init__(self, node, configmanager):
+    def __init__(self, node, configmanager, datacallback=None):
         self.databuffer = ""
         if node not in _handled_consoles:
             _handled_consoles[node] = _ConsoleHandler(node, configmanager)
         self.conshdl = _handled_consoles[node]
         self.write = _handled_consoles[node].write
-        _handled_consoles[node].register_rcpt(self.got_data)
+        if datacallback is None:
+            _handled_consoles[node].register_rcpt(self.got_data)
+        else:
+            _handled_consoles[node].register_rcpt(datacallback)
 
     def got_data(self, data):
+        """Receive data from console and buffer
+
+        If the caller does not provide a callback and instead will be polling
+        for data, we must maintain data in a buffer until retrieved
+        """
         self.databuffer += data
 
     def get_next_output(self, timeout=45):
