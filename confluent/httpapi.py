@@ -92,7 +92,6 @@ def resourcehandler(env, start_response):
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
-    print env
     if authorized['code'] == 401:
         start_response('401 Authentication Required',
             [('Content-type', 'text/plain'),
