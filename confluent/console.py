@@ -16,16 +16,50 @@ class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
         self._console = plugin.handle_path("/node/%s/_console/session" % node,
             "create", configmanager)
+        self.buffer = bytearray()
         self._console.connect(self.get_console_output)
         self.rcpts = []
 
     def register_rcpt(self, callback):
         self.rcpts.append(callback)
 
+
+    def flushbuffer(self):
+        #TODO:log the old stuff
+        if len(self.buffer) > 512:
+            self.buffer = bytearray(self.buffer[-512:])
+        #Will be interesting to keep track of logged but
+        #retained data, must only log data not already
+        #flushed
+        #also, timestamp data...
+
     def get_console_output(self, data):
-        #TODO: logging, forwarding, etc
+        self.buffer += data
+        #TODO: analyze buffer for registered events, examples:
+        #   panics
+        #   certificate signing request
+        if len(self.buffer) > 2048:
+            #call to function to get generic data to log if applicable
+            #and shrink buffer
+            self.flushbuffer()
         for rcpt in self.rcpts:
             rcpt(data)
+
+    def get_recent(self):
+        #this is one scheme to clear screen, move cursor then clear
+        if len(self.buffer) > 512:
+            bgn = -512
+        else:
+            bgn = 0
+        bufidx = self.buffer[bgn:].rfind('\x1b[H\x1b[J')
+        if bufidx >= 0:
+            return str(self.buffer[bufidx:])
+        #another scheme is the 2J scheme
+        bufidx = self.buffer[bgn:].rfind('\x1b[2J')
+        if bufidx >= 0:
+            return str(self.buffer[bufidx:])
+        else:
+            return str(self.buffer[bgn:])
 
     def write(self, data):
         #TODO.... take note of data coming in from audit/log perspective?
@@ -48,15 +82,16 @@ class ConsoleSession(object):
     """
 
     def __init__(self, node, configmanager, datacallback=None):
-        self.databuffer = ""
         if node not in _handled_consoles:
             _handled_consoles[node] = _ConsoleHandler(node, configmanager)
         self.conshdl = _handled_consoles[node]
         self.write = _handled_consoles[node].write
         if datacallback is None:
+            self.databuffer =  _handled_consoles[node].get_recent()
             _handled_consoles[node].register_rcpt(self.got_data)
         else:
             _handled_consoles[node].register_rcpt(datacallback)
+            datacallback(_handled_consoles[node].get_recent())
 
     def got_data(self, data):
         """Receive data from console and buffer
