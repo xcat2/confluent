@@ -8,6 +8,7 @@ import confluent.console as console
 import confluent.config as config
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
+import eventlet
 
 def sessionhdl(connection):
     #TODO: authenticate and authorize peer
@@ -23,7 +24,9 @@ def sessionhdl(connection):
 def _handler():
     plainsocket = socket.socket()
     srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
-                    cert="/etc/confluent/srvcert.pem", server_side=True)
+                    certfile="/etc/confluent/srvcert.pem",
+                    ssl_version=ssl.PROTOCOL_TLSv1,
+                    server_side=True)
     srv.bind(('0.0.0.0', 4001))
     srv.listen(5)
     while (1):  # TODO: exithook

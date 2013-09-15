@@ -141,15 +141,18 @@ def resourcehandler(env, start_response):
     start_response('404 Not Found', [])
     return ["Unrecognized directive (404)"]
 
+
+def serve():
+    # TODO(jbjohnso): move to unix socket and explore
+    # either making apache deal with it
+    # or just supporting nginx or lighthttpd
+    # for now, http port access
+    scgi.WSGIServer(resourcehandler, bindAddress=("localhost",4004)).run())
+
+
 class HttpApi(object):
     def start(self):
-        # TODO(jbjohnso): move to unix socket and explore
-        # either making apache deal with it
-        # or just supporting nginx or lighthttpd
-        # for now, http port access
-        self.server = eventlet.spawn(
-            scgi.WSGIServer(resourcehandler,
-                            bindAddress=("localhost",4004)).run())
+        self.server = eventlet.spawn(serve)
 
 
 

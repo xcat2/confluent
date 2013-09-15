@@ -13,6 +13,7 @@
 
 import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
+import confluent.sockapi as sockapi
 import eventlet
 from eventlet.green import socket
 from eventlet import wsgi
@@ -24,8 +25,8 @@ def run():
     pluginapi.load_plugins()
     webservice = httpapi.HttpApi()
     webservice.start()
-    sockapi = sockapi.SockApi()
-    sockapi.start()
+    sockservice = sockapi.SockApi()
+    sockservice.start()
     while (1):
         eventlet.sleep(100)
 
