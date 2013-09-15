@@ -134,7 +134,12 @@ def resourcehandler(env, start_response):
         else: #no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             outdata = consolesessions[sessid].get_next_output(timeout=45)
-            rsp = json.dumps({'session': querydict['session'], 'data': outdata})
+            try:
+                rsp = json.dumps({'session': querydict['session'], 'data': outdata})
+            except UnicodeDecodeError:
+                rsp = json.dumps({'session': querydict['session'], 'data': outdata}, encoding='cp1252')
+            except UnicodeDecodeError:
+                rsp = json.dumps({'session': querydict['session'], 'data': 'DECODEERROR'})
             start_response('200 OK', [('Content-Type',
                 'application/json; charset=utf-8')])
             return [rsp]
