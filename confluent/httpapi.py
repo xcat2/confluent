@@ -147,7 +147,7 @@ def serve():
     # either making apache deal with it
     # or just supporting nginx or lighthttpd
     # for now, http port access
-    scgi.WSGIServer(resourcehandler, bindAddress=("localhost",4004)).run())
+    scgi.WSGIServer(resourcehandler, bindAddress=("localhost",4004)).run()
 
 
 class HttpApi(object):
