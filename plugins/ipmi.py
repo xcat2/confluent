@@ -1,5 +1,6 @@
 import collections
 import eventlet
+import eventlet.event
 import os
 import pyghmi.ipmi.console as console
 console.session.select = eventlet.green.select
@@ -9,6 +10,7 @@ _ipmithread = None
 pullchain = None
 tmptimeout = None
 ipmiq = collections.deque([])
+ipmiwaiters = collections.deque([])
 
 
 def _ipmi_evtloop():
@@ -22,13 +24,16 @@ def _ipmi_evtloop():
             tmptimeout = None
         else:
             console.session.Session.wait_for_rsp(timeout=600)
+        while ipmiwaiters:
+            waiter = ipmiwaiters.popleft()
+            waiter.send()
 
 def _process_chgs(intline):
-    print "yoink"
     os.read(intline,1)  # answer the bell
     while ipmiq:
         cval = ipmiq.popleft()
-        cval[0](*cval[1])
+        if hasattr(cval[0], '__call__'):
+            cval[0](*cval[1])
 
 
 
@@ -88,15 +93,14 @@ class Console(object):
                                              userid=self.username,
                                              password=self.password,
                                              kg=self.kg,
+                                             force=True,
                                              iohandler=callback)
         if _ipmithread is None:
             pullchain = os.pipe()
             _ipmithread = eventlet.spawn(_ipmi_evtloop)
 
     def write(self, data):
-        global pullchain
         ipmiq.append((self.solconnection.send_data, (data,)))
-        print "yank"
         os.write(pullchain[1],'1')
         #self.solconnection.send_data(data)
 
@@ -114,9 +118,14 @@ class Console(object):
         # taller than it has to be
         global tmptimeout
         tmptimeout = timeout
+        os.write(pullchain[1],'1')
+        eventlet.sleep(0.001)
+        waitevt = eventlet.event.Event()
+        ipmiwaiters.append(waitevt)
+        waitevt.wait()
         #TODO: a channel for the ipmithread to tug back instead of busy wait
-        while tmptimeout is not None:
-            eventlet.sleep(0)
+        #while tmptimeout is not None:
+        #    eventlet.sleep(0)
         #console.session.Session.wait_for_rsp(timeout=timeout)
 
 
