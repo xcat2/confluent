@@ -1,13 +1,35 @@
+import collections
 import eventlet
+import os
 import pyghmi.ipmi.console as console
 console.session.select = eventlet.green.select
 
-_loopthread = None
+_ipmithread = None
+#pullchain is a pipe to tug on to induce the ipmi thread process pending data
+pullchain = None
+tmptimeout = None
+ipmiq = collections.deque([])
 
 
 def _ipmi_evtloop():
+    global tmptimeout
+    global pullchain
+    console.session.Session.register_handle_callback(pullchain[0],
+                                                     _process_chgs)
     while (1):
-        console.session.Session.wait_for_rsp(timeout=600)
+        if tmptimeout is not None:
+            console.session.Session.wait_for_rsp(timeout=tmptimeout)
+            tmptimeout = None
+        else:
+            console.session.Session.wait_for_rsp(timeout=600)
+
+def _process_chgs(intline):
+    print "yoink"
+    os.read(intline,1)  # answer the bell
+    while ipmiq:
+        cval = ipmiq.popleft()
+        cval[0](*cval[1])
+
 
 
 def get_conn_params(node, configdata):
@@ -59,18 +81,24 @@ class Console(object):
         # Cannot actually create console until 'connect', when we get callback
 
     def connect(self,callback):
-        global _loopthread
+        global _ipmithread
+        global pullchain
         self.solconnection = console.Console(bmc=self.bmc,
                                              port=self.port,
                                              userid=self.username,
                                              password=self.password,
                                              kg=self.kg,
                                              iohandler=callback)
-        if _loopthread is None:
-            _loopthread = eventlet.spawn(_ipmi_evtloop)
+        if _ipmithread is None:
+            pullchain = os.pipe()
+            _ipmithread = eventlet.spawn(_ipmi_evtloop)
 
     def write(self, data):
-        self.solconnection.send_data(data)
+        global pullchain
+        ipmiq.append((self.solconnection.send_data, (data,)))
+        print "yank"
+        os.write(pullchain[1],'1')
+        #self.solconnection.send_data(data)
 
     def wait_for_data(self, timeout=600):
         """Wait for some network event.
@@ -84,7 +112,12 @@ class Console(object):
         # would be to add a layer through the callback.  IMO there isn't enough
         # value in assuring data coming back to bother with making the stack
         # taller than it has to be
-        console.session.Session.wait_for_rsp(timeout=timeout)
+        global tmptimeout
+        tmptimeout = timeout
+        #TODO: a channel for the ipmithread to tug back instead of busy wait
+        while tmptimeout is not None:
+            eventlet.sleep(0)
+        #console.session.Session.wait_for_rsp(timeout=timeout)
 
 
 def create(nodes, element, configmanager):
