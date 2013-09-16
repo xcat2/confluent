@@ -15,6 +15,7 @@ import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
 import confluent.sockapi as sockapi
 import eventlet
+import eventlet.backdoor as backdoor
 from eventlet.green import socket
 from eventlet import wsgi
 import multiprocessing
@@ -27,6 +28,8 @@ def run():
     webservice.start()
     sockservice = sockapi.SockApi()
     sockservice.start()
+    #TODO: Unix domain socket instead
+    eventlet.spawn(backdoor.backdoor_server, eventlet.listen(('localhost', 2121)))
     while (1):
         eventlet.sleep(100)
 
