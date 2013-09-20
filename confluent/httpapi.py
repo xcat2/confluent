@@ -137,7 +137,7 @@ def resourcehandler(env, start_response):
             try:
                 rsp = json.dumps({'session': querydict['session'], 'data': outdata})
             except UnicodeDecodeError:
-                rsp = json.dumps({'session': querydict['session'], 'data': outdata}, encoding='cp1252')
+                rsp = json.dumps({'session': querydict['session'], 'data': outdata}, encoding='cp437')
             except UnicodeDecodeError:
                 rsp = json.dumps({'session': querydict['session'], 'data': 'DECODEERROR'})
             start_response('200 OK', [('Content-Type',

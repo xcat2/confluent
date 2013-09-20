@@ -9,6 +9,8 @@
 #there should be no more than one handler per node
 import confluent.pluginapi as plugin
 import confluent.util as util
+import eventlet
+import random
 
 _handled_consoles = {}
 
@@ -18,16 +20,24 @@ class _ConsoleHandler(object):
             "create", configmanager)
         self.buffer = bytearray()
         self._console.connect(self.get_console_output)
-        self.rcpts = []
+        self.rcpts = {}
+
+    def unregister_rcpt(self, handle):
+        if handle in self.rcpts:
+            del self.rcpts[handle]
 
     def register_rcpt(self, callback):
-        self.rcpts.append(callback)
+        hdl = random.random()
+        while hdl in self.rcpts:
+            hdl = random.random()
+        self.rcpts[hdl] = callback
+        return hdl
 
 
     def flushbuffer(self):
         #TODO:log the old stuff
-        if len(self.buffer) > 512:
-            self.buffer = bytearray(self.buffer[-512:])
+        if len(self.buffer) > 1024:
+            self.buffer = bytearray(self.buffer[-1024:])
         #Will be interesting to keep track of logged but
         #retained data, must only log data not already
         #flushed
@@ -38,28 +48,38 @@ class _ConsoleHandler(object):
         #TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        if len(self.buffer) > 2048:
+        if len(self.buffer) > 8192:
             #call to function to get generic data to log if applicable
             #and shrink buffer
             self.flushbuffer()
-        for rcpt in self.rcpts:
+        for rcpt in self.rcpts.itervalues():
             rcpt(data)
 
     def get_recent(self):
+        """Retrieve 'recent' data
+
+        Replay data in the intent to perhaps reproduce the display.
+        """
+        #For now, just try to seek back in buffer to find a clear screen
+        #If that fails, just return buffer
+        #a scheme always tracking the last clear screen would be too costly
+        #an alternative would be to emulate a VT100 to know what the
+        #whole screen would look like
         #this is one scheme to clear screen, move cursor then clear
-        if len(self.buffer) > 512:
-            bgn = -512
-        else:
-            bgn = 0
-        bufidx = self.buffer[bgn:].rfind('\x1b[H\x1b[J')
+        bufidx = self.buffer.rfind('\x1b[H\x1b[J')
         if bufidx >= 0:
             return str(self.buffer[bufidx:])
         #another scheme is the 2J scheme
-        bufidx = self.buffer[bgn:].rfind('\x1b[2J')
+        bufidx = self.buffer.rfind('\x1b[2J')
         if bufidx >= 0:
+            # there was some sort of clear screen event
+            # somewhere in the buffer, replay from that point
+            # in hopes that it reproduces the screen
             return str(self.buffer[bufidx:])
         else:
-            return str(self.buffer[bgn:])
+            #we have no indication of last erase, play back last kibibyte
+            #to give some sense of context anyway
+            return str(self.buffer[-1024:])
 
     def write(self, data):
         #TODO.... take note of data coming in from audit/log perspective?
@@ -84,14 +104,21 @@ class ConsoleSession(object):
     def __init__(self, node, configmanager, datacallback=None):
         if node not in _handled_consoles:
             _handled_consoles[node] = _ConsoleHandler(node, configmanager)
+        self.node = node
         self.conshdl = _handled_consoles[node]
         self.write = _handled_consoles[node].write
         if datacallback is None:
+            self.reaper = eventlet.spawn_after(15, self.destroy)
             self.databuffer =  _handled_consoles[node].get_recent()
-            _handled_consoles[node].register_rcpt(self.got_data)
+            self.reghdl = _handled_consoles[node].register_rcpt(self.got_data)
         else:
-            _handled_consoles[node].register_rcpt(datacallback)
+            self.reghdl = _handled_consoles[node].register_rcpt(datacallback)
             datacallback(_handled_consoles[node].get_recent())
+
+    def destroy(self):
+        _handled_consoles[self.node].unregister_rcpt(self.reghdl)
+        self.databuffer = None
+        self.reghdl = None
 
     def got_data(self, data):
         """Receive data from console and buffer
@@ -107,6 +134,7 @@ class ConsoleSession(object):
         Ideally purely event driven scheme is perfect.  AJAX over HTTP is
         at least one case where we don't have that luxury
         """
+        self.reaper.cancel()
         currtime = util.monotonic_time()
         deadline = currtime + 45
         while len(self.databuffer) == 0 and currtime < deadline:
@@ -115,6 +143,7 @@ class ConsoleSession(object):
             currtime = util.monotonic_time()
         retval = self.databuffer
         self.databuffer = ""
+        self.reaper = eventlet.spawn_after(15, self.destroy)
         return retval
 
 
