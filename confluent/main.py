@@ -15,6 +15,7 @@ import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
 import confluent.sockapi as sockapi
 import eventlet
+import eventlet.backdoor as backdoor
 from eventlet.green import socket
 from eventlet import wsgi
 import multiprocessing
@@ -23,6 +24,9 @@ import os
 
 def run():
     pluginapi.load_plugins()
+    #TODO: eventlet has a bug about unix domain sockets, this code works with bugs fixed
+    #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock", family=socket.AF_UNIX)
+    #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
     webservice = httpapi.HttpApi()
     webservice.start()
     sockservice = sockapi.SockApi()
