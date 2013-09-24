@@ -24,8 +24,10 @@ import os
 
 def run():
     pluginapi.load_plugins()
-    #TODO: eventlet has a bug about unix domain sockets, this code works with bugs fixed
-    #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock", family=socket.AF_UNIX)
+    #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code 
+    #works with bugs fixed
+    #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
+    #                           family=socket.AF_UNIX)
     #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
     webservice = httpapi.HttpApi()
     webservice.start()
