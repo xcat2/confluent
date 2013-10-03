@@ -12,7 +12,8 @@ import json
 import os
 import string
 import urlparse
-scgi = eventlet.import_patched('flup.server.scgi')
+import eventlet.wsgi
+#scgi = eventlet.import_patched('flup.server.scgi')
 
 
 consolesessions = {}
@@ -152,7 +153,13 @@ def serve():
     # either making apache deal with it
     # or just supporting nginx or lighthttpd
     # for now, http port access
-    scgi.WSGIServer(resourcehandler, bindAddress=("localhost",4004)).run()
+    #scgi.WSGIServer(resourcehandler, bindAddress=("localhost",4004)).run()
+    #based on a bakeoff perf wise, eventlet http support proxied actually did
+    #edge out patched flup.  unpatched flup was about the same as eventlet http
+    #but deps are simpler without flup
+    #also, the potential for direct http can be handy
+    #todo remains unix domain socket for even http
+    eventlet.wsgi.server(eventlet.listen(("",4005)),resourcehandler)
 
 
 class HttpApi(object):
