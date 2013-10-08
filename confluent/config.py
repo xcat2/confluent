@@ -235,7 +235,19 @@ class ConfigManager(object):
             return None
 
 
-    def create_user(self, name, role="Administrator", id=None, displayname=None):
+    def set_user(self, name, attributemap):
+        """Set user attribute(s)
+
+        :param name: The login name of the user
+        :param attributemap: A dict of key values to set
+        """
+        user = self._cfgstore['users'][name]
+        for attribute in attributemap:
+            user[attribute] = attributemap[attribute]
+        self._bg_sync_to_file()
+
+    def create_user(self, name,
+                    role="Administrator", id=None, displayname=None):
         """Create a new user
 
         :param name: The login name of the user
