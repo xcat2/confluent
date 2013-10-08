@@ -12,6 +12,7 @@ import confluent.config
 import math
 import os
 
+import Crypto.Protocol.KDF as kdf
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
@@ -21,33 +22,13 @@ _masterintegritykey = None
 
 
 
-def _pbkdf2(passphrase, salt, iterations, size):
-    # Implement the PBKDF2 standard algorithm for deriving key data
-    # from a passphrase.  See internet for details
-    blocks = int(math.ceil(size/32.0))  # Hardcoded to SHA256 behavior
-    retkey = ""
-    for block in xrange(blocks):
-        citerations = iterations
-        tsalt = salt + chr(block)
-        currval = HMAC.new(passphrase, tsalt, SHA256).digest()
-        currarray = array.array('L',currval)
-        while citerations > 1:
-            currval = HMAC.new(passphrase, currval).digest()
-            nextarray = array.array('L',currval)
-            for index in range(len(nextarray)):
-                currarray[index] = currarray[index] ^ nextarray[index]
-            currval = currarray.tostring()
-            currarray = nextarray
-            citerations = citerations - 1
-        retkey += currval
-    return retkey[:size]
-
-
 def _derive_keys(passphrase, salt):
     #implement our specific combination of pbkdf2 transforms to get at
     #key.  We bump the iterations up because we can afford to
-    tmpkey = _pbkdf2(passphrase, salt, 50000, 32)
-    finalkey = _pbkdf2(tmpkey, salt, 50000, 96)
+    tmpkey = kdf.PBKDF2(passphrase, salt, 32, 50000,
+                        lambda p, s: HMAC.new(p, s, SHA256).digest())
+    finalkey = kdf.PBKDF2(tmpkey, salt, 32, 50000,
+                        lambda p, s: HMAC.new(p, s, SHA256).digest())
     return (finalkey[:32],finalkey[32:])
 
 
