@@ -202,7 +202,13 @@ class ConfigManager(object):
     def __init__(self, tenant, decrypt=False):
         global _cfgstore
         self.decrypt = decrypt
-        if 'tenant' not in _cfgstore:
+        if tenant is None:
+            self.tenant = None
+            if 'main' not in _cfgstore:
+                 _cfgstore['main'] = {'id': None}
+            self._cfgstore  = _cfgstore['main']
+            return
+        elif 'tenant' not in _cfgstore:
             _cfgstore['tenant'] = {tenant: {'id': tenant}}
             self._bg_sync_to_file()
         elif tenant not in _cfgstore['tenant']:
