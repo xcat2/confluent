@@ -3,6 +3,7 @@
 
 # This is the socket api layer.
 # It implement unix and tls sockets
+# 
 # TODO: SO_PEERCRED for unix socket
 import confluent.console as console
 import confluent.config as config
@@ -19,6 +20,7 @@ def sessionhdl(connection):
     while (1):
         data = connection.read()
         if not data:
+            consession.destroy()
             return
         consession.write(data)
 

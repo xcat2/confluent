@@ -53,7 +53,10 @@ class _ConsoleHandler(object):
             #and shrink buffer
             self.flushbuffer()
         for rcpt in self.rcpts.itervalues():
-            rcpt(data)
+            try:
+                rcpt(data)
+            except:
+                pass
 
     def get_recent(self):
         """Retrieve 'recent' data
