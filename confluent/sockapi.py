@@ -18,11 +18,14 @@ def sessionhdl(connection):
                                         datacallback=connection.write)
     while (1):
         data = connection.read()
+        if not data:
+            return
         consession.write(data)
 
 
 def _handler():
     plainsocket = socket.socket()
+    plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
                     certfile="/etc/confluent/srvcert.pem",
                     ssl_version=ssl.PROTOCOL_TLSv1,

@@ -113,7 +113,9 @@ class ConsoleSession(object):
             self.reghdl = _handled_consoles[node].register_rcpt(self.got_data)
         else:
             self.reghdl = _handled_consoles[node].register_rcpt(datacallback)
-            datacallback(_handled_consoles[node].get_recent())
+            recdata = _handled_consoles[node].get_recent()
+            if recdata:
+                datacallback(recdata)
 
     def destroy(self):
         _handled_consoles[self.node].unregister_rcpt(self.reghdl)
