@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 
+import fcntl
 import optparse
+import os
+import select
 import socket
 import ssl
 import sys
+import tty
 
 def parseservervalue(serverstring):
     if serverstring.find(']:') != -1:
@@ -54,8 +58,22 @@ if opts.server:  # going over a TLS network
 
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
-        
-print server.read()
+
+tty.setraw(sys.stdin.fileno())
+fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+while (1):
+    rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
+    for fh in rdylist:
+        if fh == server:
+            #fh.read()
+            data = fh.recv(16384)
+            if data:
+                sys.stdout.write(data)
+                sys.stdout.flush()
+            else:
+                print "whoops"
+        else:
+            server.sendall(fh.read())
 server.shutdown(socket.SHUT_RDWR)
 server.close()
 
