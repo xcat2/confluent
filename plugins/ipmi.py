@@ -8,6 +8,7 @@ console.session.select = eventlet.green.select
 _ipmithread = None
 #pullchain is a pipe to tug on to induce the ipmi thread process pending data
 pullchain = None
+chainpulled = False
 tmptimeout = None
 ipmiq = collections.deque([])
 ipmiwaiters = collections.deque([])
@@ -29,7 +30,9 @@ def _ipmi_evtloop():
             waiter.send()
 
 def _process_chgs(intline):
+    global chainpulled
     os.read(intline,1)  # answer the bell
+    chainpulled = False
     while ipmiq:
         cval = ipmiq.popleft()
         if hasattr(cval[0], '__call__'):
@@ -100,8 +103,12 @@ class Console(object):
             _ipmithread = eventlet.spawn(_ipmi_evtloop)
 
     def write(self, data):
+        global chainpulled
         ipmiq.append((self.solconnection.send_data, (data,)))
-        os.write(pullchain[1],'1')
+        if not chainpulled:
+            chainpulled = True
+            os.write(pullchain[1],'1')
+
         #self.solconnection.send_data(data)
 
     def wait_for_data(self, timeout=600):
@@ -117,8 +124,11 @@ class Console(object):
         # value in assuring data coming back to bother with making the stack
         # taller than it has to be
         global tmptimeout
+        global chainpulled
         tmptimeout = timeout
-        os.write(pullchain[1],'1')
+        if not chainpulled:
+            chainpulled=True
+            os.write(pullchain[1],'1')
         eventlet.sleep(0.001)
         waitevt = eventlet.event.Event()
         ipmiwaiters.append(waitevt)
