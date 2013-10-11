@@ -1,5 +1,22 @@
 #!/usr/bin/env python
 
+# ultimately, this should provide an interactive cli for navigating confluent
+# tree and doing console with a socket.  <ESC>]0;<string><BELL> can be used to
+# present info such as whether it is in a console or other mode and, if in
+# console, how many other connections are live and looking
+# this means 'wcons' simply needs to make a terminal run and we'll take care of
+# the title while providing more info
+# this also means the socket interface needs to have ways to convey more
+# interesting pieces of data (like concurrent connection count)
+# socket will probably switch to a TLV scheme:
+# 32 bit TL, 8 bits of type code and 24 bit size
+# type codes:
+# 0: string data
+# 1: json data
+# 24 bit size allows the peer to avoid having to do any particular parsing to
+# understand message boundaries (which is a significant burden on the xCAT
+# protocol)
+
 import fcntl
 import optparse
 import os
