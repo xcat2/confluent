@@ -175,12 +175,15 @@ class Console(object):
 
 class IpmiIterator(object):
     def __init__(self, operator, nodes, element, cfg):
+        crypt = cfg.decrypt
+        cfg.decrypt = True
         configdata = cfg.get_node_attributes(nodes,
             ['secret.ipmiuser', 'secret.ipmipassphrase',
              'secret.managementuser', 'secret.managementpassphrase',
              'hardwaremanagement.manager'])
+        cfg.decrypt = crypt
         for node in nodes:
-            IpmiHandler(operator, node, element, configdata)
+            IpmiHandler(operator, node, element, configdata).handle_request()
 
     def __iter__(self):
         return self
@@ -197,14 +200,23 @@ class IpmiHandler(object):
         return self
 
     def __init__(self, operation, node, element, cfd):
+        global chainpulled
+        global _ipmithread
+        global ipmisessions
+        global pullchain
+        if _ipmithread is None:
+            pullchain = os.pipe()
+            _ipmithread = eventlet.spawn(_ipmi_evtloop)
+        eventlet.sleep(0)
         self.cfg = cfd[node]
+        self.loggedin = False
         self.node = node
         self.element = element
         self.op = operation
         connparams = get_conn_params(node, self.cfg)
         self.ipmicmd = None
         try:
-            ipmisession = ipmisessions[(self.bmc, self.port)]
+            ipmisession = ipmisessions[(connparams['bmc'], connparams['port'])]
         except KeyError:
             ipmisession = None
         ipmiq.append((ipmicommand.Command,{'bmc': connparams['bmc'],
@@ -212,20 +224,32 @@ class IpmiHandler(object):
                                            'password': connparams['passphrase'],
                                            'kg': connparams['kg'],
                                            'port': connparams['port'],
-                                           'onlogon': self.handle_request,
+                                           'onlogon': self.logged,
                                            'ipmisession': ipmisession},
-                                           got_ipmicmd))
+                                           self.got_ipmicmd))
+        if not chainpulled:
+            chainpulled = True
+            os.write(pullchain[1],'1')
         while self.ipmicmd == None:
             wait_on_ipmi()
         if ipmisession is None:
-            ipmisessions[(self.bmc, self.port)] = self.ipmicmd.ipmi_session
+            ipmisessions[(connparams['bmc'], connparams['port'])] = self.ipmicmd.ipmi_session
 
     def got_ipmicmd(self, ipmicmd):
         self.ipmicmd = ipmicmd
 
+    def logged(self, response, ipmicmd):
+        if 'error' in response:
+            raise Exception(response['error'])
+        self.loggedin = True
+
     def call_ipmicmd(self, function, *args):
+        global chainpulled
         self.lastrsp = None
         ipmiq.append((function, args, self.got_rsp))
+        if not chainpulled:
+            chainpulled = True
+            os.write(pullchain[1],'1')
         while self.lastrsp is None:
             wait_on_ipmi()
         return self.lastrsp
@@ -233,12 +257,12 @@ class IpmiHandler(object):
     def got_rsp(self, response):
         self.lastrsp = response
 
-    def handle_request(self, response):
-        if 'error' in response:
-            raise Exception(response['error'])
+    def handle_request(self):
+        while not self.loggedin:
+            wait_on_ipmi()
         if self.element == 'power/state':
             if 'read' == self.op:
-                rsp = self.call_ipmi(self.ipmicmd.get_power)
+                rsp = self.call_ipmicmd(self.ipmicmd.get_power)
                 print(rsp)
 
 def create(nodes, element, configmanager):
@@ -253,4 +277,5 @@ def create(nodes, element, configmanager):
 
 
 def retrieve(nodes, element, configmanager):
-    pass
+    return IpmiIterator('read', nodes, element, configmanager)
+
