@@ -143,10 +143,11 @@ while not doexit:
                 sys.stdout.flush()
             else:
                 doexit = True
+                sys.stdout.write("\r\n[remote disconnected]\r\n")
                 break
         else:
             input = fh.read()
             input = check_escape_seq(input, fh)
             if input:
                 server.sendall(input)
-
+exit()
