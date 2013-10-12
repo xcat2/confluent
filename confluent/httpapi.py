@@ -5,8 +5,9 @@
 # shillinabox javascript
 import base64
 import Cookie
-import confluent.console as console
 import confluent.auth as auth
+import confluent.console as console
+import confluent.pluginapi as pluginapi
 import confluent.util as util
 import eventlet
 import json
@@ -186,8 +187,10 @@ def resourcehandler(env, start_response):
                 rsp = json.dumps({'session': querydict['session'], 'data': 'DECODEERROR'})
             start_response('200 OK', headers)
             return [rsp]
-    start_response('404 Not Found', headers)
-    return ["404 Unrecognized resource"]
+    else:
+        pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr)
+        start_response('404 Not Found', headers)
+        return ["404 Unrecognized resource"]
 
 
 def serve():
