@@ -17,6 +17,13 @@
 # understand message boundaries (which is a significant burden on the xCAT
 # protocol)
 
+# When in a console client mode, will recognize two escape sequences by
+# default:
+# Ctrl-E, c, ?: mimick conserver behavior
+# ctrl-]: go to interactive prompt (telnet escape, but not telnet prompt)
+# esc-( would interfere with normal esc use too much
+# ~ I will not use for now...
+
 import fcntl
 import optparse
 import os
@@ -24,7 +31,13 @@ import select
 import socket
 import ssl
 import sys
+import termios
 import tty
+
+conserversequence = '\x05c' # ctrl-e, c
+
+oldtcattr = termios.tcgetattr(sys.stdin.fileno())
+server = None
 
 def parseservervalue(serverstring):
     if serverstring.find(']:') != -1:
@@ -38,6 +51,43 @@ def parseservervalue(serverstring):
         server = serverstring
         port = 4001
     return (server, port)
+
+
+def exit(code=0):
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+    server.shutdown(socket.SHUT_RDWR)
+    server.close()
+    sys.exit(code)
+
+def conserver_command(fh, command):
+    while not command:
+        ready, _, _ = select.select((fh,), (), (), 1)
+        if ready:
+            command += fh.read()
+    if command[0] == '.':
+        print("disconnect]\r")
+        exit()
+    elif command[0] == '?':
+        print("help]\r")
+        print(".    disconnect\r")
+        print("<cr> abort command\r")
+    elif command[0] == '\x0d':
+        print("ignored]\r")
+    else: #not a command at all..
+        print("unknown -- use '?']\r")
+
+
+def check_escape_seq(input, fh):
+    while conserversequence.startswith(input):
+        if input.startswith(conserversequence):  # We have full sequence
+            sys.stdout.write("[")
+            sys.stdout.flush()
+            return conserver_command(fh, input[len(conserversequence):])
+        ready, _, _ = select.select((fh,), (), (), 3)
+        if not ready:  # 3 seconds of no typing
+            break
+        input += fh.read()
+    return input
 
 
 def connect_tls_server(serverstring):
@@ -69,7 +119,6 @@ parser.add_option("-s", "--server", dest="server",
 parser.add_option("-u", "--unixsocket", dest="unixsock",
                   help="TLS server to connect to", metavar="UNIXDOMAINSOCKET")
 opts, args =  parser.parse_args()
-server = None
 if opts.server:  # going over a TLS network
     server = connect_tls_server(opts.server)
 
@@ -78,7 +127,12 @@ if opts.server:  # going over a TLS network
 
 tty.setraw(sys.stdin.fileno())
 fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
-while (1):
+# clear on start can help with readable of TUI, but it
+# can be annoying, so for now don't do it.
+# sys.stdout.write('\x1b[H\x1b[J')
+# sys.stdout.flush()
+doexit = False
+while not doexit:
     rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
     for fh in rdylist:
         if fh == server:
@@ -88,9 +142,11 @@ while (1):
                 sys.stdout.write(data)
                 sys.stdout.flush()
             else:
-                print "whoops"
+                doexit = True
+                break
         else:
-            server.sendall(fh.read())
-server.shutdown(socket.SHUT_RDWR)
-server.close()
+            input = fh.read()
+            input = check_escape_seq(input, fh)
+            if input:
+                server.sendall(input)
 
