@@ -1,6 +1,8 @@
 import collections
 import eventlet
 import eventlet.event
+import eventlet.greenpool as greenpool
+import eventlet.queue
 import os
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
@@ -13,7 +15,6 @@ chainpulled = False
 tmptimeout = None
 ipmiq = collections.deque([])
 ipmiwaiters = collections.deque([])
-ipmisessions = {}
 
 
 def wait_on_ipmi():
@@ -108,12 +109,7 @@ class Console(object):
     def connect(self,callback):
         global _ipmithread
         global pullchain
-        global ipmisessions
         global chainpulled
-        try:
-            ipmisession = ipmisessions[(self.bmc, self.port)]
-        except KeyError:
-            ipmisession = None
         if _ipmithread is None:
             pullchain = os.pipe()
             _ipmithread = eventlet.spawn(_ipmi_evtloop)
@@ -124,16 +120,12 @@ class Console(object):
                                       'password': self.password,
                                       'kg': self.kg,
                                       'force': True,
-                                      'ipmisession': ipmisession,
                                       'iohandler': callback}, self.got_consobject))
         if not chainpulled:
             chainpulled = True
             os.write(pullchain[1],'1')
         while self.solconnection is None:
             wait_on_ipmi()
-        if ipmisession is None:
-            ipmisessions[(self.bmc, self.port)] = \
-                    self.solconnection.ipmi_session
 
     def got_consobject(self, solconnection):
         self.solconnection = solconnection
@@ -183,16 +175,19 @@ class IpmiIterator(object):
              'hardwaremanagement.manager'])
         cfg.decrypt = crypt
         for node in nodes:
-            IpmiHandler(operator, node, element, configdata).handle_request()
+            print IpmiHandler(operator, node, element, configdata).handle_request()
+            #eventlet.spawn(perform_request,
+            #    (operator, node, element, configdata, self.resultqueue))
 
     def __iter__(self):
         return self
 
     def next(self):
         pass
-        
 
 
+def perform_request(operator, node, element, configdata, queue):
+    IpmiHandler(operator, node, element, configdata).handle_request()
 
 
 class IpmiHandler(object):
@@ -202,7 +197,6 @@ class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd):
         global chainpulled
         global _ipmithread
-        global ipmisessions
         global pullchain
         if _ipmithread is None:
             pullchain = os.pipe()
@@ -215,25 +209,18 @@ class IpmiHandler(object):
         self.op = operation
         connparams = get_conn_params(node, self.cfg)
         self.ipmicmd = None
-        try:
-            ipmisession = ipmisessions[(connparams['bmc'], connparams['port'])]
-        except KeyError:
-            ipmisession = None
         ipmiq.append((ipmicommand.Command,{'bmc': connparams['bmc'],
                                            'userid': connparams['username'],
                                            'password': connparams['passphrase'],
                                            'kg': connparams['kg'],
                                            'port': connparams['port'],
-                                           'onlogon': self.logged,
-                                           'ipmisession': ipmisession},
+                                           'onlogon': self.logged},
                                            self.got_ipmicmd))
         if not chainpulled:
             chainpulled = True
             os.write(pullchain[1],'1')
         while self.ipmicmd == None:
             wait_on_ipmi()
-        if ipmisession is None:
-            ipmisessions[(connparams['bmc'], connparams['port'])] = self.ipmicmd.ipmi_session
 
     def got_ipmicmd(self, ipmicmd):
         self.ipmicmd = ipmicmd
@@ -262,8 +249,7 @@ class IpmiHandler(object):
             wait_on_ipmi()
         if self.element == 'power/state':
             if 'read' == self.op:
-                rsp = self.call_ipmicmd(self.ipmicmd.get_power)
-                print(rsp)
+                return self.call_ipmicmd(self.ipmicmd.get_power)
 
 def create(nodes, element, configmanager):
     if element == '_console/session':
