@@ -60,9 +60,11 @@ nodeelements = {
     },
     'power/state': {
         'pluginattrs': ['hardwaremanagement.method'],
+        'default': 'ipmi',
     },
     'boot/device': {
         'pluginattrs': ['hardwaremanagement.method'],
+        'default': 'ipmi',
     }
 }
 
@@ -71,7 +73,7 @@ def handle_path(path, operation, configmanager):
 
     The plugins should generally return some sort of iterator.
     An exception is made for console/session, which should return
-    a class with read(), write(bytes), and close()
+    a class with connect(), read(), write(bytes), and close()
     '''
     if (path.startswith("/node/") or path.startswith("/system/") or
         # single node requests
@@ -90,6 +92,9 @@ def handle_path(path, operation, configmanager):
                     return pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
                         nodes=(node,), element=element,
                         configmanager=configmanager)
+            if plugroute['default']:
+                return pluginmap[plugroute['default']].__dict__[operation](
+                    nodes=(node,), element=element, configmanager=configmanager)
 
 
 
