@@ -4,19 +4,15 @@ the socket protocol is empowered to do whatever is needed.
 
 All data across the wire is TLV values.
 
-(since a single character is an exceedingly common case, have a single byte TLV
-for those occasions)
-Single byte TL (msb: 0):
-Type=0
-Length=TL & 0b01111111
-Types:
-0: text string
+A shorter single byte TLV variant was considered for lower overhead for things
+like single character, but in every case where throughput efficiency would
+matter is probably padded to 16 byte boundaries anyway due to block ciphers.
 
-(all other data has a 4 byte TLV for now)
-Four byte TLs: (msb: 0b10)
-Type=TL & 0b00111111000000000000000000000000 >> 24:
+(all data has a 4 byte TLV for now)
+Four byte TLs: (msb: 0b0)
+Type=TL & 0b01111111000000000000000000000000 >> 24:
 Length= TL & 0b111111111111111111111111
 0: text string
 1: json data
 
-(msb: 0b11 is reserved), probably never to be needed
+(msb: 0b1 is reserved), probably never to be needed
