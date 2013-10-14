@@ -15,9 +15,28 @@ import struct
 
 SO_PEERCRED = 17
 
-def sessionhdl(connection):
+def sessionhdl(connection, authname):
     #TODO: authenticate and authorize peer
     # For now, trying to test the console stuff, so let's just do n1.
+    skipauth = False
+    if authname and isinstance(authname, bool):
+        skipauth = True
+    connection.sendall("Confluent -- v0 --\r\n")
+    if authname is None:  # prompt for name and passphrase
+        connection.sendall("Name: ")
+        username = connection.recv()
+        connection.sendall(username)
+        while "\r" not in username:
+            ddata = connection.recv(4096)
+            connection.sendall(ddata)
+            username += ddata
+        username, _, passphrase = username.partition("\r")
+        connection.sendall("\nPassphrase: ")
+        while "\r" not in passphrase:
+            passphrase += connection.recv(4096)
+        connection.sendall("\r\n")
+        print username
+        print passphrase
     cfm = config.ConfigManager(tenant=0)
     consession = console.ConsoleSession(node='n1', configmanager=cfm,
                                         datacallback=connection.sendall)
@@ -38,9 +57,10 @@ def _tlshandler():
                     server_side=True)
     srv.bind(('0.0.0.0', 4001))
     srv.listen(5)
+    authname = None
     while (1):  # TODO: exithook
         cnn, addr = srv.accept()
-        eventlet.spawn_n(sessionhdl, cnn)
+        eventlet.spawn_n(sessionhdl, cnn, authname)
 
 
 def _unixdomainhandler():
@@ -55,8 +75,20 @@ def _unixdomainhandler():
         cnn, addr = unixsocket.accept()
         creds = cnn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED,
                                 struct.calcsize('3i'))
-        print struct.unpack('3i',creds)
-        eventlet.spawn_n(sessionhdl, cnn)
+        pid, uid, gid = struct.unpack('3i',creds)
+        if uid in (os.getuid(), 0):
+            #this is where we happily accept the person
+            #to do whatever.  This allows the server to
+            #start with no configuration whatsoever
+            #and yet still be configurable by some means
+            authname = True
+        else:
+            try:
+                authname = pwd.getpwuid(uid).pw_name
+            except KeyError:
+                cnn.close()
+                return
+        eventlet.spawn_n(sessionhdl, cnn, authname)
 
 
 
