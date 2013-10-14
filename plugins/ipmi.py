@@ -174,20 +174,21 @@ class IpmiIterator(object):
              'secret.managementuser', 'secret.managementpassphrase',
              'hardwaremanagement.manager'])
         cfg.decrypt = crypt
+        self.gpile = greenpool.GreenPile()
         for node in nodes:
-            print IpmiHandler(operator, node, element, configdata).handle_request()
-            #eventlet.spawn(perform_request,
-            #    (operator, node, element, configdata, self.resultqueue))
+            self.gpile.spawn(perform_request, operator, node, element, configdata)
 
     def __iter__(self):
         return self
 
     def next(self):
-        pass
+        ndata = self.gpile.next()
+        # need to apply any translations between pyghmi and confluent
+        return ndata
 
 
-def perform_request(operator, node, element, configdata, queue):
-    IpmiHandler(operator, node, element, configdata).handle_request()
+def perform_request(operator, node, element, configdata):
+    return IpmiHandler(operator, node, element, configdata).handle_request()
 
 
 class IpmiHandler(object):

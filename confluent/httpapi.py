@@ -138,12 +138,14 @@ def resourcehandler(env, start_response):
         start_response('401 Authentication Required',
             [('Content-type', 'text/plain'),
             ('WWW-Authenticate', 'Basic realm="confluent"')])
-        return 'authentication required'
+        yield 'authentication required'
+        return
     if authorized['code'] == 403:
         start_response('403 Forbidden',
             [('Content-type', 'text/plain'),
             ('WWW-Authenticate', 'Basic realm="confluent"')])
-        return 'authorization failed'
+        yield 'authorization failed'
+        return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
     headers = [('Content-Type', 'application/json; charset=utf-8')]
@@ -164,7 +166,8 @@ def resourcehandler(env, start_response):
                 return
             sessid = _assign_consessionid(consession)
             start_response('200 OK', headers)
-            return ['{"session":"%s","data":""}' % sessid]
+            yield '{"session":"%s","data":""}' % sessid
+            return
         elif 'keys' in querydict.keys():
             # client wishes to push some keys into the remote console
             input = ""
@@ -174,7 +177,7 @@ def resourcehandler(env, start_response):
             consolesessions[sessid]['expiry'] = time.time() + 90
             consolesessions[sessid]['session'].write(input)
             start_response('200 OK', headers)
-            return [] # client has requests to send or receive, not both...
+            return # client has requests to send or receive, not both...
         else: #no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             consolesessions[sessid]['expiry'] = time.time() + 90
@@ -186,11 +189,12 @@ def resourcehandler(env, start_response):
             except UnicodeDecodeError:
                 rsp = json.dumps({'session': querydict['session'], 'data': 'DECODEERROR'})
             start_response('200 OK', headers)
-            return [rsp]
+            yield rsp
+            return
     else:
-        pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr)
-        start_response('404 Not Found', headers)
-        return ["404 Unrecognized resource"]
+        start_response('200 OK', headers)
+        for rsp in pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr):
+            yield json.dumps(rsp, separators=(',', ':'))
 
 
 def serve():
