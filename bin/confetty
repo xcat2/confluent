@@ -34,6 +34,7 @@ import sys
 import termios
 import tty
 
+SO_PASSCRED = 16
 conserversequence = '\x05c' # ctrl-e, c
 
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
@@ -90,9 +91,17 @@ def check_escape_seq(input, fh):
     return input
 
 
+def connect_unix_server(sockpath):
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
+    server.connect(sockpath)
+    return server
+
+
 def connect_tls_server(serverstring):
     host, port = parseservervalue(serverstring)
-    for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+    for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC,
+            socket.SOCK_STREAM):
         af, socktype, proto, cononname, sa = res
         try:
             server = socket.socket(af, socktype, proto)
@@ -121,6 +130,8 @@ parser.add_option("-u", "--unixsocket", dest="unixsock",
 opts, args =  parser.parse_args()
 if opts.server:  # going over a TLS network
     server = connect_tls_server(opts.server)
+elif opts.unixsock:
+    server = connect_unix_server(opts.unixsock)
 
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
