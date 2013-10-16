@@ -193,7 +193,13 @@ def resourcehandler(env, start_response):
             return
     else:
         start_response('200 OK', headers)
-        for rsp in pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr):
+        try:
+            hdlr = pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr)
+        except:
+            start_response('404 Not found', headers)
+            yield "404 - Request path not recognized"
+            return
+        for rsp in hdlr:
             yield json.dumps(rsp, separators=(',', ':'))
 
 
