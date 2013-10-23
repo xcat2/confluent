@@ -136,6 +136,9 @@ elif opts.unixsock:
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
 
+banner = server.recv(128)
+while "\n" not in banner:
+    banner += server.recv(128)
 tty.setraw(sys.stdin.fileno())
 fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
 # clear on start can help with readable of TUI, but it

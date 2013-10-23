@@ -24,19 +24,25 @@ def sessionhdl(connection, authname):
     connection.sendall("Confluent -- v0 --\r\n")
     if authname is None:  # prompt for name and passphrase
         connection.sendall("Name: ")
-        username = connection.recv()
+        username = connection.recv(4096)
         connection.sendall(username)
         while "\r" not in username:
             ddata = connection.recv(4096)
+            if not ddata:
+                return
             connection.sendall(ddata)
             username += ddata
         username, _, passphrase = username.partition("\r")
         connection.sendall("\nPassphrase: ")
         while "\r" not in passphrase:
-            passphrase += connection.recv(4096)
+            pdata = connection.recv(4096)
+            if not pdata:
+                return
+            passphrase += pdata
         connection.sendall("\r\n")
         print username
         print passphrase
+    connection.sendall("Confluent -- v0 -- Session Granted\r\n/->")
     cfm = config.ConfigManager(tenant=0)
     consession = console.ConsoleSession(node='n1', configmanager=cfm,
                                         datacallback=connection.sendall)
