@@ -98,7 +98,7 @@ def handle_path(path, operation, configmanager):
                     passvalue = pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
                         nodes=(node,), element=element,
                         configmanager=configmanager)
-            if plugroute['default']:
+            if 'default' in plugroute:
                 passvalue = pluginmap[plugroute['default']].__dict__[operation](
                     nodes=(node,), element=element, configmanager=configmanager)
         if isinstance(passvalue, console.Console):
