@@ -7,6 +7,7 @@ import base64
 import Cookie
 import confluent.auth as auth
 import confluent.consoleserver as consoleserver
+import confluent.exceptions as exc
 import confluent.pluginapi as pluginapi
 import confluent.util as util
 import eventlet
@@ -192,13 +193,13 @@ def resourcehandler(env, start_response):
             yield rsp
             return
     else:
-        start_response('200 OK', headers)
         try:
             hdlr = pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr)
-        except:
+        except exc.NotFoundException:
             start_response('404 Not found', headers)
             yield "404 - Request path not recognized"
             return
+        start_response('200 OK', headers)
         for rsp in hdlr:
             yield rsp.json()
 

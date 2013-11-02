@@ -46,7 +46,6 @@ from Crypto.Hash import SHA256
 import array
 import ast
 import collections
-import confluent.config.crypto as crypto
 import confluent.util
 import copy
 import cPickle

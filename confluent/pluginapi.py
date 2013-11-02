@@ -18,6 +18,7 @@
 # see API.txt
 
 import confluent.interface.console as console
+import confluent.exceptions as exc
 import os
 import sys
 
@@ -106,7 +107,7 @@ def handle_path(path, operation, configmanager):
         else:
             return stripnode(passvalue, node)
     else:
-        raise Exception("TODO: notfoundexception")
+        raise exc.NotFoundException()
 
 
 
