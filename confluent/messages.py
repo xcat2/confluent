@@ -19,7 +19,13 @@ class ConfluentMessage(object):
 
     def html(self):
         #this is used to facilitate the api explorer feature
-        pass
+        snippet = ""
+        for key in self.kvpairs.iterkeys():
+            snippet += key + ":"
+            snippet += '<input type="text" name="%s" value="%s">' % (
+                            key, self.kvpairs[key])
+        return snippet
+            
 
 
 class PowerState(ConfluentMessage):

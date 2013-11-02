@@ -108,11 +108,11 @@ def _pick_mimetype(env):
     if the '.json' scheme doesn't cut it.
     """
     if env['PATH_INFO'].endswith('.json'):
-        return 'application/json'
+        return 'application/json; charset=utf-8'
     elif env['PATH_INFO'].endswith('.html'):
         return 'text/html'
     elif 'application/json' in env['HTTP_ACCEPT']:
-        return 'application/json'
+        return 'application/json; charset=utf-8'
     else:
         return 'text/html'
 
@@ -149,7 +149,7 @@ def resourcehandler(env, start_response):
         return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
-    headers = [('Content-Type', 'application/json; charset=utf-8')]
+    headers = [('Content-Type', mimetype) ]
     headers.extend(("Set-Cookie", m.OutputString())
             for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
@@ -200,15 +200,22 @@ def resourcehandler(env, start_response):
             yield "404 - Request path not recognized"
             return
         start_response('200 OK', headers)
-        yield '['
-        docomma = False
-        for rsp in hdlr:
-            if docomma:
-                yield ','
-            else:
-                docomma = True
-            yield rsp.json()
-        yield ']'
+        if mimetype == 'text/html':
+            yield '<html><body><form>'
+            for rsp in hdlr:
+                yield rsp.html()
+                yield '<br>'
+            yield '</form></body></html>'
+        else:
+            yield '['
+            docomma = False
+            for rsp in hdlr:
+                if docomma:
+                    yield ','
+                else:
+                    docomma = True
+                yield rsp.json()
+            yield ']'
 
 
 def serve():
