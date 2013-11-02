@@ -3,7 +3,7 @@
 # the PBKDF2 transform is skipped unless a user has been idle for sufficient 
 # time
 
-import confluent.config as config
+import confluent.config.configmanager as configmanager
 import eventlet
 import Crypto.Protocol.KDF as kdf
 import Crypto.Hash as hash
@@ -41,7 +41,7 @@ def _get_usertenant(name, tenant=False):
         user = name
     elif '/' in name:  # tenant scoped name
         tenant, user = name.split('/', 1)
-    elif config.is_tenant(name):
+    elif configmanager.is_tenant(name):
         # the account is the implicit tenant owner account
         user = name
         tenant = name
@@ -66,9 +66,9 @@ def authorize(name, element, tenant=False, access='rw'):
             request.
     """
     user, tenant = _get_usertenant(name, tenant)
-    if tenant is not None and not config.is_tenant(tenant):
+    if tenant is not None and not configmanager.is_tenant(tenant):
         return None
-    configmanager = config.ConfigManager(tenant)
+    configmanager = configmanager.ConfigManager(tenant)
     userobj = configmanager.get_user(user)
     if userobj: #returning
         return (userobj, configmanager)
@@ -90,7 +90,7 @@ def set_user_passphrase(name, passphrase, tenant=None):
     salt = os.urandom(8)
     crypted = kdf.PBKDF2(passphrase, salt, 32, 10000,
                 lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest())
-    cfm = config.ConfigManager(tenant)
+    cfm = configmanager.ConfigManager(tenant)
     cfm.set_user(name, { 'cryptpass': (salt, crypted) })
 
 
@@ -131,7 +131,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
             # invalidate cache and force the slower check
             del _passcache[(user, tenant)]
             return None
-    cfm = config.ConfigManager(tenant)
+    cfm = configmanager.ConfigManager(tenant)
     ucfg = cfm.get_user(user)
     if ucfg is None or 'cryptpass' not in ucfg:
         eventlet.sleep(0.05) #stall even on test for existance of a username

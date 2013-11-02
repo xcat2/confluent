@@ -6,7 +6,7 @@
 # 
 # TODO: SO_PEERCRED for unix socket
 import confluent.consoleserver as consoleserver
-import confluent.config as config
+import confluent.config.configmanager as configmanager
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 import eventlet
@@ -43,7 +43,7 @@ def sessionhdl(connection, authname):
         print username
         print passphrase
     connection.sendall("Confluent -- v0 -- Session Granted\r\n/->")
-    cfm = config.ConfigManager(tenant=0)
+    cfm = configmanager.ConfigManager(tenant=0)
     consession = consoleserver.ConsoleSession(node='n1', configmanager=cfm,
                                         datacallback=connection.sendall)
     while (1):
