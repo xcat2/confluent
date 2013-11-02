@@ -1,4 +1,6 @@
 import collections
+import confluent.console
+import confluent.messages as msg
 import eventlet
 import eventlet.event
 import eventlet.greenpool as greenpool
@@ -90,7 +92,7 @@ def get_conn_params(node, configdata):
     }
 
 
-class Console(object):
+class IpmiConsole(confluent.console.Console):
     def __init__(self, node, config):
         crypt = config.decrypt
         config.decrypt = True
@@ -250,13 +252,15 @@ class IpmiHandler(object):
             wait_on_ipmi()
         if self.element == 'power/state':
             if 'read' == self.op:
-                return self.call_ipmicmd(self.ipmicmd.get_power)
+                power = self.call_ipmicmd(self.ipmicmd.get_power)
+                return msg.PowerState(node=self.node,
+                                      state=power['powerstate'])
 
 def create(nodes, element, configmanager):
     if element == '_console/session':
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
-        return Console(nodes[0], configmanager)
+        return IpmiConsole(nodes[0], configmanager)
     else:
         raise Exception(
             "TODO(jbjohnso): ipmi api implementation of %s" % element)

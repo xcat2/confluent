@@ -200,7 +200,7 @@ def resourcehandler(env, start_response):
             yield "404 - Request path not recognized"
             return
         for rsp in hdlr:
-            yield json.dumps(rsp, separators=(',', ':'))
+            yield rsp.json()
 
 
 def serve():

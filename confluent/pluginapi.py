@@ -17,6 +17,7 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
+import confluent.console as console
 import os
 import sys
 
@@ -68,6 +69,11 @@ nodeelements = {
     }
 }
 
+def stripnode(iterablersp, node):
+    for i in iterablersp:
+        i.strip_node(node)
+        yield i
+
 def handle_path(path, operation, configmanager):
     '''Given a full path request, return an object.
 
@@ -89,12 +95,18 @@ def handle_path(path, operation, configmanager):
                 [node], plugroute['pluginattrs'])
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
-                    return pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
+                    passvalue = pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
                         nodes=(node,), element=element,
                         configmanager=configmanager)
             if plugroute['default']:
-                return pluginmap[plugroute['default']].__dict__[operation](
+                passvalue pluginmap[plugroute['default']].__dict__[operation](
                     nodes=(node,), element=element, configmanager=configmanager)
+        if isinstance(passvalue, console.Console):
+            return passvalue
+        else:
+            return stripnode(passvalue)
+    else:
+        raise Exception("TODO: notfoundexception")
 
 
 
