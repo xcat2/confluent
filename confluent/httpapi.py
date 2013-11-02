@@ -22,6 +22,12 @@ import eventlet.wsgi
 
 consolesessions = {}
 httpsessions = {}
+opmap = {
+    'POST': 'create',
+    'GET': 'retrieve',
+    'PUT': 'update',
+    'DELETE': 'delete',
+}
 
 
 def _sessioncleaner():
@@ -193,6 +199,9 @@ def resourcehandler(env, start_response):
             yield rsp
             return
     else:
+        # normal request
+        operation = opmap[env['REQUEST_METHOD']]
+        resource = '.' + env['PATH_INFO'][env['PATH_INFO'].rindex('/'):]
         try:
             hdlr = pluginapi.handle_path(env['PATH_INFO'], 'retrieve', cfgmgr)
         except exc.NotFoundException:
@@ -201,7 +210,7 @@ def resourcehandler(env, start_response):
             return
         start_response('200 OK', headers)
         if mimetype == 'text/html':
-            yield '<html><body><form>'
+            yield '<html><body><form action="' + resource + '" method="post">'
             for rsp in hdlr:
                 yield rsp.html()
                 yield '<br>'
