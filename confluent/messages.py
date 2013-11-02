@@ -31,4 +31,17 @@ class PowerState(ConfluentMessage):
             }
         }
 
+class Attributes(ConfluentMessage):
+    def __init__(self, node, kv):
+        self.kvpairs = {
+            node: kv
+        }
 
+class CryptedAttributes(Attributes):
+    def __init__(self, node, kv):
+        # for now, just keep the dictionary keys and discard crypt value
+        for currkey in kv.iterkeys():
+            kv[currkey] = '*****ENCRYPTEDVALUE*****'
+        self.kvpairs = {
+            node: kv
+        }

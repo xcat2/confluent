@@ -200,8 +200,15 @@ def resourcehandler(env, start_response):
             yield "404 - Request path not recognized"
             return
         start_response('200 OK', headers)
+        yield '['
+        docomma = False
         for rsp in hdlr:
+            if docomma:
+                yield ','
+            else:
+                docomma = True
             yield rsp.json()
+        yield ']'
 
 
 def serve():

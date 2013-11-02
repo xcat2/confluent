@@ -54,6 +54,8 @@ nodetree = {
     '/power/': ['state'],
     '/boot/': ['device'],
     '/console/': ['session', 'logging'],
+    '/attributes/all': [],  # TODO: put in the 'categories' automaticly from
+                            # confluent.config.attributes
 }
 
 # _ elements are for internal use (e.g. special console scheme)
@@ -71,7 +73,10 @@ nodeelements = {
     'boot/device': {
         'pluginattrs': ['hardwaremanagement.method'],
         'default': 'ipmi',
-    }
+    },
+    'attributes/all': {
+        'handler': 'attributes',
+    },
 }
 
 def stripnode(iterablersp, node):
@@ -93,9 +98,13 @@ def handle_path(path, operation, configmanager):
         node = path[nodeidx:]
         node, _, element = node.partition("/")
         if element not in nodeelements:
-            raise Exception("Invalid element requested")
+            raise exc.NotFoundException("Invalid element requested")
         plugroute = nodeelements[element]
-        if 'pluginattrs' in plugroute:
+        if 'handler' in plugroute:  #fixed handler definition
+            passvalue = pluginmap[plugroute['handler']].__dict__[operation](
+                nodes=(node,), element=element,
+                configmanager=configmanager)
+        elif 'pluginattrs' in plugroute:
             nodeattr = configmanager.get_node_attributes(
                 [node], plugroute['pluginattrs'])
             for attrname in plugroute['pluginattrs']:
