@@ -8,7 +8,7 @@
 # by passphrase and optionally TPM
 
 import array
-import confluent.config
+import confluent.config.configmanager as configmanager
 import math
 import os
 
@@ -60,21 +60,21 @@ def _format_key(key, passphrase=None):
 def init_masterkey(passphrase=None):
     global _masterkey
     global _masterintegritykey
-    cfgn = confluent.config.get_global('master_privacy_key')
+    cfgn = configmanager.get_global('master_privacy_key')
 
     if cfgn:
         _masterkey = _get_protected_key(cfgn, passphrase=passphrase)
     else:
         _masterkey = os.urandom(32)
-        confluent.config.set_global('master_privacy_key', _format_key(
+        configmanager.set_global('master_privacy_key', _format_key(
             _masterkey,
             passphrase=passphrase))
-    cfgn = confluent.config.get_global('master_integrity_key')
+    cfgn = configmanager.get_global('master_integrity_key')
     if cfgn:
         _masterintegritykey = _get_protected_key(cfgn, passphrase=passphrase)
     else:
         _masterintegritykey = os.urandom(64)
-        confluent.config.set_global('master_integrity_key', _format_key(
+        configmanager.set_global('master_integrity_key', _format_key(
             _masterintegritykey,
             passphrase=passphrase))
 

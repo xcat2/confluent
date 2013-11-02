@@ -68,10 +68,10 @@ def authorize(name, element, tenant=False, access='rw'):
     user, tenant = _get_usertenant(name, tenant)
     if tenant is not None and not configmanager.is_tenant(tenant):
         return None
-    configmanager = configmanager.ConfigManager(tenant)
-    userobj = configmanager.get_user(user)
+    manager = configmanager.ConfigManager(tenant)
+    userobj = manager.get_user(user)
     if userobj: #returning
-        return (userobj, configmanager)
+        return (userobj, manager)
     return None
 
 

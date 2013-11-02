@@ -35,7 +35,7 @@
 import array
 import ast
 import collections
-import confluent.crypto
+import confluent.config.crypto as crypto
 import confluent.util
 import copy
 import cPickle
@@ -182,7 +182,7 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
         return nodeobj[attribute]
     elif 'cryptvalue' in nodeobj[attribute] and decrypt:
         retdict = copy.deepcopy(nodeobj[attribute])
-        retdict['value'] = confluent.crypto.decrypt_value(
+        retdict['value'] = crypto.decrypt_value(
                                 nodeobj[attribute]['cryptvalue'])
         return retdict
     return nodeobj[attribute]
@@ -356,7 +356,7 @@ class ConfigManager(object):
                     groups=attribmap[node]['groups'])
                 if 'value' in newdict and attrname.startswith("secret."):
                     newdict['cryptvalue' ] = \
-                        confluent.crypto.crypt_value(newdict['value'])
+                        crypto.crypt_value(newdict['value'])
                     del newdict['value']
                 cfgobj[attrname] = newdict
                 if ('_expressionkeys' in cfgobj and
