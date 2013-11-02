@@ -5,7 +5,7 @@
 # It implement unix and tls sockets
 # 
 # TODO: SO_PEERCRED for unix socket
-import confluent.console as console
+import confluent.consoleserver as consoleserver
 import confluent.config as config
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
@@ -44,7 +44,7 @@ def sessionhdl(connection, authname):
         print passphrase
     connection.sendall("Confluent -- v0 -- Session Granted\r\n/->")
     cfm = config.ConfigManager(tenant=0)
-    consession = console.ConsoleSession(node='n1', configmanager=cfm,
+    consession = consoleserver.ConsoleSession(node='n1', configmanager=cfm,
                                         datacallback=connection.sendall)
     while (1):
         data = connection.recv(4096)

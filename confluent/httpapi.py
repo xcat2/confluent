@@ -6,7 +6,7 @@
 import base64
 import Cookie
 import confluent.auth as auth
-import confluent.console as console
+import confluent.consoleserver as consoleserver
 import confluent.pluginapi as pluginapi
 import confluent.util as util
 import eventlet
@@ -159,7 +159,7 @@ def resourcehandler(env, start_response):
         _, _, nodename = prefix.rpartition('/')
         if 'session' not in querydict.keys() or not querydict['session']:
             # Request for new session
-            consession = console.ConsoleSession(node=nodename,
+            consession = consoleserver.ConsoleSession(node=nodename,
                                                 configmanager=cfgmgr)
             if not consession:
                 start_response("500 Internal Server Error", headers)

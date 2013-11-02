@@ -17,7 +17,7 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
-import confluent.console as console
+import confluent.interface.console as console
 import os
 import sys
 
@@ -99,7 +99,7 @@ def handle_path(path, operation, configmanager):
                         nodes=(node,), element=element,
                         configmanager=configmanager)
             if plugroute['default']:
-                passvalue pluginmap[plugroute['default']].__dict__[operation](
+                passvalue = pluginmap[plugroute['default']].__dict__[operation](
                     nodes=(node,), element=element, configmanager=configmanager)
         if isinstance(passvalue, console.Console):
             return passvalue
