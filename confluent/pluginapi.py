@@ -28,22 +28,26 @@ pluginmap = {}
 def load_plugins():
     # To know our plugins directory, we get the parent path of 'bin'
     path=os.path.dirname(os.path.realpath(__file__))
-    plugindir = os.path.realpath(os.path.join(path,'..','plugins'))
-    sys.path.append(plugindir)
+    plugintop = os.path.realpath(os.path.join(path,'..','plugins'))
     plugins = set()
-    #two passes, to avoid adding both py and pyc files
-    for plugin in os.listdir(plugindir):
-        plugin = os.path.splitext(plugin)[0]
-        plugins.add(plugin)
-    for plugin in plugins:
-        if plugin.startswith('.'):
+    for plugindir in os.listdir(plugintop):
+        plugindir = os.path.join(plugintop,plugindir)
+        if not os.path.isdir(plugindir):
             continue
-        tmpmod = __import__(plugin)
-        if 'plugin_names' in tmpmod.__dict__:
-            for name in tmpmod.plugin_names:
-                pluginmap[name] = tmpmod
-        else:
-            pluginmap[plugin] = tmpmod
+        sys.path.append(plugindir)
+        #two passes, to avoid adding both py and pyc files
+        for plugin in os.listdir(plugindir):
+            plugin = os.path.splitext(plugin)[0]
+            plugins.add(plugin)
+        for plugin in plugins:
+            if plugin.startswith('.'):
+                continue
+            tmpmod = __import__(plugin)
+            if 'plugin_names' in tmpmod.__dict__:
+                for name in tmpmod.plugin_names:
+                    pluginmap[name] = tmpmod
+            else:
+                pluginmap[plugin] = tmpmod
 
 nodetree = {
     '/': ['power/', 'boot/', 'console/', 'attributes/'],
