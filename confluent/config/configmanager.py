@@ -102,7 +102,7 @@ def _format_key(key, passphrase=None):
 def init_masterkey(passphrase=None):
     global _masterkey
     global _masterintegritykey
-    cfgn = configmanager.get_global('master_privacy_key')
+    cfgn = get_global('master_privacy_key')
 
     if cfgn:
         _masterkey = _get_protected_key(cfgn, passphrase=passphrase)
@@ -111,7 +111,7 @@ def init_masterkey(passphrase=None):
         configmanager.set_global('master_privacy_key', _format_key(
             _masterkey,
             passphrase=passphrase))
-    cfgn = configmanager.get_global('master_integrity_key')
+    cfgn = get_global('master_integrity_key')
     if cfgn:
         _masterintegritykey = _get_protected_key(cfgn, passphrase=passphrase)
     else:
