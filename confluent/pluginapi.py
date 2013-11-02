@@ -104,7 +104,7 @@ def handle_path(path, operation, configmanager):
         if isinstance(passvalue, console.Console):
             return passvalue
         else:
-            return stripnode(passvalue)
+            return stripnode(passvalue, node)
     else:
         raise Exception("TODO: notfoundexception")
 

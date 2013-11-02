@@ -1,5 +1,5 @@
 import collections
-import confluent.console
+import confluent.interface.console
 import confluent.messages as msg
 import eventlet
 import eventlet.event
@@ -92,7 +92,7 @@ def get_conn_params(node, configdata):
     }
 
 
-class IpmiConsole(confluent.console.Console):
+class IpmiConsole(confluent.interface.console.Console):
     def __init__(self, node, config):
         crypt = config.decrypt
         config.decrypt = True
