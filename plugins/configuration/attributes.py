@@ -1,6 +1,6 @@
 import confluent.messages as msg
 
-def retrieve(nodes, element, configmanager):
+def retrieve(nodes, element, configmanager, inputdata):
     attributes = configmanager.get_node_attributes(nodes)
     for node in attributes.iterkeys():
         for attribute in attributes[node].iterkeys():

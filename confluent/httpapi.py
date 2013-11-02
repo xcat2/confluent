@@ -203,7 +203,8 @@ def resourcehandler(env, start_response):
         operation = opmap[env['REQUEST_METHOD']]
         resource = '.' + env['PATH_INFO'][env['PATH_INFO'].rindex('/'):]
         try:
-            hdlr = pluginapi.handle_path(env['PATH_INFO'], operation, cfgmgr)
+            hdlr = pluginapi.handle_path(env['PATH_INFO'], operation,
+                                         cfgmgr, querydict)
         except exc.NotFoundException:
             start_response('404 Not found', headers)
             yield "404 - Request path not recognized"

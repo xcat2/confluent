@@ -84,7 +84,7 @@ def stripnode(iterablersp, node):
         i.strip_node(node)
         yield i
 
-def handle_path(path, operation, configmanager):
+def handle_path(path, operation, configmanager, inputdata=None):
     '''Given a full path request, return an object.
 
     The plugins should generally return some sort of iterator.
@@ -103,7 +103,8 @@ def handle_path(path, operation, configmanager):
         if 'handler' in plugroute:  #fixed handler definition
             passvalue = pluginmap[plugroute['handler']].__dict__[operation](
                 nodes=(node,), element=element,
-                configmanager=configmanager)
+                configmanager=configmanager,
+                inputdata=inputdata)
         elif 'pluginattrs' in plugroute:
             nodeattr = configmanager.get_node_attributes(
                 [node], plugroute['pluginattrs'])
@@ -111,10 +112,12 @@ def handle_path(path, operation, configmanager):
                 if attrname in nodeattr[node]:
                     passvalue = pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
                         nodes=(node,), element=element,
-                        configmanager=configmanager)
+                        configmanager=configmanager,
+                        inputdata=inputdata)
             if 'default' in plugroute:
                 passvalue = pluginmap[plugroute['default']].__dict__[operation](
-                    nodes=(node,), element=element, configmanager=configmanager)
+                    nodes=(node,), element=element, configmanager=configmanager,
+                    inputdata=inputdata)
         if isinstance(passvalue, console.Console):
             return passvalue
         else:

@@ -168,7 +168,7 @@ class IpmiConsole(confluent.interface.console.Console):
 
 
 class IpmiIterator(object):
-    def __init__(self, operator, nodes, element, cfg):
+    def __init__(self, operator, nodes, element, cfg, inputdata):
         crypt = cfg.decrypt
         cfg.decrypt = True
         configdata = cfg.get_node_attributes(nodes,
@@ -178,7 +178,7 @@ class IpmiIterator(object):
         cfg.decrypt = crypt
         self.gpile = greenpool.GreenPile()
         for node in nodes:
-            self.gpile.spawn(perform_request, operator, node, element, configdata)
+            self.gpile.spawn(perform_request, operator, node, element, configdata, inputdata)
 
     def __iter__(self):
         return self
@@ -189,15 +189,15 @@ class IpmiIterator(object):
         return ndata
 
 
-def perform_request(operator, node, element, configdata):
-    return IpmiHandler(operator, node, element, configdata).handle_request()
+def perform_request(operator, node, element, configdata, inputdata):
+    return IpmiHandler(operator, node, element, configdata, inputdata).handle_request()
 
 
 class IpmiHandler(object):
     def __iter__():
         return self
 
-    def __init__(self, operation, node, element, cfd):
+    def __init__(self, operation, node, element, cfd, inputdata):
         global chainpulled
         global _ipmithread
         global pullchain
@@ -212,6 +212,7 @@ class IpmiHandler(object):
         self.op = operation
         connparams = get_conn_params(node, self.cfg)
         self.ipmicmd = None
+        self.inputdata = inputdata
         ipmiq.append((ipmicommand.Command,{'bmc': connparams['bmc'],
                                            'userid': connparams['username'],
                                            'password': connparams['passphrase'],
@@ -255,18 +256,26 @@ class IpmiHandler(object):
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
                 return msg.PowerState(node=self.node,
                                       state=power['powerstate'])
+            elif 'update' == self.op:
+                self.call_ipmicmd(self.ipmicmd.set_power, self.inputdata['powerstate'])
+                power = self.call_ipmicmd(self.ipmicmd.get_power)
+                print repr(power)
 
-def create(nodes, element, configmanager):
+                
+
+def create(nodes, element, configmanager, inputdata):
     if element == '_console/session':
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
         return IpmiConsole(nodes[0], configmanager)
     else:
-        raise Exception(
-            "TODO(jbjohnso): ipmi api implementation of %s" % element)
+        return IpmiIterator('update', nodes, element, configmanager, inputdata)
+
+def update(nodes, element, configmanager, inputdata):
+    create(nodes, element, configmanager, inputdata)
 
 
 
-def retrieve(nodes, element, configmanager):
-    return IpmiIterator('read', nodes, element, configmanager)
+def retrieve(nodes, element, configmanager, inputdata):
+    return IpmiIterator('read', nodes, element, configmanager, inputdata)
 
