@@ -31,7 +31,18 @@
 #   - Passphrase protected (requiring human interaction every restart)
 #   - TPM sealing (which would forgo the interactive assuming risk of
 #           physical attack on TPM is not a concern)
+# This module provides cryptographic convenience functions, largely to be
+# used by config.py to protect/unlock configuration as appropriopriate.
+# The default behavior provides no meaningful protection, all encrypted
+# values are linked to a master key that is stored in the clear.
+# meanigful protection comes when the user elects to protect the key
+# by passphrase and optionally TPM
 
+
+import Crypto.Protocol.KDF as kdf
+from Crypto.Cipher import AES
+from Crypto.Hash import HMAC
+from Crypto.Hash import SHA256
 import array
 import ast
 import collections
@@ -47,6 +58,110 @@ import os
 import re
 import string
 import threading
+
+
+_masterkey = None
+_masterintegritykey = None
+
+
+
+def _derive_keys(passphrase, salt):
+    #implement our specific combination of pbkdf2 transforms to get at
+    #key.  We bump the iterations up because we can afford to
+    tmpkey = kdf.PBKDF2(passphrase, salt, 32, 50000,
+                        lambda p, s: HMAC.new(p, s, SHA256).digest())
+    finalkey = kdf.PBKDF2(tmpkey, salt, 32, 50000,
+                        lambda p, s: HMAC.new(p, s, SHA256).digest())
+    return (finalkey[:32],finalkey[32:])
+
+
+def _get_protected_key(keydict, passphrase):
+    if keydict['unencryptedvalue']:
+        return keydict['unencryptedvalue']
+    # TODO(jbjohnso): check for TPM sealing
+    if 'passphraseprotected' in keydict:
+        if passphrase is None:
+            raise Exception("Passphrase protected secret requires passhrase")
+        for pp in keydict['passphraseprotected']:
+            salt = pp[0]
+            privkey, integkey = _derive_keys(passphrase, salt)
+            return decrypt_value(pp[1:], key=privkey, integritykey=integkey)
+    else:
+        raise Exception("No available decryption key")
+
+
+def _format_key(key, passphrase=None):
+    if passphrase is not None:
+        salt = os.urandom(32)
+        privkey, integkey = _derive_keys(passphrase, salt)
+        cval = crypt_value(key, key=privkey, integritykey=integkey)
+        return {"passphraseprotected": cval}
+    else:
+        return {"unencryptedvalue": key}
+
+
+def init_masterkey(passphrase=None):
+    global _masterkey
+    global _masterintegritykey
+    cfgn = configmanager.get_global('master_privacy_key')
+
+    if cfgn:
+        _masterkey = _get_protected_key(cfgn, passphrase=passphrase)
+    else:
+        _masterkey = os.urandom(32)
+        configmanager.set_global('master_privacy_key', _format_key(
+            _masterkey,
+            passphrase=passphrase))
+    cfgn = configmanager.get_global('master_integrity_key')
+    if cfgn:
+        _masterintegritykey = _get_protected_key(cfgn, passphrase=passphrase)
+    else:
+        _masterintegritykey = os.urandom(64)
+        configmanager.set_global('master_integrity_key', _format_key(
+            _masterintegritykey,
+            passphrase=passphrase))
+
+
+
+def decrypt_value(cryptvalue,
+                   key=_masterkey,
+                   integritykey=_masterintegritykey):
+    iv, cipherdata, hmac = cryptvalue
+    if _masterkey is None or _masterintegritykey is None:
+        init_masterkey()
+    check_hmac = HMAC.new(_masterintegritykey, cipherdata, SHA256).digest()
+    if hmac != check_hmac:
+        raise Exception("bad HMAC value on crypted value")
+    decrypter = AES.new(_masterkey, AES.MODE_CBC, iv)
+    value = decrypter.decrypt(cipherdata)
+    padsize = ord(value[-1])
+    pad = value[-padsize:]
+    # Note that I cannot grasp what could be done with a subliminal
+    # channel in padding in this case, but check the padding anyway
+    for padbyte in pad:
+        if ord(padbyte) != padsize:
+            raise Exception("bad padding in encrypted value")
+    return value[0:-padsize]
+
+
+def crypt_value(value,
+                 key=_masterkey,
+                 integritykey=_masterintegritykey):
+    # encrypt given value
+    # PKCS7 is the padding scheme to employ, if no padded needed, pad with 16
+    # check HMAC prior to attempting decrypt
+    if key is None or integritykey is None:
+        init_masterkey()
+        key=_masterkey
+        integritykey=_masterintegritykey
+    iv = os.urandom(16)
+    crypter = AES.new(key, AES.MODE_CBC, iv)
+    neededpad = 16 - (len(value) % 16)
+    pad = chr(neededpad) * neededpad
+    value = value + pad
+    cryptval = crypter.encrypt(value)
+    hmac = HMAC.new(integritykey, cryptval, SHA256).digest()
+    return (iv, cryptval, hmac)
 
 
 
@@ -182,8 +297,7 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
         return nodeobj[attribute]
     elif 'cryptvalue' in nodeobj[attribute] and decrypt:
         retdict = copy.deepcopy(nodeobj[attribute])
-        retdict['value'] = crypto.decrypt_value(
-                                nodeobj[attribute]['cryptvalue'])
+        retdict['value'] = decrypt_value(nodeobj[attribute]['cryptvalue'])
         return retdict
     return nodeobj[attribute]
 
@@ -355,8 +469,7 @@ class ConfigManager(object):
                     self._sync_groups_to_node(node=node,
                     groups=attribmap[node]['groups'])
                 if 'value' in newdict and attrname.startswith("secret."):
-                    newdict['cryptvalue' ] = \
-                        crypto.crypt_value(newdict['value'])
+                    newdict['cryptvalue' ] = crypt_value(newdict['value'])
                     del newdict['value']
                 cfgobj[attrname] = newdict
                 if ('_expressionkeys' in cfgobj and
