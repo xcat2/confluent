@@ -52,20 +52,23 @@ def _get_query_dict(env, reqbody, reqtype):
         for qpair in qstring.split('&'):
             qkey, qvalue = qpair.split('=')
             qdict[qkey] = qvalue
-    print reqbody
     if reqbody is not None:
         if "application/x-www-form-urlencoded" in reqtype:
-            pbody = urlparse.parse_qs(reqbody)
+            pbody = urlparse.parse_qs(reqbody, True)
             for ky in pbody.iterkeys():
                 if len(pbody[ky]) > 1:  # e.g. REST explorer
                     qdict[ky] = pbody[ky]
                 else:
                     qdict[ky] = pbody[ky][0]
-    if 'restexplorerignorekey' in qdict:
-        for key in qdict['restexplorerignorekey']:
-            if key in qdict:
-                del qdict[key]
-        del qdict['restexplorerignorekey']
+    if 'restexplorerhonorkey' in qdict:
+        nqdict = {}
+        for key in qdict:
+            if key == 'restexplorerop':
+                nqdict[key] = qdict['restexplorerop']
+                continue
+            if key in qdict['restexplorerhonorkey']:
+                nqdict[key] = qdict[key]
+        qdict = nqdict
     return qdict
 
 
@@ -173,7 +176,6 @@ def resourcehandler(env, start_response):
     if 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
-    print repr(querydict)
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
         prefix, _, _ = env['PATH_INFO'].partition('/console/session')
@@ -227,22 +229,33 @@ def resourcehandler(env, start_response):
             return
         start_response('200 OK', headers)
         if mimetype == 'text/html':
-            yield '<html><body><form action="' + resource + '" method="post">'
-            yield '<input type="hidden" name="restexplorerop" value="update">'
-            for rsp in hdlr:
-                yield rsp.html()
-                yield "<br>"
-            yield '<input type="submit"></form></body></html>'
+            for datum in _assemble_html(hdlr, resource):
+                yield datum
         else:
-            yield '['
-            docomma = False
-            for rsp in hdlr:
-                if docomma:
-                    yield ','
-                else:
-                    docomma = True
-                yield rsp.json()
-            yield ']'
+            for datum in _assemble_json(hdlr, resource):
+                yield datum
+
+
+def _assemble_html(responses, resource):
+    yield '<html><body><form action="' + resource + '" method="post">'
+    yield '<input type="hidden" name="restexplorerop" value="update">'
+    yield '<input type="hidden" name="restexplorerhonorkey" value="">'
+    for rsp in responses:
+        yield rsp.html()
+        yield "<br>"
+    yield '<input type="submit"></form></body></html>'
+
+
+def _assemble_json(responses, resource):
+    yield '['
+    docomma = False
+    for rsp in responses:
+        if docomma:
+            yield ','
+        else:
+            docomma = True
+        yield rsp.json()
+    yield ']'
 
 
 def serve():

@@ -25,8 +25,6 @@ class ConfluentMessage(object):
             label = key
             value = ''
             note = ''
-            if 'label' in val:
-                label = val['label']
             if 'value' in val:
                 value = val['value']
             if 'note' in val:
@@ -34,8 +32,8 @@ class ConfluentMessage(object):
             snippet += label + ":" + \
                        '<input type="text" name="%s" value="%s">%s' % (
                             key, value, note)
-            snippet += '<input type="checkbox" name="restexplorerignorekey" '
-            snippet += 'value="%s" checked>' % (key)
+            snippet += '<input type="checkbox" name="restexplorerhonorkey" '
+            snippet += 'value="%s">' % (key)
         return snippet
 
 
