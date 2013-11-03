@@ -237,7 +237,11 @@ def resourcehandler(env, start_response):
 
 
 def _assemble_html(responses, resource):
-    yield '<html><body><form action="' + resource + '" method="post">'
+    yield '<html><head><title>'
+    yield 'Confluent REST Explorer: ' + resource + '</title></head>'
+    yield '<body><form action="' + resource + '" method="post">'
+    yield 'Only values that have their'
+    yield 'respective values honored by the confluent server.<hr>'
     yield '<input type="hidden" name="restexplorerop" value="update">'
     yield '<input type="hidden" name="restexplorerhonorkey" value="">'
     for rsp in responses:
