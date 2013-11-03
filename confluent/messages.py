@@ -22,7 +22,6 @@ class ConfluentMessage(object):
         snippet = ""
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
-            print repr(val)
             label = key
             value = ''
             note = ''
@@ -52,7 +51,6 @@ class Attributes(ConfluentMessage):
         nkv = {}
         for key in kv.iterkeys():
             nkv[key] = { 'label': key, 'value': kv[key] }
-        print repr(nkv)
         self.kvpairs = {
             node: nkv
         }
