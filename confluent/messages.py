@@ -26,13 +26,17 @@ class ConfluentMessage(object):
             label = key
             value = ''
             note = ''
+            type = 'text'
             if 'value' in val:
                 value = val['value']
             if 'note' in val:
                 note = '(' + val['note'] + ')'
+                if val['note'] == 'Encrypted':
+                    type = 'password'
+                    value = 'dummyvalue'
             snippet += label + ":" + \
-                       '<input type="text" name="%s" value="%s">%s' % (
-                            key, value, note)
+                       '<input type="%s" name="%s" value="%s">%s' % (
+                            type, key, value, note)
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
             snippet += 'value="%s">' % (key)
         return snippet

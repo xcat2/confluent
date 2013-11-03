@@ -251,7 +251,7 @@ def _assemble_html(responses, resource, querydict):
         yield json.dumps(querydict, separators=(',', ': '),
                          indent=4, sort_keys=True)
         yield '<hr>'
-    yield 'Only values that have their'
+    yield 'Only fields that have their boxes checked will have their '
     yield 'respective values honored by the confluent server.<hr>'
     yield '<input type="hidden" name="restexplorerop" value="update">'
     yield '<input type="hidden" name="restexplorerhonorkey" value="">'
