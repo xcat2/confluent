@@ -60,6 +60,16 @@ class ConfluentChoiceMessage(ConfluentMessage):
             snippet += 'value="%s">' % (key)
         return snippet
 
+class LinkRelation(ConfluentMessage):
+    def html(self):
+        return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
+
+
+
+class ChildCollection(LinkRelation):
+    def __init__(self, collname):
+        self.rel = 'item'
+        self.href = collname
 
 def get_input_message(path, operation, inputdata, nodes=None):
     if 'power/state' in path and operation != 'retrieve':

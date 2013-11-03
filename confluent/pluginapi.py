@@ -50,17 +50,18 @@ def load_plugins():
             else:
                 pluginmap[plugin] = tmpmod
 
-nodetree = {
-    '/': ['power/', 'boot/', 'console/', 'attributes/'],
+
+nodecollections = {
     '/power/': ['state'],
     '/boot/': ['device'],
     '/console/': ['session', 'logging'],
-    '/attributes/all': [],  # TODO: put in the 'categories' automaticly from
-                            # confluent.config.attributes
-    '/attributes/current': [],  # TODO: put in the 'categories' automaticly from
+    '/attributes/': [],  # TODO: put in the 'categories' automaticly from
                             # confluent.config.attributes
 }
 
+rootcollections = {
+    '/node/': nodecollections
+}
 # _ elements are for internal use (e.g. special console scheme)
 nodeelements = {
     '_console/session': {
@@ -90,6 +91,19 @@ def stripnode(iterablersp, node):
         i.strip_node(node)
         yield i
 
+def enumerate_collection(collection, configmanager):
+    print collection
+    if collection == '/node/':
+        print 'node col'
+        for node in configmanager.get_nodes():
+            print node
+            yield msg.ChildCollection(node + '/')
+
+
+def enumerate_collections(collections):
+    for collection in collections.iterkeys():
+        yield msg.ChildCollection(collection)
+
 def handle_path(path, operation, configmanager, inputdata=None):
     '''Given a full path request, return an object.
 
@@ -97,7 +111,11 @@ def handle_path(path, operation, configmanager, inputdata=None):
     An exception is made for console/session, which should return
     a class with connect(), read(), write(bytes), and close()
     '''
-    if (path.startswith("/node/") or path.startswith("/system/") or
+    if path == '/':
+        return enumerate_collections(rootcollections)
+    elif path in rootcollections:
+        return enumerate_collection(path, configmanager)
+    elif (path.startswith("/node/") or path.startswith("/system/") or
         # single node requests
             path.startswith("/vm/")):
         nodeidx = path.find("/",1) + 1
