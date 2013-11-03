@@ -14,5 +14,12 @@ def retrieve(nodes, element, configmanager, inputdata):
             else:
                 print repr(currattr)
                 raise Exception("BUGGY ATTRIBUTE FOR NODE")
-    
-    
+
+
+def update(nodes, element, configmanager, inputdata):
+    updatedict = {}
+    for node in nodes:
+        updatenode = inputdata.get_attributes(node)
+        if updatenode:
+            updatedict[node] = updatenode
+    configmanager.set_node_attributes(updatedict)

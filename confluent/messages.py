@@ -66,6 +66,11 @@ class InputAttributes(ConfluentMessage):
             for node in nodes:
                 self.nodeattribs[node] = inputdata
 
+    def get_attributes(self, node):
+        if node not in self.nodeattribs:
+            return {}
+        return self.nodeattribs[node]
+
 
 class InputPowerMessage(ConfluentMessage):
     valid_powerstates = set([
