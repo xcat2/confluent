@@ -52,6 +52,7 @@ def _get_query_dict(env, reqbody, reqtype):
         for qpair in qstring.split('&'):
             qkey, qvalue = qpair.split('=')
             qdict[qkey] = qvalue
+    print reqbody
     if reqbody is not None:
         if "application/x-www-form-urlencoded" in reqtype:
             pbody = urlparse.parse_qs(reqbody)
@@ -159,6 +160,7 @@ def resourcehandler(env, start_response):
     headers.extend(("Set-Cookie", m.OutputString())
             for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
+    operation = opmap[env['REQUEST_METHOD']]
     querydict = _get_query_dict(env, reqbody, reqtype)
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
@@ -200,7 +202,6 @@ def resourcehandler(env, start_response):
             return
     else:
         # normal request
-        operation = opmap[env['REQUEST_METHOD']]
         url = env['PATH_INFO']
         url = url.replace('.json', '')
         url = url.replace('.html', '')
@@ -219,7 +220,7 @@ def resourcehandler(env, start_response):
             for rsp in hdlr:
                 yield rsp.html()
                 yield "<br>\n"
-            yield '</form></body></html>'
+            yield '<input type="submit"></form></body></html>'
         else:
             yield '['
             docomma = False
