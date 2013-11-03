@@ -8,6 +8,7 @@ import Cookie
 import confluent.auth as auth
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
+import confluent.messages
 import confluent.pluginapi as pluginapi
 import confluent.util as util
 import eventlet
@@ -262,15 +263,52 @@ def _assemble_html(responses, resource, querydict):
 
 
 def _assemble_json(responses, resource):
-    yield '['
     docomma = False
+    links = {
+        'self': ['{"href"="%s"' % resource],
+        'collection': ['{"href"="%s"' % '../'],
+    }
+    yield '{'
+    hadrsp = False
     for rsp in responses:
+        if isinstance(rsp, confluent.messages.LinkRelation):
+            haldata = rsp.json_hal()
+            for hk in haldata.iterkeys():
+                if hk in links:
+                    links[hk].append(haldata[hk])
+                else:
+                    links[hk] = [haldata[hk]]
+            continue
+        hadrsp = True
         if docomma:
             yield ','
         else:
             docomma = True
         yield rsp.json()
-    yield ']'
+    docomma = False
+    if hadrsp:
+        yield ','
+    yield '"_links": {'
+    groupcomma = False
+    for link in links.iterkeys():
+        if groupcomma:
+            yield ','
+        else:
+            groupcomma = True
+        yield json.dumps(link) + ":"
+        if len(links[link]) == 1:
+            yield links[link][0]
+        else:
+            yield '['
+            for lk in links[link]:
+                if docomma:
+                    yield ','
+                else:
+                    docomma = True
+                yield lk
+            yield ']'
+    yield '}'
+    yield '}'
 
 
 def serve():

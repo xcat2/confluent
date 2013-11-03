@@ -15,7 +15,8 @@ class ConfluentMessage(object):
 
     def json(self):
         # This will create the canonical json representation of this message
-        return json.dumps(self.kvpairs, separators=(',', ':'))
+        jsonsnippet = json.dumps(self.kvpairs, separators=(',', ':'))[1:-1]
+        return jsonsnippet
 
     def strip_node(self, node):
         self.kvpairs = self.kvpairs[node]
@@ -61,6 +62,9 @@ class ConfluentChoiceMessage(ConfluentMessage):
         return snippet
 
 class LinkRelation(ConfluentMessage):
+    def json_hal(self):
+        return {self.rel: '{ "href": "%s" }' % self.href }
+
     def html(self):
         return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
 
