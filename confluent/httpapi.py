@@ -201,9 +201,12 @@ def resourcehandler(env, start_response):
     else:
         # normal request
         operation = opmap[env['REQUEST_METHOD']]
-        resource = '.' + env['PATH_INFO'][env['PATH_INFO'].rindex('/'):]
+        url = env['PATH_INFO']
+        url = url.replace('.json', '')
+        url = url.replace('.html', '')
+        resource = '.' + url[url.rindex('/'):]
         try:
-            hdlr = pluginapi.handle_path(env['PATH_INFO'], operation,
+            hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
         except exc.NotFoundException:
             start_response('404 Not found', headers)
