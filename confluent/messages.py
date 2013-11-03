@@ -36,39 +36,63 @@ class ConfluentMessage(object):
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
             snippet += 'value="%s">' % (key)
         return snippet
+
+
 def get_input_message(path, operation, inputdata, nodes=None):
     if 'power/state' in path and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
+    elif path.startswith('attributes/') and operation != 'retrieve':
+        return InputAttributes(path, nodes, inputdata)
+    elif inputdata:
+        raise exc.InvalidArgumentException()
 
 
-valid_powerstates = set([
-    'on',
-    'off',
-    'reset',
-    'boot',
-    ])
+class InputAttributes(ConfluentMessage):
+
+    def __init__(self, path, nodes, inputdata):
+        self.nodeattribs = {}
+        nestedmode = False
+        if not inputdata:
+            raise exc.InvalidArgumentException
+        for node in nodes:
+            if node in inputdata:
+                nestedmode = True
+                self.nodeattribs[node] = inputdata[node]
+        if nestedmode:
+            for key in inputdata:
+                if key not in nodes:
+                    raise exc.InvalidArgumentException
+        else:
+            for node in nodes:
+                self.nodeattribs[node] = inputdata
 
 
 class InputPowerMessage(ConfluentMessage):
+    valid_powerstates = set([
+        'on',
+        'off',
+        'reset',
+        'boot',
+        ])
 
     def __init__(self, path, nodes, inputdata):
         self.powerbynode = {}
         if not inputdata:
             raise exc.InvalidArgumentException()
-        if ('powerstate' not in inputdata):
+        if 'powerstate' not in inputdata:
             #assume we have nested information
             for key in nodes:
                 if key not in inputdata:
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
                 if ('powerstate' not in datum or
-                        datum['powerstate'] not in valid_powerstates):
+                        datum['powerstate'] not in self.valid_powerstates):
                     raise exc.InvalidArgumentException()
                 self.powerbynode[key] = datum['powerstate']
         else: # we have a powerstate argument not by node
             datum = inputdata
             if ('powerstate' not in datum or
-                    datum['powerstate'] not in valid_powerstates):
+                    datum['powerstate'] not in self.valid_powerstates):
                 raise exc.InvalidArgumentException()
             for node in nodes:
                 self.powerbynode[node] = datum['powerstate']

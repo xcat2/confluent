@@ -14,6 +14,7 @@ import eventlet
 import json
 import os
 import string
+import traceback
 import time
 import urlparse
 import eventlet.wsgi
@@ -228,6 +229,7 @@ def resourcehandler(env, start_response):
             yield "404 - Request path not recognized"
             return
         except exc.InvalidArgumentException:
+            traceback.print_exc()
             start_response('400 Bad Request', headers)
             yield '400 - Bad Request'
             return
