@@ -57,7 +57,15 @@ def _get_query_dict(env, reqbody, reqtype):
         if "application/x-www-form-urlencoded" in reqtype:
             pbody = urlparse.parse_qs(reqbody)
             for ky in pbody.iterkeys():
-                qdict[ky] = pbody[ky][0]
+                if len(pbody[ky]) > 1:  # e.g. REST explorer
+                    qdict[ky] = pbody[ky]
+                else:
+                    qdict[ky] = pbody[ky][0]
+    if 'restexplorerignorekey' in qdict:
+        for key in qdict['restexplorerignorekey']:
+            if key in qdict:
+                del qdict[key]
+        del qdict['restexplorerignorekey']
     return qdict
 
 
@@ -162,6 +170,10 @@ def resourcehandler(env, start_response):
     cfgmgr = authorized['cfgmgr']
     operation = opmap[env['REQUEST_METHOD']]
     querydict = _get_query_dict(env, reqbody, reqtype)
+    if 'restexplorerop' in querydict:
+        operation = querydict['restexplorerop']
+        del querydict['restexplorerop']
+    print repr(querydict)
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
         prefix, _, _ = env['PATH_INFO'].partition('/console/session')
@@ -217,9 +229,11 @@ def resourcehandler(env, start_response):
         if mimetype == 'text/html':
             yield '<html><body><form action="' + resource + '" method="post">'
             yield '<input type="hidden" name="restexplorerop" value="update">'
+            yield "<table><tr><td></td><td>Ignore on submit</td></tr><br>"
             for rsp in hdlr:
                 yield rsp.html()
-                yield "<br>\n"
+                yield "<br>"
+            yield "</table>"
             yield '<input type="submit"></form></body></html>'
         else:
             yield '['
