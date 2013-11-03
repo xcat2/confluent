@@ -215,9 +215,10 @@ def resourcehandler(env, start_response):
         start_response('200 OK', headers)
         if mimetype == 'text/html':
             yield '<html><body><form action="' + resource + '" method="post">'
+            yield '<input type="hidden" name="restexplorerop" value="update">'
             for rsp in hdlr:
                 yield rsp.html()
-                yield '<br>'
+                yield "<br>\n"
             yield '</form></body></html>'
         else:
             yield '['

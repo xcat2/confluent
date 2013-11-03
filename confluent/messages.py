@@ -34,6 +34,8 @@ class ConfluentMessage(object):
             snippet += label + ":" + \
                        '<input type="text" name="%s" value="%s">%s' % (
                             key, value, note)
+            snippet += '<input type="checkbox" name="restexplorerignorekey" '
+            snippet += 'value="%s" checked>' % (key)
         return snippet
 
 
