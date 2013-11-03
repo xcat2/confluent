@@ -131,7 +131,7 @@ node = {
                        'The managed node.')
     },
     'virtualization.host': {
-        'description': ('Hypervisor where this node does/should reside',
+        'description': ('Hypervisor where this node does/should reside'),
         'appliesto': ['vm'],
     },
     'virtualization.computepool': {

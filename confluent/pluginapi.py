@@ -57,6 +57,8 @@ nodetree = {
     '/console/': ['session', 'logging'],
     '/attributes/all': [],  # TODO: put in the 'categories' automaticly from
                             # confluent.config.attributes
+    '/attributes/current': [],  # TODO: put in the 'categories' automaticly from
+                            # confluent.config.attributes
 }
 
 # _ elements are for internal use (e.g. special console scheme)
@@ -76,6 +78,9 @@ nodeelements = {
         'default': 'ipmi',
     },
     'attributes/all': {
+        'handler': 'attributes',
+    },
+    'attributes/current': {
         'handler': 'attributes',
     },
 }
