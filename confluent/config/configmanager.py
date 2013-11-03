@@ -390,11 +390,18 @@ class ConfigManager(object):
             }
         self._bg_sync_to_file()
 
+    def is_node(self, node):
+        if 'nodes' not in self._cfgstore:
+            return False
+        if node not in self._cfgstore['nodes']:
+            return False
+        return True
+
     def get_nodes(self):
         if 'nodes' not in self._cfgstore:
             return []
         return self._cfgstore['nodes'].iterkeys()
-        
+
     def get_node_attributes(self, nodelist, attributes=[]):
         if 'nodes' not in self._cfgstore:
             return None

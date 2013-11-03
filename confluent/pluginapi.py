@@ -52,15 +52,15 @@ def load_plugins():
 
 
 nodecollections = {
-    '/power/': ['state'],
-    '/boot/': ['device'],
-    '/console/': ['session', 'logging'],
-    '/attributes/': [],  # TODO: put in the 'categories' automaticly from
+    'power/': ['state'],
+    'boot/': ['device'],
+    'console/': ['session', 'logging'],
+    'attributes/': [],  # TODO: put in the 'categories' automaticly from
                             # confluent.config.attributes
 }
 
 rootcollections = {
-    '/node/': nodecollections
+    'node/': nodecollections
 }
 # _ elements are for internal use (e.g. special console scheme)
 nodeelements = {
@@ -91,13 +91,27 @@ def stripnode(iterablersp, node):
         i.strip_node(node)
         yield i
 
+def iterate_collections(iterable):
+    for coll in iterable:
+        if coll[-1] != '/':
+            coll = coll + '/'
+        yield msg.ChildCollection(coll)
+
 def enumerate_collection(collection, configmanager):
-    print collection
-    if collection == '/node/':
-        print 'node col'
-        for node in configmanager.get_nodes():
-            print node
-            yield msg.ChildCollection(node + '/')
+    if collection.startswith("/"):
+        collection = collection[1:]
+    if collection == 'node/':
+        return iterate_collections(configmanager.get_nodes())
+    elif collection.startswith('node/'):
+        nodecoll = collection.replace('node/','')
+        print nodecoll
+        if '/' not in nodecoll[:-1]:  # it is supposed to be a node
+            node = nodecoll[:-1]
+            if  not configmanager.is_node(node):
+                raise exc.NotFoundException("Invalid node requested")
+            return iterate_collections(nodecollections.iterkeys())
+    else:
+        raise exc.NotFoundException("Invalid path")
 
 
 def enumerate_collections(collections):
@@ -113,7 +127,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
     '''
     if path == '/':
         return enumerate_collections(rootcollections)
-    elif path in rootcollections:
+    elif path[-1] == '/':
         return enumerate_collection(path, configmanager)
     elif (path.startswith("/node/") or path.startswith("/system/") or
         # single node requests
