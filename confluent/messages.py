@@ -21,11 +21,21 @@ class ConfluentMessage(object):
         #this is used to facilitate the api explorer feature
         snippet = ""
         for key in self.kvpairs.iterkeys():
-            snippet += key + ":"
-            snippet += '<input type="text" name="%s" value="%s">' % (
-                            key, self.kvpairs[key])
+            val = self.kvpairs[key]
+            print repr(val)
+            label = key
+            value = ''
+            note = ''
+            if 'label' in val:
+                label = val['label']
+            if 'value' in val:
+                value = val['value']
+            if 'note' in val:
+                note = '(' + val['note'] + ')'
+            snippet += label + ":" + \
+                       '<input type="text" name="%s" value="%s">%s' % (
+                            key, value, note)
         return snippet
-            
 
 
 class PowerState(ConfluentMessage):
@@ -33,21 +43,26 @@ class PowerState(ConfluentMessage):
     def __init__(self, node, state):
         self.kvpairs = {
             node: {
-                'powerstate': state,
+                'powerstate': { 'label': 'Power', 'value': state, }
             }
         }
 
 class Attributes(ConfluentMessage):
     def __init__(self, node, kv):
+        nkv = {}
+        for key in kv.iterkeys():
+            nkv[key] = { 'label': key, 'value': kv[key] }
+        print repr(nkv)
         self.kvpairs = {
-            node: kv
+            node: nkv
         }
 
 class CryptedAttributes(Attributes):
     def __init__(self, node, kv):
         # for now, just keep the dictionary keys and discard crypt value
-        for currkey in kv.iterkeys():
-            kv[currkey] = '*****ENCRYPTEDVALUE*****'
+        nkv = {}
+        for key in kv.iterkeys():
+            nkv[key] = { 'label': key, 'note': 'Encrypted' }
         self.kvpairs = {
-            node: kv
+            node: nkv
         }
