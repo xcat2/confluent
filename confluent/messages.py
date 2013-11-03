@@ -31,14 +31,11 @@ class ConfluentMessage(object):
                 value = val['value']
             if 'note' in val:
                 note = '(' + val['note'] + ')'
-            snippet += "<tr><td>"
             snippet += label + ":" + \
                        '<input type="text" name="%s" value="%s">%s' % (
                             key, value, note)
-            snippet += "</td><td>"
             snippet += '<input type="checkbox" name="restexplorerignorekey" '
             snippet += 'value="%s" checked>' % (key)
-            snippet += "</td></tr>"
         return snippet
 
 
