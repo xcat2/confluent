@@ -259,9 +259,9 @@ class IpmiHandler(object):
             elif 'update' == self.op:
                 self.call_ipmicmd(self.ipmicmd.set_power, self.inputdata['powerstate'])
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
-                print repr(power)
+                return msg.PowerState(node=self.node,
+                                      state=power['powerstate'])
 
-                
 
 def create(nodes, element, configmanager, inputdata):
     if element == '_console/session':
@@ -272,7 +272,7 @@ def create(nodes, element, configmanager, inputdata):
         return IpmiIterator('update', nodes, element, configmanager, inputdata)
 
 def update(nodes, element, configmanager, inputdata):
-    create(nodes, element, configmanager, inputdata)
+    return create(nodes, element, configmanager, inputdata)
 
 
 

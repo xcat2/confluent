@@ -229,17 +229,22 @@ def resourcehandler(env, start_response):
             return
         start_response('200 OK', headers)
         if mimetype == 'text/html':
-            for datum in _assemble_html(hdlr, resource):
+            for datum in _assemble_html(hdlr, resource, querydict):
                 yield datum
         else:
             for datum in _assemble_json(hdlr, resource):
                 yield datum
 
 
-def _assemble_html(responses, resource):
+def _assemble_html(responses, resource, querydict):
     yield '<html><head><title>'
     yield 'Confluent REST Explorer: ' + resource + '</title></head>'
     yield '<body><form action="' + resource + '" method="post">'
+    if querydict:
+        yield 'Response to input data:<br>'
+        yield json.dumps(querydict, separators=(',', ': '),
+                         indent=4, sort_keys=True)
+        yield '<hr>'
     yield 'Only values that have their'
     yield 'respective values honored by the confluent server.<hr>'
     yield '<input type="hidden" name="restexplorerop" value="update">'
