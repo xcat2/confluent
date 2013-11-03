@@ -7,6 +7,8 @@ import confluent.exceptions as exc
 import json
 
 class ConfluentMessage(object):
+    defaultvalue = ''
+    defaulttype = 'text'
 
     def __init__(self):
         raise NotImplementedError("Must be subclassed!")
@@ -24,19 +26,36 @@ class ConfluentMessage(object):
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
             label = key
-            value = ''
+            value = self.defaultvalue
             note = ''
-            type = 'text'
+            type = self.defaulttype
             if 'value' in val:
                 value = val['value']
             if 'note' in val:
                 note = '(' + val['note'] + ')'
-                if val['note'] == 'Encrypted':
-                    type = 'password'
-                    value = 'dummyvalue'
             snippet += label + ":" + \
                        '<input type="%s" name="%s" value="%s">%s' % (
                             type, key, value, note)
+            snippet += '<input type="checkbox" name="restexplorerhonorkey" '
+            snippet += 'value="%s">' % (key)
+        return snippet
+
+
+class ConfluentChoiceMessage(ConfluentMessage):
+
+    def html(self):
+        snippet = ""
+        for key in self.kvpairs.iterkeys():
+            val = self.kvpairs[key]
+            snippet += key + ':<select name="%s">' % key
+            for opt in self.valid_values:
+                snippet += opt + ":"
+                if opt == val['value']:
+                    snippet += '<option value="%s" selected>%s</option>' % (
+                        opt, opt)
+                else:
+                    snippet += '<option value="%s">%s</option>' % (opt, opt)
+            snippet += '</select>'
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
             snippet += 'value="%s">' % (key)
         return snippet
@@ -77,7 +96,7 @@ class InputAttributes(ConfluentMessage):
 
 
 class InputPowerMessage(ConfluentMessage):
-    valid_powerstates = set([
+    valid_values = set([
         'on',
         'off',
         'reset',
@@ -95,13 +114,13 @@ class InputPowerMessage(ConfluentMessage):
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
                 if ('powerstate' not in datum or
-                        datum['powerstate'] not in self.valid_powerstates):
+                        datum['powerstate'] not in self.valid_values):
                     raise exc.InvalidArgumentException()
                 self.powerbynode[key] = datum['powerstate']
         else: # we have a powerstate argument not by node
             datum = inputdata
             if ('powerstate' not in datum or
-                    datum['powerstate'] not in self.valid_powerstates):
+                    datum['powerstate'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
                 self.powerbynode[node] = datum['powerstate']
@@ -110,7 +129,13 @@ class InputPowerMessage(ConfluentMessage):
         return self.powerbynode[node]
 
 
-class PowerState(ConfluentMessage):
+class PowerState(ConfluentChoiceMessage):
+    valid_values = set([
+        'on',
+        'off',
+        'reset',
+        'boot',
+        ])
 
     def __init__(self, node, state, querydict=None):
         self.kvpairs = {
@@ -129,6 +154,9 @@ class Attributes(ConfluentMessage):
         }
 
 class CryptedAttributes(Attributes):
+    defaultvalue = 'dummyvalue'
+    defaulttype = 'password'
+
     def __init__(self, node, kv):
         # for now, just keep the dictionary keys and discard crypt value
         nkv = {}
