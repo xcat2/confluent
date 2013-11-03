@@ -227,6 +227,10 @@ def resourcehandler(env, start_response):
             start_response('404 Not found', headers)
             yield "404 - Request path not recognized"
             return
+        except exc.InvalidArgumentException:
+            start_response('400 Bad Request', headers)
+            yield '400 - Bad Request'
+            return
         start_response('200 OK', headers)
         if mimetype == 'text/html':
             for datum in _assemble_html(hdlr, resource, querydict):

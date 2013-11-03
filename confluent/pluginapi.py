@@ -19,6 +19,7 @@
 
 import confluent.interface.console as console
 import confluent.exceptions as exc
+import confluent.messages as msg
 import os
 import sys
 
@@ -99,6 +100,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
         node, _, element = node.partition("/")
         if element not in nodeelements:
             raise exc.NotFoundException("Invalid element requested")
+        inputdata = msg.get_input_message(element, operation, inputdata, (node,))
         plugroute = nodeelements[element]
         if 'handler' in plugroute:  #fixed handler definition
             passvalue = pluginmap[plugroute['handler']].__dict__[operation](

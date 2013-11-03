@@ -257,7 +257,9 @@ class IpmiHandler(object):
                 return msg.PowerState(node=self.node,
                                       state=power['powerstate'])
             elif 'update' == self.op:
-                self.call_ipmicmd(self.ipmicmd.set_power, self.inputdata['powerstate'])
+                powerstate = self.inputdata.powerstate(self.node)
+                #TODO: call with wait argument
+                self.call_ipmicmd(self.ipmicmd.set_power, powerstate)
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
                 return msg.PowerState(node=self.node,
                                       state=power['powerstate'])

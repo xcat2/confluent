@@ -3,6 +3,7 @@
 # This module implements client/server messages emitted from plugins.
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
+import confluent.exceptions as exc
 import json
 
 class ConfluentMessage(object):
@@ -35,11 +36,50 @@ class ConfluentMessage(object):
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
             snippet += 'value="%s">' % (key)
         return snippet
+def get_input_message(path, operation, inputdata, nodes=None):
+    if 'power/state' in path and operation != 'retrieve':
+        return InputPowerMessage(path, nodes, inputdata)
+
+
+valid_powerstates = set([
+    'on',
+    'off',
+    'reset',
+    'boot',
+    ])
+
+
+class InputPowerMessage(ConfluentMessage):
+
+    def __init__(self, path, nodes, inputdata):
+        self.powerbynode = {}
+        if not inputdata:
+            raise exc.InvalidArgumentException()
+        if ('powerstate' not in inputdata):
+            #assume we have nested information
+            for key in nodes:
+                if key not in inputdata:
+                    raise exc.InvalidArgumentException()
+                datum = inputdata[key]
+                if ('powerstate' not in datum or
+                        datum['powerstate'] not in valid_powerstates):
+                    raise exc.InvalidArgumentException()
+                self.powerbynode[key] = datum['powerstate']
+        else: # we have a powerstate argument not by node
+            datum = inputdata
+            if ('powerstate' not in datum or
+                    datum['powerstate'] not in valid_powerstates):
+                raise exc.InvalidArgumentException()
+            for node in nodes:
+                self.powerbynode[node] = datum['powerstate']
+
+    def powerstate(self, node):
+        return self.powerbynode[node]
 
 
 class PowerState(ConfluentMessage):
 
-    def __init__(self, node, state):
+    def __init__(self, node, state, querydict=None):
         self.kvpairs = {
             node: {
                 'powerstate': { 'label': 'Power', 'value': state, }

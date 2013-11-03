@@ -3,3 +3,6 @@ class ConfluentException(Exception):
 
 class NotFoundException(ConfluentException):
     pass
+
+class InvalidArgumentException(ConfluentException):
+    pass
