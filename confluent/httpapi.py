@@ -256,10 +256,22 @@ def _assemble_html(responses, resource, querydict):
     yield 'respective values honored by the confluent server.<hr>'
     yield '<input type="hidden" name="restexplorerop" value="update">'
     yield '<input type="hidden" name="restexplorerhonorkey" value="">'
+    yield '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
+    if resource[-1] == '/':
+        yield '<a rel="collection" href="../">../</a><br>'
+    else:
+        yield '<a rel="collection" href="./">./</a><br>'
+    pendingrsp = []
     for rsp in responses:
+        if isinstance(rsp, confluent.messages.LinkRelation):
+            yield rsp.html()
+            yield "<br>"
+        else:
+            pendingrsp.append(rsp)
+    for rsp in pendingrsp:
         yield rsp.html()
         yield "<br>"
-    yield '<input type="submit"></form></body></html>'
+    yield '<input value="PUT" type="submit"></form></body></html>'
 
 
 def _assemble_json(responses, resource):
@@ -271,8 +283,11 @@ def _assemble_json(responses, resource):
     docomma = False
     links = {
         'self': ['{"href":"%s"}' % resource],
-        'collection': ['{"href":"%s"}' % '../'],
     }
+    if resource[-1] == '/':
+        links['collection'] = ['{"href":"%s"}' % '../']
+    else:
+        links['collection'] = ['{"href":"%s"}' % './']
     yield '{'
     hadrsp = False
     for rsp in responses:
