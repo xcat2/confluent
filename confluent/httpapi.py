@@ -263,10 +263,15 @@ def _assemble_html(responses, resource, querydict):
 
 
 def _assemble_json(responses, resource):
+    #NOTE(jbjohnso) I'm considering giving up on yielding bit by bit
+    #in json case over http.  Notably, duplicate key values from plugin
+    #overwrite, but we'd want to preserve them into an array instead.
+    #the downside is that http would just always blurt it ll out at
+    #once and hold on to all the data in memory
     docomma = False
     links = {
-        'self': ['{"href"="%s"' % resource],
-        'collection': ['{"href"="%s"' % '../'],
+        'self': ['{"href":"%s"}' % resource],
+        'collection': ['{"href":"%s"}' % '../'],
     }
     yield '{'
     hadrsp = False
