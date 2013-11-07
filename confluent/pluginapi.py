@@ -25,6 +25,8 @@ import sys
 
 pluginmap = {}
 
+def nested_lookup(nestdict, key):
+    return reduce(dict.__getitem__, key, nestdict)
 
 def load_plugins():
     # To know our plugins directory, we get the parent path of 'bin'
@@ -62,7 +64,40 @@ nodecollections = {
 rootcollections = {
     'node/': nodecollections
 }
-# _ elements are for internal use (e.g. special console scheme)
+
+class PluginRoute(object):
+    def __init__(self, routedict):
+        self.routeinfo = routedict
+# _ prefix indicates internal use (e.g. special console scheme) and should not
+# be enumerated in any collection
+noderesources = {
+    '_console': {
+        'session': PluginRoute({
+            'pluginattrs': ['console.method' ,'hardwaremanagement.method'],
+        }),
+    },
+    'console': {
+        #this is a dummy value, http or socket must handle special
+        'session': PluginRoute({}),
+    },
+    'power': {
+        'state': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
+    },
+    'boot': {
+        'device': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
+    },
+    'attributes': {
+        'all': PluginRoute({ 'handler': 'attributes' }),
+        'current': PluginRoute({ 'handler': 'attributes' }),
+    },
+}
+
 nodeelements = {
     '_console/session': {
         'pluginattrs': ['console.method' ,'hardwaremanagement.method'],
@@ -97,21 +132,21 @@ def iterate_collections(iterable):
             coll = coll + '/'
         yield msg.ChildCollection(coll)
 
-def enumerate_collection(collection, configmanager):
-    if collection.startswith("/"):
-        collection = collection[1:]
-    if collection == 'node/':
+def iterate_resources(fancydict):
+    for resource in fancydict.iterkeys():
+        if resource.startswith("_"):
+            continue
+        if not isinstance(fancydict[resource], PluginRoute):  # a resource
+            resource += '/'
+        yield msg.ChildCollection(resource)
+
+def enumerate_node_collection(collectionpath, configmanager):
+    print repr(collectionpath)
+    if collectionpath == [ 'node' ]:  #it is simple '/node/', need a list of nodes
         return iterate_collections(configmanager.get_nodes())
-    elif collection.startswith('node/'):
-        nodecoll = collection.replace('node/','')
-        print nodecoll
-        if '/' not in nodecoll[:-1]:  # it is supposed to be a node
-            node = nodecoll[:-1]
-            if  not configmanager.is_node(node):
-                raise exc.NotFoundException("Invalid node requested")
-            return iterate_collections(nodecollections.iterkeys())
-    else:
-        raise exc.NotFoundException("Invalid path")
+    del collectionpath[0:2]
+    collection = nested_lookup(noderesources, collectionpath)
+    return iterate_resources(collection)
 
 
 def enumerate_collections(collections):
@@ -125,23 +160,36 @@ def handle_path(path, operation, configmanager, inputdata=None):
     An exception is made for console/session, which should return
     a class with connect(), read(), write(bytes), and close()
     '''
-    if path == '/':
+    iscollection = False
+    pathcomponents = path.split('/')
+    del pathcomponents[0]  # discard the value from leading /
+    print repr(pathcomponents)
+    if pathcomponents[-1] == '':
+        iscollection = True
+        del pathcomponents[-1]
+    if not pathcomponents: #root collection list
         return enumerate_collections(rootcollections)
-    elif path[-1] == '/':
-        return enumerate_collection(path, configmanager)
-    elif (path.startswith("/node/") or path.startswith("/system/") or
-        # single node requests
-            path.startswith("/vm/")):
-        nodeidx = path.find("/",1) + 1
-        node = path[nodeidx:]
-        node, _, element = node.partition("/")
-        if element not in nodeelements:
+    elif pathcomponents[0] in ('node', 'system', 'vm'):
+        #single node request of some sort
+        try:
+            node = pathcomponents[1]
+        except IndexError:  # doesn't actually have a long enough path
+            return iterate_collections(configmanager.get_nodes())
+        if iscollection:
+            print "oh hi there..."
+            print repr(pathcomponents[2:])
+            return enumerate_node_collection(pathcomponents, configmanager)
+        print repr(pathcomponents)
+        del pathcomponents[0:2]
+        print repr(pathcomponents)
+        try:
+            plugroute = nested_lookup(noderesources, pathcomponents).routeinfo
+        except KeyError:
             raise exc.NotFoundException("Invalid element requested")
-        inputdata = msg.get_input_message(element, operation, inputdata, (node,))
-        plugroute = nodeelements[element]
+        inputdata = msg.get_input_message(pathcomponents, operation, inputdata, (node,))
         if 'handler' in plugroute:  #fixed handler definition
             passvalue = pluginmap[plugroute['handler']].__dict__[operation](
-                nodes=(node,), element=element,
+                nodes=(node,), element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata)
         elif 'pluginattrs' in plugroute:
@@ -150,12 +198,12 @@ def handle_path(path, operation, configmanager, inputdata=None):
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
                     passvalue = pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
-                        nodes=(node,), element=element,
+                        nodes=(node,), element=pathcomponents,
                         configmanager=configmanager,
                         inputdata=inputdata)
             if 'default' in plugroute:
                 passvalue = pluginmap[plugroute['default']].__dict__[operation](
-                    nodes=(node,), element=element, configmanager=configmanager,
+                    nodes=(node,), element=pathcomponents, configmanager=configmanager,
                     inputdata=inputdata)
         if isinstance(passvalue, console.Console):
             return passvalue

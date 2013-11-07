@@ -257,6 +257,9 @@ def _assemble_html(responses, resource, querydict):
     yield '<input type="hidden" name="restexplorerop" value="update">'
     yield '<input type="hidden" name="restexplorerhonorkey" value="">'
     yield '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
+    print 'got a %s' % resource
+    if resource in ('/', './'):
+        pass
     if resource[-1] == '/':
         yield '<a rel="collection" href="../">../</a><br>'
     else:

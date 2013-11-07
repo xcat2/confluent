@@ -76,9 +76,9 @@ class ChildCollection(LinkRelation):
         self.href = collname
 
 def get_input_message(path, operation, inputdata, nodes=None):
-    if 'power/state' in path and operation != 'retrieve':
+    if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
-    elif path.startswith('attributes/') and operation != 'retrieve':
+    elif path[0] == 'attributes' and operation != 'retrieve':
         return InputAttributes(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()

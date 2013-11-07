@@ -3,7 +3,7 @@ import confluent.config.attributes as allattributes
 
 def retrieve(nodes, element, configmanager, inputdata):
     attributes = configmanager.get_node_attributes(nodes)
-    if element.endswith('/all'):
+    if element[-1] == 'all':
         for node in nodes:
             for attribute in sorted(allattributes.node.iterkeys()):
                 if attribute in attributes[node]: #have a setting for it
@@ -16,7 +16,7 @@ def retrieve(nodes, element, configmanager, inputdata):
                 else:
                     yield msg.Attributes(node,
                         {attribute: val['value']})
-    elif element.endswith('/current'):
+    elif element[-1] == 'current':
         for node in attributes.iterkeys():
             for attribute in sorted(attributes[node].iterkeys()):
                 currattr = attributes[node][attribute]

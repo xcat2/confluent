@@ -251,7 +251,7 @@ class IpmiHandler(object):
     def handle_request(self):
         while not self.loggedin:
             wait_on_ipmi()
-        if self.element == 'power/state':
+        if self.element == [ 'power', 'state' ]:
             if 'read' == self.op:
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
                 return msg.PowerState(node=self.node,
@@ -266,7 +266,7 @@ class IpmiHandler(object):
 
 
 def create(nodes, element, configmanager, inputdata):
-    if element == '_console/session':
+    if element == [ '_console', 'session' ]:
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
         return IpmiConsole(nodes[0], configmanager)
