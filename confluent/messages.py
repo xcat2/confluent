@@ -26,7 +26,6 @@ class ConfluentMessage(object):
         snippet = ""
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
-            label = key
             value = self.defaultvalue
             note = ''
             type = self.defaulttype
@@ -34,7 +33,7 @@ class ConfluentMessage(object):
                 value = val['value']
             if 'note' in val:
                 note = '(' + val['note'] + ')'
-            snippet += label + ":" + \
+            snippet += key + ":" + \
                        '<input type="%s" name="%s" value="%s">%s' % (
                             type, key, value, note)
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
@@ -80,6 +79,8 @@ def get_input_message(path, operation, inputdata, nodes=None):
         return InputPowerMessage(path, nodes, inputdata)
     elif path[0] == 'attributes' and operation != 'retrieve':
         return InputAttributes(path, nodes, inputdata)
+    elif path == [ 'boot', 'device' ] and operation != 'retrieve':
+        return InputBootDevice(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -143,6 +144,50 @@ class InputPowerMessage(ConfluentMessage):
         return self.powerbynode[node]
 
 
+class BootDevice(ConfluentChoiceMessage):
+    valid_values = set([
+        'network',
+        'hd',
+        'setup',
+        'default',
+        'cd',
+        ])
+
+    def __init__(self, node, device):
+        if device not in self.valid_values:
+            raise Exception("Invalid boot device argument passed in")
+        self.kvpairs = {
+            node: {
+                'bootdevice': { 'value': device },
+            }
+        }
+
+class InputBootDevice(BootDevice):
+    def __init__(self, path, nodes, inputdata):
+        self.bootdevbynode = {}
+        if not inputdata:
+            raise exc.InvalidArgumentException()
+        if 'bootdevice' not in inputdata:
+            for key in nodes:
+                if key not in inputdata:
+                    raise exc.InvalidArgumentException()
+                datum = inputdata[key]
+                if ('powerstate' not in datoum or
+                        datum['powerstate'] not in self.valid_values):
+                    raise exc.InvalidArgumenTException()
+                self.bootdevbynode[key] = datum['bootdevice']
+        else:
+            datum = inputdata
+            if ('bootdevice' not in datum or
+                    datum['bootdevice'] not in self.valid_values):
+                raise exc.InvalidArgumentException()
+            for node in nodes:
+                self.bootdevbynode[node] = datum['bootdevice']
+
+    def bootdevice(self, node):
+        return self.bootdevbynode[node]
+
+
 class PowerState(ConfluentChoiceMessage):
     valid_values = set([
         'on',
@@ -151,10 +196,10 @@ class PowerState(ConfluentChoiceMessage):
         'boot',
         ])
 
-    def __init__(self, node, state, querydict=None):
+    def __init__(self, node, state):
         self.kvpairs = {
             node: {
-                'powerstate': { 'label': 'Power', 'value': state, }
+                'powerstate': { 'value': state },
             }
         }
 
@@ -162,7 +207,7 @@ class Attributes(ConfluentMessage):
     def __init__(self, node, kv):
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = { 'label': key, 'value': kv[key] }
+            nkv[key] = { 'value': kv[key] }
         self.kvpairs = {
             node: nkv
         }
@@ -175,7 +220,7 @@ class CryptedAttributes(Attributes):
         # for now, just keep the dictionary keys and discard crypt value
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = { 'label': key, 'note': 'Encrypted' }
+            nkv[key] = { 'note': 'Encrypted' }
         self.kvpairs = {
             node: nkv
         }

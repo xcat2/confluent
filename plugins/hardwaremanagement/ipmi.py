@@ -263,6 +263,18 @@ class IpmiHandler(object):
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
                 return msg.PowerState(node=self.node,
                                       state=power['powerstate'])
+        elif self.element == [ 'boot', 'device' ]:
+            if 'read' == self.op:
+                bootdev = self.call_ipmicmd(self.ipmicmd.get_bootdev)
+                print repr(bootdev)
+                return msg.BootDevice(node=self.node,
+                        device=bootdev['bootdev'])
+            elif 'update' == self.op:
+                bootdev = self.inputdata.bootdevice(self.node)
+                bootdev = self.call_ipmicmd(self.ipmicmd.set_bootdev, bootdev)
+                return msg.BootDevice(node=self.node,
+                        device=bootdev['bootdev'])
+
 
 
 def create(nodes, element, configmanager, inputdata):
