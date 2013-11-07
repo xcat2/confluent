@@ -176,8 +176,6 @@ def handle_path(path, operation, configmanager, inputdata=None):
         except IndexError:  # doesn't actually have a long enough path
             return iterate_collections(configmanager.get_nodes())
         if iscollection:
-            print "oh hi there..."
-            print repr(pathcomponents[2:])
             return enumerate_node_collection(pathcomponents, configmanager)
         print repr(pathcomponents)
         del pathcomponents[0:2]

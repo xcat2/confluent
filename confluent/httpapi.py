@@ -236,14 +236,14 @@ def resourcehandler(env, start_response):
             return
         start_response('200 OK', headers)
         if mimetype == 'text/html':
-            for datum in _assemble_html(hdlr, resource, querydict):
+            for datum in _assemble_html(hdlr, resource, querydict, url):
                 yield datum
         else:
-            for datum in _assemble_json(hdlr, resource):
+            for datum in _assemble_json(hdlr, resource, url):
                 yield datum
 
 
-def _assemble_html(responses, resource, querydict):
+def _assemble_html(responses, resource, querydict, url):
     yield '<html><head><title>'
     yield 'Confluent REST Explorer: ' + resource + '</title></head>'
     yield '<body><form action="' + resource + '" method="post">'
@@ -257,10 +257,9 @@ def _assemble_html(responses, resource, querydict):
     yield '<input type="hidden" name="restexplorerop" value="update">'
     yield '<input type="hidden" name="restexplorerhonorkey" value="">'
     yield '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
-    print 'got a %s' % resource
-    if resource in ('/', './'):
+    if url == '/':
         pass
-    if resource[-1] == '/':
+    elif resource[-1] == '/':
         yield '<a rel="collection" href="../">../</a><br>'
     else:
         yield '<a rel="collection" href="./">./</a><br>'
@@ -277,7 +276,7 @@ def _assemble_html(responses, resource, querydict):
     yield '<input value="PUT" type="submit"></form></body></html>'
 
 
-def _assemble_json(responses, resource):
+def _assemble_json(responses, resource, url):
     #NOTE(jbjohnso) I'm considering giving up on yielding bit by bit
     #in json case over http.  Notably, duplicate key values from plugin
     #overwrite, but we'd want to preserve them into an array instead.
@@ -287,7 +286,9 @@ def _assemble_json(responses, resource):
     links = {
         'self': ['{"href":"%s"}' % resource],
     }
-    if resource[-1] == '/':
+    if url == '/':
+        pass
+    elif resource[-1] == '/':
         links['collection'] = ['{"href":"%s"}' % '../']
     else:
         links['collection'] = ['{"href":"%s"}' % './']
