@@ -495,6 +495,8 @@ class ConfigManager(object):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
                 cfgobj[attr] = newdict
+                #TODO: inherit: if attr != 'nodes': for each member node
+                #check and update inheritence scheme
 
     def set_node_attributes(self, attribmap):
         if 'nodes' not in self._cfgstore:
