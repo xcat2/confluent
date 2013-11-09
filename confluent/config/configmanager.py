@@ -13,12 +13,20 @@
 # encrypted fields do not support expressions, either as a source or
 # destination
 
-# For multi-node operation, each instance opens and retains a TLS connection
-# to each other instance.  'set' operations push to queue for writeback and
-# returns.  The writeback thread writes to local disk and to other instances.
-# A function is provided to wait for pending output to disk and peers
-# to complete to assure that a new requesst to  peer does not beat
-# configuration data to  the target
+#TODO: clustered mode
+# In clustered case, only one instance is the 'master'.  If some 'def set'
+# is requested on a slave, it creates a transaction id and an event, firing it
+# to master.  It then waits on the event.  When the master reflects the data
+# back and that reflection data goes into memory, the wait will be satisfied
+# this means that set on a slave will be much longer.
+# the assumption is that only the calls to 'def set' need be pushed to/from
+# master and all the implicit activity that ensues will pan out since
+# the master is ensuring a strict ordering of transactions
+# for missed transactions, transaction log will be used to track transactions
+# transaction log can have a constrained size if we want, in which case full
+# replication will trigger.
+# uuid.uuid4() will be used for transaction ids
+
 
 # on disk format is cpickle.  No data shall be in the configuration db required
 # to get started.  For example, argv shall indicate ports rather than cfg store
@@ -457,13 +465,21 @@ class ConfigManager(object):
             else:
                 self._cfgstore['nodes'][node]['groups'].add(group)
 
+    def set_group_attributes(self, attribmap):
+        if 'groups' not in self._cfgstore:
+            self._cfgstore0'groups'] = {}
+        for group in attribmap.iterkeys():
+            if group not in self._cfgstore['groups']:
+                self._cfgstore['groups'][group] = {'name': {'value': group}}
+            cfgobj = self._cfgstore['groups'][group]
+
     def set_node_attributes(self, attribmap):
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}
         # TODO(jbjohnso): multi mgr support, here if we have peers,
         # pickle the arguments and fire them off in eventlet
         # flows to peers, all should have the same result
-        for node in attribmap.keys():
+        for node in attribmap.iterkeys():
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {'name': {'value': node}}
             cfgobj = self._cfgstore['nodes'][node]
