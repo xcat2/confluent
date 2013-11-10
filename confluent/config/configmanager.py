@@ -422,7 +422,7 @@ class ConfigManager(object):
             cfgnodeobj = self._cfgstore['nodes'][node]
             nodeobj = {}
             if len(attributes) == 0:
-                attributes = cfgnodeobj.keys()
+                attributes = cfgnodeobj.iterkeys()
             for attribute in attributes:
                 if attribute not in cfgnodeobj:
                     continue
@@ -431,72 +431,124 @@ class ConfigManager(object):
             retdict[node] = nodeobj
         return retdict
 
+    def _node_added_to_group(self, node, group):
+        try:
+            nodecfg = self._cfgstore['nodes'][node]
+            groupcfg = self._cfgstore['groups'][group]
+        except KeyError:  # something did not exist, nothing to do
+            return
+        for attrib in groupcfg.iterkeys():
+            self._do_inheritance(nodecfg, attrib)
+
+    def _node_removed_from_group(self, node, group):
+        try:
+            nodecfg = self._cfgstore['nodes'][node]
+        except KeyError:  # node did not exist, nothing to do
+            return
+        for attrib in nodecfg.keys():
+            if attrib == 'groups':
+                continue
+            try:
+                if nodecfg[attrib]['inheritedfrom'] == group:
+                    del nodecfg[attrib]  # remove invalid inherited data
+                    self._do_inheritance(nodecfg, attrib)
+            except KeyError:  # inheritedfrom not set, move on
+                pass
+
+    def _do_inheritance(self, nodecfg, attrib, srcgroup=None):
+        # for now, just do single inheritance
+        # TODO: concatenating inheritance if requested
+        if attrib in ('nodes', 'groups'):
+            #not attributes that should be considered here
+            return
+        if attrib in nodecfg and 'inheritedfrom' not in nodecfg[attrib]:
+            return # already has a non-inherited value set, nothing to do
+        # if the attribute is not set, this will search for a candidate
+        # if it is set, but inheritedfrom, search for a replacement, just
+        # in case
+        for group in nodecfg['groups']:
+            if attrib in self._cfgstore['groups'][group]:
+                if srcgroup is not None and group != srcgroup:
+                    # skip needless deepcopy
+                    return
+                nodecfg[attrib] = \
+                    copy.deepcopy(self._cfgstore['groups'][group][attrib])
+                nodecfg[attrib]['inheritedfrom'] = group
+                return
+            if srcgroup is not None and group == srcgroup:
+                # break out
+                return
+
     def _sync_groups_to_node(self, groups, node):
         if 'groups' not in self._cfgstore:
             self._cfgstore['groups'] = {}
-        for group in self._cfgstore['groups'].keys():
+        for group in self._cfgstore['groups'].iterkeys():
             if group not in groups:
-                self._cfgstore['groups'][group]['nodes'].discard(node)
-                #TODO: inherit: for given node, re-evaluate cfg elements
-                # with dangling inheritfrom
+                if node in self._cfgstore['groups'][group]['nodes']:
+                    self._cfgstore['groups'][group]['nodes'].discard(node)
+                    self._node_removed_from_group(node, group)
         for group in groups:
+            if 'grouplist' not in self._cfgstore:
+                self._cfgstore['grouplist'] = [group]
+            elif group not in self._cfgstore['grouplist']:
+                self._cfgstore['grouplist'].append(group)
             if group not in self._cfgstore['groups']:
                 self._cfgstore['groups'][group] = {'name': {'value': group},
                                                       'nodes': set([node]) }
             elif 'nodes' not in self._cfgstore['groups'][group]:
                 self._cfgstore['groups'][group]['nodes'] = set([node])
-            else:
+            elif node not in self._cfgstore['groups'][group]['nodes']:
                 self._cfgstore['groups'][group]['nodes'].add(node)
-            #TODO: inherit: run inheritences over for given node
-            # but only if it wasn't already in group...
-            # so we have to check if node in 'nodes' before add()
-            if 'grouplist' not in self._cfgstore:
-                self._cfgstore['grouplist'] = [group]
-            elif group not in self._cfgstore['grouplist']:
-                self._cfgstore['grouplist'].append(group)
+            else:
+                continue #the group membership already existed, to next group
+            # node was not already in given group, perform inheritence fixup
+            self._node_added_to_group(node, group)
 
     def _sync_nodes_to_group(self, nodes, group):
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}
-        for node in self._cfgstore['nodes'].keys():
+        for node in self._cfgstore['nodes'].iterkeys():
             if node not in nodes and 'groups' in self._cfgstore['nodes'][node]:
-                self._cfgstore['nodes'][node]['groups'].discard(group)
-                #TODO: inherit: for any elements with inheritedfrom set to
-                # group, redo inheritence
+                if group in self._cfgstore['nodes'][node]['groups']:
+                    self._cfgstore['nodes'][node]['groups'].discard(group)
+                    self._node_removed_from_group(node, group)
         for node in nodes:
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {'name': {'value': node},
                                                  'groups': set([group]) }
             elif 'groups' not in self._cfgstore['nodes'][node]:
                 self._cfgstore['nodes'][node]['groups'] = set([group])
-            else:
+            elif group not in self._cfgstore['nodes'][node]['groups']:
                 self._cfgstore['nodes'][node]['groups'].add(group)
-            #TODO: inherit: if group not in 'groups': look for new
-            # inheritence implications
+            else:
+                continue # next node, this node already in
+            self._node_added_to_group(node, group)
 
     def set_group_attributes(self, attribmap):
         if 'groups' not in self._cfgstore:
-            self._cfgstore0'groups'] = {}
+            self._cfgstore['groups'] = {}
         for group in attribmap.iterkeys():
             if group not in self._cfgstore['groups']:
-                self._cfgstore['groups'][group] = {'name': {'value': group}}
+                self._cfgstore['groups'][group] = {'name': {'value': group}, 'nodes': set([])}
             cfgobj = self._cfgstore['groups'][group]
-            for attr in attribmap[group].keys():
+            for attr in attribmap[group].iterkeys():
                 newdict = {}
                 if (isinstance(attribmap[group][attr], dict) or
-                        isinstance(attribmap[node][attr], set)):
+                        isinstance(attribmap[group][attr], set)):
                     newdict = attribmap[group][attr]
                 else:
                     newdict = { 'value': attribmap[group][attr] }
-                if attr == 'nodes':
-                    self._sync_nodes_to_group(group=group,
-                        nodes=attribmap[group]['nodes'])
                 if 'value' in newdict and attr.startswith("secret."):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
                 cfgobj[attr] = newdict
-                #TODO: inherit: if attr != 'nodes': for each member node
-                #check and update inheritence scheme
+                if attr == 'nodes':
+                    self._sync_nodes_to_group(group=group,
+                        nodes=attribmap[group]['nodes'])
+                else:  # update inheritence
+                    for node in cfgobj['nodes']:
+                        nodecfg = self._cfgstore['nodes'][node]
+                        self._do_inheritance(nodecfg, attr, group)
 
     def set_node_attributes(self, attribmap):
         if 'nodes' not in self._cfgstore:
@@ -510,20 +562,20 @@ class ConfigManager(object):
             cfgobj = self._cfgstore['nodes'][node]
             exprmgr = _ExpressionFormat(cfgobj)
             recalcexpressions = False
-            for attrname in attribmap[node].keys():
+            for attrname in attribmap[node].iterkeys():
                 newdict = {}
                 if (isinstance(attribmap[node][attrname], dict) or
                         isinstance(attribmap[node][attrname], set)):
                     newdict = attribmap[node][attrname]
                 else:
                     newdict = {'value': attribmap[node][attrname] }
-                if attrname == 'groups':
-                    self._sync_groups_to_node(node=node,
-                    groups=attribmap[node]['groups'])
                 if 'value' in newdict and attrname.startswith("secret."):
                     newdict['cryptvalue' ] = crypt_value(newdict['value'])
                     del newdict['value']
                 cfgobj[attrname] = newdict
+                if attrname == 'groups':
+                    self._sync_groups_to_node(node=node,
+                    groups=attribmap[node]['groups'])
                 if ('_expressionkeys' in cfgobj and
                         attrname in cfgobj['_expressionkeys']):
                     recalcexpressions = True
@@ -580,7 +632,7 @@ class ConfigManager(object):
             return cls._sync_to_file()
 
     def _recalculate_expressions(self, cfgobj, formatter):
-        for key in cfgobj.keys():
+        for key in cfgobj.iterkeys():
             if not isinstance(cfgobj[key],dict):
                 continue
             if 'expression' in cfgobj[key]:
