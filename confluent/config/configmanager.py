@@ -510,16 +510,16 @@ class ConfigManager(object):
         for node in self._cfgstore['nodes'].iterkeys():
             if node not in nodes and 'groups' in self._cfgstore['nodes'][node]:
                 if group in self._cfgstore['nodes'][node]['groups']:
-                    self._cfgstore['nodes'][node]['groups'].discard(group)
+                    self._cfgstore['nodes'][node]['groups'].remove(group)
                     self._node_removed_from_group(node, group)
         for node in nodes:
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {'name': {'value': node},
-                                                 'groups': set([group]) }
+                                                 'groups': [group] }
             elif 'groups' not in self._cfgstore['nodes'][node]:
-                self._cfgstore['nodes'][node]['groups'] = set([group])
+                self._cfgstore['nodes'][node]['groups'] = [group]
             elif group not in self._cfgstore['nodes'][node]['groups']:
-                self._cfgstore['nodes'][node]['groups'].add(group)
+                self._cfgstore['nodes'][node]['groups'].append(group)
             else:
                 continue # next node, this node already in
             self._node_added_to_group(node, group)
@@ -533,11 +533,10 @@ class ConfigManager(object):
             cfgobj = self._cfgstore['groups'][group]
             for attr in attribmap[group].iterkeys():
                 newdict = {}
-                if (isinstance(attribmap[group][attr], dict) or
-                        isinstance(attribmap[group][attr], set)):
-                    newdict = attribmap[group][attr]
-                else:
+                if (isinstance(attribmap[group][attr], str)):
                     newdict = { 'value': attribmap[group][attr] }
+                else:
+                    newdict = attribmap[group][attr]
                 if 'value' in newdict and attr.startswith("secret."):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
