@@ -53,17 +53,7 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-nodecollections = {
-    'power/': ['state'],
-    'boot/': ['device'],
-    'console/': ['session', 'logging'],
-    'attributes/': [],  # TODO: put in the 'categories' automaticly from
-                            # confluent.config.attributes
-}
-
-rootcollections = {
-    'node/': nodecollections
-}
+rootcollections = [ 'node/', 'nodegroup/' ];
 
 class PluginRoute(object):
     def __init__(self, routedict):
@@ -98,29 +88,6 @@ noderesources = {
     },
 }
 
-nodeelements = {
-    '_console/session': {
-        'pluginattrs': ['console.method' ,'hardwaremanagement.method'],
-    },
-    'console/session': {
-        'pluginattrs': ['console.method' ,'hardwaremanagement.method'],
-    },
-    'power/state': {
-        'pluginattrs': ['hardwaremanagement.method'],
-        'default': 'ipmi',
-    },
-    'boot/device': {
-        'pluginattrs': ['hardwaremanagement.method'],
-        'default': 'ipmi',
-    },
-    'attributes/all': {
-        'handler': 'attributes',
-    },
-    'attributes/current': {
-        'handler': 'attributes',
-    },
-}
-
 def stripnode(iterablersp, node):
     for i in iterablersp:
         i.strip_node(node)
@@ -141,7 +108,6 @@ def iterate_resources(fancydict):
         yield msg.ChildCollection(resource)
 
 def enumerate_node_collection(collectionpath, configmanager):
-    print repr(collectionpath)
     if collectionpath == [ 'node' ]:  #it is simple '/node/', need a list of nodes
         return iterate_collections(configmanager.get_nodes())
     del collectionpath[0:2]
@@ -150,7 +116,7 @@ def enumerate_node_collection(collectionpath, configmanager):
 
 
 def enumerate_collections(collections):
-    for collection in collections.iterkeys():
+    for collection in collections:
         yield msg.ChildCollection(collection)
 
 def handle_path(path, operation, configmanager, inputdata=None):
@@ -163,7 +129,6 @@ def handle_path(path, operation, configmanager, inputdata=None):
     iscollection = False
     pathcomponents = path.split('/')
     del pathcomponents[0]  # discard the value from leading /
-    print repr(pathcomponents)
     if pathcomponents[-1] == '':
         iscollection = True
         del pathcomponents[-1]
@@ -177,9 +142,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
             return iterate_collections(configmanager.get_nodes())
         if iscollection:
             return enumerate_node_collection(pathcomponents, configmanager)
-        print repr(pathcomponents)
         del pathcomponents[0:2]
-        print repr(pathcomponents)
         try:
             plugroute = nested_lookup(noderesources, pathcomponents).routeinfo
         except KeyError:
