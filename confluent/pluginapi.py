@@ -134,6 +134,11 @@ def handle_path(path, operation, configmanager, inputdata=None):
         del pathcomponents[-1]
     if not pathcomponents: #root collection list
         return enumerate_collections(rootcollections)
+    elif pathcomponents[0] == 'nodegroup':
+        try:
+            group = pathcomponents[1]
+        except IndexError:
+            return iterate_collections(configmanager.get_groups())
     elif pathcomponents[0] in ('node', 'system', 'vm'):
         #single node request of some sort
         try:

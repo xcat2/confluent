@@ -231,7 +231,6 @@ class ListAttributes(ConfluentMessage):
         }
 
 class CryptedAttributes(Attributes):
-    defaultvalue = 'dummyvalue'
     defaulttype = 'password'
 
     def __init__(self, node, kv):

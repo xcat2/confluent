@@ -405,6 +405,11 @@ class ConfigManager(object):
             return False
         return True
 
+    def get_groups(self):
+        if 'groups' not in self._cfgstore:
+            return []
+        return self._cfgstore['groups'].iterkeys()
+
     def get_nodes(self):
         if 'nodes' not in self._cfgstore:
             return []

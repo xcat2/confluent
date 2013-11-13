@@ -8,10 +8,15 @@ def retrieve(nodes, element, configmanager, inputdata):
             for attribute in sorted(allattributes.node.iterkeys()):
                 if attribute in attributes[node]: #have a setting for it
                     val = attributes[node][attribute]
+                elif attribute == 'groups': # no setting, provide a blank
+                    val = []
                 else: # no setting, provide a blank
                     val = {'value': '', 'cryptvalue': ''}
                 if attribute.startswith('secret.'):
                     yield msg.CryptedAttributes(node,
+                        {attribute: val})
+                elif isinstance(val, list):
+                    yield msg.ListAttributes(node,
                         {attribute: val})
                 else:
                     yield msg.Attributes(node,
