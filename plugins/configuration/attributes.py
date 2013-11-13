@@ -41,3 +41,4 @@ def update(nodes, element, configmanager, inputdata):
         if updatenode:
             updatedict[node] = updatenode
     configmanager.set_node_attributes(updatedict)
+    return retrieve(nodes, element, configmanager, inputdata)

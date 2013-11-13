@@ -59,7 +59,8 @@ def _get_query_dict(env, reqbody, reqtype):
             pbody = urlparse.parse_qs(reqbody, True)
             for ky in pbody.iterkeys():
                 if len(pbody[ky]) > 1:  # e.g. REST explorer
-                    qdict[ky] = pbody[ky]
+                    na = [i for i in pbody[ky] if i != '']
+                    qdict[ky] = na
                 else:
                     qdict[ky] = pbody[ky][0]
     if 'restexplorerhonorkey' in qdict:
