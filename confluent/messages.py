@@ -33,6 +33,18 @@ class ConfluentMessage(object):
                 value = val['value']
             if 'note' in val:
                 note = '(' + val['note'] + ')'
+            if isinstance(val, list):
+                snippet += key + ":"
+                for v in val:
+                    snippet += \
+                       '<input type="%s" name="%s" value="%s">%s' % (
+                            type, key, v, note)
+                snippet += \
+                       '<input type="%s" name="%s" value="">%s' % (
+                            type, key, note)
+                snippet += '<input type="checkbox" name="restexplorerhonorkey" '
+                snippet += 'value="%s">' % (key)
+                return snippet
             snippet += key + ":" + \
                        '<input type="%s" name="%s" value="%s">%s' % (
                             type, key, value, note)
@@ -210,6 +222,12 @@ class Attributes(ConfluentMessage):
             nkv[key] = { 'value': kv[key] }
         self.kvpairs = {
             node: nkv
+        }
+
+class ListAttributes(ConfluentMessage):
+    def __init__(self, node, kv):
+        self .kvpairs = {
+            node: kv
         }
 
 class CryptedAttributes(Attributes):

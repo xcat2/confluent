@@ -26,6 +26,9 @@ def retrieve(nodes, element, configmanager, inputdata):
                 elif 'cryptvalue' in currattr:
                     yield msg.CryptedAttributes(node,
                         {attribute: currattr['cryptvalue']})
+                elif isinstance(currattr, list):
+                    yield msg.ListAttributes(node,
+                        {attribute: currattr})
                 else:
                     print repr(currattr)
                     raise Exception("BUGGY ATTRIBUTE FOR NODE")

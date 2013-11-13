@@ -563,11 +563,10 @@ class ConfigManager(object):
             recalcexpressions = False
             for attrname in attribmap[node].iterkeys():
                 newdict = {}
-                if (isinstance(attribmap[node][attrname], dict) or
-                        isinstance(attribmap[node][attrname], set)):
-                    newdict = attribmap[node][attrname]
-                else:
+                if (isinstance(attribmap[node][attrname], str)):
                     newdict = {'value': attribmap[node][attrname] }
+                else:
+                    newdict = attribmap[node][attrname]
                 if 'value' in newdict and attrname.startswith("secret."):
                     newdict['cryptvalue' ] = crypt_value(newdict['value'])
                     del newdict['value']
