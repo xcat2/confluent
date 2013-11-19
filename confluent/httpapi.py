@@ -235,13 +235,15 @@ def resourcehandler(env, start_response):
             start_response('400 Bad Request', headers)
             yield '400 - Bad Request'
             return
-        start_response('200 OK', headers)
+        pagecontent = ""
         if mimetype == 'text/html':
             for datum in _assemble_html(hdlr, resource, querydict, url):
-                yield datum
+                pagecontent += datum
         else:
             for datum in _assemble_json(hdlr, resource, url):
-                yield datum
+                pagecontent += datum
+        start_response('200 OK', headers)
+        yield pagecontent
 
 
 def _assemble_html(responses, resource, querydict, url):
