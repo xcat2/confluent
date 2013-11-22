@@ -287,55 +287,38 @@ def _assemble_json(responses, resource, url):
     #once and hold on to all the data in memory
     docomma = False
     links = {
-        'self': ['{"href":"%s"}' % resource],
+        'self': {"href":resource},
     }
     if url == '/':
         pass
     elif resource[-1] == '/':
-        links['collection'] = ['{"href":"%s"}' % '../']
+        links['collection'] = {"href":"../"}
     else:
-        links['collection'] = ['{"href":"%s"}' % './']
-    yield '{'
-    hadrsp = False
+        links['collection'] = {"href":"./"}
+    rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
-            haldata = rsp.json_hal()
+            haldata = rsp.raw_rel()
             for hk in haldata.iterkeys():
                 if hk in links:
-                    links[hk].append(haldata[hk])
+                    if isinstance(links[hk], list):
+                        links[hk].append(haldata[hk])
+                    else:
+                        links[hk] = [ links[hk], haldata[hk] ]
                 else:
-                    links[hk] = [haldata[hk]]
-            continue
-        hadrsp = True
-        if docomma:
-            yield ','
+                    links[hk] = haldata[hk]
         else:
-            docomma = True
-        yield rsp.json()
-    docomma = False
-    if hadrsp:
-        yield ','
-    yield '"_links": {'
-    groupcomma = False
-    for link in links.iterkeys():
-        if groupcomma:
-            yield ','
-        else:
-            groupcomma = True
-        yield json.dumps(link) + ":"
-        if len(links[link]) == 1:
-            yield links[link][0]
-        else:
-            yield '['
-            for lk in links[link]:
-                if docomma:
-                    yield ','
+            rsp = rsp.rawdata()
+            for dk in rsp.iterkeys():
+                if dk in rspdata:
+                    if isinstance(rspdata[dk], list):
+                        rspdata[dk].append(rsp[dk])
+                    else:
+                        rspdata[dk] = [ rspdata[dk], rsp[dk] ]
                 else:
-                    docomma = True
-                yield lk
-            yield ']'
-    yield '}'
-    yield '}'
+                    rspdata[dk] = rsp[dk]
+    rspdata["_links"] = links
+    yield json.dumps(rspdata, sort_keys=True, indent=4)
 
 
 def serve():

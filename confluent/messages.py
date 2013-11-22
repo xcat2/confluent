@@ -18,6 +18,12 @@ class ConfluentMessage(object):
         jsonsnippet = json.dumps(self.kvpairs, separators=(',', ':'))[1:-1]
         return jsonsnippet
 
+    def rawdata(self):
+        """Return pythonic representation of the response.
+
+        Used by httpapi while assembling data prior to json serialization"""
+        return self.kvpairs
+
     def strip_node(self, node):
         self.kvpairs = self.kvpairs[node]
 
@@ -74,9 +80,23 @@ class ConfluentChoiceMessage(ConfluentMessage):
 
 class LinkRelation(ConfluentMessage):
     def json_hal(self):
+        """Provide json_hal style representation of the relation.
+
+        This currently only makes sense for the socket api.
+        """
         return {self.rel: '{ "href": "%s" }' % self.href }
 
+    def raw_rel(self):
+        """Provide python structure of the relation.
+
+        This currently is only sensible to consume from httpapi.
+        """
+        return { self.rel: { "href": self.href }}
+
     def html(self):
+        """Provide an html representation of the link relation.
+
+        This is used by the API explorer aspect of httpapi"""
         return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
 
 
