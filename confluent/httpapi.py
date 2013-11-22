@@ -257,7 +257,6 @@ def _assemble_html(responses, resource, querydict, url):
         yield '<hr>'
     yield 'Only fields that have their boxes checked will have their '
     yield 'respective values honored by the confluent server.<hr>'
-    yield '<input type="hidden" name="restexplorerop" value="update">'
     yield '<input type="hidden" name="restexplorerhonorkey" value="">'
     yield '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
     if url == '/':
@@ -279,7 +278,9 @@ def _assemble_html(responses, resource, querydict, url):
         yield rsp.html()
         yield "<br>"
     if not iscollection:
-        yield '<input value="PUT" type="submit"></form></body></html>'
+        yield '<input value="update" name="restexplorerop" type="submit"></form></body></html>'
+    else:
+        yield '<input type="hidden" name="restexplorerop" value="update">'
 
 
 def _assemble_json(responses, resource, url):

@@ -251,6 +251,9 @@ class IpmiHandler(object):
     def handle_request(self):
         while not self.loggedin:
             wait_on_ipmi()
+        bootdevices = {
+            'optical': 'cd'
+        }
         if self.element == [ 'power', 'state' ]:
             if 'read' == self.op:
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
@@ -266,12 +269,15 @@ class IpmiHandler(object):
         elif self.element == [ 'boot', 'device' ]:
             if 'read' == self.op:
                 bootdev = self.call_ipmicmd(self.ipmicmd.get_bootdev)
-                print repr(bootdev)
+                if bootdev['bootdev'] in bootdevices:
+                    bootdev['bootdev'] = bootdevices[bootdev['bootdev']]
                 return msg.BootDevice(node=self.node,
                         device=bootdev['bootdev'])
             elif 'update' == self.op:
                 bootdev = self.inputdata.bootdevice(self.node)
                 bootdev = self.call_ipmicmd(self.ipmicmd.set_bootdev, bootdev)
+                if bootdev['bootdev'] in bootdevices:
+                    bootdev['bootdev'] = bootdevices[bootdev['bootdev']]
                 return msg.BootDevice(node=self.node,
                         device=bootdev['bootdev'])
 

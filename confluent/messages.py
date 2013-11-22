@@ -98,6 +98,7 @@ class LinkRelation(ConfluentMessage):
 
         This is used by the API explorer aspect of httpapi"""
         return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
+        #return '<a href="%s" rel="%s">%s</a><input type="submit" name="restexprerorop" value="delete:%s"' % (self.href, self.rel, self.href, self.href)
 
 
 
@@ -187,7 +188,7 @@ class BootDevice(ConfluentChoiceMessage):
 
     def __init__(self, node, device):
         if device not in self.valid_values:
-            raise Exception("Invalid boot device argument passed in")
+            raise Exception("Invalid boot device argument passed in: %s" % device)
         self.kvpairs = {
             node: {
                 'bootdevice': { 'value': device },
