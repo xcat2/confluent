@@ -263,8 +263,10 @@ def _assemble_html(responses, resource, querydict, url):
     if url == '/':
         pass
     elif resource[-1] == '/':
+        iscollection = True
         yield '<a rel="collection" href="../">../</a><br>'
     else:
+        iscollection = False
         yield '<a rel="collection" href="./">./</a><br>'
     pendingrsp = []
     for rsp in responses:
@@ -276,7 +278,8 @@ def _assemble_html(responses, resource, querydict, url):
     for rsp in pendingrsp:
         yield rsp.html()
         yield "<br>"
-    yield '<input value="PUT" type="submit"></form></body></html>'
+    if not iscollection:
+        yield '<input value="PUT" type="submit"></form></body></html>'
 
 
 def _assemble_json(responses, resource, url):
