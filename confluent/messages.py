@@ -58,6 +58,9 @@ class ConfluentMessage(object):
             snippet += 'value="%s">' % (key)
         return snippet
 
+class DeletedResource(ConfluentMessage):
+    def __init__(self):
+        self.kvpairs = {}
 
 class ConfluentChoiceMessage(ConfluentMessage):
 

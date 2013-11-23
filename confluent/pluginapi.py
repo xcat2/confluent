@@ -107,6 +107,12 @@ def iterate_resources(fancydict):
             resource += '/'
         yield msg.ChildCollection(resource)
 
+def delete_node_collection(collectionpath, configmanager):
+    if len(collectionpath) == 2:  #just node
+        node = collectionpath[-1]
+        configmanager.del_nodes([node])
+        yield msg.DeletedResource()
+
 def enumerate_node_collection(collectionpath, configmanager):
     if collectionpath == [ 'node' ]:  #it is simple '/node/', need a list of nodes
         return iterate_collections(configmanager.get_nodes())
@@ -146,7 +152,12 @@ def handle_path(path, operation, configmanager, inputdata=None):
         except IndexError:  # doesn't actually have a long enough path
             return iterate_collections(configmanager.get_nodes())
         if iscollection:
-            return enumerate_node_collection(pathcomponents, configmanager)
+            if operation == "delete":
+                return delete_node_collection(pathcomponents, configmanager)
+            elif operation == "retrieve":
+                return enumerate_node_collection(pathcomponents, configmanager)
+            else:
+                raise Exception("TODO here")
         del pathcomponents[0:2]
         try:
             plugroute = nested_lookup(noderesources, pathcomponents).routeinfo
