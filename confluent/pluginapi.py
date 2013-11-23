@@ -97,7 +97,7 @@ def iterate_collections(iterable):
     for coll in iterable:
         if coll[-1] != '/':
             coll = coll + '/'
-        yield msg.ChildCollection(coll)
+        yield msg.ChildCollection(coll, candelete=True)
 
 def iterate_resources(fancydict):
     for resource in fancydict.iterkeys():

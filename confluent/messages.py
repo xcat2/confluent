@@ -103,9 +103,16 @@ class LinkRelation(ConfluentMessage):
 
 
 class ChildCollection(LinkRelation):
-    def __init__(self, collname):
+    def __init__(self, collname, candelete=False):
         self.rel = 'item'
         self.href = collname
+        self.candelete = candelete
+
+    def html(self):
+        if self.candelete:
+            return '<a href="%s" rel="%s">%s</a> . . . . . . . . . . . . . . . . . . <button type="submit" name="restexplorerop" value="delete" formaction="%s">delete</button>' % (self.href, self.rel, self.href, self.href)
+        else:
+            return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
 
 def get_input_message(path, operation, inputdata, nodes=None):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':

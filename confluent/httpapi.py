@@ -149,13 +149,18 @@ def _assign_consessionid(consolesession):
 def resourcehandler(env, start_response):
     """Function to handle new wsgi requests
     """
-    authorized = _authorize_request(env)
     mimetype = _pick_mimetype(env)
     reqbody = None
     reqtype = None
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
+    operation = opmap[env['REQUEST_METHOD']]
+    querydict = _get_query_dict(env, reqbody, reqtype)
+    if 'restexplorerop' in querydict:
+        operation = querydict['restexplorerop']
+        del querydict['restexplorerop']
+    authorized = _authorize_request(env)
     if authorized['code'] == 401:
         start_response('401 Authentication Required',
             [('Content-type', 'text/plain'),
@@ -174,11 +179,6 @@ def resourcehandler(env, start_response):
     headers.extend(("Set-Cookie", m.OutputString())
             for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
-    operation = opmap[env['REQUEST_METHOD']]
-    querydict = _get_query_dict(env, reqbody, reqtype)
-    if 'restexplorerop' in querydict:
-        operation = querydict['restexplorerop']
-        del querydict['restexplorerop']
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
         prefix, _, _ = env['PATH_INFO'].partition('/console/session')
@@ -279,8 +279,6 @@ def _assemble_html(responses, resource, querydict, url):
         yield "<br>"
     if not iscollection:
         yield '<input value="update" name="restexplorerop" type="submit"></form></body></html>'
-    else:
-        yield '<input type="hidden" name="restexplorerop" value="update">'
 
 
 def _assemble_json(responses, resource, url):
