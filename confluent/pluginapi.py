@@ -112,6 +112,8 @@ def delete_node_collection(collectionpath, configmanager):
         node = collectionpath[-1]
         configmanager.del_nodes([node])
         yield msg.DeletedResource()
+    else:
+        raise Exception("Not implemented")
 
 def enumerate_node_collection(collectionpath, configmanager):
     if collectionpath == [ 'node' ]:  #it is simple '/node/', need a list of nodes

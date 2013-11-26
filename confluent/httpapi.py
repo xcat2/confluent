@@ -247,36 +247,35 @@ def resourcehandler(env, start_response):
 
 
 def _assemble_html(responses, resource, querydict, url):
-    yield '<html><head><title>'
-    yield 'Confluent REST Explorer: ' + resource + '</title></head>'
-    yield '<body><form action="' + resource + '" method="post">'
+    yield '<html><head><title>' \
+          'Confluent REST Explorer: ' + resource + '</title></head>' \
+          '<body><form action="' + resource + '" method="post">'
     if querydict:
-        yield 'Response to input data:<br>'
-        yield json.dumps(querydict, separators=(',', ': '),
-                         indent=4, sort_keys=True)
-        yield '<hr>'
-    yield 'Only fields that have their boxes checked will have their '
-    yield 'respective values honored by the confluent server.<hr>'
-    yield '<input type="hidden" name="restexplorerhonorkey" value="">'
-    yield '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
+        yield 'Response to input data:<br>' + \
+              json.dumps(querydict, separators=(',', ': '),
+                         indent=4, sort_keys=True) + '<hr>'
+    yield 'Only fields that have their boxes checked will have their ' \
+          'respective values honored by the confluent server.<hr>' \
+          '<input type="hidden" name="restexplorerhonorkey" value="">' + \
+          '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
     if url == '/':
         iscollection = True
     elif resource[-1] == '/':
         iscollection = True
         yield '<a rel="collection" href="../">../</a><br>'
+
     else:
         iscollection = False
         yield '<a rel="collection" href="./">./</a><br>'
     pendingrsp = []
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
-            yield rsp.html()
-            yield "<br>"
+            yield rsp.html() + "<br>"
         else:
             pendingrsp.append(rsp)
     for rsp in pendingrsp:
-        yield rsp.html()
-        yield "<br>"
+        yield rsp.html()+ "<br>"
+    print url
     if not iscollection:
         yield '<input value="update" name="restexplorerop" type="submit"></form></body></html>'
 
