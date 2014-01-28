@@ -142,12 +142,13 @@ class ConsoleSession(object):
         self.reaper.cancel()
         currtime = util.monotonic_time()
         deadline = currtime + 45
-        if self.databuffer is None:
+        try:
+            while len(self.databuffer) == 0 and currtime < deadline:
+                timeo = deadline - currtime
+                self.conshdl._console.wait_for_data(timeout=timeo)
+                currtime = util.monotonic_time()
+        except TypeError:
             return ""
-        while len(self.databuffer) == 0 and currtime < deadline:
-            timeo = deadline - currtime
-            self.conshdl._console.wait_for_data(timeout=timeo)
-            currtime = util.monotonic_time()
         retval = self.databuffer
         self.databuffer = ""
         self.reaper = eventlet.spawn_after(15, self.destroy)
