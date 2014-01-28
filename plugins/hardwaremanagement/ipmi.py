@@ -40,6 +40,8 @@ def _ipmi_evtloop():
             while ipmiwaiters:
                 waiter = ipmiwaiters.popleft()
                 waiter.send()
+        except RunTimeError:
+            raise
         except:
             print "Whoops, that was a doozy"
 
