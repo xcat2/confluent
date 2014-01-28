@@ -6,6 +6,7 @@
 import base64
 import Cookie
 import confluent.auth as auth
+import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
 import confluent.messages
@@ -31,6 +32,22 @@ opmap = {
     'DELETE': 'delete',
 }
 
+def node_creation_resources():
+    yield confluent.messages.Attributes(
+        kv={ 'name': None}, desc="Name of the node").html() + '<br>'
+    for attr in sorted(attribs.node.iterkeys()):
+        if attr.startswith("secret."):
+            yield confluent.messages.CryptedAttributes(
+                kv={ attr: None }, desc=attribs.node[attr]['description']).html() + \
+                '<br>'
+        else:
+            yield confluent.messages.Attributes(
+                kv={ attr: None }, desc=attribs.node[attr]['description']).html() + \
+                '<br>'
+
+create_resource_functions = {
+    '/node/': node_creation_resources,
+}
 
 def _sessioncleaner():
     while (1):
@@ -149,13 +166,18 @@ def _assign_consessionid(consolesession):
 def resourcehandler(env, start_response):
     """Function to handle new wsgi requests
     """
-    authorized = _authorize_request(env)
     mimetype = _pick_mimetype(env)
     reqbody = None
     reqtype = None
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
+    operation = opmap[env['REQUEST_METHOD']]
+    querydict = _get_query_dict(env, reqbody, reqtype)
+    if 'restexplorerop' in querydict:
+        operation = querydict['restexplorerop']
+        del querydict['restexplorerop']
+    authorized = _authorize_request(env)
     if authorized['code'] == 401:
         start_response('401 Authentication Required',
             [('Content-type', 'text/plain'),
@@ -174,11 +196,6 @@ def resourcehandler(env, start_response):
     headers.extend(("Set-Cookie", m.OutputString())
             for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
-    operation = opmap[env['REQUEST_METHOD']]
-    querydict = _get_query_dict(env, reqbody, reqtype)
-    if 'restexplorerop' in querydict:
-        operation = querydict['restexplorerop']
-        del querydict['restexplorerop']
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
         prefix, _, _ = env['PATH_INFO'].partition('/console/session')
@@ -235,46 +252,60 @@ def resourcehandler(env, start_response):
             start_response('400 Bad Request', headers)
             yield '400 - Bad Request'
             return
-        start_response('200 OK', headers)
+        pagecontent = ""
         if mimetype == 'text/html':
             for datum in _assemble_html(hdlr, resource, querydict, url):
-                yield datum
+                pagecontent += datum
         else:
             for datum in _assemble_json(hdlr, resource, url):
-                yield datum
+                pagecontent += datum
+        start_response('200 OK', headers)
+        yield pagecontent
 
 
 def _assemble_html(responses, resource, querydict, url):
-    yield '<html><head><title>'
-    yield 'Confluent REST Explorer: ' + resource + '</title></head>'
-    yield '<body><form action="' + resource + '" method="post">'
+    yield '<html><head><title>' \
+          'Confluent REST Explorer: ' + url + '</title></head>' \
+          '<body><form action="' + resource + '" method="post">'
     if querydict:
-        yield 'Response to input data:<br>'
-        yield json.dumps(querydict, separators=(',', ': '),
-                         indent=4, sort_keys=True)
-        yield '<hr>'
-    yield 'Only fields that have their boxes checked will have their '
-    yield 'respective values honored by the confluent server.<hr>'
-    yield '<input type="hidden" name="restexplorerop" value="update">'
-    yield '<input type="hidden" name="restexplorerhonorkey" value="">'
-    yield '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
+        yield 'Response to input data:<br>' + \
+              json.dumps(querydict, separators=(',', ': '),
+                         indent=4, sort_keys=True) + '<hr>'
+    yield 'Only fields that have their boxes checked will have their ' \
+          'respective values honored by the confluent server.<hr>' \
+          '<input type="hidden" name="restexplorerhonorkey" value="">' + \
+          '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
     if url == '/':
-        pass
+        iscollection = True
     elif resource[-1] == '/':
+        iscollection = True
         yield '<a rel="collection" href="../">../</a><br>'
+
     else:
+        iscollection = False
         yield '<a rel="collection" href="./">./</a><br>'
     pendingrsp = []
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
-            yield rsp.html()
-            yield "<br>"
+            yield rsp.html() + "<br>"
         else:
             pendingrsp.append(rsp)
     for rsp in pendingrsp:
-        yield rsp.html()
-        yield "<br>"
-    yield '<input value="PUT" type="submit"></form></body></html>'
+        yield rsp.html()+ "<br>"
+    if iscollection:
+        localpath = url[:-2]
+        try:
+            firstpass = True
+            for y in create_resource_functions[url]():
+                if firstpass:
+                    yield "<hr>Define new %s:<BR>" % url.split("/")[-2]
+                firstpass = False
+                yield y
+            yield '<input value="create" name="restexplorerop" type="submit"></form></body></html>'
+        except KeyError:
+            pass
+    else:
+        yield '<input value="update" name="restexplorerop" type="submit"></form></body></html>'
 
 
 def _assemble_json(responses, resource, url):
@@ -285,55 +316,38 @@ def _assemble_json(responses, resource, url):
     #once and hold on to all the data in memory
     docomma = False
     links = {
-        'self': ['{"href":"%s"}' % resource],
+        'self': {"href":resource},
     }
     if url == '/':
         pass
     elif resource[-1] == '/':
-        links['collection'] = ['{"href":"%s"}' % '../']
+        links['collection'] = {"href":"../"}
     else:
-        links['collection'] = ['{"href":"%s"}' % './']
-    yield '{'
-    hadrsp = False
+        links['collection'] = {"href":"./"}
+    rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
-            haldata = rsp.json_hal()
+            haldata = rsp.raw_rel()
             for hk in haldata.iterkeys():
                 if hk in links:
-                    links[hk].append(haldata[hk])
+                    if isinstance(links[hk], list):
+                        links[hk].append(haldata[hk])
+                    else:
+                        links[hk] = [ links[hk], haldata[hk] ]
                 else:
-                    links[hk] = [haldata[hk]]
-            continue
-        hadrsp = True
-        if docomma:
-            yield ','
+                    links[hk] = haldata[hk]
         else:
-            docomma = True
-        yield rsp.json()
-    docomma = False
-    if hadrsp:
-        yield ','
-    yield '"_links": {'
-    groupcomma = False
-    for link in links.iterkeys():
-        if groupcomma:
-            yield ','
-        else:
-            groupcomma = True
-        yield json.dumps(link) + ":"
-        if len(links[link]) == 1:
-            yield links[link][0]
-        else:
-            yield '['
-            for lk in links[link]:
-                if docomma:
-                    yield ','
+            rsp = rsp.rawdata()
+            for dk in rsp.iterkeys():
+                if dk in rspdata:
+                    if isinstance(rspdata[dk], list):
+                        rspdata[dk].append(rsp[dk])
+                    else:
+                        rspdata[dk] = [ rspdata[dk], rsp[dk] ]
                 else:
-                    docomma = True
-                yield lk
-            yield ']'
-    yield '}'
-    yield '}'
+                    rspdata[dk] = rsp[dk]
+    rspdata["_links"] = links
+    yield json.dumps(rspdata, sort_keys=True, indent=4)
 
 
 def serve():

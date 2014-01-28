@@ -18,6 +18,12 @@ class ConfluentMessage(object):
         jsonsnippet = json.dumps(self.kvpairs, separators=(',', ':'))[1:-1]
         return jsonsnippet
 
+    def rawdata(self):
+        """Return pythonic representation of the response.
+
+        Used by httpapi while assembling data prior to json serialization"""
+        return self.kvpairs
+
     def strip_node(self, node):
         self.kvpairs = self.kvpairs[node]
 
@@ -29,29 +35,38 @@ class ConfluentMessage(object):
             value = self.defaultvalue
             note = ''
             type = self.defaulttype
+            try:
+                desc = self.desc
+            except:
+                desc = ''
             if 'value' in val:
                 value = val['value']
+            if value is None:
+                value = ''
             if 'note' in val:
                 note = '(' + val['note'] + ')'
             if isinstance(val, list):
                 snippet += key + ":"
                 for v in val:
                     snippet += \
-                       '<input type="%s" name="%s" value="%s">%s' % (
-                            type, key, v, note)
+                       '<input type="%s" name="%s" value="%s" title="%s">%s' % (
+                            type, key, v, desc, note)
                 snippet += \
-                       '<input type="%s" name="%s" value="">%s' % (
-                            type, key, note)
+                       '<input type="%s" name="%s" value="" title="%s">%s' % (
+                            type, key, desc, note)
                 snippet += '<input type="checkbox" name="restexplorerhonorkey" '
                 snippet += 'value="%s">' % (key)
                 return snippet
             snippet += key + ":" + \
-                       '<input type="%s" name="%s" value="%s">%s' % (
-                            type, key, value, note)
+                       '<input type="%s" name="%s" value="%s" title="%s">%s' % (
+                            type, key, value, desc, note)
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
             snippet += 'value="%s">' % (key)
         return snippet
 
+class DeletedResource(ConfluentMessage):
+    def __init__(self):
+        self.kvpairs = {}
 
 class ConfluentChoiceMessage(ConfluentMessage):
 
@@ -74,17 +89,39 @@ class ConfluentChoiceMessage(ConfluentMessage):
 
 class LinkRelation(ConfluentMessage):
     def json_hal(self):
+        """Provide json_hal style representation of the relation.
+
+        This currently only makes sense for the socket api.
+        """
         return {self.rel: '{ "href": "%s" }' % self.href }
 
+    def raw_rel(self):
+        """Provide python structure of the relation.
+
+        This currently is only sensible to consume from httpapi.
+        """
+        return { self.rel: { "href": self.href }}
+
     def html(self):
+        """Provide an html representation of the link relation.
+
+        This is used by the API explorer aspect of httpapi"""
         return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
+        #return '<a href="%s" rel="%s">%s</a><input type="submit" name="restexprerorop" value="delete:%s"' % (self.href, self.rel, self.href, self.href)
 
 
 
 class ChildCollection(LinkRelation):
-    def __init__(self, collname):
+    def __init__(self, collname, candelete=False):
         self.rel = 'item'
         self.href = collname
+        self.candelete = candelete
+
+    def html(self):
+        if self.candelete:
+            return '<a href="%s" rel="%s">%s</a> . . . . . . . . . . . . . . . . . . <button type="submit" name="restexplorerop" value="delete" formaction="%s">delete</button>' % (self.href, self.rel, self.href, self.href)
+        else:
+            return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
 
 def get_input_message(path, operation, inputdata, nodes=None):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
@@ -167,7 +204,7 @@ class BootDevice(ConfluentChoiceMessage):
 
     def __init__(self, node, device):
         if device not in self.valid_values:
-            raise Exception("Invalid boot device argument passed in")
+            raise Exception("Invalid boot device argument passed in: %s" % device)
         self.kvpairs = {
             node: {
                 'bootdevice': { 'value': device },
@@ -216,13 +253,17 @@ class PowerState(ConfluentChoiceMessage):
         }
 
 class Attributes(ConfluentMessage):
-    def __init__(self, node, kv):
+    def __init__(self, node=None, kv=None, desc=None):
+        self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
             nkv[key] = { 'value': kv[key] }
-        self.kvpairs = {
-            node: nkv
-        }
+        if node is None:
+            self.kvpairs = nkv
+        else:
+            self.kvpairs = {
+                node: nkv
+            }
 
 class ListAttributes(ConfluentMessage):
     def __init__(self, node, kv):
@@ -233,11 +274,15 @@ class ListAttributes(ConfluentMessage):
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
 
-    def __init__(self, node, kv):
+    def __init__(self, node=None, kv=None, desc=None):
         # for now, just keep the dictionary keys and discard crypt value
+        self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
             nkv[key] = { 'note': 'Encrypted' }
-        self.kvpairs = {
-            node: nkv
-        }
+        if node is None:
+            self.kvpairs = nkv
+        else:
+            self.kvpairs = {
+                node: nkv
+            }

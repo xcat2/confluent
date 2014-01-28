@@ -554,6 +554,15 @@ class ConfigManager(object):
                         nodecfg = self._cfgstore['nodes'][node]
                         self._do_inheritance(nodecfg, attr, group)
 
+    def del_nodes(self, nodes):
+        if 'nodes' not in self._cfgstore:
+            return
+        for node in nodes:
+            if node in self._cfgstore['nodes']:
+                self._sync_groups_to_node(node=node, groups=[])
+                del self._cfgstore['nodes'][node]
+        self._bg_sync_to_file()
+
     def set_node_attributes(self, attribmap):
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}

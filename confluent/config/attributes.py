@@ -52,105 +52,106 @@ nic = {
 # 'node', which can be considered a 'system' or a 'vm'
 node = {
     'groups': {
+        'type': (list, tuple),
         'default': 'all',
         'description': ('List of static groups for which this node is'
                         'considered a member'),
     },
-    'type': {
-        'description': ('Classification of node as system, vm, etc')
-    },
-    'id': {
-        'description': ('Numeric identifier for node')
-    },
-    'location.timezone': {
-        'description': 'POSIX timezone to apply to this node',
-    },
-    'status.summary': {
-        'description': ('An assessment of the overall health of the node.  It'
-                        'can be "optimal", "warning", "critical"'),
-    },
-    'status.lastheartbeat': {
-        'description': 'Timestamp of last received heartbeat',
-    },
-    'status.heartbeatexpiry': {
-        'description': 'Time when Heartbeat will be considered expired',
-    },
-    'status.deployment': {
-        'description': 'State of any deployment activity in progress',
-    },
-    'status.faultdetails': {
-        'description': 'Detailed problem data, if any',
-    },
-    'network.gateway': {
-        'description': 'Default gateway to configure node with',
-    },
-    'network.nameservers': {
-        'description': '''DNS servers for node to use''',
-    },
-    'network.domain': {
-        'description': 'Value to append to nodename, if any, to get FQDN',
-    },
-    'network.interfaces': {
-        'dictof': 'nic',
-        'description': ('Dict of network interfaces to configure on node. '
-                       'Keyed on hardware address.'),
-    },
-    'storage.osvolume': {
-        'default': 'auto',
-        'description': 'Description of storage to target when deploying OS',
-    },
-    'storage.clientiqn': {
-        'description': ('Indicates IQN used by this node when communicating'
-                        'with iSCSI servers'),
-    },
-    'storage.iscsiserver': {
-        'description': 'Address of iSCSI server used for boot if applicable',
-    },
-    'storage.pool': {
-        'description': ('For scenarios like SAN boot and virtualization, this'
-                        'describes the pool to allocate boot volume from'),
-    },
-    'os.imagename': {
-        'description': 'The OS Image applied or to be applied to node',
-    },
-    'console.speed': {
-        'default': 'auto',
-        'description': ('Indicate the speed at which to run serial port.'
-                        'Default behavior is to autodetect the appropriate'
-                        'value as possible')
-    },
-    'console.port': {
-        'default': 'auto',
-        'description': ('Indicate which port to use for text console.  Default'
-                        'behavior is to auto detect the value appropriate for'
-                        'the platform.  "Disable" can be used to suppress'
-                        'serial console configuration')
-    },
+    #'type': {
+    #    'description': ('Classification of node as system, vm, etc')
+    #},
+    #'id': {
+    #    'description': ('Numeric identifier for node')
+    #},
+#    'location.timezone': {
+#        'description': 'POSIX timezone to apply to this node',
+#    },
+#    'status.summary': {
+#        'description': ('An assessment of the overall health of the node.  It'
+#                        'can be "optimal", "warning", "critical"'),
+#    },
+#    'status.lastheartbeat': {
+#        'description': 'Timestamp of last received heartbeat',
+#    },
+#    'status.heartbeatexpiry': {
+#        'description': 'Time when Heartbeat will be considered expired',
+#    },
+#    'status.deployment': {
+#        'description': 'State of any deployment activity in progress',
+#    },
+#    'status.faultdetails': {
+#        'description': 'Detailed problem data, if any',
+#    },
+#    'network.gateway': {
+#        'description': 'Default gateway to configure node with',
+#    },
+#    'network.nameservers': {
+#        'description': '''DNS servers for node to use''',
+#    },
+#    'network.domain': {
+#        'description': 'Value to append to nodename, if any, to get FQDN',
+#    },
+#    'network.interfaces': {
+#        'dictof': 'nic',
+#        'description': ('Dict of network interfaces to configure on node. '
+#                       'Keyed on hardware address.'),
+#    },
+#    'storage.osvolume': {
+#        'default': 'auto',
+#        'description': 'Description of storage to target when deploying OS',
+#    },
+#    'storage.clientiqn': {
+#        'description': ('Indicates IQN used by this node when communicating'
+#                        'with iSCSI servers'),
+#    },
+#    'storage.iscsiserver': {
+#        'description': 'Address of iSCSI server used for boot if applicable',
+#    },
+#    'storage.pool': {
+#        'description': ('For scenarios like SAN boot and virtualization, this'
+#                        'describes the pool to allocate boot volume from'),
+#    },
+#    'os.imagename': {
+#        'description': 'The OS Image applied or to be applied to node',
+#    },
+#    'console.speed': {
+#        'default': 'auto',
+#        'description': ('Indicate the speed at which to run serial port.'
+#                        'Default behavior is to autodetect the appropriate'
+#                        'value as possible')
+#    },
+#    'console.port': {
+#        'default': 'auto',
+#        'description': ('Indicate which port to use for text console.  Default'
+#                        'behavior is to auto detect the value appropriate for'
+#                        'the platform.  "Disable" can be used to suppress'
+#                        'serial console configuration')
+#    },
     'console.method': {
         'description': ('Indicate the method used to access the console of'
                        'The managed node.')
     },
-    'virtualization.host': {
-        'description': ('Hypervisor where this node does/should reside'),
-        'appliesto': ['vm'],
-    },
-    'virtualization.computepool': {
-        'description': ('Set of compute resources this node is permitted to'
-                        ' be created on/be migrated to'),
-        'appliesto': ['vm'],
-    },
-    'virtualization.storagemodel': {
-        'description': ('The model of storage adapter to emulate in a virtual'
-                        'machine.  Defaults to virtio-blk for KVM, vmscsi for'
-                        'VMware'),
-        'appliesto': ['vm'],
-    },
-    'virtualization.nicmodel': {
-        'description': ('The model of NIC adapter to emulate in a virtual'
-                        'machine.  Defaults to virtio-net for KVM, vmxnet3 for'
-                        'VMware'),
-        'appliesto': ['vm'],
-    },
+#    'virtualization.host': {
+#        'description': ('Hypervisor where this node does/should reside'),
+#        'appliesto': ['vm'],
+#    },
+#    'virtualization.computepool': {
+#        'description': ('Set of compute resources this node is permitted to'
+#                        ' be created on/be migrated to'),
+#        'appliesto': ['vm'],
+#    },
+#    'virtualization.storagemodel': {
+#        'description': ('The model of storage adapter to emulate in a virtual'
+#                        'machine.  Defaults to virtio-blk for KVM, vmscsi for'
+#                        'VMware'),
+#        'appliesto': ['vm'],
+#    },
+#    'virtualization.nicmodel': {
+#        'description': ('The model of NIC adapter to emulate in a virtual'
+#                        'machine.  Defaults to virtio-net for KVM, vmxnet3 for'
+#                        'VMware'),
+#        'appliesto': ['vm'],
+#    },
     'hardwaremanagement.manager': {
         'description': 'The management address dedicated to this node',
     },
@@ -158,56 +159,56 @@ node = {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
     },
-    'enclosure.manager': {
-        'description': "The management device for this node's chassis",
-        'appliesto': ['system'],
-    },
-    'enclosure.bay': {
-        'description': 'The bay in the enclosure, if any',
-        'appliesto': ['system'],
-    },
-    'enclosure.type': {
-        'description': '''The type of enclosure in use (e.g. IBM BladeCenter,
-IBM Flex)''',
-        'appliesto': ['system'],
-    },
-    'inventory.serialnumber': {
-        'description': 'The manufacturer serial number of node',
-    },
-    'inventory.uuid': {
-        'description': 'The UUID of the node as presented in DMI',
-    },
-    'inventory.modelnumber': {
-        'description': 'The manufacturer dictated  model number for the node',
-    },
-    'inventory.snmpengineid': {
-        'description': 'The SNMP Engine id used by this node',
-    },
-    'secret.snmpuser': {
-        'description': 'The user to use for SNMPv3 access to this node',
-    },
-    'secret.snmppassphrase': {
-        'description': 'The passphrase to use for SNMPv3 access to this node',
-    },
-    'secret.snmplocalizedkey': {
-        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
-                        'This can be used in lieu of snmppassphrase to avoid'
-                        'retaining the passphrase TODO: document procedure'
-                        'to commit passphrase to localized key'),
-    },
-    'secret.snmpcommunity': {
-        'description': ('SNMPv1 community string, it is highly recommended to'
-                        'step up to SNMPv3'),
-    },
-    'secret.localadminpassphrase': {
-        'description': ('The passphrase to apply to local root/administrator '
-                        'account. '
-                        'If the environment is 100% Linux, the value may be '
-                        'one-way crypted as in /etc/shadow.  For Windows, if '
-                        'the value is not set or is one-way crypted, the '
-                        'local '
-                        'Administrator account will be disabled, requiring AD')
-    },
+#    'enclosure.manager': {
+#        'description': "The management device for this node's chassis",
+#        'appliesto': ['system'],
+#    },
+#    'enclosure.bay': {
+#        'description': 'The bay in the enclosure, if any',
+#        'appliesto': ['system'],
+#    },
+#    'enclosure.type': {
+#        'description': '''The type of enclosure in use (e.g. IBM BladeCenter,
+#IBM Flex)''',
+#        'appliesto': ['system'],
+#    },
+#    'inventory.serialnumber': {
+#        'description': 'The manufacturer serial number of node',
+#    },
+#    'inventory.uuid': {
+#        'description': 'The UUID of the node as presented in DMI',
+#    },
+#    'inventory.modelnumber': {
+#        'description': 'The manufacturer dictated  model number for the node',
+#    },
+#    'inventory.snmpengineid': {
+#        'description': 'The SNMP Engine id used by this node',
+#    },
+#    'secret.snmpuser': {
+#        'description': 'The user to use for SNMPv3 access to this node',
+#    },
+#    'secret.snmppassphrase': {
+#        'description': 'The passphrase to use for SNMPv3 access to this node',
+#    },
+#    'secret.snmplocalizedkey': {
+#        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
+#                        'This can be used in lieu of snmppassphrase to avoid'
+#                        'retaining the passphrase TODO: document procedure'
+#                        'to commit passphrase to localized key'),
+#    },
+#    'secret.snmpcommunity': {
+#        'description': ('SNMPv1 community string, it is highly recommended to'
+#                        'step up to SNMPv3'),
+#    },
+#    'secret.localadminpassphrase': {
+#        'description': ('The passphrase to apply to local root/administrator '
+#                        'account. '
+#                        'If the environment is 100% Linux, the value may be '
+#                        'one-way crypted as in /etc/shadow.  For Windows, if '
+#                        'the value is not set or is one-way crypted, the '
+#                        'local '
+#                        'Administrator account will be disabled, requiring AD')
+#    },
     'secret.ipmikg': {
         'description': 'Optional Integrity key for IPMI communication'
     },
@@ -224,19 +225,19 @@ IBM Flex)''',
                         'to connect over the network and value is not set, '
                         'PASSW0RD is attempted')
     },
-    'secret.managementuser': {
-        'description': ('Username to be set and used by protocols like SSH and '
-                        'HTTP where client provides passphrase over the network.'
-                        'Given the distinct security models betwen this class '
-                        'of protocols and SNMP and IPMI, snmp and ipmi utilize '
-                        'dedicated values.'),
-    },
-    'secret.managementpassphrase': {
-        'description': ('Passphrase to be set and used by protocols like SSH '
-                        'and HTTP, where client sends passphrase over the '
-                        'network.  Given distinct security models between '
-                        'this class of protocols, SNMP, and IPMI, SNMP and '
-                        'IPMI are given their own settings with distinct '
-                        'behaviors'),
-    },
+#    'secret.managementuser': {
+#        'description': ('Username to be set and used by protocols like SSH and '
+#                        'HTTP where client provides passphrase over the network.'
+#                        'Given the distinct security models betwen this class '
+#                        'of protocols and SNMP and IPMI, snmp and ipmi utilize '
+#                        'dedicated values.'),
+#    },
+#    'secret.managementpassphrase': {
+#        'description': ('Passphrase to be set and used by protocols like SSH '
+#                        'and HTTP, where client sends passphrase over the '
+#                        'network.  Given distinct security models between '
+#                        'this class of protocols, SNMP, and IPMI, SNMP and '
+#                        'IPMI are given their own settings with distinct '
+#                        'behaviors'),
+#    },
 }
