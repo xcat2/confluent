@@ -31,14 +31,17 @@ def _ipmi_evtloop():
     console.session.Session.register_handle_callback(pullchain[0],
                                                      _process_chgs)
     while (1):
-        if tmptimeout is not None:
-            console.session.Session.wait_for_rsp(timeout=tmptimeout)
-            tmptimeout = None
-        else:
-            console.session.Session.wait_for_rsp(timeout=600)
-        while ipmiwaiters:
-            waiter = ipmiwaiters.popleft()
-            waiter.send()
+        try:
+            if tmptimeout is not None:
+                console.session.Session.wait_for_rsp(timeout=tmptimeout)
+                tmptimeout = None
+            else:
+                console.session.Session.wait_for_rsp(timeout=600)
+            while ipmiwaiters:
+                waiter = ipmiwaiters.popleft()
+                waiter.send()
+        except:
+            print "Whoops, that was a doozy"
 
 def _process_chgs(intline):
     #here we receive functions to run in our thread
@@ -48,15 +51,18 @@ def _process_chgs(intline):
     global chainpulled
     os.read(intline,1)  # answer the bell
     chainpulled = False
-    while ipmiq:
-        cval = ipmiq.popleft()
-        if hasattr(cval[0], '__call__'):
-            if isinstance(cval[1], tuple):
-                rv = cval[0](*cval[1])
-            elif isinstance(cval[1], dict):
-                rv = cval[0](**cval[1])
-            if len(cval) > 2:
-                cval[2](rv)
+    try:
+        while ipmiq:
+            cval = ipmiq.popleft()
+            if hasattr(cval[0], '__call__'):
+                if isinstance(cval[1], tuple):
+                    rv = cval[0](*cval[1])
+                elif isinstance(cval[1], dict):
+                    rv = cval[0](**cval[1])
+                if len(cval) > 2:
+                    cval[2](rv)
+    except:  # assure the thread does not crash and burn
+        print "should put in some debug data here..."
 
 
 
