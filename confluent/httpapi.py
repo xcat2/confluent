@@ -6,6 +6,7 @@
 import base64
 import Cookie
 import confluent.auth as auth
+import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
 import confluent.messages
@@ -31,6 +32,22 @@ opmap = {
     'DELETE': 'delete',
 }
 
+def node_creation_resources():
+    yield confluent.messages.Attributes(
+        kv={ 'name': None}, desc="Name of the node").html() + '<br>'
+    for attr in sorted(attribs.node.iterkeys()):
+        if attr.startswith("secret."):
+            yield confluent.messages.CryptedAttributes(
+                kv={ attr: None }, desc=attribs.node[attr]['description']).html() + \
+                '<br>'
+        else:
+            yield confluent.messages.Attributes(
+                kv={ attr: None }, desc=attribs.node[attr]['description']).html() + \
+                '<br>'
+
+create_resource_functions = {
+    '/node/': node_creation_resources,
+}
 
 def _sessioncleaner():
     while (1):
@@ -248,7 +265,7 @@ def resourcehandler(env, start_response):
 
 def _assemble_html(responses, resource, querydict, url):
     yield '<html><head><title>' \
-          'Confluent REST Explorer: ' + resource + '</title></head>' \
+          'Confluent REST Explorer: ' + url + '</title></head>' \
           '<body><form action="' + resource + '" method="post">'
     if querydict:
         yield 'Response to input data:<br>' + \
@@ -275,8 +292,19 @@ def _assemble_html(responses, resource, querydict, url):
             pendingrsp.append(rsp)
     for rsp in pendingrsp:
         yield rsp.html()+ "<br>"
-    print url
-    if not iscollection:
+    if iscollection:
+        localpath = url[:-2]
+        try:
+            firstpass = True
+            for y in create_resource_functions[url]():
+                if firstpass:
+                    yield "<hr>Define new %s:<BR>" % url.split("/")[-2]
+                firstpass = False
+                yield y
+            yield '<input value="create" name="restexplorerop" type="submit"></form></body></html>'
+        except KeyError:
+            pass
+    else:
         yield '<input value="update" name="restexplorerop" type="submit"></form></body></html>'
 
 

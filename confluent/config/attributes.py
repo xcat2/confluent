@@ -57,12 +57,12 @@ node = {
         'description': ('List of static groups for which this node is'
                         'considered a member'),
     },
-    'type': {
-        'description': ('Classification of node as system, vm, etc')
-    },
-    'id': {
-        'description': ('Numeric identifier for node')
-    },
+    #'type': {
+    #    'description': ('Classification of node as system, vm, etc')
+    #},
+    #'id': {
+    #    'description': ('Numeric identifier for node')
+    #},
 #    'location.timezone': {
 #        'description': 'POSIX timezone to apply to this node',
 #    },

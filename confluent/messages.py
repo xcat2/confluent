@@ -35,25 +35,31 @@ class ConfluentMessage(object):
             value = self.defaultvalue
             note = ''
             type = self.defaulttype
+            try:
+                desc = self.desc
+            except:
+                desc = ''
             if 'value' in val:
                 value = val['value']
+            if value is None:
+                value = ''
             if 'note' in val:
                 note = '(' + val['note'] + ')'
             if isinstance(val, list):
                 snippet += key + ":"
                 for v in val:
                     snippet += \
-                       '<input type="%s" name="%s" value="%s">%s' % (
-                            type, key, v, note)
+                       '<input type="%s" name="%s" value="%s" title="%s">%s' % (
+                            type, key, v, desc, note)
                 snippet += \
-                       '<input type="%s" name="%s" value="">%s' % (
-                            type, key, note)
+                       '<input type="%s" name="%s" value="" title="%s">%s' % (
+                            type, key, desc, note)
                 snippet += '<input type="checkbox" name="restexplorerhonorkey" '
                 snippet += 'value="%s">' % (key)
                 return snippet
             snippet += key + ":" + \
-                       '<input type="%s" name="%s" value="%s">%s' % (
-                            type, key, value, note)
+                       '<input type="%s" name="%s" value="%s" title="%s">%s' % (
+                            type, key, value, desc, note)
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
             snippet += 'value="%s">' % (key)
         return snippet
@@ -247,13 +253,17 @@ class PowerState(ConfluentChoiceMessage):
         }
 
 class Attributes(ConfluentMessage):
-    def __init__(self, node, kv):
+    def __init__(self, node=None, kv=None, desc=None):
+        self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
             nkv[key] = { 'value': kv[key] }
-        self.kvpairs = {
-            node: nkv
-        }
+        if node is None:
+            self.kvpairs = nkv
+        else:
+            self.kvpairs = {
+                node: nkv
+            }
 
 class ListAttributes(ConfluentMessage):
     def __init__(self, node, kv):
@@ -264,11 +274,15 @@ class ListAttributes(ConfluentMessage):
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
 
-    def __init__(self, node, kv):
+    def __init__(self, node=None, kv=None, desc=None):
         # for now, just keep the dictionary keys and discard crypt value
+        self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
             nkv[key] = { 'note': 'Encrypted' }
-        self.kvpairs = {
-            node: nkv
-        }
+        if node is None:
+            self.kvpairs = nkv
+        else:
+            self.kvpairs = {
+                node: nkv
+            }

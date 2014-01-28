@@ -123,9 +123,20 @@ def enumerate_node_collection(collectionpath, configmanager):
     return iterate_resources(collection)
 
 
+def create_node(inputdata, configmanager):
+    try:
+        nodename = inputdata['name']
+        del inputdata['name']
+        attribmap = { nodename: inputdata }
+    except KeyError:
+        raise exc.InvalidArgumentException()
+    configmanager.set_node_attributes(attribmap)
+
+
 def enumerate_collections(collections):
     for collection in collections:
         yield msg.ChildCollection(collection)
+
 
 def handle_path(path, operation, configmanager, inputdata=None):
     '''Given a full path request, return an object.
@@ -152,6 +163,11 @@ def handle_path(path, operation, configmanager, inputdata=None):
         try:
             node = pathcomponents[1]
         except IndexError:  # doesn't actually have a long enough path
+            # this is enumerating a list of nodes
+            if operation == "delete":
+                raise exc.InvalidArgumentException()
+            if operation == "create":
+                create_node(inputdata, configmanager)
             return iterate_collections(configmanager.get_nodes())
         if iscollection:
             if operation == "delete":
