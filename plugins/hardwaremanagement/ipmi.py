@@ -40,10 +40,11 @@ def _ipmi_evtloop():
             while ipmiwaiters:
                 waiter = ipmiwaiters.popleft()
                 waiter.send()
-        except RunTimeError:
+        except RuntimeError:
             raise
         except:
-            print "Whoops, that was a doozy"
+            import sys
+            print sys.exc_info()[2]
 
 def _process_chgs(intline):
     #here we receive functions to run in our thread
@@ -64,7 +65,8 @@ def _process_chgs(intline):
                 if len(cval) > 2:
                     cval[2](rv)
     except:  # assure the thread does not crash and burn
-        print "should put in some debug data here..."
+        import sys
+        print sys.exc_info()[2]
 
 
 
