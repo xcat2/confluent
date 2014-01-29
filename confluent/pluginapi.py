@@ -190,13 +190,15 @@ def handle_path(path, operation, configmanager, inputdata=None):
         elif 'pluginattrs' in plugroute:
             nodeattr = configmanager.get_node_attributes(
                 [node], plugroute['pluginattrs'])
+            foundplug = False
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
+                    foundplug = True
                     passvalue = pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
                         nodes=(node,), element=pathcomponents,
                         configmanager=configmanager,
                         inputdata=inputdata)
-            if 'default' in plugroute:
+            if (not foundplug) and 'default' in plugroute:
                 passvalue = pluginmap[plugroute['default']].__dict__[operation](
                     nodes=(node,), element=pathcomponents, configmanager=configmanager,
                     inputdata=inputdata)
