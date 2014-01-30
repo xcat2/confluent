@@ -43,8 +43,8 @@ def _ipmi_evtloop():
         except RuntimeError:
             raise
         except:
-            import sys
-            print sys.exc_info()[2]
+            import traceback
+            traceback.print_exc()
 
 def _process_chgs(intline):
     #here we receive functions to run in our thread
@@ -65,8 +65,8 @@ def _process_chgs(intline):
                 if len(cval) > 2:
                     cval[2](rv)
     except:  # assure the thread does not crash and burn
-        import sys
-        print sys.exc_info()[2]
+        import traceback
+        traceback.print_exc()
     # If we are inside a loop within pyghmi, this is our only shot
     # so we have to wake up anything that might be interested in
     # state changes here as well as the evtloop
