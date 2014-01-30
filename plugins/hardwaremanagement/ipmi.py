@@ -67,7 +67,12 @@ def _process_chgs(intline):
     except:  # assure the thread does not crash and burn
         import sys
         print sys.exc_info()[2]
-
+    # If we are inside a loop within pyghmi, this is our only shot
+    # so we have to wake up anything that might be interested in
+    # state changes here as well as the evtloop
+    while ipmiwaiters:
+        waiter = ipmiwaiters.popleft()
+        waiter.send()
 
 
 def get_conn_params(node, configdata):
