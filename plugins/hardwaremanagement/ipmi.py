@@ -1,5 +1,5 @@
 import collections
-import confluent.interface.console
+import confluent.interface.console as conapi
 import confluent.messages as msg
 import eventlet
 import eventlet.event
@@ -107,10 +107,11 @@ def get_conn_params(node, configdata):
     }
 
 
-class IpmiConsole(confluent.interface.console.Console):
+class IpmiConsole(conapi.Console):
     def __init__(self, node, config):
         crypt = config.decrypt
         config.decrypt = True
+        self.broken = False
         configdata = config.get_node_attributes([node],
             ['secret.ipmiuser', 'secret.ipmipassphrase',
              'secret.managementuser', 'secret.managementpassphrase',
@@ -125,7 +126,12 @@ class IpmiConsole(confluent.interface.console.Console):
 
     def handle_data(self, data):
         if type(data) == dict:
-            #TODO: convert dict into a confluent.interface.console.ConsoleEvent
+            disconnect = frozenset(('Session Disconnected', 'timeout'))
+            if 'error' in data and data['error'] in disconnect:
+                self.broken = True
+                self.datacallback(conapi.ConsoleEvent.Disconnect)
+            else:
+                raise Exception("Unrecognized pyghmi input %s" % repr(data))
         else:
             self.datacallback(data)
 
@@ -156,6 +162,8 @@ class IpmiConsole(confluent.interface.console.Console):
 
     def write(self, data):
         global chainpulled
+        while self.solconnection is None and not self.broken:
+            wait_on_ipmi()
         ipmiq.append((self.solconnection.send_data, (data,)))
         if not chainpulled:
             chainpulled = True

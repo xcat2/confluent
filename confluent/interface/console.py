@@ -21,3 +21,15 @@ class Console(object):
     def wait_for_data(self, timeout=600):
         raise NotImplementedException("Subclassing required")
 
+    def ping(self):
+        """This function is a hint to the console plugin that now would be a
+        nice time to assess health of console connection.  Plugins that see
+        a use for this should be periodically doing this on their own for
+        logging and such, this provides a hint that a user has taken an
+        explicit interest in the console output.  In my experience, this
+        correlates with some conditions that may suggest a loss of console
+        as well, so consoles can schedule a health check to run at this time.
+        No return is expected, any error condition can be reported by sending
+        ConsoleEvent.Disconnect, just like normal."""
+        pass
+

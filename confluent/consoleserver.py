@@ -7,6 +7,7 @@
 
 #we track nodes that are actively being logged, watched, or have attached
 #there should be no more than one handler per node
+import confluent.interface.console as conapi
 import confluent.pluginapi as plugin
 import confluent.util as util
 import eventlet
@@ -17,9 +18,15 @@ _handled_consoles = {}
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
         self.rcpts = {}
-        self._console = plugin.handle_path("/node/%s/_console/session" % node,
-            "create", configmanager)
+        self.cfgmgr = configmanager
+        self.node = node
         self.buffer = bytearray()
+        self._connect()
+
+    def _connect(self):
+        self._console = plugin.handle_path(
+            "/node/%s/_console/session" % self.node,
+            "create", self.cfgmgr)
         self._console.connect(self.get_console_output)
 
     def unregister_rcpt(self, handle):
@@ -44,6 +51,15 @@ class _ConsoleHandler(object):
         #also, timestamp data...
 
     def get_console_output(self, data):
+        # Spawn as a greenthread, return control as soon as possible
+        # to the console object
+        eventlet.spawn(self._handle_console_output, data)
+
+    def _handle_console_output(self, data):
+        if type(data) == int:
+            if data == conapi.ConsoleEvent.Disconnect:
+                self._connect()
+            return
         self.buffer += data
         #TODO: analyze buffer for registered events, examples:
         #   panics
