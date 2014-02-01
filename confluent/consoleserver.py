@@ -16,11 +16,11 @@ _handled_consoles = {}
 
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
+        self.rcpts = {}
         self._console = plugin.handle_path("/node/%s/_console/session" % node,
             "create", configmanager)
         self.buffer = bytearray()
         self._console.connect(self.get_console_output)
-        self.rcpts = {}
 
     def unregister_rcpt(self, handle):
         if handle in self.rcpts:

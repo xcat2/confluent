@@ -123,10 +123,17 @@ class IpmiConsole(confluent.interface.console.Console):
         self.port = connparams['port']
         # Cannot actually create console until 'connect', when we get callback
 
+    def handle_data(self, data):
+        if type(data) == dict:
+            #TODO: convert dict into a confluent.interface.console.ConsoleEvent
+        else:
+            self.datacallback(data)
+
     def connect(self,callback):
         global _ipmithread
         global pullchain
         global chainpulled
+        self.datacallback = callback
         if _ipmithread is None:
             pullchain = os.pipe()
             _ipmithread = eventlet.spawn(_ipmi_evtloop)
@@ -137,7 +144,7 @@ class IpmiConsole(confluent.interface.console.Console):
                                       'password': self.password,
                                       'kg': self.kg,
                                       'force': True,
-                                      'iohandler': callback}, self.got_consobject))
+                                      'iohandler': self.handle_data}, self.got_consobject))
         if not chainpulled:
             chainpulled = True
             os.write(pullchain[1],'1')
