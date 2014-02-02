@@ -7,6 +7,7 @@ import eventlet.event
 import eventlet.greenpool as greenpool
 import eventlet.queue
 import os
+import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
 console.session.select = eventlet.green.select
@@ -63,11 +64,19 @@ def _process_chgs(intline):
                     rv = cval[0](*cval[1])
                 elif isinstance(cval[1], dict):
                     rv = cval[0](**cval[1])
-                if len(cval) > 2:
-                    cval[2](rv)
+    except pygexc.IpmiException as problem:
+        if str(problem) == 'timeout':
+            rv = {'error': 'timeout'}
+        else:
+            import traceback
+            traceback.print_exc()
+            cval=()
     except:  # assure the thread does not crash and burn
         import traceback
         traceback.print_exc()
+        cval=()
+    if len(cval) > 2:
+        cval[2](rv)
     # If we are inside a loop within pyghmi, this is our only shot
     # so we have to wake up anything that might be interested in
     # state changes here as well as the evtloop
@@ -277,6 +286,11 @@ class IpmiHandler(object):
             os.write(pullchain[1],'1')
         while self.lastrsp is None:
             wait_on_ipmi()
+        if 'error' in self.lastrsp:
+            if self.lastrsp['error'] == 'timeout':
+                raise exc.TargetEndpointTimeout()
+            else:
+                raise Exception(self.lastrsp['error'])
         return self.lastrsp
 
     def got_rsp(self, response):
