@@ -1,4 +1,5 @@
 import collections
+import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.messages as msg
 import eventlet
@@ -231,6 +232,7 @@ class IpmiHandler(object):
         global chainpulled
         global _ipmithread
         global pullchain
+        self.broken = False
         if _ipmithread is None:
             pullchain = os.pipe()
             _ipmithread = eventlet.spawn(_ipmi_evtloop)
@@ -261,8 +263,10 @@ class IpmiHandler(object):
 
     def logged(self, response, ipmicmd):
         if 'error' in response:
-            raise Exception(response['error'])
-        self.loggedin = True
+            self.broken = True
+            self.error = response['error']
+        else:
+            self.loggedin = True
 
     def call_ipmicmd(self, function, *args):
         global chainpulled
@@ -279,11 +283,16 @@ class IpmiHandler(object):
         self.lastrsp = response
 
     def handle_request(self):
-        while not self.loggedin:
-            wait_on_ipmi()
         bootdevices = {
             'optical': 'cd'
         }
+        while not (self.loggedin or self.broken):
+            wait_on_ipmi()
+        if self.broken:
+            if self.error == 'timeout':
+                raise exc.TargetEndpointTimeout()
+            else:
+                raise Exception(self.error)
         if self.element == [ 'power', 'state' ]:
             if 'read' == self.op:
                 power = self.call_ipmicmd(self.ipmicmd.get_power)
