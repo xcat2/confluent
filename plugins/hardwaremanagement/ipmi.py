@@ -56,6 +56,7 @@ def _process_chgs(intline):
     global chainpulled
     os.read(intline,1)  # answer the bell
     chainpulled = False
+    cval = ()
     try:
         while ipmiq:
             cval = ipmiq.popleft()
