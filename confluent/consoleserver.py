@@ -11,6 +11,7 @@ import confluent.interface.console as conapi
 import confluent.pluginapi as plugin
 import confluent.util as util
 import eventlet
+import eventlet.green.threading as threading
 import random
 
 _handled_consoles = {}
@@ -123,6 +124,7 @@ class ConsoleSession(object):
     def __init__(self, node, configmanager, datacallback=None):
         if node not in _handled_consoles:
             _handled_consoles[node] = _ConsoleHandler(node, configmanager)
+        self._evt = threading.Event()
         self.node = node
         self.conshdl = _handled_consoles[node]
         self.write = _handled_consoles[node].write
@@ -139,6 +141,7 @@ class ConsoleSession(object):
     def destroy(self):
         _handled_consoles[self.node].unregister_rcpt(self.reghdl)
         self.databuffer = None
+        self._evt = None
         self.reghdl = None
 
     def got_data(self, data):
@@ -148,6 +151,7 @@ class ConsoleSession(object):
         for data, we must maintain data in a buffer until retrieved
         """
         self.databuffer += data
+        self._evt.set()
 
     def get_next_output(self, timeout=45):
         """Poll for next available output on this console.
@@ -161,12 +165,20 @@ class ConsoleSession(object):
         try:
             while len(self.databuffer) == 0 and currtime < deadline:
                 timeo = deadline - currtime
+                # change to a threading event object
+                # got_data will trigger this function to move
+                if self._evt is None:
+                    self._evt = threading.Event()
+                self._evt.wait(timeout)
                 self.conshdl._console.wait_for_data(timeout=timeo)
                 currtime = util.monotonic_time()
         except TypeError:
+            import traceback
+            traceback.print_exc()
             return ""
         retval = self.databuffer
         self.databuffer = ""
+        self._evt.clear()
         self.reaper = eventlet.spawn_after(15, self.destroy)
         return retval
 
