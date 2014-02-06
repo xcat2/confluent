@@ -13,6 +13,7 @@ import confluent.util as util
 import eventlet
 import eventlet.green.threading as threading
 import random
+import time
 
 _handled_consoles = {}
 
@@ -160,25 +161,17 @@ class ConsoleSession(object):
         at least one case where we don't have that luxury
         """
         self.reaper.cancel()
-        currtime = util.monotonic_time()
-        deadline = currtime + 45
         try:
-            while len(self.databuffer) == 0 and currtime < deadline:
-                timeo = deadline - currtime
-                # change to a threading event object
-                # got_data will trigger this function to move
-                if self._evt is None:
-                    self._evt = threading.Event()
+            if len(self.databuffer) == 0:
                 self._evt.wait(timeout)
-                self.conshdl._console.wait_for_data(timeout=timeo)
-                currtime = util.monotonic_time()
         except TypeError:
             import traceback
             traceback.print_exc()
             return ""
         retval = self.databuffer
         self.databuffer = ""
-        self._evt.clear()
+        if self._evt is not None:
+            self._evt.clear()
         self.reaper = eventlet.spawn_after(15, self.destroy)
         return retval
 

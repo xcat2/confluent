@@ -13,18 +13,12 @@ import pyghmi.ipmi.command as ipmicommand
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
 
-tmptimeout = None
 _ipmithread = None
 
 def _ipmi_evtloop():
-    global tmptimeout
-    while (1):
+    while True:
         try:
-            if tmptimeout is not None:
-                console.session.Session.wait_for_rsp(timeout=tmptimeout)
-                tmptimeout = None
-            else:
-                console.session.Session.wait_for_rsp(timeout=600)
+            console.session.Session.wait_for_rsp(timeout=600)
         except:
             import traceback
             traceback.print_exc()
@@ -91,35 +85,15 @@ class IpmiConsole(conapi.Console):
             self.datacallback(data)
 
     def connect(self,callback):
-        global _ipmithread
         self.datacallback = callback
-        self.solconnection=console.Console(bmc=self.bmc, port=self.port,
+        self.solconnection = console.Console(bmc=self.bmc, port=self.port,
                                            userid=self.username,
                                            password=self.password, kg=self.kg,
                                            force=True,
                                            iohandler=self.handle_data)
-        if _ipmithread is None:
-            _ipmithread = eventlet.spawn(_ipmi_evtloop)
 
     def write(self, data):
         self.solconnection.send_data(data)
-
-    def wait_for_data(self, timeout=600):
-        """Wait for some network event.
-
-        This is currently not guaranteed to actually have data when
-        return.  This is supposed to be something more appropriate
-        than sleep(0), but only marginally so.
-        """
-        # reason for this is that we currently nicely pass through the callback
-        # straight to ipmi library.  To implement this accurately, easiest path
-        # would be to add a layer through the callback.  IMO there isn't enough
-        # value in assuring data coming back to bother with making the stack
-        # taller than it has to be
-        #TODO: a channel for the ipmithread to tug back instead of busy wait
-        #while tmptimeout is not None:
-        #    eventlet.sleep(0)
-        console.session.Session.wait_for_rsp(timeout=timeout)
 
 
 class IpmiIterator(object):
@@ -223,7 +197,14 @@ class IpmiHandler(object):
 
 
 
+def initthread():
+    global _ipmithread
+    if _ipmithread is None:
+        _ipmithread = eventlet.spawn(_ipmi_evtloop)
+
+
 def create(nodes, element, configmanager, inputdata):
+    initthread()
     if element == [ '_console', 'session' ]:
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
@@ -232,10 +213,12 @@ def create(nodes, element, configmanager, inputdata):
         return IpmiIterator('update', nodes, element, configmanager, inputdata)
 
 def update(nodes, element, configmanager, inputdata):
+    initthread()
     return create(nodes, element, configmanager, inputdata)
 
 
 
 def retrieve(nodes, element, configmanager, inputdata):
+    initthread()
     return IpmiIterator('read', nodes, element, configmanager, inputdata)
 
