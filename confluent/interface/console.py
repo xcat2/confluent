@@ -6,20 +6,21 @@ class ConsoleEvent(object):
     reconnect or anything like that.  Break is a serial break."""
     Disconnect, Break = range(2)
 
+
 class Console(object):
     """This is the class defining the interface a console plugin must return
     for the _console/session element"""
     def __init__(self, node, config):
-        raise NotImplementedException("Subclassing required")
+        raise NotImplementedError("Subclassing required")
 
     def connect(self, callback):
-        raise NotImplementedException("Subclassing required")
+        raise NotImplementedError("Subclassing required")
 
     def write(self, data):
-        raise NotImplementedException("Subclassing required")
+        raise NotImplementedError("Subclassing required")
 
     def wait_for_data(self, timeout=600):
-        raise NotImplementedException("Subclassing required")
+        raise NotImplementedError("Subclassing required")
 
     def ping(self):
         """This function is a hint to the console plugin that now would be a
@@ -32,4 +33,3 @@ class Console(object):
         No return is expected, any error condition can be reported by sending
         ConsoleEvent.Disconnect, just like normal."""
         pass
-
