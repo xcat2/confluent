@@ -14,8 +14,6 @@ import confluent.pluginapi as pluginapi
 import confluent.util as util
 import eventlet
 import json
-import os
-import string
 import traceback
 import time
 import urlparse
@@ -32,22 +30,24 @@ opmap = {
     'DELETE': 'delete',
 }
 
+
 def node_creation_resources():
     yield confluent.messages.Attributes(
-        kv={ 'name': None}, desc="Name of the node").html() + '<br>'
+        kv={'name': None}, desc="Name of the node").html() + '<br>'
     for attr in sorted(attribs.node.iterkeys()):
         if attr.startswith("secret."):
             yield confluent.messages.CryptedAttributes(
-                kv={ attr: None }, desc=attribs.node[attr]['description']).html() + \
-                '<br>'
+                kv={attr: None},
+                desc=attribs.node[attr]['description']).html() + '<br>'
         else:
             yield confluent.messages.Attributes(
-                kv={ attr: None }, desc=attribs.node[attr]['description']).html() + \
-                '<br>'
+                kv={attr: None},
+                desc=attribs.node[attr]['description']).html() + '<br>'
 
 create_resource_functions = {
     '/node/': node_creation_resources,
 }
+
 
 def _sessioncleaner():
     while (1):
@@ -110,13 +110,13 @@ def _authorize_request(env):
                 authdata = auth.authorize(name, element=None)
     if authdata is False and 'HTTP_AUTHORIZATION' in env:
         name, passphrase = base64.b64decode(
-                env['HTTP_AUTHORIZATION'].replace('Basic ','')).split(':',1)
+            env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, element=None)
         sessid = util.randomstring(32)
         while sessid in httpsessions:
             sessid = util.randomstring(32)
         httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90}
-        cookie['confluentsessionid']=sessid
+        cookie['confluentsessionid'] = sessid
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
         cookie['confluentsessionid']['path'] = '/'
@@ -160,8 +160,9 @@ def _assign_consessionid(consolesession):
     while sessid in consolesessions.keys():
         sessid = util.randomstring(32)
     consolesessions[sessid] = {'session': consolesession,
-        'expiry': time.time() + 60}
+                               'expiry': time.time() + 60}
     return sessid
+
 
 def resourcehandler(env, start_response):
     """Function to handle new wsgi requests
@@ -179,22 +180,25 @@ def resourcehandler(env, start_response):
         del querydict['restexplorerop']
     authorized = _authorize_request(env)
     if authorized['code'] == 401:
-        start_response('401 Authentication Required',
+        start_response(
+            '401 Authentication Required',
             [('Content-type', 'text/plain'),
-            ('WWW-Authenticate', 'Basic realm="confluent"')])
+             ('WWW-Authenticate', 'Basic realm="confluent"')])
         yield 'authentication required'
         return
     if authorized['code'] == 403:
-        start_response('403 Forbidden',
+        start_response(
+            '403 Forbidden',
             [('Content-type', 'text/plain'),
-            ('WWW-Authenticate', 'Basic realm="confluent"')])
+             ('WWW-Authenticate', 'Basic realm="confluent"')])
         yield 'authorization failed'
         return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
-    headers = [('Content-Type', mimetype) ]
-    headers.extend(("Set-Cookie", m.OutputString())
-            for m in authorized['cookie'].values())
+    headers = [('Content-Type', mimetype)]
+    headers.extend(
+        ("Set-Cookie", m.OutputString())
+        for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
     if '/console/session' in env['PATH_INFO']:
         #hard bake JSON into this path, do not support other incarnations
@@ -203,7 +207,7 @@ def resourcehandler(env, start_response):
         if 'session' not in querydict.keys() or not querydict['session']:
             # Request for new session
             consession = consoleserver.ConsoleSession(node=nodename,
-                                                configmanager=cfgmgr)
+                                                      configmanager=cfgmgr)
             if not consession:
                 start_response("500 Internal Server Error", headers)
                 return
@@ -215,7 +219,7 @@ def resourcehandler(env, start_response):
             # client wishes to push some keys into the remote console
             input = ""
             for idx in xrange(0, len(querydict['keys']), 2):
-                input += chr(int(querydict['keys'][idx:idx+2],16))
+                input += chr(int(querydict['keys'][idx:idx+2], 16))
             sessid = querydict['session']
             if sessid not in consolesessions:
                 start_response('400 Expired Session', headers)
@@ -223,20 +227,24 @@ def resourcehandler(env, start_response):
             consolesessions[sessid]['expiry'] = time.time() + 90
             consolesessions[sessid]['session'].write(input)
             start_response('200 OK', headers)
-            return # client has requests to send or receive, not both...
-        else: #no keys, but a session, means it's hooking to receive data
+            return  # client has requests to send or receive, not both...
+        else:  # no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             if sessid not in consolesessions:
                 start_response('400 Expired Session', headers)
                 return
             consolesessions[sessid]['expiry'] = time.time() + 90
-            outdata = consolesessions[sessid]['session'].get_next_output(timeout=45)
+            outdata = consolesessions[sessid]['session'].get_next_output(
+                timeout=45)
             try:
-                rsp = json.dumps({'session': querydict['session'], 'data': outdata})
+                rsp = json.dumps({'session': querydict['session'],
+                                  'data': outdata})
             except UnicodeDecodeError:
-                rsp = json.dumps({'session': querydict['session'], 'data': outdata}, encoding='cp437')
+                rsp = json.dumps({'session': querydict['session'],
+                                  'data': outdata}, encoding='cp437')
             except UnicodeDecodeError:
-                rsp = json.dumps({'session': querydict['session'], 'data': 'DECODEERROR'})
+                rsp = json.dumps({'session': querydict['session'],
+                                  'data': 'DECODEERROR'})
             start_response('200 OK', headers)
             yield rsp
             return
@@ -297,9 +305,9 @@ def _assemble_html(responses, resource, querydict, url):
         else:
             pendingrsp.append(rsp)
     for rsp in pendingrsp:
-        yield rsp.html()+ "<br>"
+        yield rsp.html() + "<br>"
     if iscollection:
-        localpath = url[:-2]
+        # localpath = url[:-2] (why was this here??)
         try:
             firstpass = True
             for y in create_resource_functions[url]():
@@ -307,11 +315,13 @@ def _assemble_html(responses, resource, querydict, url):
                     yield "<hr>Define new %s:<BR>" % url.split("/")[-2]
                 firstpass = False
                 yield y
-            yield '<input value="create" name="restexplorerop" type="submit"></form></body></html>'
+            yield ('<input value="create" name="restexplorerop" type="submit">'
+                   '</form></body></html>')
         except KeyError:
             pass
     else:
-        yield '<input value="update" name="restexplorerop" type="submit"></form></body></html>'
+        yield ('<input value="update" name="restexplorerop" type="submit">'
+               '</form></body></html>')
 
 
 def _assemble_json(responses, resource, url):
@@ -320,16 +330,15 @@ def _assemble_json(responses, resource, url):
     #overwrite, but we'd want to preserve them into an array instead.
     #the downside is that http would just always blurt it ll out at
     #once and hold on to all the data in memory
-    docomma = False
     links = {
-        'self': {"href":resource},
+        'self': {"href": resource},
     }
     if url == '/':
         pass
     elif resource[-1] == '/':
-        links['collection'] = {"href":"../"}
+        links['collection'] = {"href": "../"}
     else:
-        links['collection'] = {"href":"./"}
+        links['collection'] = {"href": "./"}
     rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
@@ -339,7 +348,7 @@ def _assemble_json(responses, resource, url):
                     if isinstance(links[hk], list):
                         links[hk].append(haldata[hk])
                     else:
-                        links[hk] = [ links[hk], haldata[hk] ]
+                        links[hk] = [links[hk], haldata[hk]]
                 else:
                     links[hk] = haldata[hk]
         else:
@@ -349,7 +358,7 @@ def _assemble_json(responses, resource, url):
                     if isinstance(rspdata[dk], list):
                         rspdata[dk].append(rsp[dk])
                     else:
-                        rspdata[dk] = [ rspdata[dk], rsp[dk] ]
+                        rspdata[dk] = [rspdata[dk], rsp[dk]]
                 else:
                     rspdata[dk] = rsp[dk]
     rspdata["_links"] = links
@@ -367,7 +376,7 @@ def serve():
     #but deps are simpler without flup
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
-    eventlet.wsgi.server(eventlet.listen(("",4005)),resourcehandler)
+    eventlet.wsgi.server(eventlet.listen(("", 4005)), resourcehandler)
 
 
 class HttpApi(object):
@@ -375,7 +384,3 @@ class HttpApi(object):
         self.server = eventlet.spawn(serve)
 
 _cleaner = eventlet.spawn(_sessioncleaner)
-
-
-
-
