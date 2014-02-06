@@ -1,6 +1,6 @@
 # authentication and authorization routines for confluent
 # authentication scheme caches passphrase values to help HTTP Basic auth
-# the PBKDF2 transform is skipped unless a user has been idle for sufficient 
+# the PBKDF2 transform is skipped unless a user has been idle for sufficient
 # time
 
 import confluent.config.configmanager as configmanager
@@ -36,7 +36,7 @@ def _get_usertenant(name, tenant=False):
     administrator account a tenant gets.
     Otherwise, just assume a user in the default tenant
     """
-    if not isinstance(tenant,bool):
+    if not isinstance(tenant, bool):
         # if not boolean, it must be explicit tenant
         user = name
     elif '/' in name:  # tenant scoped name
@@ -45,11 +45,12 @@ def _get_usertenant(name, tenant=False):
         # the account is the implicit tenant owner account
         user = name
         tenant = name
-    else: # assume it is a non-tenant user account
+    else:  # assume it is a non-tenant user account
         user = name
         tenant = None
     yield user
     yield tenant
+
 
 def authorize(name, element, tenant=False, access='rw'):
     #TODO: actually use the element to ascertain if this user is good enough
@@ -70,7 +71,7 @@ def authorize(name, element, tenant=False, access='rw'):
         return None
     manager = configmanager.ConfigManager(tenant)
     userobj = manager.get_user(user)
-    if userobj: #returning
+    if userobj:  # returning
         return (userobj, manager)
     return None
 
@@ -89,9 +90,10 @@ def set_user_passphrase(name, passphrase, tenant=None):
     _passcache[(user, tenant)] = passphrase
     salt = os.urandom(8)
     crypted = kdf.PBKDF2(passphrase, salt, 32, 10000,
-                lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest())
+                         lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest()
+                         )
     cfm = configmanager.ConfigManager(tenant)
-    cfm.set_user(name, { 'cryptpass': (salt, crypted) })
+    cfm.set_user(name, {'cryptpass': (salt, crypted)})
 
 
 def check_user_passphrase(name, passphrase, element=None, tenant=False):
@@ -116,14 +118,14 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     # for that particular user.
     # similarly, guessing usernames is throttled to 20/sec
     user, tenant = _get_usertenant(name, tenant)
-    while (user,tenant) in _passchecking:
+    while (user, tenant) in _passchecking:
         # Want to serialize passphrase checking activity
         # by a user, which might be malicious
         # would normally make an event and wait
         # but here there's no need for that
         eventlet.sleep(0.5)
-    if (user,tenant) in _passcache:
-        if passphrase == _passcache[(user,tenant)]:
+    if (user, tenant) in _passcache:
+        if passphrase == _passcache[(user, tenant)]:
             return authorize(user, element, tenant)
         else:
             # In case of someone trying to guess,
@@ -134,7 +136,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     cfm = configmanager.ConfigManager(tenant)
     ucfg = cfm.get_user(user)
     if ucfg is None or 'cryptpass' not in ucfg:
-        eventlet.sleep(0.05) #stall even on test for existance of a username
+        eventlet.sleep(0.05)  # stall even on test for existance of a username
         return None
     _passchecking[(user, tenant)] = True
     # TODO(jbjohnso): WORKERPOOL
@@ -142,9 +144,10 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     # throw it at the worker pool when implemented
     salt, crypt = ucfg['cryptpass']
     crypted = kdf.PBKDF2(passphrase, salt, 32, 10000,
-                lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest())
+                         lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest()
+                         )
     del _passchecking[(user, tenant)]
-    eventlet.sleep(0.05) #either way, we want to stall so that client can't
+    eventlet.sleep(0.05)  # either way, we want to stall so that client can't
         # determine failure because there is a delay, valid response will
         # delay as well
     if crypt == crypted:

@@ -9,13 +9,12 @@
 #there should be no more than one handler per node
 import confluent.interface.console as conapi
 import confluent.pluginapi as plugin
-import confluent.util as util
 import eventlet
 import eventlet.green.threading as threading
 import random
-import time
 
 _handled_consoles = {}
+
 
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
@@ -41,7 +40,6 @@ class _ConsoleHandler(object):
             hdl = random.random()
         self.rcpts[hdl] = callback
         return hdl
-
 
     def flushbuffer(self):
         #TODO:log the old stuff
@@ -108,6 +106,7 @@ class _ConsoleHandler(object):
         #level?
         self._console.write(data)
 
+
 #this represents some api view of a console handler.  This handles things like
 #holding the caller specific queue data, for example, when http api should be
 #sending data, but there is no outstanding POST request to hold it,
@@ -131,7 +130,7 @@ class ConsoleSession(object):
         self.write = _handled_consoles[node].write
         if datacallback is None:
             self.reaper = eventlet.spawn_after(15, self.destroy)
-            self.databuffer =  _handled_consoles[node].get_recent()
+            self.databuffer = _handled_consoles[node].get_recent()
             self.reghdl = _handled_consoles[node].register_rcpt(self.got_data)
         else:
             self.reghdl = _handled_consoles[node].register_rcpt(datacallback)
@@ -161,13 +160,8 @@ class ConsoleSession(object):
         at least one case where we don't have that luxury
         """
         self.reaper.cancel()
-        try:
-            if len(self.databuffer) == 0:
-                self._evt.wait(timeout)
-        except TypeError:
-            import traceback
-            traceback.print_exc()
-            return ""
+        if len(self.databuffer) == 0:
+            self._evt.wait(timeout)
         retval = self.databuffer
         self.databuffer = ""
         if self._evt is not None:
@@ -185,8 +179,8 @@ def handle_request(request=None, connection=None, releaseconnection=False):
     :param connection: For socket style console, this is a read/write socket
                        that the caller has released from it's control and
                        console plugin will do all IO
-    :param releaseconnection: A function for console to call to indicate confluent
-                          should resume control over the connection
+    :param releaseconnection: A function for console to call to indicate
+                          confluent should resume control over the connection
 
     """
     if request is not None:  # This is indicative of http style
@@ -209,10 +203,11 @@ def handle_request(request=None, connection=None, releaseconnection=False):
               # the responses:
               # <responding to session open>: (the session seems to be opaque
               # {"session":"h5lrOKViIeQGp1nXjKWpAQ","data":""}
-              # <responding to wait for data with data, specically a prompt that sets title>
-              # {"session":"blah","data":"\r\n\u001B]0;bob@thor:~\u0007[bob@thor ~]$ "}
+              # <responding to wait for data with data, specically a prompt
+              # that sets title>
+              # {"session":"blah","data":"\r\n\u001B]0;bob@thor:~\u0007$ "}
               # <responding to wait with no data (seems to wait 46 seconds)
               # {"session":"jSGBPmAxavsD/1acSl/uog","data":""}
               # closed session returns HTTP 400 to a console answer
     elif connection is not None:  # This is a TLS or unix socket
-        conshandler = ConsoleSession(connection, releaseconnection)
+        ConsoleSession(connection, releaseconnection)

@@ -5,8 +5,8 @@
 
 # have to specify a standard place for cfg selection of *which* plugin
 # as well a standard to map api requests to python funcitons
-# e.g. <nodeelement>/power/state maps to some plugin HardwareManager.get_power/set_power
-# selected by hardwaremanagement.method
+# e.g. <nodeelement>/power/state maps to some plugin
+# HardwareManager.get_power/set_power selected by hardwaremanagement.method
 # plugins can advertise a set of names if there is a desire for readable things
 # exceptions to handle os images
 # endpoints point to a class... usually, the class should have:
@@ -25,16 +25,18 @@ import sys
 
 pluginmap = {}
 
+
 def nested_lookup(nestdict, key):
     return reduce(dict.__getitem__, key, nestdict)
 
+
 def load_plugins():
     # To know our plugins directory, we get the parent path of 'bin'
-    path=os.path.dirname(os.path.realpath(__file__))
-    plugintop = os.path.realpath(os.path.join(path,'..','plugins'))
+    path = os.path.dirname(os.path.realpath(__file__))
+    plugintop = os.path.realpath(os.path.join(path, '..', 'plugins'))
     plugins = set()
     for plugindir in os.listdir(plugintop):
-        plugindir = os.path.join(plugintop,plugindir)
+        plugindir = os.path.join(plugintop, plugindir)
         if not os.path.isdir(plugindir):
             continue
         sys.path.append(plugindir)
@@ -53,7 +55,8 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-rootcollections = [ 'node/', 'nodegroup/' ];
+rootcollections = ['node/', 'nodegroup/']
+
 
 class PluginRoute(object):
     def __init__(self, routedict):
@@ -63,7 +66,7 @@ class PluginRoute(object):
 noderesources = {
     '_console': {
         'session': PluginRoute({
-            'pluginattrs': ['console.method' ,'hardwaremanagement.method'],
+            'pluginattrs': ['console.method', 'hardwaremanagement.method'],
         }),
     },
     'console': {
@@ -83,21 +86,24 @@ noderesources = {
         }),
     },
     'attributes': {
-        'all': PluginRoute({ 'handler': 'attributes' }),
-        'current': PluginRoute({ 'handler': 'attributes' }),
+        'all': PluginRoute({'handler': 'attributes'}),
+        'current': PluginRoute({'handler': 'attributes'}),
     },
 }
+
 
 def stripnode(iterablersp, node):
     for i in iterablersp:
         i.strip_node(node)
         yield i
 
+
 def iterate_collections(iterable):
     for coll in iterable:
         if coll[-1] != '/':
             coll = coll + '/'
         yield msg.ChildCollection(coll, candelete=True)
+
 
 def iterate_resources(fancydict):
     for resource in fancydict.iterkeys():
@@ -107,16 +113,18 @@ def iterate_resources(fancydict):
             resource += '/'
         yield msg.ChildCollection(resource)
 
+
 def delete_node_collection(collectionpath, configmanager):
-    if len(collectionpath) == 2:  #just node
+    if len(collectionpath) == 2:  # just node
         node = collectionpath[-1]
         configmanager.del_nodes([node])
         yield msg.DeletedResource()
     else:
         raise Exception("Not implemented")
 
+
 def enumerate_node_collection(collectionpath, configmanager):
-    if collectionpath == [ 'node' ]:  #it is simple '/node/', need a list of nodes
+    if collectionpath == ['node']:  # it is just '/node/', need a list of nodes
         return iterate_collections(configmanager.get_nodes())
     del collectionpath[0:2]
     collection = nested_lookup(noderesources, collectionpath)
@@ -127,7 +135,7 @@ def create_node(inputdata, configmanager):
     try:
         nodename = inputdata['name']
         del inputdata['name']
-        attribmap = { nodename: inputdata }
+        attribmap = {nodename: inputdata}
     except KeyError:
         raise exc.InvalidArgumentException()
     configmanager.set_node_attributes(attribmap)
@@ -151,11 +159,11 @@ def handle_path(path, operation, configmanager, inputdata=None):
     if pathcomponents[-1] == '':
         iscollection = True
         del pathcomponents[-1]
-    if not pathcomponents: #root collection list
+    if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'nodegroup':
         try:
-            group = pathcomponents[1]
+            pass  # group = pathcomponents[1]
         except IndexError:
             return iterate_collections(configmanager.get_groups())
     elif pathcomponents[0] in ('node', 'system', 'vm'):
@@ -181,8 +189,9 @@ def handle_path(path, operation, configmanager, inputdata=None):
             plugroute = nested_lookup(noderesources, pathcomponents).routeinfo
         except KeyError:
             raise exc.NotFoundException("Invalid element requested")
-        inputdata = msg.get_input_message(pathcomponents, operation, inputdata, (node,))
-        if 'handler' in plugroute:  #fixed handler definition
+        inputdata = msg.get_input_message(
+            pathcomponents, operation, inputdata, (node,))
+        if 'handler' in plugroute:  # fixed handler definition
             passvalue = pluginmap[plugroute['handler']].__dict__[operation](
                 nodes=(node,), element=pathcomponents,
                 configmanager=configmanager,
@@ -190,17 +199,16 @@ def handle_path(path, operation, configmanager, inputdata=None):
         elif 'pluginattrs' in plugroute:
             nodeattr = configmanager.get_node_attributes(
                 [node], plugroute['pluginattrs'])
-            foundplug = False
+            plugpath = None
+            if 'default' in plugroute:
+                plugpath = plugroute['default']
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
-                    foundplug = True
-                    passvalue = pluginmap[nodeattr[node][attrname]['value']].__dict__[operation](
-                        nodes=(node,), element=pathcomponents,
-                        configmanager=configmanager,
-                        inputdata=inputdata)
-            if (not foundplug) and 'default' in plugroute:
-                passvalue = pluginmap[plugroute['default']].__dict__[operation](
-                    nodes=(node,), element=pathcomponents, configmanager=configmanager,
+                    plugpath = nodeattr[node][attrname]['value']
+            if plugpath is not None:
+                passvalue = pluginmap[plugpath].__dict__[operation](
+                    nodes=(node,), element=pathcomponents,
+                    configmanager=configmanager,
                     inputdata=inputdata)
         if isinstance(passvalue, console.Console):
             return passvalue
@@ -208,6 +216,3 @@ def handle_path(path, operation, configmanager, inputdata=None):
             return stripnode(passvalue, node)
     else:
         raise exc.NotFoundException()
-
-
-

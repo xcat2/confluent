@@ -6,6 +6,7 @@
 import confluent.exceptions as exc
 import json
 
+
 class ConfluentMessage(object):
     defaultvalue = ''
     defaulttype = 'text'
@@ -48,25 +49,26 @@ class ConfluentMessage(object):
             if isinstance(val, list):
                 snippet += key + ":"
                 for v in val:
-                    snippet += \
-                       '<input type="%s" name="%s" value="%s" title="%s">%s' % (
-                            type, key, v, desc, note)
-                snippet += \
-                       '<input type="%s" name="%s" value="" title="%s">%s' % (
-                            type, key, desc, note)
-                snippet += '<input type="checkbox" name="restexplorerhonorkey" '
-                snippet += 'value="%s">' % (key)
+                    snippet += ('<input type="{0}" name="{1}" value="{2}" '
+                                ' "title="{3}">{4}'
+                                ).format(type, key, v, desc, note)
+                snippet += (
+                    '<input type="{0}" name="{1}" value="" title="{2}">{3}'
+                    '<input type="checkbox" name="restexplorerhonorkey" '
+                    'value="{1}">').format(type, key, desc, note)
                 return snippet
-            snippet += key + ":" + \
-                       '<input type="%s" name="%s" value="%s" title="%s">%s' % (
-                            type, key, value, desc, note)
-            snippet += '<input type="checkbox" name="restexplorerhonorkey" '
-            snippet += 'value="%s">' % (key)
+            snippet += (key + ":" +
+                        '<input type="{0}" name="{1}" value="{2}" '
+                        'title="{3}">{4}<input type="checkbox" '
+                        'name="restexplorerhonorkey" value="{1}">'
+                        ).format(type, key, value, desc, note)
         return snippet
+
 
 class DeletedResource(ConfluentMessage):
     def __init__(self):
         self.kvpairs = {}
+
 
 class ConfluentChoiceMessage(ConfluentMessage):
 
@@ -87,28 +89,30 @@ class ConfluentChoiceMessage(ConfluentMessage):
             snippet += 'value="%s">' % (key)
         return snippet
 
+
 class LinkRelation(ConfluentMessage):
     def json_hal(self):
         """Provide json_hal style representation of the relation.
 
         This currently only makes sense for the socket api.
         """
-        return {self.rel: '{ "href": "%s" }' % self.href }
+        return {self.rel: '{ "href": "%s" }' % self.href}
 
     def raw_rel(self):
         """Provide python structure of the relation.
 
         This currently is only sensible to consume from httpapi.
         """
-        return { self.rel: { "href": self.href }}
+        return {self.rel: {"href": self.href}}
 
     def html(self):
         """Provide an html representation of the link relation.
 
         This is used by the API explorer aspect of httpapi"""
-        return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
-        #return '<a href="%s" rel="%s">%s</a><input type="submit" name="restexprerorop" value="delete:%s"' % (self.href, self.rel, self.href, self.href)
-
+        return '<a href="{0}" rel="{1}">{0}</a>'.format(self.href, self.rel)
+        # return '<a href="%s" rel="%s">%s</a><input type="submit"
+        # name="restexprerorop" value="delete:%s"' % (self.href, self.rel,
+        # self.href, self.href)
 
 
 class ChildCollection(LinkRelation):
@@ -119,16 +123,20 @@ class ChildCollection(LinkRelation):
 
     def html(self):
         if self.candelete:
-            return '<a href="%s" rel="%s">%s</a> . . . . . . . . . . . . . . . . . . <button type="submit" name="restexplorerop" value="delete" formaction="%s">delete</button>' % (self.href, self.rel, self.href, self.href)
+            return ('<a href="{0}" rel="{1}">{0}</a> . . . . . . . . . . . . '
+                    '<button type="submit" name="restexplorerop" '
+                    'value="delete" formaction="{0}">delete'
+                    '</button>').format(self.href, self.rel)
         else:
-            return '<a href="%s" rel="%s">%s</a>' % (self.href, self.rel, self.href)
+            return '<a href="{0}" rel="{0}">{0}</a>'.format(self.href)
+
 
 def get_input_message(path, operation, inputdata, nodes=None):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
     elif path[0] == 'attributes' and operation != 'retrieve':
         return InputAttributes(path, nodes, inputdata)
-    elif path == [ 'boot', 'device' ] and operation != 'retrieve':
+    elif path == ['boot', 'device'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
@@ -181,7 +189,7 @@ class InputPowerMessage(ConfluentMessage):
                         datum['powerstate'] not in self.valid_values):
                     raise exc.InvalidArgumentException()
                 self.powerbynode[key] = datum['powerstate']
-        else: # we have a powerstate argument not by node
+        else:  # we have a powerstate argument not by node
             datum = inputdata
             if ('powerstate' not in datum or
                     datum['powerstate'] not in self.valid_values):
@@ -204,12 +212,13 @@ class BootDevice(ConfluentChoiceMessage):
 
     def __init__(self, node, device):
         if device not in self.valid_values:
-            raise Exception("Invalid boot device argument passed in: %s" % device)
+            raise Exception("Invalid boot device argument passed in:" + device)
         self.kvpairs = {
             node: {
-                'bootdevice': { 'value': device },
+                'bootdevice': {'value': device},
             }
         }
+
 
 class InputBootDevice(BootDevice):
     def __init__(self, path, nodes, inputdata):
@@ -221,7 +230,7 @@ class InputBootDevice(BootDevice):
                 if key not in inputdata:
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
-                if ('powerstate' not in datoum or
+                if ('powerstate' not in datum or
                         datum['powerstate'] not in self.valid_values):
                     raise exc.InvalidArgumenTException()
                 self.bootdevbynode[key] = datum['bootdevice']
@@ -248,16 +257,17 @@ class PowerState(ConfluentChoiceMessage):
     def __init__(self, node, state):
         self.kvpairs = {
             node: {
-                'powerstate': { 'value': state },
+                'powerstate': {'value': state},
             }
         }
+
 
 class Attributes(ConfluentMessage):
     def __init__(self, node=None, kv=None, desc=None):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = { 'value': kv[key] }
+            nkv[key] = {'value': kv[key]}
         if node is None:
             self.kvpairs = nkv
         else:
@@ -265,11 +275,13 @@ class Attributes(ConfluentMessage):
                 node: nkv
             }
 
+
 class ListAttributes(ConfluentMessage):
     def __init__(self, node, kv):
         self .kvpairs = {
             node: kv
         }
+
 
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
@@ -279,7 +291,7 @@ class CryptedAttributes(Attributes):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = { 'note': 'Encrypted' }
+            nkv[key] = {'note': 'Encrypted'}
         if node is None:
             self.kvpairs = nkv
         else:
