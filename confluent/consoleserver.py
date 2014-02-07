@@ -122,24 +122,27 @@ class ConsoleSession(object):
     """
 
     def __init__(self, node, configmanager, datacallback=None):
-        if node not in _handled_consoles:
-            _handled_consoles[node] = _ConsoleHandler(node, configmanager)
+        self.tenant = configmanager.tenant
+        consk = (node, self.tenant)
+        self.ckey = consk
+        if consk not in _handled_consoles:
+            _handled_consoles[consk] = _ConsoleHandler(node, configmanager)
         self._evt = threading.Event()
         self.node = node
-        self.conshdl = _handled_consoles[node]
-        self.write = _handled_consoles[node].write
+        self.conshdl = _handled_consoles[consk]
+        self.write = _handled_consoles[consk].write
         if datacallback is None:
             self.reaper = eventlet.spawn_after(15, self.destroy)
-            self.databuffer = _handled_consoles[node].get_recent()
-            self.reghdl = _handled_consoles[node].register_rcpt(self.got_data)
+            self.databuffer = _handled_consoles[consk].get_recent()
+            self.reghdl = _handled_consoles[consk].register_rcpt(self.got_data)
         else:
-            self.reghdl = _handled_consoles[node].register_rcpt(datacallback)
-            recdata = _handled_consoles[node].get_recent()
+            self.reghdl = _handled_consoles[consk].register_rcpt(datacallback)
+            recdata = _handled_consoles[consk].get_recent()
             if recdata:
                 datacallback(recdata)
 
     def destroy(self):
-        _handled_consoles[self.node].unregister_rcpt(self.reghdl)
+        _handled_consoles[self.ckey].unregister_rcpt(self.reghdl)
         self.databuffer = None
         self._evt = None
         self.reghdl = None
