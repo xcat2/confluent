@@ -5,6 +5,8 @@
 # It implement unix and tls sockets
 # 
 # TODO: SO_PEERCRED for unix socket
+import confluent.auth as auth
+import confluent.common.tlvdata as tlvdata
 import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import eventlet.green.socket as socket
@@ -15,39 +17,46 @@ import struct
 
 SO_PEERCRED = 17
 
+class ClientConsole(object):
+    def __init__(self, client):
+        self.client = client
+
+    def sendall(self, data):
+        tlvdata.send_tlvdata(self.client, data)
+
 def sessionhdl(connection, authname):
-    #TODO: authenticate and authorize peer
-    # For now, trying to test the console stuff, so let's just do n1.
-    skipauth = False
+    # For now, trying to test the console stuff, so let's just do n4.
+    authenticated = False
     if authname and isinstance(authname, bool):
-        skipauth = True
-    connection.sendall("Confluent -- v0 --\r\n")
-    if authname is None:  # prompt for name and passphrase
-        connection.sendall("Name: ")
-        username = connection.recv(4096)
-        connection.sendall(username)
-        while "\r" not in username:
-            ddata = connection.recv(4096)
-            if not ddata:
-                return
-            connection.sendall(ddata)
-            username += ddata
-        username, _, passphrase = username.partition("\r")
-        connection.sendall("\nPassphrase: ")
-        while "\r" not in passphrase:
-            pdata = connection.recv(4096)
-            if not pdata:
-                return
-            passphrase += pdata
-        connection.sendall("\r\n")
-        print username
-        print passphrase
-    connection.sendall("Confluent -- v0 -- Session Granted\r\n/->")
-    cfm = configmanager.ConfigManager(tenant=0)
-    consession = consoleserver.ConsoleSession(node='n1', configmanager=cfm,
-                                        datacallback=connection.sendall)
+        authenticated = True
+        cfm = configmanager.ConfigManager(tenant=None)
+    elif authname:
+        authenticated = True
+        authdata = auth.authorize(authname, element=None)
+        cfm = authdata[1]
+        authenticated = True
+    tlvdata.send_tlvdata(connection,"Confluent -- v0 --")
+    while not authenticated:  # prompt for name and passphrase
+        tlvdata.send_tlvdata(connection, {'authpassed': 0})
+        response = tlvdata.recv_tlvdata(connection)
+        username = response['username']
+        passphrase = response['passphrase']
+        # NOTE(jbjohnso): Here, we need to authenticate, but not
+        # authorize a user.  When authorization starts understanding
+        # element path, that authorization will need to be called
+        # per request the user makes
+        authdata = auth.check_user_passphrase(username, passphrase)
+        if authdata is None:
+            tlvdata.send_tlvdata(connection, {'authpassed': 0})
+        else:
+            authenticated = True
+            cfm = authdata[1]
+    tlvdata.send_tlvdata(connection, {'authpassed': 1})
+    ccons = ClientConsole(connection)
+    consession = consoleserver.ConsoleSession(node='n4', configmanager=cfm,
+                                        datacallback=ccons.sendall)
     while (1):
-        data = connection.recv(4096)
+        data = tlvdata.recv_tlvdata(connection)
         if not data:
             consession.destroy()
             return

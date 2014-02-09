@@ -113,6 +113,9 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     :param tenant: Optional explicit indication of tenant (defaults to
                    embedded in name)
     """
+    # The reason why tenant is 'False' instead of 'None':
+    # None means explictly not a tenant.  False means check
+    # the username for signs of being a tenant
     # If there is any sign of guessing on a user, all valid and
     # invalid attempts are equally slowed to no more than 20 per second
     # for that particular user.

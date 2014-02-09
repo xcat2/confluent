@@ -25,6 +25,7 @@
 # ~ I will not use for now...
 
 import fcntl
+import getpass
 import optparse
 import os
 import select
@@ -33,6 +34,12 @@ import ssl
 import sys
 import termios
 import tty
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..'))
+sys.path.append(path)
+
+import confluent.common.tlvdata as tlvdata
 
 SO_PASSCRED = 16
 conserversequence = '\x05c' # ctrl-e, c
@@ -136,9 +143,14 @@ elif opts.unixsock:
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
 
-banner = server.recv(128)
-while "\n" not in banner:
-    banner += server.recv(128)
+banner = tlvdata.recv_tlvdata(server)
+authinfo = tlvdata.recv_tlvdata(server)
+while authinfo['authpassed'] != 1:
+    username = raw_input("Name: ")
+    passphrase = getpass.getpass("Passphrase: ")
+    tlvdata.send_tlvdata(server,
+                         {'username': username, 'passphrase': passphrase})
+    authinfo = tlvdata.recv_tlvdata(server)
 tty.setraw(sys.stdin.fileno())
 fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
 # clear on start can help with readable of TUI, but it
@@ -151,7 +163,7 @@ while not doexit:
     for fh in rdylist:
         if fh == server:
             #fh.read()
-            data = fh.recv(16384)
+            data = tlvdata.recv_tlvdata(fh)
             if data:
                 sys.stdout.write(data)
                 sys.stdout.flush()
@@ -163,5 +175,5 @@ while not doexit:
             input = fh.read()
             input = check_escape_seq(input, fh)
             if input:
-                server.sendall(input)
+                tlvdata.send_tlvdata(server, input)
 exit()
