@@ -91,7 +91,7 @@ class ConfluentChoiceMessage(ConfluentMessage):
 
 
 class LinkRelation(ConfluentMessage):
-    def json_hal(self):
+    def json(self):
         """Provide json_hal style representation of the relation.
 
         This currently only makes sense for the socket api.

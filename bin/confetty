@@ -29,12 +29,14 @@ import getpass
 import optparse
 import os
 import select
+import shlex
 import socket
 import ssl
 import sys
 import termios
 import tty
 
+target = "/"
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..'))
 sys.path.append(path)
@@ -46,6 +48,10 @@ conserversequence = '\x05c' # ctrl-e, c
 
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
 server = None
+
+def prompt():
+    sys.stdout.write(target + ' -> ')
+    sys.stdout.flush()
 
 def parseservervalue(serverstring):
     if serverstring.find(']:') != -1:
@@ -60,6 +66,62 @@ def parseservervalue(serverstring):
         port = 4001
     return (server, port)
 
+
+def parse_command(command):
+    args = shlex.split(command, posix=True)
+    return args
+    
+def do_command(command, server):
+    global target
+    if command == "":  # result of ctrl-d
+        command = "exit\n"
+        print("exit")
+    command = command[:-1]
+    command = command.lower()
+    argv = parse_command(command)
+    if len(argv) == 0:
+        prompt()
+        return
+    if argv[0] == "exit":
+        server.close()
+        sys.exit(0)
+    if argv[0] == "cd":
+        otarget = target
+        change_target(argv[1])
+        tlvdata.send_tlvdata(server, {"operation": 'retrieve', 'path': target})
+        result = tlvdata.recv_tlvdata(server)
+        if 'error' in result:
+            print target + ':' + result['error']
+            target = otarget
+        
+
+        
+    prompt()
+
+
+def change_target(path):
+    global target
+    pathcomponents = path.split("/")
+    if pathcomponents[0] == "":  # absolute path
+        target = path
+    else:
+        targparts = target.split("/")[:-1]
+        for component in pathcomponents:
+            if component in ('.',''):  # ignore these
+                continue
+            elif component == '..':
+                if len(targparts) > 0:
+                    del targparts[-1]
+            else:
+                targparts.append(component)
+        targparts.append('')
+        target = '/'.join(targparts)
+    if len(target) ==0 or target[-1] != '/':
+        target += '/'
+
+def startconsole():
+    tty.setraw(sys.stdin.fileno())
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
 
 def exit(code=0):
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
@@ -151,13 +213,15 @@ while authinfo['authpassed'] != 1:
     tlvdata.send_tlvdata(server,
                          {'username': username, 'passphrase': passphrase})
     authinfo = tlvdata.recv_tlvdata(server)
-tty.setraw(sys.stdin.fileno())
-fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
 # clear on start can help with readable of TUI, but it
 # can be annoying, so for now don't do it.
 # sys.stdout.write('\x1b[H\x1b[J')
 # sys.stdout.flush()
+
 doexit = False
+inconsole = False
+pendingcommand = ""
+prompt()
 while not doexit:
     rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
     for fh in rdylist:
@@ -175,8 +239,13 @@ while not doexit:
                 sys.stdout.write("\r\n[remote disconnected]\r\n")
                 break
         else:
-            input = fh.read()
-            input = check_escape_seq(input, fh)
-            if input:
-                tlvdata.send_tlvdata(server, input)
+            if inconsole:
+                input = fh.read()
+                input = check_escape_seq(input, fh)
+                if input:
+                    tlvdata.send_tlvdata(server, input)
+            else:
+                command = fh.readline()
+                inconsole = do_command(command, server)
+                
 exit()

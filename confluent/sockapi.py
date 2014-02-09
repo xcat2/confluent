@@ -9,9 +9,13 @@ import confluent.auth as auth
 import confluent.common.tlvdata as tlvdata
 import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
+import confluent.exceptions as exc
+import confluent.messages
+import confluent.pluginapi as pluginapi
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 import eventlet
+import json
 import os
 import struct
 
@@ -19,7 +23,7 @@ SO_PEERCRED = 17
 
 class ClientConsole(object):
     def __init__(self, client):
-        self.client = client
+        self.client = clientn
 
     def sendall(self, data):
         tlvdata.send_tlvdata(self.client, data)
@@ -41,7 +45,7 @@ def sessionhdl(connection, authname):
         response = tlvdata.recv_tlvdata(connection)
         username = response['username']
         passphrase = response['passphrase']
-        # NOTE(jbjohnso): Here, we need to authenticate, but not
+        # note(jbjohnso): here, we need to authenticate, but not
         # authorize a user.  When authorization starts understanding
         # element path, that authorization will need to be called
         # per request the user makes
@@ -50,6 +54,34 @@ def sessionhdl(connection, authname):
             authenticated = True
             cfm = authdata[1]
     tlvdata.send_tlvdata(connection, {'authpassed': 1})
+    request = tlvdata.recv_tlvdata(connection)
+    while request is not None:
+        process_request(connection, request, cfm, authdata)
+        request = tlvdata.recv_tlvdata(connection)
+
+
+def send_response(responses, connection):
+    for rsp in responses:
+        tlvdata.send_tlvdata(connection, json.dumps(rsp.json()))
+
+def process_request(connection, request, cfm, authdata):
+    #TODO(jbjohnso): authorize each request
+    if type(request) == dict:
+        operation = request['operation']
+        path = request['path']
+        params = request.get('parameters', None)
+        try:
+            hdlr = pluginapi.handle_path(path, operation, cfm, params)
+        except exc.NotFoundException:
+            tlvdata.send_tlvdata(connection, {"errorcode": 404,
+                                 "error": "Target not found"})
+            return
+        except exc.InvalidArgumentException:
+            tlvdata.send_tlvdata(connection, {"errorcode": 400,
+                                 "error": "Bad Request"})
+            return
+        send_response(hdlr, connection)
+    return
     ccons = ClientConsole(connection)
     consession = consoleserver.ConsoleSession(node='n4', configmanager=cfm,
                                         datacallback=ccons.sendall)
