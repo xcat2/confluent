@@ -163,8 +163,11 @@ while not doexit:
     for fh in rdylist:
         if fh == server:
             #fh.read()
-            data = tlvdata.recv_tlvdata(fh)
-            if data:
+            try:
+                data = tlvdata.recv_tlvdata(fh)
+            except Exception:
+                data = None
+            if data is not None:
                 sys.stdout.write(data)
                 sys.stdout.flush()
             else:
