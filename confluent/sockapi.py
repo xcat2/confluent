@@ -46,9 +46,7 @@ def sessionhdl(connection, authname):
         # element path, that authorization will need to be called
         # per request the user makes
         authdata = auth.check_user_passphrase(username, passphrase)
-        if authdata is None:
-            tlvdata.send_tlvdata(connection, {'authpassed': 0})
-        else:
+        if authdata is not None:
             authenticated = True
             cfm = authdata[1]
     tlvdata.send_tlvdata(connection, {'authpassed': 1})
