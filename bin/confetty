@@ -248,7 +248,10 @@ while authinfo['authpassed'] != 1:
 doexit = False
 inconsole = False
 pendingcommand = ""
-prompt()
+if len(args) == 1:  # a node name, go straight to trying to console
+    do_command("start /node/%s/console/session" % args[0], server)
+else:
+    prompt()
 while not doexit:
     rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
     for fh in rdylist:
