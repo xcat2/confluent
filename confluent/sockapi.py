@@ -105,6 +105,12 @@ def process_request(connection, request, cfm, authdata):
                 ccons.startsending()
                 while consession is not None:
                     data = tlvdata.recv_tlvdata(connection)
+                    if type(data) == dict:
+                        if data['operation'] == 'stop':
+                            consession.destroy()
+                            return
+                        else:
+                            raise Exception("TODO")
                     if not data:
                         consession.destroy()
                         return
