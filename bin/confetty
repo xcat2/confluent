@@ -98,7 +98,7 @@ def do_command(command, server):
         sys.exit(0)
     if argv[0] == "cd":
         otarget = target
-        change_target(argv[1])
+        target = fullpath_target(argv[1])
         for res in send_request('retrieve', target, server):
             if 'error' in res:
                 print target + ': ' + res['error']
@@ -110,19 +110,24 @@ def do_command(command, server):
             else:
                 for item in res['item']:
                     print item["href"]
-
-        
-        
-
-        
+    if argv[0] == 'start':
+        targpath = fullpath_target(argv[1])
+        tlvdata.send_tlvdata(server, {'operation': 'start', 'path': targpath})
+        status = tlvdata.recv_tlvdata(server)
+        if 'error' in status:
+            print 'Error: ' + status['error']
+            return
+        print '[console session started]'
+        startconsole()
+        return
     prompt()
 
 
-def change_target(path):
+def fullpath_target(path):
     global target
     pathcomponents = path.split("/")
     if pathcomponents[0] == "":  # absolute path
-        target = path
+        ntarget = path
     else:
         targparts = target.split("/")[:-1]
         for component in pathcomponents:
@@ -134,13 +139,16 @@ def change_target(path):
             else:
                 targparts.append(component)
         targparts.append('')
-        target = '/'.join(targparts)
-    if len(target) ==0 or target[-1] != '/':
-        target += '/'
+        ntarget = '/'.join(targparts)
+    if len(ntarget) ==0 or ntarget[-1] != '/':
+        ntarget += '/'
+    return ntarget
 
 def startconsole():
+    global inconsole
     tty.setraw(sys.stdin.fileno())
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+    inconsole = True
 
 def exit(code=0):
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
@@ -250,6 +258,9 @@ while not doexit:
                 data = tlvdata.recv_tlvdata(fh)
             except Exception:
                 data = None
+            if type(data) == dict:
+                print repr(data)
+                continue
             if data is not None:
                 sys.stdout.write(data)
                 sys.stdout.flush()
@@ -265,6 +276,5 @@ while not doexit:
                     tlvdata.send_tlvdata(server, input)
             else:
                 command = fh.readline()
-                inconsole = do_command(command, server)
-                
+                do_command(command, server)
 exit()

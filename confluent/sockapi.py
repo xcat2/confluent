@@ -23,10 +23,22 @@ SO_PEERCRED = 17
 
 class ClientConsole(object):
     def __init__(self, client):
-        self.client = clientn
+        self.client = client
+        self.xmit = False
+        self.pendingdata = ""
 
     def sendall(self, data):
+        if not self.xmit:
+            self.pendingdata += data
+            return
         tlvdata.send_tlvdata(self.client, data)
+
+    def startsending(self):
+        self.xmit = True
+        if self.pendingdata != "":
+            tlvdata.send_tlvdata(self.client, self.pendingdata)
+        self.pendingdata = None
+
 
 def sessionhdl(connection, authname):
     # For now, trying to test the console stuff, so let's just do n4.
@@ -65,6 +77,7 @@ def send_response(responses, connection):
         return
     for rsp in responses:
         tlvdata.send_tlvdata(connection, rsp.raw())
+    tlvdata.send_tlvdata(connection, {'_requestdone': 1})
 
 
 def process_request(connection, request, cfm, authdata):
@@ -75,25 +88,37 @@ def process_request(connection, request, cfm, authdata):
         params = request.get('parameters', None)
         hdlr = None
         try:
-            hdlr = pluginapi.handle_path(path, operation, cfm, params)
+            if operation == 'start':
+                elems = path.split('/')
+                if elems[3] != "console":
+                    raise exc.InvalidArgumentException()
+                node = elems[2]
+                ccons = ClientConsole(connection)
+                consession = consoleserver.ConsoleSession(
+                    node=node, configmanager=cfm, datacallback=ccons.sendall)
+                if consession is None:
+                    raise Exception("TODO")
+                tlvdata.send_tlvdata(connection, {'started': 1})
+                ccons.startsending()
+                while consession is not None:
+                    data = tlvdata.recv_tlvdata(connection)
+                    if not data:
+                        consession.destroy()
+                        return
+                    consession.write(data)
+            else:
+                hdlr = pluginapi.handle_path(path, operation, cfm, params)
         except exc.NotFoundException:
             tlvdata.send_tlvdata(connection, {"errorcode": 404,
                                  "error": "Target not found"})
+            tlvdata.send_tlvdata(connection, {"_requestdone": 1})
         except exc.InvalidArgumentException:
             tlvdata.send_tlvdata(connection, {"errorcode": 400,
-                                 "error": "Bad Request"})
+                                 "error": "Bad Request",
+                                 "_requestdone": 1})
+            tlvdata.send_tlvdata(connection, {"_requestdone": 1})
         send_response(hdlr, connection)
-        tlvdata.send_tlvdata(connection, {'_requestdone': 1})
     return
-    ccons = ClientConsole(connection)
-    consession = consoleserver.ConsoleSession(node='n4', configmanager=cfm,
-                                        datacallback=ccons.sendall)
-    while (1):
-        data = tlvdata.recv_tlvdata(connection)
-        if not data:
-            consession.destroy()
-            return
-        consession.write(data)
 
 
 def _tlshandler():
