@@ -17,6 +17,8 @@ import eventlet.green.ssl as ssl
 import eventlet
 import json
 import os
+import pwd
+import stat
 import struct
 
 SO_PEERCRED = 17
@@ -48,10 +50,10 @@ def sessionhdl(connection, authname):
         authenticated = True
         cfm = configmanager.ConfigManager(tenant=None)
     elif authname:
-        authenticated = True
         authdata = auth.authorize(authname, element=None)
-        cfm = authdata[1]
-        authenticated = True
+        if authdata is not None:
+            cfm = authdata[1]
+            authenticated = True
     tlvdata.send_tlvdata(connection,"Confluent -- v0 --")
     while not authenticated:  # prompt for name and passphrase
         tlvdata.send_tlvdata(connection, {'authpassed': 0})
@@ -144,6 +146,9 @@ def _unixdomainhandler():
     except OSError:  # if file does not exist, no big deal
         pass
     unixsocket.bind("/var/run/confluent/api.sock")
+    os.chmod("/var/run/confluent/api.sock",
+             stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |
+             stat.S_IRGRP | stat.S_IWUSR | stat.S_IRUSR)
     unixsocket.listen(5)
     while (1):
         cnn, addr = unixsocket.accept()
