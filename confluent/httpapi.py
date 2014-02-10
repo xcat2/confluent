@@ -342,7 +342,7 @@ def _assemble_json(responses, resource, url):
     rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
-            haldata = rsp.raw_rel()
+            haldata = rsp.raw()
             for hk in haldata.iterkeys():
                 if hk in links:
                     if isinstance(links[hk], list):
