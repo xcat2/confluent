@@ -179,23 +179,23 @@ class InputPowerMessage(ConfluentMessage):
         self.powerbynode = {}
         if not inputdata:
             raise exc.InvalidArgumentException()
-        if 'powerstate' not in inputdata:
+        if 'state' not in inputdata:
             #assume we have nested information
             for key in nodes:
                 if key not in inputdata:
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
-                if ('powerstate' not in datum or
-                        datum['powerstate'] not in self.valid_values):
+                if ('state' not in datum or
+                        datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumentException()
-                self.powerbynode[key] = datum['powerstate']
-        else:  # we have a powerstate argument not by node
+                self.powerbynode[key] = datum['state']
+        else:  # we have a state argument not by node
             datum = inputdata
-            if ('powerstate' not in datum or
-                    datum['powerstate'] not in self.valid_values):
+            if ('state' not in datum or
+                    datum['state'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
-                self.powerbynode[node] = datum['powerstate']
+                self.powerbynode[node] = datum['state']
 
     def powerstate(self, node):
         return self.powerbynode[node]
@@ -230,8 +230,8 @@ class InputBootDevice(BootDevice):
                 if key not in inputdata:
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
-                if ('powerstate' not in datum or
-                        datum['powerstate'] not in self.valid_values):
+                if ('state' not in datum or
+                        datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumenTException()
                 self.bootdevbynode[key] = datum['bootdevice']
         else:
@@ -257,7 +257,7 @@ class PowerState(ConfluentChoiceMessage):
     def __init__(self, node, state):
         self.kvpairs = {
             node: {
-                'powerstate': {'value': state},
+                'state': {'value': state},
             }
         }
 
