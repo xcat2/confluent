@@ -43,6 +43,7 @@ class ClientConsole(object):
 def sessionhdl(connection, authname):
     # For now, trying to test the console stuff, so let's just do n4.
     authenticated = False
+    authdata = None
     if authname and isinstance(authname, bool):
         authenticated = True
         cfm = configmanager.ConfigManager(tenant=None)
