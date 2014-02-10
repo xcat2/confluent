@@ -61,8 +61,11 @@ def sessionhdl(connection, authname):
 
 
 def send_response(responses, connection):
+    if responses is None:
+        return
     for rsp in responses:
-        tlvdata.send_tlvdata(connection, json.dumps(rsp.json()))
+        tlvdata.send_tlvdata(connection, rsp.raw())
+
 
 def process_request(connection, request, cfm, authdata):
     #TODO(jbjohnso): authorize each request
@@ -70,17 +73,17 @@ def process_request(connection, request, cfm, authdata):
         operation = request['operation']
         path = request['path']
         params = request.get('parameters', None)
+        hdlr = None
         try:
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
         except exc.NotFoundException:
             tlvdata.send_tlvdata(connection, {"errorcode": 404,
                                  "error": "Target not found"})
-            return
         except exc.InvalidArgumentException:
             tlvdata.send_tlvdata(connection, {"errorcode": 400,
                                  "error": "Bad Request"})
-            return
         send_response(hdlr, connection)
+        tlvdata.send_tlvdata(connection, {'_requestdone': 1})
     return
     ccons = ClientConsole(connection)
     consession = consoleserver.ConsoleSession(node='n4', configmanager=cfm,

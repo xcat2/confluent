@@ -98,7 +98,7 @@ class LinkRelation(ConfluentMessage):
         """
         return {self.rel: '{ "href": "%s" }' % self.href}
 
-    def raw_rel(self):
+    def raw(self):
         """Provide python structure of the relation.
 
         This currently is only sensible to consume from httpapi.

@@ -71,8 +71,19 @@ def parse_command(command):
     args = shlex.split(command, posix=True)
     return args
     
+
+currchildren = None
+
+def send_request(operation, path, server):
+    tlvdata.send_tlvdata(server, {'operation': operation, 'path': path})
+    result = tlvdata.recv_tlvdata(server)
+    while '_requestdone' not in result:
+        yield result
+        result = tlvdata.recv_tlvdata(server)
+
 def do_command(command, server):
     global target
+    global currchildren
     if command == "":  # result of ctrl-d
         command = "exit\n"
         print("exit")
@@ -88,11 +99,19 @@ def do_command(command, server):
     if argv[0] == "cd":
         otarget = target
         change_target(argv[1])
-        tlvdata.send_tlvdata(server, {"operation": 'retrieve', 'path': target})
-        result = tlvdata.recv_tlvdata(server)
-        if 'error' in result:
-            print target + ':' + result['error']
-            target = otarget
+        for res in send_request('retrieve', target, server):
+            if 'error' in res:
+                print target + ': ' + res['error']
+                target = otarget
+    if argv[0] in ('show', 'ls'):
+        for res in send_request('retrieve', target, server):
+            if type(res['item']) == dict:
+                print res['item']["href"]
+            else:
+                for item in res['item']:
+                    print item["href"]
+
+        
         
 
         
