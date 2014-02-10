@@ -126,6 +126,9 @@ def delete_node_collection(collectionpath, configmanager):
 def enumerate_node_collection(collectionpath, configmanager):
     if collectionpath == ['node']:  # it is just '/node/', need a list of nodes
         return iterate_collections(configmanager.get_nodes())
+    node = collectionpath[1]
+    if not configmanager.is_node(node):
+        raise exc.NotFoundException("Invalid element requested")
     del collectionpath[0:2]
     collection = nested_lookup(noderesources, collectionpath)
     return iterate_resources(collection)
