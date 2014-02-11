@@ -352,7 +352,7 @@ def _assemble_json(responses, resource, url):
                 else:
                     links[hk] = haldata[hk]
         else:
-            rsp = rsp.rawdata()
+            rsp = rsp.raw()
             for dk in rsp.iterkeys():
                 if dk in rspdata:
                     if isinstance(rspdata[dk], list):

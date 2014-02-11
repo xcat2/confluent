@@ -30,7 +30,7 @@ def retrieve(nodes, element, configmanager, inputdata):
                         {attribute: currattr['value']})
                 elif 'cryptvalue' in currattr:
                     yield msg.CryptedAttributes(node,
-                        {attribute: currattr['cryptvalue']})
+                        {attribute: currattr})
                 elif isinstance(currattr, list):
                     yield msg.ListAttributes(node,
                         {attribute: currattr})

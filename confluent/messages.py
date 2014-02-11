@@ -19,7 +19,7 @@ class ConfluentMessage(object):
         jsonsnippet = json.dumps(self.kvpairs, separators=(',', ':'))[1:-1]
         return jsonsnippet
 
-    def rawdata(self):
+    def raw(self):
         """Return pythonic representation of the response.
 
         Used by httpapi while assembling data prior to json serialization"""
@@ -34,7 +34,6 @@ class ConfluentMessage(object):
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
             value = self.defaultvalue
-            note = ''
             type = self.defaulttype
             try:
                 desc = self.desc
@@ -44,24 +43,26 @@ class ConfluentMessage(object):
                 value = val['value']
             if value is None:
                 value = ''
-            if 'note' in val:
-                note = '(' + val['note'] + ')'
+            if value == '' and 'isset' in val and val['isset'] is True:
+                # an encrypted value, put some *** to show it is set
+                # in the explorer
+                value = '********'
             if isinstance(val, list):
                 snippet += key + ":"
                 for v in val:
                     snippet += ('<input type="{0}" name="{1}" value="{2}" '
-                                ' "title="{3}">{4}'
-                                ).format(type, key, v, desc, note)
+                                ' "title="{3}">'
+                                ).format(type, key, v, desc)
                 snippet += (
-                    '<input type="{0}" name="{1}" value="" title="{2}">{3}'
+                    '<input type="{0}" name="{1}" value="" title="{2}">'
                     '<input type="checkbox" name="restexplorerhonorkey" '
-                    'value="{1}">').format(type, key, desc, note)
+                    'value="{1}">').format(type, key, desc)
                 return snippet
             snippet += (key + ":" +
                         '<input type="{0}" name="{1}" value="{2}" '
-                        'title="{3}">{4}<input type="checkbox" '
+                        'title="{3}"><input type="checkbox" '
                         'name="restexplorerhonorkey" value="{1}">'
-                        ).format(type, key, value, desc, note)
+                        ).format(type, key, value, desc)
         return snippet
 
 
@@ -291,7 +292,10 @@ class CryptedAttributes(Attributes):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = {'note': 'Encrypted'}
+            if kv[key]['cryptvalue'] != '':
+                nkv[key] = {'isset': True}
+            else:
+                nkv[key] = {'isset': False}
         if node is None:
             self.kvpairs = nkv
         else:
