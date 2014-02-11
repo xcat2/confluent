@@ -254,6 +254,8 @@ if opts.server:  # going over a TLS network
     server = connect_tls_server(opts.server)
 elif opts.unixsock:
     server = connect_unix_server(opts.unixsock)
+elif os.path.exists("/var/run/confluent/api.sock"):
+    server = connect_unix_server("/var/run/confluent/api.sock")
 
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
