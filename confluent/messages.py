@@ -216,7 +216,7 @@ class BootDevice(ConfluentChoiceMessage):
             raise Exception("Invalid boot device argument passed in:" + device)
         self.kvpairs = {
             node: {
-                'bootdevice': {'value': device},
+                'device': {'value': device},
             }
         }
 
@@ -226,7 +226,7 @@ class InputBootDevice(BootDevice):
         self.bootdevbynode = {}
         if not inputdata:
             raise exc.InvalidArgumentException()
-        if 'bootdevice' not in inputdata:
+        if 'device' not in inputdata:
             for key in nodes:
                 if key not in inputdata:
                     raise exc.InvalidArgumentException()
@@ -234,14 +234,14 @@ class InputBootDevice(BootDevice):
                 if ('state' not in datum or
                         datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumenTException()
-                self.bootdevbynode[key] = datum['bootdevice']
+                self.bootdevbynode[key] = datum['device']
         else:
             datum = inputdata
-            if ('bootdevice' not in datum or
-                    datum['bootdevice'] not in self.valid_values):
+            if ('device' not in datum or
+                    datum['device'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
-                self.bootdevbynode[node] = datum['bootdevice']
+                self.bootdevbynode[node] = datum['device']
 
     def bootdevice(self, node):
         return self.bootdevbynode[node]
