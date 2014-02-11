@@ -313,4 +313,5 @@ while not doexit:
             else:
                 command = fh.readline()
                 do_command(command, server)
+consoleonly = True
 exit()
