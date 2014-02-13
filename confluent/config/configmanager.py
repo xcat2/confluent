@@ -561,6 +561,15 @@ class ConfigManager(object):
                 del self._cfgstore['nodes'][node]
         self._bg_sync_to_file()
 
+    def del_groups(self, groups):
+        if 'groups' not in self._cfgstore:
+            return
+        for group in groups:
+            if group in self._cfgstore['groups']:
+                self._sync_nodes_to_group(group=group, nodes=[])
+                del self._cfgstore['groups'][group]
+        self._bg_sync_to_file()
+
     def set_node_attributes(self, attribmap):
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}

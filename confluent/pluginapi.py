@@ -114,11 +114,19 @@ def iterate_resources(fancydict):
         yield msg.ChildCollection(resource)
 
 
+def delete_nodegroup_collection(collectionpath, configmanager):
+    if len(collectionpath) == 2:  # just the nodegroup
+        group = collectionpath[-1]
+        configmanager.del_groups([group])
+        yield msg.DeletedResource(group)
+    else:
+        raise Exception("Not implemented")
+
 def delete_node_collection(collectionpath, configmanager):
     if len(collectionpath) == 2:  # just node
         node = collectionpath[-1]
-        configmanager.del_nodes([node])
-        yield msg.DeletedResource()
+        configmanager.del_groups([node])
+        yield msg.DeletedResource(node)
     else:
         raise Exception("Not implemented")
 
@@ -169,6 +177,11 @@ def handle_path(path, operation, configmanager, inputdata=None):
             group = pathcomponents[1]
         except IndexError:
             return iterate_collections(configmanager.get_groups())
+        if iscollection:
+            if operation == "delete":
+                return delete_nodegroup_collection(pathcomponents, configmanager)
+            else:
+                raise Exception("TODO")
     elif pathcomponents[0] in ('node', 'system', 'vm'):
         #single node request of some sort
         try:

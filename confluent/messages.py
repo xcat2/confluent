@@ -67,7 +67,7 @@ class ConfluentMessage(object):
 
 
 class DeletedResource(ConfluentMessage):
-    def __init__(self):
+    def __init__(self, resource):
         self.kvpairs = {}
 
 
