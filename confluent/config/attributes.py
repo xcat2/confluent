@@ -52,7 +52,7 @@ nic = {
 # 'node', which can be considered a 'system' or a 'vm'
 node = {
     'groups': {
-        'type': (list, tuple),
+        'type': list,
         'default': 'all',
         'description': ('List of static groups for which this node is '
                         'considered a member'),

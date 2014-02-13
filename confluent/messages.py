@@ -45,6 +45,10 @@ class ConfluentMessage(object):
                 value = '********'
             if isinstance(val, list):
                 snippet += key + ":"
+                if len(val) == 0:
+                    snippet += ('<input type="{0}" name="{1}" value="" '
+                                ' "title="{2}">'
+                                ).format(type, key, self.desc)
                 for v in val:
                     snippet += ('<input type="{0}" name="{1}" value="{2}" '
                                 ' "title="{3}">'
@@ -274,11 +278,12 @@ class Attributes(ConfluentMessage):
 
 
 class ListAttributes(ConfluentMessage):
-    def __init__(self, node, kv, desc=''):
+    def __init__(self, node=None, kv=None, desc=''):
         self.desc = desc
-        self .kvpairs = {
-            node: kv
-        }
+        if node is None:
+            self.kvpairs = kv
+        else:
+            self .kvpairs = {node: kv}
 
 
 class CryptedAttributes(Attributes):

@@ -575,7 +575,7 @@ class ConfigManager(object):
             for attrname in attribmap[node].iterkeys():
                 if (attrname not in attributes.node or
                         ('type' in attributes.node[attrname] and
-                        type(attribmap[node][attrname]) not in attributes.node[attrname]['type'])):
+                        not isinstance(attribmap[node][attrname],attributes.node[attrname]['type'])):
                     raise ValueError
                 newdict = {}
                 if (isinstance(attribmap[node][attrname], str)):

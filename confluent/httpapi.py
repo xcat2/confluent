@@ -38,11 +38,15 @@ def node_creation_resources():
         if attr.startswith("secret."):
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
-                desc=attribs.node[attr]['description']).html() + '<br>'
+                desc=attribs.node[attr]['description']).html() + '<br>\n'
+        elif 'type' in attribs.node[attr] and list == attribs.node[attr]['type']:
+            yield confluent.messages.ListAttributes(
+                kv={attr: []},
+                desc=attribs.node[attr]['description']).html() + '<br>\n'
         else:
             yield confluent.messages.Attributes(
                 kv={attr: None},
-                desc=attribs.node[attr]['description']).html() + '<br>'
+                desc=attribs.node[attr]['description']).html() + '<br>\n'
 
 create_resource_functions = {
     '/node/': node_creation_resources,
