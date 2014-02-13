@@ -54,7 +54,7 @@ node = {
     'groups': {
         'type': (list, tuple),
         'default': 'all',
-        'description': ('List of static groups for which this node is'
+        'description': ('List of static groups for which this node is '
                         'considered a member'),
     },
     #'type': {
@@ -128,8 +128,8 @@ node = {
 #                        'serial console configuration')
 #    },
     'console.method': {
-        'description': ('Indicate the method used to access the console of'
-                       'The managed node.')
+        'description': ('Indicate the method used to access the console of '
+                       'the managed node.')
     },
 #    'virtualization.host': {
 #        'description': ('Hypervisor where this node does/should reside'),

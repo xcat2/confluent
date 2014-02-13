@@ -54,6 +54,7 @@ from Crypto.Hash import SHA256
 import array
 import ast
 import collections
+import confluent.config.attributes as attributes
 import confluent.util
 import copy
 import cPickle
@@ -236,9 +237,9 @@ class _ExpressionFormat(string.Formatter):
         ast.BitOr: operator.or_,
     }
 
-    def __init__(self, nodeobj):
+    def __init__(self, nodeobj, nodename):
         self._nodeobj = nodeobj
-        self._numbers = re.findall(self.nummatch, nodeobj['name']['value'])
+        self._nodename = nodename
 
     def get_field(self, field_name, args, kwargs):
         parsed = ast.parse(field_name)
@@ -246,10 +247,6 @@ class _ExpressionFormat(string.Formatter):
 
     def _handle_ast_node(self, node):
         if isinstance(node, ast.Num):
-            if '_expressionkeys' not in self._nodeobj:
-                self._nodeobj['_expressionkeys'] = set(['name'])
-            else:
-                self._nodeobj['_expressionkeys'].add('name')
             return node.n
         elif isinstance(node, ast.Attribute):
             #ok, we have something with a dot
@@ -266,10 +263,12 @@ class _ExpressionFormat(string.Formatter):
         elif isinstance(node, ast.Name):
             var = node.id
             if var == 'nodename':
-                return self._nodeobj['name']['value']
+                return self._nodename
             mg = re.match(self.posmatch, var)
             if mg:
                 idx = int(mg.group(1))
+                if self._numbers == None:
+                    self._numbers = re.findall(self.nummatch, self._nodename)
                 return int(self._numbers[idx - 1])
             else:
                 if var in self._nodeobj:
@@ -471,6 +470,7 @@ class ConfigManager(object):
         # if the attribute is not set, this will search for a candidate
         # if it is set, but inheritedfrom, search for a replacement, just
         # in case
+        print repr(nodecfg['groups'])
         for group in nodecfg['groups']:
             if attrib in self._cfgstore['groups'][group]:
                 if srcgroup is not None and group != srcgroup:
@@ -498,8 +498,7 @@ class ConfigManager(object):
             elif group not in self._cfgstore['grouplist']:
                 self._cfgstore['grouplist'].append(group)
             if group not in self._cfgstore['groups']:
-                self._cfgstore['groups'][group] = {'name': {'value': group},
-                                                      'nodes': set([node]) }
+                self._cfgstore['groups'][group] = {'nodes': set([node])}
             elif 'nodes' not in self._cfgstore['groups'][group]:
                 self._cfgstore['groups'][group]['nodes'] = set([node])
             elif node not in self._cfgstore['groups'][group]['nodes']:
@@ -519,8 +518,7 @@ class ConfigManager(object):
                     self._node_removed_from_group(node, group)
         for node in nodes:
             if node not in self._cfgstore['nodes']:
-                self._cfgstore['nodes'][node] = {'name': {'value': node},
-                                                 'groups': [group] }
+                self._cfgstore['nodes'][node] = {'groups': [group]}
             elif 'groups' not in self._cfgstore['nodes'][node]:
                 self._cfgstore['nodes'][node]['groups'] = [group]
             elif group not in self._cfgstore['nodes'][node]['groups']:
@@ -534,7 +532,7 @@ class ConfigManager(object):
             self._cfgstore['groups'] = {}
         for group in attribmap.iterkeys():
             if group not in self._cfgstore['groups']:
-                self._cfgstore['groups'][group] = {'name': {'value': group}, 'nodes': set([])}
+                self._cfgstore['groups'][group] = {'nodes': set([])}
             cfgobj = self._cfgstore['groups'][group]
             for attr in attribmap[group].iterkeys():
                 newdict = {}
@@ -571,11 +569,14 @@ class ConfigManager(object):
         # flows to peers, all should have the same result
         for node in attribmap.iterkeys():
             if node not in self._cfgstore['nodes']:
-                self._cfgstore['nodes'][node] = {'name': {'value': node}}
+                self._cfgstore['nodes'][node] = {}
             cfgobj = self._cfgstore['nodes'][node]
-            exprmgr = _ExpressionFormat(cfgobj)
             recalcexpressions = False
             for attrname in attribmap[node].iterkeys():
+                if (attrname not in attributes.node or
+                        ('type' in attributes.node[attrname] and
+                        type(attribmap[node][attrname]) not in attributes.node[attrname])):
+                    raise ValueError
                 newdict = {}
                 if (isinstance(attribmap[node][attrname], str)):
                     newdict = {'value': attribmap[node][attrname] }
@@ -592,10 +593,13 @@ class ConfigManager(object):
                         attrname in cfgobj['_expressionkeys']):
                     recalcexpressions = True
                 if 'expression' in cfgobj[attrname]:  # evaluate now
+                    if exprmgr is None:
+                        exprmgr = _ExpressionFormat(cfgobj, node)
                     cfgobj[attrname] = _decode_attribute(attrname, cfgobj,
                                                          formatter=exprmgr)
             if recalcexpressions:
-                exprmgr = _ExpressionFormat(cfgobj)
+                if exprmgr is None:
+                    exprmgr = _ExpressionFormat(cfgobj, node)
                 self._recalculate_expressions(cfgobj, formatter=exprmgr)
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
