@@ -166,7 +166,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'nodegroup':
         try:
-            pass  # group = pathcomponents[1]
+            group = pathcomponents[1]
         except IndexError:
             return iterate_collections(configmanager.get_groups())
     elif pathcomponents[0] in ('node', 'system', 'vm'):
