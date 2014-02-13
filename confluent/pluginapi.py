@@ -125,7 +125,7 @@ def delete_nodegroup_collection(collectionpath, configmanager):
 def delete_node_collection(collectionpath, configmanager):
     if len(collectionpath) == 2:  # just node
         node = collectionpath[-1]
-        configmanager.del_groups([node])
+        configmanager.del_nodes([node])
         yield msg.DeletedResource(node)
     else:
         raise Exception("Not implemented")
