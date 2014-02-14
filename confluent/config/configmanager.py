@@ -522,7 +522,7 @@ class ConfigManager(object):
             elif 'groups' not in self._cfgstore['nodes'][node]:
                 self._cfgstore['nodes'][node]['groups'] = [group]
             elif group not in self._cfgstore['nodes'][node]['groups']:
-                self._cfgstore['nodes'][node]['groups'].append(group)
+                self._cfgstore['nodes'][node]['groups'].insert(0, group)
             else:
                 continue # next node, this node already in
             self._node_added_to_group(node, group)
@@ -536,7 +536,11 @@ class ConfigManager(object):
             cfgobj = self._cfgstore['groups'][group]
             for attr in attribmap[group].iterkeys():
                 newdict = {}
-                if (isinstance(attribmap[group][attr], str)):
+                if attr == 'nodes':
+                    if not isinstance(attribmap[group][attr], list):
+                        raise ValueError
+                    newdict = set(attribmap[group][attr])
+                elif (isinstance(attribmap[group][attr], str)):
                     newdict = { 'value': attribmap[group][attr] }
                 else:
                     newdict = attribmap[group][attr]

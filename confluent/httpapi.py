@@ -31,6 +31,28 @@ opmap = {
 }
 
 
+def group_creation_resources():
+    yield confluent.messages.Attributes(
+        kv={'name': None}, desc="Name of the group").html() + '<br>'
+    yield confluent.messages.ListAttributes(kv={'nodes': []},
+        desc='Nodes to add to the group').html() + '<br>\n'
+    for attr in sorted(attribs.node.iterkeys()):
+        if attr == 'groups':
+            continue
+        if attr.startswith("secret."):
+            yield confluent.messages.CryptedAttributes(
+                kv={attr: None},
+                desc=attribs.node[attr]['description']).html() + '<br>\n'
+        elif 'type' in attribs.node[attr] and list == attribs.node[attr]['type']:
+            yield confluent.messages.ListAttributes(
+                kv={attr: []},
+                desc=attribs.node[attr]['description']).html() + '<br>\n'
+        else:
+            yield confluent.messages.Attributes(
+                kv={attr: None},
+                desc=attribs.node[attr]['description']).html() + '<br>\n'
+
+
 def node_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the node").html() + '<br>'
@@ -50,6 +72,7 @@ def node_creation_resources():
 
 create_resource_functions = {
     '/node/': node_creation_resources,
+    '/nodegroup/': group_creation_resources,
 }
 
 

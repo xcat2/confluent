@@ -142,6 +142,16 @@ def enumerate_node_collection(collectionpath, configmanager):
     return iterate_resources(collection)
 
 
+def create_group(inputdata, configmanager):
+    try:
+        groupname = inputdata['name']
+        del inputdata['name']
+        attribmap = {groupname: inputdata}
+    except KeyError:
+        raise exc.InvalidArgumenTException()
+    configmanager.set_group_attributes(attribmap)
+
+
 def create_node(inputdata, configmanager):
     try:
         nodename = inputdata['name']
@@ -176,6 +186,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
         try:
             group = pathcomponents[1]
         except IndexError:
+            if operation == "create":
+                create_group(inputdata, configmanager)
             return iterate_collections(configmanager.get_groups())
         if iscollection:
             if operation == "delete":
