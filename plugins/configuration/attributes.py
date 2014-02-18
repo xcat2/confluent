@@ -21,18 +21,18 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
             if attribute == 'groups':
                 continue
             if attribute in grpcfg:
-                val = grpcfg[attribute]['value']
+                val = grpcfg[attribute]
             else:
-                val = None
+                val = {'value': None}
             if attribute.startswith('secret.'):
                 yield msg.CryptedAttributes(
-                    kv={attribute: None},
+                    kv={attribute: val},
                     desc=allattributes.node[attribute]['description'])
             elif isinstance(val, list):
                 raise Exception("TODO")
             else:
                 yield msg.Attributes(
-                    kv={attribute: val},
+                    kv={attribute: val['value']},
                     desc=allattributes.node[attribute]['description'])
     if element == 'current':
         for attribute in sorted(grpcfg.iterkeys()):
