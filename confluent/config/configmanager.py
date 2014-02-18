@@ -404,6 +404,13 @@ class ConfigManager(object):
             return False
         return True
 
+    def is_nodegroup(self, nodegroup):
+        if 'groups' not in self._cfgstore:
+            return False
+        if nodegroup not in self._cfgstore['groups']:
+            return False
+        return True
+
     def get_groups(self):
         if 'groups' not in self._cfgstore:
             return []
@@ -413,6 +420,9 @@ class ConfigManager(object):
         if 'nodes' not in self._cfgstore:
             return []
         return self._cfgstore['nodes'].iterkeys()
+
+    def get_nodegroup_attributes(self, nodegroup, attributes=[]):
+        return self._cfgstore['groups'][nodegroup]
 
     def get_node_attributes(self, nodelist, attributes=[]):
         if 'nodes' not in self._cfgstore:
@@ -470,7 +480,6 @@ class ConfigManager(object):
         # if the attribute is not set, this will search for a candidate
         # if it is set, but inheritedfrom, search for a replacement, just
         # in case
-        print repr(nodecfg['groups'])
         for group in nodecfg['groups']:
             if attrib in self._cfgstore['groups'][group]:
                 if srcgroup is not None and group != srcgroup:
@@ -479,6 +488,7 @@ class ConfigManager(object):
                 nodecfg[attrib] = \
                     copy.deepcopy(self._cfgstore['groups'][group][attrib])
                 nodecfg[attrib]['inheritedfrom'] = group
+                self._refresh_nodecfg(nodecfg, attrib)
                 return
             if srcgroup is not None and group == srcgroup:
                 # break out
@@ -555,6 +565,20 @@ class ConfigManager(object):
                     for node in cfgobj['nodes']:
                         nodecfg = self._cfgstore['nodes'][node]
                         self._do_inheritance(nodecfg, attr, group)
+        self._bg_sync_to_file()
+
+    def _refresh_nodecfg(self, cfgobj, attrname):
+        exprmgr = None
+        if 'expression' in cfgobj[attrname]:  # evaluate now
+            if exprmgr is None:
+                exprmgr = _ExpressionFormat(cfgobj, node)
+            cfgobj[attrname] = _decode_attribute(attrname, cfgobj,
+                                                 formatter=exprmgr)
+        if ('_expressionkeys' in cfgobj and
+                attrname in cfgobj['_expressionkeys']):
+            if exprmgr is None:
+                exprmgr = _ExpressionFormat(cfgobj, node)
+            self._recalculate_expressions(cfgobj, formatter=exprmgr)
 
     def del_nodes(self, nodes):
         if 'nodes' not in self._cfgstore:

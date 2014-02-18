@@ -91,6 +91,13 @@ noderesources = {
     },
 }
 
+nodegroupresources = {
+    'attributes': {
+        'all': PluginRoute({'handler': 'attributes'}),
+        'current': PluginRoute({'handler': 'attributes'}),
+    },
+}
+
 
 def stripnode(iterablersp, node):
     for i in iterablersp:
@@ -130,6 +137,14 @@ def delete_node_collection(collectionpath, configmanager):
     else:
         raise Exception("Not implemented")
 
+
+def enumerate_nodegroup_collection(collectionpath, configmanager):
+    nodegroup = collectionpath[1]
+    if not configmanager.is_nodegroup(nodegroup):
+        raise exc.NotFoundException("Invalid element requested")
+    del collectionpath[0:2]
+    collection = nested_lookup(nodegroupresources, collectionpath)
+    return iterate_resources(collection)
 
 def enumerate_node_collection(collectionpath, configmanager):
     if collectionpath == ['node']:  # it is just '/node/', need a list of nodes
@@ -192,8 +207,21 @@ def handle_path(path, operation, configmanager, inputdata=None):
         if iscollection:
             if operation == "delete":
                 return delete_nodegroup_collection(pathcomponents, configmanager)
+            elif operation == "retrieve":
+                return enumerate_nodegroup_collection(pathcomponents, configmanager)
             else:
                 raise Exception("TODO")
+        try:
+            plugroute = nested_lookup(nodegroupresources, pathcomponents[2:]).routeinfo
+        except KeyError:
+            raise exc.NotFoundException("Invalid element requested")
+        inputdata = msg.get_input_message(
+            pathcomponents[2:], operation, inputdata)
+        if 'handler' in plugroute:  # fixed handler definition
+            return pluginmap[plugroute['handler']].__dict__[operation](
+                nodes=None, element=pathcomponents,
+                configmanager=configmanager,
+                inputdata=inputdata)
     elif pathcomponents[0] in ('node', 'system', 'vm'):
         #single node request of some sort
         try:

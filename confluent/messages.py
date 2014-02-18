@@ -150,6 +150,9 @@ class InputAttributes(ConfluentMessage):
         nestedmode = False
         if not inputdata:
             raise exc.InvalidArgumentException
+        if nodes is None:
+            self.attribs = inputdata
+            return
         for node in nodes:
             if node in inputdata:
                 nestedmode = True
@@ -283,7 +286,7 @@ class ListAttributes(ConfluentMessage):
         if node is None:
             self.kvpairs = kv
         else:
-            self .kvpairs = {node: kv}
+            self.kvpairs = {node: kv}
 
 
 class CryptedAttributes(Attributes):
