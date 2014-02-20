@@ -602,6 +602,20 @@ class ConfigManager(object):
                 del self._cfgstore['groups'][group]
         self._bg_sync_to_file()
 
+    def clear_node_attributes(self, nodes, attributes):
+        for node in nodes:
+            try:
+                nodek = self._cfgstore['nodes'][node]
+            except KeyError:
+                continue
+            for attrib in attributes:
+                if attrib in nodek and 'inheritedfrom' not in nodek[attrib]:
+                    # if the attribute is set and not inherited,
+                    # delete it and check for inheritence to backfil data
+                    del nodek[attrib]
+                    self._do_inheritance(nodek, attrib)
+        self._bg_sync_to_file()
+
     def set_node_attributes(self, attribmap):
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}
