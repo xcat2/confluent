@@ -545,7 +545,7 @@ class ConfigManager(object):
                 self._cfgstore['groups'][group] = {'nodes': set([])}
             cfgobj = self._cfgstore['groups'][group]
             for attr in attribmap[group].iterkeys():
-                if (attr not in allattributes.node or
+                if attr != 'nodes' and (attr not in allattributes.node or
                         ('type' in allattributes.node[attr] and
                         not isinstance(attribmap[node][attr],allattributes.node[attr]['type']))):
                     raise ValueError
