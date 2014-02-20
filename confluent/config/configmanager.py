@@ -54,7 +54,7 @@ from Crypto.Hash import SHA256
 import array
 import ast
 import collections
-import confluent.config.attributes as attributes
+import confluent.config.attributes as allattributes
 import confluent.util
 import copy
 import cPickle
@@ -545,6 +545,10 @@ class ConfigManager(object):
                 self._cfgstore['groups'][group] = {'nodes': set([])}
             cfgobj = self._cfgstore['groups'][group]
             for attr in attribmap[group].iterkeys():
+                if (attr not in allattributes.node or
+                        ('type' in allattributes.node[attr] and
+                        not isinstance(attribmap[node][attr],allattributes.node[attr]['type']))):
+                    raise ValueError
                 newdict = {}
                 if attr == 'nodes':
                     if not isinstance(attribmap[group][attr], list):
@@ -610,9 +614,9 @@ class ConfigManager(object):
             cfgobj = self._cfgstore['nodes'][node]
             recalcexpressions = False
             for attrname in attribmap[node].iterkeys():
-                if (attrname not in attributes.node or
-                        ('type' in attributes.node[attrname] and
-                        not isinstance(attribmap[node][attrname],attributes.node[attrname]['type']))):
+                if (attrname not in allattributes.node or
+                        ('type' in allattributes.node[attrname] and
+                        not isinstance(attribmap[node][attrname],allattributes.node[attrname]['type']))):
                     raise ValueError
                 newdict = {}
                 if (isinstance(attribmap[node][attrname], str)):

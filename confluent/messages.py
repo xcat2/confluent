@@ -35,11 +35,11 @@ class ConfluentMessage(object):
             val = self.kvpairs[key]
             value = self.defaultvalue
             type = self.defaulttype
-            if 'value' in val:
+            if val is not None and 'value' in val:
                 value = val['value']
             if value is None:
                 value = ''
-            if value == '' and 'isset' in val and val['isset'] is True:
+            if val is not None and value == '' and 'isset' in val and val['isset'] is True:
                 # an encrypted value, put some *** to show it is set
                 # in the explorer
                 value = '********'
@@ -271,7 +271,10 @@ class Attributes(ConfluentMessage):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = {'value': kv[key]}
+            if type(kv[key]) == str:
+                nkv[key] = {'value': kv[key]}
+            else:
+                nkv[key] = kv[key]
         if node is None:
             self.kvpairs = nkv
         else:

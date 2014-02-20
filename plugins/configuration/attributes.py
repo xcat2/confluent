@@ -41,7 +41,10 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
             if attribute == 'nodes':
                 desc = 'The nodes belonging to this group'
             else:
-                desc = allattributes.node[attribute]['description']
+                try:
+                    desc = allattributes.node[attribute]['description']
+                except KeyError:
+                    desc = 'Unknown'
             if 'value' in currattr:
                 yield msg.Attributes(
                     kv={attribute: currattr['value']},
@@ -89,18 +92,20 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
         for node in attributes.iterkeys():
             for attribute in sorted(attributes[node].iterkeys()):
                 currattr = attributes[node][attribute]
+                try:
+                    desc = allattributes.node[attribute]['description']
+                except KeyError:
+                    desc = 'Unknown'
                 if 'value' in currattr:
                     yield msg.Attributes(node,
                         {attribute: currattr['value']},
-                        allattributes.node[attribute]['description'])
+                        desc)
                 elif 'cryptvalue' in currattr:
                     yield msg.CryptedAttributes(node,
-                        {attribute: currattr},
-                        allattributes.node[attribute]['description'])
+                        {attribute: currattr}, desc)
                 elif isinstance(currattr, list):
                     yield msg.ListAttributes(node,
-                        {attribute: currattr},
-                        allattributes.node[attribute]['description'])
+                        {attribute: currattr}, desc)
                 else:
                     raise Exception("BUGGY ATTRIBUTE FOR NODE")
 
