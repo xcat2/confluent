@@ -423,7 +423,18 @@ class ConfigManager(object):
         return self._cfgstore['nodes'].iterkeys()
 
     def get_nodegroup_attributes(self, nodegroup, attributes=[]):
-        return self._cfgstore['groups'][nodegroup]
+        cfgnodeobj = self._cfgstore['groups'][nodegroup]
+        if len(attributes) == 0:
+            attributes = cfgnodeobj.iterkeys()
+        nodeobj = {}
+        for attribute in attributes:
+            if attribute.startswith('_'):
+                continue
+            if attribute not in cfgnodeobj:
+                continue
+            nodeobj[attribute] = _decode_attribute(attribute, cfgnodeobj,
+                                                   decrypt=self.decrypt)
+        return nodeobj
 
     def get_node_attributes(self, nodelist, attributes=[]):
         if 'nodes' not in self._cfgstore:
@@ -439,8 +450,14 @@ class ConfigManager(object):
             if len(attributes) == 0:
                 attributes = cfgnodeobj.iterkeys()
             for attribute in attributes:
+                if attribute.startswith('_'):
+                    # skip private things
+                    continue
                 if attribute not in cfgnodeobj:
                     continue
+                # since the formatter is not passed in, the calculator is
+                # skipped.  The decryption, however, we want to do only on
+                # demand
                 nodeobj[attribute] = _decode_attribute(attribute, cfgnodeobj,
                                                        decrypt=self.decrypt)
             retdict[node] = nodeobj

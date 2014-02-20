@@ -36,8 +36,6 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                     desc=allattributes.node[attribute]['description'])
     if element == 'current':
         for attribute in sorted(grpcfg.iterkeys()):
-            if attribute.startswith("_"):
-                continue
             currattr = grpcfg[attribute]
             desc=""
             if attribute == 'nodes':
@@ -50,6 +48,10 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
             if 'value' in currattr:
                 yield msg.Attributes(
                     kv={attribute: currattr['value']},
+                    desc=desc)
+            elif 'expression' in currattr:
+                yield msg.Attributes(
+                    kv={attribute: currattr['expression']},
                     desc=desc)
             elif 'cryptvalue' in currattr:
                 yield msg.CryptedAttributes(
@@ -74,9 +76,6 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
     if element[-1] == 'all':
         for node in nodes:
             for attribute in sorted(allattributes.node.iterkeys()):
-                if attribute.startswith("_"):
-                    # a 'private' attribute
-                    continue
                 if attribute in attributes[node]: #have a setting for it
                     val = attributes[node][attribute]
                 elif attribute == 'groups': # no setting, provide a blank
@@ -98,8 +97,6 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
     elif element[-1] == 'current':
         for node in attributes.iterkeys():
             for attribute in sorted(attributes[node].iterkeys()):
-                if attribute.startswith("_"):
-                    continue
                 currattr = attributes[node][attribute]
                 try:
                     desc = allattributes.node[attribute]['description']
