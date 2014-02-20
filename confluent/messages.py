@@ -37,6 +37,8 @@ class ConfluentMessage(object):
             type = self.defaulttype
             if val is not None and 'value' in val:
                 value = val['value']
+            elif val is not None and 'expression' in val:
+                value = val['expression']
             if value is None:
                 value = ''
             if val is not None and value == '' and 'isset' in val and val['isset'] is True:
@@ -152,6 +154,10 @@ class InputAttributes(ConfluentMessage):
             raise exc.InvalidArgumentException
         if nodes is None:
             self.attribs = inputdata
+            for attrib in self.attribs:
+                if (type(self.attribs[attrib]) == str and
+                        '{' in self.attribs[attrib]):
+                    self.attribs[attrib] = {'expression': self.attribs[attrib]}
             return
         for node in nodes:
             if node in inputdata:
@@ -168,7 +174,11 @@ class InputAttributes(ConfluentMessage):
     def get_attributes(self, node):
         if node not in self.nodeattribs:
             return {}
-        return self.nodeattribs[node]
+        nodeattr = self.nodeattribs[node]
+        for attr in nodeattr:
+            if type(nodeattr[attr]) == str and '{' in nodeattr[attr]:
+                nodeattr[attr] = {'expression': nodeattr[attr]}
+        return nodeattr
 
 
 class InputPowerMessage(ConfluentMessage):

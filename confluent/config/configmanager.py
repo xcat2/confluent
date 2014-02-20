@@ -240,6 +240,7 @@ class _ExpressionFormat(string.Formatter):
     def __init__(self, nodeobj, nodename):
         self._nodeobj = nodeobj
         self._nodename = nodename
+        self._numbers = None
 
     def get_field(self, field_name, args, kwargs):
         parsed = ast.parse(field_name)
@@ -256,7 +257,7 @@ class _ExpressionFormat(string.Formatter):
             if '_expressionkeys' not in self._nodeobj:
                 self._nodeobj['_expressionkeys'] = set([key])
             else:
-                self._nodeobj['_expressionkeys'].add([key])
+                self._nodeobj['_expressionkeys'].add(key)
             val = _decode_attribute(key, self._nodeobj,
                                     formatter=self)
             return val['value'] if 'value' in val else ""
@@ -452,7 +453,7 @@ class ConfigManager(object):
         except KeyError:  # something did not exist, nothing to do
             return
         for attrib in groupcfg.iterkeys():
-            self._do_inheritance(nodecfg, attrib)
+            self._do_inheritance(nodecfg, attrib, node)
 
     def _node_removed_from_group(self, node, group):
         try:
@@ -460,16 +461,18 @@ class ConfigManager(object):
         except KeyError:  # node did not exist, nothing to do
             return
         for attrib in nodecfg.keys():
+            if attrib.startswith("_"):
+                continue
             if attrib == 'groups':
                 continue
             try:
                 if nodecfg[attrib]['inheritedfrom'] == group:
                     del nodecfg[attrib]  # remove invalid inherited data
-                    self._do_inheritance(nodecfg, attrib)
+                    self._do_inheritance(nodecfg, attrib, node)
             except KeyError:  # inheritedfrom not set, move on
                 pass
 
-    def _do_inheritance(self, nodecfg, attrib, srcgroup=None):
+    def _do_inheritance(self, nodecfg, attrib, nodename, srcgroup=None):
         # for now, just do single inheritance
         # TODO: concatenating inheritance if requested
         if attrib in ('nodes', 'groups'):
@@ -488,7 +491,7 @@ class ConfigManager(object):
                 nodecfg[attrib] = \
                     copy.deepcopy(self._cfgstore['groups'][group][attrib])
                 nodecfg[attrib]['inheritedfrom'] = group
-                self._refresh_nodecfg(nodecfg, attrib)
+                self._refresh_nodecfg(nodecfg, attrib, nodename)
                 return
             if srcgroup is not None and group == srcgroup:
                 # break out
@@ -568,10 +571,10 @@ class ConfigManager(object):
                 else:  # update inheritence
                     for node in cfgobj['nodes']:
                         nodecfg = self._cfgstore['nodes'][node]
-                        self._do_inheritance(nodecfg, attr, group)
+                        self._do_inheritance(nodecfg, attr, node, srcgroup=group)
         self._bg_sync_to_file()
 
-    def _refresh_nodecfg(self, cfgobj, attrname):
+    def _refresh_nodecfg(self, cfgobj, attrname, node):
         exprmgr = None
         if 'expression' in cfgobj[attrname]:  # evaluate now
             if exprmgr is None:
@@ -613,7 +616,7 @@ class ConfigManager(object):
                     # if the attribute is set and not inherited,
                     # delete it and check for inheritence to backfil data
                     del nodek[attrib]
-                    self._do_inheritance(nodek, attrib)
+                    self._do_inheritance(nodek, attrib, node)
         self._bg_sync_to_file()
 
     def set_node_attributes(self, attribmap):
