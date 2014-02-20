@@ -228,6 +228,7 @@ class _ExpressionFormat(string.Formatter):
     _supported_ops = {
         ast.Mult: operator.mul,
         ast.Div: operator.floordiv,
+        ast.Mod: operator.mod,
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.LShift: operator.lshift,
