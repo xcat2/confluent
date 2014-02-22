@@ -28,6 +28,7 @@ import fcntl
 import getpass
 import optparse
 import os
+import readline
 import select
 import shlex
 import socket
@@ -51,8 +52,77 @@ oldtcattr = termios.tcgetattr(sys.stdin.fileno())
 server = None
 
 def prompt():
-    sys.stdout.write(target + ' -> ')
-    sys.stdout.flush()
+    try:
+        return raw_input(target + ' -> ')
+    except KeyboardInterrupt:
+        print ""
+        return ""
+    except EOFError:  # ctrl-d
+        print("exit")
+        return "exit"
+#    sys.stdout.write(target + ' -> ')
+#    sys.stdout.flush()
+#    username = raw_input("Name: ")
+
+valid_commands = [
+    'start',
+    'cd',
+    'show',
+    'set',
+    'create',
+]
+
+candidates = None
+lastcline = None
+
+def completer(text, state):
+    try:
+        return rcompleter(text, state)
+    except:
+        import traceback
+        traceback.print_exc()
+
+def rcompleter(text, state):
+    global candidates
+    global lastcline
+    global valid_commands
+    cline = readline.get_line_buffer()
+    if len(text):
+        cline = cline[:-len(text)]
+    if cline != lastcline:
+        lastcline = cline
+        candidates = None
+    args = shlex.split(cline, posix=True)
+    currpos = len(args)
+    if currpos and cline[-1] == ' ':
+        currpos += 1
+    if currpos <= 1:
+        foundcount = 0
+        for cmd in valid_commands:
+            if cmd.startswith(text):
+                if foundcount == state:
+                    return cmd
+                else:
+                    foundcount += 1
+        return None
+    if candidates is None:
+        candidates = []
+        targpath = fullpath_target(args[-1])
+        for res in send_request('retrieve', targpath, server):
+            if 'item' in res:  # a link relation
+                if type(res['item']) == dict:
+                    candidates.append(res['item']["href"])
+                else:
+                    for item in res['item']:
+                        candidates.append(item["href"])
+    foundcount = 0
+    for elem in candidates:
+        if elem.startswith(text):
+            if foundcount == state:
+                return elem
+            else:
+                foundcount += 1
+    return None
 
 def parseservervalue(serverstring):
     if serverstring.find(']:') != -1:
@@ -86,14 +156,9 @@ def do_command(command, server):
     global target
     global currconsole
     global currchildren
-    if command == "":  # result of ctrl-d
-        command = "exit\n"
-        print("exit")
-    command = command[:-1]
     command = command.lower()
     argv = parse_command(command)
     if len(argv) == 0:
-        prompt()
         return
     if argv[0] == "exit":
         server.close()
@@ -137,7 +202,6 @@ def do_command(command, server):
         print '[console session started]'
         startconsole()
         return
-    prompt()
 
 
 def fullpath_target(path, forcepath=False):
@@ -165,13 +229,16 @@ def fullpath_target(path, forcepath=False):
 def startconsole():
     global inconsole
     tty.setraw(sys.stdin.fileno())
-    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+    currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
     inconsole = True
 
 def exit(code=0):
     global consoleonly
     global inconsole
     global currconsole
+    currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     if consoleonly:
         server.shutdown(socket.SHUT_RDWR)
@@ -180,7 +247,6 @@ def exit(code=0):
     else:
         tlvdata.send_tlvdata(server, {'operation': 'stop', 'path': currconsole})
         inconsole = False
-        prompt()
 
 def conserver_command(fh, command):
     while not command:
@@ -264,6 +330,7 @@ banner = tlvdata.recv_tlvdata(server)
 authinfo = tlvdata.recv_tlvdata(server)
 while authinfo['authpassed'] != 1:
     username = raw_input("Name: ")
+    readline.clear_history()
     passphrase = getpass.getpass("Passphrase: ")
     tlvdata.send_tlvdata(server,
                          {'username': username, 'passphrase': passphrase})
@@ -273,45 +340,45 @@ while authinfo['authpassed'] != 1:
 # sys.stdout.write('\x1b[H\x1b[J')
 # sys.stdout.flush()
 
+readline.parse_and_bind("tab: complete")
+readline.set_completer(completer)
 doexit = False
 inconsole = False
 pendingcommand = ""
 if len(args) == 1:  # a node name, go straight to trying to console
     consoleonly = True
     do_command("start /node/%s/console/session" % args[0], server)
-else:
-    prompt()
 while not doexit:
-    rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
-    for fh in rdylist:
-        if fh == server:
-            # this only should get called in the
-            # case of a console session
-            # each command should slurp up all relevant
-            # recv_tlvdata potential
-            #fh.read()
-            try:
-                data = tlvdata.recv_tlvdata(fh)
-            except Exception:
-                data = None
-            if type(data) == dict:
-                print repr(data)
-                continue
-            if data is not None:
-                sys.stdout.write(data)
-                sys.stdout.flush()
+    if inconsole:
+        rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
+        for fh in rdylist:
+            if fh == server:
+                # this only should get called in the
+                # case of a console session
+                # each command should slurp up all relevant
+                # recv_tlvdata potential
+                #fh.read()
+                try:
+                    data = tlvdata.recv_tlvdata(fh)
+                except Exception:
+                    data = None
+                if type(data) == dict:
+                    print repr(data)
+                    continue
+                if data is not None:
+                    sys.stdout.write(data)
+                    sys.stdout.flush()
+                else:
+                    doexit = True
+                    sys.stdout.write("\r\n[remote disconnected]\r\n")
+                    break
             else:
-                doexit = True
-                sys.stdout.write("\r\n[remote disconnected]\r\n")
-                break
-        else:
-            if inconsole:
                 input = fh.read()
                 input = check_escape_seq(input, fh)
                 if input:
                     tlvdata.send_tlvdata(server, input)
-            else:
-                command = fh.readline()
-                do_command(command, server)
+    else:
+        command = prompt()
+        do_command(command, server)
 consoleonly = True
 exit()
