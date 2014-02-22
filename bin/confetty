@@ -296,6 +296,7 @@ def connect_tls_server(serverstring):
         af, socktype, proto, cononname, sa = res
         try:
             server = socket.socket(af, socktype, proto)
+            server.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except:
             server = None
             continue
