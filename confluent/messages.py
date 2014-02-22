@@ -148,9 +148,6 @@ def get_input_message(path, operation, inputdata, nodes=None):
 class InputAttributes(ConfluentMessage):
 
     def __init__(self, path, inputdata, nodes=None):
-        print "DEBUG: making input attributes "
-        print repr(nodes)
-        print repr(inputdata)
         self.nodeattribs = {}
         nestedmode = False
         if not inputdata:
