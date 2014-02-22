@@ -187,7 +187,9 @@ def do_command(command, server):
                         print item["href"]
             else:  # generic attributes to list
                 for key in res.iterkeys():
-                    if 'value' in res[key]:
+                    if res[key] is None:
+                        print "%s=" % key
+                    elif 'value' in res[key]:
                         print "%s=%s" % (key, res[key]['value'])
                     else:
                         if 'isset' in res[key] and res[key]['isset']:
