@@ -105,6 +105,7 @@ def rcompleter(text, state):
                 else:
                     foundcount += 1
         return None
+    cmd = args[0]
     if candidates is None:
         candidates = []
         targpath = fullpath_target(args[-1])
@@ -117,6 +118,8 @@ def rcompleter(text, state):
                         candidates.append(item["href"])
     foundcount = 0
     for elem in candidates:
+        if cmd == 'cd' and elem[-1] != '/':
+            continue
         if elem.startswith(text):
             if foundcount == state:
                 return elem
