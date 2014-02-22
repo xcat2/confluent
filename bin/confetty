@@ -92,7 +92,7 @@ def rcompleter(text, state):
     if currpos and cline[-1] == ' ':
         lastarg = ''
         currpos += 1
-    else:
+    elif currpos:
         lastarg = args[-1]
     if currpos <= 1:
         foundcount = 0
@@ -214,6 +214,8 @@ def fullpath_target(path, forcepath=False):
     if path == '':
         return target
     pathcomponents = path.split("/")
+    if pathcomponents[-1] == "":  # preserve path
+        forcepath=True
     if pathcomponents[0] == "":  # absolute path
         ntarget = path
     else:
@@ -226,7 +228,7 @@ def fullpath_target(path, forcepath=False):
                     del targparts[-1]
             else:
                 targparts.append(component)
-        if forcepath:
+        if forcepath and targparts[-1] != "":
             targparts.append('')
         ntarget = '/'.join(targparts)
     if forcepath and (len(ntarget) == 0 or ntarget[-1] != '/'):
