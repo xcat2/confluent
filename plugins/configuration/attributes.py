@@ -92,7 +92,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                         allattributes.node[attribute]['description'])
                 else:
                     yield msg.Attributes(node,
-                        {attribute: val['value']},
+                        {attribute: val},
                         allattributes.node[attribute]['description'])
     elif element[-1] == 'current':
         for node in attributes.iterkeys():
