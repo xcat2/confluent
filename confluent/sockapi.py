@@ -133,7 +133,7 @@ def process_request(connection, request, cfm, authdata):
 def _tlshandler():
     plainsocket = socket.socket()
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    plainsocket.setsockopt(socket.SOL_SOCKET, socket.TCP_NODELAY, 1)
+    plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
                     certfile="/etc/confluent/srvcert.pem",
                     ssl_version=ssl.PROTOCOL_TLSv1,
