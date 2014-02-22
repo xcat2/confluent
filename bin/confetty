@@ -37,6 +37,7 @@ import sys
 import termios
 import tty
 
+exitcode = 0
 consoleonly = False
 target = "/"
 path = os.path.dirname(os.path.realpath(__file__))
@@ -156,9 +157,11 @@ def send_request(operation, path, server):
         result = tlvdata.recv_tlvdata(server)
 
 def do_command(command, server):
+    global exitcode
     global target
     global currconsole
     global currchildren
+    exitcode = 0
     command = command.lower()
     argv = parse_command(command)
     if len(argv) == 0:
@@ -166,14 +169,16 @@ def do_command(command, server):
     if argv[0] == "exit":
         server.close()
         sys.exit(0)
-    if argv[0] == "cd":
+    elif argv[0] == "cd":
         otarget = target
         target = fullpath_target(argv[1], forcepath=True)
         for res in send_request('retrieve', target, server):
+            if 'errorcode' in res:
+                exitcode = res['errorcode']
             if 'error' in res:
-                print target + ': ' + res['error']
+                sys.stderr.write(target + ': ' + res['error'] + '\n')
                 target = otarget
-    if argv[0] in ('cat', 'show', 'ls', 'dir'):
+    elif argv[0] in ('cat', 'show', 'ls', 'dir'):
         if len(argv) > 1:
             targpath = fullpath_target(argv[1])
         else:
@@ -196,17 +201,21 @@ def do_command(command, server):
                             print "%s=********" % key
                         else:
                             print "%s=" % key
-    if argv[0] == 'start':
+    elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         currconsole = targpath
         tlvdata.send_tlvdata(server, {'operation': 'start', 'path': targpath})
         status = tlvdata.recv_tlvdata(server)
         if 'error' in status:
-            print 'Error: ' + status['error']
+            if 'errorcode' in status:
+                exitcode = status['errorcode']
+            sys.stderr.write('Error: ' + status['error'] + '\n')
             return
         print '[console session started]'
         startconsole()
         return
+    else:
+        sys.stderr.write("%s: command not found...\n" % argv[0])
 
 
 def fullpath_target(path, forcepath=False):

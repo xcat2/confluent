@@ -163,7 +163,7 @@ def create_group(inputdata, configmanager):
         del inputdata['name']
         attribmap = {groupname: inputdata}
     except KeyError:
-        raise exc.InvalidArgumenTException()
+        raise exc.InvalidArgumentException()
     configmanager.set_group_attributes(attribmap)
 
 
@@ -202,7 +202,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
             group = pathcomponents[1]
         except IndexError:
             if operation == "create":
-                create_group(inputdata, configmanager)
+                inputdata = msg.InputAttributes(pathcomponents, inputdata)
+                create_group(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.get_groups())
         if iscollection:
             if operation == "delete":
@@ -231,7 +232,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
             if operation == "delete":
                 raise exc.InvalidArgumentException()
             if operation == "create":
-                create_node(inputdata, configmanager)
+                inputdata = msg.InputAttributes(pathcomponents, inputdata)
+                create_node(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.get_nodes())
         if iscollection:
             if operation == "delete":

@@ -138,7 +138,7 @@ def get_input_message(path, operation, inputdata, nodes=None):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
     elif path[0] == 'attributes' and operation != 'retrieve':
-        return InputAttributes(path, nodes, inputdata)
+        return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'device'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
     elif inputdata:
@@ -147,7 +147,10 @@ def get_input_message(path, operation, inputdata, nodes=None):
 
 class InputAttributes(ConfluentMessage):
 
-    def __init__(self, path, nodes, inputdata):
+    def __init__(self, path, inputdata, nodes=None):
+        print "DEBUG: making input attributes "
+        print repr(nodes)
+        print repr(inputdata)
         self.nodeattribs = {}
         nestedmode = False
         if not inputdata:

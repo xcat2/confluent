@@ -643,6 +643,7 @@ class ConfigManager(object):
         # TODO(jbjohnso): multi mgr support, here if we have peers,
         # pickle the arguments and fire them off in eventlet
         # flows to peers, all should have the same result
+        exprmgr = None
         for node in attribmap.iterkeys():
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {}
