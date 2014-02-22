@@ -351,6 +351,7 @@ while authinfo['authpassed'] != 1:
 # sys.stdout.flush()
 
 readline.parse_and_bind("tab: complete")
+readline.parse_and_bind("set bell-style none")
 readline.set_completer(completer)
 doexit = False
 inconsole = False
