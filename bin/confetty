@@ -73,7 +73,6 @@ valid_commands = [
 ]
 
 candidates = None
-lastcline = None
 
 def completer(text, state):
     try:
@@ -84,18 +83,17 @@ def completer(text, state):
 
 def rcompleter(text, state):
     global candidates
-    global lastcline
     global valid_commands
     cline = readline.get_line_buffer()
     if len(text):
         cline = cline[:-len(text)]
-    if cline != lastcline:
-        lastcline = cline
-        candidates = None
     args = shlex.split(cline, posix=True)
     currpos = len(args)
     if currpos and cline[-1] == ' ':
+        lastarg = ''
         currpos += 1
+    else:
+        lastarg = args[-1]
     if currpos <= 1:
         foundcount = 0
         for cmd in valid_commands:
@@ -104,11 +102,12 @@ def rcompleter(text, state):
                     return cmd
                 else:
                     foundcount += 1
+        candidates = None
         return None
     cmd = args[0]
     if candidates is None:
         candidates = []
-        targpath = fullpath_target(args[-1])
+        targpath = fullpath_target(lastarg)
         for res in send_request('retrieve', targpath, server):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
@@ -125,6 +124,7 @@ def rcompleter(text, state):
                 return elem
             else:
                 foundcount += 1
+    candidates = None
     return None
 
 def parseservervalue(serverstring):
@@ -144,7 +144,7 @@ def parseservervalue(serverstring):
 def parse_command(command):
     args = shlex.split(command, posix=True)
     return args
-    
+
 
 currchildren = None
 
@@ -211,6 +211,8 @@ def do_command(command, server):
 
 def fullpath_target(path, forcepath=False):
     global target
+    if path == '':
+        return target
     pathcomponents = path.split("/")
     if pathcomponents[0] == "":  # absolute path
         ntarget = path
