@@ -166,10 +166,10 @@ def do_command(command, server):
     argv = parse_command(command)
     if len(argv) == 0:
         return
-    if argv[0] == "exit":
+    if argv[0] == 'exit':
         server.close()
         sys.exit(0)
-    elif argv[0] == "cd":
+    elif argv[0] == 'cd':
         otarget = target
         if len(argv) > 1:
             target = fullpath_target(argv[1], forcepath=True)
@@ -216,7 +216,6 @@ def do_command(command, server):
                     notestr = '(' + ', '.join(notes) + ')'
                     output = '{0:<40} {1:>39}'.format(attrstr, notestr)
                     print output
-
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         currconsole = targpath
@@ -230,8 +229,28 @@ def do_command(command, server):
         print '[console session started]'
         startconsole()
         return
+    elif argv[0] == 'set':
+        setvalues(argv[1:])
     else:
         sys.stderr.write("%s: command not found...\n" % argv[0])
+
+def setvalues(attribs):
+    if '=' in attribs[0]:  # going straight to attribute
+        resource = attribs[0][:attribs[0].index("=")]
+    else:  # an actual resource
+        resource = attribs[0]
+        attribs = attribs[1:]
+    keydata = {}
+    for attrib in attribs:
+        if '=' not in attrib:
+            sys.stderr.write("Invalid syntax %s" % attrib)
+            return
+        key = attrib[:attrib.index("=")]
+        value = attrib[attrib.index("=") + 1:]
+        keydata[key] = value
+    targpath = fullpath_target(resource)
+    tlvdata.send_tlvdata(server, {'operation': 'update', 'path': targpath, 'parameters': keydata})
+
 
 
 def fullpath_target(path, forcepath=False):

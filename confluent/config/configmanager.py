@@ -441,7 +441,7 @@ class ConfigManager(object):
         if 'nodes' not in self._cfgstore:
             return None
         retdict = {}
-        if isinstance(nodelist,str):
+        if isinstance(nodelist,str) or isinstance(nodelist, unicode):
             nodelist = [nodelist]
         for node in nodelist:
             if node not in self._cfgstore['nodes']:
@@ -575,7 +575,8 @@ class ConfigManager(object):
                     if not isinstance(attribmap[group][attr], list):
                         raise ValueError
                     newdict = set(attribmap[group][attr])
-                elif (isinstance(attribmap[group][attr], str)):
+                elif (isinstance(attribmap[group][attr], str) or 
+                        isinstance(attribmap[group][attr], unicode)):
                     newdict = { 'value': attribmap[group][attr] }
                 else:
                     newdict = attribmap[group][attr]
@@ -655,7 +656,8 @@ class ConfigManager(object):
                         not isinstance(attribmap[node][attrname],allattributes.node[attrname]['type']))):
                     raise ValueError
                 newdict = {}
-                if (isinstance(attribmap[node][attrname], str)):
+                if (isinstance(attribmap[node][attrname], str) or
+                        isinstance(attribmap[node][attrname], unicode)):
                     newdict = {'value': attribmap[node][attrname] }
                 else:
                     newdict = attribmap[node][attrname]
