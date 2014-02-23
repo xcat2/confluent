@@ -125,12 +125,20 @@ def update_nodegroup(group, element, configmanager, inputdata):
     except ValueError:
         raise exc.InvalidArgumentException()
     return retrieve_nodegroup(group, element, configmanager, inputdata)
-    
+
 def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
     for node in nodes:
         updatenode = inputdata.get_attributes(node)
+        clearattribs = []
         if updatenode:
+            for attrib in updatenode.iterkeys():
+                if updatenode[attrib] is None:
+                    clearattribs.append(attrib)
+            if len(clearattribs) > 0:
+                for attrib in clearattribs:
+                    del updatenode[attrib]
+                configmanager.clear_node_attributes([node], clearattribs)
             updatedict[node] = updatenode
     try:
         configmanager.set_node_attributes(updatedict)

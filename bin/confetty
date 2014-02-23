@@ -70,6 +70,7 @@ valid_commands = [
     'cd',
     'show',
     'set',
+    'unset',
     'create',
 ]
 
@@ -234,8 +235,23 @@ def do_command(command, server):
         return
     elif argv[0] == 'set':
         setvalues(argv[1:])
+    elif argv[0] in ('unset', 'clear'):
+        clearvalues(argv[1], argv[2:])
     else:
         sys.stderr.write("%s: command not found...\n" % argv[0])
+
+
+def clearvalues(resource, attribs):
+    targpath = fullpath_target(resource)
+    keydata = {}
+    for attrib in attribs:
+        keydata[attrib] = None
+    for res in send_request('update', targpath, server, keydata):
+        if 'error' in res:
+            if 'errorcode' in res:
+                exitcode = res['errorcode']
+            sys.stderr.write('Error: ' + res['error'] + '\n')
+
 
 def setvalues(attribs):
     if '=' in attribs[0]:  # going straight to attribute
