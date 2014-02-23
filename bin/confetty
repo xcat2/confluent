@@ -149,8 +149,11 @@ def parse_command(command):
 
 currchildren = None
 
-def send_request(operation, path, server):
-    tlvdata.send_tlvdata(server, {'operation': operation, 'path': path})
+def send_request(operation, path, server, parameters=None):
+    payload = {'operation': operation, 'path': path}
+    if parameters is not None:
+        payload['parameters'] = parameters
+    tlvdata.send_tlvdata(server, payload)
     result = tlvdata.recv_tlvdata(server)
     while '_requestdone' not in result:
         yield result
@@ -249,7 +252,12 @@ def setvalues(attribs):
         value = attrib[attrib.index("=") + 1:]
         keydata[key] = value
     targpath = fullpath_target(resource)
-    tlvdata.send_tlvdata(server, {'operation': 'update', 'path': targpath, 'parameters': keydata})
+    for res in send_request('update', targpath, server, keydata):
+        if 'error' in res:
+            if 'errorcode' in res:
+                exitcode = res['errorcode']
+            sys.stderr.write('Error: ' + res['error'] + '\n')
+            return
 
 
 
