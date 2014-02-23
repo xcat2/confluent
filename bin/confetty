@@ -192,15 +192,28 @@ def do_command(command, server):
                         print item["href"]
             else:  # generic attributes to list
                 for key in res.iterkeys():
+                    notes = []
                     if res[key] is None:
-                        print "%s=" % key
-                    elif 'value' in res[key]:
-                        print "%s=%s" % (key, res[key]['value'])
+                        attrstr = '%s=""' % key
+                    elif type(res[key]) == list:
+                        attrstr = '%s=["%s"]' % (key, '","'.join(res[key]))
+                    elif 'value' in res[key] and res[key]['value'] is not None:
+                        attrstr = '%s="%s"' % (key, res[key]['value'])
+                    elif 'value' in res[key] and res[key]['value'] is None:
+                        attrstr = '%s=""' % key
                     else:
                         if 'isset' in res[key] and res[key]['isset']:
-                            print "%s=********" % key
+                            attrstr = '%s="********"' % key
                         else:
-                            print "%s=" % key
+                            attrstr = '%s=""' % key
+                    if res[key] is not None and 'inheritedfrom' in res[key]:
+                        notes.append('Inherited from %s' % res[key]['inheritedfrom'])
+                    if res[key] is not None and 'expression' in res[key]:
+                        notes.append('Derived from expression "%s"' % res[key]['expression'])
+                    notestr = '(' + ', '.join(notes) + ')'
+                    output = '{0:<40} {1:>39}'.format(attrstr, notestr)
+                    print output
+
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         currconsole = targpath

@@ -104,7 +104,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                     desc = 'Unknown'
                 if 'value' in currattr:
                     yield msg.Attributes(node,
-                        {attribute: currattr['value']},
+                        {attribute: currattr},
                         desc)
                 elif 'cryptvalue' in currattr:
                     yield msg.CryptedAttributes(node,

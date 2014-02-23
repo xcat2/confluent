@@ -35,8 +35,13 @@ class ConfluentMessage(object):
             val = self.kvpairs[key]
             value = self.defaultvalue
             type = self.defaulttype
+            notes = []
             if val is not None and 'value' in val:
                 value = val['value']
+                if 'inheritedfrom' in val:
+                    notes.append('Inherited from %s' % val['inheritedfrom'])
+                if 'expression' in val:
+                    notes.append('Derived from expression "%s"' % val['expression'])
             elif val is not None and 'expression' in val:
                 value = val['expression']
             if value is None:
@@ -44,6 +49,8 @@ class ConfluentMessage(object):
             if val is not None and value == '' and 'isset' in val and val['isset'] is True:
                 # an encrypted value, put some *** to show it is set
                 # in the explorer
+                if 'inheritedfrom' in val:
+                    notes.append('Inherited from %s' % val['inheritedfrom'])
                 value = '********'
             if isinstance(val, list):
                 snippet += key + ":"
@@ -65,6 +72,8 @@ class ConfluentMessage(object):
                         'title="{3}"><input type="checkbox" '
                         'name="restexplorerhonorkey" value="{1}">'
                         ).format(type, key, value, self.desc)
+            if len(notes) > 0:
+                snippet += '(' + ','.join(notes) + ')'
         return snippet
 
 
@@ -314,6 +323,7 @@ class CryptedAttributes(Attributes):
             try:
                 if kv[key] is not None and kv[key]['cryptvalue'] != '':
                     nkv[key] = {'isset': True}
+                    nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
             except KeyError:
                 pass
         if node is None:
