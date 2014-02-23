@@ -81,7 +81,7 @@ noderesources = {
         }),
     },
     'boot': {
-        'device': PluginRoute({
+        'nextdevice': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
             'default': 'ipmi',
         }),

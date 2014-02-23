@@ -148,7 +148,7 @@ def get_input_message(path, operation, inputdata, nodes=None):
         return InputPowerMessage(path, nodes, inputdata)
     elif path[0] == 'attributes' and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
-    elif path == ['boot', 'device'] and operation != 'retrieve':
+    elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
@@ -238,7 +238,7 @@ class BootDevice(ConfluentChoiceMessage):
             raise Exception("Invalid boot device argument passed in:" + device)
         self.kvpairs = {
             node: {
-                'device': {'value': device},
+                'nextdevice': {'value': device},
             }
         }
 
@@ -248,7 +248,7 @@ class InputBootDevice(BootDevice):
         self.bootdevbynode = {}
         if not inputdata:
             raise exc.InvalidArgumentException()
-        if 'device' not in inputdata:
+        if 'nextdevice' not in inputdata:
             for key in nodes:
                 if key not in inputdata:
                     raise exc.InvalidArgumentException()
@@ -256,14 +256,14 @@ class InputBootDevice(BootDevice):
                 if ('state' not in datum or
                         datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumenTException()
-                self.bootdevbynode[key] = datum['device']
+                self.bootdevbynode[key] = datum['nextdevice']
         else:
             datum = inputdata
-            if ('device' not in datum or
-                    datum['device'] not in self.valid_values):
+            if ('nextdevice' not in datum or
+                    datum['nextdevice'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
-                self.bootdevbynode[node] = datum['device']
+                self.bootdevbynode[node] = datum['nextdevice']
 
     def bootdevice(self, node):
         return self.bootdevbynode[node]
