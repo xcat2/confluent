@@ -164,7 +164,7 @@ class IpmiHandler(object):
                 raise Exception(self.error)
         if self.element == [ 'power', 'state' ]:
             return self.power()
-        elif self.element == [ 'boot', 'device' ]:
+        elif self.element == [ 'boot', 'nextdevice' ]:
             return self.bootdevice()
 
     def bootdevice(self):
