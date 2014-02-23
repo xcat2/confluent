@@ -257,7 +257,6 @@ def setvalues(attribs):
             if 'errorcode' in res:
                 exitcode = res['errorcode']
             sys.stderr.write('Error: ' + res['error'] + '\n')
-            return
 
 
 

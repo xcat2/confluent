@@ -123,8 +123,7 @@ def process_request(connection, request, cfm, authdata):
             tlvdata.send_tlvdata(connection, {"_requestdone": 1})
         except exc.InvalidArgumentException:
             tlvdata.send_tlvdata(connection, {"errorcode": 400,
-                                 "error": "Bad Request",
-                                 "_requestdone": 1})
+                                 "error": "Bad Request"})
             tlvdata.send_tlvdata(connection, {"_requestdone": 1})
         send_response(hdlr, connection)
     return
