@@ -27,7 +27,10 @@ pluginmap = {}
 
 
 def nested_lookup(nestdict, key):
-    return reduce(dict.__getitem__, key, nestdict)
+    try:
+        return reduce(dict.__getitem__, key, nestdict)
+    except TypeError:
+        raise exc.NotFoundException("Invalid element requested")
 
 
 def load_plugins():
@@ -155,6 +158,8 @@ def enumerate_node_collection(collectionpath, configmanager):
         raise exc.NotFoundException("Invalid element requested")
     del collectionpath[0:2]
     collection = nested_lookup(noderesources, collectionpath)
+    if not isinstance(collection, dict):
+        raise exc.NotFoundException("Invalid element requested")
     return iterate_resources(collection)
 
 
