@@ -171,7 +171,10 @@ def do_command(command, server):
         sys.exit(0)
     elif argv[0] == "cd":
         otarget = target
-        target = fullpath_target(argv[1], forcepath=True)
+        if len(argv) > 1:
+            target = fullpath_target(argv[1], forcepath=True)
+        else: # cd by itself, go 'home'
+            target = '/'
         for res in send_request('retrieve', target, server):
             if 'errorcode' in res:
                 exitcode = res['errorcode']

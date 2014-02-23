@@ -67,6 +67,7 @@ noderesources = {
     '_console': {
         'session': PluginRoute({
             'pluginattrs': ['console.method', 'hardwaremanagement.method'],
+            'default': 'ipmi',
         }),
     },
     'console': {

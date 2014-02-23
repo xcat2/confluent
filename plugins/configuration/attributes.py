@@ -45,14 +45,8 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                     desc = allattributes.node[attribute]['description']
                 except KeyError:
                     desc = 'Unknown'
-            if 'value' in currattr:
-                yield msg.Attributes(
-                    kv={attribute: currattr['value']},
-                    desc=desc)
-            elif 'expression' in currattr:
-                yield msg.Attributes(
-                    kv={attribute: currattr['expression']},
-                    desc=desc)
+            if 'value' in currattr or 'expression' in currattr:
+                yield msg.Attributes( kv={attribute: currattr}, desc=desc)
             elif 'cryptvalue' in currattr:
                 yield msg.CryptedAttributes(
                     kv={attribute: currattr},
