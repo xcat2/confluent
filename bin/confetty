@@ -298,7 +298,7 @@ def fullpath_target(path, forcepath=False):
                     del targparts[-1]
             else:
                 targparts.append(component)
-        if forcepath and len(targparts) == 0 or targparts[-1] != "":
+        if forcepath and (len(targparts) == 0 or targparts[-1] != ""):
             targparts.append('')
         ntarget = '/'.join(targparts)
     if forcepath and (len(ntarget) == 0 or ntarget[-1] != '/'):
