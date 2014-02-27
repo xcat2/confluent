@@ -1,0 +1,4 @@
+-Reordering a group does not reorder inheritance preferences
+-Setting multiple values at once where one is an expression including the othe
+    can fail because the expression is attempted to set before
+    the next setting comes to work and then we get a stack trace
