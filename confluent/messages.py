@@ -164,7 +164,7 @@ class InputAttributes(ConfluentMessage):
         if nodes is None:
             self.attribs = inputdata
             for attrib in self.attribs:
-                if (type(self.attribs[attrib]) == str and
+                if (type(self.attribs[attrib]) in (str, unicode) and
                         '{' in self.attribs[attrib]):
                     self.attribs[attrib] = {'expression': self.attribs[attrib]}
             return
@@ -185,7 +185,7 @@ class InputAttributes(ConfluentMessage):
             return {}
         nodeattr = self.nodeattribs[node]
         for attr in nodeattr:
-            if type(nodeattr[attr]) == str and '{' in nodeattr[attr]:
+            if type(nodeattr[attr]) in (str, unicode) and '{' in nodeattr[attr]:
                 nodeattr[attr] = {'expression': nodeattr[attr]}
         return nodeattr
 
@@ -290,7 +290,7 @@ class Attributes(ConfluentMessage):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
-            if type(kv[key]) == str:
+            if type(kv[key]) in (str, unicode):
                 nkv[key] = {'value': kv[key]}
             else:
                 nkv[key] = kv[key]

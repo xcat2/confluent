@@ -2,3 +2,24 @@
 -Setting multiple values at once where one is an expression including the othe
     can fail because the expression is attempted to set before
     the next setting comes to work and then we get a stack trace
+    Should leave value out of it and set 'broken' with a reason as the
+    value to the key
+-cannot set expression value through confetty
+-expressionkeys never gets smaller - perf impact
+-need event notification for config change- e.g. set attribute triggers consol
+ session object check to see if credentials changed
+-When the time comes to dole out configuration/discovery, take page from xCAT
+    'flexdiscover' command, if possible bring an ipmi device under management
+    by way of ipv6 to eliminate requirement for ip to be specified.
+    Requires the polling event support (which is required for security anyway)
+
+-this stack trace (happened with method was set to ""):
+Traceback (most recent call last):
+  File "/usr/lib/python2.6/site-packages/eventlet/wsgi.py", line 402, in handle_one_response
+    for data in result:
+  File "/home/jbjohnso/Development/confluent/confluent/httpapi.py", line 301, in resourcehandler
+    cfgmgr, querydict)
+  File "/home/jbjohnso/Development/confluent/confluent/pluginapi.py", line 273, in handle_path
+    passvalue = pluginmap[plugpath].__dict__[operation](
+KeyError: ''
+
