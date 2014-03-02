@@ -7,6 +7,11 @@
 -expressionkeys never gets smaller - perf impact
 -need event notification for config change- e.g. set attribute triggers consol
  session object check to see if credentials changed
+ design is that calling code on init registers a callback for related node to
+ the in-context config manager object.  callback shall be OO so no context
+ object parametr passed in.  ipmi will use it for user/password/hardwaremanagement.manager
+ changes to console and command objects.  console will use it to hook add/deletion
+ of nodes and/or indicating a different console.method or hardwaremanagement.method
 -When the time comes to dole out configuration/discovery, take page from xCAT
     'flexdiscover' command, if possible bring an ipmi device under management
     by way of ipv6 to eliminate requirement for ip to be specified.
