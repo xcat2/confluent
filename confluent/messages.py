@@ -164,9 +164,23 @@ class InputAttributes(ConfluentMessage):
         if nodes is None:
             self.attribs = inputdata
             for attrib in self.attribs:
-                if (type(self.attribs[attrib]) in (str, unicode) and
-                        '{' in self.attribs[attrib]):
-                    self.attribs[attrib] = {'expression': self.attribs[attrib]}
+                if type(self.attribs[attrib]) in (str, unicode):
+                    try:
+                        # ok, try to use format against the string
+                        # store back result to the attribute to
+                        # handle things like '{{' and '}}'
+                        # if any weird sort of error should
+                        # happen, it means the string has something
+                        # that formatter is looking to fulfill, but
+                        # is unable to do so, meaning it is an expression
+                        tv = self.attribs[attrib].format()
+                        self.attribs[attrib] = tv
+                    except:
+                        # this means format() actually thought there was work
+                        # that suggested parameters, push it in as an
+                        # expression
+                        self.attribs[attrib] = {
+                            'expression': self.attribs[attrib]}
             return
         for node in nodes:
             if node in inputdata:
@@ -185,8 +199,16 @@ class InputAttributes(ConfluentMessage):
             return {}
         nodeattr = self.nodeattribs[node]
         for attr in nodeattr:
-            if type(nodeattr[attr]) in (str, unicode) and '{' in nodeattr[attr]:
-                nodeattr[attr] = {'expression': nodeattr[attr]}
+            if type(nodeattr[attr]) in (str, unicode):
+                try:
+                    # as above, use format() to see if string follows
+                    # expression, store value back in case of escapes
+                    tv = nodeattr[attr].format()
+                    nodeattr[attr] = tv
+                except:
+                    # an expression string will error if format() done
+                    # use that as cue to put it into config as an expr
+                    nodeattr[attr] = {'expression': nodeattr[attr]}
         return nodeattr
 
 
