@@ -299,7 +299,12 @@ def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
     # set methods induce recalculation as appropriate to get a cached value
     if 'expression' in nodeobj[attribute] and formatter is not None:
         retdict = copy.deepcopy(nodeobj[attribute])
-        retdict['value'] = formatter.format(retdict['expression'])
+        if 'value' in retdict:
+            del retdict['value']
+        try:
+            retdict['value'] = formatter.format(retdict['expression'])
+        except Exception as e:
+            retdict['broken'] = str(e)
         return retdict
     elif 'value' in nodeobj[attribute]:
         return nodeobj[attribute]
@@ -501,6 +506,8 @@ class ConfigManager(object):
         # if the attribute is not set, this will search for a candidate
         # if it is set, but inheritedfrom, search for a replacement, just
         # in case
+        if not 'groups' in nodecfg:
+            return
         for group in nodecfg['groups']:
             if attrib in self._cfgstore['groups'][group]:
                 if srcgroup is not None and group != srcgroup:
@@ -630,12 +637,19 @@ class ConfigManager(object):
                 nodek = self._cfgstore['nodes'][node]
             except KeyError:
                 continue
+            recalcexpressions = False
             for attrib in attributes:
                 if attrib in nodek and 'inheritedfrom' not in nodek[attrib]:
                     # if the attribute is set and not inherited,
                     # delete it and check for inheritence to backfil data
                     del nodek[attrib]
                     self._do_inheritance(nodek, attrib, node)
+                if ('_expressionkeys' in nodek and
+                        attrib in nodek['_expressionkeys']):
+                    recalcexpressions = True
+            if recalcexpressions:
+                exprmgr = _ExpressionFormat(nodek, node)
+                self._recalculate_expressions(nodek, formatter=exprmgr)
         self._bg_sync_to_file()
 
     def set_node_attributes(self, attribmap):
@@ -644,8 +658,8 @@ class ConfigManager(object):
         # TODO(jbjohnso): multi mgr support, here if we have peers,
         # pickle the arguments and fire them off in eventlet
         # flows to peers, all should have the same result
-        exprmgr = None
         for node in attribmap.iterkeys():
+            exprmgr = None
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {}
             cfgobj = self._cfgstore['nodes'][node]

@@ -1,9 +1,4 @@
 -Reordering a group does not reorder inheritance preferences
--Setting multiple values at once where one is an expression including the othe
-    can fail because the expression is attempted to set before
-    the next setting comes to work and then we get a stack trace
-    Should leave value out of it and set 'broken' with a reason as the
-    value to the key
 -expressionkeys never gets smaller - perf impact
 -need event notification for config change- e.g. set attribute triggers consol
  session object check to see if credentials changed

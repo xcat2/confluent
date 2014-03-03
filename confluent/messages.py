@@ -42,6 +42,10 @@ class ConfluentMessage(object):
                     notes.append('Inherited from %s' % val['inheritedfrom'])
                 if 'expression' in val:
                     notes.append('Derived from expression "%s"' % val['expression'])
+            elif val is not None and 'expression' in val and 'broken' in val:
+                value = "*BROKEN*"
+                notes.append('Derived from expression "%s"' % val['expression'])
+                notes.append('Broken because of %s' % val['broken'])
             elif val is not None and 'expression' in val:
                 value = val['expression']
             if value is None:

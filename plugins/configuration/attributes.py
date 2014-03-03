@@ -62,7 +62,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
             else:
                 print attribute
                 print repr(currattr)
-                raise Exception("BUGGY ATTRIBUTE FOR NODE")
+                raise Exception("BUGGY ATTRIBUTE FOR NODEGROUP")
 
 
 def retrieve_nodes(nodes, element, configmanager, inputdata):
@@ -96,7 +96,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                     desc = allattributes.node[attribute]['description']
                 except KeyError:
                     desc = 'Unknown'
-                if 'value' in currattr:
+                if 'value' in currattr or 'expression' in currattr:
                     yield msg.Attributes(node,
                         {attribute: currattr},
                         desc)
