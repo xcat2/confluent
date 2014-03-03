@@ -27,6 +27,8 @@ def send_tlvdata(handle, data):
 
 def recv_tlvdata(handle):
     tl = handle.recv(4)
+    if len(tl) == 0:
+        return None
     tl = struct.unpack("!I", tl)[0]
     if tl & 0b10000000000000000000000000000000:
         raise Exception("Protocol Violation, reserved bit set")
