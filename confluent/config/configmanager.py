@@ -541,8 +541,6 @@ class ConfigManager(object):
                 self._cfgstore['groups'][group]['nodes'] = set([node])
             elif node not in self._cfgstore['groups'][group]['nodes']:
                 self._cfgstore['groups'][group]['nodes'].add(node)
-            else:
-                continue #the group membership already existed, to next group
             # node was not already in given group, perform inheritence fixup
             self._node_added_to_group(node, group)
 

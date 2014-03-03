@@ -1,4 +1,3 @@
--Reordering a group does not reorder inheritance preferences
 -expressionkeys never gets smaller - perf impact
 -need event notification for config change- e.g. set attribute triggers consol
  session object check to see if credentials changed
