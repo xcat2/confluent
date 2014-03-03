@@ -198,6 +198,11 @@ def do_command(command, server):
                     for item in res['item']:
                         print item["href"]
             else:  # generic attributes to list
+                if 'error' in res:
+                    sys.stderr.write(res['error'] + '\n')
+                if 'errorcode' in res:
+                    exitcode = res['errorcode']
+                    continue
                 for key in res.iterkeys():
                     notes = []
                     if res[key] is None:
@@ -219,7 +224,7 @@ def do_command(command, server):
                         notes.append('Derived from expression "%s"' % res[key]['expression'])
                     notestr = '(' + ', '.join(notes) + ')'
                     output = '{0:<40} {1:>39}'.format(attrstr, notestr)
-                    print output
+                    print(output)
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         currconsole = targpath
