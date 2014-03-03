@@ -71,7 +71,14 @@ def sessionhdl(connection, authname):
     tlvdata.send_tlvdata(connection, {'authpassed': 1})
     request = tlvdata.recv_tlvdata(connection)
     while request is not None:
-        process_request(connection, request, cfm, authdata)
+        try:
+            process_request(connection, request, cfm, authdata)
+        except:
+            import traceback
+            traceback.print_exc()
+            tlvdata.send_tlvdata(connection, {'errorcode': 500,
+                                  'error': 'Unexpected error'})
+            tlvdata.send_tlvdata(connection, {'_requestdone': 1})
         request = tlvdata.recv_tlvdata(connection)
 
 
