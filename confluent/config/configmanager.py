@@ -531,7 +531,7 @@ class ConfigManager(object):
                 continue
             try:
                 if nodecfg[attrib]['inheritedfrom'] == group:
-                    _mark_dirtykey('node', node, self.tenant)
+                    _mark_dirtykey('nodes', node, self.tenant)
                     del nodecfg[attrib]  # remove invalid inherited data
                     self._do_inheritance(nodecfg, attrib, node)
             except KeyError:  # inheritedfrom not set, move on
