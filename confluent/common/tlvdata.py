@@ -3,7 +3,7 @@ import confluent.common.tlv as tlv
 import json
 import struct
 
-def send_tlvdata(handle, data):
+def send(handle, data):
     if isinstance(data, str):
         # plain text, e.g. console data
         tl = len(data)
@@ -25,7 +25,7 @@ def send_tlvdata(handle, data):
         handle.sendall(struct.pack("!I", tl))
         handle.sendall(sdata)
 
-def recv_tlvdata(handle):
+def recv(handle):
     tl = handle.recv(4)
     if len(tl) == 0:
         return None

@@ -45,8 +45,8 @@ path = os.path.realpath(os.path.join(path, '..'))
 sys.path.append(path)
 
 import confluent.common.tlvdata as tlvdata
+import confluent.common.client as client
 
-SO_PASSCRED = 16
 conserversequence = '\x05c' # ctrl-e, c
 
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
@@ -75,6 +75,7 @@ valid_commands = [
 ]
 
 candidates = None
+session = None
 
 def completer(text, state):
     try:
@@ -110,7 +111,7 @@ def rcompleter(text, state):
     if candidates is None:
         candidates = []
         targpath = fullpath_target(lastarg)
-        for res in send_request('retrieve', targpath, server):
+        for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
                     candidates.append(res['item']["href"])
@@ -129,19 +130,6 @@ def rcompleter(text, state):
     candidates = None
     return None
 
-def parseservervalue(serverstring):
-    if serverstring.find(']:') != -1:
-        server, port = serverstring[1:].split(']:')
-    elif serverstring[0] == '[':
-        server = serverstring[1:-1]
-        port = 4001
-    elif -1 != opts.server.find(':'):
-        server, port = opts.server.split(":")
-    else:
-        server = serverstring
-        port = 4001
-    return (server, port)
-
 
 def parse_command(command):
     args = shlex.split(command, posix=True)
@@ -149,16 +137,6 @@ def parse_command(command):
 
 
 currchildren = None
-
-def send_request(operation, path, server, parameters=None):
-    payload = {'operation': operation, 'path': path}
-    if parameters is not None:
-        payload['parameters'] = parameters
-    tlvdata.send_tlvdata(server, payload)
-    result = tlvdata.recv_tlvdata(server)
-    while '_requestdone' not in result:
-        yield result
-        result = tlvdata.recv_tlvdata(server)
 
 def do_command(command, server):
     global exitcode
@@ -171,7 +149,6 @@ def do_command(command, server):
     if len(argv) == 0:
         return
     if argv[0] == 'exit':
-        server.close()
         sys.exit(0)
     elif argv[0] == 'cd':
         otarget = target
@@ -179,7 +156,7 @@ def do_command(command, server):
             target = fullpath_target(argv[1], forcepath=True)
         else: # cd by itself, go 'home'
             target = '/'
-        for res in send_request('retrieve', target, server):
+        for res in session.read(target, server):
             if 'errorcode' in res:
                 exitcode = res['errorcode']
             if 'error' in res:
@@ -190,7 +167,7 @@ def do_command(command, server):
             targpath = fullpath_target(argv[1])
         else:
             targpath = target
-        for res in send_request('retrieve', targpath, server):
+        for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
                     print res['item']["href"]
@@ -228,8 +205,8 @@ def do_command(command, server):
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         currconsole = targpath
-        tlvdata.send_tlvdata(server, {'operation': 'start', 'path': targpath})
-        status = tlvdata.recv_tlvdata(server)
+        tlvdata.send(server, {'operation': 'start', 'path': targpath})
+        status = tlvdata.recv(server)
         if 'error' in status:
             if 'errorcode' in status:
                 exitcode = status['errorcode']
@@ -251,7 +228,7 @@ def clearvalues(resource, attribs):
     keydata = {}
     for attrib in attribs:
         keydata[attrib] = None
-    for res in send_request('update', targpath, server, keydata):
+    for res in session.update(targpath, keydata):
         if 'error' in res:
             if 'errorcode' in res:
                 exitcode = res['errorcode']
@@ -276,7 +253,7 @@ def setvalues(attribs):
         value = attrib[attrib.index("=") + 1:]
         keydata[key] = value
     targpath = fullpath_target(resource)
-    for res in send_request('update', targpath, server, keydata):
+    for res in session.update(targpath, keydata):
         if 'error' in res:
             if 'errorcode' in res:
                 exitcode = res['errorcode']
@@ -326,10 +303,9 @@ def exit(code=0):
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     if consoleonly:
         server.shutdown(socket.SHUT_RDWR)
-        server.close()
         sys.exit(code)
     else:
-        tlvdata.send_tlvdata(server, {'operation': 'stop', 'path': currconsole})
+        tlvdata.send(server, {'operation': 'stop', 'path': currconsole})
         inconsole = False
 
 def conserver_command(fh, command):
@@ -363,63 +339,23 @@ def check_escape_seq(input, fh):
     return input
 
 
-def connect_unix_server(sockpath):
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
-    server.connect(sockpath)
-    return server
-
-
-def connect_tls_server(serverstring):
-    host, port = parseservervalue(serverstring)
-    for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC,
-            socket.SOCK_STREAM):
-        af, socktype, proto, cononname, sa = res
-        try:
-            server = socket.socket(af, socktype, proto)
-            server.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        except:
-            server = None
-            continue
-        try:
-            server.settimeout(5)
-            server.connect(sa)
-        except:
-            server.close()
-            server = None
-            continue
-        break
-    if server is None:
-        sys.stderr.write("Failed to connect to %s\n" % serverstring)
-        sys.exit(1)
-    secserver = ssl.wrap_socket(server)
-    return secserver
-
 parser = optparse.OptionParser()
 parser.add_option("-s", "--server", dest="server",
-                  help="TLS server to connect to", metavar="SERVER:PORT")
-parser.add_option("-u", "--unixsocket", dest="unixsock",
-                  help="TLS server to connect to", metavar="UNIXDOMAINSOCKET")
+                  help="Confluent instance to connect to", metavar="SERVER:PORT")
 opts, args =  parser.parse_args()
 if opts.server:  # going over a TLS network
-    server = connect_tls_server(opts.server)
-elif opts.unixsock:
-    server = connect_unix_server(opts.unixsock)
-elif os.path.exists("/var/run/confluent/api.sock"):
-    server = connect_unix_server("/var/run/confluent/api.sock")
+    session = client.Command(opts.server)
+else:
+    session = client.Command()
 
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
 
-banner = tlvdata.recv_tlvdata(server)
-authinfo = tlvdata.recv_tlvdata(server)
-while authinfo['authpassed'] != 1:
+while not session.authenticated:
     username = raw_input("Name: ")
     readline.clear_history()
     passphrase = getpass.getpass("Passphrase: ")
-    tlvdata.send_tlvdata(server,
-                         {'username': username, 'passphrase': passphrase})
-    authinfo = tlvdata.recv_tlvdata(server)
+    session.authenticate(username, passphrase)
 # clear on start can help with readable of TUI, but it
 # can be annoying, so for now don't do it.
 # sys.stdout.write('\x1b[H\x1b[J')
@@ -436,16 +372,16 @@ if len(args) == 1:  # a node name, go straight to trying to console
     do_command("start /node/%s/console/session" % args[0], server)
 while not doexit:
     if inconsole:
-        rdylist, _, _ = select.select((sys.stdin, server), (), (), 60)
+        rdylist, _, _ = select.select((sys.stdin, session.connection), (), (), 60)
         for fh in rdylist:
-            if fh == server:
+            if fh == session.connection:
                 # this only should get called in the
                 # case of a console session
                 # each command should slurp up all relevant
-                # recv_tlvdata potential
+                # recv potential
                 #fh.read()
                 try:
-                    data = tlvdata.recv_tlvdata(fh)
+                    data = tlvdata.recv(fh)
                 except Exception:
                     data = None
                 if type(data) == dict:
@@ -462,7 +398,7 @@ while not doexit:
                 input = fh.read()
                 input = check_escape_seq(input, fh)
                 if input:
-                    tlvdata.send_tlvdata(server, input)
+                    tlvdata.send(session.connection, input)
     else:
         command = prompt()
         do_command(command, server)

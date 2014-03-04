@@ -6,6 +6,10 @@
          in, the respective session layers will provide a caching session that
          should accelerate things after the client gets in once
         -penalizing a client clearly trying to break in
+-other auth
+    -pam if user exists but has no passphrase
+    -keystone?
+    -ad? (specialized to the AD case)
 -expressionkeys never gets smaller - perf impact
 -need event notification for config change- e.g. set attribute triggers consol
  session object check to see if credentials changed

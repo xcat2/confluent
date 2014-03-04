@@ -145,6 +145,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     # TODO(jbjohnso): WORKERPOOL
     # PBKDF2 is, by design, cpu intensive
     # throw it at the worker pool when implemented
+    # maybe a distinct worker pool, wondering about starving out non-auth stuff
     salt, crypt = ucfg['cryptpass']
     crypted = kdf.PBKDF2(passphrase, salt, 32, 10000,
                          lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest()

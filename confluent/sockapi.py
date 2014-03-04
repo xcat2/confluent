@@ -33,12 +33,12 @@ class ClientConsole(object):
         if not self.xmit:
             self.pendingdata += data
             return
-        tlvdata.send_tlvdata(self.client, data)
+        tlvdata.send(self.client, data)
 
     def startsending(self):
         self.xmit = True
         if self.pendingdata != "":
-            tlvdata.send_tlvdata(self.client, self.pendingdata)
+            tlvdata.send(self.client, self.pendingdata)
         self.pendingdata = None
 
 
@@ -54,10 +54,10 @@ def sessionhdl(connection, authname):
         if authdata is not None:
             cfm = authdata[1]
             authenticated = True
-    tlvdata.send_tlvdata(connection,"Confluent -- v0 --")
+    tlvdata.send(connection,"Confluent -- v0 --")
     while not authenticated:  # prompt for name and passphrase
-        tlvdata.send_tlvdata(connection, {'authpassed': 0})
-        response = tlvdata.recv_tlvdata(connection)
+        tlvdata.send(connection, {'authpassed': 0})
+        response = tlvdata.recv(connection)
         username = response['username']
         passphrase = response['passphrase']
         # note(jbjohnso): here, we need to authenticate, but not
@@ -68,26 +68,26 @@ def sessionhdl(connection, authname):
         if authdata is not None:
             authenticated = True
             cfm = authdata[1]
-    tlvdata.send_tlvdata(connection, {'authpassed': 1})
-    request = tlvdata.recv_tlvdata(connection)
+    tlvdata.send(connection, {'authpassed': 1})
+    request = tlvdata.recv(connection)
     while request is not None:
         try:
             process_request(connection, request, cfm, authdata)
         except:
             import traceback
             traceback.print_exc()
-            tlvdata.send_tlvdata(connection, {'errorcode': 500,
+            tlvdata.send(connection, {'errorcode': 500,
                                   'error': 'Unexpected error'})
-            tlvdata.send_tlvdata(connection, {'_requestdone': 1})
-        request = tlvdata.recv_tlvdata(connection)
+            tlvdata.send(connection, {'_requestdone': 1})
+        request = tlvdata.recv(connection)
 
 
 def send_response(responses, connection):
     if responses is None:
         return
     for rsp in responses:
-        tlvdata.send_tlvdata(connection, rsp.raw())
-    tlvdata.send_tlvdata(connection, {'_requestdone': 1})
+        tlvdata.send(connection, rsp.raw())
+    tlvdata.send(connection, {'_requestdone': 1})
 
 
 def process_request(connection, request, cfm, authdata):
@@ -108,10 +108,10 @@ def process_request(connection, request, cfm, authdata):
                     node=node, configmanager=cfm, datacallback=ccons.sendall)
                 if consession is None:
                     raise Exception("TODO")
-                tlvdata.send_tlvdata(connection, {'started': 1})
+                tlvdata.send(connection, {'started': 1})
                 ccons.startsending()
                 while consession is not None:
-                    data = tlvdata.recv_tlvdata(connection)
+                    data = tlvdata.recv(connection)
                     if type(data) == dict:
                         if data['operation'] == 'stop':
                             consession.destroy()
@@ -125,13 +125,13 @@ def process_request(connection, request, cfm, authdata):
             else:
                 hdlr = pluginapi.handle_path(path, operation, cfm, params)
         except exc.NotFoundException:
-            tlvdata.send_tlvdata(connection, {"errorcode": 404,
+            tlvdata.send(connection, {"errorcode": 404,
                                  "error": "Target not found"})
-            tlvdata.send_tlvdata(connection, {"_requestdone": 1})
+            tlvdata.send(connection, {"_requestdone": 1})
         except exc.InvalidArgumentException:
-            tlvdata.send_tlvdata(connection, {"errorcode": 400,
+            tlvdata.send(connection, {"errorcode": 400,
                                  "error": "Bad Request"})
-            tlvdata.send_tlvdata(connection, {"_requestdone": 1})
+            tlvdata.send(connection, {"_requestdone": 1})
         send_response(hdlr, connection)
     return
 
