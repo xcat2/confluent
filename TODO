@@ -1,3 +1,11 @@
+-user can bog down all requests by hammering it with bad auth requests causing
+ the auth facility to get bogged down in PBKDF
+    Option:
+        -a multiprocessing pool to handle new authentications.  The auth action
+         itself would be stalled out whilst an attack was underway, but once
+         in, the respective session layers will provide a caching session that
+         should accelerate things after the client gets in once
+        -penalizing a client clearly trying to break in
 -expressionkeys never gets smaller - perf impact
 -need event notification for config change- e.g. set attribute triggers consol
  session object check to see if credentials changed
