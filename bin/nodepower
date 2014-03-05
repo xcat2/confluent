@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+import os
+import sys
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..'))
+sys.path.append(path)
+
+import confluent.common.client as client
+
+
+node = sys.argv[1]
+
+session = client.Command()
+for res in session.read("/node/{0}/power/state".format(node)):
+    print("%s: %s" % (node, res['state']['value']))
