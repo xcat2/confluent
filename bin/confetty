@@ -205,8 +205,8 @@ def do_command(command, server):
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         currconsole = targpath
-        tlvdata.send(server, {'operation': 'start', 'path': targpath})
-        status = tlvdata.recv(server)
+        tlvdata.send(session.connection, {'operation': 'start', 'path': targpath})
+        status = tlvdata.recv(session.connection)
         if 'error' in status:
             if 'errorcode' in status:
                 exitcode = status['errorcode']
@@ -302,10 +302,9 @@ def exit(code=0):
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     if consoleonly:
-        server.shutdown(socket.SHUT_RDWR)
         sys.exit(code)
     else:
-        tlvdata.send(server, {'operation': 'stop', 'path': currconsole})
+        tlvdata.send(session.connection, {'operation': 'stop', 'path': currconsole})
         inconsole = False
 
 def conserver_command(fh, command):
