@@ -45,6 +45,7 @@
 #    (a future extended version might include suport for Forward Secure Sealing
 #    or other fields)
 
+import collections
 import confluent.config.configmanager as configuration
 import eventlet
 import os
@@ -93,14 +94,15 @@ class Logger(object):
         self.closer = None
         self.textfile = None
         self.binfile = None
-        self.logentries = []
+        self.logentries = collections.deque()
 
     def writedata(self):
         if self.textfile is None:
             self.textfile = open(self.textpath, mode='ab')
         if self.binfile is None:
             self.binfile = open(self.binpath, mode='ab')
-        for entry in self.logentries:
+        while self.logentries:
+            entry = self.logentries.popleft()
             ltype = entry[0]
             tstamp = entry[1]
             data = entry[2]
@@ -117,8 +119,8 @@ class Logger(object):
             offset = self.textfile.tell() + len(textdate)
             datalen = len(data)
             # metadata length is always 16 for this code at the moment
-            binrecord = struct.pack(">BBIHII",
-                    16, ltype, offset, datalen, tstamp, evtdata)
+            binrecord = struct.pack(">BBIHIBBH",
+                    16, ltype, offset, datalen, tstamp, evtdata, entry[4], 0)
             if self.isconsole:
                 if ltype == 2:
                     textrecord = data
@@ -128,12 +130,13 @@ class Logger(object):
                 textrecord = textdate + data + '\n'
             self.textfile.write(textrecord)
             self.binfile.write(binrecord)
-        self.logentries = []
+        self.textfile.flush()
+        self.binfile.flush()
         if self.closer is None:
             self.closer = eventlet.spawn_after(15, self.closelog)
         self.writer = None
 
-    def log(self, logdata=None, ltype=None, event=0):
+    def log(self, logdata=None, ltype=None, event=0, eventdata=0):
         if type(logdata) not in (str, unicode, dict):
             raise Exception("Unsupported logdata")
         if ltype is None:
@@ -152,7 +155,7 @@ class Logger(object):
                 self.logentries[-1][1] == timestamp):
             self.logentries[-1][2] += logdata
         else:
-            self.logentries.append([ltype, timestamp, logdata, event])
+            self.logentries.append([ltype, timestamp, logdata, event, eventdata])
         if self.writer is None:
             self.writer = eventlet.spawn_after(2, self.writedata)
 

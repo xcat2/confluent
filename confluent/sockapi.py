@@ -42,13 +42,12 @@ class ClientConsole(object):
         self.pendingdata = None
 
 
-def sessionhdl(connection, authname):
+def sessionhdl(connection, authname, skipauth):
     # For now, trying to test the console stuff, so let's just do n4.
     authenticated = False
     authdata = None
-    if authname and isinstance(authname, bool):
+    if skipauth:
         authenticated = True
-        authname = "superuser"
         cfm = configmanager.ConfigManager(tenant=None)
     elif authname:
         authdata = auth.authorize(authname, element=None)
@@ -170,19 +169,24 @@ def _unixdomainhandler():
         creds = cnn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED,
                                 struct.calcsize('3i'))
         pid, uid, gid = struct.unpack('3i',creds)
+        skipauth = False
         if uid in (os.getuid(), 0):
             #this is where we happily accept the person
             #to do whatever.  This allows the server to
             #start with no configuration whatsoever
             #and yet still be configurable by some means
-            authname = True
+            skipauth = True
+            try:
+                authname = pwd.getpwuid(uid).pw_name
+            except:
+                authname = "UNKNOWN SUPERUSER"
         else:
             try:
                 authname = pwd.getpwuid(uid).pw_name
             except KeyError:
                 cnn.close()
                 return
-        eventlet.spawn_n(sessionhdl, cnn, authname)
+        eventlet.spawn_n(sessionhdl, cnn, authname, skipauth)
 
 
 

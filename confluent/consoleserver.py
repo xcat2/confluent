@@ -25,6 +25,7 @@ class _ConsoleHandler(object):
         self.logger = log.Logger(node, tenant=configmanager.tenant)
         self.buffer = bytearray()
         self._connect()
+        self.users = {}
 
     def _connect(self):
         self._console = plugin.handle_path(
@@ -58,14 +59,21 @@ class _ConsoleHandler(object):
         eventlet.spawn(self._handle_console_output, data)
 
     def attachuser(self, username):
+        if username in self.users:
+            self.users[username] += 1
+        else:
+            self.users[username] = 1
         self.logger.log(
             logdata=username, ltype=log.DataTypes.event,
-            event=log.Events.clientconnect)
+            event=log.Events.clientconnect,
+            eventdata=self.users[username])
 
     def detachuser(self, username):
+        self.users[username] -= 1
         self.logger.log(
             logdata=username, ltype=log.DataTypes.event,
-            event=log.Events.clientdisconnect)
+            event=log.Events.clientdisconnect,
+            eventdata=self.users[username])
 
     def _handle_console_output(self, data):
         if type(data) == int:
