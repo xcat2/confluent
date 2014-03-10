@@ -8,6 +8,7 @@
 #we track nodes that are actively being logged, watched, or have attached
 #there should be no more than one handler per node
 import confluent.interface.console as conapi
+import confluent.log as log
 import confluent.pluginapi as plugin
 import eventlet
 import eventlet.green.threading as threading
@@ -21,6 +22,7 @@ class _ConsoleHandler(object):
         self.rcpts = {}
         self.cfgmgr = configmanager
         self.node = node
+        self.logger = log.Logger(node, tenant=configmanager.tenant)
         self.buffer = bytearray()
         self._connect()
 
@@ -55,11 +57,22 @@ class _ConsoleHandler(object):
         # to the console object
         eventlet.spawn(self._handle_console_output, data)
 
+    def attachuser(self, username):
+        self.logger.log(
+            logdata=username, ltype=log.DataTypes.event,
+            event=log.Events.clientconnect)
+
+    def detachuser(self, username):
+        self.logger.log(
+            logdata=username, ltype=log.DataTypes.event,
+            event=log.Events.clientdisconnect)
+
     def _handle_console_output(self, data):
         if type(data) == int:
             if data == conapi.ConsoleEvent.Disconnect:
                 self._connect()
             return
+        self.logger.log(data)
         self.buffer += data
         #TODO: analyze buffer for registered events, examples:
         #   panics
@@ -121,12 +134,14 @@ class ConsoleSession(object):
     :param node: Name of the node for which this session will be created
     """
 
-    def __init__(self, node, configmanager, datacallback=None):
+    def __init__(self, node, configmanager, username, datacallback=None):
         self.tenant = configmanager.tenant
         consk = (node, self.tenant)
         self.ckey = consk
+        self.username = username
         if consk not in _handled_consoles:
             _handled_consoles[consk] = _ConsoleHandler(node, configmanager)
+        _handled_consoles[consk].attachuser(username)
         self._evt = threading.Event()
         self.node = node
         self.conshdl = _handled_consoles[consk]
@@ -142,6 +157,7 @@ class ConsoleSession(object):
                 datacallback(recdata)
 
     def destroy(self):
+        _handled_consoles[self.ckey].detachuser(self.username)
         _handled_consoles[self.ckey].unregister_rcpt(self.reghdl)
         self.databuffer = None
         self._evt = None

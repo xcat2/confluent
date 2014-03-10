@@ -36,7 +36,8 @@
 # The information to store:
 #    - leading bit reserved, 0 for now
 #    - length of metadata record 7 bits
-#    - type of data referenced by this entry (one byte)
+#    - type of data referenced by this entry (one byte), currently:
+#       0=text event, 1=json, 2=console data
 #    - offset into the text log to begin (4 bytes)
 #    - length of data referenced by this entry (2 bytes)
 #    - UTC timestamp of this entry in seconds since epoch (unsigned 32 bit?)
@@ -44,7 +45,11 @@
 #    (a future extended version might include suport for Forward Secure Sealing
 #    or other fields)
 
+import confluent.config.configmanager as configuration
+import eventlet
 import os
+import struct
+import time
 
 # on conserving filehandles:
 # upon write, if file not open, open it for append
@@ -57,7 +62,103 @@ import os
 # if that happens, warn to have user increase ulimit for optimal
 # performance
 
+
+class Events(object):
+    undefined, clearscreen, clientconnect, clientdisconnect = range(4)
+    logstr = {
+        2: 'connection by ',
+        3: 'disconnection by ',
+    }
+
+
+class DataTypes(object):
+    text, dictionary, console, event = range(4)
+
 class Logger(object):
-    def __init__(self, location, console=True, configmanager):
-        self.location = location
-        os.path.isdir(location)
+    """
+    :param console:  If true, [] will be used to denote non-text events.  If
+                     False, events will be formatted like syslog:
+                     date: message<CR>
+    """
+    def __init__(self, logname, console=True, tenant=None):
+        self.filepath = configuration.get_global("logdirectory")
+        if self.filepath is None:
+            self.filepath = "/var/log/confluent/"
+        self.isconsole = console
+        if console:
+            self.filepath += "consoles/"
+        self.textpath = self.filepath + logname
+        self.binpath = self.filepath + logname + ".cbl"
+        self.writer = None
+        self.closer = None
+        self.textfile = None
+        self.binfile = None
+        self.logentries = []
+
+    def writedata(self):
+        if self.textfile is None:
+            self.textfile = open(self.textpath, mode='ab')
+        if self.binfile is None:
+            self.binfile = open(self.binpath, mode='ab')
+        for entry in self.logentries:
+            ltype = entry[0]
+            tstamp = entry[1]
+            data = entry[2]
+            evtdata = entry[3]
+            textdate = ''
+            if self.isconsole and ltype != 2:
+                textdate = time.strftime(
+                    '[%m/%d %H:%M:%S ', time.localtime(tstamp))
+                if ltype == DataTypes.event and evtdata in Events.logstr:
+                    textdate += Events.logstr[evtdata]
+            elif not self.isconsole:
+                textdate = time.strftime(
+                    '%b %d %H:%M:%S ', time.localtime(tstamp))
+            offset = self.textfile.tell() + len(textdate)
+            datalen = len(data)
+            # metadata length is always 16 for this code at the moment
+            binrecord = struct.pack(">BBIHII",
+                    16, ltype, offset, datalen, tstamp, evtdata)
+            if self.isconsole:
+                if ltype == 2:
+                    textrecord = data
+                else:
+                    textrecord = textdate + data + ']'
+            else:
+                textrecord = textdate + data + '\n'
+            self.textfile.write(textrecord)
+            self.binfile.write(binrecord)
+        self.logentries = []
+        if self.closer is None:
+            self.closer = eventlet.spawn_after(15, self.closelog)
+        self.writer = None
+
+    def log(self, logdata=None, ltype=None, event=0):
+        if type(logdata) not in (str, unicode, dict):
+            raise Exception("Unsupported logdata")
+        if ltype is None:
+            if type(logdata) == dict:
+                ltype = 1
+            elif self.isconsole:
+                ltype = 2
+            else:
+                ltype = 0
+        if self.closer is not None:
+            self.closer.cancel()
+            self.closer = None
+        timestamp = int(time.time())
+        if (len(self.logentries) > 0 and ltype == 2 and
+                event == 0 and self.logentries[-1][0] == 2 and
+                self.logentries[-1][1] == timestamp):
+            self.logentries[-1][2] += logdata
+        else:
+            self.logentries.append([ltype, timestamp, logdata, event])
+        if self.writer is None:
+            self.writer = eventlet.spawn_after(2, self.writedata)
+
+    def closelog(self):
+        self.textfile.close()
+        self.binfile.close()
+        self.textfile = None
+        self.binfile = None
+        self.closer = None

@@ -155,6 +155,7 @@ def _authorize_request(env):
         return {'code': 200,
                 'cookie': cookie,
                 'cfgmgr': authdata[1],
+                'username': name,
                 'userdata': authdata[0]}
     else:
         return {'code': 401}
@@ -237,8 +238,9 @@ def resourcehandler(env, start_response):
         _, _, nodename = prefix.rpartition('/')
         if 'session' not in querydict.keys() or not querydict['session']:
             # Request for new session
-            consession = consoleserver.ConsoleSession(node=nodename,
-                                                      configmanager=cfgmgr)
+            consession = consoleserver.ConsoleSession(
+                node=nodename, configmanager=cfgmgr,
+                username=authorized['username'])
             if not consession:
                 start_response("500 Internal Server Error", headers)
                 return

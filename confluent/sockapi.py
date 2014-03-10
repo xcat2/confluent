@@ -48,6 +48,7 @@ def sessionhdl(connection, authname):
     authdata = None
     if authname and isinstance(authname, bool):
         authenticated = True
+        authname = "superuser"
         cfm = configmanager.ConfigManager(tenant=None)
     elif authname:
         authdata = auth.authorize(authname, element=None)
@@ -58,13 +59,13 @@ def sessionhdl(connection, authname):
     while not authenticated:  # prompt for name and passphrase
         tlvdata.send(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
-        username = response['username']
+        authname = response['username']
         passphrase = response['passphrase']
         # note(jbjohnso): here, we need to authenticate, but not
         # authorize a user.  When authorization starts understanding
         # element path, that authorization will need to be called
         # per request the user makes
-        authdata = auth.check_user_passphrase(username, passphrase)
+        authdata = auth.check_user_passphrase(authname, passphrase)
         if authdata is not None:
             authenticated = True
             cfm = authdata[1]
@@ -72,7 +73,7 @@ def sessionhdl(connection, authname):
     request = tlvdata.recv(connection)
     while request is not None:
         try:
-            process_request(connection, request, cfm, authdata)
+            process_request(connection, request, cfm, authdata, authname)
         except:
             import traceback
             traceback.print_exc()
@@ -90,7 +91,7 @@ def send_response(responses, connection):
     tlvdata.send(connection, {'_requestdone': 1})
 
 
-def process_request(connection, request, cfm, authdata):
+def process_request(connection, request, cfm, authdata, authname):
     #TODO(jbjohnso): authorize each request
     if type(request) == dict:
         operation = request['operation']
@@ -105,7 +106,8 @@ def process_request(connection, request, cfm, authdata):
                 node = elems[2]
                 ccons = ClientConsole(connection)
                 consession = consoleserver.ConsoleSession(
-                    node=node, configmanager=cfm, datacallback=ccons.sendall)
+                    node=node, configmanager=cfm, username=authname,
+                    datacallback=ccons.sendall)
                 if consession is None:
                     raise Exception("TODO")
                 tlvdata.send(connection, {'started': 1})
