@@ -63,17 +63,24 @@ class _ConsoleHandler(object):
             self.users[username] += 1
         else:
             self.users[username] = 1
+        edata = self.users[username]
+        if edata > 2:  # for log purposes, only need to
+            # clearly indicate redundant connections
+            # not connection count
+            edata = 2
         self.logger.log(
             logdata=username, ltype=log.DataTypes.event,
-            event=log.Events.clientconnect,
-            eventdata=self.users[username])
+            event=log.Events.clientconnect, eventdata=edata)
 
     def detachuser(self, username):
         self.users[username] -= 1
+        if self.users[username] < 2:
+            edata = self.users[username]
+        else:
+            edata = 2
         self.logger.log(
             logdata=username, ltype=log.DataTypes.event,
-            event=log.Events.clientdisconnect,
-            eventdata=self.users[username])
+            event=log.Events.clientdisconnect, eventdata=edata)
 
     def _handle_console_output(self, data):
         if type(data) == int:
