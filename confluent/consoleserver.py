@@ -26,6 +26,8 @@ class _ConsoleHandler(object):
         self.buffer = bytearray()
         self._connect()
         self.users = {}
+        self.appmodedetected = False
+        self.shiftin = None
 
     def _connect(self):
         self._console = plugin.handle_path(
@@ -45,13 +47,10 @@ class _ConsoleHandler(object):
         return hdl
 
     def flushbuffer(self):
-        #TODO:log the old stuff
-        if len(self.buffer) > 1024:
-            self.buffer = bytearray(self.buffer[-1024:])
-        #Will be interesting to keep track of logged but
-        #retained data, must only log data not already
-        #flushed
-        #also, timestamp data...
+        # Logging is handled in a different stream
+        # this buffer is now just for having screen redraw on
+        # connect
+        self.buffer = bytearray(self.buffer[-8192:])
 
     def get_console_output(self, data):
         # Spawn as a greenthread, return control as soon as possible
@@ -87,18 +86,35 @@ class _ConsoleHandler(object):
             if data == conapi.ConsoleEvent.Disconnect:
                 self._connect()
             return
-        self.logger.log(data)
+        prefix = ''
+        if '\0' in data:  # there is a null in the output
+            # the proper response is to do nothing, but here using it as a cue
+            # that perhaps firmware has reset since that's the only place
+            # observed so far.  Lose the shiftin and app mode when detected
+            prefix = '\x1b[?1l'
+            self.shiftin = None
+            self.appmodedetected = False
+        if '\x1b[?1h' in data:  # remember the session wants the client to be in
+            # 'application mode'  Thus far only observed on esxi
+            self.appmodedetected = True
+        if '\x1b)0' in data:
+            # console indicates it wants access to special drawing characters
+            self.shiftin = '0'
+        eventdata = 0
+        if self.appmodedetected:
+            eventdata = eventdata | 1
+        if self.shiftin is not None:
+            eventdata = eventdata | 2
+        self.logger.log(data, eventdata=eventdata)
         self.buffer += data
         #TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        if len(self.buffer) > 8192:
-            #call to function to get generic data to log if applicable
-            #and shrink buffer
+        if len(self.buffer) > 16384:
             self.flushbuffer()
         for rcpt in self.rcpts.itervalues():
             try:
-                rcpt(data)
+                rcpt(prefix + data)
             except:
                 pass
 
@@ -110,23 +126,31 @@ class _ConsoleHandler(object):
         #For now, just try to seek back in buffer to find a clear screen
         #If that fails, just return buffer
         #a scheme always tracking the last clear screen would be too costly
+        retdata = ''
+        if self.shiftin is not None:  #detected that terminal requested a
+            #shiftin character set, relay that to the terminal that cannected
+            retdata += '\x1b)' + self.shiftin
+        if self.appmodedetected:
+            retdata += '\x1b[?1h'
+        else:
+            retdata += '\x1b[?1l'
         #an alternative would be to emulate a VT100 to know what the
         #whole screen would look like
         #this is one scheme to clear screen, move cursor then clear
         bufidx = self.buffer.rfind('\x1b[H\x1b[J')
         if bufidx >= 0:
-            return str(self.buffer[bufidx:])
+            return retdata + str(self.buffer[bufidx:])
         #another scheme is the 2J scheme
         bufidx = self.buffer.rfind('\x1b[2J')
         if bufidx >= 0:
             # there was some sort of clear screen event
             # somewhere in the buffer, replay from that point
             # in hopes that it reproduces the screen
-            return str(self.buffer[bufidx:])
+            return retdata + str(self.buffer[bufidx:])
         else:
             #we have no indication of last erase, play back last kibibyte
             #to give some sense of context anyway
-            return str(self.buffer[-1024:])
+            return retdata + str(self.buffer[-1024:])
 
     def write(self, data):
         #TODO.... take note of data coming in from audit/log perspective?

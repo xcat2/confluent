@@ -118,9 +118,12 @@ class Logger(object):
                     '%b %d %H:%M:%S ', time.localtime(tstamp))
             offset = self.textfile.tell() + len(textdate)
             datalen = len(data)
+            eventaux = entry[4]
+            if eventaux is None:
+                eventaux = 0
             # metadata length is always 16 for this code at the moment
             binrecord = struct.pack(">BBIHIBBH",
-                    16, ltype, offset, datalen, tstamp, evtdata, entry[4], 0)
+                    16, ltype, offset, datalen, tstamp, evtdata, eventaux, 0)
             if self.isconsole:
                 if ltype == 2:
                     textrecord = data
@@ -136,7 +139,7 @@ class Logger(object):
             self.closer = eventlet.spawn_after(15, self.closelog)
         self.writer = None
 
-    def log(self, logdata=None, ltype=None, event=0, eventdata=0):
+    def log(self, logdata=None, ltype=None, event=0, eventdata=None):
         if type(logdata) not in (str, unicode, dict):
             raise Exception("Unsupported logdata")
         if ltype is None:
@@ -154,6 +157,8 @@ class Logger(object):
                 event == 0 and self.logentries[-1][0] == 2 and
                 self.logentries[-1][1] == timestamp):
             self.logentries[-1][2] += logdata
+            if eventdata is not None:
+                self.logentries[-1][4] = eventdata
         else:
             self.logentries.append([ltype, timestamp, logdata, event, eventdata])
         if self.writer is None:
