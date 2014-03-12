@@ -48,6 +48,7 @@
 import collections
 import confluent.config.configmanager as configuration
 import eventlet
+import fcntl
 import os
 import struct
 import time
@@ -116,6 +117,7 @@ class Logger(object):
             elif not self.isconsole:
                 textdate = time.strftime(
                     '%b %d %H:%M:%S ', time.localtime(tstamp))
+            fcntl.flock(self.textfile, fcntl.LOCK_EX)
             offset = self.textfile.tell() + len(textdate)
             datalen = len(data)
             eventaux = entry[4]
@@ -132,12 +134,52 @@ class Logger(object):
             else:
                 textrecord = textdate + data + '\n'
             self.textfile.write(textrecord)
+            fcntl.flock(self.textfile, fcntl.LOCK_UN)
+            fcntl.flock(self.binfile, fcntl.LOCK_EX)
             self.binfile.write(binrecord)
+            fcntl.flock(self.binfile, fcntl.LOCK_UN)
         self.textfile.flush()
         self.binfile.flush()
         if self.closer is None:
             self.closer = eventlet.spawn_after(15, self.closelog)
         self.writer = None
+
+    def read_recent_text(self, size):
+        try:
+            textfile = open(self.textpath, mode='r')
+            binfile = open(self.binpath, mode='r')
+        except IOError:
+            return ('', 0)
+        fcntl.flock(binfile, fcntl.LOCK_SH)
+        binfile.seek(0, 2)
+        binidx = binfile.tell() - 16
+        currsize = 0
+        offsets = collections.deque()
+        termstate = 0
+        while binidx > 0 and currsize < size:
+            binfile.seek(binidx, 0)
+            binidx -= 16
+            recbytes = binfile.read(16)
+            (_, ltype, offset, datalen, tstamp, evtdata, eventaux, _) = \
+                struct.unpack(">BBIHIBBH", recbytes)
+            binrecord = struct.pack(">BBIHIBBH",
+                    16, ltype, offset, datalen, tstamp, evtdata, eventaux, 0)
+            if ltype != 2:
+                continue
+            currsize += datalen
+            offsets.append((offset, datalen))
+            termstate = termstate | eventaux
+        fcntl.flock(binfile, fcntl.LOCK_UN)
+        binfile.close()
+        textdata = ''
+        fcntl.flock(textfile, fcntl.LOCK_SH)
+        while offsets:
+            (offset, len) = offsets.popleft()
+            textfile.seek(offset, 0)
+            textdata += textfile.read(len)
+        fcntl.flock(textfile, fcntl.LOCK_UN)
+        textfile.close()
+        return (textdata, termstate)
 
     def log(self, logdata=None, ltype=None, event=0, eventdata=None):
         if type(logdata) not in (str, unicode, dict):

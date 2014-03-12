@@ -24,10 +24,17 @@ class _ConsoleHandler(object):
         self.node = node
         self.logger = log.Logger(node, tenant=configmanager.tenant)
         self.buffer = bytearray()
-        self._connect()
-        self.users = {}
+        (text, termstate) = self.logger.read_recent_text(8192)
+        self.buffer += text
         self.appmodedetected = False
         self.shiftin = None
+        if termstate & 1:
+            self.appmodedetected = True
+        if termstate & 2:
+            self.shiftin = '0'
+        self._connect()
+        self.users = {}
+
 
     def _connect(self):
         self._console = plugin.handle_path(
@@ -159,6 +166,10 @@ class _ConsoleHandler(object):
         self._console.write(data)
 
 
+def connect_node(node, configmanager):
+    consk = (node, configmanager.tenant)
+    if consk not in _handled_consoles:
+        _handled_consoles[consk] = _ConsoleHandler(node, configmanager)
 #this represents some api view of a console handler.  This handles things like
 #holding the caller specific queue data, for example, when http api should be
 #sending data, but there is no outstanding POST request to hold it,
@@ -178,8 +189,7 @@ class ConsoleSession(object):
         consk = (node, self.tenant)
         self.ckey = consk
         self.username = username
-        if consk not in _handled_consoles:
-            _handled_consoles[consk] = _ConsoleHandler(node, configmanager)
+        connect_node(node, configmanager)
         _handled_consoles[consk].attachuser(username)
         self._evt = threading.Event()
         self.node = node
