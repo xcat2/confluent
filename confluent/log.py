@@ -155,7 +155,7 @@ class Logger(object):
         binidx = binfile.tell() - 16
         currsize = 0
         offsets = collections.deque()
-        termstate = 0
+        termstate = None
         while binidx > 0 and currsize < size:
             binfile.seek(binidx, 0)
             binidx -= 16
@@ -168,7 +168,8 @@ class Logger(object):
                 continue
             currsize += datalen
             offsets.append((offset, datalen))
-            termstate = termstate | eventaux
+            if termstate is None:
+                termstate = termstate | eventaux
         fcntl.flock(binfile, fcntl.LOCK_UN)
         binfile.close()
         textdata = ''
