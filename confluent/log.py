@@ -180,6 +180,8 @@ class Logger(object):
             textdata += textfile.read(len)
         fcntl.flock(textfile, fcntl.LOCK_UN)
         textfile.close()
+        if termstate is None:
+            termstate = 0
         return (textdata, termstate)
 
     def log(self, logdata=None, ltype=None, event=0, eventdata=None):
