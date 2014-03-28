@@ -58,7 +58,7 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-rootcollections = ['node/', 'nodegroup/']
+rootcollections = ['nodes/', 'groups/']
 
 
 class PluginRoute(object):
@@ -151,7 +151,7 @@ def enumerate_nodegroup_collection(collectionpath, configmanager):
     return iterate_resources(collection)
 
 def enumerate_node_collection(collectionpath, configmanager):
-    if collectionpath == ['node']:  # it is just '/node/', need a list of nodes
+    if collectionpath == ['nodes']:  # it is just '/node/', need a list of nodes
         return iterate_collections(configmanager.get_nodes())
     node = collectionpath[1]
     if not configmanager.is_node(node):
@@ -203,7 +203,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
         del pathcomponents[-1]
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
-    elif pathcomponents[0] == 'nodegroup':
+    elif pathcomponents[0] == 'groups':
         try:
             group = pathcomponents[1]
         except IndexError:
@@ -229,7 +229,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 nodes=None, element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata)
-    elif pathcomponents[0] in ('node', 'system', 'vm'):
+    elif pathcomponents[0] in ('nodes', 'system', 'vm'):
         #single node request of some sort
         try:
             node = pathcomponents[1]

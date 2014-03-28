@@ -38,7 +38,7 @@ class _ConsoleHandler(object):
 
     def _connect(self):
         self._console = plugin.handle_path(
-            "/node/%s/_console/session" % self.node,
+            "/nodes/%s/_console/session" % self.node,
             "create", self.cfgmgr)
         self._console.connect(self.get_console_output)
 

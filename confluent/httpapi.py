@@ -71,8 +71,8 @@ def node_creation_resources():
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
 
 create_resource_functions = {
-    '/node/': node_creation_resources,
-    '/nodegroup/': group_creation_resources,
+    '/nodes/': node_creation_resources,
+    '/groups/': group_creation_resources,
 }
 
 
@@ -356,7 +356,7 @@ def _assemble_html(responses, resource, querydict, url):
             firstpass = True
             for y in create_resource_functions[url]():
                 if firstpass:
-                    yield "<hr>Define new %s:<BR>" % url.split("/")[-2]
+                    yield "<hr>Define new resource in %s:<BR>" % url.split("/")[-2]
                 firstpass = False
                 yield y
             yield ('<input value="create" name="restexplorerop" type="submit">'

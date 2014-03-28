@@ -368,7 +368,7 @@ inconsole = False
 pendingcommand = ""
 if len(args) == 1:  # a node name, go straight to trying to console
     consoleonly = True
-    do_command("start /node/%s/console/session" % args[0], server)
+    do_command("start /nodes/%s/console/session" % args[0], server)
 while not doexit:
     if inconsole:
         rdylist, _, _ = select.select((sys.stdin, session.connection), (), (), 60)
