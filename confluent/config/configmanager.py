@@ -572,6 +572,7 @@ class ConfigManager(object):
             if group not in groups:
                 if node in self._cfgstore['groups'][group]['nodes']:
                     self._cfgstore['groups'][group]['nodes'].discard(node)
+                    _mark_dirtykey('groups', group, self.tenant)
                     self._node_removed_from_group(node, group)
         for group in groups:
             if group not in self._cfgstore['groups']:
