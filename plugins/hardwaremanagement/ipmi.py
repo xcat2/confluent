@@ -16,11 +16,15 @@ console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
 
 _ipmithread = None
+_ipmiwaiters = []
 
 def _ipmi_evtloop():
     while True:
         try:
             console.session.Session.wait_for_rsp(timeout=600)
+            while _ipmiwaiters:
+                waiter = _ipmiwaiters.pop()
+                waiter.send()
         except:
             import traceback
             traceback.print_exc()
@@ -73,6 +77,7 @@ class IpmiConsole(conapi.Console):
         self.kg = connparams['kg']
         self.bmc = connparams['bmc']
         self.port = connparams['port']
+        self.connected = False
         # Cannot actually create console until 'connect', when we get callback
 
     def handle_data(self, data):
@@ -80,7 +85,9 @@ class IpmiConsole(conapi.Console):
             disconnect = frozenset(('Session Disconnected', 'timeout'))
             if 'error' in data and data['error'] in disconnect:
                 self.broken = True
-                self.datacallback(conapi.ConsoleEvent.Disconnect)
+                self.error = data['error']
+                if self.connected:
+                    self.datacallback(conapi.ConsoleEvent.Disconnect)
             else:
                 raise Exception("Unrecognized pyghmi input %s" % repr(data))
         else:
@@ -94,8 +101,15 @@ class IpmiConsole(conapi.Console):
                                                 password=self.password,
                                                 kg=self.kg, force=True,
                                                 iohandler=self.handle_data)
+            while not self.solconnection.connected and not self.broken:
+                w = eventlet.event.Event()
+                _ipmiwaiters.append(w)
+                w.wait()
+            if self.broken:
+                raise exc.TargetEndpointUnreachable(self.error)
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))
+
 
     def write(self, data):
         self.solconnection.send_data(data)
