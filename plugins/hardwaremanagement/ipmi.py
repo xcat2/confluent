@@ -11,6 +11,7 @@ import os
 import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
+import socket
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
 
@@ -87,11 +88,14 @@ class IpmiConsole(conapi.Console):
 
     def connect(self,callback):
         self.datacallback = callback
-        self.solconnection = console.Console(bmc=self.bmc, port=self.port,
-                                           userid=self.username,
-                                           password=self.password, kg=self.kg,
-                                           force=True,
-                                           iohandler=self.handle_data)
+        try:
+            self.solconnection = console.Console(bmc=self.bmc, port=self.port,
+                                                userid=self.username,
+                                                password=self.password,
+                                                kg=self.kg, force=True,
+                                                iohandler=self.handle_data)
+        except socket.gaierror as err:
+            raise exc.TargetEndpointUnreachable(str(err))
 
     def write(self, data):
         self.solconnection.send_data(data)
@@ -159,7 +163,7 @@ class IpmiHandler(object):
         self._logevt.wait()
         if self.broken:
             if self.error == 'timeout':
-                raise exc.TargetEndpointTimeout()
+                raise exc.TargetEndpointUnreachable('Target timed out')
             else:
                 raise Exception(self.error)
         if self.element == [ 'power', 'state' ]:

@@ -11,7 +11,7 @@ class InvalidArgumentException(ConfluentException):
     # like http code 400
     pass
 
-class TargetEndpointTimeout(ConfluentException):
+class TargetEndpointUnreachable(ConfluentException):
     # A target system was unavailable.  For example, a BMC
     # was unreachable.  http code 504
     pass
