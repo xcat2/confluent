@@ -39,6 +39,7 @@ import tty
 
 exitcode = 0
 consoleonly = False
+consolename = ""
 target = "/"
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..'))
@@ -52,7 +53,27 @@ conserversequence = '\x05c' # ctrl-e, c
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
 server = None
 
+statedata = {}
+
+def updatestatus(stateinfo):
+    status = consolename
+    if 'clientcount' in stateinfo:
+        statedata['clientcount'] = stateinfo['clientcount']
+    if 'connectstate' in stateinfo:
+        statedata['connectstate'] = stateinfo['connectstate']
+    info = []
+    if 'connectstate' in statedata and statedata['connectstate'] != 'connected':
+        info.append(statedata['connectstate'])
+    if 'clientcount' in statedata and statedata['clientcount'] != 1:
+        info.append('clients: %d' % statedata['clientcount'])
+    if info:
+        status += ' [' + ','.join(info) + ']'
+    sys.stdout.write('\x1b]0;console: %s\x07' % status)
+    sys.stdout.flush()
+
+
 def prompt():
+    sys.stdout.write('\x1b]0;confetty: %s\x07' % target)
     try:
         return raw_input(target + ' -> ')
     except KeyboardInterrupt:
@@ -204,6 +225,7 @@ def do_command(command, server):
                     print(output)
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
+        nodename = targpath.split('/')[-3]
         currconsole = targpath
         tlvdata.send(session.connection, {'operation': 'start', 'path': targpath})
         status = tlvdata.recv(session.connection)
@@ -213,7 +235,7 @@ def do_command(command, server):
             sys.stderr.write('Error: ' + status['error'] + '\n')
             return
         print '[console session started]'
-        startconsole()
+        startconsole(nodename)
         return
     elif argv[0] == 'set':
         setvalues(argv[1:])
@@ -287,8 +309,10 @@ def fullpath_target(path, forcepath=False):
         ntarget += '/'
     return ntarget
 
-def startconsole():
+def startconsole(nodename):
     global inconsole
+    global consolename
+    consolename = nodename
     tty.setraw(sys.stdin.fileno())
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
@@ -384,7 +408,7 @@ while not doexit:
                 except Exception:
                     data = None
                 if type(data) == dict:
-                    print repr(data)
+                    updatestatus(data)
                     continue
                 if data is not None:
                     sys.stdout.write(data)
