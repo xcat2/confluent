@@ -27,18 +27,18 @@ class ClientConsole(object):
     def __init__(self, client):
         self.client = client
         self.xmit = False
-        self.pendingdata = ""
+        self.pendingdata = []
 
     def sendall(self, data):
         if not self.xmit:
-            self.pendingdata += data
+            self.pendingdata.append(data)
             return
         tlvdata.send(self.client, data)
 
     def startsending(self):
         self.xmit = True
-        if self.pendingdata != "":
-            tlvdata.send(self.client, self.pendingdata)
+        for datum in self.pendingdata:
+            tlvdata.send(self.client, datum)
         self.pendingdata = None
 
 

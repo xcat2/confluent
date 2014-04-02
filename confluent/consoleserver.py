@@ -25,6 +25,7 @@ class _ConsoleHandler(object):
         self.cfgmgr = configmanager
         self.node = node
         self.connectstate = 'unconnected'
+        self.clientcount = 0
         self.logger = log.Logger(node, tenant=configmanager.tenant)
         self.buffer = bytearray()
         (text, termstate) = self.logger.read_recent_text(8192)
@@ -72,10 +73,14 @@ class _ConsoleHandler(object):
         self._connect()
 
     def unregister_rcpt(self, handle):
+        self.clientcount -= 1
         if handle in self.rcpts:
             del self.rcpts[handle]
+        self._send_rcpts({'clientcount': self.clientcount})
 
     def register_rcpt(self, callback):
+        self.clientcount += 1
+        self._send_rcpts({'clientcount': self.clientcount})
         hdl = random.random()
         while hdl in self.rcpts:
             hdl = random.random()
@@ -174,6 +179,10 @@ class _ConsoleHandler(object):
         #For now, just try to seek back in buffer to find a clear screen
         #If that fails, just return buffer
         #a scheme always tracking the last clear screen would be too costly
+        connstate = {
+            'connectstate': self.connectstate,
+            'clientcount': self.clientcount,
+        }
         retdata = ''
         if self.shiftin is not None:  #detected that terminal requested a
             #shiftin character set, relay that to the terminal that cannected
@@ -187,18 +196,18 @@ class _ConsoleHandler(object):
         #this is one scheme to clear screen, move cursor then clear
         bufidx = self.buffer.rfind('\x1b[H\x1b[J')
         if bufidx >= 0:
-            return retdata + str(self.buffer[bufidx:])
+            return (retdata + str(self.buffer[bufidx:]), connstate)
         #another scheme is the 2J scheme
         bufidx = self.buffer.rfind('\x1b[2J')
         if bufidx >= 0:
             # there was some sort of clear screen event
             # somewhere in the buffer, replay from that point
             # in hopes that it reproduces the screen
-            return retdata + str(self.buffer[bufidx:])
+            return (retdata + str(self.buffer[bufidx:]), connstate)
         else:
             #we have no indication of last erase, play back last kibibyte
             #to give some sense of context anyway
-            return retdata + str(self.buffer[-1024:])
+            return (retdata + str(self.buffer[-1024:]), connstate)
 
     def write(self, data):
         #TODO.... take note of data coming in from audit/log perspective?
@@ -239,13 +248,13 @@ class ConsoleSession(object):
         if datacallback is None:
             self.reaper = eventlet.spawn_after(15, self.destroy)
             self.databuffer = collections.deque([])
-            self.databuffer.append(_handled_consoles[consk].get_recent())
             self.reghdl = _handled_consoles[consk].register_rcpt(self.got_data)
+            self.databuffer.extend(_handled_consoles[consk].get_recent())
         else:
             self.reghdl = _handled_consoles[consk].register_rcpt(datacallback)
-            recdata = _handled_consoles[consk].get_recent()
-            if recdata:
-                datacallback(recdata)
+            for recdata in  _handled_consoles[consk].get_recent():
+                if recdata:
+                    datacallback(recdata)
 
     def destroy(self):
         _handled_consoles[self.ckey].detachuser(self.username)
