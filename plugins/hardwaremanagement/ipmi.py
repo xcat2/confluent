@@ -72,6 +72,7 @@ class IpmiConsole(conapi.Console):
              'secret.managementuser', 'secret.managementpassphrase',
              'hardwaremanagement.manager'])
         connparams = get_conn_params(node, configdata[node])
+        config.decrypt = crypt
         self.username = connparams['username']
         self.password = connparams['passphrase']
         self.kg = connparams['kg']
