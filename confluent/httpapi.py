@@ -259,19 +259,6 @@ def resourcehandler(env, start_response):
             start_response('200 OK', headers)
             yield json.dumps({'session': querydict['session']})
             return  # client has requests to send or receive, not both...
-        elif 'keys' in querydict.keys():
-            # client wishes to push some keys into the remote console
-            input = ""
-            for idx in xrange(0, len(querydict['keys']), 2):
-                input += chr(int(querydict['keys'][idx:idx+2], 16))
-            sessid = querydict['session']
-            if sessid not in consolesessions:
-                start_response('400 Expired Session', headers)
-                return
-            consolesessions[sessid]['expiry'] = time.time() + 90
-            consolesessions[sessid]['session'].write(input)
-            start_response('200 OK', headers)
-            return  # client has requests to send or receive, not both...
         else:  # no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             if sessid not in consolesessions:
