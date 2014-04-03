@@ -280,12 +280,16 @@ def resourcehandler(env, start_response):
             consolesessions[sessid]['expiry'] = time.time() + 90
             outdata = consolesessions[sessid]['session'].get_next_output(
                 timeout=45)
+            if isinstance(outdata, dict):
+                rspdata = outdata
+                rspdata['session'] = querydict['session']
+            else:
+                rspdata = {'session': querydict['session'],
+                           'data': outdata}
             try:
-                rsp = json.dumps({'session': querydict['session'],
-                                  'data': outdata})
+                rsp = json.dumps(rspdata)
             except UnicodeDecodeError:
-                rsp = json.dumps({'session': querydict['session'],
-                                  'data': outdata}, encoding='cp437')
+                rsp = json.dumps(rspdata, encoding='cp437')
             except UnicodeDecodeError:
                 rsp = json.dumps({'session': querydict['session'],
                                   'data': 'DECODEERROR'})
