@@ -136,15 +136,9 @@ class _ConsoleHandler(object):
             if data == conapi.ConsoleEvent.Disconnect:
                 self._got_disconnected()
             return
-        prefix = ''
-        if '\0' in data:  # there is a null in the output
-            # the proper response is to do nothing, but here using it as a cue
-            # that perhaps firmware has reset since that's the only place
-            # observed so far.  Lose the shiftin and app mode when detected
-            prefix = '\x1b[?1l'
-            self.shiftin = None
+        if '\x1b[?1l' in data:  # request for ansi mode cursor keys
             self.appmodedetected = False
-        if '\x1b[?1h' in data:  # remember the session wants the client to be in
+        if '\x1b[?1h' in data:  # remember the session wants the client to use
             # 'application mode'  Thus far only observed on esxi
             self.appmodedetected = True
         if '\x1b)0' in data:
@@ -162,7 +156,7 @@ class _ConsoleHandler(object):
         #   certificate signing request
         if len(self.buffer) > 16384:
             self.flushbuffer()
-        self._send_rcpts(prefix + data)
+        self._send_rcpts(data)
 
     def _send_rcpts(self, data):
         for rcpt in self.rcpts.itervalues():
