@@ -212,32 +212,32 @@ node = {
     'secret.ipmikg': {
         'description': 'Optional Integrity key for IPMI communication'
     },
-    'secret.ipmiuser': {
-        'description': ('The username to use to log into IPMI device related '
-                        'to the node.  For setting username, default behavior '
-                        'is to randomize username, for using username if not '
-                        'set, USERID is assumed'),
-    },
-    'secret.ipmipassphrase': {
-        'description': ('The key to use to authenticate to IPMI device related '
-                        'to the node.  For setting passphrase, default behavior '
-                        'is to randomize passphrase and store it here.  If going '
-                        'to connect over the network and value is not set, '
-                        'PASSW0RD is attempted')
-    },
-#    'secret.managementuser': {
-#        'description': ('Username to be set and used by protocols like SSH and '
-#                        'HTTP where client provides passphrase over the network.'
-#                        'Given the distinct security models betwen this class '
-#                        'of protocols and SNMP and IPMI, snmp and ipmi utilize '
-#                        'dedicated values.'),
+#    'secret.ipmiuser': {
+#        'description': ('The username to use to log into IPMI device related '
+#                        'to the node.  For setting username, default behavior '
+#                        'is to randomize username, for using username if not '
+#                        'set, USERID is assumed'),
 #    },
-#    'secret.managementpassphrase': {
-#        'description': ('Passphrase to be set and used by protocols like SSH '
-#                        'and HTTP, where client sends passphrase over the '
-#                        'network.  Given distinct security models between '
-#                        'this class of protocols, SNMP, and IPMI, SNMP and '
-#                        'IPMI are given their own settings with distinct '
-#                        'behaviors'),
+#    'secret.ipmipassphrase': {
+#        'description': ('The key to use to authenticate to IPMI device related '
+#                        'to the node.  For setting passphrase, default behavior '
+#                        'is to randomize passphrase and store it here.  If going '
+#                        'to connect over the network and value is not set, '
+#                        'PASSW0RD is attempted')
 #    },
+    'secret.hardwaremanagementuser': {
+        'description': ('Username to be set and used by protocols like SSH and '
+                        'HTTP where client provides passphrase over the network.'
+                        'Given the distinct security models betwen this class '
+                        'of protocols and SNMP and IPMI, snmp and ipmi utilize '
+                        'dedicated values.'),
+    },
+    'secret.hardwaremanagementpassphrase': {
+        'description': ('Passphrase to be set and used by protocols like SSH '
+                        'and HTTP, where client sends passphrase over the '
+                        'network.  Given distinct security models between '
+                        'this class of protocols, SNMP, and IPMI, SNMP and '
+                        'IPMI are given their own settings with distinct '
+                        'behaviors'),
+    },
 }

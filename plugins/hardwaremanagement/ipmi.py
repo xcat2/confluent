@@ -31,15 +31,11 @@ def _ipmi_evtloop():
 
 
 def get_conn_params(node, configdata):
-    if 'secret.ipmiuser' in configdata:
-        username = configdata['secret.ipmiuser']['value']
-    elif 'secret.managementuser' in configdata:
+    if 'secret.hardwaremanagementuser' in configdata:
         username = configdata['secret.managementuser']['value']
     else:
         username = 'USERID'
-    if 'secret.ipmipassphrase' in configdata:
-        passphrase = configdata['secret.ipmipassphrase']['value']
-    elif 'secret.managementpassphrase' in configdata:
+    if 'secret.hardwaremanagementpassphrase' in configdata:
         passphrase = configdata['secret.managementpassphrase']['value']
     else:
         passphrase = 'PASSW0RD' # for lack of a better guess
@@ -68,9 +64,9 @@ class IpmiConsole(conapi.Console):
         config.decrypt = True
         self.broken = False
         configdata = config.get_node_attributes([node],
-            ['secret.ipmiuser', 'secret.ipmipassphrase',
-             'secret.managementuser', 'secret.managementpassphrase',
-             'hardwaremanagement.manager'])
+            ['secret.hardwaremanagementuser',
+             'secret.hardwaremanagementpassphrase',
+             'secret.ipmikg', 'hardwaremanagement.manager'])
         connparams = get_conn_params(node, configdata[node])
         config.decrypt = crypt
         self.username = connparams['username']
@@ -121,9 +117,9 @@ class IpmiIterator(object):
         crypt = cfg.decrypt
         cfg.decrypt = True
         configdata = cfg.get_node_attributes(nodes,
-            ['secret.ipmiuser', 'secret.ipmipassphrase',
-             'secret.managementuser', 'secret.managementpassphrase',
-             'hardwaremanagement.manager'])
+            ['secret.hardwaremanagementuser',
+             'secret.hardwaremanagementpassphrase',
+             'secret.ipmikg', 'hardwaremanagement.manager'])
         cfg.decrypt = crypt
         self.gpile = greenpool.GreenPile()
         for node in nodes:
