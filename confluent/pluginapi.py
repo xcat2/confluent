@@ -170,7 +170,7 @@ def create_group(inputdata, configmanager):
         attribmap = {groupname: inputdata}
     except KeyError:
         raise exc.InvalidArgumentException()
-    configmanager.set_group_attributes(attribmap)
+    configmanager.add_group_attributes(attribmap)
 
 
 def create_node(inputdata, configmanager):
@@ -180,7 +180,7 @@ def create_node(inputdata, configmanager):
         attribmap = {nodename: inputdata}
     except KeyError:
         raise exc.InvalidArgumentException()
-    configmanager.set_node_attributes(attribmap)
+    configmanager.add_node_attributes(attribmap)
 
 
 def enumerate_collections(collections):

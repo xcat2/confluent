@@ -12,6 +12,7 @@ import confluent.exceptions as exc
 import confluent.messages
 import confluent.pluginapi as pluginapi
 import confluent.util as util
+import copy
 import eventlet
 import json
 import traceback
@@ -289,6 +290,7 @@ def resourcehandler(env, start_response):
         url = url.replace('.json', '')
         url = url.replace('.html', '')
         resource = '.' + url[url.rindex('/'):]
+        lquerydict = copy.deepcopy(querydict)
         try:
             hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
@@ -303,7 +305,7 @@ def resourcehandler(env, start_response):
             return
         pagecontent = ""
         if mimetype == 'text/html':
-            for datum in _assemble_html(hdlr, resource, querydict, url):
+            for datum in _assemble_html(hdlr, resource, lquerydict, url):
                 pagecontent += datum
         else:
             for datum in _assemble_json(hdlr, resource, url):
