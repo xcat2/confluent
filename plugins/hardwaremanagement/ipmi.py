@@ -32,11 +32,11 @@ def _ipmi_evtloop():
 
 def get_conn_params(node, configdata):
     if 'secret.hardwaremanagementuser' in configdata:
-        username = configdata['secret.managementuser']['value']
+        username = configdata['secret.hardwaremanagementuser']['value']
     else:
         username = 'USERID'
     if 'secret.hardwaremanagementpassphrase' in configdata:
-        passphrase = configdata['secret.managementpassphrase']['value']
+        passphrase = configdata['secret.hardwaremanagementpassphrase']['value']
     else:
         passphrase = 'PASSW0RD' # for lack of a better guess
     if 'hardwaremanagement.manager' in configdata:
