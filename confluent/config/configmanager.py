@@ -373,6 +373,11 @@ class ConfigManager(object):
             if 'main' not in _cfgstore:
                  _cfgstore['main'] = {}
             self._cfgstore  = _cfgstore['main']
+            if 'groups' not in self._cfgstore:
+                self._cfgstore['groups'] = {'everything': {'nodes': set()}}
+            if 'nodes' not in self._cfgstore:
+                self._cfgstore['nodes'] = {}
+            self._bg_sync_to_file()
             return
         elif 'tenant' not in _cfgstore:
             _cfgstore['tenant'] = {tenant: {}}
@@ -386,6 +391,7 @@ class ConfigManager(object):
             self._cfgstore['groups'] = {'everything': {}}
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}
+        self._bg_sync_to_file()
 
     def watch_attributes(self, nodes, attributes, callback):
         """
@@ -694,7 +700,7 @@ class ConfigManager(object):
             group = group.encode('utf-8')
             _mark_dirtykey('groups', group, self.tenant)
             if group not in self._cfgstore['groups']:
-                self._cfgstore['groups'][group] = {'nodes': set([])}
+                self._cfgstore['groups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['groups'][group]
             for attr in attribmap[group].iterkeys():
                 newdict = {}
