@@ -57,16 +57,18 @@ def get_conn_params(node, configdata):
         'port': 623,
     }
 
+_configattributes = ('secret.hardwaremanagementuser',
+             'secret.hardwaremanagementpassphrase',
+             'secret.ipmikg', 'hardwaremanagement.manager')
 
 class IpmiConsole(conapi.Console):
+    configattributes = frozenset(_configattributes)
+
     def __init__(self, node, config):
         crypt = config.decrypt
         config.decrypt = True
         self.broken = False
-        configdata = config.get_node_attributes([node],
-            ['secret.hardwaremanagementuser',
-             'secret.hardwaremanagementpassphrase',
-             'secret.ipmikg', 'hardwaremanagement.manager'])
+        configdata = config.get_node_attributes([node], _configattributes)
         connparams = get_conn_params(node, configdata[node])
         config.decrypt = crypt
         self.username = connparams['username']
@@ -77,10 +79,14 @@ class IpmiConsole(conapi.Console):
         self.connected = False
         # Cannot actually create console until 'connect', when we get callback
 
+    def __del__(self):
+        self.solconnection = None
+
     def handle_data(self, data):
         if type(data) == dict:
             disconnect = frozenset(('Session Disconnected', 'timeout'))
             if 'error' in data and data['error'] in disconnect:
+                self.solconnection = None
                 self.broken = True
                 self.error = data['error']
                 if self.connected:
@@ -92,6 +98,9 @@ class IpmiConsole(conapi.Console):
 
     def connect(self,callback):
         self.datacallback = callback
+        # we provide a weak reference to pyghmi as otherwise we'd
+        # have a circular reference and reference counting would never get
+        # out...
         try:
             self.solconnection = console.Console(bmc=self.bmc, port=self.port,
                                                 userid=self.username,
@@ -102,11 +111,21 @@ class IpmiConsole(conapi.Console):
                 w = eventlet.event.Event()
                 _ipmiwaiters.append(w)
                 w.wait()
+                if self.broken:
+                    break
             if self.broken:
                 raise exc.TargetEndpointUnreachable(self.error)
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))
 
+
+    def close(self):
+        if hasattr(self, 'solconnection') and self.solconnection is not None:
+            # break the circular reference here
+            self.solconnection.out_handler = None
+        self.solconnection = None
+        self.broken = True
+        self.error = "closed"
 
     def write(self, data):
         self.solconnection.send_data(data)
@@ -116,10 +135,7 @@ class IpmiIterator(object):
     def __init__(self, operator, nodes, element, cfg, inputdata):
         crypt = cfg.decrypt
         cfg.decrypt = True
-        configdata = cfg.get_node_attributes(nodes,
-            ['secret.hardwaremanagementuser',
-             'secret.hardwaremanagementpassphrase',
-             'secret.ipmikg', 'hardwaremanagement.manager'])
+        configdata = cfg.get_node_attributes(nodes, _configattributes)
         cfg.decrypt = crypt
         self.gpile = greenpool.GreenPile()
         for node in nodes:

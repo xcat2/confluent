@@ -18,6 +18,8 @@ import random
 
 _handled_consoles = {}
 
+_genwatchattribs = frozenset(('console.method',))
+
 
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
@@ -39,10 +41,17 @@ class _ConsoleHandler(object):
             self.shiftin = '0'
         self.users = {}
         self.connectstate = 'connecting'
+        self._attribwatcher = None
+        self._console = None
         eventlet.spawn(self._connect)
 
+    def _attribschanged(self, **kwargs):
+        eventlet.spawn(self._connect)
 
     def _connect(self):
+        if self._console:
+            self._console.close()
+            self._console = None
         self.connectstate = 'connecting'
         self._send_rcpts({'connectstate': self.connectstate})
         if self.reconnect:
@@ -51,6 +60,15 @@ class _ConsoleHandler(object):
         self._console = plugin.handle_path(
             "/nodes/%s/_console/session" % self.node,
             "create", self.cfgmgr)
+        if self._attribwatcher:
+            self.cfgmgr.remove_watcher(self._attribwatcher)
+            self._attribwatcher = None
+        if hasattr(self._console, "configattributes"):
+            attribstowatch = self._console.configattributes | _genwatchattribs
+        else:
+            attribstowatch = _genwatchattribs
+        self.cfgmgr.watch_attributes((self.node,), attribstowatch,
+                                     self._attribschanged)
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointUnreachable:
