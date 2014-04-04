@@ -229,7 +229,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 nodes=None, element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata)
-    elif pathcomponents[0] in ('nodes', 'system', 'vm'):
+    elif pathcomponents[0] == 'nodes':
         #single node request of some sort
         try:
             node = pathcomponents[1]
