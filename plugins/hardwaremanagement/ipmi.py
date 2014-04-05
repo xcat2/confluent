@@ -61,6 +61,12 @@ _configattributes = ('secret.hardwaremanagementuser',
              'secret.hardwaremanagementpassphrase',
              'secret.ipmikg', 'hardwaremanagement.manager')
 
+def _donothing(data):
+    # a dummy function to avoid some awkward exceptions from
+    # zombie pyghmi console objects
+    pass
+
+
 class IpmiConsole(conapi.Console):
     configattributes = frozenset(_configattributes)
 
@@ -122,7 +128,7 @@ class IpmiConsole(conapi.Console):
     def close(self):
         if hasattr(self, 'solconnection') and self.solconnection is not None:
             # break the circular reference here
-            self.solconnection.out_handler = None
+            self.solconnection.out_handler = _donothing
         self.solconnection = None
         self.broken = True
         self.error = "closed"

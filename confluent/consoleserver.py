@@ -43,12 +43,19 @@ class _ConsoleHandler(object):
         self.connectstate = 'connecting'
         self._attribwatcher = None
         self._console = None
+        self.connectionthread = None
         eventlet.spawn(self._connect)
 
     def _attribschanged(self, **kwargs):
         eventlet.spawn(self._connect)
 
     def _connect(self):
+        if self.connectionthread:
+            self.connectionthread.kill()
+            self.connectionthread = None
+        self.connectionthread = eventlet.spawn(self._connect_backend)
+
+    def _connect_backend(self):
         if self._console:
             self._console.close()
             self._console = None
@@ -67,16 +74,16 @@ class _ConsoleHandler(object):
             attribstowatch = self._console.configattributes | _genwatchattribs
         else:
             attribstowatch = _genwatchattribs
-        self.cfgmgr.watch_attributes((self.node,), attribstowatch,
-                                     self._attribschanged)
+        self._attribwatcher = self.cfgmgr.watch_attributes(
+            (self.node,), attribstowatch, self._attribschanged)
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointUnreachable:
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate})
             retrytime = 30 + (30 * random.random())
-            print "Console was unreachable, waiting %d seconds..." % retrytime
-            self.reconnect = eventlet.spawn_after(retrytime, self._connect)
+            if not self.reconnect:
+                self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
         self._got_connected()
 
