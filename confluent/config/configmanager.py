@@ -788,8 +788,7 @@ class ConfigManager(object):
             if group in self._cfgstore['groups']:
                 self._sync_nodes_to_group(group=group, nodes=[],
                                           changeset=changeset)
-                _mark_dirtykey('groups', group, self.tenant,
-                               changeset=changeset)
+                _mark_dirtykey('groups', group, self.tenant)
                 del self._cfgstore['groups'][group]
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
