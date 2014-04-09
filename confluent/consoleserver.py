@@ -80,6 +80,7 @@ class _ConsoleHandler(object):
         self._console = plugin.handle_path(
             "/nodes/%s/_console/session" % self.node,
             "create", self.cfgmgr)
+        self.send_break = self._console.send_break
         if self._attribwatcher:
             self.cfgmgr.remove_watcher(self._attribwatcher)
             self._attribwatcher = None
@@ -287,6 +288,9 @@ class ConsoleSession(object):
             for recdata in  _handled_consoles[consk].get_recent():
                 if recdata:
                     datacallback(recdata)
+
+    def send_break(self):
+        self.conshdl.send_break()
 
     def destroy(self):
         _handled_consoles[self.ckey].detachuser(self.username)

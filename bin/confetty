@@ -344,10 +344,25 @@ def exit(code=0):
     if consoleonly:
         sys.exit(code)
     else:
-        tlvdata.send(session.connection, {'operation': 'stop', 'path': currconsole})
+        tlvdata.send(session.connection, {'operation': 'stop',
+                                          'path': currconsole})
         inconsole = False
 
 def conserver_command(fh, command):
+    # x - conserver has that as 'show baud', I am inclined to replace that with
+    #     'request exclusive'
+    # b - conserver has that as 'broadcast message', I'm tempted to use that
+    #     for break
+    # r - replay
+    # p - replay (this is the one I've always used)
+    # f - force attach read/write
+    # a - attach read/write
+    # s - spy mode
+    # l[n] - send a particular break, tempted to do l0 for compatibility
+    # o - reopen tty, this should mean reconnect console
+    # d - down a console... never used this...
+    # L - toggle logging
+    # w - who is on console
     while not command:
         ready, _, _ = select.select((fh,), (), (), 1)
         if ready:
@@ -355,9 +370,14 @@ def conserver_command(fh, command):
     if command[0] == '.':
         print("disconnect]\r")
         exit()
+    if command[0] == 'b':
+        tlvdata.send(session.connection, {'operation': 'break',
+                                          'path': currconsole})
+        print("break sent]\r")
     elif command[0] == '?':
         print("help]\r")
         print(".    disconnect\r")
+        print("b    break\r")
         print("<cr> abort command\r")
     elif command[0] == '\x0d':
         print("ignored]\r")

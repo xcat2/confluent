@@ -150,6 +150,9 @@ class IpmiConsole(conapi.Console):
     def write(self, data):
         self.solconnection.send_data(data)
 
+    def send_break(self):
+        self.solconnection.send_break()
+
 
 class IpmiIterator(object):
     def __init__(self, operator, nodes, element, cfg, inputdata):

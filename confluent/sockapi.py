@@ -131,6 +131,9 @@ def process_request(connection, request, cfm, authdata, authname):
                         if data['operation'] == 'stop':
                             consession.destroy()
                             return
+                        elif data['operation'] == 'break':
+                            consession.send_break()
+                            continue
                         else:
                             raise Exception("TODO")
                     if not data:
