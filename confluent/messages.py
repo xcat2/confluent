@@ -164,7 +164,7 @@ class ChildCollection(LinkRelation):
 def get_input_message(path, operation, inputdata, nodes=None):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
-    elif path[0] == 'attributes' and operation != 'retrieve':
+    elif path[0] in ('attributes', 'users') and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
@@ -326,7 +326,7 @@ class PowerState(ConfluentChoiceMessage):
 
 
 class Attributes(ConfluentMessage):
-    def __init__(self, node=None, kv=None, desc=''):
+    def __init__(self, name=None, kv=None, desc=''):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
@@ -334,11 +334,11 @@ class Attributes(ConfluentMessage):
                 nkv[key] = {'value': kv[key]}
             else:
                 nkv[key] = kv[key]
-        if node is None:
+        if name is None:
             self.kvpairs = nkv
         else:
             self.kvpairs = {
-                node: nkv
+                name: nkv
             }
 
 

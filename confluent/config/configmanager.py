@@ -98,6 +98,7 @@ def _mkpath(pathname):
 def _derive_keys(passphrase, salt):
     #implement our specific combination of pbkdf2 transforms to get at
     #key.  We bump the iterations up because we can afford to
+    #TODO: WORKERPOOL PBKDF2 is expensive
     tmpkey = kdf.PBKDF2(passphrase, salt, 32, 50000,
                         lambda p, s: HMAC.new(p, s, SHA256).digest())
     finalkey = kdf.PBKDF2(tmpkey, salt, 32, 50000,
@@ -246,7 +247,8 @@ def set_global(globalname, value):
 
 
 def _mark_dirtykey(category, key, tenant=None):
-    key = key.encode('utf-8')
+    if type(key) in (str, unicode):
+        key = key.encode('utf-8')
     with _dirtylock:
         if 'dirtykeys' not in _cfgstore:
             _cfgstore['dirtykeys'] = {}
@@ -261,11 +263,11 @@ def _generate_new_id():
     # generate a random id outside the usual ranges used for norml users in
     # /etc/passwd.  Leave an equivalent amount of space near the end disused,
     # just in case
-    id = confluent.util.securerandomnumber(65537, 4294901759)
-    if 'idmap' not in _cfgstore:
+    id = str(confluent.util.securerandomnumber(65537, 4294901759))
+    if 'idmap' not in _cfgstore['main']:
         return id
-    while id in _cfgstore['idmap']:
-        id = confluent.util.securerandomnumber(65537, 4294901759)
+    while id in _cfgstore['main']['idmap']:
+        id = str(confluent.util.securerandomnumber(65537, 4294901759))
     return id
 
 class _ExpressionFormat(string.Formatter):
@@ -483,6 +485,9 @@ class ConfigManager(object):
         del self._notifierids[watcher]
 
 
+    def list_users(self):
+        return self._cfgstore['users'].iterkeys()
+
     def get_user(self, name):
         """Get user information from DB
 
@@ -509,11 +514,21 @@ class ConfigManager(object):
         user = self._cfgstore['users'][name]
         _mark_dirtykey('users', name, self.tenant)
         for attribute in attributemap:
-            user[attribute] = attributemap[attribute]
+            if attribute == 'passphrase':
+                salt = os.urandom(8)
+                #TODO: WORKERPOOL, offload password set to a worker
+                crypted = kdf.PBKDF2(
+                    attributemap[attribute], salt, 32, 10000,
+                    lambda p, s: HMAC.new(p, s, SHA256).digest()
+                    )
+                user['cryptpass'] = (salt, crypted)
+            else:
+                user[attribute] = attributemap[attribute]
         self._bg_sync_to_file()
 
     def create_user(self, name,
-                    role="Administrator", id=None, displayname=None):
+                    role="Administrator", id=None, displayname=None,
+                    attributemap=None):
         """Create a new user
 
         :param name: The login name of the user
@@ -526,7 +541,7 @@ class ConfigManager(object):
         if id is None:
             id = _generate_new_id()
         else:
-            if id in _cfgstore['idmap']:
+            if id in _cfgstore['main']['idmap']:
                 raise Exception("Duplicate id requested")
         if 'users' not in self._cfgstore:
             self._cfgstore['users'] = { }
@@ -537,13 +552,15 @@ class ConfigManager(object):
         self._cfgstore['users'][name] = {'id': id}
         if displayname is not None:
             self._cfgstore['users'][name]['displayname'] = displayname
-        if 'idmap' not in _cfgstore:
-            _cfgstore['idmap'] = {}
+        if 'idmap' not in _cfgstore['main']:
+            _cfgstore['main']['idmap'] = {}
         _mark_dirtykey('idmap', id)
-        _cfgstore['idmap'][id] = {
+        _cfgstore['main']['idmap'][id] = {
             'tenant': self.tenant,
             'username': name
             }
+        if attributemap is not None:
+            self.set_user(name, attributemap)
         self._bg_sync_to_file()
 
     def is_node(self, node):
@@ -555,7 +572,7 @@ class ConfigManager(object):
     def get_groups(self):
         return self._cfgstore['groups'].iterkeys()
 
-    def get_nodes(self):
+    def list_nodes(self):
         return self._cfgstore['nodes'].iterkeys()
 
     def get_nodegroup_attributes(self, nodegroup, attributes=[]):

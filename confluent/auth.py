@@ -92,26 +92,6 @@ def authorize(name, element, tenant=False, access='rw'):
     return None
 
 
-def set_user_passphrase(name, passphrase, tenant=None):
-    """Set user passphrase
-
-    :param name: The unique shortname of the user
-    :param passphrase: The passphrase to set for given user
-    :param tenant: The tenant to which the user belongs.
-    """
-    # TODO(jbjohnso): WORKERPOOL
-    # When worker pool implemented, hand off the
-    # PBKDF2 to a worker instead of blocking
-    user, tenant = _get_usertenant(name, tenant)
-    _passcache[(user, tenant)] = passphrase
-    salt = os.urandom(8)
-    crypted = kdf.PBKDF2(passphrase, salt, 32, 10000,
-                         lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest()
-                         )
-    cfm = configmanager.ConfigManager(tenant)
-    cfm.set_user(name, {'cryptpass': (salt, crypted)})
-
-
 def check_user_passphrase(name, passphrase, element=None, tenant=False):
     """Check a a login name and passphrase for authenticity and authorization
 

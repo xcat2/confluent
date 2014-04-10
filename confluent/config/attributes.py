@@ -61,6 +61,11 @@ nic = {
     },
 }
 
+user = {
+    'passphrase': {
+        'description':  'The passphrase used to authenticate this user'
+    },
+}
 
 # 'node', which can be considered a 'system' or a 'vm'
 node = {

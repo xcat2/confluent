@@ -313,7 +313,7 @@ def setvalues(attribs):
     else:  # an actual resource
         resource = attribs[0]
         attribs = attribs[1:]
-    keydata = paramaterize_attribs(attribs)
+    keydata = parameterize_attribs(attribs)
     if not keydata:
         return
     targpath = fullpath_target(resource)

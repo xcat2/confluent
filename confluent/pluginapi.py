@@ -32,6 +32,7 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
+import confluent.config.attributes as attrscheme
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
@@ -73,7 +74,7 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-rootcollections = ['nodes/', 'groups/']
+rootcollections = ['nodes/', 'groups/', 'users/']
 
 
 class PluginRoute(object):
@@ -117,15 +118,47 @@ nodegroupresources = {
 }
 
 
+def create_user(inputdata, configmanager):
+    try:
+        username = inputdata['name']
+        del inputdata['name']
+    except (KeyError, ValueError):
+        raise exc.InvalidArgumentException()
+    configmanager.create_user(username, attributemap=inputdata)
+
+
+def update_user(name, attribmap, configmanager):
+    try:
+        configmanager.set_user(name, attribmap)
+    except ValueError:
+        raise exc.InvalidArgumentException()
+
+def show_user(name, configmanager):
+    userobj = configmanager.get_user(name)
+    rv = {}
+    for attr in attrscheme.user.iterkeys():
+        rv[attr] = None
+        if attr == 'passphrase':
+            if 'cryptpass' in userobj:
+                rv['passphrase'] = {'cryptvalue': True}
+            yield msg.CryptedAttributes(kv={'passphrase': rv['passphrase']},
+                                        desc=attrscheme.user[attr]['description'])
+        else:
+            if attr in userobj:
+                rv[attr] = userobj[attr]
+            yield msg.Attributes(kv={attr: rv[attr]},
+                                 desc=attrscheme.user[attr]['description'])
+
+
 def stripnode(iterablersp, node):
     for i in iterablersp:
         i.strip_node(node)
         yield i
 
 
-def iterate_collections(iterable):
+def iterate_collections(iterable, forcecollection=True):
     for coll in iterable:
-        if coll[-1] != '/':
+        if forcecollection and coll[-1] != '/':
             coll = coll + '/'
         yield msg.ChildCollection(coll, candelete=True)
 
@@ -166,7 +199,7 @@ def enumerate_nodegroup_collection(collectionpath, configmanager):
 
 def enumerate_node_collection(collectionpath, configmanager):
     if collectionpath == ['nodes']:  # it is just '/node/', need a list of nodes
-        return iterate_collections(configmanager.get_nodes())
+        return iterate_collections(configmanager.list_nodes())
     node = collectionpath[1]
     if not configmanager.is_node(node):
         raise exc.NotFoundException("Invalid element requested")
@@ -256,7 +289,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
             if operation == "create":
                 inputdata = msg.InputAttributes(pathcomponents, inputdata)
                 create_node(inputdata.attribs, configmanager)
-            return iterate_collections(configmanager.get_nodes())
+            return iterate_collections(configmanager.list_nodes())
         if len(pathcomponents) == 2:
             iscollection = True
         if iscollection:
@@ -296,5 +329,24 @@ def handle_path(path, operation, configmanager, inputdata=None):
             return passvalue
         else:
             return stripnode(passvalue, node)
+    elif pathcomponents[0] == 'users':
+        try:
+            user = pathcomponents[1]
+        except IndexError: # it's just users/
+            if operation == 'create':
+                inputdata = msg.get_input_message(
+                    pathcomponents, operation, inputdata)
+                create_user(inputdata.attribs, configmanager)
+            return iterate_collections(configmanager.list_users(), forcecollection=False)
+        inputdata = msg.get_input_message(
+            pathcomponents, operation, inputdata)
+        if operation == 'retrieve':
+            return show_user(user, configmanager)
+        elif operation == 'delete':
+            delete_user(user, configmanager)
+            return show_user(user, configmanager)
+        elif operation == 'update':
+            update_user(user, inputdata.attribs, configmanager)
+            return show_user(user, configmanager)
     else:
         raise exc.NotFoundException()
