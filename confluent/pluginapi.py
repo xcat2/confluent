@@ -225,6 +225,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 inputdata = msg.InputAttributes(pathcomponents, inputdata)
                 create_group(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.get_groups())
+        if len(pathcomponents) == 2:
+            iscollection = True
         if iscollection:
             if operation == "delete":
                 return delete_nodegroup_collection(pathcomponents, configmanager)
