@@ -109,6 +109,9 @@ valid_commands = [
     'set',
     'unset',
     'create',
+    'remove',
+    'rm',
+    'delete',
 ]
 
 candidates = None
@@ -255,10 +258,34 @@ def do_command(command, server):
         return
     elif argv[0] == 'set':
         setvalues(argv[1:])
+    elif argv[0] == 'create':
+        createresource(argv[1:])
+    elif argv[0] in ('rm', 'delete', 'remove'):
+        delresource(argv[1])
     elif argv[0] in ('unset', 'clear'):
         clearvalues(argv[1], argv[2:])
     else:
         sys.stderr.write("%s: command not found...\n" % argv[0])
+
+
+def createresource(args):
+    resname = args[0]
+    attribs = args[1:]
+    keydata = parameterize_attribs(attribs)
+    if keydata is None:
+        return
+    targpath = fullpath_target(resname)
+    collection, _, resname = targpath.rpartition('/')
+    keydata['name'] = resname
+    makecall(session.create, (collection, keydata))
+
+
+def makecall(callout, args):
+    for response in callout(*args):
+        if 'error' in response:
+            if 'errorcode' in response:
+                exitcode = response['errorcode']
+            sys.stderr.write('Error: ' + response['error'] + '\n')
 
 
 def clearvalues(resource, attribs):
@@ -273,6 +300,10 @@ def clearvalues(resource, attribs):
             sys.stderr.write('Error: ' + res['error'] + '\n')
 
 
+def delresource(resname):
+    resname = fullpath_target(resname)
+    makecall(session.delete, (resname,))
+
 def setvalues(attribs):
     if '=' in attribs[0]:  # going straight to attribute
         resource = attribs[0][:attribs[0].index("=")]
@@ -282,14 +313,9 @@ def setvalues(attribs):
     else:  # an actual resource
         resource = attribs[0]
         attribs = attribs[1:]
-    keydata = {}
-    for attrib in attribs:
-        if '=' not in attrib:
-            sys.stderr.write("Invalid syntax %s" % attrib)
-            return
-        key = attrib[:attrib.index("=")]
-        value = attrib[attrib.index("=") + 1:]
-        keydata[key] = value
+    keydata = paramaterize_attribs(attribs)
+    if not keydata:
+        return
     targpath = fullpath_target(resource)
     for res in session.update(targpath, keydata):
         if 'error' in res:
@@ -297,6 +323,18 @@ def setvalues(attribs):
                 exitcode = res['errorcode']
             sys.stderr.write('Error: ' + res['error'] + '\n')
 
+def parameterize_attribs(attribs):
+    keydata = {}
+    for attrib in attribs:
+        if '=' not in attrib:
+            sys.stderr.write("Invalid syntax %s\n" % attrib)
+            return None
+        key = attrib[:attrib.index("=")]
+        value = attrib[attrib.index("=") + 1:]
+        if key == 'groups':
+            value = value.split(',')
+        keydata[key] = value
+    return keydata
 
 
 def fullpath_target(path, forcepath=False):

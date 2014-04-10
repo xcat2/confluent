@@ -246,6 +246,7 @@ def set_global(globalname, value):
 
 
 def _mark_dirtykey(category, key, tenant=None):
+    key = key.encode('utf-8')
     with _dirtylock:
         if 'dirtykeys' not in _cfgstore:
             _cfgstore['dirtykeys'] = {}
@@ -787,6 +788,7 @@ class ConfigManager(object):
                 watcher(added=[], deleting=nodes, configmanager=self)
         changeset = {}
         for node in nodes:
+            node = node.encode('utf-8')
             if node in self._cfgstore['nodes']:
                 self._sync_groups_to_node(node=node, groups=[],
                                           changeset=changeset)
@@ -849,6 +851,7 @@ class ConfigManager(object):
         # first do a sanity check of the input upfront
         # this mitigates risk of arguments being partially applied
         for node in attribmap.iterkeys():
+            node = node.encode('utf-8')
             if autocreate is False and node not in self._cfgstore['nodes']:
                 raise ValueError("node {0} does not exist".format(node))
             for attrname in attribmap[node].iterkeys():

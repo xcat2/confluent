@@ -255,6 +255,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 inputdata = msg.InputAttributes(pathcomponents, inputdata)
                 create_node(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.get_nodes())
+        if len(pathcomponents) == 2:
+            iscollection = True
         if iscollection:
             if operation == "delete":
                 return delete_node_collection(pathcomponents, configmanager)
