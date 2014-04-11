@@ -172,6 +172,10 @@ def iterate_resources(fancydict):
         yield msg.ChildCollection(resource)
 
 
+def delete_user(user, configmanager):
+    configmanager.del_user(user)
+    yield msg.DeletedResource(user)
+
 def delete_nodegroup_collection(collectionpath, configmanager):
     if len(collectionpath) == 2:  # just the nodegroup
         group = collectionpath[-1]
@@ -330,6 +334,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
         else:
             return stripnode(passvalue, node)
     elif pathcomponents[0] == 'users':
+        #TODO: when non-administrator accounts exist,
+        # they must only be allowed to see their own user
         try:
             user = pathcomponents[1]
         except IndexError: # it's just users/
@@ -338,14 +344,13 @@ def handle_path(path, operation, configmanager, inputdata=None):
                     pathcomponents, operation, inputdata)
                 create_user(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.list_users(), forcecollection=False)
-        inputdata = msg.get_input_message(
-            pathcomponents, operation, inputdata)
         if operation == 'retrieve':
             return show_user(user, configmanager)
         elif operation == 'delete':
-            delete_user(user, configmanager)
-            return show_user(user, configmanager)
+            return delete_user(user, configmanager)
         elif operation == 'update':
+            inputdata = msg.get_input_message(
+                pathcomponents, operation, inputdata)
             update_user(user, inputdata.attribs, configmanager)
             return show_user(user, configmanager)
     else:

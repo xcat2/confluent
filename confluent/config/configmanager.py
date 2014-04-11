@@ -526,6 +526,13 @@ class ConfigManager(object):
                 user[attribute] = attributemap[attribute]
         self._bg_sync_to_file()
 
+    def del_user(self, name):
+        changeset = {}
+        if name in self._cfgstore['users']:
+            _mark_dirtykey('users', name, self.tenant)
+            del self._cfgstore['users'][name]
+        self._bg_sync_to_file()
+
     def create_user(self, name,
                     role="Administrator", id=None, displayname=None,
                     attributemap=None):
@@ -992,7 +999,6 @@ class ConfigManager(object):
                         del globalf[globalkey]
             globalf.close()
         if 'dirtykeys' in _cfgstore:
-            #with lock:
             with _dirtylock:
                 currdirt = copy.deepcopy(_cfgstore['dirtykeys'])
                 del _cfgstore['dirtykeys']

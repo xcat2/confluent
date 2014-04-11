@@ -184,10 +184,10 @@ def do_command(command, server):
     global currconsole
     global currchildren
     exitcode = 0
-    command = command.lower()
     argv = parse_command(command)
     if len(argv) == 0:
         return
+    argv[0] = argv[0].lower()
     if argv[0] == 'exit':
         sys.exit(0)
     elif argv[0] == 'cd':
