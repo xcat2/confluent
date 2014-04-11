@@ -344,6 +344,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
                     pathcomponents, operation, inputdata)
                 create_user(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.list_users(), forcecollection=False)
+        if user not in configmanager.list_users():
+            raise exc.NotFoundException("Invalid user %s" % user)
         if operation == 'retrieve':
             return show_user(user, configmanager)
         elif operation == 'delete':
