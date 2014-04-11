@@ -11,6 +11,9 @@
     -keystone?
     -ad? (specialized to the AD case)
 -expressionkeys never gets smaller - perf impact
+-When a user account is changed, have httpapi and sockapi notified of changes
+ to kill off related sessions.  password changes are given a pass, but user
+ deletion will result in immediate session termination
 -need event notification for config change- e.g. set attribute triggers consol
  session object check to see if credentials changed
  design is that calling code on init registers a callback for related node to
