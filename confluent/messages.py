@@ -21,7 +21,27 @@ import confluent.exceptions as exc
 import json
 
 
+def _htmlify_structure(indict):
+    ret = "<ul>"
+    if isinstance(indict, dict):
+        for key in indict.iterkeys():
+            ret += "<li>{0}: ".format(key)
+            if type(indict[key]) in (str, unicode):
+                ret += indict[key]
+            else:
+                ret += _htmlify_structure(indict[key])
+    elif isinstance(indict, list):
+        if type(indict[0]) in (str, unicode):
+            ret += ",".join(indict)
+        else:
+            for v in indict:
+                ret += _htmlify_structure(v)
+    return ret + '</ul>'
+
+
+
 class ConfluentMessage(object):
+    readonly = False
     defaultvalue = ''
     defaulttype = 'text'
 
@@ -72,24 +92,31 @@ class ConfluentMessage(object):
                 value = '********'
             if isinstance(val, list):
                 snippet += key + ":"
-                if len(val) == 0:
+                if len(val) == 0 and not self.readonly:
                     snippet += ('<input type="{0}" name="{1}" value="" '
                                 ' "title="{2}">'
                                 ).format(type, key, self.desc)
                 for v in val:
-                    snippet += ('<input type="{0}" name="{1}" value="{2}" '
-                                ' "title="{3}">'
-                                ).format(type, key, v, self.desc)
-                snippet += (
-                    '<input type="{0}" name="{1}" value="" title="{2}">'
-                    '<input type="checkbox" name="restexplorerhonorkey" '
-                    'value="{1}">').format(type, key, self.desc)
+                    if self.readonly:
+                        snippet += _htmlify_structure(v)
+                    else:
+                        snippet += ('<input type="{0}" name="{1}" value="{2}" '
+                                    ' "title="{3}">'
+                                    ).format(type, key, v, self.desc)
+                if not self.readonly:
+                    snippet += (
+                        '<input type="{0}" name="{1}" value="" title="{2}">'
+                        '<input type="checkbox" name="restexplorerhonorkey" '
+                        'value="{1}">').format(type, key, self.desc)
                 return snippet
-            snippet += (key + ":" +
-                        '<input type="{0}" name="{1}" value="{2}" '
-                        'title="{3}"><input type="checkbox" '
-                        'name="restexplorerhonorkey" value="{1}">'
-                        ).format(type, key, value, self.desc)
+            if self.readonly:
+                snippet += "{0}: {1}".format(key, value)
+            else:
+                snippet += (key + ":" +
+                            '<input type="{0}" name="{1}" value="{2}" '
+                            'title="{3}"><input type="checkbox" '
+                            'name="restexplorerhonorkey" value="{1}">'
+                            ).format(type, key, value, self.desc)
             if len(notes) > 0:
                 snippet += '(' + ','.join(notes) + ')'
         return snippet
@@ -324,6 +351,45 @@ class PowerState(ConfluentChoiceMessage):
             }
         }
 
+
+class SensorReadings(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, sensors=[], name=None):
+        readings = []
+        for sensor in sensors:
+            sensordict = {'name': sensor['name']}
+            if 'value' in sensor:
+                sensordict['value'] = sensor['value']
+            if 'units' in sensor:
+                sensordict['units'] = sensor['units']
+            if 'states' in sensor:
+                sensordict['states'] = sensor['states']
+            if 'health' in sensor:
+                sensordict['health'] = sensor['health']
+            readings.append(sensordict)
+        if name is None:
+            self.kvpairs = {'sensors': readings}
+        else:
+            self.kvpairs = {name: {'sensors': readings}}
+
+
+class HealthSummary(ConfluentMessage):
+    readonly = True
+    valid_values = set([
+        'ok',
+        'warning',
+        'critical',
+        'failed',
+    ])
+
+    def __init__(self, health, name=None):
+        if health not in self.valid_values:
+            raise ValueError("%d is not a valid health state" % health)
+        if name is None:
+            self.kvpairs = {'health': {'value': health}}
+        else:
+            self.kvpairs = {name: {'health': {'value': health}}}
 
 class Attributes(ConfluentMessage):
     def __init__(self, name=None, kv=None, desc=''):

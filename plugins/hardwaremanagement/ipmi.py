@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.messages as msg
@@ -21,7 +20,7 @@ import eventlet.event
 import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
 import eventlet.queue
-import os
+import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
@@ -156,6 +155,7 @@ class IpmiConsole(conapi.Console):
 
 class IpmiIterator(object):
     def __init__(self, operator, nodes, element, cfg, inputdata):
+        self.currdata = None
         crypt = cfg.decrypt
         cfg.decrypt = True
         configdata = cfg.get_node_attributes(nodes, _configattributes)
@@ -168,10 +168,15 @@ class IpmiIterator(object):
         return self
 
     def next(self):
-        ndata = self.gpile.next()
+        if self.currdata is None:
+            self.currdata = self.gpile.next()
         # need to apply any translations between pyghmi and confluent
-        return ndata
-
+        try:
+            retdata = self.currdata.next()
+        except AttributeError:
+            retdata = self.currdata
+            self.currdata = None
+        return retdata
 
 def perform_request(operator, node, element, configdata, inputdata):
     return IpmiHandler(operator, node, element, configdata, inputdata).handle_request()
@@ -220,6 +225,41 @@ class IpmiHandler(object):
             return self.power()
         elif self.element == [ 'boot', 'nextdevice' ]:
             return self.bootdevice()
+        elif self.element == [ 'health', 'hardware' ]:
+            return self.health()
+
+    def _str_health(self, health):
+        if pygconstants.Health.Failed & health:
+            health = 'failed'
+        elif pygconstants.Health.Critical & health:
+            health = 'critical'
+        elif pygconstants.Health.Warning & health:
+            health = 'warning'
+        else:
+            health = 'ok'
+        return health
+
+    def _dict_sensor(self, pygreading):
+        retdict = {}
+        retdict['name'] = pygreading.name
+        retdict['value'] = pygreading.value
+        retdict['states'] = pygreading.states
+        retdict['health'] = self._str_health(pygreading.health)
+        return retdict
+
+    def health(self):
+        if 'read' == self.op:
+            response = self.ipmicmd.get_health()
+            health = response['health']
+            health = self._str_health(health)
+            yield msg.HealthSummary(health, self.node)
+            if 'badreadings' in response:
+                badsensors = []
+                for reading in response['badreadings']:
+                    badsensors.append(self._dict_sensor(reading))
+                yield msg.SensorReadings(badsensors, name=self.node)
+        else:
+            raise exc.InvalidArgumentException('health is read-only')
 
     def bootdevice(self):
         if 'read' == self.op:
@@ -275,4 +315,3 @@ def update(nodes, element, configmanager, inputdata):
 def retrieve(nodes, element, configmanager, inputdata):
     initthread()
     return IpmiIterator('read', nodes, element, configmanager, inputdata)
-

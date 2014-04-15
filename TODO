@@ -36,3 +36,7 @@ Traceback (most recent call last):
     passvalue = pluginmap[plugpath].__dict__[operation](
 KeyError: ''
 
+
+-reuse SDR to make health faster
+-have pyghmi and friends do multiprocessing pools (particularly the PBKDF stuff in auth)
+-bad password retrie
