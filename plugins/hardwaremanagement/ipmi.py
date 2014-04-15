@@ -162,7 +162,8 @@ class IpmiIterator(object):
         cfg.decrypt = crypt
         self.gpile = greenpool.GreenPile()
         for node in nodes:
-            self.gpile.spawn(perform_request, operator, node, element, configdata, inputdata)
+            self.gpile.spawn(perform_request, operator, node, element,
+                             configdata, inputdata, cfg)
 
     def __iter__(self):
         return self
@@ -178,12 +179,14 @@ class IpmiIterator(object):
             self.currdata = None
         return retdata
 
-def perform_request(operator, node, element, configdata, inputdata):
-    return IpmiHandler(operator, node, element, configdata, inputdata).handle_request()
+def perform_request(operator, node, element, configdata, inputdata, cfg):
+    return IpmiHandler(operator, node, element, configdata, inputdata, cfg
+                      ).handle_request()
 
+persistent_ipmicmds = {}
 
 class IpmiHandler(object):
-    def __init__(self, operation, node, element, cfd, inputdata):
+    def __init__(self, operation, node, element, cfd, inputdata, cfg):
         self.broken = False
         eventlet.sleep(0)
         self.cfg = cfd[node]
@@ -193,14 +196,16 @@ class IpmiHandler(object):
         self.op = operation
         connparams = get_conn_params(node, self.cfg)
         self.ipmicmd = None
-        self._logevt = threading.Event()
         self.inputdata = inputdata
-        self.ipmicmd = ipmicommand.Command(bmc=connparams['bmc'],
-                                           userid=connparams['username'],
-                                           password=connparams['passphrase'],
-                                           kg=connparams['kg'],
-                                           port=connparams['port'],
-                                           onlogon=self.logged)
+        tenant = cfg.tenant
+        self._logevt = None
+        if (node,tenant) not in persistent_ipmicmds:
+            self._logevt = threading.Event()
+            persistent_ipmicmds[(node,tenant)] = ipmicommand.Command(
+                bmc=connparams['bmc'], userid=connparams['username'],
+                password=connparams['passphrase'], kg=connparams['kg'],
+                port=connparams['port'], onlogon=self.logged)
+        self.ipmicmd = persistent_ipmicmds[(node,tenant)]
 
     bootdevices = {
         'optical': 'cd'
@@ -215,7 +220,9 @@ class IpmiHandler(object):
         self._logevt.set()
 
     def handle_request(self):
-        self._logevt.wait()
+        if self._logevt is not None:
+            self._logevt.wait()
+        self._logevt = None
         if self.broken:
             if self.error == 'timeout':
                 raise exc.TargetEndpointUnreachable('Target timed out')
