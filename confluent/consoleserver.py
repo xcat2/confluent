@@ -107,7 +107,6 @@ class _ConsoleHandler(object):
 
     def _got_disconnected(self):
         self.connecstate = 'unconnected'
-        eventlet.spawn(self._send_disconnect_events)
         self._send_rcpts({'connectstate': self.connectstate})
         self._connect()
 
@@ -243,10 +242,8 @@ class _ConsoleHandler(object):
             return (retdata + str(self.buffer[-1024:]), connstate)
 
     def write(self, data):
-        #TODO.... take note of data coming in from audit/log perspective?
-        #or just let echo take care of it and then we can skip this stack
-        #level?
-        self._console.write(data)
+        if self.connectstate == 'connected':
+            self._console.write(data)
 
 
 def connect_node(node, configmanager):

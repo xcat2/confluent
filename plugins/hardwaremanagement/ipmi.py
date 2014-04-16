@@ -104,14 +104,12 @@ class IpmiConsole(conapi.Console):
     def handle_data(self, data):
         if type(data) == dict:
             disconnect = frozenset(('Session Disconnected', 'timeout'))
-            if 'error' in data and data['error'] in disconnect:
+            if 'error' in data:
                 self.solconnection = None
                 self.broken = True
                 self.error = data['error']
                 if self.connected:
                     self.datacallback(conapi.ConsoleEvent.Disconnect)
-            else:
-                raise Exception("Unrecognized pyghmi input %s" % repr(data))
         else:
             self.datacallback(data)
 
@@ -134,6 +132,7 @@ class IpmiConsole(conapi.Console):
                     break
             if self.broken:
                 raise exc.TargetEndpointUnreachable(self.error)
+            self.connected = True
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))
 
