@@ -62,7 +62,6 @@ import collections
 import confluent.config.configmanager as configuration
 import eventlet
 import fcntl
-import os
 import struct
 import time
 
@@ -79,7 +78,10 @@ import time
 
 
 class Events(object):
-    undefined, clearscreen, clientconnect, clientdisconnect = range(4)
+    (
+        undefined, clearscreen, clientconnect, clientdisconnect,
+        consoledisconnect, consoleconnect,
+    ) = range(6)
     logstr = {
         2: 'connection by ',
         3: 'disconnection by ',
@@ -88,6 +90,7 @@ class Events(object):
 
 class DataTypes(object):
     text, dictionary, console, event = range(4)
+
 
 class Logger(object):
     """
@@ -137,8 +140,9 @@ class Logger(object):
             if eventaux is None:
                 eventaux = 0
             # metadata length is always 16 for this code at the moment
-            binrecord = struct.pack(">BBIHIBBH",
-                    16, ltype, offset, datalen, tstamp, evtdata, eventaux, 0)
+            binrecord = struct.pack(
+                ">BBIHIBBH", 16, ltype, offset, datalen, tstamp, evtdata,
+                eventaux, 0)
             if self.isconsole:
                 if ltype == 2:
                     textrecord = data
@@ -175,8 +179,6 @@ class Logger(object):
             recbytes = binfile.read(16)
             (_, ltype, offset, datalen, tstamp, evtdata, eventaux, _) = \
                 struct.unpack(">BBIHIBBH", recbytes)
-            binrecord = struct.pack(">BBIHIBBH",
-                    16, ltype, offset, datalen, tstamp, evtdata, eventaux, 0)
             if ltype != 2:
                 continue
             currsize += datalen
@@ -218,7 +220,8 @@ class Logger(object):
             if eventdata is not None:
                 self.logentries[-1][4] = eventdata
         else:
-            self.logentries.append([ltype, timestamp, logdata, event, eventdata])
+            self.logentries.append(
+                [ltype, timestamp, logdata, event, eventdata])
         if self.writer is None:
             self.writer = eventlet.spawn_after(2, self.writedata)
 
