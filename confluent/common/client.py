@@ -20,28 +20,32 @@ import ssl
 import confluent.common.tlvdata as tlvdata
 
 SO_PASSCRED = 16
+
+
 def _parseserver(string):
     if ']:' in string:
         server, port = string[1:].split(']:')
     elif string[0] == '[':
-        server = serverstring[1:-1]
+        server = string[1:-1]
         port = 4001
     elif ':' in string:
         server, port = string.plit(':')
     else:
         server = string
         port = 4001
-    return (server, port)
+    return server, port
+
 
 class Command(object):
 
     def __init__(self, server="/var/run/confluent/api.sock"):
+        self.connection = None
         self.serverloc = server
         if os.path.isabs(server) and os.path.exists(server):
             self._connect_unix()
         else:
             self._connect_tls()
-        banner = tlvdata.recv(self.connection)
+        tlvdata.recv(self.connection)
         authdata = tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
@@ -74,7 +78,8 @@ class Command(object):
 
     def _connect_tls(self):
         server, port = _parseserver(self.serverloc)
-        for res in socket.getaddrinfo(server, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
+        for res in socket.getaddrinfo(server, port, socket.AF_UNSPEC,
+                                      socket.SOCK_STREAM):
             af, socktype, proto, canonname, sa = res
             try:
                 self.connection = socket.socket(af, socktype, proto)
@@ -96,8 +101,9 @@ class Command(object):
         #TODO(jbjohnso): server certificate validation
         self.connection = ssl.wrap_socket(self.connection)
 
+
 def send_request(operation, path, server, parameters=None):
-    '''This function iterates over all the responses
+    """This function iterates over all the responses
     received from the server.
 
     :param operation:  The operation to request, retrieve, update, delete,
@@ -105,7 +111,7 @@ def send_request(operation, path, server, parameters=None):
     :param path: The URI path to the resource to operate on
     :param server: The socket to send data over
     :param parameters:  Parameters if any to send along with the request
-    '''
+    """
     payload = {'operation': operation, 'path': path}
     if parameters is not None:
         payload['parameters'] = parameters
@@ -114,4 +120,3 @@ def send_request(operation, path, server, parameters=None):
     while '_requestdone' not in result:
         yield result
         result = tlvdata.recv(server)
-

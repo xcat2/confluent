@@ -15,7 +15,6 @@
 # limitations under the License.
 
 
-
 #This defines the attributes of variou classes of things
 
 # 'nic', meant to be a nested structure under node
@@ -140,14 +139,14 @@ node = {
 #    },
 #    'console.port': {
 #        'default': 'auto',
-#        'description': ('Indicate which port to use for text console.  Default'
-#                        'behavior is to auto detect the value appropriate for'
-#                        'the platform.  "Disable" can be used to suppress'
-#                        'serial console configuration')
+#        'description': ('Indicate which port to use for text console. '
+#                        'Default behavior is to auto detect the value '
+#                        'appropriate for the platform.  "Disable" can be used
+#                        'to suppress serial console configuration')
 #    },
     'console.method': {
         'description': ('Indicate the method used to access the console of '
-                       'the managed node.')
+                        'the managed node.')
     },
 #    'virtualization.host': {
 #        'description': ('Hypervisor where this node does/should reside'),
@@ -166,8 +165,8 @@ node = {
 #    },
 #    'virtualization.nicmodel': {
 #        'description': ('The model of NIC adapter to emulate in a virtual'
-#                        'machine.  Defaults to virtio-net for KVM, vmxnet3 for'
-#                        'VMware'),
+#                        'machine.  Defaults to virtio-net for KVM, vmxnet3 '
+#                        'for VMware'),
 #        'appliesto': ['vm'],
 #    },
     'hardwaremanagement.manager': {
@@ -225,30 +224,31 @@ node = {
 #                        'one-way crypted as in /etc/shadow.  For Windows, if '
 #                        'the value is not set or is one-way crypted, the '
 #                        'local '
-#                        'Administrator account will be disabled, requiring AD')
+#                        'Administrator account will be disabled, requiring '
+#                        'AD')
 #    },
     'secret.ipmikg': {
         'description': 'Optional Integrity key for IPMI communication'
     },
 #    'secret.ipmiuser': {
 #        'description': ('The username to use to log into IPMI device related '
-#                        'to the node.  For setting username, default behavior '
-#                        'is to randomize username, for using username if not '
-#                        'set, USERID is assumed'),
+#                        'to the node.  For setting username, default '
+#                        'behavior is to randomize username, for using '
+#                        'username if not set, USERID is assumed'),
 #    },
 #    'secret.ipmipassphrase': {
-#        'description': ('The key to use to authenticate to IPMI device related '
-#                        'to the node.  For setting passphrase, default behavior '
-#                        'is to randomize passphrase and store it here.  If going '
-#                        'to connect over the network and value is not set, '
-#                        'PASSW0RD is attempted')
+#        'description': ('The key to use to authenticate to IPMI device '
+#                        'related to the node.  For setting passphrase, '
+#                        'default behavior is to randomize passphrase and '
+#                        'store it here.  If going to connect over the '
+#                        'network and value is not set, PASSW0RD is attempted')
 #    },
     'secret.hardwaremanagementuser': {
-        'description': ('Username to be set and used by protocols like SSH and '
-                        'HTTP where client provides passphrase over the network.'
-                        'Given the distinct security models betwen this class '
-                        'of protocols and SNMP and IPMI, snmp and ipmi utilize '
-                        'dedicated values.'),
+        'description': ('Username to be set and used by protocols like SSH '
+                        'and HTTP where client provides passphrase over the '
+                        'network. Given the distinct security models betwen '
+                        'this class of protocols and SNMP and IPMI, snmp and '
+                        'ipmi utilize dedicated values.'),
     },
     'secret.hardwaremanagementpassphrase': {
         'description': ('Passphrase to be set and used by protocols like SSH '

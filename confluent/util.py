@@ -26,13 +26,13 @@ def randomstring(length=20):
     :param length: The number of characters to produce, defaults to 20
     """
     chunksize = length / 4
-    if (length % 4 > 0):
+    if length % 4 > 0:
         chunksize += 1
     strval = base64.urlsafe_b64encode(os.urandom(chunksize * 3))
     return strval[0:length-1]
 
 
-def securerandomnumber(min=0, max=4294967295):
+def securerandomnumber(low=0, high=4294967295):
     """Return a random number within requested range
 
     Note that this function will not return smaller than 0 nor larger
@@ -40,11 +40,11 @@ def securerandomnumber(min=0, max=4294967295):
     The python random number facility does not provide charateristics
     appropriate for secure rng, go to os.urandom
 
-    :param min: Smallest number to return (defaults to 0)
-    :param max: largest number to return (defaults to 2^32-1)
+    :param low: Smallest number to return (defaults to 0)
+    :param high: largest number to return (defaults to 2^32-1)
     """
     number = -1
-    while number < min or number > max:
+    while number < low or number > high:
         number = struct.unpack("I", os.urandom(4))[0]
     return number
 

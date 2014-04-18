@@ -80,6 +80,7 @@ rootcollections = ['nodes/', 'groups/', 'users/']
 class PluginRoute(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
+
 # _ prefix indicates internal use (e.g. special console scheme) and should not
 # be enumerated in any collection
 noderesources = {
@@ -139,6 +140,7 @@ def update_user(name, attribmap, configmanager):
     except ValueError:
         raise exc.InvalidArgumentException()
 
+
 def show_user(name, configmanager):
     userobj = configmanager.get_user(name)
     rv = {}
@@ -148,7 +150,8 @@ def show_user(name, configmanager):
             if 'cryptpass' in userobj:
                 rv['passphrase'] = {'cryptvalue': True}
             yield msg.CryptedAttributes(kv={'passphrase': rv['passphrase']},
-                                        desc=attrscheme.user[attr]['description'])
+                                        desc=attrscheme.user[attr][
+                                            'description'])
         else:
             if attr in userobj:
                 rv[attr] = userobj[attr]
@@ -165,7 +168,7 @@ def stripnode(iterablersp, node):
 def iterate_collections(iterable, forcecollection=True):
     for coll in iterable:
         if forcecollection and coll[-1] != '/':
-            coll = coll + '/'
+            coll += '/'
         yield msg.ChildCollection(coll, candelete=True)
 
 
@@ -182,6 +185,7 @@ def delete_user(user, configmanager):
     configmanager.del_user(user)
     yield msg.DeletedResource(user)
 
+
 def delete_nodegroup_collection(collectionpath, configmanager):
     if len(collectionpath) == 2:  # just the nodegroup
         group = collectionpath[-1]
@@ -189,6 +193,7 @@ def delete_nodegroup_collection(collectionpath, configmanager):
         yield msg.DeletedResource(group)
     else:
         raise Exception("Not implemented")
+
 
 def delete_node_collection(collectionpath, configmanager):
     if len(collectionpath) == 2:  # just node
@@ -207,8 +212,9 @@ def enumerate_nodegroup_collection(collectionpath, configmanager):
     collection = nested_lookup(nodegroupresources, collectionpath)
     return iterate_resources(collection)
 
+
 def enumerate_node_collection(collectionpath, configmanager):
-    if collectionpath == ['nodes']:  # it is just '/node/', need a list of nodes
+    if collectionpath == ['nodes']:  # it is just '/node/', need to list nodes
         return iterate_collections(configmanager.list_nodes())
     node = collectionpath[1]
     if not configmanager.is_node(node):
@@ -246,12 +252,12 @@ def enumerate_collections(collections):
 
 
 def handle_path(path, operation, configmanager, inputdata=None):
-    '''Given a full path request, return an object.
+    """Given a full path request, return an object.
 
     The plugins should generally return some sort of iterator.
     An exception is made for console/session, which should return
     a class with connect(), read(), write(bytes), and close()
-    '''
+    """
     iscollection = False
     pathcomponents = path.split('/')
     del pathcomponents[0]  # discard the value from leading /
@@ -261,9 +267,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'groups':
-        try:
-            group = pathcomponents[1]
-        except IndexError:
+        if len(pathcomponents) < 2:
             if operation == "create":
                 inputdata = msg.InputAttributes(pathcomponents, inputdata)
                 create_group(inputdata.attribs, configmanager)
@@ -272,13 +276,16 @@ def handle_path(path, operation, configmanager, inputdata=None):
             iscollection = True
         if iscollection:
             if operation == "delete":
-                return delete_nodegroup_collection(pathcomponents, configmanager)
+                return delete_nodegroup_collection(pathcomponents,
+                                                   configmanager)
             elif operation == "retrieve":
-                return enumerate_nodegroup_collection(pathcomponents, configmanager)
+                return enumerate_nodegroup_collection(pathcomponents,
+                                                      configmanager)
             else:
                 raise Exception("TODO")
         try:
-            plugroute = nested_lookup(nodegroupresources, pathcomponents[2:]).routeinfo
+            plugroute = nested_lookup(
+                nodegroupresources, pathcomponents[2:]).routeinfo
         except KeyError:
             raise exc.NotFoundException("Invalid element requested")
         inputdata = msg.get_input_message(
@@ -310,6 +317,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
             else:
                 raise Exception("TODO here")
         del pathcomponents[0:2]
+        passvalue = None
         try:
             plugroute = nested_lookup(noderesources, pathcomponents).routeinfo
         except KeyError:
@@ -346,12 +354,13 @@ def handle_path(path, operation, configmanager, inputdata=None):
         # they must only be allowed to see their own user
         try:
             user = pathcomponents[1]
-        except IndexError: # it's just users/
+        except IndexError:  # it's just users/
             if operation == 'create':
                 inputdata = msg.get_input_message(
                     pathcomponents, operation, inputdata)
                 create_user(inputdata.attribs, configmanager)
-            return iterate_collections(configmanager.list_users(), forcecollection=False)
+            return iterate_collections(configmanager.list_users(),
+                                       forcecollection=False)
         if user not in configmanager.list_users():
             raise exc.NotFoundException("Invalid user %s" % user)
         if operation == 'retrieve':

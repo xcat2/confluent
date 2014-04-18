@@ -58,6 +58,7 @@ class _ConsoleHandler(object):
         self._attribwatcher = None
         self._console = None
         self.connectionthread = None
+        self.send_break = None
         eventlet.spawn(self._connect)
 
     def _attribschanged(self, **kwargs):
@@ -110,7 +111,7 @@ class _ConsoleHandler(object):
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
-        self.connecstate = 'unconnected'
+        self.connectstate = 'unconnected'
         self.logger.log(
             logdata='console disconnected', ltype=log.DataTypes.event,
             event=log.Events.consoledisconnect)
@@ -191,9 +192,9 @@ class _ConsoleHandler(object):
             self.shiftin = '0'
         eventdata = 0
         if self.appmodedetected:
-            eventdata = eventdata | 1
+            eventdata |= 1
         if self.shiftin is not None:
-            eventdata = eventdata | 2
+            eventdata |= 2
         self.logger.log(data, eventdata=eventdata)
         self.buffer += data
         #TODO: analyze buffer for registered events, examples:
@@ -235,18 +236,18 @@ class _ConsoleHandler(object):
         #this is one scheme to clear screen, move cursor then clear
         bufidx = self.buffer.rfind('\x1b[H\x1b[J')
         if bufidx >= 0:
-            return (retdata + str(self.buffer[bufidx:]), connstate)
+            return retdata + str(self.buffer[bufidx:]), connstate
         #another scheme is the 2J scheme
         bufidx = self.buffer.rfind('\x1b[2J')
         if bufidx >= 0:
             # there was some sort of clear screen event
             # somewhere in the buffer, replay from that point
             # in hopes that it reproduces the screen
-            return (retdata + str(self.buffer[bufidx:]), connstate)
+            return retdata + str(self.buffer[bufidx:]), connstate
         else:
             #we have no indication of last erase, play back last kibibyte
             #to give some sense of context anyway
-            return (retdata + str(self.buffer[-1024:]), connstate)
+            return retdata + str(self.buffer[-1024:]), connstate
 
     def write(self, data):
         if self.connectstate == 'connected':

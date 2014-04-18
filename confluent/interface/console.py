@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 class ConsoleEvent(object):
     """This represents a number of specific events to be sent between
     consoleserver and console objects.  Disconnect indicates that the console

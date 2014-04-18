@@ -18,28 +18,30 @@
 # This is the socket api layer.
 # It implement unix and tls sockets
 # 
-# TODO: SO_PEERCRED for unix socket
-import confluent.auth as auth
-import confluent.common.tlvdata as tlvdata
-import confluent.consoleserver as consoleserver
-import confluent.config.configmanager as configmanager
-import confluent.exceptions as exc
-import confluent.log as log
-import confluent.messages
-import confluent.pluginapi as pluginapi
-import eventlet.green.socket as socket
-import eventlet.green.ssl as ssl
-import eventlet
-import json
+
 import os
 import pwd
 import stat
 import struct
 import traceback
 
+import eventlet.green.socket as socket
+import eventlet.green.ssl as ssl
+import eventlet
+
+import confluent.auth as auth
+import confluent.common.tlvdata as tlvdata
+import confluent.consoleserver as consoleserver
+import confluent.config.configmanager as configmanager
+import confluent.exceptions as exc
+import confluent.log as log
+import confluent.pluginapi as pluginapi
+
+
 tracelog = None
 auditlog = None
 SO_PEERCRED = 17
+
 
 class ClientConsole(object):
     def __init__(self, client):
@@ -72,7 +74,7 @@ def sessionhdl(connection, authname, skipauth):
         if authdata is not None:
             cfm = authdata[1]
             authenticated = True
-    tlvdata.send(connection,"Confluent -- v0 --")
+    tlvdata.send(connection, "Confluent -- v0 --")
     while not authenticated:  # prompt for name and passphrase
         tlvdata.send(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
@@ -209,7 +211,7 @@ def _unixdomainhandler():
              stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |
              stat.S_IRGRP | stat.S_IWUSR | stat.S_IRUSR)
     unixsocket.listen(5)
-    while (1):
+    while True:
         cnn, addr = unixsocket.accept()
         creds = cnn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED,
                                 struct.calcsize('3i'))
@@ -234,8 +236,11 @@ def _unixdomainhandler():
         eventlet.spawn_n(sessionhdl, cnn, authname, skipauth)
 
 
-
 class SockApi(object):
+    def __init__(self):
+        self.tlsserver = None
+        self.unixdomainserver = None
+
     def start(self):
         global auditlog
         global tracelog

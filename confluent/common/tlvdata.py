@@ -18,6 +18,7 @@ import confluent.common.tlv as tlv
 import json
 import struct
 
+
 def send(handle, data):
     if isinstance(data, str):
         # plain text, e.g. console data
@@ -31,7 +32,7 @@ def send(handle, data):
         handle.sendall(data)
     elif isinstance(data, dict):  # JSON currently only goes to 4 bytes
         # Some structured message, like what would be seen in http responses
-        sdata = json.dumps(data, separators=(',',':'))
+        sdata = json.dumps(data, separators=(',', ':'))
         tl = len(sdata)
         if tl > 16777215:
             raise Exception("JSON data exceeds protocol limits")
@@ -39,6 +40,7 @@ def send(handle, data):
         tl |= 16777216
         handle.sendall(struct.pack("!I", tl))
         handle.sendall(sdata)
+
 
 def recv(handle):
     tl = handle.recv(4)
@@ -49,14 +51,14 @@ def recv(handle):
         raise Exception("Protocol Violation, reserved bit set")
     # 4 byte tlv
     dlen = tl & 16777215  # grab lower 24 bits
-    type = (tl & 2130706432) >> 24  # grab 7 bits from near beginning
+    datatype = (tl & 2130706432) >> 24  # grab 7 bits from near beginning
     data = handle.recv(dlen)
     while len(data) < dlen:
         ndata = handle.recv(dlen - len(data))
         if not ndata:
             raise Exception("Error reading data")
         data += ndata
-    if type == tlv.Types.text:
+    if datatype == tlv.Types.text:
         return data
-    elif type == tlv.Types.json:
+    elif datatype == tlv.Types.json:
         return json.loads(data)
