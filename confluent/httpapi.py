@@ -52,7 +52,8 @@ def group_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
     yield confluent.messages.ListAttributes(kv={'nodes': []},
-                                            desc='Nodes to add to the group').html() + '<br>\n'
+                                            desc='Nodes to add to the group'
+                                            ).html() + '<br>\n'
     for attr in sorted(attribs.node.iterkeys()):
         if attr == 'groups':
             continue
@@ -60,8 +61,8 @@ def group_creation_resources():
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
-        elif 'type' in attribs.node[attr] and list == attribs.node[attr][
-            'type']:
+        elif ('type' in attribs.node[attr] and
+                list == attribs.node[attr]['type']):
             yield confluent.messages.ListAttributes(
                 kv={attr: []},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -79,8 +80,8 @@ def node_creation_resources():
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
-        elif 'type' in attribs.node[attr] and list == attribs.node[attr][
-            'type']:
+        elif ('type' in attribs.node[attr] and
+                list == attribs.node[attr]['type']):
             yield confluent.messages.ListAttributes(
                 kv={attr: []},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -373,7 +374,8 @@ def resourcehandler_backend(env, start_response):
 def _assemble_html(responses, resource, querydict, url):
     yield '<html><head><title>' \
           'Confluent REST Explorer: ' + url + '</title></head>' \
-                                              '<body><form action="' + resource + '" method="post">'
+                                              '<body><form action="' + \
+                                              resource + '" method="post">'
     if querydict:
         yield 'Response to input data:<br>' + \
               json.dumps(querydict, separators=(',', ': '),

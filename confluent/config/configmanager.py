@@ -734,9 +734,9 @@ class ConfigManager(object):
             for attr in attribmap[group].iterkeys():
                 if (attr != 'nodes' and
                         (attr not in allattributes.node or
-                        ('type' in allattributes.node[attr] and not isinstance(
-                         attribmap[group][attr],
-                         allattributes.node[attr]['type'])))):
+                         ('type' in allattributes.node[attr] and
+                          not isinstance(attribmap[group][attr],
+                                         allattributes.node[attr]['type'])))):
                     raise ValueError
                 if attr == 'nodes':
                     if not isinstance(attribmap[group][attr], list):
@@ -1056,4 +1056,3 @@ try:
     ConfigManager._read_from_path()
 except IOError:
     _cfgstore = {}
-
