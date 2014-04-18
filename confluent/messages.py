@@ -45,6 +45,8 @@ class ConfluentMessage(object):
     defaulttype = 'text'
 
     def __init__(self):
+        self.desc = ''
+        self.kvpairs = {}
         raise NotImplementedError("Must be subclassed!")
 
     def json(self):
@@ -97,14 +99,14 @@ class ConfluentMessage(object):
                 if len(val) == 0 and not self.readonly:
                     snippet += ('<input type="{0}" name="{1}" value="" '
                                 ' "title="{2}">'
-                        ).format(valtype, key, self.desc)
+                                ).format(valtype, key, self.desc)
                 for v in val:
                     if self.readonly:
                         snippet += _htmlify_structure(v)
                     else:
                         snippet += ('<input type="{0}" name="{1}" value="{2}" '
                                     ' "title="{3}">'
-                        ).format(valtype, key, v, self.desc)
+                                    ).format(valtype, key, v, self.desc)
                 if not self.readonly:
                     snippet += (
                         '<input type="{0}" name="{1}" value="" title="{2}">'
@@ -118,7 +120,7 @@ class ConfluentMessage(object):
                             '<input type="{0}" name="{1}" value="{2}" '
                             'title="{3}"><input type="checkbox" '
                             'name="restexplorerhonorkey" value="{1}">'
-                ).format(valtype, key, value, self.desc)
+                            ).format(valtype, key, value, self.desc)
             if len(notes) > 0:
                 snippet += '(' + ','.join(notes) + ')'
         return snippet
@@ -130,6 +132,8 @@ class DeletedResource(ConfluentMessage):
 
 
 class ConfluentChoiceMessage(ConfluentMessage):
+    valid_values = set()
+
     def html(self):
         snippet = ""
         for key in self.kvpairs.iterkeys():
@@ -149,6 +153,10 @@ class ConfluentChoiceMessage(ConfluentMessage):
 
 
 class LinkRelation(ConfluentMessage):
+    def __init__(self):
+        self.href = ''
+        self.rel = ''
+
     def json(self):
         """Provide json_hal style representation of the relation.
 
@@ -276,13 +284,13 @@ class InputPowerMessage(ConfluentMessage):
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
                 if ('state' not in datum or
-                            datum['state'] not in self.valid_values):
+                        datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumentException()
                 self.powerbynode[key] = datum['state']
         else:  # we have a state argument not by node
             datum = inputdata
             if ('state' not in datum or
-                        datum['state'] not in self.valid_values):
+                    datum['state'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
                 self.powerbynode[node] = datum['state']
@@ -321,13 +329,13 @@ class InputBootDevice(BootDevice):
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
                 if ('state' not in datum or
-                            datum['state'] not in self.valid_values):
-                    raise exc.InvalidArgumenTException()
+                        datum['state'] not in self.valid_values):
+                    raise exc.InvalidArgumentException()
                 self.bootdevbynode[key] = datum['nextdevice']
         else:
             datum = inputdata
             if ('nextdevice' not in datum or
-                        datum['nextdevice'] not in self.valid_values):
+                    datum['nextdevice'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
                 self.bootdevbynode[node] = datum['nextdevice']
@@ -355,7 +363,7 @@ class PowerState(ConfluentChoiceMessage):
 class SensorReadings(ConfluentMessage):
     readonly = True
 
-    def __init__(self, sensors=[], name=None):
+    def __init__(self, sensors=(), name=None):
         readings = []
         for sensor in sensors:
             sensordict = {'name': sensor['name']}
