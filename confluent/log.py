@@ -62,6 +62,8 @@ import collections
 import confluent.config.configmanager as configuration
 import eventlet
 import fcntl
+import json
+import os
 import struct
 import time
 
@@ -76,12 +78,13 @@ import time
 # if that happens, warn to have user increase ulimit for optimal
 # performance
 
+_loggers = {}
 
 class Events(object):
     (
         undefined, clearscreen, clientconnect, clientdisconnect,
-        consoledisconnect, consoleconnect,
-    ) = range(6)
+        consoledisconnect, consoleconnect, stacktrace
+    ) = range(7)
     logstr = {
         2: 'connection by ',
         3: 'disconnection by ',
@@ -98,13 +101,30 @@ class Logger(object):
                      False, events will be formatted like syslog:
                      date: message<CR>
     """
-    def __init__(self, logname, console=True, tenant=None):
+    def __new__(cls, logname, console=False, tenant=None):
+        global _loggers
+        if console:
+            relpath = 'consoles/' + logname
+        else:
+            relpath = logname
+        if relpath in _loggers:
+            return _loggers[relpath]
+        else:
+            return object.__new__(cls)
+
+    def __init__(self, logname, console=False, tenant=None):
+        if hasattr(self, 'initialized'):
+            # we are just a copy of the same object
+            return
+        self.initialized = True
         self.filepath = configuration.get_global("logdirectory")
         if self.filepath is None:
             self.filepath = "/var/log/confluent/"
         self.isconsole = console
         if console:
             self.filepath += "consoles/"
+        if not os.path.isdir(self.filepath):
+            os.makedirs(self.filepath, 448)
         self.textpath = self.filepath + logname
         self.binpath = self.filepath + logname + ".cbl"
         self.writer = None
@@ -204,6 +224,7 @@ class Logger(object):
             raise Exception("Unsupported logdata")
         if ltype is None:
             if type(logdata) == dict:
+                logdata = json.dumps(logdata)
                 ltype = 1
             elif self.isconsole:
                 ltype = 2

@@ -22,6 +22,7 @@ import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
+import confluent.log as log
 import confluent.messages
 import confluent.pluginapi as pluginapi
 import confluent.util as util
@@ -35,6 +36,8 @@ import eventlet.wsgi
 #scgi = eventlet.import_patched('flup.server.scgi')
 
 
+auditlog = None
+tracelog = None
 consolesessions = {}
 httpsessions = {}
 opmap = {
@@ -137,7 +140,7 @@ def _get_query_dict(env, reqbody, reqtype):
     return qdict
 
 
-def _authorize_request(env):
+def _authorize_request(env, operation):
     """Grant/Deny access based on data from wsgi env
 
     """
@@ -165,12 +168,27 @@ def _authorize_request(env):
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
         cookie['confluentsessionid']['path'] = '/'
+    auditmsg = {
+        'user': name,
+        'operation': operation,
+        'target': env['PATH_INFO'],
+    }
+    skiplog = False
+    if '/console/session' in env['PATH_INFO']:
+        skiplog = True
     if authdata:
-        return {'code': 200,
+        authinfo = {'code': 200,
                 'cookie': cookie,
                 'cfgmgr': authdata[1],
-                'username': name,
+                'username': authdata[2],
                 'userdata': authdata[0]}
+        if authdata[3] is not None:
+            auditmsg['tenant'] = authdata[3]
+            authinfo['tenant'] = authdata[3]
+        auditmsg['user'] = authdata[2]
+        if not skiplog:
+            auditlog.log(auditmsg)
+        return authinfo
     else:
         return {'code': 401}
     # TODO(jbjohnso): actually evaluate the request for authorization
@@ -224,7 +242,7 @@ def resourcehandler(env, start_response):
     if 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
-    authorized = _authorize_request(env)
+    authorized = _authorize_request(env, operation)
     if authorized['code'] == 401:
         start_response(
             '401 Authentication Required',
@@ -251,6 +269,14 @@ def resourcehandler(env, start_response):
         prefix, _, _ = env['PATH_INFO'].partition('/console/session')
         _, _, nodename = prefix.rpartition('/')
         if 'session' not in querydict.keys() or not querydict['session']:
+            auditmsg = {
+                'operation': 'start',
+                'target': env['PATH_INFO'],
+                'user': authorized['username'],
+            }
+            if 'tenant' in authorized:
+                auditmsg['tenant'] = authorized['tenant']
+            auditlog.log(auditmsg)
             # Request for new session
             consession = consoleserver.ConsoleSession(
                 node=nodename, configmanager=cfgmgr,
@@ -426,11 +452,16 @@ def serve():
     #but deps are simpler without flup
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
-    eventlet.wsgi.server(eventlet.listen(("", 4005)), resourcehandler)
+    eventlet.wsgi.server(eventlet.listen(("", 4005)), resourcehandler,
+                        log=False, log_output=False, debug=False)
 
 
 class HttpApi(object):
     def start(self):
+        global auditlog
+        global tracelog
+        tracelog = log.Logger('trace')
+        auditlog = log.Logger('audit')
         self.server = eventlet.spawn(serve)
 
 _cleaner = eventlet.spawn(_sessioncleaner)

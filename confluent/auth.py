@@ -68,7 +68,7 @@ def _get_usertenant(name, tenant=False):
     yield tenant
 
 
-def authorize(name, element, tenant=False, access='rw'):
+def authorize(name, element, tenant=False, operation='create'):
     #TODO: actually use the element to ascertain if this user is good enough
     """Determine whether the given authenticated name is authorized.
 
@@ -76,7 +76,7 @@ def authorize(name, element, tenant=False, access='rw'):
     :param element: The path being examined.
     :param tenant: The tenant under which the account exists (defaults to
                     detect from name)
-    :param access: Defaults to 'rw', can check 'ro' access
+    :param operation: Defaults to checking for 'create' level access
 
     returns None if authorization fails or a tuple of the user object
             and the relevant ConfigManager object for the context of the
@@ -88,7 +88,7 @@ def authorize(name, element, tenant=False, access='rw'):
     manager = configmanager.ConfigManager(tenant)
     userobj = manager.get_user(user)
     if userobj:  # returning
-        return (userobj, manager)
+        return (userobj, manager, user, tenant)
     return None
 
 
@@ -104,7 +104,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     detected passphrase guessing activity when such activity is detected.
 
     :param name: The login name provided by client
-    :param passhprase: The passphrase provided by client
+    :param passphrase: The passphrase provided by client
     :param element: Optional specification of a particular destination
     :param tenant: Optional explicit indication of tenant (defaults to
                    embedded in name)

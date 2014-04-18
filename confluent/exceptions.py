@@ -30,3 +30,7 @@ class TargetEndpointUnreachable(ConfluentException):
     # A target system was unavailable.  For example, a BMC
     # was unreachable.  http code 504
     pass
+
+class ForbiddenRequest(ConfluentException):
+    # The client request is not allowed by authorization engine
+    pass

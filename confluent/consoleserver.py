@@ -41,7 +41,8 @@ class _ConsoleHandler(object):
         self.node = node
         self.connectstate = 'unconnected'
         self.clientcount = 0
-        self.logger = log.Logger(node, tenant=configmanager.tenant)
+        self.logger = log.Logger(node, console=True,
+                                 tenant=configmanager.tenant)
         self.buffer = bytearray()
         (text, termstate) = self.logger.read_recent_text(8192)
         self.buffer += text

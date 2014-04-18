@@ -24,6 +24,7 @@ import confluent.common.tlvdata as tlvdata
 import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import confluent.exceptions as exc
+import confluent.log as log
 import confluent.messages
 import confluent.pluginapi as pluginapi
 import eventlet.green.socket as socket
@@ -34,7 +35,10 @@ import os
 import pwd
 import stat
 import struct
+import traceback
 
+tracelog = None
+auditlog = None
 SO_PEERCRED = 17
 
 class ClientConsole(object):
@@ -79,17 +83,25 @@ def sessionhdl(connection, authname, skipauth):
         # element path, that authorization will need to be called
         # per request the user makes
         authdata = auth.check_user_passphrase(authname, passphrase)
-        if authdata is not None:
+        if authdata is None:
+            auditlog.log(
+                {'operation': 'connect', 'user': authname, 'allowed': False})
+        else:
             authenticated = True
             cfm = authdata[1]
     tlvdata.send(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
     while request is not None:
         try:
-            process_request(connection, request, cfm, authdata, authname)
+            process_request(
+                connection, request, cfm, authdata, authname, skipauth)
+        except exc.ForbiddenRequest as e:
+            tlvdata.send(connection, {'errorcode': 403,
+                                  'error': 'Forbidden'})
+            tlvdata.send(connection, {'_requestdone': 1})
         except:
-            import traceback
-            traceback.print_exc()
+            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                event=log.Events.stacktrace)
             tlvdata.send(connection, {'errorcode': 500,
                                   'error': 'Unexpected error'})
             tlvdata.send(connection, {'_requestdone': 1})
@@ -104,53 +116,69 @@ def send_response(responses, connection):
     tlvdata.send(connection, {'_requestdone': 1})
 
 
-def process_request(connection, request, cfm, authdata, authname):
+def process_request(connection, request, cfm, authdata, authname, skipauth):
     #TODO(jbjohnso): authorize each request
-    if type(request) == dict:
-        operation = request['operation']
-        path = request['path']
-        params = request.get('parameters', None)
-        hdlr = None
-        try:
-            if operation == 'start':
-                elems = path.split('/')
-                if elems[3] != "console":
-                    raise exc.InvalidArgumentException()
-                node = elems[2]
-                ccons = ClientConsole(connection)
-                consession = consoleserver.ConsoleSession(
-                    node=node, configmanager=cfm, username=authname,
-                    datacallback=ccons.sendall)
-                if consession is None:
-                    raise Exception("TODO")
-                tlvdata.send(connection, {'started': 1})
-                ccons.startsending()
-                while consession is not None:
-                    data = tlvdata.recv(connection)
-                    if type(data) == dict:
-                        if data['operation'] == 'stop':
-                            consession.destroy()
-                            return
-                        elif data['operation'] == 'break':
-                            consession.send_break()
-                            continue
-                        else:
-                            raise Exception("TODO")
-                    if not data:
+    if not isinstance(request, dict):
+        raise ValueError
+    operation = request['operation']
+    path = request['path']
+    params = request.get('parameters', None)
+    hdlr = None
+    if not skipauth:
+        authdata = auth.authorize(authdata[2], path, authdata[3], operation)
+        auditmsg = {
+            'operation': operation,
+            'user': authdata[2],
+            'target': path,
+        }
+        if authdata[3] is not None:
+            auditmsg['tenant'] = authdata[3]
+        if authdata is None:
+            auditmsg['allowed'] = False
+            auditlog.log(auditmsg)
+            raise exc.ForbiddenRequest()
+        auditmsg['allowed'] = True
+        auditlog.log(auditmsg)
+    try:
+        if operation == 'start':
+            elems = path.split('/')
+            if elems[3] != "console":
+                raise exc.InvalidArgumentException()
+            node = elems[2]
+            ccons = ClientConsole(connection)
+            consession = consoleserver.ConsoleSession(
+                node=node, configmanager=cfm, username=authname,
+                datacallback=ccons.sendall)
+            if consession is None:
+                raise Exception("TODO")
+            tlvdata.send(connection, {'started': 1})
+            ccons.startsending()
+            while consession is not None:
+                data = tlvdata.recv(connection)
+                if type(data) == dict:
+                    if data['operation'] == 'stop':
                         consession.destroy()
                         return
-                    consession.write(data)
-            else:
-                hdlr = pluginapi.handle_path(path, operation, cfm, params)
-        except exc.NotFoundException:
-            tlvdata.send(connection, {"errorcode": 404,
-                                 "error": "Target not found"})
-            tlvdata.send(connection, {"_requestdone": 1})
-        except exc.InvalidArgumentException:
-            tlvdata.send(connection, {"errorcode": 400,
-                                 "error": "Bad Request"})
-            tlvdata.send(connection, {"_requestdone": 1})
-        send_response(hdlr, connection)
+                    elif data['operation'] == 'break':
+                        consession.send_break()
+                        continue
+                    else:
+                        raise Exception("TODO")
+                if not data:
+                    consession.destroy()
+                    return
+                consession.write(data)
+        else:
+            hdlr = pluginapi.handle_path(path, operation, cfm, params)
+    except exc.NotFoundException:
+        tlvdata.send(connection, {"errorcode": 404,
+                             "error": "Target not found"})
+        tlvdata.send(connection, {"_requestdone": 1})
+    except exc.InvalidArgumentException:
+        tlvdata.send(connection, {"errorcode": 400,
+                             "error": "Bad Request"})
+        tlvdata.send(connection, {"_requestdone": 1})
+    send_response(hdlr, connection)
     return
 
 
@@ -209,5 +237,9 @@ def _unixdomainhandler():
 
 class SockApi(object):
     def start(self):
+        global auditlog
+        global tracelog
+        tracelog = log.Logger('trace')
+        auditlog = log.Logger('audit')
         self.tlsserver = eventlet.spawn(_tlshandler)
         self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
