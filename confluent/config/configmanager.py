@@ -486,7 +486,10 @@ class ConfigManager(object):
 
 
     def list_users(self):
-        return self._cfgstore['users'].iterkeys()
+        try:
+            return self._cfgstore['users'].iterkeys()
+        except KeyError:
+            return []
 
     def get_user(self, name):
         """Get user information from DB
@@ -580,7 +583,10 @@ class ConfigManager(object):
         return self._cfgstore['groups'].iterkeys()
 
     def list_nodes(self):
-        return self._cfgstore['nodes'].iterkeys()
+        try:
+            return self._cfgstore['nodes'].iterkeys()
+        except KeyError:
+            return []
 
     def get_nodegroup_attributes(self, nodegroup, attributes=[]):
         cfgnodeobj = self._cfgstore['groups'][nodegroup]
