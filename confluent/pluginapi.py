@@ -324,6 +324,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
         elif 'pluginattrs' in plugroute:
             nodeattr = configmanager.get_node_attributes(
                 [node], plugroute['pluginattrs'])
+            if node not in nodeattr:
+                raise exc.NotFoundException("Invalid node %s" % node)
             plugpath = None
             if 'default' in plugroute:
                 plugpath = plugroute['default']
