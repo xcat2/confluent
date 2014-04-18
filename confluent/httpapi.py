@@ -168,15 +168,15 @@ def _authorize_request(env, operation):
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
         cookie['confluentsessionid']['path'] = '/'
-    auditmsg = {
-        'user': name,
-        'operation': operation,
-        'target': env['PATH_INFO'],
-    }
     skiplog = False
     if '/console/session' in env['PATH_INFO']:
         skiplog = True
     if authdata:
+        auditmsg = {
+            'user': name,
+            'operation': operation,
+            'target': env['PATH_INFO'],
+        }
         authinfo = {'code': 200,
                 'cookie': cookie,
                 'cfgmgr': authdata[1],
@@ -229,6 +229,17 @@ def _assign_consessionid(consolesession):
 
 
 def resourcehandler(env, start_response):
+    try:
+        for rsp in resourcehandler_backend(env, start_response):
+            yield rsp
+    except:
+        tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                     event=log.Events.stacktrace)
+        start_response('500 - Internal Server Error', [])
+        yield '500 - Internal Server Error'
+        return
+
+def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
     mimetype = _pick_mimetype(env)
