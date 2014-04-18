@@ -52,7 +52,7 @@ def group_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
     yield confluent.messages.ListAttributes(kv={'nodes': []},
-        desc='Nodes to add to the group').html() + '<br>\n'
+                                            desc='Nodes to add to the group').html() + '<br>\n'
     for attr in sorted(attribs.node.iterkeys()):
         if attr == 'groups':
             continue
@@ -60,7 +60,8 @@ def group_creation_resources():
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
-        elif 'type' in attribs.node[attr] and list == attribs.node[attr]['type']:
+        elif 'type' in attribs.node[attr] and list == attribs.node[attr][
+            'type']:
             yield confluent.messages.ListAttributes(
                 kv={attr: []},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -78,7 +79,8 @@ def node_creation_resources():
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
-        elif 'type' in attribs.node[attr] and list == attribs.node[attr]['type']:
+        elif 'type' in attribs.node[attr] and list == attribs.node[attr][
+            'type']:
             yield confluent.messages.ListAttributes(
                 kv={attr: []},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -86,6 +88,7 @@ def node_creation_resources():
             yield confluent.messages.Attributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
+
 
 create_resource_functions = {
     '/nodes/': node_creation_resources,
@@ -127,7 +130,7 @@ def _get_query_dict(env, reqbody, reqtype):
         elif 'application/json' == reqtype:
             pbody = json.loads(reqbody)
             for key in pbody.iterkeys():
-                qdict[key] = pbody[ky]
+                qdict[key] = pbody[key]
     if 'restexplorerhonorkey' in qdict:
         nqdict = {}
         for key in qdict:
@@ -145,6 +148,7 @@ def _authorize_request(env, operation):
 
     """
     authdata = False
+    name = ''
     cookie = Cookie.SimpleCookie()
     if 'HTTP_COOKIE' in env:
         #attempt to use the cookie.  If it matches
@@ -178,10 +182,10 @@ def _authorize_request(env, operation):
             'target': env['PATH_INFO'],
         }
         authinfo = {'code': 200,
-                'cookie': cookie,
-                'cfgmgr': authdata[1],
-                'username': authdata[2],
-                'userdata': authdata[0]}
+                    'cookie': cookie,
+                    'cfgmgr': authdata[1],
+                    'username': authdata[2],
+                    'userdata': authdata[0]}
         if authdata[3] is not None:
             auditmsg['tenant'] = authdata[3]
             authinfo['tenant'] = authdata[3]
@@ -191,13 +195,13 @@ def _authorize_request(env, operation):
         return authinfo
     else:
         return {'code': 401}
-    # TODO(jbjohnso): actually evaluate the request for authorization
-    # In theory, the x509 or http auth stuff will get translated and then
-    # passed on to the core authorization function in an appropriate form
-    # expresses return in the form of http code
-    # 401 if there is no known identity
-    # 403 if valid identity, but no access
-    # going to run 200 just to get going for now
+        # TODO(jbjohnso): actually evaluate the request for authorization
+        # In theory, the x509 or http auth stuff will get translated and then
+        # passed on to the core authorization function in an appropriate form
+        # expresses return in the form of http code
+        # 401 if there is no known identity
+        # 403 if valid identity, but no access
+        # going to run 200 just to get going for now
 
 
 def _pick_mimetype(env):
@@ -238,6 +242,7 @@ def resourcehandler(env, start_response):
         start_response('500 - Internal Server Error', [])
         yield '500 - Internal Server Error'
         return
+
 
 def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
@@ -327,10 +332,11 @@ def resourcehandler_backend(env, start_response):
             try:
                 rsp = json.dumps(rspdata)
             except UnicodeDecodeError:
-                rsp = json.dumps(rspdata, encoding='cp437')
-            except UnicodeDecodeError:
-                rsp = json.dumps({'session': querydict['session'],
-                                  'data': 'DECODEERROR'})
+                try:
+                    rsp = json.dumps(rspdata, encoding='cp437')
+                except UnicodeDecodeError:
+                    rsp = json.dumps({'session': querydict['session'],
+                                      'data': 'DECODEERROR'})
             start_response('200 OK', headers)
             yield rsp
             return
@@ -367,7 +373,7 @@ def resourcehandler_backend(env, start_response):
 def _assemble_html(responses, resource, querydict, url):
     yield '<html><head><title>' \
           'Confluent REST Explorer: ' + url + '</title></head>' \
-          '<body><form action="' + resource + '" method="post">'
+                                              '<body><form action="' + resource + '" method="post">'
     if querydict:
         yield 'Response to input data:<br>' + \
               json.dumps(querydict, separators=(',', ': '),
@@ -399,7 +405,8 @@ def _assemble_html(responses, resource, querydict, url):
             firstpass = True
             for y in create_resource_functions[url]():
                 if firstpass:
-                    yield "<hr>Define new resource in %s:<BR>" % url.split("/")[-2]
+                    yield "<hr>Define new resource in %s:<BR>" % \
+                          url.split("/")[-2]
                 firstpass = False
                 yield y
             yield ('<input value="create" name="restexplorerop" type="submit">'
@@ -464,7 +471,7 @@ def serve():
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
     eventlet.wsgi.server(eventlet.listen(("", 4005)), resourcehandler,
-                        log=False, log_output=False, debug=False)
+                         log=False, log_output=False, debug=False)
 
 
 class HttpApi(object):
@@ -474,5 +481,6 @@ class HttpApi(object):
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
         self.server = eventlet.spawn(serve)
+
 
 _cleaner = eventlet.spawn(_sessioncleaner)

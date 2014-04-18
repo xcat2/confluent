@@ -29,14 +29,13 @@ import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
 import confluent.sockapi as sockapi
 import eventlet
-import eventlet.backdoor as backdoor
-from eventlet.green import socket
-from eventlet import wsgi
+#import eventlet.backdoor as backdoor
 import fcntl
-import multiprocessing
+#import multiprocessing
 import sys
 import os
 import signal
+
 
 def _daemonize():
     thispid = os.fork()
@@ -48,7 +47,7 @@ def _daemonize():
     if thispid > 0:
         print 'confluent server starting as pid %d' % thispid
         os._exit(0)
-    os.closerange(0,2)
+    os.closerange(0, 2)
     os.umask(63)
     os.open(os.devnull, os.O_RDWR)
     os.dup2(0, 1)
@@ -69,7 +68,8 @@ def _checkpidfile():
         fcntl.flock(pidfile, fcntl.LOCK_EX)
         pid = pidfile.read()
         if pid != '':
-            print '/var/run/confluent/pid exists and indicates %s is still running' % pid
+            print ('/var/run/confluent/pid exists and indicates %s is still '
+                   'running' % pid)
             sys.exit(1)
         pidfile.write(str(os.getpid()))
         fcntl.flock(pidfile, fcntl.LOCK_UN)
@@ -84,20 +84,23 @@ def _checkpidfile():
         fcntl.flock(pidfile, fcntl.LOCK_SH)
         pid = pidfile.read()
         if pid != str(os.getpid()):
-            print '/var/run/confluent/pid exists and indicates %s is still running' % pid
+            print ('/var/run/confluent/pid exists and indicates %s is still '
+                   'running' % pid)
             sys.exit(1)
         fcntl.flock(pidfile, fcntl.LOCK_UN)
         pidfile.close()
 
 
-def terminate(signal, frame):
+def terminate(signalname, frame):
     sys.exit(0)
 
-def exit():
+
+def doexit():
     pidfile = open('/var/run/confluent/pid')
     pid = pidfile.read()
     if pid == str(os.getpid()):
         os.remove('/var/run/confluent/pid')
+
 
 def run():
     _checkpidfile()
@@ -106,7 +109,7 @@ def run():
     _updatepidfile()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
-    #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code 
+    #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code
     #works with bugs fixed
     #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
     #                           family=socket.AF_UNIX)
@@ -115,7 +118,6 @@ def run():
     webservice.start()
     sockservice = sockapi.SockApi()
     sockservice.start()
-    atexit.register(exit)
-    while (1):
+    atexit.register(doexit)
+    while 1:
         eventlet.sleep(100)
-

@@ -80,6 +80,7 @@ import time
 
 _loggers = {}
 
+
 class Events(object):
     (
         undefined, clearscreen, clientconnect, clientdisconnect,
@@ -186,7 +187,7 @@ class Logger(object):
             textfile = open(self.textpath, mode='r')
             binfile = open(self.binpath, mode='r')
         except IOError:
-            return ('', 0)
+            return '', 0
         fcntl.flock(binfile, fcntl.LOCK_SH)
         binfile.seek(0, 2)
         binidx = binfile.tell() - 16
@@ -210,14 +211,14 @@ class Logger(object):
         textdata = ''
         fcntl.flock(textfile, fcntl.LOCK_SH)
         while offsets:
-            (offset, len) = offsets.pop()
+            (offset, length) = offsets.pop()
             textfile.seek(offset, 0)
-            textdata += textfile.read(len)
+            textdata += textfile.read(length)
         fcntl.flock(textfile, fcntl.LOCK_UN)
         textfile.close()
         if termstate is None:
             termstate = 0
-        return (textdata, termstate)
+        return textdata, termstate
 
     def log(self, logdata=None, ltype=None, event=0, eventdata=None):
         if type(logdata) not in (str, unicode, dict):

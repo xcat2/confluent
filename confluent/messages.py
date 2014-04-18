@@ -39,7 +39,6 @@ def _htmlify_structure(indict):
     return ret + '</ul>'
 
 
-
 class ConfluentMessage(object):
     readonly = False
     defaultvalue = ''
@@ -68,23 +67,26 @@ class ConfluentMessage(object):
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
             value = self.defaultvalue
-            type = self.defaulttype
+            valtype = self.defaulttype
             notes = []
             if val is not None and 'value' in val:
                 value = val['value']
                 if 'inheritedfrom' in val:
                     notes.append('Inherited from %s' % val['inheritedfrom'])
                 if 'expression' in val:
-                    notes.append('Derived from expression "%s"' % val['expression'])
+                    notes.append(
+                        'Derived from expression "%s"' % val['expression'])
             elif val is not None and 'expression' in val and 'broken' in val:
                 value = "*BROKEN*"
-                notes.append('Derived from expression "%s"' % val['expression'])
+                notes.append(
+                    'Derived from expression "%s"' % val['expression'])
                 notes.append('Broken because of %s' % val['broken'])
             elif val is not None and 'expression' in val:
                 value = val['expression']
             if value is None:
                 value = ''
-            if val is not None and value == '' and 'isset' in val and val['isset'] is True:
+            if val is not None and value == '' and 'isset' in val and val[
+                    'isset'] is True:
                 # an encrypted value, put some *** to show it is set
                 # in the explorer
                 if 'inheritedfrom' in val:
@@ -95,19 +97,19 @@ class ConfluentMessage(object):
                 if len(val) == 0 and not self.readonly:
                     snippet += ('<input type="{0}" name="{1}" value="" '
                                 ' "title="{2}">'
-                                ).format(type, key, self.desc)
+                        ).format(valtype, key, self.desc)
                 for v in val:
                     if self.readonly:
                         snippet += _htmlify_structure(v)
                     else:
                         snippet += ('<input type="{0}" name="{1}" value="{2}" '
                                     ' "title="{3}">'
-                                    ).format(type, key, v, self.desc)
+                        ).format(valtype, key, v, self.desc)
                 if not self.readonly:
                     snippet += (
                         '<input type="{0}" name="{1}" value="" title="{2}">'
                         '<input type="checkbox" name="restexplorerhonorkey" '
-                        'value="{1}">').format(type, key, self.desc)
+                        'value="{1}">').format(valtype, key, self.desc)
                 return snippet
             if self.readonly:
                 snippet += "{0}: {1}".format(key, value)
@@ -116,7 +118,7 @@ class ConfluentMessage(object):
                             '<input type="{0}" name="{1}" value="{2}" '
                             'title="{3}"><input type="checkbox" '
                             'name="restexplorerhonorkey" value="{1}">'
-                            ).format(type, key, value, self.desc)
+                ).format(valtype, key, value, self.desc)
             if len(notes) > 0:
                 snippet += '(' + ','.join(notes) + ')'
         return snippet
@@ -128,7 +130,6 @@ class DeletedResource(ConfluentMessage):
 
 
 class ConfluentChoiceMessage(ConfluentMessage):
-
     def html(self):
         snippet = ""
         for key in self.kvpairs.iterkeys():
@@ -143,7 +144,7 @@ class ConfluentChoiceMessage(ConfluentMessage):
                     snippet += '<option value="%s">%s</option>' % (opt, opt)
             snippet += '</select>'
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
-            snippet += 'value="%s">' % (key)
+            snippet += 'value="{0}">'.format(key)
         return snippet
 
 
@@ -200,7 +201,6 @@ def get_input_message(path, operation, inputdata, nodes=None):
 
 
 class InputAttributes(ConfluentMessage):
-
     def __init__(self, path, inputdata, nodes=None):
         self.nodeattribs = {}
         nestedmode = False
@@ -263,7 +263,7 @@ class InputPowerMessage(ConfluentMessage):
         'off',
         'reset',
         'boot',
-        ])
+    ])
 
     def __init__(self, path, nodes, inputdata):
         self.powerbynode = {}
@@ -276,13 +276,13 @@ class InputPowerMessage(ConfluentMessage):
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
                 if ('state' not in datum or
-                        datum['state'] not in self.valid_values):
+                            datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumentException()
                 self.powerbynode[key] = datum['state']
         else:  # we have a state argument not by node
             datum = inputdata
             if ('state' not in datum or
-                    datum['state'] not in self.valid_values):
+                        datum['state'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
                 self.powerbynode[node] = datum['state']
@@ -298,7 +298,7 @@ class BootDevice(ConfluentChoiceMessage):
         'setup',
         'default',
         'cd',
-        ])
+    ])
 
     def __init__(self, node, device):
         if device not in self.valid_values:
@@ -321,13 +321,13 @@ class InputBootDevice(BootDevice):
                     raise exc.InvalidArgumentException()
                 datum = inputdata[key]
                 if ('state' not in datum or
-                        datum['state'] not in self.valid_values):
+                            datum['state'] not in self.valid_values):
                     raise exc.InvalidArgumenTException()
                 self.bootdevbynode[key] = datum['nextdevice']
         else:
             datum = inputdata
             if ('nextdevice' not in datum or
-                    datum['nextdevice'] not in self.valid_values):
+                        datum['nextdevice'] not in self.valid_values):
                 raise exc.InvalidArgumentException()
             for node in nodes:
                 self.bootdevbynode[node] = datum['nextdevice']
@@ -342,7 +342,7 @@ class PowerState(ConfluentChoiceMessage):
         'off',
         'reset',
         'boot',
-        ])
+    ])
 
     def __init__(self, node, state):
         self.kvpairs = {
@@ -390,6 +390,7 @@ class HealthSummary(ConfluentMessage):
             self.kvpairs = {'health': {'value': health}}
         else:
             self.kvpairs = {name: {'health': {'value': health}}}
+
 
 class Attributes(ConfluentMessage):
     def __init__(self, name=None, kv=None, desc=''):

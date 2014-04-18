@@ -21,9 +21,9 @@
 
 import confluent.config.configmanager as configmanager
 import eventlet
-import Crypto.Protocol.KDF as kdf
-import Crypto.Hash as hash
-import os
+import Crypto.Protocol.KDF as KDF
+import hashlib
+import hmac
 import time
 
 _passcache = {}
@@ -33,7 +33,7 @@ _passchecking = {}
 def _prune_passcache():
     # This function makes sure we don't remember a passphrase in memory more
     # than 10 seconds
-    while (1):
+    while True:
         curtime = time.time()
         for passent in _passcache.iterkeys():
             if passent[2] < curtime - 10:
@@ -88,7 +88,7 @@ def authorize(name, element, tenant=False, operation='create'):
     manager = configmanager.ConfigManager(tenant)
     userobj = manager.get_user(user)
     if userobj:  # returning
-        return (userobj, manager, user, tenant)
+        return userobj, manager, user, tenant
     return None
 
 
@@ -110,7 +110,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
                    embedded in name)
     """
     # The reason why tenant is 'False' instead of 'None':
-    # None means explictly not a tenant.  False means check
+    # None means explicitly not a tenant.  False means check
     # the username for signs of being a tenant
     # If there is any sign of guessing on a user, all valid and
     # invalid attempts are equally slowed to no more than 20 per second
@@ -135,7 +135,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     cfm = configmanager.ConfigManager(tenant)
     ucfg = cfm.get_user(user)
     if ucfg is None or 'cryptpass' not in ucfg:
-        eventlet.sleep(0.05)  # stall even on test for existance of a username
+        eventlet.sleep(0.05)  # stall even on test for existence of a username
         return None
     _passchecking[(user, tenant)] = True
     # TODO(jbjohnso): WORKERPOOL
@@ -143,8 +143,8 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     # throw it at the worker pool when implemented
     # maybe a distinct worker pool, wondering about starving out non-auth stuff
     salt, crypt = ucfg['cryptpass']
-    crypted = kdf.PBKDF2(passphrase, salt, 32, 10000,
-                         lambda p, s: hash.HMAC.new(p, s, hash.SHA256).digest()
+    crypted = KDF.PBKDF2(passphrase, salt, 32, 10000,
+                         lambda p, s: hmac.new(p, s, hashlib.sha256).digest()
                          )
     del _passchecking[(user, tenant)]
     eventlet.sleep(0.05)  # either way, we want to stall so that client can't
