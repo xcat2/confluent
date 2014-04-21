@@ -35,7 +35,7 @@
 
 # When in a console client mode, will recognize two escape sequences by
 # default:
-# Ctrl-E, c, ?: mimick conserver behavior
+# Ctrl-E, c, ?: mimic conserver behavior
 # ctrl-]: go to interactive prompt (telnet escape, but not telnet prompt)
 # esc-( would interfere with normal esc use too much
 # ~ I will not use for now...
@@ -47,8 +47,6 @@ import os
 import readline
 import select
 import shlex
-import socket
-import ssl
 import sys
 import termios
 import tty
@@ -64,12 +62,13 @@ sys.path.append(path)
 import confluent.common.tlvdata as tlvdata
 import confluent.common.client as client
 
-conserversequence = '\x05c' # ctrl-e, c
+conserversequence = '\x05c'  # ctrl-e, c
 
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
-server = None
+netserver = None
 
 statedata = {}
+
 
 def updatestatus(stateinfo):
     status = consolename
@@ -78,7 +77,8 @@ def updatestatus(stateinfo):
     if 'connectstate' in stateinfo:
         statedata['connectstate'] = stateinfo['connectstate']
     info = []
-    if 'connectstate' in statedata and statedata['connectstate'] != 'connected':
+    if ('connectstate' in statedata and
+            statedata['connectstate'] != 'connected'):
         info.append(statedata['connectstate'])
     if 'clientcount' in statedata and statedata['clientcount'] != 1:
         info.append('clients: %d' % statedata['clientcount'])
@@ -117,12 +117,14 @@ valid_commands = [
 candidates = None
 session = None
 
+
 def completer(text, state):
     try:
         return rcompleter(text, state)
     except:
         import traceback
         traceback.print_exc()
+
 
 def rcompleter(text, state):
     global candidates
@@ -137,6 +139,8 @@ def rcompleter(text, state):
         currpos += 1
     elif currpos:
         lastarg = args[-1]
+    else:
+        lastarg = ''
     if currpos <= 1:
         foundcount = 0
         for cmd in valid_commands:
@@ -178,6 +182,7 @@ def parse_command(command):
 
 currchildren = None
 
+
 def do_command(command, server):
     global exitcode
     global target
@@ -194,7 +199,7 @@ def do_command(command, server):
         otarget = target
         if len(argv) > 1:
             target = fullpath_target(argv[1], forcepath=True)
-        else: # cd by itself, go 'home'
+        else:  # cd by itself, go 'home'
             target = '/'
         for res in session.read(target, server):
             if 'errorcode' in res:
@@ -236,9 +241,12 @@ def do_command(command, server):
                         else:
                             attrstr = '%s=""' % key
                     if res[key] is not None and 'inheritedfrom' in res[key]:
-                        notes.append('Inherited from %s' % res[key]['inheritedfrom'])
+                        notes.append(
+                            'Inherited from %s' % res[key]['inheritedfrom'])
                     if res[key] is not None and 'expression' in res[key]:
-                        notes.append('Derived from expression "%s"' % res[key]['expression'])
+                        notes.append(
+                            ('Derived from expression "%s"' %
+                             res[key]['expression']))
                     notestr = '(' + ', '.join(notes) + ')'
                     output = '{0:<40} {1:>39}'.format(attrstr, notestr)
                     print(output)
@@ -246,7 +254,8 @@ def do_command(command, server):
         targpath = fullpath_target(argv[1])
         nodename = targpath.split('/')[-3]
         currconsole = targpath
-        tlvdata.send(session.connection, {'operation': 'start', 'path': targpath})
+        tlvdata.send(
+            session.connection, {'operation': 'start', 'path': targpath})
         status = tlvdata.recv(session.connection)
         if 'error' in status:
             if 'errorcode' in status:
@@ -281,6 +290,7 @@ def createresource(args):
 
 
 def makecall(callout, args):
+    global exitcode
     for response in callout(*args):
         if 'error' in response:
             if 'errorcode' in response:
@@ -289,6 +299,7 @@ def makecall(callout, args):
 
 
 def clearvalues(resource, attribs):
+    global exitcode
     targpath = fullpath_target(resource)
     keydata = {}
     for attrib in attribs:
@@ -304,7 +315,9 @@ def delresource(resname):
     resname = fullpath_target(resname)
     makecall(session.delete, (resname,))
 
+
 def setvalues(attribs):
+    global exitcode
     if '=' in attribs[0]:  # going straight to attribute
         resource = attribs[0][:attribs[0].index("=")]
         if '/' in resource:
@@ -323,6 +336,7 @@ def setvalues(attribs):
                 exitcode = res['errorcode']
             sys.stderr.write('Error: ' + res['error'] + '\n')
 
+
 def parameterize_attribs(attribs):
     keydata = {}
     for attrib in attribs:
@@ -337,19 +351,19 @@ def parameterize_attribs(attribs):
     return keydata
 
 
-def fullpath_target(path, forcepath=False):
+def fullpath_target(currpath, forcepath=False):
     global target
-    if path == '':
+    if currpath == '':
         return target
-    pathcomponents = path.split("/")
+    pathcomponents = currpath.split("/")
     if pathcomponents[-1] == "":  # preserve path
-        forcepath=True
+        forcepath = True
     if pathcomponents[0] == "":  # absolute path
-        ntarget = path
+        ntarget = currpath
     else:
         targparts = target.split("/")[:-1]
         for component in pathcomponents:
-            if component in ('.',''):  # ignore these
+            if component in ('.', ''):  # ignore these
                 continue
             elif component == '..':
                 if len(targparts) > 0:
@@ -363,6 +377,7 @@ def fullpath_target(path, forcepath=False):
         ntarget += '/'
     return ntarget
 
+
 def startconsole(nodename):
     global inconsole
     global consolename
@@ -372,21 +387,22 @@ def startconsole(nodename):
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
     inconsole = True
 
-def exit(code=0):
-    global consoleonly
+
+def quitconfetty(code=0, fullexit=False):
     global inconsole
     global currconsole
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
-    if consoleonly:
+    if fullexit:
         sys.exit(code)
     else:
         tlvdata.send(session.connection, {'operation': 'stop',
                                           'path': currconsole})
         inconsole = False
 
-def conserver_command(fh, command):
+
+def conserver_command(filehandle, command):
     # x - conserver has that as 'show baud', I am inclined to replace that with
     #     'request exclusive'
     # b - conserver has that as 'broadcast message', I'm tempted to use that
@@ -402,12 +418,12 @@ def conserver_command(fh, command):
     # L - toggle logging
     # w - who is on console
     while not command:
-        ready, _, _ = select.select((fh,), (), (), 1)
+        ready, _, _ = select.select((filehandle,), (), (), 1)
         if ready:
-            command += fh.read()
+            command += filehandle.read()
     if command[0] == '.':
         print("disconnect]\r")
-        exit()
+        quitconfetty(fullexit=consoleonly)
     if command[0] == 'b':
         tlvdata.send(session.connection, {'operation': 'break',
                                           'path': currconsole})
@@ -419,27 +435,29 @@ def conserver_command(fh, command):
         print("<cr> abort command\r")
     elif command[0] == '\x0d':
         print("ignored]\r")
-    else: #not a command at all..
+    else:  # not a command at all..
         print("unknown -- use '?']\r")
 
 
-def check_escape_seq(input, fh):
-    while conserversequence.startswith(input):
-        if input.startswith(conserversequence):  # We have full sequence
+def check_escape_seq(currinput, filehandle):
+    while conserversequence.startswith(currinput):
+        if currinput.startswith(conserversequence):  # We have full sequence
             sys.stdout.write("[")
             sys.stdout.flush()
-            return conserver_command(fh, input[len(conserversequence):])
-        ready, _, _ = select.select((fh,), (), (), 3)
+            return conserver_command(
+                filehandle, currinput[len(conserversequence):])
+        ready, _, _ = select.select((filehandle,), (), (), 3)
         if not ready:  # 3 seconds of no typing
             break
-        input += fh.read()
-    return input
+        currinput += filehandle.read()
+    return currinput
 
 
 parser = optparse.OptionParser()
-parser.add_option("-s", "--server", dest="server",
-                  help="Confluent instance to connect to", metavar="SERVER:PORT")
-opts, args =  parser.parse_args()
+parser.add_option("-s", "--server", dest="netserver",
+                  help="Confluent instance to connect to",
+                  metavar="SERVER:PORT")
+opts, shellargs = parser.parse_args()
 if opts.server:  # going over a TLS network
     session = client.Command(opts.server)
 else:
@@ -464,12 +482,13 @@ readline.set_completer(completer)
 doexit = False
 inconsole = False
 pendingcommand = ""
-if len(args) == 1:  # a node name, go straight to trying to console
+if len(shellargs) == 1:  # a node name, go straight to trying to console
     consoleonly = True
-    do_command("start /nodes/%s/console/session" % args[0], server)
+    do_command("start /nodes/%s/console/session" % shellargs[0], netserver)
 while not doexit:
     if inconsole:
-        rdylist, _, _ = select.select((sys.stdin, session.connection), (), (), 60)
+        rdylist, _, _ = select.select(
+            (sys.stdin, session.connection), (), (), 60)
         for fh in rdylist:
             if fh == session.connection:
                 # this only should get called in the
@@ -492,12 +511,11 @@ while not doexit:
                     sys.stdout.write("\r\n[remote disconnected]\r\n")
                     break
             else:
-                input = fh.read()
-                input = check_escape_seq(input, fh)
-                if input:
-                    tlvdata.send(session.connection, input)
+                myinput = fh.read()
+                myinput = check_escape_seq(myinput, fh)
+                if myinput:
+                    tlvdata.send(session.connection, myinput)
     else:
-        command = prompt()
-        do_command(command, server)
-consoleonly = True
-exit()
+        currcommand = prompt()
+        do_command(currcommand, netserver)
+quitconfetty(fullexit=True)

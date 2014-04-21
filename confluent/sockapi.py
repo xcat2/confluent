@@ -66,6 +66,7 @@ def sessionhdl(connection, authname, skipauth):
     # For now, trying to test the console stuff, so let's just do n4.
     authenticated = False
     authdata = None
+    cfm = None
     if skipauth:
         authenticated = True
         cfm = configmanager.ConfigManager(tenant=None)
@@ -97,15 +98,15 @@ def sessionhdl(connection, authname, skipauth):
         try:
             process_request(
                 connection, request, cfm, authdata, authname, skipauth)
-        except exc.ForbiddenRequest as e:
+        except exc.ForbiddenRequest:
             tlvdata.send(connection, {'errorcode': 403,
-                                  'error': 'Forbidden'})
+                                      'error': 'Forbidden'})
             tlvdata.send(connection, {'_requestdone': 1})
         except:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                event=log.Events.stacktrace)
+                         event=log.Events.stacktrace)
             tlvdata.send(connection, {'errorcode': 500,
-                                  'error': 'Unexpected error'})
+                                      'error': 'Unexpected error'})
             tlvdata.send(connection, {'_requestdone': 1})
         request = tlvdata.recv(connection)
 
@@ -174,11 +175,11 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
     except exc.NotFoundException:
         tlvdata.send(connection, {"errorcode": 404,
-                             "error": "Target not found"})
+                                  "error": "Target not found"})
         tlvdata.send(connection, {"_requestdone": 1})
     except exc.InvalidArgumentException:
         tlvdata.send(connection, {"errorcode": 400,
-                             "error": "Bad Request"})
+                                  "error": "Bad Request"})
         tlvdata.send(connection, {"_requestdone": 1})
     send_response(hdlr, connection)
     return
@@ -189,9 +190,9 @@ def _tlshandler():
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
-                    certfile="/etc/confluent/srvcert.pem",
-                    ssl_version=ssl.PROTOCOL_TLSv1,
-                    server_side=True)
+                          certfile="/etc/confluent/srvcert.pem",
+                          ssl_version=ssl.PROTOCOL_TLSv1,
+                          server_side=True)
     srv.bind(('0.0.0.0', 4001))
     srv.listen(5)
     authname = None
@@ -214,8 +215,8 @@ def _unixdomainhandler():
     while True:
         cnn, addr = unixsocket.accept()
         creds = cnn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED,
-                                struct.calcsize('3i'))
-        pid, uid, gid = struct.unpack('3i',creds)
+                               struct.calcsize('3i'))
+        pid, uid, gid = struct.unpack('3i', creds)
         skipauth = False
         if uid in (os.getuid(), 0):
             #this is where we happily accept the person

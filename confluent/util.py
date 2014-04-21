@@ -37,7 +37,7 @@ def securerandomnumber(low=0, high=4294967295):
 
     Note that this function will not return smaller than 0 nor larger
     than 2^32-1 no matter what is requested.
-    The python random number facility does not provide charateristics
+    The python random number facility does not provide characteristics
     appropriate for secure rng, go to os.urandom
 
     :param low: Smallest number to return (defaults to 0)
