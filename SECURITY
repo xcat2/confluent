@@ -1,0 +1,43 @@
+Try to forbid running as root.  If started as root, require a username to
+switch to.  The latter will probably be required for operations involving
+privileged ports or multicast.  Additionally, be SELinux friendly. 
+
+Things that tend to require root try to do without or handle in other ways:
+    -writing new dhcpd config and/or dns config
+        -DNS updates keep DDNS scheme, have a helper script to create an
+         amenable named config structure for common case on deploy.  Dynamic
+         zone creation would require something more.
+        -dhcp - require less precise dhcp configuration.  Have a script to
+         generate things with dynamic range and such.  May not be viable
+         for appliance-style deployment.
+        -perhaps implement sudo type escalation for key utilities as required
+    -copycds mount
+        -switch to libguestfs
+    -xdsh/xdcp
+        -Try to get by with psh/pscp style usage where that relationship is
+         entirely outside the daemon.
+    -binding low ports like SLP or bootps or setting multicast/broadcast
+        -bind early, then drop privilege
+
+
+Some experiments were tried with capabilities, but the logistics of meaningful
+restriction in the context of running under an interpreter like python has not
+been figured out.  Once python is exec()ed, pythons setcap attributes take
+over.  This would require a much less secure python or a private python
+interpreter copy.  So we will have to at least start as root and drop privelege
+after setting only the things we care about up (binding socket, setting
+multicast).
+
+Should the time come for arbitrary executable invocation as described in config
+comes about, such facilities will be part of a feature that would be disabled
+by default.  Two examples would be template fill in feature and script backend
+for consoles.
+
+When starting to service PXE, PXE and http support by default.  However, for
+more strict environments, allow https-only mode and disabling PXE.  The two
+might make sense to be tied together, since https bootstrap in the midst of a
+PXE boot is not really benefitting from absolute security.
+
+Auto-actuation of SLP detected entities might be enabled by default, but again
+having it locked down for environments that want hard assurance that every
+operation is meaningfully authenticated may make sense.
