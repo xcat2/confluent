@@ -380,7 +380,7 @@ def _addchange(changeset, node, attrname):
 
 
 def hook_new_configmanagers(callback):
-    '''Register callback for new tenants
+    """Register callback for new tenants
 
     From the point when this function is called until the end,
     callback may be invoked to indicate a new tenant and
@@ -389,11 +389,14 @@ def hook_new_configmanagers(callback):
 
     :param callback: Function to call for each possible config manager
     :returns: identifier that can be used to cancel this registration
-    '''
+    """
     #TODO(jbjohnso): actually live up to the promise of ongoing callbacks
     callback(ConfigManager(None))
-    for tenant in _cfgstore['tenant'].iterkeys():
-        callback(ConfigManager(tenant))
+    try:
+        for tenant in _cfgstore['tenant'].iterkeys():
+            callback(ConfigManager(tenant))
+    except KeyError:
+        pass
 
 
 class ConfigManager(object):
