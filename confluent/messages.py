@@ -228,7 +228,7 @@ class InputAttributes(ConfluentMessage):
                         # is unable to do so, meaning it is an expression
                         tv = self.attribs[attrib].format()
                         self.attribs[attrib] = tv
-                    except:
+                    except (KeyError, IndexError):
                         # this means format() actually thought there was work
                         # that suggested parameters, push it in as an
                         # expression
@@ -258,7 +258,7 @@ class InputAttributes(ConfluentMessage):
                     # expression, store value back in case of escapes
                     tv = nodeattr[attr].format()
                     nodeattr[attr] = tv
-                except:
+                except (KeyError, IndexError):
                     # an expression string will error if format() done
                     # use that as cue to put it into config as an expr
                     nodeattr[attr] = {'expression': nodeattr[attr]}

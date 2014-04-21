@@ -98,7 +98,7 @@ create_resource_functions = {
 
 
 def _sessioncleaner():
-    while (1):
+    while True:
         currtime = time.time()
         for session in httpsessions.keys():
             if httpsessions[session]['expiry'] < currtime:
@@ -148,7 +148,7 @@ def _authorize_request(env, operation):
     """Grant/Deny access based on data from wsgi env
 
     """
-    authdata = False
+    authdata = None
     name = ''
     cookie = Cookie.SimpleCookie()
     if 'HTTP_COOKIE' in env:
@@ -161,7 +161,7 @@ def _authorize_request(env, operation):
                 httpsessions[sessionid]['expiry'] = time.time() + 90
                 name = httpsessions[sessionid]['name']
                 authdata = auth.authorize(name, element=None)
-    if authdata is False and 'HTTP_AUTHORIZATION' in env:
+    if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, element=None)
@@ -306,13 +306,13 @@ def resourcehandler_backend(env, start_response):
             yield '{"session":"%s","data":""}' % sessid
             return
         elif 'bytes' in querydict.keys():  # not keycodes...
-            input = querydict['bytes']
+            myinput = querydict['bytes']
             sessid = querydict['session']
             if sessid not in consolesessions:
                 start_response('400 Expired Session', headers)
                 return
             consolesessions[sessid]['expiry'] = time.time() + 90
-            consolesessions[sessid]['session'].write(input)
+            consolesessions[sessid]['session'].write(myinput)
             start_response('200 OK', headers)
             yield json.dumps({'session': querydict['session']})
             return  # client has requests to send or receive, not both...
@@ -477,6 +477,9 @@ def serve():
 
 
 class HttpApi(object):
+    def __init__(self):
+        self.server = None
+
     def start(self):
         global auditlog
         global tracelog

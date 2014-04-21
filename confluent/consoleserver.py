@@ -208,7 +208,7 @@ class _ConsoleHandler(object):
         for rcpt in self.rcpts.itervalues():
             try:
                 rcpt(data)
-            except:
+            except:  # No matter the reason, advance to next recipient
                 pass
 
     def get_recent(self):

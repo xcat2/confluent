@@ -207,7 +207,7 @@ def _load_dict_from_dbm(dpath, tdb):
 def is_tenant(tenant):
     try:
         return tenant in _cfgstore['tenant']
-    except:
+    except KeyError:
         return False
 
 
@@ -219,7 +219,7 @@ def get_global(globalname):
     """
     try:
         return _cfgstore['globals'][globalname]
-    except:
+    except KeyError:
         return None
 
 
@@ -509,7 +509,7 @@ class ConfigManager(object):
         """
         try:
             return copy.deepcopy(self._cfgstore['users'][name])
-        except:
+        except KeyError:
             return None
 
     def set_user(self, name, attributemap):

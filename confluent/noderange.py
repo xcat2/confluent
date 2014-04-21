@@ -18,7 +18,7 @@
 # considered ast, but a number of things violate python grammar like [] in
 # the middle of strings and use of @ for anything is not in their syntax
 
-#construct custom grammer with pyparsing
+#construct custom grammar with pyparsing
 
 #>>> grammar = pyparsing.Word(pyparsing.alphanums+'/', pyparsing.alphanums+'[]-.*') | ',-' | ',' | '@'
 #>>> parser = pyparsing.nestedExpr('(',')',content=grammar)

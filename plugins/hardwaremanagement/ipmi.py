@@ -25,11 +25,13 @@ import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
 import socket
+
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
 
 _ipmithread = None
 _ipmiwaiters = []
+
 
 def _ipmi_evtloop():
     while True:
@@ -38,8 +40,9 @@ def _ipmi_evtloop():
             while _ipmiwaiters:
                 waiter = _ipmiwaiters.pop()
                 waiter.send()
-        except:
+        except:  # TODO(jbjohnso): log the trace into the log
             import traceback
+
             traceback.print_exc()
 
 
@@ -51,7 +54,7 @@ def get_conn_params(node, configdata):
     if 'secret.hardwaremanagementpassphrase' in configdata:
         passphrase = configdata['secret.hardwaremanagementpassphrase']['value']
     else:
-        passphrase = 'PASSW0RD' # for lack of a better guess
+        passphrase = 'PASSW0RD'  # for lack of a better guess
     if 'hardwaremanagement.manager' in configdata:
         bmc = configdata['hardwaremanagement.manager']['value']
     else:
@@ -70,9 +73,11 @@ def get_conn_params(node, configdata):
         'port': 623,
     }
 
+
 _configattributes = ('secret.hardwaremanagementuser',
-             'secret.hardwaremanagementpassphrase',
-             'secret.ipmikg', 'hardwaremanagement.manager')
+                     'secret.hardwaremanagementpassphrase',
+                     'secret.ipmikg', 'hardwaremanagement.manager')
+
 
 def _donothing(data):
     # a dummy function to avoid some awkward exceptions from
@@ -84,7 +89,10 @@ class IpmiConsole(conapi.Console):
     configattributes = frozenset(_configattributes)
 
     def __init__(self, node, config):
+        self.error = None
+        self.datacallback = None
         crypt = config.decrypt
+        self.solconnection = None
         config.decrypt = True
         self.broken = False
         configdata = config.get_node_attributes([node], _configattributes)
@@ -103,7 +111,6 @@ class IpmiConsole(conapi.Console):
 
     def handle_data(self, data):
         if type(data) == dict:
-            disconnect = frozenset(('Session Disconnected', 'timeout'))
             if 'error' in data:
                 self.solconnection = None
                 self.broken = True
@@ -113,17 +120,17 @@ class IpmiConsole(conapi.Console):
         else:
             self.datacallback(data)
 
-    def connect(self,callback):
+    def connect(self, callback):
         self.datacallback = callback
         # we provide a weak reference to pyghmi as otherwise we'd
         # have a circular reference and reference counting would never get
         # out...
         try:
             self.solconnection = console.Console(bmc=self.bmc, port=self.port,
-                                                userid=self.username,
-                                                password=self.password,
-                                                kg=self.kg, force=True,
-                                                iohandler=self.handle_data)
+                                                 userid=self.username,
+                                                 password=self.password,
+                                                 kg=self.kg, force=True,
+                                                 iohandler=self.handle_data)
             while not self.solconnection.connected and not self.broken:
                 w = eventlet.event.Event()
                 _ipmiwaiters.append(w)
@@ -136,9 +143,8 @@ class IpmiConsole(conapi.Console):
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))
 
-
     def close(self):
-        if hasattr(self, 'solconnection') and self.solconnection is not None:
+        if self.solconnection is not None:
             # break the circular reference here
             self.solconnection.out_handler = _donothing
         self.solconnection = None
@@ -178,15 +184,19 @@ class IpmiIterator(object):
             self.currdata = None
         return retdata
 
+
 def perform_request(operator, node, element, configdata, inputdata, cfg):
     return IpmiHandler(operator, node, element, configdata, inputdata, cfg
-                      ).handle_request()
+                       ).handle_request()
+
 
 persistent_ipmicmds = {}
+
 
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg):
         self.broken = False
+        self.error = None
         eventlet.sleep(0)
         self.cfg = cfd[node]
         self.loggedin = False
@@ -198,13 +208,13 @@ class IpmiHandler(object):
         self.inputdata = inputdata
         tenant = cfg.tenant
         self._logevt = None
-        if (node,tenant) not in persistent_ipmicmds:
+        if (node, tenant) not in persistent_ipmicmds:
             self._logevt = threading.Event()
-            persistent_ipmicmds[(node,tenant)] = ipmicommand.Command(
+            persistent_ipmicmds[(node, tenant)] = ipmicommand.Command(
                 bmc=connparams['bmc'], userid=connparams['username'],
                 password=connparams['passphrase'], kg=connparams['kg'],
                 port=connparams['port'], onlogon=self.logged)
-        self.ipmicmd = persistent_ipmicmds[(node,tenant)]
+        self.ipmicmd = persistent_ipmicmds[(node, tenant)]
 
     bootdevices = {
         'optical': 'cd'
@@ -227,14 +237,15 @@ class IpmiHandler(object):
                 raise exc.TargetEndpointUnreachable('Target timed out')
             else:
                 raise Exception(self.error)
-        if self.element == [ 'power', 'state' ]:
+        if self.element == ['power', 'state']:
             return self.power()
-        elif self.element == [ 'boot', 'nextdevice' ]:
+        elif self.element == ['boot', 'nextdevice']:
             return self.bootdevice()
-        elif self.element == [ 'health', 'hardware' ]:
+        elif self.element == ['health', 'hardware']:
             return self.health()
 
-    def _str_health(self, health):
+    @staticmethod
+    def _str_health(health):
         if pygconstants.Health.Failed & health:
             health = 'failed'
         elif pygconstants.Health.Critical & health:
@@ -246,11 +257,9 @@ class IpmiHandler(object):
         return health
 
     def _dict_sensor(self, pygreading):
-        retdict = {}
-        retdict['name'] = pygreading.name
-        retdict['value'] = pygreading.value
-        retdict['states'] = pygreading.states
-        retdict['health'] = self._str_health(pygreading.health)
+        retdict = {'name': pygreading.name, 'value': pygreading.value,
+                   'states': pygreading.states,
+                   'health': self._str_health(pygreading.health)}
         return retdict
 
     def health(self):
@@ -273,14 +282,14 @@ class IpmiHandler(object):
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
             return msg.BootDevice(node=self.node,
-                    device=bootdev['bootdev'])
+                                  device=bootdev['bootdev'])
         elif 'update' == self.op:
             bootdev = self.inputdata.bootdevice(self.node)
             bootdev = self.ipmicmd.set_bootdev(bootdev)
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
             return msg.BootDevice(node=self.node,
-                    device=bootdev['bootdev'])
+                                  device=bootdev['bootdev'])
 
     def power(self):
         if 'read' == self.op:
@@ -296,7 +305,6 @@ class IpmiHandler(object):
                                   state=power['powerstate'])
 
 
-
 def initthread():
     global _ipmithread
     if _ipmithread is None:
@@ -305,17 +313,17 @@ def initthread():
 
 def create(nodes, element, configmanager, inputdata):
     initthread()
-    if element == [ '_console', 'session' ]:
+    if element == ['_console', 'session']:
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
         return IpmiConsole(nodes[0], configmanager)
     else:
         return IpmiIterator('update', nodes, element, configmanager, inputdata)
 
+
 def update(nodes, element, configmanager, inputdata):
     initthread()
     return create(nodes, element, configmanager, inputdata)
-
 
 
 def retrieve(nodes, element, configmanager, inputdata):
