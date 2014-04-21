@@ -25,6 +25,7 @@
 # It also will optionally snoop SLP DA requests
 
 import atexit
+import confluent.consoleserver as consoleserver
 import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
 import confluent.sockapi as sockapi
@@ -114,6 +115,7 @@ def run():
     #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
     #                           family=socket.AF_UNIX)
     #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
+    consoleserver.start_console_sessions()
     webservice = httpapi.HttpApi()
     webservice.start()
     sockservice = sockapi.SockApi()
