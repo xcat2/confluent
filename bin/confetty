@@ -458,7 +458,7 @@ parser.add_option("-s", "--server", dest="netserver",
                   help="Confluent instance to connect to",
                   metavar="SERVER:PORT")
 opts, shellargs = parser.parse_args()
-if opts.server:  # going over a TLS network
+if opts.netserver:  # going over a TLS network
     session = client.Command(opts.server)
 else:
     session = client.Command()
