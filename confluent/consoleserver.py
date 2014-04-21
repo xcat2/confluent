@@ -21,6 +21,7 @@
 #we track nodes that are actively being logged, watched, or have attached
 #there should be no more than one handler per node
 import collections
+import confluent.config.configmanager as configmodule
 import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.log as log
@@ -117,6 +118,15 @@ class _ConsoleHandler(object):
             event=log.Events.consoledisconnect)
         self._send_rcpts({'connectstate': self.connectstate})
         self._connect()
+
+    def close(self):
+        self._send_rcpts({'deleting': True})
+        if self._console:
+            self._console.close()
+            self._console = None
+        if self.connectionthread:
+            self.connectionthread.kill()
+            self.connectionthread = None
 
     def unregister_rcpt(self, handle):
         self.clientcount -= 1
@@ -252,6 +262,30 @@ class _ConsoleHandler(object):
     def write(self, data):
         if self.connectstate == 'connected':
             self._console.write(data)
+
+
+def disconnect_node(node, configmanager):
+    consk = (node, configmanager.tenant)
+    if consk in _handled_consoles:
+        _handled_consoles[consk].close()
+        del _handled_consoles[consk]
+
+
+def _nodechange(added, deleting, configmanager):
+    for node in added:
+        connect_node(node, configmanager)
+    for node in deleting:
+        disconnect_node(node, configmanager)
+
+
+def _start_tenant_sessions(cfm):
+    for node in cfm.list_nodes():
+        connect_node(node, cfm)
+    cfm.watch_nodecollection(_nodechange)
+
+
+def start_console_sessions():
+    configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
 def connect_node(node, configmanager):
