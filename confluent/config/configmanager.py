@@ -800,6 +800,8 @@ class ConfigManager(object):
 
     def clear_group_attributes(self, groups, attributes):
         changeset = {}
+        if type(groups) in (str, unicode):
+            groups = (groups,)
         for group in groups:
                 group = group.encode('utf-8')
                 try:
