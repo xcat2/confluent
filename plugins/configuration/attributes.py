@@ -136,6 +136,14 @@ def update(nodes, element, configmanager, inputdata):
 
 def update_nodegroup(group, element, configmanager, inputdata):
     try:
+        clearattribs = []
+        for attrib in inputdata.attribs.iterkeys():
+            if inputdata.attribs[attrib] is None:
+                clearattribs.append(attrib)
+        for attrib in clearattribs:
+            del inputdata.attribs[attrib]
+        if clearattribs:
+            configmanager.clear_group_attributes(group, clearattribs)
         configmanager.set_group_attributes({group: inputdata.attribs})
     except ValueError:
         raise exc.InvalidArgumentException()
