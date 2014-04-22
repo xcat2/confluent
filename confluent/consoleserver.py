@@ -56,7 +56,6 @@ class _ConsoleHandler(object):
         if termstate & 2:
             self.shiftin = '0'
         self.users = {}
-        self.connectstate = 'connecting'
         self._attribwatcher = None
         self._console = None
         self.connectionthread = None
