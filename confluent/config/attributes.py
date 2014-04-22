@@ -144,6 +144,11 @@ node = {
 #                        'appropriate for the platform.  "Disable" can be used
 #                        'to suppress serial console configuration')
 #    },
+    'console.logging': {
+        'description': ('Indicate logging level to apply to console.  Valid '
+                        'values are currently "full", "interactive", and '
+                        '"none". Defaults to "full".')
+    },
     'console.method': {
         'description': ('Indicate the method used to access the console of '
                         'the managed node.')

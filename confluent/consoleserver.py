@@ -32,11 +32,12 @@ import random
 
 _handled_consoles = {}
 
-_genwatchattribs = frozenset(('console.method',))
+_genwatchattribs = frozenset(('console.method', 'console.logging'))
 
 
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
+        self._isondemand = False
         self.rcpts = {}
         self.cfgmgr = configmanager
         self.node = node
@@ -60,10 +61,64 @@ class _ConsoleHandler(object):
         self._console = None
         self.connectionthread = None
         self.send_break = None
-        eventlet.spawn(self._connect)
+        self._attribwatcher = self.cfgmgr.watch_attributes(
+            (self.node,), _genwatchattribs, self._attribschanged)
+        self.check_isondemand()
+        if not self._isondemand:
+            eventlet.spawn(self._connect)
 
-    def _attribschanged(self, **kwargs):
-        eventlet.spawn(self._connect)
+    def check_isondemand(self):
+        attrvalue = self.cfgmgr.get_node_attributes(
+            (self.node,), ('console.logging',))
+        if self.node not in attrvalue:
+            self._isondemand = False
+        elif 'console.logging' not in attrvalue[self.node]:
+            self._isondemand = False
+        elif attrvalue[self.node]['console.logging']['value'] != 'full':
+            self._isondemand = True
+
+    def _attribschanged(self, nodeattribs, configmanager, **kwargs):
+        if 'console.logging' in nodeattribs[self.node]:
+            # decide whether logging changes how we react or not
+            logvalue = 'full'
+            attributevalue = configmanager.get_node_attributes(
+                (self.node,), ('console.logging',))
+            try:
+                    logvalue = \
+                        attributevalue[self.node]['console.logging']['value']
+            except KeyError:
+                pass
+            if logvalue == 'full':
+                self._alwayson()
+            else:
+                self._ondemand()
+        if not self._isondemand or self.clientcount > 0:
+            eventlet.spawn(self._connect)
+
+    def _alwayson(self):
+        self._isondemand = False
+        if not self._console and not self.connectionthread:
+            self._connect()
+        else:
+                self._console.ping()
+
+    def _disconnect(self):
+        if self.connectionthread:
+            self.connectionthread.kill()
+            self.connectionthread = None
+        if self._console:
+            self.logger.log(
+                logdata='console disconnected', ltype=log.DataTypes.event,
+                event=log.Events.consoledisconnect)
+            self._console.close()
+            self._console = None
+            self.connectstate = 'unconnected'
+            self._send_rcpts({'connectstate': self.connectstate})
+
+    def _ondemand(self):
+        self._isondemand = True
+        if self.clientcount < 1 and self._console:
+            self._disconnect()
 
     def _connect(self):
         if self.connectionthread:
@@ -121,10 +176,9 @@ class _ConsoleHandler(object):
 
     def close(self):
         self._send_rcpts({'deleting': True})
+        self._disconnect()
         if self._console:
-            self.logger.log(
-                logdata='console disconnected', ltype=log.DataTypes.event,
-                event=log.Events.consoledisconnect)
+
             self._console.close()
             self._console = None
         if self.connectionthread:
@@ -136,6 +190,8 @@ class _ConsoleHandler(object):
         if handle in self.rcpts:
             del self.rcpts[handle]
         self._send_rcpts({'clientcount': self.clientcount})
+        if self._isondemand and self.clientcount < 1:
+            self._disconnect()
 
     def register_rcpt(self, callback):
         self.clientcount += 1
