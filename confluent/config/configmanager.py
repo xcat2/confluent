@@ -975,7 +975,7 @@ class ConfigManager(object):
         if newnodes:
             if self.tenant in self._nodecollwatchers:
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
-                for watcher in nodecollwatchers[self.tenant].itervalues():
+                for watcher in nodecollwatchers.itervalues():
                     watcher(added=newnodes, deleting=[], configmanager=self)
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
