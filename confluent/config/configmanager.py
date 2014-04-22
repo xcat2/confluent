@@ -821,6 +821,8 @@ class ConfigManager(object):
                             nodecfg = self._cfgstore['nodes'][node]
                             self._do_inheritance(
                                 nodecfg, attrib, node, changeset)
+        self._notif_attribwatchers(changeset)
+        self._bg_sync_to_file()
 
     def _refresh_nodecfg(self, cfgobj, attrname, node, changeset):
         exprmgr = None
