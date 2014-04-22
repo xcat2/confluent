@@ -810,13 +810,15 @@ class ConfigManager(object):
                     continue
                 _mark_dirtykey('groups', group, self.tenant)
                 for attrib in attributes:
-                    del groupentry[attrib]
                     if attrib == 'nodes':
                         groupentry['nodes'] = set()
                         self._sync_nodes_to_group(
                             group=group, nodes=(), changeset=changeset)
                     else:
-                        del groupentry[attrib]
+                        try:
+                            del groupentry[attrib]
+                        except KeyError:
+                            pass
                         for node in groupentry['nodes']:
                             nodecfg = self._cfgstore['nodes'][node]
                             self._do_inheritance(
