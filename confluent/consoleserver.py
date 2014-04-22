@@ -122,6 +122,9 @@ class _ConsoleHandler(object):
     def close(self):
         self._send_rcpts({'deleting': True})
         if self._console:
+            self.logger.log(
+                logdata='console disconnected', ltype=log.DataTypes.event,
+                event=log.Events.consoledisconnect)
             self._console.close()
             self._console = None
         if self.connectionthread:
