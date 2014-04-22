@@ -798,6 +798,28 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
+    def clear_group_attributes(self, groups, attributes):
+        changeset = {}
+        for group in groups:
+                group = group.encode('utf-8')
+                try:
+                    groupentry = self._cfgstore['groups'][group]
+                except KeyError:
+                    continue
+                _mark_dirtykey('groups', group, self.tenant)
+                for attrib in attributes:
+                    del groupentry[attrib]
+                    if attrib == 'nodes':
+                        groupentry['nodes'] = set()
+                        self._sync_nodes_to_group(
+                            group=group, nodes=(), changeset=changeset)
+                    else:
+                        del groupentry[attrib]
+                        for node in groupentry['nodes']:
+                            nodecfg = self._cfgstore['nodes'][node]
+                            self._do_inheritance(
+                                nodecfg, attrib, node, changeset)
+
     def _refresh_nodecfg(self, cfgobj, attrname, node, changeset):
         exprmgr = None
         if 'expression' in cfgobj[attrname]:  # evaluate now
