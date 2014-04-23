@@ -41,3 +41,7 @@ KeyError: ''
 
 
 -have pyghmi and friends do multiprocessing pools (particularly the PBKDF stuff in auth)
+-have console sessions be instructed as to more specific clue for unconnected
+    -misconfigured - console.method probably not set right
+    -unreachable - hardwaremanagement.manager probably wrong
+    -authentication failure - user/passphrase probable not right

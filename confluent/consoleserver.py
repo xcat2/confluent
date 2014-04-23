@@ -29,11 +29,13 @@ import confluent.pluginapi as plugin
 import eventlet
 import eventlet.green.threading as threading
 import random
+import traceback
 
 _handled_consoles = {}
 
 _genwatchattribs = frozenset(('console.method', 'console.logging'))
 
+_tracelog = None
 
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
@@ -135,9 +137,13 @@ class _ConsoleHandler(object):
         if self.reconnect:
             self.reconnect.cancel()
             self.reconnect = None
-        self._console = plugin.handle_path(
-            "/nodes/%s/_console/session" % self.node,
-            "create", self.cfgmgr)
+        try:
+            self._console = plugin.handle_path(
+                "/nodes/%s/_console/session" % self.node,
+                "create", self.cfgmgr)
+        except:
+            _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                          event=log.Events.stacktrace)
         if not isinstance(self._console, conapi.Console):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate})
@@ -345,11 +351,17 @@ def _nodechange(added, deleting, configmanager):
 
 def _start_tenant_sessions(cfm):
     for node in cfm.list_nodes():
-        connect_node(node, cfm)
+        try:
+            connect_node(node, cfm)
+        except:
+            _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                          event=log.Events.stacktrace)
     cfm.watch_nodecollection(_nodechange)
 
 
 def start_console_sessions():
+    global _tracelog
+    _tracelog = log.Logger('trace')
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
