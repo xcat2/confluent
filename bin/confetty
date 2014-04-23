@@ -485,12 +485,17 @@ parser.add_option("-s", "--server", dest="netserver",
 opts, shellargs = parser.parse_args()
 if opts.netserver:  # going over a TLS network
     session = client.Command(opts.netserver)
-else:
+elif 'CONFLUENT_HOST' in os.environ:
+    session = client.Command(os.environ['CONFLUENT_HOST'])
+else:  # unix domain
     session = client.Command()
 
 #Next stop, reading and writing from whichever of stdin and server goes first.
 #see pyghmi code for solconnect.py
-
+if not session.authenticated and 'CONFLUENT_USER' in os.environ:
+    username = os.environ['CONFLUENT_USER']
+    passphrase = os.environ['CONFLUENT_PASSPHRASE']
+    session.authenticate(username, passphrase)
 while not session.authenticated:
     username = raw_input("Name: ")
     readline.clear_history()
@@ -507,9 +512,13 @@ readline.set_completer(completer)
 doexit = False
 inconsole = False
 pendingcommand = ""
-if len(shellargs) == 1:  # a node name, go straight to trying to console
+if len(shellargs) == 1 and ' ' not in shellargs[0]:  # straight to node console
     consoleonly = True
     do_command("start /nodes/%s/console/session" % shellargs[0], netserver)
+elif shellargs:
+    command = " ".join(shellargs)
+    do_command(command, netserver)
+    quitconfetty(fullexit=True)
 while not doexit:
     if inconsole:
         rdylist, _, _ = select.select(
