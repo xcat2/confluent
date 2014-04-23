@@ -220,6 +220,20 @@ class Logger(object):
             termstate = 0
         return textdata, termstate
 
+    def write(self, data):
+        """Write plain text to log
+
+        This is intended so that a log object may be used to replace a
+        normal file object with a loss of capability.  For example,
+        sys.stdout = logobject
+
+        :param data: data to log
+        """
+        self.log(data)
+
+    def flush(self):
+        pass
+
     def log(self, logdata=None, ltype=None, event=0, eventdata=None):
         if type(logdata) not in (str, unicode, dict):
             raise Exception("Unsupported logdata")

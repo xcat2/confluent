@@ -28,6 +28,7 @@ import atexit
 import confluent.consoleserver as consoleserver
 import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
+import confluent.log as log
 import confluent.sockapi as sockapi
 import eventlet
 #import eventlet.backdoor as backdoor
@@ -53,6 +54,8 @@ def _daemonize():
     os.open(os.devnull, os.O_RDWR)
     os.dup2(0, 1)
     os.dup2(0, 2)
+    sys.stdout = log.logger('stdout')
+    sys.stderr = log.logger('stderr')
 
 
 def _updatepidfile():
