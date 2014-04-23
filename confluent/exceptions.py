@@ -36,6 +36,11 @@ class TargetEndpointUnreachable(ConfluentException):
     # was unreachable.  http code 504
     pass
 
+class TargetEndpointBadCredentials(ConfluentException):
+    # target was reachable, but authentication/authorization
+    # failed
+    pass
+
 
 class ForbiddenRequest(ConfluentException):
     # The client request is not allowed by authorization engine

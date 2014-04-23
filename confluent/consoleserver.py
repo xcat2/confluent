@@ -146,8 +146,9 @@ class _ConsoleHandler(object):
                           event=log.Events.stacktrace)
         if not isinstance(self._console, conapi.Console):
             self.connectstate = 'unconnected'
-            self._send_rcpts({'connectstate': self.connectstate})
             self.error = 'misconfigured'
+            self._send_rcpts({'connectstate': self.connectstate,
+                              'error': self.error})
             return
         self.send_break = self._console.send_break
         if self._attribwatcher:
@@ -161,10 +162,20 @@ class _ConsoleHandler(object):
             (self.node,), attribstowatch, self._attribschanged)
         try:
             self._console.connect(self.get_console_output)
+        except exc.TargetEndpointBadCredentials:
+            self.error = 'badcredentials'
+            self.connectstate = 'unconnected'
+            self._send_rcpts({'connectstate': self.connectstate,
+                              'error': self.error})
+            retrytime = 30 + (30 * random.random())
+            if not self.reconnect:
+                self.reconnect = eventlet.spawn_after(retrytime, self._connect)
+            return
         except exc.TargetEndpointUnreachable:
             self.error = 'unreachable'
             self.connectstate = 'unconnected'
-            self._send_rcpts({'connectstate': self.connectstate})
+            self._send_rcpts({'connectstate': self.connectstate,
+                              'error': self.error})
             retrytime = 30 + (30 * random.random())
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)

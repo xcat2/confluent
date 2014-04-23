@@ -138,7 +138,11 @@ class IpmiConsole(conapi.Console):
                 if self.broken:
                     break
             if self.broken:
-                raise exc.TargetEndpointUnreachable(self.error)
+                if (self.error.startswith('Incorrect password') or
+                        self.error.startswith('Unauthorized name')):
+                    raise exc.TargetEndpointBadCredentials
+                else:
+                    raise exc.TargetEndpointUnreachable(self.error)
             self.connected = True
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))

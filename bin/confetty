@@ -67,21 +67,16 @@ conserversequence = '\x05c'  # ctrl-e, c
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
 netserver = None
 
-statedata = {}
-
-
 def updatestatus(stateinfo):
     status = consolename
-    if 'clientcount' in stateinfo:
-        statedata['clientcount'] = stateinfo['clientcount']
-    if 'connectstate' in stateinfo:
-        statedata['connectstate'] = stateinfo['connectstate']
     info = []
-    if ('connectstate' in statedata and
-            statedata['connectstate'] != 'connected'):
-        info.append(statedata['connectstate'])
-    if 'clientcount' in statedata and statedata['clientcount'] != 1:
-        info.append('clients: %d' % statedata['clientcount'])
+    if ('connectstate' in stateinfo and
+            stateinfo['connectstate'] != 'connected'):
+        info.append(stateinfo['connectstate'])
+    if 'error' in stateinfo:
+        info.append(stateinfo['error'])
+    if 'clientcount' in stateinfo and stateinfo['clientcount'] != 1:
+        info.append('clients: %d' % stateinfo['clientcount'])
     if info:
         status += ' [' + ','.join(info) + ']'
     sys.stdout.write('\x1b]0;console: %s\x07' % status)
