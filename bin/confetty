@@ -67,6 +67,7 @@ conserversequence = '\x05c'  # ctrl-e, c
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
 netserver = None
 
+
 def updatestatus(stateinfo):
     status = consolename
     info = []
@@ -81,6 +82,32 @@ def updatestatus(stateinfo):
         status += ' [' + ','.join(info) + ']'
     sys.stdout.write('\x1b]0;console: %s\x07' % status)
     sys.stdout.flush()
+
+
+def recurse_format(datum, levels=0):
+    ret = ''
+    import json
+    return json.dumps(datum, indent=1)
+    if isinstance(datum, dict):
+        for key in datum.iterkeys():
+            if datum[key] is None:
+                continue
+            ret += key + ':'
+            if type(datum[key]) in (str, unicode):
+                ret += datum[key] + '\n'
+            else:
+                ret += recurse_format(datum[key], levels + 1)
+    elif isinstance(datum, list):
+        if type(datum[0]) in (str, unicode):
+            ret += '[' + ",".join(datum) + ']\n'
+        else:
+            ret += '['
+            elems = []
+            for elem in datum:
+                elems.append('{' + recurse_format(elem, levels + 1) + '}')
+            ret += ','.join(elems)
+            ret += ('  ' * levels) + ']\n'
+    return ret
 
 
 def prompt():
@@ -225,7 +252,7 @@ def do_command(command, server):
                     if res[key] is None:
                         attrstr = '%s=""' % key
                     elif type(res[key]) == list:
-                        attrstr = '%s=["%s"]' % (key, '","'.join(res[key]))
+                        attrstr = '%s=%s' % (key, recurse_format(res[key]))
                     elif 'value' in res[key] and res[key]['value'] is not None:
                         attrstr = '%s="%s"' % (key, res[key]['value'])
                     elif 'value' in res[key] and res[key]['value'] is None:
@@ -242,8 +269,11 @@ def do_command(command, server):
                         notes.append(
                             ('Derived from expression "%s"' %
                              res[key]['expression']))
-                    notestr = '(' + ', '.join(notes) + ')'
-                    output = '{0:<40} {1:>39}'.format(attrstr, notestr)
+                    if notes:
+                        notestr = '(' + ', '.join(notes) + ')'
+                        output = '{0:<40} {1:>39}'.format(attrstr, notestr)
+                    else:
+                        output = attrstr
                     print(output)
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
