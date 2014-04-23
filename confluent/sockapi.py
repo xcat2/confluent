@@ -62,7 +62,7 @@ class ClientConsole(object):
         self.pendingdata = None
 
 
-def sessionhdl(connection, authname, skipauth):
+def sessionhdl(connection, authname, skipauth=False):
     # For now, trying to test the console stuff, so let's just do n4.
     authenticated = False
     authdata = None

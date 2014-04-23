@@ -454,7 +454,7 @@ parser.add_option("-s", "--server", dest="netserver",
                   metavar="SERVER:PORT")
 opts, shellargs = parser.parse_args()
 if opts.netserver:  # going over a TLS network
-    session = client.Command(opts.server)
+    session = client.Command(opts.netserver)
 else:
     session = client.Command()
 

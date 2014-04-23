@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import anydbm as dbm
+import errno
 import os
 import socket
 import ssl
@@ -29,7 +31,7 @@ def _parseserver(string):
         server = string[1:-1]
         port = 4001
     elif ':' in string:
-        server, port = string.plit(':')
+        server, port = string.split(':')
     else:
         server = string
         port = 4001
@@ -90,8 +92,9 @@ class Command(object):
                 continue
             try:
                 self.connection.settimeout(5)
-                self.connection.connection(sa)
+                self.connection.connect(sa)
             except:
+                raise
                 self.connection.close()
                 self.connection = None
                 continue
@@ -99,7 +102,37 @@ class Command(object):
         if self.connection is None:
             raise Exception("Failed to connect to %s" % self.serverloc)
         #TODO(jbjohnso): server certificate validation
-        self.connection = ssl.wrap_socket(self.connection)
+        clientcfgdir = os.path.join(os.path.expanduser("~"), ".confluent")
+        try:
+            os.makedirs(clientcfgdir)
+        except OSError as exc:
+            if not (exc.errno == errno.EEXIST and os.path.isdir(clientcfgdir)):
+                raise
+        cacert = os.path.join(clientcfgdir, "ca.pem")
+        certreqs = ssl.CERT_REQUIRED
+        knownhosts = False
+        if not os.path.exists(cacert):
+            cacert = None
+            certreqs = ssl.CERT_NONE
+            knownhosts = True
+        self.connection = ssl.wrap_socket(self.connection, ca_certs=cacert,
+                                          cert_reqs=certreqs,
+                                          ssl_version=ssl.PROTOCOL_TLSv1)
+        if knownhosts:
+            certdata = self.connection.getpeercert(binary_form=True)
+            hostid = '@'.join((port,server))
+            khf = dbm.open(os.path.join(clientcfgdir, "knownhosts"), 'c', 384)
+            if hostid in khf:
+                if certdata == khf[hostid]:
+                    return
+                else:
+                    replace = raw_input(
+                        "MISMATCHED CERTIFICATE DATA, ACCEPT NEW? (y/n):")
+                    if replace not in ('y', 'Y'):
+                        raise Exception("BAD CERTIFICATE")
+            print 'Adding new key for %s:%s' % (server, port)
+            khf[hostid] = certdata
+
 
 
 def send_request(operation, path, server, parameters=None):
