@@ -170,7 +170,8 @@ class Logger(object):
                 else:
                     textrecord = textdate + data + ']'
             else:
-                textrecord = textdate + data + '\n'
+                if not textrecord.endswith('\n'):
+                    textrecord = textdate + data + '\n'
             self.textfile.write(textrecord)
             fcntl.flock(self.textfile, fcntl.LOCK_UN)
             fcntl.flock(self.binfile, fcntl.LOCK_EX)

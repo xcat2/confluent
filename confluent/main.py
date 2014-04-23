@@ -54,8 +54,8 @@ def _daemonize():
     os.open(os.devnull, os.O_RDWR)
     os.dup2(0, 1)
     os.dup2(0, 2)
-    sys.stdout = log.logger('stdout')
-    sys.stderr = log.logger('stderr')
+    sys.stdout = log.Logger('stdout')
+    sys.stderr = log.Logger('stderr')
 
 
 def _updatepidfile():
