@@ -170,8 +170,9 @@ class Logger(object):
                 else:
                     textrecord = textdate + data + ']'
             else:
-                if not data.endswith('\n'):
-                    textrecord = textdate + data + '\n'
+                textrecord = textdate + data
+                if not textrecord.endswith('\n'):
+                    textrecord += '\n'
             self.textfile.write(textrecord)
             fcntl.flock(self.textfile, fcntl.LOCK_UN)
             fcntl.flock(self.binfile, fcntl.LOCK_EX)
@@ -230,7 +231,8 @@ class Logger(object):
 
         :param data: data to log
         """
-        self.log(data)
+        if data != '\n':  # 'print' likes to do '\n' by itself, skip that
+            self.log(data)
 
     def flush(self):
         pass
