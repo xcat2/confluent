@@ -821,8 +821,17 @@ class ConfigManager(object):
                             pass
                         for node in groupentry['nodes']:
                             nodecfg = self._cfgstore['nodes'][node]
-                            self._do_inheritance(
-                                nodecfg, attrib, node, changeset)
+                            try:
+                                delnodeattrib = (
+                                    nodecfg[attrib]['inheritedfrom'] == group)
+                            except KeyError:
+                                delnodeattrib = False
+                            if delnodeattrib:
+                                _mark_dirtykey('nodes', node, self.tenant)
+                                del nodecfg[attrib]
+                                self._do_inheritance(nodecfg, attrib, node,
+                                                     changeset)
+                                _addchange(changeset, node, attrib)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -1104,3 +1113,13 @@ try:
     ConfigManager._read_from_path()
 except IOError:
     _cfgstore = {}
+
+
+# some unit tests worth implementing:
+# set group attribute on lower priority group, result is that node should not
+# change
+# after that point, then unset on the higher priority group, lower priority
+# group should get it then
+# rinse and repeat for set on node versus set on group
+# clear group attribute and assure than it becomes unset on all nodes
+# set various expressions
