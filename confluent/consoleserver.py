@@ -38,6 +38,7 @@ _genwatchattribs = frozenset(('console.method', 'console.logging'))
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
         self._isondemand = False
+        self.error = None
         self.rcpts = {}
         self.cfgmgr = configmanager
         self.node = node
@@ -137,6 +138,11 @@ class _ConsoleHandler(object):
         self._console = plugin.handle_path(
             "/nodes/%s/_console/session" % self.node,
             "create", self.cfgmgr)
+        if not isinstance(self._console, conapi.Console):
+            self.connectstate = 'unconnected'
+            self._send_rcpts({'connectstate': self.connectstate})
+            self.error = 'misconfigured'
+            return
         self.send_break = self._console.send_break
         if self._attribwatcher:
             self.cfgmgr.remove_watcher(self._attribwatcher)
@@ -150,6 +156,7 @@ class _ConsoleHandler(object):
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointUnreachable:
+            self.error = 'unreachable'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate})
             retrytime = 30 + (30 * random.random())

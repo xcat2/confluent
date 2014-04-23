@@ -857,11 +857,11 @@ class ConfigManager(object):
         for node in nodeattrs.iterkeys():
             if node not in attribwatchers:
                 continue
-            attribwatchers = attribwatchers[node]
+            attribwatcher = attribwatchers[node]
             for attrname in nodeattrs[node].iterkeys():
-                if attrname not in attribwatchers:
+                if attrname not in attribwatcher:
                     continue
-                for notifierid in attribwatchers[attrname].iterkeys():
+                for notifierid in attribwatcher[attrname].iterkeys():
                     if notifierid in notifdata:
                         if node in notifdata[notifierid]['nodeattrs']:
                             notifdata[notifierid]['nodeattrs'][node].append(
@@ -872,7 +872,7 @@ class ConfigManager(object):
                     else:
                         notifdata[notifierid] = {
                             'nodeattrs': {node: [attrname]},
-                            'callback': attribwatchers[attrname][notifierid]
+                            'callback': attribwatcher[attrname][notifierid]
                         }
         for watcher in notifdata.itervalues():
             callback = watcher['callback']
