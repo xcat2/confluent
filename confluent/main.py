@@ -25,6 +25,7 @@
 # It also will optionally snoop SLP DA requests
 
 import atexit
+import confluent.auth as auth
 import confluent.consoleserver as consoleserver
 import confluent.pluginapi as pluginapi
 import confluent.httpapi as httpapi
@@ -111,6 +112,7 @@ def run():
     pluginapi.load_plugins()
     _daemonize()
     _updatepidfile()
+    auth.init_auth()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
     #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code

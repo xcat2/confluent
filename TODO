@@ -1,11 +1,3 @@
--user can bog down all requests by hammering it with bad auth requests causing
- the auth facility to get bogged down in PBKDF
-    Option:
-        -a multiprocessing pool to handle new authentications.  The auth action
-         itself would be stalled out whilst an attack was underway, but once
-         in, the respective session layers will provide a caching session that
-         should accelerate things after the client gets in once
-        -penalizing a client clearly trying to break in
 -other auth
     -pam if user exists but has no passphrase
     -keystone?
@@ -14,13 +6,6 @@
 -When a user account is changed, have httpapi and sockapi notified of changes
  to kill off related sessions.  password changes are given a pass, but user
  deletion will result in immediate session termination
--need event notification for config change- e.g. set attribute triggers consol
- session object check to see if credentials changed
- design is that calling code on init registers a callback for related node to
- the in-context config manager object.  callback shall be OO so no context
- object parametr passed in.  ipmi will use it for user/password/hardwaremanagement.manager
- changes to console and command objects.  console will use it to hook add/deletion
- of nodes and/or indicating a different console.method or hardwaremanagement.method
 -When the time comes to dole out configuration/discovery, take page from xCAT
     'flexdiscover' command, if possible bring an ipmi device under management
     by way of ipv6 to eliminate requirement for ip to be specified.
@@ -40,8 +25,4 @@ Traceback (most recent call last):
 KeyError: ''
 
 
--have pyghmi and friends do multiprocessing pools (particularly the PBKDF stuff in auth)
--have console sessions be instructed as to more specific clue for unconnected
-    -misconfigured - console.method probably not set right
-    -unreachable - hardwaremanagement.manager probably wrong
-    -authentication failure - user/passphrase probable not right
+-have pyghmi and friends do multiprocessing pools

@@ -21,13 +21,17 @@
 
 import confluent.config.configmanager as configmanager
 import eventlet
+import eventlet.tpool
 import Crypto.Protocol.KDF as KDF
 import hashlib
 import hmac
+import multiprocessing
 import time
 
 _passcache = {}
 _passchecking = {}
+
+authworkers = None
 
 
 def _prune_passcache():
@@ -143,9 +147,13 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     # throw it at the worker pool when implemented
     # maybe a distinct worker pool, wondering about starving out non-auth stuff
     salt, crypt = ucfg['cryptpass']
-    crypted = KDF.PBKDF2(passphrase, salt, 32, 10000,
-                         lambda p, s: hmac.new(p, s, hashlib.sha256).digest()
-                         )
+    # execute inside tpool to get greenthreads to give it a special thread
+    # world
+    #TODO(jbjohnso): util function to generically offload a call
+    #such a beast could be passed into pyghmi as a way for pyghmi to
+    #magically get offload of the crypto functions without having
+    #to explicitly get into the eventlet tpool game
+    crypted = eventlet.tpool.execute(_do_pbkdf, passphrase, salt)
     del _passchecking[(user, tenant)]
     eventlet.sleep(0.05)  # either way, we want to stall so that client can't
         # determine failure because there is a delay, valid response will
@@ -154,3 +162,26 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         _passcache[(user, tenant)] = passphrase
         return authorize(user, element, tenant)
     return None
+
+
+def _apply_pbkdf(passphrase, salt):
+    return KDF.PBKDF2(passphrase, salt, 32, 10000,
+                      lambda p, s: hmac.new(p, s, hashlib.sha256).digest())
+
+
+def _do_pbkdf(passphrase, salt):
+    # we must get it over to the authworkers pool or else get blocked in
+    # compute.  However, we do want to wait for result, so we have
+    # one of the exceedingly rare sort of circumstances where 'apply'
+    # actually makes sense
+    return authworkers.apply(_apply_pbkdf, [passphrase, salt])
+
+
+def init_auth():
+    # have a some auth workers available.  Keep them distinct from
+    # the general populace of workers to avoid unauthorized users
+    # starving out productive work
+    global authworkers
+    # for now we'll just have one auth worker and see if there is any
+    # demand for more.  I personally doubt it.
+    authworkers = multiprocessing.Pool(processes=1)
