@@ -384,7 +384,8 @@ def _assemble_html(responses, resource, querydict, url, extension):
     yield 'Only fields that have their boxes checked will have their ' \
           'respective values honored by the confluent server.<hr>' \
           '<input type="hidden" name="restexplorerhonorkey" value="">' + \
-          '<a rel="self" href="%s">%s</a><br>' % (resource, resource)
+          '<a rel="self" href="{0}{1}">{0}{1}</a><br>'.format(
+              resource, extension)
     if url == '/':
         iscollection = True
     elif resource[-1] == '/':
