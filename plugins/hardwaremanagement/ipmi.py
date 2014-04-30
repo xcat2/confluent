@@ -21,7 +21,6 @@ import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
 import eventlet.queue
 import pyghmi.constants as pygconstants
-import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
 import socket
@@ -184,6 +183,10 @@ class IpmiIterator(object):
         try:
             retdata = self.currdata.next()
         except AttributeError:
+            if hasattr(self.currdata, 'next'):
+                # the attribute error is not the immediate
+                # one, raise it to be caught as normal
+                raise
             retdata = self.currdata
             self.currdata = None
         return retdata
