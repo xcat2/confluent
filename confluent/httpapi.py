@@ -215,13 +215,13 @@ def _pick_mimetype(env):
     if the '.json' scheme doesn't cut it.
     """
     if env['PATH_INFO'].endswith('.json'):
-        return 'application/json; charset=utf-8'
+        return 'application/json; charset=utf-8', '.json'
     elif env['PATH_INFO'].endswith('.html'):
-        return 'text/html'
+        return 'text/html', '.html'
     elif 'application/json' in env['HTTP_ACCEPT']:
-        return 'application/json; charset=utf-8'
+        return 'application/json; charset=utf-8', ''
     else:
-        return 'text/html'
+        return 'text/html', ''
 
 
 def _assign_consessionid(consolesession):
@@ -248,7 +248,7 @@ def resourcehandler(env, start_response):
 def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
-    mimetype = _pick_mimetype(env)
+    mimetype, extension = _pick_mimetype(env)
     reqbody = None
     reqtype = None
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
@@ -362,16 +362,17 @@ def resourcehandler_backend(env, start_response):
             return
         pagecontent = ""
         if mimetype == 'text/html':
-            for datum in _assemble_html(hdlr, resource, lquerydict, url):
+            for datum in _assemble_html(hdlr, resource, lquerydict, url,
+                                        extension):
                 pagecontent += datum
         else:
-            for datum in _assemble_json(hdlr, resource, url):
+            for datum in _assemble_json(hdlr, resource, url, extension):
                 pagecontent += datum
         start_response('200 OK', headers)
         yield pagecontent
 
 
-def _assemble_html(responses, resource, querydict, url):
+def _assemble_html(responses, resource, querydict, url, extension):
     yield '<html><head><title>' \
           'Confluent REST Explorer: ' + url + '</title></head>' \
                                               '<body><form action="' + \
@@ -388,15 +389,17 @@ def _assemble_html(responses, resource, querydict, url):
         iscollection = True
     elif resource[-1] == '/':
         iscollection = True
-        yield '<a rel="collection" href="../">../</a><br>'
+        yield '<a rel="collection" href="../{0}">../{0}</a><br>'.format(
+            extension)
 
     else:
         iscollection = False
-        yield '<a rel="collection" href="./">./</a><br>'
+        yield '<a rel="collection" href="./{0}">./{0}</a><br>'.format(
+            extension)
     pendingrsp = []
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
-            yield rsp.html() + "<br>"
+            yield rsp.html(extension) + "<br>"
         else:
             pendingrsp.append(rsp)
     for rsp in pendingrsp:
@@ -420,26 +423,28 @@ def _assemble_html(responses, resource, querydict, url):
                '</form></body></html>')
 
 
-def _assemble_json(responses, resource, url):
+def _assemble_json(responses, resource, url, extension):
     #NOTE(jbjohnso) I'm considering giving up on yielding bit by bit
     #in json case over http.  Notably, duplicate key values from plugin
     #overwrite, but we'd want to preserve them into an array instead.
     #the downside is that http would just always blurt it ll out at
     #once and hold on to all the data in memory
     links = {
-        'self': {"href": resource},
+        'self': {"href": resource + extension},
     }
     if url == '/':
         pass
     elif resource[-1] == '/':
-        links['collection'] = {"href": "../"}
+        links['collection'] = {"href": "../" + extension}
     else:
-        links['collection'] = {"href": "./"}
+        links['collection'] = {"href": "./" + extension}
     rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
             haldata = rsp.raw()
             for hk in haldata.iterkeys():
+                if 'href' in haldata[hk]:
+                    haldata[hk]['href'] += extension
                 if hk in links:
                     if isinstance(links[hk], list):
                         links[hk].append(haldata[hk])

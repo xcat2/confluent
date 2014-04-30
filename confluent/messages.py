@@ -63,7 +63,7 @@ class ConfluentMessage(object):
     def strip_node(self, node):
         self.kvpairs = self.kvpairs[node]
 
-    def html(self):
+    def html(self, extension=''):
         #this is used to facilitate the api explorer feature
         snippet = ""
         for key in self.kvpairs.iterkeys():
@@ -134,7 +134,7 @@ class DeletedResource(ConfluentMessage):
 class ConfluentChoiceMessage(ConfluentMessage):
     valid_values = set()
 
-    def html(self):
+    def html(self, extension=''):
         snippet = ""
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
@@ -171,11 +171,13 @@ class LinkRelation(ConfluentMessage):
         """
         return {self.rel: {"href": self.href}}
 
-    def html(self):
+    def html(self, extension=''):
         """Provide an html representation of the link relation.
 
         This is used by the API explorer aspect of httpapi"""
-        return '<a href="{0}" rel="{1}">{0}</a>'.format(self.href, self.rel)
+        return '<a href="{0}{2}" rel="{1}">{0}{2}</a>'.format(self.href,
+                                                              self.rel,
+                                                              extension)
         # return '<a href="%s" rel="%s">%s</a><input type="submit"
         # name="restexprerorop" value="delete:%s"' % (self.href, self.rel,
         # self.href, self.href)
@@ -187,14 +189,16 @@ class ChildCollection(LinkRelation):
         self.href = collname
         self.candelete = candelete
 
-    def html(self):
+    def html(self, extension=''):
         if self.candelete:
-            return ('<a href="{0}" rel="{1}">{0}</a> . . . . . . . . . . . . '
-                    '<button type="submit" name="restexplorerop" '
-                    'value="delete" formaction="{0}">delete'
-                    '</button>').format(self.href, self.rel)
+            return (
+                '<a href="{0}{2}" rel="{1}">{0}{2}</a> . . . . . . . . . . . . '
+                '<button type="submit" name="restexplorerop" '
+                'value="delete" formaction="{0}">delete'
+                '</button>').format(self.href, self.rel, extension)
         else:
-            return '<a href="{0}" rel="{0}">{0}</a>'.format(self.href)
+            return '<a href="{0}{1}" rel="{0}">{0}{1}</a>'.format(self.href,
+                                                                  extension)
 
 
 def get_input_message(path, operation, inputdata, nodes=None):
