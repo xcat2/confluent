@@ -39,6 +39,7 @@ _tracelog = None
 
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
+        self._dologging = True
         self._isondemand = False
         self.error = None
         self.rcpts = {}
@@ -70,46 +71,58 @@ class _ConsoleHandler(object):
             eventlet.spawn(self._connect)
 
     def check_isondemand(self):
+        self._dologging = True
         attrvalue = self.cfgmgr.get_node_attributes(
             (self.node,), ('console.logging',))
         if self.node not in attrvalue:
             self._isondemand = False
         elif 'console.logging' not in attrvalue[self.node]:
             self._isondemand = False
-        elif attrvalue[self.node]['console.logging']['value'] != 'full':
+        elif (attrvalue[self.node]['console.logging']['value'] not in (
+                'full', '')):
             self._isondemand = True
+        elif (attrvalue[self.node]['console.logging']['value']) == 'none':
+            self._dologging = False
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         if 'console.logging' in nodeattribs[self.node]:
             # decide whether logging changes how we react or not
+            self._dologging = True
             logvalue = 'full'
             attributevalue = configmanager.get_node_attributes(
                 (self.node,), ('console.logging',))
             try:
-                    logvalue = \
-                        attributevalue[self.node]['console.logging']['value']
+                logvalue = \
+                    attributevalue[self.node]['console.logging']['value']
             except KeyError:
                 pass
-            if logvalue == 'full':
+            if logvalue in ('full', ''):
                 self._alwayson()
             else:
                 self._ondemand()
+                if logvalue == 'none':
+                    self._dologging = False
         if not self._isondemand or self.clientcount > 0:
             eventlet.spawn(self._connect)
+
+    def log(self, *args, **kwargs):
+        if not self._dologging:
+            return
+        self.logger.log(*args, **kwargs)
 
     def _alwayson(self):
         self._isondemand = False
         if not self._console and not self.connectionthread:
             self._connect()
         else:
-                self._console.ping()
+            self._console.ping()
 
     def _disconnect(self):
         if self.connectionthread:
             self.connectionthread.kill()
             self.connectionthread = None
         if self._console:
-            self.logger.log(
+            self.log(
                 logdata='console disconnected', ltype=log.DataTypes.event,
                 event=log.Events.consoledisconnect)
             self._console.close()
@@ -184,14 +197,14 @@ class _ConsoleHandler(object):
 
     def _got_connected(self):
         self.connectstate = 'connected'
-        self.logger.log(
+        self.log(
             logdata='console connected', ltype=log.DataTypes.event,
             event=log.Events.consoleconnect)
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
         self.connectstate = 'unconnected'
-        self.logger.log(
+        self.log(
             logdata='console disconnected', ltype=log.DataTypes.event,
             event=log.Events.consoledisconnect)
         self._send_rcpts({'connectstate': self.connectstate})
@@ -255,7 +268,7 @@ class _ConsoleHandler(object):
             # clearly indicate redundant connections
             # not connection count
             edata = 2
-        self.logger.log(
+        self.log(
             logdata=username, ltype=log.DataTypes.event,
             event=log.Events.clientconnect, eventdata=edata)
 
@@ -265,7 +278,7 @@ class _ConsoleHandler(object):
             edata = self.users[username]
         else:
             edata = 2
-        self.logger.log(
+        self.log(
             logdata=username, ltype=log.DataTypes.event,
             event=log.Events.clientdisconnect, eventdata=edata)
 
@@ -287,7 +300,7 @@ class _ConsoleHandler(object):
             eventdata |= 1
         if self.shiftin is not None:
             eventdata |= 2
-        self.logger.log(data, eventdata=eventdata)
+        self.log(data, eventdata=eventdata)
         self.buffer += data
         #TODO: analyze buffer for registered events, examples:
         #   panics

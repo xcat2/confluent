@@ -150,6 +150,7 @@ class IpmiConsole(conapi.Console):
         if self.solconnection is not None:
             # break the circular reference here
             self.solconnection.out_handler = _donothing
+            self.solconnection.ipmi_session.logout()
         self.solconnection = None
         self.broken = True
         self.error = "closed"
@@ -215,7 +216,8 @@ class IpmiHandler(object):
         self.inputdata = inputdata
         tenant = cfg.tenant
         self._logevt = None
-        if (node, tenant) not in persistent_ipmicmds:
+        if ((node, tenant) not in persistent_ipmicmds or
+                not persistent_ipmicmds[(node, tenant)].logged):
             self._logevt = threading.Event()
             persistent_ipmicmds[(node, tenant)] = ipmicommand.Command(
                 bmc=connparams['bmc'], userid=connparams['username'],
