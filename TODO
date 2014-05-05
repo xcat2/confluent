@@ -28,9 +28,8 @@ KeyError: ''
 -have pyghmi and friends do multiprocessing pools
 -investigate console behavior when target off (causing disconnects/reconnects
  on input)
--with logging set to interactive or none, repeatedly connect to an ipmi
- console that is actively outputting data.  It seems that some race condition
- causes creation of an ipmi console to result in a hung up console
+-test to make sure that 'Session Disconnected' is working
 -confetty to do right thing with respect to status updates when run right on a
  console.  It currently clutters up the screen with data that would land in
  a titlebar
+-audit log did not show confetty activity for starting console

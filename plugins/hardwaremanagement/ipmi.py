@@ -150,7 +150,7 @@ class IpmiConsole(conapi.Console):
         if self.solconnection is not None:
             # break the circular reference here
             self.solconnection.out_handler = _donothing
-            self.solconnection.ipmi_session.logout()
+            self.solconnection.close()
         self.solconnection = None
         self.broken = True
         self.error = "closed"
