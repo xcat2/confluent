@@ -102,6 +102,14 @@ def sessionhdl(connection, authname, skipauth=False):
             tlvdata.send(connection, {'errorcode': 403,
                                       'error': 'Forbidden'})
             tlvdata.send(connection, {'_requestdone': 1})
+        except exc.TargetEndpointBadCredentials:
+            tlvdata.send(connection, {'errorcode': 502,
+                                      'error': 'Bad Credentials'})
+            tlvdata.send(connection, {'_requestdone': 1})
+        except exc.TargetEndpointUnreachable:
+            tlvdata.send(connection, {'errorcode': 504,
+                                      'error': 'Unreachable Target'})
+            tlvdata.send(connection, {'_requestdone': 1})
         except:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)

@@ -10,9 +10,6 @@
     'flexdiscover' command, if possible bring an ipmi device under management
     by way of ipv6 to eliminate requirement for ip to be specified.
     Requires the polling event support (which is required for security anyway)
--Change the remote timeout behavior to yield a response, then have pluginapi
- decides whether to error the response or a message indicating error in case of
- multi-node request
 
 -this stack trace (happened with method was set to ""):
 Traceback (most recent call last):
@@ -33,3 +30,6 @@ KeyError: ''
  console.  It currently clutters up the screen with data that would land in
  a titlebar
 -audit log did not show confetty activity for starting console
+-ipmi plugin needs to watch for connection attribute changes.  test case is to
+ connect to a bmc and then misconfigure.  Currently, it keeps working, it should
+ break.  watchattribs is the key

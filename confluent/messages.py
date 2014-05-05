@@ -126,6 +126,42 @@ class ConfluentMessage(object):
         return snippet
 
 
+class ConfluentNodeError(object):
+    def __init__(self, node):
+        self.node = node
+        self.error = None
+        raise NotImplementedError  # this is an abstract base class
+
+    def raw(self):
+        return {self.node: {'error': self.error}}
+
+    def html(self):
+        return self.node + ":" + self.error
+
+    def strip_node(self, node):
+        #NOTE(jbjohnso): For single node errors, raise exception to
+        #trigger what a developer of that medium would expect
+        raise NotImplementedError
+
+
+class ConfluentTargetTimeout(ConfluentNodeError):
+    def __init__(self, node):
+        self.node = node
+        self.error = 'timeout'
+
+    def strip_node(self, node):
+        raise exc.TargetEndpointUnreachable
+
+
+class ConfluentTargetInvalidCredentials(ConfluentNodeError):
+    def __init__(self, node):
+        self.node = node
+        self.error = 'bad credentials'
+
+    def strip_node(self, node):
+        raise exc.TargetEndpointBadCredentials
+
+
 class DeletedResource(ConfluentMessage):
     def __init__(self, resource):
         self.kvpairs = {}

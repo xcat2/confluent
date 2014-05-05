@@ -351,25 +351,30 @@ def resourcehandler_backend(env, start_response):
         try:
             hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
+
+            pagecontent = ""
+            if mimetype == 'text/html':
+                for datum in _assemble_html(hdlr, resource, lquerydict, url,
+                                            extension):
+                    pagecontent += datum
+            else:
+                for datum in _assemble_json(hdlr, resource, url, extension):
+                    pagecontent += datum
+                start_response('200 OK', headers)
+            yield pagecontent
         except exc.NotFoundException:
             start_response('404 Not found', headers)
             yield "404 - Request path not recognized"
-            return
         except exc.InvalidArgumentException:
-            traceback.print_exc()
             start_response('400 Bad Request', headers)
             yield '400 - Bad Request'
-            return
-        pagecontent = ""
-        if mimetype == 'text/html':
-            for datum in _assemble_html(hdlr, resource, lquerydict, url,
-                                        extension):
-                pagecontent += datum
-        else:
-            for datum in _assemble_json(hdlr, resource, url, extension):
-                pagecontent += datum
-        start_response('200 OK', headers)
-        yield pagecontent
+        except exc.TargetEndpointUnreachable:
+            start_response('504 Unreachable Target', headers)
+            yield '504 - Unreachable Target'
+        except exc.TargetEndpointBadCredentials:
+            start_response('502 Bad Credentials', headers)
+            yield '502 - Bad Credentials'
+
 
 
 def _assemble_html(responses, resource, querydict, url, extension):

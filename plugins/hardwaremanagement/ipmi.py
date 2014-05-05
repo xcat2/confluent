@@ -217,7 +217,7 @@ class IpmiHandler(object):
         tenant = cfg.tenant
         self._logevt = None
         if ((node, tenant) not in persistent_ipmicmds or
-                not persistent_ipmicmds[(node, tenant)].logged):
+                not persistent_ipmicmds[(node, tenant)].ipmi_session.logged):
             self._logevt = threading.Event()
             persistent_ipmicmds[(node, tenant)] = ipmicommand.Command(
                 bmc=connparams['bmc'], userid=connparams['username'],
@@ -243,7 +243,7 @@ class IpmiHandler(object):
         self._logevt = None
         if self.broken:
             if self.error == 'timeout':
-                raise exc.TargetEndpointUnreachable('Target timed out')
+                return iter([msg.ConfluentTargetTimeout(self.node)])
             else:
                 raise Exception(self.error)
         if self.element == ['power', 'state']:
