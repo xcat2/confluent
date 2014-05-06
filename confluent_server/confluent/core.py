@@ -52,7 +52,7 @@ def nested_lookup(nestdict, key):
 def load_plugins():
     # To know our plugins directory, we get the parent path of 'bin'
     path = os.path.dirname(os.path.realpath(__file__))
-    plugintop = os.path.realpath(os.path.join(path, '..', 'plugins'))
+    plugintop = os.path.realpath(os.path.join(path, 'plugins'))
     plugins = set()
     for plugindir in os.listdir(plugintop):
         plugindir = os.path.join(plugintop, plugindir)

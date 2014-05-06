@@ -2,11 +2,15 @@ from setuptools import setup
 
 setup(
     name='confluent_server',
-    version='0.1.0',
+    version='0.1.1',
     author='Jarrod Johnson',
     author_email='jbjohnso@us.ibm.com',
     url='http://xcat.sf.net/',
-    packages=['confluent', 'confluent/config', 'confluent/interface'],
-    install_requires=['pycrypto>=2.6', 'confluent_client>=0.1.0'],
+    description='confluent systems management server',
+    packages=['confluent', 'confluent/config', 'confluent/interface',
+              'confluent/plugins/hardwaremanagement/',
+              'confluent/plugins/configuration/'],
+    install_requires=['pycrypto>=2.6', 'confluent_client>=0.1.0', 'eventlet',
+                      'pyghmi>=0.6.0'],
     scripts=['bin/confluent'],
 )
