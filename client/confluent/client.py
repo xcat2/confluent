@@ -19,7 +19,7 @@ import errno
 import os
 import socket
 import ssl
-import confluent.common.tlvdata as tlvdata
+import confluent.tlvdata as tlvdata
 
 SO_PASSCRED = 16
 

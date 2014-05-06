@@ -22,7 +22,7 @@ path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..'))
 sys.path.append(path)
 
-import confluent.common.client as client
+import confluent.client as client
 
 
 node = sys.argv[1]

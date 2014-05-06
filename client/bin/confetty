@@ -59,8 +59,8 @@ path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..'))
 sys.path.append(path)
 
-import confluent.common.tlvdata as tlvdata
-import confluent.common.client as client
+import confluent.tlvdata as tlvdata
+import confluent.client as client
 
 conserversequence = '\x05c'  # ctrl-e, c
 

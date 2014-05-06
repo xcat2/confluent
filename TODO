@@ -30,3 +30,4 @@ KeyError: ''
  console.  It currently clutters up the screen with data that would land in
  a titlebar
 -audit log did not show confetty activity for starting console
+-read exclusive and full exclusive console access modes

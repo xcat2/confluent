@@ -30,7 +30,7 @@ import eventlet.green.ssl as ssl
 import eventlet
 
 import confluent.auth as auth
-import confluent.common.tlvdata as tlvdata
+import confluent.tlvdata as tlvdata
 import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import confluent.exceptions as exc
