@@ -30,6 +30,3 @@ KeyError: ''
  console.  It currently clutters up the screen with data that would land in
  a titlebar
 -audit log did not show confetty activity for starting console
--ipmi plugin needs to watch for connection attribute changes.  test case is to
- connect to a bmc and then misconfigure.  Currently, it keeps working, it should
- break.  watchattribs is the key
