@@ -35,7 +35,7 @@ import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import confluent.exceptions as exc
 import confluent.log as log
-import confluent.pluginapi as pluginapi
+import confluent.core as pluginapi
 
 
 tracelog = None

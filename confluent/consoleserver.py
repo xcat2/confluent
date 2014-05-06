@@ -25,7 +25,7 @@ import confluent.config.configmanager as configmodule
 import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.log as log
-import confluent.pluginapi as plugin
+import confluent.core as plugin
 import eventlet
 import eventlet.green.threading as threading
 import random

@@ -27,7 +27,7 @@
 import atexit
 import confluent.auth as auth
 import confluent.consoleserver as consoleserver
-import confluent.pluginapi as pluginapi
+import confluent.core as confluentcore
 import confluent.httpapi as httpapi
 import confluent.log as log
 import confluent.sockapi as sockapi
@@ -109,7 +109,7 @@ def doexit():
 
 def run():
     _checkpidfile()
-    pluginapi.load_plugins()
+    confluentcore.load_plugins()
     _daemonize()
     _updatepidfile()
     auth.init_auth()

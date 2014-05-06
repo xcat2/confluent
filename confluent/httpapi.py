@@ -24,7 +24,7 @@ import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
-import confluent.pluginapi as pluginapi
+import confluent.core as pluginapi
 import confluent.util as util
 import copy
 import eventlet
