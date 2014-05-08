@@ -31,3 +31,4 @@ KeyError: ''
  a titlebar
 -audit log did not show confetty activity for starting console
 -read exclusive and full exclusive console access modes
+-invalid attributes at create time come out as 500
