@@ -365,9 +365,9 @@ def resourcehandler_backend(env, start_response):
         except exc.NotFoundException:
             start_response('404 Not found', headers)
             yield "404 - Request path not recognized"
-        except exc.InvalidArgumentException:
-            start_response('400 Bad Request', headers)
-            yield '400 - Bad Request'
+        except exc.InvalidArgumentException as e:
+            start_response('400 Bad Request - ' + str(e), headers)
+            yield '400 - Bad Request - ' + str(e)
         except exc.TargetEndpointUnreachable:
             start_response('504 Unreachable Target', headers)
             yield '504 - Unreachable Target'

@@ -185,9 +185,9 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
         tlvdata.send(connection, {"errorcode": 404,
                                   "error": "Target not found"})
         tlvdata.send(connection, {"_requestdone": 1})
-    except exc.InvalidArgumentException:
+    except exc.InvalidArgumentException as e:
         tlvdata.send(connection, {"errorcode": 400,
-                                  "error": "Bad Request"})
+                                  "error": "Bad Request - " + str(e)})
         tlvdata.send(connection, {"_requestdone": 1})
     send_response(hdlr, connection)
     return

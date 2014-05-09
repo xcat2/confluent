@@ -205,6 +205,37 @@ def parse_command(command):
 currchildren = None
 
 
+def print_result(res):
+    for key in res.iterkeys():
+        notes = []
+        if res[key] is None:
+            attrstr = '%s=""' % key
+        elif type(res[key]) == list:
+            attrstr = '%s=%s' % (key, recurse_format(res[key]))
+        elif 'value' in res[key] and res[key]['value'] is not None:
+            attrstr = '%s="%s"' % (key, res[key]['value'])
+        elif 'value' in res[key] and res[key]['value'] is None:
+            attrstr = '%s=""' % key
+        else:
+            if 'isset' in res[key] and res[key]['isset']:
+                attrstr = '%s="********"' % key
+            else:
+                attrstr = '%s=""' % key
+        if res[key] is not None and 'inheritedfrom' in res[key]:
+            notes.append(
+                'Inherited from %s' % res[key]['inheritedfrom'])
+        if res[key] is not None and 'expression' in res[key]:
+            notes.append(
+                ('Derived from expression "%s"' %
+                 res[key]['expression']))
+        if notes:
+            notestr = '(' + ', '.join(notes) + ')'
+            output = '{0:<40} {1:>39}'.format(attrstr, notestr)
+        else:
+            output = attrstr
+        print(output)
+
+
 def do_command(command, server):
     global exitcode
     global target
@@ -247,34 +278,7 @@ def do_command(command, server):
                 if 'errorcode' in res:
                     exitcode = res['errorcode']
                     continue
-                for key in res.iterkeys():
-                    notes = []
-                    if res[key] is None:
-                        attrstr = '%s=""' % key
-                    elif type(res[key]) == list:
-                        attrstr = '%s=%s' % (key, recurse_format(res[key]))
-                    elif 'value' in res[key] and res[key]['value'] is not None:
-                        attrstr = '%s="%s"' % (key, res[key]['value'])
-                    elif 'value' in res[key] and res[key]['value'] is None:
-                        attrstr = '%s=""' % key
-                    else:
-                        if 'isset' in res[key] and res[key]['isset']:
-                            attrstr = '%s="********"' % key
-                        else:
-                            attrstr = '%s=""' % key
-                    if res[key] is not None and 'inheritedfrom' in res[key]:
-                        notes.append(
-                            'Inherited from %s' % res[key]['inheritedfrom'])
-                    if res[key] is not None and 'expression' in res[key]:
-                        notes.append(
-                            ('Derived from expression "%s"' %
-                             res[key]['expression']))
-                    if notes:
-                        notestr = '(' + ', '.join(notes) + ')'
-                        output = '{0:<40} {1:>39}'.format(attrstr, notestr)
-                    else:
-                        output = attrstr
-                    print(output)
+                print_result(res)
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
         nodename = targpath.split('/')[-3]
@@ -360,6 +364,7 @@ def setvalues(attribs):
             if 'errorcode' in res:
                 exitcode = res['errorcode']
             sys.stderr.write('Error: ' + res['error'] + '\n')
+        print_result(res)
 
 
 def parameterize_attribs(attribs):
