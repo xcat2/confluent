@@ -145,8 +145,8 @@ def update_nodegroup(group, element, configmanager, inputdata):
         if clearattribs:
             configmanager.clear_group_attributes(group, clearattribs)
         configmanager.set_group_attributes({group: inputdata.attribs})
-    except ValueError:
-        raise exc.InvalidArgumentException()
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
     return retrieve_nodegroup(group, element, configmanager, inputdata)
 
 
@@ -166,6 +166,6 @@ def update_nodes(nodes, element, configmanager, inputdata):
             updatedict[node] = updatenode
     try:
         configmanager.set_node_attributes(updatedict)
-    except ValueError:
-        raise exc.InvalidArgumentException()
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
     return retrieve(nodes, element, configmanager, inputdata)

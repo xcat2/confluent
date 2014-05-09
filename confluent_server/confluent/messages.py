@@ -253,7 +253,7 @@ class InputAttributes(ConfluentMessage):
         self.nodeattribs = {}
         nestedmode = False
         if not inputdata:
-            raise exc.InvalidArgumentException
+            raise exc.InvalidArgumentException('no request data provided')
         if nodes is None:
             self.attribs = inputdata
             for attrib in self.attribs:
@@ -316,22 +316,29 @@ class InputPowerMessage(ConfluentMessage):
     def __init__(self, path, nodes, inputdata):
         self.powerbynode = {}
         if not inputdata:
-            raise exc.InvalidArgumentException()
+            raise exc.InvalidArgumentException('missing input data')
         if 'state' not in inputdata:
             #assume we have nested information
             for key in nodes:
                 if key not in inputdata:
-                    raise exc.InvalidArgumentException()
+                    raise exc.InvalidArgumentException(key + ' not in request')
                 datum = inputdata[key]
-                if ('state' not in datum or
-                        datum['state'] not in self.valid_values):
-                    raise exc.InvalidArgumentException()
+                if 'state' not in datum:
+                    raise exc.InvalidArgumentException(
+                        'missing state argument')
+                elif datum['state'] not in self.valid_values:
+                    raise exc.InvalidArgumentException(
+                        datum['state'] + ' is not one of ' +
+                        ','.join(self.valid_values))
                 self.powerbynode[key] = datum['state']
         else:  # we have a state argument not by node
             datum = inputdata
-            if ('state' not in datum or
-                    datum['state'] not in self.valid_values):
-                raise exc.InvalidArgumentException()
+            if 'state' not in datum:
+                raise exc.InvalidArgumentException('missing state argument')
+            elif datum['state'] not in self.valid_values:
+                raise exc.InvalidArgumentException(datum['state'] +
+                                                   ' is not one of ' +
+                                                   ','.join(self.valid_values))
             for node in nodes:
                 self.powerbynode[node] = datum['state']
 
@@ -366,17 +373,25 @@ class InputBootDevice(BootDevice):
         if 'nextdevice' not in inputdata:
             for key in nodes:
                 if key not in inputdata:
-                    raise exc.InvalidArgumentException()
+                    raise exc.InvalidArgumentException(key + ' not in request')
                 datum = inputdata[key]
-                if ('state' not in datum or
-                        datum['state'] not in self.valid_values):
-                    raise exc.InvalidArgumentException()
+                if 'nextdevice' not in datum:
+                    raise exc.InvalidArgumentException(
+                        'missing nextdevice argument')
+                elif datum['nextdevice'] not in self.valid_values:
+                    raise exc.InvalidArgumentException(
+                        datum['nextdevice'] + ' is not one of ' +
+                        ','.join(self.valid_values))
                 self.bootdevbynode[key] = datum['nextdevice']
         else:
             datum = inputdata
-            if ('nextdevice' not in datum or
-                    datum['nextdevice'] not in self.valid_values):
-                raise exc.InvalidArgumentException()
+            if 'nextdevice' not in datum:
+                raise exc.InvalidArgumentException(
+                    'missing nextdevice argument')
+            elif datum['nextdevice'] not in self.valid_values:
+                raise exc.InvalidArgumentException(
+                    datum['nextdevice'] + ' is not one of ' +
+                    ','.join(self.valid_values))
             for node in nodes:
                 self.bootdevbynode[node] = datum['nextdevice']
 
