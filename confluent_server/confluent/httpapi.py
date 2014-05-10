@@ -360,7 +360,7 @@ def resourcehandler_backend(env, start_response):
             else:
                 for datum in _assemble_json(hdlr, resource, url, extension):
                     pagecontent += datum
-                start_response('200 OK', headers)
+            start_response('200 OK', headers)
             yield pagecontent
         except exc.NotFoundException:
             start_response('404 Not found', headers)
