@@ -80,7 +80,13 @@ def _checkpidfile():
         fcntl.flock(pidfile, fcntl.LOCK_UN)
         pidfile.close()
     except IOError:
-        pidfile = open('/var/run/confluent/pid', 'w')
+        try:
+            pidfile = open('/var/run/confluent/pid', 'w')
+        except IOError as e:
+            if e.errno != 2:
+                raise
+            os.makedirs('/var/run/confluent')
+            pidfile = open('/var/run/confluent/pid', 'w')
         fcntl.flock(pidfile, fcntl.LOCK_EX)
         pidfile.write(str(os.getpid()))
         fcntl.flock(pidfile, fcntl.LOCK_UN)

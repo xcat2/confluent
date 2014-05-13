@@ -31,4 +31,6 @@ KeyError: ''
  a titlebar
 -audit log did not show confetty activity for starting console
 -read exclusive and full exclusive console access modes
--invalid attributes at create time come out as 500
+-when an http session exists, confluent cpu usage on my vm idles at 2 %.
+ profile exactly what is spinning and try to make it nicer
+- an ipmi console was once stuck in 'connecting' state, no idea how

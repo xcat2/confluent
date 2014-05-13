@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='confluent_server',
-    version='0.1.3',
+    version='0.1.5',
     author='Jarrod Johnson',
     author_email='jbjohnso@us.ibm.com',
     url='http://xcat.sf.net/',
