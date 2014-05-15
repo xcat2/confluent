@@ -33,4 +33,32 @@ KeyError: ''
 -read exclusive and full exclusive console access modes
 -when an http session exists, confluent cpu usage on my vm idles at 2 %.
  profile exactly what is spinning and try to make it nicer
-- an ipmi console was once stuck in 'connecting' state, no idea how
+- an ipmi console was once stuck in 'connecting' state, no idea how, this traceback might have occurred:
+Traceback (most recent call last):
+  File "/usr/lib/python2.6/site-packages/eventlet/hubs/hub.py", line 346, in fire_timers
+    timer()
+  File "/usr/lib/python2.6/site-packages/eventlet/hubs/timer.py", line 56, in __call__
+    cb(*args, **kw)
+  File "/usr/lib/python2.6/site-packages/eventlet/semaphore.py", line 121, in _do_acquire
+    waiter.switch()
+  File "/usr/lib/python2.6/site-packages/eventlet/greenthread.py", line 194, in main
+    result = function(*args, **kwargs)
+  File "/usr/lib/python2.6/site-packages/confluent/consoleserver.py", line 177, in _connect_backend
+    self._console.connect(self.get_console_output)
+  File "/usr/lib/python2.6/site-packages/confluent/plugins/hardwaremanagement/ipmi.py", line 143, in connect
+    iohandler=self.handle_data)
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/console.py", line 65, in __init__
+    session.Session.wait_for_rsp(0)
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/private/session.py", line 914, in wait_for_rsp
+    cls._route_ipmiresponse(sockaddr, data)
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/private/session.py", line 991, in _route_ipmiresponse
+    sockaddr=sockaddr)
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/private/session.py", line 1035, in _handle_ipmi_packet
+    self._handle_ipmi2_packet(data)
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/private/session.py", line 1063, in _handle_ipmi2_packet
+    self.k1, rawdata[4:-12], hashlib.sha1).digest()[:12]
+  File "/usr/lib64/python2.6/hmac.py", line 133, in new
+    return HMAC(key, msg, digestmod)
+  File "/usr/lib64/python2.6/hmac.py", line 68, in __init__
+    if len(key) > blocksize:
+TypeError: object of type 'NoneType' has no len()

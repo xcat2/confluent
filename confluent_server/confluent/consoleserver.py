@@ -27,7 +27,7 @@ import confluent.interface.console as conapi
 import confluent.log as log
 import confluent.core as plugin
 import eventlet
-import eventlet.green.threading as threading
+import eventlet.event
 import random
 import traceback
 
@@ -416,7 +416,7 @@ class ConsoleSession(object):
         self.username = username
         connect_node(node, configmanager)
         _handled_consoles[consk].attachuser(username)
-        self._evt = threading.Event()
+        self._evt = None
         self.node = node
         self.conshdl = _handled_consoles[consk]
         self.write = _handled_consoles[consk].write
@@ -448,7 +448,8 @@ class ConsoleSession(object):
         for data, we must maintain data in a buffer until retrieved
         """
         self.databuffer.append(data)
-        self._evt.set()
+        if self._evt:
+            self._evt.send()
 
     def get_next_output(self, timeout=45):
         """Poll for next available output on this console.
@@ -457,10 +458,13 @@ class ConsoleSession(object):
         at least one case where we don't have that luxury
         """
         self.reaper.cancel()
+        if self._evt:
+            raise Exception('get_next_output is not re-entrant')
         if not self.databuffer:
-            self._evt.wait(timeout)
-        if self._evt is not None:
-            self._evt.clear()
+            self._evt = eventlet.event.Event()
+            with eventlet.Timeout(timeout, False):
+                self._evt.wait()
+            self._evt = None
         if not self.databuffer:
             self.reaper = eventlet.spawn_after(15, self.destroy)
             return ""
