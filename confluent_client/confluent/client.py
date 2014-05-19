@@ -121,10 +121,10 @@ class Command(object):
                                           ssl_version=ssl.PROTOCOL_TLSv1)
         if knownhosts:
             certdata = self.connection.getpeercert(binary_form=True)
+            fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
             hostid = '@'.join((port,server))
             khf = dbm.open(os.path.join(clientcfgdir, "knownhosts"), 'c', 384)
             if hostid in khf:
-                fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
                 if fingerprint == khf[hostid]:
                     return
                 else:

@@ -194,14 +194,14 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
 
 
 def _tlshandler():
-    plainsocket = socket.socket()
+    plainsocket = socket.socket(AF_INET6)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
                           certfile="/etc/confluent/srvcert.pem",
                           ssl_version=ssl.PROTOCOL_TLSv1,
                           server_side=True)
-    srv.bind(('0.0.0.0', 13001))
+    srv.bind(('::', 13001, 0, 0))
     srv.listen(5)
     authname = None
     while (1):  # TODO: exithook
