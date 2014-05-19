@@ -194,7 +194,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
 
 
 def _tlshandler():
-    plainsocket = socket.socket(AF_INET6)
+    plainsocket = socket.socket(socket.AF_INET6)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
