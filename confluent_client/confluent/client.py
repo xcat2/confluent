@@ -16,6 +16,7 @@
 
 import anydbm as dbm
 import errno
+import hashlib
 import os
 import socket
 import ssl
@@ -29,12 +30,12 @@ def _parseserver(string):
         server, port = string[1:].split(']:')
     elif string[0] == '[':
         server = string[1:-1]
-        port = 4001
+        port = '4001'
     elif ':' in string:
         server, port = string.split(':')
     else:
         server = string
-        port = 4001
+        port = '4001'
     return server, port
 
 
@@ -123,7 +124,8 @@ class Command(object):
             hostid = '@'.join((port,server))
             khf = dbm.open(os.path.join(clientcfgdir, "knownhosts"), 'c', 384)
             if hostid in khf:
-                if certdata == khf[hostid]:
+                fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
+                if fingerprint == khf[hostid]:
                     return
                 else:
                     replace = raw_input(
@@ -131,7 +133,7 @@ class Command(object):
                     if replace not in ('y', 'Y'):
                         raise Exception("BAD CERTIFICATE")
             print 'Adding new key for %s:%s' % (server, port)
-            khf[hostid] = certdata
+            khf[hostid] = fingerprint
 
 
 
