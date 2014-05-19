@@ -30,12 +30,12 @@ def _parseserver(string):
         server, port = string[1:].split(']:')
     elif string[0] == '[':
         server = string[1:-1]
-        port = '6001'
+        port = '13001'
     elif ':' in string:
         server, port = string.split(':')
     else:
         server = string
-        port = '6001'
+        port = '13001'
     return server, port
 
 
