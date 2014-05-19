@@ -201,7 +201,7 @@ def _tlshandler():
                           certfile="/etc/confluent/srvcert.pem",
                           ssl_version=ssl.PROTOCOL_TLSv1,
                           server_side=True)
-    srv.bind(('0.0.0.0', 4001))
+    srv.bind(('0.0.0.0', 6001))
     srv.listen(5)
     authname = None
     while (1):  # TODO: exithook
