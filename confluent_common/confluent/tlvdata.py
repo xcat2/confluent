@@ -44,6 +44,8 @@ def send(handle, data):
 
 def recv(handle):
     tl = handle.recv(4)
+    while len(tl) < 4:
+        tl += handle.recv(4 - len(tl))
     if len(tl) == 0:
         return None
     tl = struct.unpack("!I", tl)[0]
