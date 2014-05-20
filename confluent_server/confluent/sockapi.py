@@ -197,16 +197,20 @@ def _tlshandler():
     plainsocket = socket.socket(socket.AF_INET6)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    srv = ssl.wrap_socket(plainsocket, keyfile="/etc/confluent/privkey.pem",
+    plainsocket.bind(('::', 13001, 0, 0))
+    plainsocket.listen(5)
+    while (1):  # TODO: exithook
+        cnn, addr = plainsocket.accept()
+        eventlet.spawn_n(_tlsstartup, cnn)
+
+
+def _tlsstartup(cnn):
+    authname = None
+    cnn = ssl.wrap_socket(cnn, keyfile="/etc/confluent/privkey.pem",
                           certfile="/etc/confluent/srvcert.pem",
                           ssl_version=ssl.PROTOCOL_TLSv1,
                           server_side=True)
-    srv.bind(('::', 13001, 0, 0))
-    srv.listen(5)
-    authname = None
-    while (1):  # TODO: exithook
-        cnn, addr = srv.accept()
-        eventlet.spawn_n(sessionhdl, cnn, authname)
+    sessionhdl(cnn, authname)
 
 
 def _unixdomainhandler():
