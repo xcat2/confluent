@@ -36,6 +36,7 @@ import confluent.config.attributes as attrscheme
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.shellmodule as shellmodule
 import os
 import sys
 
@@ -61,11 +62,15 @@ def load_plugins():
         sys.path.append(plugindir)
         #two passes, to avoid adding both py and pyc files
         for plugin in os.listdir(plugindir):
-            plugin = os.path.splitext(plugin)[0]
-            plugins.add(plugin)
-        for plugin in plugins:
             if plugin.startswith('.'):
                 continue
+            (plugin, plugtype) = os.path.splitext(plugin)
+            if plugtype == '.sh':
+                pluginmap[plugin] = shellmodule.Plugin(
+                    os.path.join(plugindir, plugin + '.sh'))
+            else:
+                plugins.add(plugin)
+        for plugin in plugins:
             tmpmod = __import__(plugin)
             if 'plugin_names' in tmpmod.__dict__:
                 for name in tmpmod.plugin_names:
@@ -297,7 +302,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
         inputdata = msg.get_input_message(
             pathcomponents[2:], operation, inputdata)
         if 'handler' in plugroute:  # fixed handler definition
-            return pluginmap[plugroute['handler']].__dict__[operation](
+            hfunc = getattr(pluginmap[plugroute['handler']], operation)
+            return hfunc(
                 nodes=None, element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata)
@@ -331,7 +337,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
         inputdata = msg.get_input_message(
             pathcomponents, operation, inputdata, (node,))
         if 'handler' in plugroute:  # fixed handler definition
-            passvalue = pluginmap[plugroute['handler']].__dict__[operation](
+            hfunc = getattr(pluginmap[plugroute['handler']], operation)
+            passvalue = hfunc(
                 nodes=(node,), element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata)
@@ -347,7 +354,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 if attrname in nodeattr[node]:
                     plugpath = nodeattr[node][attrname]['value']
             if plugpath is not None:
-                passvalue = pluginmap[plugpath].__dict__[operation](
+                hfunc = getattr(pluginmap[plugpath], operation)
+                passvalue = hfunc(
                     nodes=(node,), element=pathcomponents,
                     configmanager=configmanager,
                     inputdata=inputdata)

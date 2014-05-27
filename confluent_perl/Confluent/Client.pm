@@ -143,11 +143,30 @@ sub authenticate {
     }
 }
 
+sub create {
+    my $self = shift;
+    my $path = shift;
+    return $self->send_request(operation=>'create', path=>$path, @_);
+}
+
+sub update {
+    my $self = shift;
+    my $path = shift;
+    return $self->send_request(operation=>'update', path=>$path, @_);
+}
+
 sub read {
     my $self = shift;
     my $path = shift;
     my %args = @_;
     return $self->send_request(operation=>'retrieve', path=>$path);
+}
+
+sub delete {
+    my $self = shift;
+    my $path = shift;
+    my %args = @_;
+    return $self->send_request(operation=>'delete', path=>$path);
 }
 
 sub send_request {
