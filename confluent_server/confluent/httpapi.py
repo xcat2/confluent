@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # This SCGI server provides a http wrap to confluent api
-# It additionally manages httprequest console sessions as supported by
-# shillinabox javascript
+# It additionally manages httprequest console sessions
 import base64
 import Cookie
 import confluent.auth as auth
@@ -29,6 +28,7 @@ import confluent.util as util
 import copy
 import eventlet
 import json
+import socket
 import traceback
 import time
 import urlparse
@@ -483,8 +483,9 @@ def serve():
     #but deps are simpler without flup
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
-    eventlet.wsgi.server(eventlet.listen(("", 4005)), resourcehandler,
-                         log=False, log_output=False, debug=False)
+    eventlet.wsgi.server(
+        eventlet.listen(('::', 4005, 0, 0), family=socket.AF_INET6),
+        resourcehandler, log=False, log_output=False, debug=False)
 
 
 class HttpApi(object):
