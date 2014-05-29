@@ -414,12 +414,14 @@ class ConfigManager(object):
             self.tenant = None
             if 'main' not in _cfgstore:
                 _cfgstore['main'] = {}
+                self._bg_sync_to_file()
             self._cfgstore = _cfgstore['main']
             if 'groups' not in self._cfgstore:
                 self._cfgstore['groups'] = {'everything': {'nodes': set()}}
+                self._bg_sync_to_file()
             if 'nodes' not in self._cfgstore:
                 self._cfgstore['nodes'] = {}
-            self._bg_sync_to_file()
+                self._bg_sync_to_file()
             return
         elif 'tenant' not in _cfgstore:
             _cfgstore['tenant'] = {tenant: {}}
