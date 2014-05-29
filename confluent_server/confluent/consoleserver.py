@@ -37,6 +37,7 @@ _genwatchattribs = frozenset(('console.method', 'console.logging'))
 
 _tracelog = None
 
+
 class _ConsoleHandler(object):
     def __init__(self, node, configmanager):
         self._dologging = True
@@ -47,6 +48,7 @@ class _ConsoleHandler(object):
         self.node = node
         self.connectstate = 'unconnected'
         self.clientcount = 0
+        self._isalive = True
         self.logger = log.Logger(node, console=True,
                                  tenant=configmanager.tenant)
         self.buffer = bytearray()
@@ -208,9 +210,11 @@ class _ConsoleHandler(object):
             logdata='console disconnected', ltype=log.DataTypes.event,
             event=log.Events.consoledisconnect)
         self._send_rcpts({'connectstate': self.connectstate})
-        self._connect()
+        if self._isalive:
+            self._connect()
 
     def close(self):
+        self._isalive = False
         self._send_rcpts({'deleting': True})
         self._disconnect()
         if self._console:

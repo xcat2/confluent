@@ -96,7 +96,7 @@ class ExecConsole(conapi.Console):
             return
         self.subproc.terminate()
         waittime = 10
-        while self.subproc is not None or self.subproc.poll() is None:
+        while self.subproc is not None and self.subproc.poll() is None:
             eventlet.sleep(1)
             waittime -= 1
             if waittime == 0:
