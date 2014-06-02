@@ -541,7 +541,6 @@ class ConfigManager(object):
         :param attributemap: A dict of key values to set
         """
         user = self._cfgstore['users'][name]
-        _mark_dirtykey('users', name, self.tenant)
         for attribute in attributemap:
             if attribute == 'passphrase':
                 salt = os.urandom(8)
@@ -553,12 +552,13 @@ class ConfigManager(object):
                 user['cryptpass'] = (salt, crypted)
             else:
                 user[attribute] = attributemap[attribute]
+        _mark_dirtykey('users', name, self.tenant)
         self._bg_sync_to_file()
 
     def del_user(self, name):
         if name in self._cfgstore['users']:
-            _mark_dirtykey('users', name, self.tenant)
             del self._cfgstore['users'][name]
+            _mark_dirtykey('users', name, self.tenant)
         self._bg_sync_to_file()
 
     def create_user(self, name,
@@ -583,19 +583,19 @@ class ConfigManager(object):
         name = name.encode('utf-8')
         if name in self._cfgstore['users']:
             raise Exception("Duplicate username requested")
-        _mark_dirtykey('users', name, self.tenant)
         self._cfgstore['users'][name] = {'id': uid}
         if displayname is not None:
             self._cfgstore['users'][name]['displayname'] = displayname
         if 'idmap' not in _cfgstore['main']:
             _cfgstore['main']['idmap'] = {}
-        _mark_dirtykey('idmap', uid)
         _cfgstore['main']['idmap'][uid] = {
             'tenant': self.tenant,
             'username': name
         }
         if attributemap is not None:
             self.set_user(name, attributemap)
+        _mark_dirtykey('users', name, self.tenant)
+        _mark_dirtykey('idmap', uid)
         self._bg_sync_to_file()
 
     def is_node(self, node):
@@ -674,10 +674,10 @@ class ConfigManager(object):
                 continue
             try:
                 if nodecfg[attrib]['inheritedfrom'] == group:
-                    _mark_dirtykey('nodes', node, self.tenant)
                     del nodecfg[attrib]  # remove invalid inherited data
                     self._do_inheritance(nodecfg, attrib, node, changeset)
                     _addchange(changeset, node, attrib)
+                    _mark_dirtykey('nodes', node, self.tenant)
             except KeyError:  # inheritedfrom not set, move on
                 pass
 
@@ -700,12 +700,12 @@ class ConfigManager(object):
                 if srcgroup is not None and group != srcgroup:
                     # skip needless deepcopy
                     return
-                _mark_dirtykey('nodes', nodename, self.tenant)
                 nodecfg[attrib] = \
                     copy.deepcopy(self._cfgstore['groups'][group][attrib])
                 nodecfg[attrib]['inheritedfrom'] = group
                 self._refresh_nodecfg(nodecfg, attrib, nodename,
                                       changeset=changeset)
+                _mark_dirtykey('nodes', nodename, self.tenant)
                 return
             if srcgroup is not None and group == srcgroup:
                 # break out
@@ -716,15 +716,15 @@ class ConfigManager(object):
             if group not in groups:
                 if node in self._cfgstore['groups'][group]['nodes']:
                     self._cfgstore['groups'][group]['nodes'].discard(node)
-                    _mark_dirtykey('groups', group, self.tenant)
                     self._node_removed_from_group(node, group, changeset)
+                    _mark_dirtykey('groups', group, self.tenant)
         for group in groups:
             if group not in self._cfgstore['groups']:
-                _mark_dirtykey('groups', group, self.tenant)
                 self._cfgstore['groups'][group] = {'nodes': set([node])}
-            elif node not in self._cfgstore['groups'][group]['nodes']:
                 _mark_dirtykey('groups', group, self.tenant)
+            elif node not in self._cfgstore['groups'][group]['nodes']:
                 self._cfgstore['groups'][group]['nodes'].add(node)
+                _mark_dirtykey('groups', group, self.tenant)
             # node was not already in given group, perform inheritence fixup
             self._node_added_to_group(node, group, changeset)
 
@@ -736,11 +736,11 @@ class ConfigManager(object):
                     self._node_removed_from_group(node, group, changeset)
         for node in nodes:
             if node not in self._cfgstore['nodes']:
-                _mark_dirtykey('nodes', node, self.tenant)
                 self._cfgstore['nodes'][node] = {'groups': [group]}
-            elif group not in self._cfgstore['nodes'][node]['groups']:
                 _mark_dirtykey('nodes', node, self.tenant)
+            elif group not in self._cfgstore['nodes'][node]['groups']:
                 self._cfgstore['nodes'][node]['groups'].insert(0, group)
+                _mark_dirtykey('nodes', node, self.tenant)
             else:
                 continue  # next node, this node already in
             self._node_added_to_group(node, group, changeset)
@@ -771,7 +771,6 @@ class ConfigManager(object):
                                     node, group))
         for group in attribmap.iterkeys():
             group = group.encode('utf-8')
-            _mark_dirtykey('groups', group, self.tenant)
             if group not in self._cfgstore['groups']:
                 self._cfgstore['groups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['groups'][group]
@@ -797,6 +796,7 @@ class ConfigManager(object):
                         self._do_inheritance(nodecfg, attr, node, changeset,
                                              srcgroup=group)
                         _addchange(changeset, node, attr)
+            _mark_dirtykey('groups', group, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -810,7 +810,6 @@ class ConfigManager(object):
                     groupentry = self._cfgstore['groups'][group]
                 except KeyError:
                     continue
-                _mark_dirtykey('groups', group, self.tenant)
                 for attrib in attributes:
                     if attrib == 'nodes':
                         groupentry['nodes'] = set()
@@ -829,11 +828,12 @@ class ConfigManager(object):
                             except KeyError:
                                 delnodeattrib = False
                             if delnodeattrib:
-                                _mark_dirtykey('nodes', node, self.tenant)
                                 del nodecfg[attrib]
                                 self._do_inheritance(nodecfg, attrib, node,
                                                      changeset)
                                 _addchange(changeset, node, attrib)
+                                _mark_dirtykey('nodes', node, self.tenant)
+                _mark_dirtykey('groups', group, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -890,8 +890,8 @@ class ConfigManager(object):
             if node in self._cfgstore['nodes']:
                 self._sync_groups_to_node(node=node, groups=[],
                                           changeset=changeset)
-                _mark_dirtykey('nodes', node, self.tenant)
                 del self._cfgstore['nodes'][node]
+                _mark_dirtykey('nodes', node, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -901,8 +901,8 @@ class ConfigManager(object):
             if group in self._cfgstore['groups']:
                 self._sync_nodes_to_group(group=group, nodes=[],
                                           changeset=changeset)
-                _mark_dirtykey('groups', group, self.tenant)
                 del self._cfgstore['groups'][group]
+                _mark_dirtykey('groups', group, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -920,10 +920,10 @@ class ConfigManager(object):
                 if attrib in nodek and 'inheritedfrom' not in nodek[attrib]:
                     # if the attribute is set and not inherited,
                     # delete it and check for inheritence to backfil data
-                    _mark_dirtykey('nodes', node, self.tenant)
                     del nodek[attrib]
                     self._do_inheritance(nodek, attrib, node, changeset)
                     _addchange(changeset, node, attrib)
+                    _mark_dirtykey('nodes', node, self.tenant)
                 if ('_expressionkeys' in nodek and
                         attrib in nodek['_expressionkeys']):
                     recalcexpressions = True
@@ -972,9 +972,7 @@ class ConfigManager(object):
                         attribmap[node]['groups'].append('everything')
         for node in attribmap.iterkeys():
             node = node.encode('utf-8')
-            _mark_dirtykey('nodes', node, self.tenant)
             exprmgr = None
-            _mark_dirtykey('nodes', node, self.tenant)
             if node not in self._cfgstore['nodes']:
                 newnodes.append(node)
                 self._cfgstore['nodes'][node] = {}
@@ -1005,6 +1003,7 @@ class ConfigManager(object):
                 # if any code is watching these attributes, notify
                 # them of the change
                 _addchange(changeset, node, attrname)
+                _mark_dirtykey('nodes', node, self.tenant)
             if recalcexpressions:
                 if exprmgr is None:
                     exprmgr = _ExpressionFormat(cfgobj, node)
