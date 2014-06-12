@@ -92,6 +92,7 @@ class ExecConsole(conapi.Console):
         os.write(self._master, data)
 
     def close(self):
+        os.close(self._master)
         if self.subproc is None or self.subproc.poll() is not None:
             return
         self.subproc.terminate()

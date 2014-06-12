@@ -36,3 +36,36 @@ KeyError: ''
  while the problem cannot be reproduced without that problem fixed, the
  problem should only cause poor performance, not induce transpose of data...
  -test out bg_sync in cfg to make sure if it runs just before a change it doesn't cause loss
+-set boot/nextdevice=cd after exiting console did:
+/nodes/n3/ -> set boot/nextdevice=cd
+Traceback (most recent call last):
+  File "/usr/bin/confetty", line 561, in <module>
+    do_command(currcommand, netserver)
+  File "/usr/bin/confetty", line 300, in do_command
+    setvalues(argv[1:])
+  File "/usr/bin/confetty", line 369, in setvalues
+    print_result(res)
+  File "/usr/bin/confetty", line 211, in print_result
+    for key in res.iterkeys():
+AttributeError: 'str' object has no attribute 'iterkeys'
+[root@odin ~]# confetty
+/ -> cd /nodes/n3
+-Jun 11 14:51:49 Traceback (most recent call last):
+  File "/usr/lib/python2.6/site-packages/confluent/httpapi.py", line 238, in resourcehandler
+    for rsp in resourcehandler_backend(env, start_response):
+  File "/usr/lib/python2.6/site-packages/confluent/httpapi.py", line 358, in resourcehandler_backend
+    extension):
+  File "/usr/lib/python2.6/site-packages/confluent/httpapi.py", line 406, in _assemble_html
+    for rsp in responses:
+  File "/usr/lib/python2.6/site-packages/confluent/core.py", line 168, in stripnode
+    for i in iterablersp:
+  File "/usr/lib/python2.6/site-packages/confluent/plugins/hardwaremanagement/ipmi.py", line 196, in next
+    retdata = self.currdata.next()
+  File "/usr/lib/python2.6/site-packages/confluent/plugins/hardwaremanagement/ipmi.py", line 288, in health
+    response = self.ipmicmd.get_health()
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/command.py", line 301, in get_health
+    for reading in self.get_sensor_data():
+  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/command.py", line 322, in get_sensor_data
+    raise Exception(rsp['error'])
+Exception: Payload already active on another session
+-try to get 'health' without trailing /
