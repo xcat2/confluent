@@ -50,22 +50,4 @@ Traceback (most recent call last):
 AttributeError: 'str' object has no attribute 'iterkeys'
 [root@odin ~]# confetty
 / -> cd /nodes/n3
--Jun 11 14:51:49 Traceback (most recent call last):
-  File "/usr/lib/python2.6/site-packages/confluent/httpapi.py", line 238, in resourcehandler
-    for rsp in resourcehandler_backend(env, start_response):
-  File "/usr/lib/python2.6/site-packages/confluent/httpapi.py", line 358, in resourcehandler_backend
-    extension):
-  File "/usr/lib/python2.6/site-packages/confluent/httpapi.py", line 406, in _assemble_html
-    for rsp in responses:
-  File "/usr/lib/python2.6/site-packages/confluent/core.py", line 168, in stripnode
-    for i in iterablersp:
-  File "/usr/lib/python2.6/site-packages/confluent/plugins/hardwaremanagement/ipmi.py", line 196, in next
-    retdata = self.currdata.next()
-  File "/usr/lib/python2.6/site-packages/confluent/plugins/hardwaremanagement/ipmi.py", line 288, in health
-    response = self.ipmicmd.get_health()
-  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/command.py", line 301, in get_health
-    for reading in self.get_sensor_data():
-  File "/usr/lib/python2.6/site-packages/pyghmi/ipmi/command.py", line 322, in get_sensor_data
-    raise Exception(rsp['error'])
-Exception: Payload already active on another session
 -try to get 'health' without trailing /

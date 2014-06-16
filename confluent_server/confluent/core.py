@@ -321,6 +321,13 @@ def handle_path(path, operation, configmanager, inputdata=None):
             return iterate_collections(configmanager.list_nodes())
         if len(pathcomponents) == 2:
             iscollection = True
+        else:
+            try:
+                routespec = nested_lookup(noderesources, pathcomponents[2:])
+            except KeyError:
+                raise exc.NotFoundException("Invalid element requested")
+            if isinstance(routespec, dict):
+                iscollection = True
         if iscollection:
             if operation == "delete":
                 return delete_node_collection(pathcomponents, configmanager)
@@ -330,10 +337,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 raise Exception("TODO here")
         del pathcomponents[0:2]
         passvalue = None
-        try:
-            plugroute = nested_lookup(noderesources, pathcomponents).routeinfo
-        except KeyError:
-            raise exc.NotFoundException("Invalid element requested")
+        plugroute = routespec.routeinfo
         inputdata = msg.get_input_message(
             pathcomponents, operation, inputdata, (node,))
         if 'handler' in plugroute:  # fixed handler definition
