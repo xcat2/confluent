@@ -48,6 +48,5 @@ Traceback (most recent call last):
   File "/usr/bin/confetty", line 211, in print_result
     for key in res.iterkeys():
 AttributeError: 'str' object has no attribute 'iterkeys'
-[root@odin ~]# confetty
-/ -> cd /nodes/n3
--try to get 'health' without trailing /
+-/detected/ collection
+  -SLP snooping: snoop for srvrequests, likel

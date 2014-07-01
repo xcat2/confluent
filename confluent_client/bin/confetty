@@ -456,7 +456,7 @@ def conserver_command(filehandle, command):
     if command[0] == '.':
         print("disconnect]\r")
         quitconfetty(fullexit=consoleonly)
-    if command[0] == 'b':
+    elif command[0] == 'b':
         tlvdata.send(session.connection, {'operation': 'break',
                                           'path': currconsole})
         print("break sent]\r")
