@@ -160,7 +160,9 @@ def _authorize_request(env, operation):
             if sessionid in httpsessions:
                 httpsessions[sessionid]['expiry'] = time.time() + 90
                 name = httpsessions[sessionid]['name']
-                authdata = auth.authorize(name, element=None)
+                authdata = auth.authorize(
+                    name, element=None, 
+                    skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
@@ -168,7 +170,8 @@ def _authorize_request(env, operation):
         sessid = util.randomstring(32)
         while sessid in httpsessions:
             sessid = util.randomstring(32)
-        httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90}
+        httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
+                                'skipuserobject': authdata[4]}
         cookie['confluentsessionid'] = sessid
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1

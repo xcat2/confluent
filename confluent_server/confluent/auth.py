@@ -113,10 +113,10 @@ def authorize(name, element, tenant=False, operation='create',
         return None
     manager = configmanager.ConfigManager(tenant)
     if skipuserobj:
-        return None, manager, user, tenant
+        return None, manager, user, tenant, skipuserobj
     userobj = manager.get_user(user)
     if userobj:  # returning
-        return userobj, manager, user, tenant
+        return userobj, manager, user, tenant, skipuserobj
     return None
 
 
