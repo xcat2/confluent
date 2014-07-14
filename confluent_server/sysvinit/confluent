@@ -1,0 +1,33 @@
+#!/bin/sh
+# IBM(c) 2014 Apache 2.0
+# chkconfig: 345 85 60
+# description: Confluent hardware manager
+
+### BEGIN INIT INFO
+# Provides: confluent
+# Default-Start: 3 4 5
+# Default-Stop: 0 1 2 6
+### END INIT INFO
+
+. /etc/init.d/functions
+case $1 in
+	restart)
+		echo -n 'Stopping Confluent '
+		kill `cat /var/run/confluent/pid`
+		sleep 5
+		echo -n 'Starting Confluent '
+		/opt/confluent/bin/confluent
+		success
+		;;
+	start)
+		echo -n 'Starting Confluent '
+		/opt/confluent/bin/confluent
+		success
+		;;
+	stop)
+		echo -n 'Stopping Confluent '
+		kill `cat /var/run/confluent/pid`
+		success
+		;;
+esac
+

@@ -56,8 +56,9 @@ consoleonly = False
 consolename = ""
 target = "/"
 path = os.path.dirname(os.path.realpath(__file__))
-path = os.path.realpath(os.path.join(path, '..'))
-sys.path.append(path)
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
 
 import confluent.tlvdata as tlvdata
 import confluent.client as client

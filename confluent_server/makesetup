@@ -1,0 +1,3 @@
+cd `dirname $0`
+VERSION=`cat VERSION`
+sed -e "s/#VERSION#/$VERSION/" setup.py.tmpl > setup.py

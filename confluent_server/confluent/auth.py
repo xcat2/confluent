@@ -26,12 +26,33 @@ import Crypto.Protocol.KDF as KDF
 import hashlib
 import hmac
 import multiprocessing
+import PAM
 import time
 
+_pamservice = 'confluent'
 _passcache = {}
 _passchecking = {}
 
 authworkers = None
+
+
+class Credentials(object):
+    def __init__(self, username, passphrase):
+        self.username = username
+        self.passphrase = passphrase
+        self.haspam = False
+
+    def pam_conv(self, auth, query_list):
+        # use stored credentials in a pam conversation
+        self.haspam = True
+        resp = []
+        for query_entry in query_list:
+            query, pamtype = query_entry
+            if query.startswith('Password'):
+                resp.append((self.passphrase, 0))
+            else:
+                return None
+        return resp
 
 
 def _prune_passcache():
@@ -72,7 +93,8 @@ def _get_usertenant(name, tenant=False):
     yield tenant
 
 
-def authorize(name, element, tenant=False, operation='create'):
+def authorize(name, element, tenant=False, operation='create',
+              skipuserobj=False):
     #TODO: actually use the element to ascertain if this user is good enough
     """Determine whether the given authenticated name is authorized.
 
@@ -90,6 +112,8 @@ def authorize(name, element, tenant=False, operation='create'):
     if tenant is not None and not configmanager.is_tenant(tenant):
         return None
     manager = configmanager.ConfigManager(tenant)
+    if skipuserobj:
+        return None, manager, user, tenant
     userobj = manager.get_user(user)
     if userobj:  # returning
         return userobj, manager, user, tenant
@@ -127,6 +151,17 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         # would normally make an event and wait
         # but here there's no need for that
         eventlet.sleep(0.5)
+    credobj = Credentials(user, passphrase)
+    try:
+        pammy = PAM.pam()
+        pammy.start(_pamservice, user, credobj.pam_conv)
+        pammy.authenticate()
+        pammy.acct_mgmt()
+        del pammy
+        return authorize(user, element, tenant, skipuserobj=True)
+    except PAM.error:
+        if credobj.haspam:
+            return None
     if (user, tenant) in _passcache:
         if passphrase == _passcache[(user, tenant)]:
             return authorize(user, element, tenant)
