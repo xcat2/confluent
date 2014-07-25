@@ -729,9 +729,9 @@ class ConfigManager(object):
         # if the attribute is not set, this will search for a candidate
         # if it is set, but inheritedfrom, search for a replacement, just
         # in case
-        if not 'nodegroups' in nodecfg:
+        if not 'groups' in nodecfg:
             return
-        for group in nodecfg['nodegroups']:
+        for group in nodecfg['groups']:
             if attrib in self._cfgstore['nodegroups'][group]:
                 if srcgroup is not None and group != srcgroup:
                     # skip needless deepcopy
