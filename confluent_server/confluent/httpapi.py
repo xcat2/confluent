@@ -167,6 +167,8 @@ def _authorize_request(env, operation):
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, element=None)
+        if not authdata:
+            return {'code': 401}
         sessid = util.randomstring(32)
         while sessid in httpsessions:
             sessid = util.randomstring(32)
