@@ -729,7 +729,7 @@ class ConfigManager(object):
         # if the attribute is not set, this will search for a candidate
         # if it is set, but inheritedfrom, search for a replacement, just
         # in case
-        if not 'groups' in nodecfg:
+        if not 'nodegroups' in nodecfg:
             return
         for group in nodecfg['nodegroups']:
             if attrib in self._cfgstore['nodegroups'][group]:
@@ -787,7 +787,7 @@ class ConfigManager(object):
     def set_group_attributes(self, attribmap, autocreate=False):
         changeset = {}
         for group in attribmap.iterkeys():
-            if not autocreate and group not in self._cfgstore['groups']:
+            if not autocreate and group not in self._cfgstore['nodegroups']:
                 raise ValueError("{0} group does not exist".format(group))
             for attr in attribmap[group].iterkeys():
                 if (attr != 'nodes' and
@@ -807,9 +807,9 @@ class ConfigManager(object):
                                     node, group))
         for group in attribmap.iterkeys():
             group = group.encode('utf-8')
-            if group not in self._cfgstore['groups']:
-                self._cfgstore['groups'][group] = {'nodes': set()}
-            cfgobj = self._cfgstore['groups'][group]
+            if group not in self._cfgstore['nodegroups']:
+                self._cfgstore['nodegroups'][group] = {'nodes': set()}
+            cfgobj = self._cfgstore['nodegroups'][group]
             for attr in attribmap[group].iterkeys():
                 if attr == 'nodes':
                     newdict = set(attribmap[group][attr])
@@ -832,7 +832,7 @@ class ConfigManager(object):
                         self._do_inheritance(nodecfg, attr, node, changeset,
                                              srcgroup=group)
                         _addchange(changeset, node, attr)
-            _mark_dirtykey('groups', group, self.tenant)
+            _mark_dirtykey('nodegroups', group, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -843,7 +843,7 @@ class ConfigManager(object):
         for group in groups:
                 group = group.encode('utf-8')
                 try:
-                    groupentry = self._cfgstore['groups'][group]
+                    groupentry = self._cfgstore['nodegroups'][group]
                 except KeyError:
                     continue
                 for attrib in attributes:
@@ -869,7 +869,7 @@ class ConfigManager(object):
                                                      changeset)
                                 _addchange(changeset, node, attrib)
                                 _mark_dirtykey('nodes', node, self.tenant)
-                _mark_dirtykey('groups', group, self.tenant)
+                _mark_dirtykey('nodegroups', group, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -934,11 +934,11 @@ class ConfigManager(object):
     def del_groups(self, groups):
         changeset = {}
         for group in groups:
-            if group in self._cfgstore['groups']:
+            if group in self._cfgstore['nodegroups']:
                 self._sync_nodes_to_group(group=group, nodes=[],
                                           changeset=changeset)
-                del self._cfgstore['groups'][group]
-                _mark_dirtykey('groups', group, self.tenant)
+                del self._cfgstore['nodegroups'][group]
+                _mark_dirtykey('nodegroups', group, self.tenant)
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
@@ -1000,10 +1000,10 @@ class ConfigManager(object):
                     raise ValueError(errstr)
                 if attrname == 'groups':
                     for group in attribmap[node]['groups']:
-                        if group not in self._cfgstore['groups']:
+                        if group not in self._cfgstore['nodegroups']:
                             raise ValueError(
                                 "group {0} does not exist".format(group))
-                    if ('everything' in self._cfgstore['groups'] and
+                    if ('everything' in self._cfgstore['nodegroups'] and
                             'everything' not in attribmap[node]['groups']):
                         attribmap[node]['groups'].append('everything')
         for node in attribmap.iterkeys():
@@ -1070,7 +1070,7 @@ class ConfigManager(object):
                     ['main', tenant, 'nodes'],
                     "%s/%s/nodes" % (rootpath, tenant))
                 _load_dict_from_dbm(
-                    ['main', tenant, 'groups'],
+                    ['main', tenant, 'nodegroups'],
                     "%s/%s/groups" % (rootpath, tenant))
                 _load_dict_from_dbm(
                     ['main', tenant, 'users'],
