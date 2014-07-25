@@ -79,7 +79,7 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-rootcollections = ['nodes/', 'groups/', 'users/']
+rootcollections = ['nodes/', 'nodegroups/', 'users/']
 
 
 class PluginRoute(object):
@@ -277,7 +277,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
         del pathcomponents[-1]
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
-    elif pathcomponents[0] == 'groups':
+    elif pathcomponents[0] == 'nodegroups':
         if len(pathcomponents) < 2:
             if operation == "create":
                 inputdata = msg.InputAttributes(pathcomponents, inputdata)

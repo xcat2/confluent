@@ -161,7 +161,7 @@ def _authorize_request(env, operation):
                 httpsessions[sessionid]['expiry'] = time.time() + 90
                 name = httpsessions[sessionid]['name']
                 authdata = auth.authorize(
-                    name, element=None, 
+                    name, element=None,
                     skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         name, passphrase = base64.b64decode(

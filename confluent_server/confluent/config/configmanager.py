@@ -416,8 +416,8 @@ class ConfigManager(object):
                 _cfgstore['main'] = {}
                 self._bg_sync_to_file()
             self._cfgstore = _cfgstore['main']
-            if 'groups' not in self._cfgstore:
-                self._cfgstore['groups'] = {'everything': {'nodes': set()}}
+            if 'nodegroups' not in self._cfgstore:
+                self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
                 self._bg_sync_to_file()
             if 'nodes' not in self._cfgstore:
                 self._cfgstore['nodes'] = {}
@@ -431,8 +431,8 @@ class ConfigManager(object):
             self._bg_sync_to_file()
         self.tenant = tenant
         self._cfgstore = _cfgstore['tenant'][tenant]
-        if 'groups' not in self._cfgstore:
-            self._cfgstore['groups'] = {'everything': {}}
+        if 'nodegroups' not in self._cfgstore:
+            self._cfgstore['nodegroups'] = {'everything': {}}
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}
         self._bg_sync_to_file()
@@ -534,6 +534,42 @@ class ConfigManager(object):
         except KeyError:
             return None
 
+    def get_usergroup(self, groupname):
+        """Get user group information from DB
+
+        :param groupname: Name of the group
+
+        Returns a dictionary describing parameters of a user group.
+        This may include the role for users in the group to receive
+        if no more specific information is found.
+
+        """
+        try:
+            return copy.deepcopy(self._cfgstore['usergroups'][groupname])
+        except KeyError:
+            return None
+
+    def set_usergroup(self, groupname, attributemap):
+        """Set usergroup attribute(s)
+
+        :param groupname: the name of teh group to modify
+        :param attributemap: The mapping of keys to values to set
+        """
+
+        for attribute in attributemap.iterkeys():
+            self._cfgstore['usergroups'][attribute] = attributemap[attribute]
+        _mark_dirtykey('usergroups', groupname, self.tenant)
+
+    def create_usergroup(selfself, groupname, role="Administrator"):
+        if 'usergroups' not in self._cfgstore:
+            self._cfgstore['usergroups'] = {}
+        groupname = groupname.encode('utf-8')
+        if groupname in self._cfgstore['usergroups']:
+            raise Exception("Duplicate groupname requested")
+        self._cfgstore['usergroups'][groupname] = {'role': role}
+        _mark_dirtykey('usergroups', groupname, self.tenant)
+
+
     def set_user(self, name, attributemap):
         """Set user attribute(s)
 
@@ -602,10 +638,10 @@ class ConfigManager(object):
         return node in self._cfgstore['nodes']
 
     def is_nodegroup(self, nodegroup):
-        return nodegroup in self._cfgstore['groups']
+        return nodegroup in self._cfgstore['nodegroups']
 
     def get_groups(self):
-        return self._cfgstore['groups'].iterkeys()
+        return self._cfgstore['nodegroups'].iterkeys()
 
     def list_nodes(self):
         try:
@@ -614,7 +650,7 @@ class ConfigManager(object):
             return []
 
     def get_nodegroup_attributes(self, nodegroup, attributes=()):
-        cfgnodeobj = self._cfgstore['groups'][nodegroup]
+        cfgnodeobj = self._cfgstore['nodegroups'][nodegroup]
         if not attributes:
             attributes = cfgnodeobj.iterkeys()
         nodeobj = {}
@@ -655,7 +691,7 @@ class ConfigManager(object):
     def _node_added_to_group(self, node, group, changeset):
         try:
             nodecfg = self._cfgstore['nodes'][node]
-            groupcfg = self._cfgstore['groups'][group]
+            groupcfg = self._cfgstore['nodegroups'][group]
         except KeyError:  # something did not exist, nothing to do
             return
         for attrib in groupcfg.iterkeys():
@@ -695,13 +731,13 @@ class ConfigManager(object):
         # in case
         if not 'groups' in nodecfg:
             return
-        for group in nodecfg['groups']:
-            if attrib in self._cfgstore['groups'][group]:
+        for group in nodecfg['nodegroups']:
+            if attrib in self._cfgstore['nodegroups'][group]:
                 if srcgroup is not None and group != srcgroup:
                     # skip needless deepcopy
                     return
                 nodecfg[attrib] = \
-                    copy.deepcopy(self._cfgstore['groups'][group][attrib])
+                    copy.deepcopy(self._cfgstore['nodegroups'][group][attrib])
                 nodecfg[attrib]['inheritedfrom'] = group
                 self._refresh_nodecfg(nodecfg, attrib, nodename,
                                       changeset=changeset)
@@ -712,19 +748,19 @@ class ConfigManager(object):
                 return
 
     def _sync_groups_to_node(self, groups, node, changeset):
-        for group in self._cfgstore['groups'].iterkeys():
+        for group in self._cfgstore['nodegroups'].iterkeys():
             if group not in groups:
-                if node in self._cfgstore['groups'][group]['nodes']:
-                    self._cfgstore['groups'][group]['nodes'].discard(node)
+                if node in self._cfgstore['nodegroups'][group]['nodes']:
+                    self._cfgstore['nodegroups'][group]['nodes'].discard(node)
                     self._node_removed_from_group(node, group, changeset)
-                    _mark_dirtykey('groups', group, self.tenant)
+                    _mark_dirtykey('nodegroups', group, self.tenant)
         for group in groups:
-            if group not in self._cfgstore['groups']:
-                self._cfgstore['groups'][group] = {'nodes': set([node])}
-                _mark_dirtykey('groups', group, self.tenant)
-            elif node not in self._cfgstore['groups'][group]['nodes']:
-                self._cfgstore['groups'][group]['nodes'].add(node)
-                _mark_dirtykey('groups', group, self.tenant)
+            if group not in self._cfgstore['nodegroups']:
+                self._cfgstore['nodegroups'][group] = {'nodes': set([node])}
+                _mark_dirtykey('nodegroups', group, self.tenant)
+            elif node not in self._cfgstore['nodegroups'][group]['nodes']:
+                self._cfgstore['nodegroups'][group]['nodes'].add(node)
+                _mark_dirtykey('nodegroups', group, self.tenant)
             # node was not already in given group, perform inheritence fixup
             self._node_added_to_group(node, group, changeset)
 
@@ -1026,7 +1062,8 @@ class ConfigManager(object):
         _load_dict_from_dbm(['globals'], rootpath + "/globals")
         _load_dict_from_dbm(['main', 'nodes'], rootpath + "/nodes")
         _load_dict_from_dbm(['main', 'users'], rootpath + "/users")
-        _load_dict_from_dbm(['main', 'groups'], rootpath + "/groups")
+        _load_dict_from_dbm(['main', 'nodegroups'], rootpath + "/nodegroups")
+        _load_dict_from_dbm(['main', 'usergroups'], rootpath + "/usergroups")
         try:
             for tenant in os.listdir(rootpath + '/tenants/'):
                 _load_dict_from_dbm(
@@ -1038,6 +1075,9 @@ class ConfigManager(object):
                 _load_dict_from_dbm(
                     ['main', tenant, 'users'],
                     "%s/%s/users" % (rootpath, tenant))
+                _load_dict_from_dbm(
+                    ['main', tenant, 'usergroups'],
+                    "%s/%s/usergroups" % (rootpath, tenant))
         except OSError:
             pass
 

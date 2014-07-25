@@ -50,3 +50,4 @@ Traceback (most recent call last):
 AttributeError: 'str' object has no attribute 'iterkeys'
 -/detected/ collection
   -SLP snooping: snoop for srvrequests, likel
+-show power/state while session is believed to be good but will timeout
