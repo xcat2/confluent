@@ -578,7 +578,7 @@ class ConfigManager(object):
         """
         user = self._cfgstore['users'][name]
         for attribute in attributemap:
-            if attribute == 'passphrase':
+            if attribute == 'password':
                 salt = os.urandom(8)
                 #TODO: WORKERPOOL, offload password set to a worker
                 crypted = KDF.PBKDF2(

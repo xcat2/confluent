@@ -36,7 +36,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         self._attribwatcher = cfm.watch_attributes(
             (node,),('secret.hardwaremanagementuser',
-                     'secret.hardwaremanagementpassphrase', 'secret.ipmikg',
+                     'secret.hardwaremanagementpassword', 'secret.ipmikg',
                      'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
 
@@ -61,8 +61,8 @@ def get_conn_params(node, configdata):
         username = configdata['secret.hardwaremanagementuser']['value']
     else:
         username = 'USERID'
-    if 'secret.hardwaremanagementpassphrase' in configdata:
-        passphrase = configdata['secret.hardwaremanagementpassphrase']['value']
+    if 'secret.hardwaremanagementpassword' in configdata:
+        passphrase = configdata['secret.hardwaremanagementpassword']['value']
     else:
         passphrase = 'PASSW0RD'  # for lack of a better guess
     if 'hardwaremanagement.manager' in configdata:
@@ -85,7 +85,7 @@ def get_conn_params(node, configdata):
 
 
 _configattributes = ('secret.hardwaremanagementuser',
-                     'secret.hardwaremanagementpassphrase',
+                     'secret.hardwaremanagementpassword',
                      'secret.ipmikg', 'hardwaremanagement.manager')
 
 

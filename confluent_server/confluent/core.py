@@ -151,10 +151,10 @@ def show_user(name, configmanager):
     rv = {}
     for attr in attrscheme.user.iterkeys():
         rv[attr] = None
-        if attr == 'passphrase':
+        if attr == 'password':
             if 'cryptpass' in userobj:
-                rv['passphrase'] = {'cryptvalue': True}
-            yield msg.CryptedAttributes(kv={'passphrase': rv['passphrase']},
+                rv['password'] = {'cryptvalue': True}
+            yield msg.CryptedAttributes(kv={'password': rv['password']},
                                         desc=attrscheme.user[attr][
                                             'description'])
         else:

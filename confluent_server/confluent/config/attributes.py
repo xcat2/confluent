@@ -61,7 +61,7 @@ nic = {
 }
 
 user = {
-    'passphrase': {
+    'password': {
         'description':  'The passphrase used to authenticate this user'
     },
 }
@@ -255,7 +255,7 @@ node = {
                         'this class of protocols and SNMP and IPMI, snmp and '
                         'ipmi utilize dedicated values.'),
     },
-    'secret.hardwaremanagementpassphrase': {
+    'secret.hardwaremanagementpassword': {
         'description': ('Passphrase to be set and used by protocols like SSH '
                         'and HTTP, where client sends passphrase over the '
                         'network.  Given distinct security models between '

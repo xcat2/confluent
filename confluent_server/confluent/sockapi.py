@@ -80,7 +80,7 @@ def sessionhdl(connection, authname, skipauth=False):
         tlvdata.send(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
         authname = response['username']
-        passphrase = response['passphrase']
+        passphrase = response['password']
         # note(jbjohnso): here, we need to authenticate, but not
         # authorize a user.  When authorization starts understanding
         # element path, that authorization will need to be called

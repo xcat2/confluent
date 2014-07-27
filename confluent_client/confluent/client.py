@@ -55,9 +55,9 @@ class Command(object):
         else:
             self.authenticated = False
 
-    def authenticate(self, username, passphrase):
+    def authenticate(self, username, password):
         tlvdata.send(self.connection,
-                     {'username': username, 'passphrase': passphrase})
+                     {'username': username, 'password': password})
         authdata = tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True

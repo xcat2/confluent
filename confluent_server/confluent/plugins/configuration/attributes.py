@@ -20,7 +20,7 @@ import confluent.config.attributes as allattributes
 def retrieve(nodes, element, configmanager, inputdata):
     if nodes is not None:
         return retrieve_nodes(nodes, element, configmanager, inputdata)
-    elif element[0] == 'groups':
+    elif element[0] == 'nodegroups':
         return retrieve_nodegroup(
             element[1], element[3], configmanager, inputdata)
 
@@ -128,7 +128,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
 def update(nodes, element, configmanager, inputdata):
     if nodes is not None:
         return update_nodes(nodes, element, configmanager, inputdata)
-    elif element[0] == 'groups':
+    elif element[0] == 'nodegroups':
         return update_nodegroup(
             element[1], element[3], configmanager, inputdata)
     raise Exception("This line should never be reached")
