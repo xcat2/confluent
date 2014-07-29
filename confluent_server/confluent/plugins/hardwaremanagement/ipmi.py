@@ -21,6 +21,7 @@ import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
 import eventlet.queue
 import pyghmi.constants as pygconstants
+import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
 import pyghmi.ipmi.command as ipmicommand
 import socket
@@ -205,8 +206,13 @@ class IpmiIterator(object):
 
 
 def perform_request(operator, node, element, configdata, inputdata, cfg):
-    return IpmiHandler(operator, node, element, configdata, inputdata, cfg
-                       ).handle_request()
+    try:
+        return IpmiHandler(operator, node, element, configdata, inputdata, cfg
+                           ).handle_request()
+    except pygexc.IpmiException as ipmiexc:
+        excmsg = str(ipmiexc)
+        if excmsg == 'Session no longer connected':
+            return msg.ConfluentTargetTimeout(node)
 
 
 persistent_ipmicmds = {}
