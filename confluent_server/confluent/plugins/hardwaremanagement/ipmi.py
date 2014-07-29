@@ -256,6 +256,11 @@ class IpmiHandler(object):
         if self.broken:
             if self.error == 'timeout':
                 return iter([msg.ConfluentTargetTimeout(self.node)])
+            elif ('Unauthorized' in self.error or
+                    'Incorrect password' in self.error):
+                return iter([msg.ConfluentTargetInvalidCredentials(self.node)])
+            elif 'Incorrect password' in self.error:
+                return iter([C])
             else:
                 raise Exception(self.error)
         if self.element == ['power', 'state']:
