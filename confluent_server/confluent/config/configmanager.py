@@ -62,11 +62,13 @@ from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
 import anydbm as dbm
 import ast
+import base64
 import confluent.config.attributes as allattributes
 import confluent.util
 import copy
 import cPickle
 import errno
+import json
 import operator
 import os
 import random
@@ -79,7 +81,7 @@ import threading
 _masterkey = None
 _masterintegritykey = None
 _dirtylock = threading.RLock()
-
+_config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 
 def _mkpath(pathname):
     try:
@@ -91,62 +93,62 @@ def _mkpath(pathname):
             raise
 
 
-def _derive_keys(passphrase, salt):
+def _derive_keys(password, salt):
     #implement our specific combination of pbkdf2 transforms to get at
     #key.  We bump the iterations up because we can afford to
     #TODO: WORKERPOOL PBKDF2 is expensive
-    tmpkey = KDF.PBKDF2(passphrase, salt, 32, 50000,
+    tmpkey = KDF.PBKDF2(password, salt, 32, 50000,
                         lambda p, s: HMAC.new(p, s, SHA256).digest())
     finalkey = KDF.PBKDF2(tmpkey, salt, 32, 50000,
                           lambda p, s: HMAC.new(p, s, SHA256).digest())
     return finalkey[:32], finalkey[32:]
 
 
-def _get_protected_key(keydict, passphrase):
+def _get_protected_key(keydict, password):
     if keydict['unencryptedvalue']:
         return keydict['unencryptedvalue']
     # TODO(jbjohnso): check for TPM sealing
     if 'passphraseprotected' in keydict:
-        if passphrase is None:
-            raise Exception("Passphrase protected secret requires passhrase")
+        if password is None:
+            raise Exception("Passphrase protected secret requires password")
         for pp in keydict['passphraseprotected']:
             salt = pp[0]
-            privkey, integkey = _derive_keys(passphrase, salt)
+            privkey, integkey = _derive_keys(password, salt)
             return decrypt_value(pp[1:], key=privkey, integritykey=integkey)
     else:
         raise Exception("No available decryption key")
 
 
-def _format_key(key, passphrase=None):
-    if passphrase is not None:
+def _format_key(key, password=None):
+    if password is not None:
         salt = os.urandom(32)
-        privkey, integkey = _derive_keys(passphrase, salt)
+        privkey, integkey = _derive_keys(password, salt)
         cval = crypt_value(key, key=privkey, integritykey=integkey)
         return {"passphraseprotected": cval}
     else:
         return {"unencryptedvalue": key}
 
 
-def init_masterkey(passphrase=None):
+def init_masterkey(password=None):
     global _masterkey
     global _masterintegritykey
     cfgn = get_global('master_privacy_key')
 
     if cfgn:
-        _masterkey = _get_protected_key(cfgn, passphrase=passphrase)
+        _masterkey = _get_protected_key(cfgn, password=password)
     else:
         _masterkey = os.urandom(32)
         set_global('master_privacy_key', _format_key(
             _masterkey,
-            passphrase=passphrase))
+            password=password))
     cfgn = get_global('master_integrity_key')
     if cfgn:
-        _masterintegritykey = _get_protected_key(cfgn, passphrase=passphrase)
+        _masterintegritykey = _get_protected_key(cfgn, password=password)
     else:
         _masterintegritykey = os.urandom(64)
         set_global('master_integrity_key', _format_key(
             _masterintegritykey,
-            passphrase=passphrase))
+            password=password))
 
 
 def decrypt_value(cryptvalue,
@@ -258,7 +260,7 @@ def _mark_dirtykey(category, key, tenant=None):
 
 
 def _generate_new_id():
-    # generate a random id outside the usual ranges used for norml users in
+    # generate a random id outside the usual ranges used for normal users in
     # /etc/passwd.  Leave an equivalent amount of space near the end disused,
     # just in case
     uid = str(confluent.util.securerandomnumber(65537, 4294901759))
@@ -560,7 +562,7 @@ class ConfigManager(object):
             self._cfgstore['usergroups'][attribute] = attributemap[attribute]
         _mark_dirtykey('usergroups', groupname, self.tenant)
 
-    def create_usergroup(selfself, groupname, role="Administrator"):
+    def create_usergroup(self, groupname, role="Administrator"):
         if 'usergroups' not in self._cfgstore:
             self._cfgstore['usergroups'] = {}
         groupname = groupname.encode('utf-8')
@@ -568,7 +570,6 @@ class ConfigManager(object):
             raise Exception("Duplicate groupname requested")
         self._cfgstore['usergroups'][groupname] = {'role': role}
         _mark_dirtykey('usergroups', groupname, self.tenant)
-
 
     def set_user(self, name, attributemap):
         """Set user attribute(s)
@@ -1054,30 +1055,69 @@ class ConfigManager(object):
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
+    def _dump_to_json(self, redact=None):
+        """Dump the configuration in json form to output
+
+        password is used to protect the 'secret' attributes in liue of the
+        actual in-configuration master key (which will have no clear form
+        in the dump
+
+        :param redact: If True, then sensitive password data will be redacted.
+                       Other values may be used one day to redact in more
+                       complex and interesting ways for non-secret
+                       data.
+
+        """
+        dumpdata = {}
+        for confarea in _config_areas:
+            if confarea not in self._cfgstore:
+                continue
+            dumpdata[confarea] = {}
+            for element in self._cfgstore[confarea].iterkeys():
+                dumpdata[confarea][element] = \
+                    copy.deepcopy(self._cfgstore[confarea][element])
+                for attribute in self._cfgstore[confarea][element].iterkeys():
+                    if 'inheritedfrom' in dumpdata[confarea][element][attribute]:
+                        del dumpdata[confarea][element][attribute]
+                    elif (attribute == 'cryptpass' or
+                                  'cryptvalue' in
+                                  dumpdata[confarea][element][attribute]):
+                        if redact is not None:
+                            dumpdata[confarea][element][attribute] = '*REDACTED*'
+                        else:
+                            if attribute == 'cryptpass':
+                                target = dumpdata[confarea][element][attribute]
+                            else:
+                                target = dumpdata[confarea][element][attribute]['cryptvalue']
+                            cryptval = []
+                            for value in target:
+                                cryptval.append(base64.b64encode(value))
+                            if attribute == 'cryptpass':
+                                dumpdata[confarea][element][attribute] = '!'.join(cryptval)
+                            else:
+                                dumpdata[confarea][element][attribute]['cryptvalue'] = '!'.join(cryptval)
+                    elif isinstance(dumpdata[confarea][element][attribute], set):
+                        dumpdata[confarea][element][attribute] = \
+                            list(dumpdata[confarea][element][attribute])
+        return json.dumps(
+            dumpdata, sort_keys=True, indent=4, separators=(',', ': '))
+
+
+
     @classmethod
     def _read_from_path(cls):
         global _cfgstore
         _cfgstore = {}
         rootpath = cls._cfgdir
         _load_dict_from_dbm(['globals'], rootpath + "/globals")
-        _load_dict_from_dbm(['main', 'nodes'], rootpath + "/nodes")
-        _load_dict_from_dbm(['main', 'users'], rootpath + "/users")
-        _load_dict_from_dbm(['main', 'nodegroups'], rootpath + "/nodegroups")
-        _load_dict_from_dbm(['main', 'usergroups'], rootpath + "/usergroups")
+        for confarea in _config_areas:
+            _load_dict_from_dbm(['main', confarea], rootpath + "/" + confarea)
         try:
             for tenant in os.listdir(rootpath + '/tenants/'):
-                _load_dict_from_dbm(
-                    ['main', tenant, 'nodes'],
-                    "%s/%s/nodes" % (rootpath, tenant))
-                _load_dict_from_dbm(
-                    ['main', tenant, 'nodegroups'],
-                    "%s/%s/groups" % (rootpath, tenant))
-                _load_dict_from_dbm(
-                    ['main', tenant, 'users'],
-                    "%s/%s/users" % (rootpath, tenant))
-                _load_dict_from_dbm(
-                    ['main', tenant, 'usergroups'],
-                    "%s/%s/usergroups" % (rootpath, tenant))
+                for confarea in _config_areas:
+                    _load_dict_from_dbm(
+                        ['main', tenant, confarea],
+                        "%s/%s/%s" % (rootpath, tenant, confarea))
         except OSError:
             pass
 
@@ -1148,6 +1188,33 @@ class ConfigManager(object):
                 # it might indeed be a nested structure
                 self._recalculate_expressions(cfgobj[key], formatter, node,
                                               changeset)
+
+def _dump_keys(password):
+    if _masterkey is None or _masterintegritykey is None:
+        init_masterkey()
+    cryptkey = _format_key(_masterkey, password=password)
+    cryptkey = '!'.join(map(base64.b64encode, cryptkey['passphraseprotected']))
+    integritykey = _format_key(_masterintegritykey, password=password)
+    integritykey = '!'.join(map(base64.b64encode, integritykey['passphraseprotected']))
+    return json.dumps({'cryptkey': cryptkey, 'integritykey': integritykey},
+                      sort_keys=True, indent=4, separators=(',', ': '))
+
+
+def dump_db_to_directory(location, password, redact=None):
+    with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
+        cfgfile.write(_dump_keys(password))
+        cfgfile.write('\n')
+    with open(os.path.join(location, 'main.json'), 'w') as cfgfile:
+        cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
+        cfgfile.write('\n')
+    try:
+        for tenant in os.listdir(ConfigManager._cfgdir + '/tenants/'):
+            with open(os.path.join(location, tenant + '.json'), 'w') as cfgfile:
+                cfgfile.write(ConfigManager(tenant=tenant)._dump_to_json(
+                    redact=redact))
+                cfgfile.write('\n')
+    except OSError:
+        pass
 
 
 try:

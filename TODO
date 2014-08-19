@@ -50,4 +50,15 @@ Traceback (most recent call last):
 AttributeError: 'str' object has no attribute 'iterkeys'
 -/detected/ collection
   -SLP snooping: snoop for srvrequests, likel
--show power/state while session is believed to be good but will timeout
+-Config backup/restore
+    -seal to password
+-Scenario was somehow solconnection object is 'broken' (broken=True) but the supervising console manager
+ never notices.  The 'write()' doesn't raise an exception, just returns.
+     -pyghmi should except on attempt to write to broken console I think...
+     -need to investigate what path does not end up getting immediate notification
+     for disconnection
+     -last observed when a switch between confluent and imm was resetting in a loop
+      while it was trying to keep console open as much as possibl
+ -cs._handled_consoles[('n4', None)]._console.handle_data({'error':1}) is how I was able to
+  kick the session state back to working order after whatever event that was missed above
+  occurred.
