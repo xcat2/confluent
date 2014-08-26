@@ -415,6 +415,8 @@ class ConsoleSession(object):
 
     def __init__(self, node, configmanager, username, datacallback=None):
         self.tenant = configmanager.tenant
+        if not configmanager.is_node(node):
+            raise exc.NotFoundException("Invalid node")
         consk = (node, self.tenant)
         self.ckey = consk
         self.username = username

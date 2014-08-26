@@ -311,6 +311,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
         #single node request of some sort
         try:
             node = pathcomponents[1]
+            if not configmanager.is_node(node):
+                raise exc.NotFoundException("Invalid Node")
         except IndexError:  # doesn't actually have a long enough path
             # this is enumerating a list of nodes
             if operation == "delete":

@@ -300,9 +300,14 @@ def resourcehandler_backend(env, start_response):
                 auditmsg['tenant'] = authorized['tenant']
             auditlog.log(auditmsg)
             # Request for new session
-            consession = consoleserver.ConsoleSession(
-                node=nodename, configmanager=cfgmgr,
-                username=authorized['username'])
+            try:
+                consession = consoleserver.ConsoleSession(
+                    node=nodename, configmanager=cfgmgr,
+                    username=authorized['username'])
+            except exc.NotFoundException:
+                start_response("404 Not found", headers)
+                yield "404 - Request Path not recognized"
+                return
             if not consession:
                 start_response("500 Internal Server Error", headers)
                 return

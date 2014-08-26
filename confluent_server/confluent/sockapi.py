@@ -128,7 +128,6 @@ def send_response(responses, connection):
 
 
 def process_request(connection, request, cfm, authdata, authname, skipauth):
-    #TODO(jbjohnso): authorize each request
     if not isinstance(request, dict):
         raise ValueError
     operation = request['operation']
