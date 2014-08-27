@@ -293,6 +293,8 @@ def do_command(command, server):
             if 'errorcode' in status:
                 exitcode = status['errorcode']
             sys.stderr.write('Error: ' + status['error'] + '\n')
+            while '_requestdone' not in status:
+                status = tlvdata.recv(session.connection)
             return
         print '[console session started]'
         startconsole(nodename)
