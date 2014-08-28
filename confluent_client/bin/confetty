@@ -459,6 +459,10 @@ def conserver_command(filehandle, command):
     if command[0] == '.':
         print("disconnect]\r")
         quitconfetty(fullexit=consoleonly)
+    elif command[0] == 'o':
+        tlvdata.send(session.connection, {'operation': 'reopen',
+                                          'path': currconsole})
+        print('reopen]\r')
     elif command[0] == 'b':
         tlvdata.send(session.connection, {'operation': 'break',
                                           'path': currconsole})
@@ -467,6 +471,7 @@ def conserver_command(filehandle, command):
         print("help]\r")
         print(".    disconnect\r")
         print("b    break\r")
+        print("o    reopen\r")
         print("<cr> abort command\r")
     elif command[0] == '\x0d':
         print("ignored]\r")

@@ -286,6 +286,9 @@ class _ConsoleHandler(object):
             logdata=username, ltype=log.DataTypes.event,
             event=log.Events.clientdisconnect, eventdata=edata)
 
+    def reopen(self):
+        self._got_disconnected()
+
     def _handle_console_output(self, data):
         if type(data) == int:
             if data == conapi.ConsoleEvent.Disconnect:
@@ -439,6 +442,9 @@ class ConsoleSession(object):
 
     def send_break(self):
         self.conshdl.send_break()
+
+    def reopen(self):
+        self.conshdl.reopen()
 
     def destroy(self):
         _handled_consoles[self.ckey].detachuser(self.username)

@@ -172,6 +172,9 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
                     elif data['operation'] == 'break':
                         consession.send_break()
                         continue
+                    elif data['operation'] == 'reopen':
+                        consession.reopen()
+                        continue
                     else:
                         raise Exception("TODO")
                 if not data:
