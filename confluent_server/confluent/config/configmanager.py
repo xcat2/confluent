@@ -405,6 +405,8 @@ class ConfigManager(object):
     _cfgdir = "/etc/confluent/cfg/"
     _cfgwriter = None
     _writepending = False
+    _syncrunning = False
+    _syncstate = threading.RLock()
     _attribwatchers = {}
     _nodecollwatchers = {}
     _notifierids = {}
@@ -1123,15 +1125,13 @@ class ConfigManager(object):
 
     @classmethod
     def _bg_sync_to_file(cls):
-        if cls._writepending:
-            # already have a write scheduled
-            return
-        elif cls._cfgwriter is not None and cls._cfgwriter.isAlive():
-            #write in progress, request write when done
-            cls._writepending = True
-        else:
-            cls._cfgwriter = threading.Thread(target=cls._sync_to_file)
-            cls._cfgwriter.start()
+        with cls._syncstate:
+            if cls._syncrunning:
+                cls._writepending = True
+                return
+            cls._syncrunning = True
+        cls._cfgwriter = threading.Thread(target=cls._sync_to_file)
+        cls._cfgwriter.start()
 
     @classmethod
     def _sync_to_file(cls):
@@ -1170,8 +1170,14 @@ class ConfigManager(object):
                                 del dbf[ck]
                         else:
                             dbf[ck] = cPickle.dumps(currdict[category][ck])
-        if cls._writepending:
-            cls._writepending = False
+        willrun = False
+        with cls._syncstate:
+            if cls._writepending:
+                cls._writepending = False
+                willrun = True
+            else:
+                cls._syncrunning = False
+        if willrun:
             return cls._sync_to_file()
 
     def _recalculate_expressions(self, cfgobj, formatter, node, changeset):
