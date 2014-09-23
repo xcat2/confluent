@@ -1130,6 +1130,9 @@ class ConfigManager(object):
                 cls._writepending = True
                 return
             cls._syncrunning = True
+        # if the thread is exiting, join it to let it close, just in case
+        if cls._cfgwriter is not None:
+            cls._cfgwriter.join()
         cls._cfgwriter = threading.Thread(target=cls._sync_to_file)
         cls._cfgwriter.start()
 
@@ -1141,14 +1144,16 @@ class ConfigManager(object):
                 del _cfgstore['dirtyglobals']
             _mkpath(cls._cfgdir)
             globalf = dbm.open(cls._cfgdir + "/globals", 'c', 384)  # 0600
-            for globalkey in dirtyglobals:
-                if globalkey in _cfgstore['globals']:
-                    globalf[globalkey] = \
-                        cPickle.dumps(_cfgstore['globals'][globalkey])
-                else:
-                    if globalkey in globalf:
-                        del globalf[globalkey]
-            globalf.close()
+            try:
+                for globalkey in dirtyglobals:
+                    if globalkey in _cfgstore['globals']:
+                        globalf[globalkey] = \
+                            cPickle.dumps(_cfgstore['globals'][globalkey])
+                    else:
+                        if globalkey in globalf:
+                            del globalf[globalkey]
+            finally:
+                globalf.close()
         if 'dirtykeys' in _cfgstore:
             with _dirtylock:
                 currdirt = copy.deepcopy(_cfgstore['dirtykeys'])
@@ -1163,13 +1168,16 @@ class ConfigManager(object):
                     currdict = _cfgstore['tenant'][tenant]
                 for category in dkdict.iterkeys():
                     _mkpath(pathname)
-                    dbf = dbm.open(pathname + category, 'c', 384)  # 0600 mode
-                    for ck in dkdict[category]:
-                        if ck not in currdict[category]:
-                            if ck in dbf:
-                                del dbf[ck]
-                        else:
-                            dbf[ck] = cPickle.dumps(currdict[category][ck])
+                    dbf = dbm.open(pathname + category, 'c', 384):  # 0600
+                    try:
+                        for ck in dkdict[category]:
+                            if ck not in currdict[category]:
+                                if ck in dbf:
+                                    del dbf[ck]
+                            else:
+                                dbf[ck] = cPickle.dumps(currdict[category][ck])
+                    finally:
+                        dbf.close()
         willrun = False
         with cls._syncstate:
             if cls._writepending:
