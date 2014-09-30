@@ -99,7 +99,15 @@ class _ConsoleHandler(object):
             except KeyError:
                 pass
             if logvalue in ('full', ''):
-                self._alwayson()
+                # if the *only* thing to change is the log,
+                # then let always on handle reconnect if needed,
+                # since we want to avoid a senseless disconnect
+                # if already connected
+                # if other things change, then unconditionally reconnect
+                onlylogging = len(nodeattribs[self.node]) == 1
+                self._alwayson(doconnect=onlylogging)
+                if onlylogging:
+                    return
             else:
                 self._ondemand()
                 if logvalue == 'none':
@@ -112,8 +120,10 @@ class _ConsoleHandler(object):
             return
         self.logger.log(*args, **kwargs)
 
-    def _alwayson(self):
+    def _alwayson(self, doconnect=True):
         self._isondemand = False
+        if not doconnect:
+            return
         if not self._console and not self.connectionthread:
             self._connect()
         else:
