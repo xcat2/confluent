@@ -1168,7 +1168,7 @@ class ConfigManager(object):
                     currdict = _cfgstore['tenant'][tenant]
                 for category in dkdict.iterkeys():
                     _mkpath(pathname)
-                    dbf = dbm.open(pathname + category, 'c', 384):  # 0600
+                    dbf = dbm.open(pathname + category, 'c', 384)  # 0600
                     try:
                         for ck in dkdict[category]:
                             if ck not in currdict[category]:
