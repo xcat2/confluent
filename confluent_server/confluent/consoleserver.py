@@ -26,6 +26,7 @@ import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.log as log
 import confluent.core as plugin
+import confluent.util as util
 import eventlet
 import eventlet.event
 import random
@@ -52,7 +53,18 @@ class _ConsoleHandler(object):
         self.logger = log.Logger(node, console=True,
                                  tenant=configmanager.tenant)
         self.buffer = bytearray()
-        (text, termstate) = self.logger.read_recent_text(8192)
+        (text, termstate, timestamp) = self.logger.read_recent_text(8192)
+        # when reading from log file, we will use wall clock
+        # it should usually match walltime.
+        self.lasttime = 0
+        if timestamp:
+            timediff = time.time() - timestamp
+            if timediff > 0:
+                self.lasttime = util.monotonic_time() - timediff
+            else:
+                # wall clock has gone backwards, use current time as best
+                # guess
+                self.lasttime = util.monotonic_time()
         self.buffer += text
         self.appmodedetected = False
         self.shiftin = None
@@ -85,6 +97,15 @@ class _ConsoleHandler(object):
             self._isondemand = True
         elif (attrvalue[self.node]['console.logging']['value']) == 'none':
             self._dologging = False
+
+    def get_buffer_age(self):
+        """Return age of buffered data
+
+        Returns age in seconds of the buffered data or
+        False in the event of calling before buffered data"""
+        if self.lasttime:
+            return util.monotonic_time() - self.lasttime
+        return False
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         if 'console.logging' in nodeattribs[self.node]:
@@ -318,6 +339,7 @@ class _ConsoleHandler(object):
         if self.shiftin is not None:
             eventdata |= 2
         self.log(data, eventdata=eventdata)
+        self.lasttime = util.monotonic_time()
         self.buffer += data
         #TODO: analyze buffer for registered events, examples:
         #   panics
@@ -452,6 +474,12 @@ class ConsoleSession(object):
 
     def send_break(self):
         self.conshdl.send_break()
+
+    def get_buffer_age(self):
+        """Get the age in seconds of the buffered data
+
+        Returns False if no data buffered yet"""
+        self.conshdl.get_buffer_age()
 
     def reopen(self):
         self.conshdl.reopen()

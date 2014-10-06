@@ -196,6 +196,7 @@ class Logger(object):
         currsize = 0
         offsets = []
         termstate = None
+        recenttimestamp = 0
         while binidx > 0 and currsize < size:
             binfile.seek(binidx, 0)
             binidx -= 16
@@ -204,6 +205,8 @@ class Logger(object):
                 struct.unpack(">BBIHIBBH", recbytes)
             if ltype != 2:
                 continue
+            if tstamp > recenttimestamp:
+                recenttimestamp = tstamp
             currsize += datalen
             offsets.append((offset, datalen))
             if termstate is None:
@@ -220,7 +223,7 @@ class Logger(object):
         textfile.close()
         if termstate is None:
             termstate = 0
-        return textdata, termstate
+        return textdata, termstate, recenttimestamp
 
     def write(self, data):
         """Write plain text to log

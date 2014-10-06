@@ -41,6 +41,7 @@
 # ~ I will not use for now...
 
 import fcntl
+import math
 import getpass
 import optparse
 import os
@@ -49,6 +50,7 @@ import select
 import shlex
 import sys
 import termios
+import time
 import tty
 
 exitcode = 0
@@ -67,18 +69,31 @@ conserversequence = '\x05c'  # ctrl-e, c
 
 oldtcattr = termios.tcgetattr(sys.stdin.fileno())
 netserver = None
+laststate = {}
 
 
-def updatestatus(stateinfo):
+def updatestatus(stateinfo={}):
     status = consolename
     info = []
-    if ('connectstate' in stateinfo and
-            stateinfo['connectstate'] != 'connected'):
+    for statekey in stateinfo.iterkeys():
+        laststate[statekey] = stateinfo[statekey]
+    if ('connectstate' in laststate and
+            laststate['connectstate'] != 'connected'):
         info.append(stateinfo['connectstate'])
-    if 'error' in stateinfo:
-        info.append(stateinfo['error'])
-    if 'clientcount' in stateinfo and stateinfo['clientcount'] != 1:
-        info.append('clients: %d' % stateinfo['clientcount'])
+    if 'error' in laststate:
+        info.append(laststate['error'])
+    if 'clientcount' in laststate and laststate['clientcount'] != 1:
+        info.append('clients: %d' % laststate['clientcount'])
+    if 'bufferage' in stateinfo:
+        laststate['showtime'] = time.time() - stateinfo['bufferage']
+    if 'showtime' in laststate:
+        showtime = laststate['showtime']
+        age = time.time() - laststate['showtime']
+        if age > 86400: # older than one day
+            # disambiguate by putting date in and time
+            info.append(time.strftime('%m-%dT%H:%M', time.localtime(showtime)))
+        else:
+            info.append(time.strftime('%H:%M', time.localtime(showtime)))
     if info:
         status += ' [' + ','.join(info) + ']'
     sys.stdout.write('\x1b]0;console: %s\x07' % status)
@@ -554,6 +569,12 @@ while not doexit:
                     continue
                 if data is not None:
                     sys.stdout.write(data)
+                    now = time.time()
+                    if ('showtime' not in laststate or
+                            (now // 60) != laststate['showtime'] // 60):
+                        # don't bother churning if minute does not change
+                        laststate['showtime'] = now
+                        updatestatus()
                     sys.stdout.flush()
                 else:
                     doexit = True

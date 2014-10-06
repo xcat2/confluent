@@ -163,6 +163,9 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
                 raise Exception("TODO")
             tlvdata.send(connection, {'started': 1})
             ccons.startsending()
+            bufferage = consession.get_buffer_age()
+            if bufferage is not False:
+                tlvdata.send(connection, {'bufferage': bufferage})
             while consession is not None:
                 data = tlvdata.recv(connection)
                 if type(data) == dict:

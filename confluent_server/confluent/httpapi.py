@@ -334,12 +334,18 @@ def resourcehandler_backend(env, start_response):
             consolesessions[sessid]['expiry'] = time.time() + 90
             outdata = consolesessions[sessid]['session'].get_next_output(
                 timeout=45)
+            bufferage = False
+            if 'stampsent' not in consolesessions[sessid]:
+                consoleserver[sessid]['stampsent'] = True
+                bufferage = consolesessions[sessid]['session'].get_buffer_age()
             if isinstance(outdata, dict):
                 rspdata = outdata
                 rspdata['session'] = querydict['session']
             else:
                 rspdata = {'session': querydict['session'],
                            'data': outdata}
+            if bufferage is not False:
+                rspdata['bufferage'] = bufferage
             try:
                 rsp = json.dumps(rspdata)
             except UnicodeDecodeError:
