@@ -96,7 +96,8 @@ def updatestatus(stateinfo={}):
             info.append(time.strftime('%H:%M', time.localtime(showtime)))
     if info:
         status += ' [' + ','.join(info) + ']'
-    sys.stdout.write('\x1b]0;console: %s\x07' % status)
+    if os.environ['TERM'] not in ('linux'):
+        sys.stdout.write('\x1b]0;console: %s\x07' % status)
     sys.stdout.flush()
 
 
@@ -127,7 +128,8 @@ def recurse_format(datum, levels=0):
 
 
 def prompt():
-    sys.stdout.write('\x1b]0;confetty: %s\x07' % target)
+    if os.environ['TERM'] not in ('linux'):
+        sys.stdout.write('\x1b]0;confetty: %s\x07' % target)
     try:
         return raw_input(target + ' -> ')
     except KeyboardInterrupt:

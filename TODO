@@ -62,3 +62,4 @@ AttributeError: 'str' object has no attribute 'iterkeys'
  -cs._handled_consoles[('n4', None)]._console.handle_data({'error':1}) is how I was able to
   kick the session state back to working order after whatever event that was missed above
   occurred.
+ -save and restore the terminal title on startup/exit respectively
