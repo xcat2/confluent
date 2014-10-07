@@ -37,7 +37,9 @@ class TermHandler(object):
         atexit.register(self.shutdown)
         self.socket.bind(path)
         os.chmod(path, stat.S_IWUSR | stat.S_IRUSR)
-        threading.Thread(target=self.sockinteract).start()
+        th = threading.Thread(target=self.sockinteract)
+        th.daemon = True
+        th.start()
 
     def shutdown(self):
         try:
