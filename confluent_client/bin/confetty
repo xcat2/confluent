@@ -62,6 +62,7 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 
+import confluent.termhandler as termhandler
 import confluent.tlvdata as tlvdata
 import confluent.client as client
 
@@ -509,12 +510,16 @@ def check_escape_seq(currinput, filehandle):
         currinput += filehandle.read()
     return currinput
 
-
 parser = optparse.OptionParser()
 parser.add_option("-s", "--server", dest="netserver",
                   help="Confluent instance to connect to",
                   metavar="SERVER:PORT")
+parser.add_option("-c", "--control", dest="controlpath",
+                  help="Path to offer terminal control",
+                  metavar="PATH")
 opts, shellargs = parser.parse_args()
+if opts.controlpath:
+    termhandler.TermHandler(opts.controlpath)
 if opts.netserver:  # going over a TLS network
     session = client.Command(opts.netserver)
 elif 'CONFLUENT_HOST' in os.environ:
