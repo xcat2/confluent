@@ -108,6 +108,8 @@ def authorize(name, element, tenant=False, operation='create',
             and the relevant ConfigManager object for the context of the
             request.
     """
+    if operation not in ('create', 'start', 'update', 'retrieve', 'delete'):
+        return None
     user, tenant = _get_usertenant(name, tenant)
     if tenant is not None and not configmanager.is_tenant(tenant):
         return None

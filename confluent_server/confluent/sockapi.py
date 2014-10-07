@@ -184,6 +184,8 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
                     consession.destroy()
                     return
                 consession.write(data)
+        elif operation == 'shutdown':
+            configmanager.ConfigManager.shutdown()
         else:
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
     except exc.NotFoundException:
