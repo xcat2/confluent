@@ -325,9 +325,13 @@ def do_command(command, server):
         delresource(argv[1])
     elif argv[0] in ('unset', 'clear'):
         clearvalues(argv[1], argv[2:])
+    elif argv[0] == 'shutdown':
+        shutdown()
     else:
         sys.stderr.write("%s: command not found...\n" % argv[0])
 
+def shutdown():
+    tlvdata.send(session.connection, {'operation': 'shutdown', 'path': '/'})
 
 def createresource(args):
     resname = args[0]

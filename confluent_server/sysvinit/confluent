@@ -13,7 +13,7 @@
 case $1 in
 	restart)
 		echo -n 'Stopping Confluent '
-		/opt/confluent/bin/confetty shutdown
+		/opt/confluent/bin/confetty shutdown /
 		echo -n 'Starting Confluent '
 		/opt/confluent/bin/confluent
 		success
@@ -25,7 +25,7 @@ case $1 in
 		;;
 	stop)
 		echo -n 'Stopping Confluent '
-		/opt/confluent/bin/confetty shutdown
+		/opt/confluent/bin/confetty shutdown /
 		success
 		;;
 esac

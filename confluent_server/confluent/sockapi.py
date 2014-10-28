@@ -23,6 +23,7 @@ import os
 import pwd
 import stat
 import struct
+import sys
 import traceback
 
 import eventlet.green.socket as socket
@@ -110,6 +111,8 @@ def sessionhdl(connection, authname, skipauth=False):
             tlvdata.send(connection, {'errorcode': 504,
                                       'error': 'Unreachable Target'})
             tlvdata.send(connection, {'_requestdone': 1})
+        except SystemExit:
+            sys.exit(0)
         except:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)
