@@ -30,6 +30,7 @@ import confluent.util as util
 import eventlet
 import eventlet.event
 import random
+import time
 import traceback
 
 _handled_consoles = {}
