@@ -80,7 +80,7 @@ def updatestatus(stateinfo={}):
         laststate[statekey] = stateinfo[statekey]
     if ('connectstate' in laststate and
             laststate['connectstate'] != 'connected'):
-        info.append(stateinfo['connectstate'])
+        info.append(laststate['connectstate'])
     if 'error' in laststate:
         info.append(laststate['error'])
     if 'clientcount' in laststate and laststate['clientcount'] != 1:
