@@ -479,7 +479,7 @@ class ConsoleSession(object):
         """Get the age in seconds of the buffered data
 
         Returns False if no data buffered yet"""
-        self.conshdl.get_buffer_age()
+        return self.conshdl.get_buffer_age()
 
     def reopen(self):
         self.conshdl.reopen()

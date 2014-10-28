@@ -189,7 +189,7 @@ class Logger(object):
             textfile = open(self.textpath, mode='r')
             binfile = open(self.binpath, mode='r')
         except IOError:
-            return '', 0
+            return '', 0, 0
         fcntl.flock(binfile, fcntl.LOCK_SH)
         binfile.seek(0, 2)
         binidx = binfile.tell() - 16

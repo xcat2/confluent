@@ -85,7 +85,7 @@ def updatestatus(stateinfo={}):
         info.append(laststate['error'])
     if 'clientcount' in laststate and laststate['clientcount'] != 1:
         info.append('clients: %d' % laststate['clientcount'])
-    if 'bufferage' in stateinfo:
+    if 'bufferage' in stateinfo and stateinfo['bufferage'] is not None:
         laststate['showtime'] = time.time() - stateinfo['bufferage']
     if 'showtime' in laststate:
         showtime = laststate['showtime']
@@ -561,7 +561,7 @@ elif shellargs:
     command = " ".join(shellargs)
     do_command(command, netserver)
     quitconfetty(fullexit=True)
-while not doexit:
+while inconsole or not doexit:
     if inconsole:
         rdylist, _, _ = select.select(
             (sys.stdin, session.connection), (), (), 60)
