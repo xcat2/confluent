@@ -336,7 +336,7 @@ def resourcehandler_backend(env, start_response):
                 timeout=45)
             bufferage = False
             if 'stampsent' not in consolesessions[sessid]:
-                consoleserver[sessid]['stampsent'] = True
+                consolesesessions[sessid]['stampsent'] = True
                 bufferage = consolesessions[sessid]['session'].get_buffer_age()
             if isinstance(outdata, dict):
                 rspdata = outdata
