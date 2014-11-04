@@ -8,25 +8,34 @@
 # Default-Start: 3 4 5
 # Default-Stop: 0 1 2 6
 ### END INIT INFO
+if [ -f /etc/init.d/functions ]; then
+    . /etc/init.d/functions
+    LOG_SUCCESS=RHSuccess
+elif [ -f /lib/lsb/init-functions ]; then
+    . /lib/lsb/init-functions
+    LOG_SUCCESS=log_success_msg
+else
+    echo "Unknown platform"
+    exit 1
+fi
 
-. /etc/init.d/functions
 case $1 in
 	restart)
 		echo -n 'Stopping Confluent '
 		/opt/confluent/bin/confetty shutdown /
 		echo -n 'Starting Confluent '
 		/opt/confluent/bin/confluent
-		success
+		$LOG_SUCCESS
 		;;
 	start)
 		echo -n 'Starting Confluent '
 		/opt/confluent/bin/confluent
-		success
+		$LOG_SUCCESS
 		;;
 	stop)
 		echo -n 'Stopping Confluent '
 		/opt/confluent/bin/confetty shutdown /
-		success
+		$LOG_SUCCESS
 		;;
 esac
 
