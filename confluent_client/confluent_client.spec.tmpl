@@ -27,7 +27,12 @@ a confluent server.
 python setup.py build
 
 %install
-python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
+python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
+for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
+    rm $RPM_BUILD_ROOT/$file
+done
+grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
+
 
 %clean
 rm -rf $RPM_BUILD_ROOT
