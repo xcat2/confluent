@@ -593,6 +593,7 @@ while inconsole or not doexit:
                     sys.stdout.flush()
                 else:
                     doexit = True
+                    inconsole = False
                     sys.stdout.write("\r\n[remote disconnected]\r\n")
                     break
             else:
