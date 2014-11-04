@@ -10,7 +10,7 @@
 ### END INIT INFO
 if [ -f /etc/init.d/functions ]; then
     . /etc/init.d/functions
-    LOG_SUCCESS=RHSuccess
+    LOG_SUCCESS=success
 elif [ -f /lib/lsb/init-functions ]; then
     . /lib/lsb/init-functions
     LOG_SUCCESS=log_success_msg
