@@ -83,6 +83,9 @@ def updatestatus(stateinfo={}):
         info.append(laststate['connectstate'])
     if 'error' in laststate:
         info.append(laststate['error'])
+        # error will be repeated if relevant
+        # avoid keeping it around as stale
+        del laststate['error']
     if 'clientcount' in laststate and laststate['clientcount'] != 1:
         info.append('clients: %d' % laststate['clientcount'])
     if 'bufferage' in stateinfo and stateinfo['bufferage'] is not None:
