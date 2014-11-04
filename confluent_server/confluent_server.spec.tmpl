@@ -12,7 +12,7 @@ Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
-Requires: pyghmi, eventlet, greenlet, confluent_common, pycrypto >= 2.6.1
+Requires: pyghmi, eventlet, greenlet, confluent_common, pycrypto >= 2.6.1, confluent_client
 Vendor: Jarrod Johnson <jbjohnso@us.ibm.com>
 Url: http://xcat.sf.net/
 
@@ -26,7 +26,12 @@ Server for console management and systems management aggregation
 python setup.py build
 
 %install
-python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
+python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
+for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
+    rm $RPM_BUILD_ROOT/$file
+done
+grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
+cat INSTALLED_FILES
 
 %clean
 rm -rf $RPM_BUILD_ROOT
