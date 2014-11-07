@@ -128,7 +128,7 @@ def _get_query_dict(env, reqbody, reqtype):
                     qdict[ky] = na
                 else:
                     qdict[ky] = pbody[ky][0]
-        elif 'application/json' == reqtype:
+        elif 'application/json' in reqtype:
             pbody = json.loads(reqbody)
             for key in pbody.iterkeys():
                 qdict[key] = pbody[key]
