@@ -313,10 +313,18 @@ class IpmiHandler(object):
             bootdev = self.ipmicmd.get_bootdev()
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
+            bootmode = 'unspecified'
+            if 'uefimode' in bootdev:
+                if bootmode['uefimode']:
+                    bootmode = 'uefi'
+                else:
+                    bootmode = 'bios'
             return msg.BootDevice(node=self.node,
-                                  device=bootdev['bootdev'])
+                                  device=bootdev['bootdev'],
+                                  bootmode=bootmode)
         elif 'update' == self.op:
             bootdev = self.inputdata.bootdevice(self.node)
+            bootmode = self.inputdata.bootmode(self.node)
             bootdev = self.ipmicmd.set_bootdev(bootdev)
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]

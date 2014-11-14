@@ -169,22 +169,25 @@ class DeletedResource(ConfluentMessage):
 
 class ConfluentChoiceMessage(ConfluentMessage):
     valid_values = set()
+    valid_paramset = {}
 
     def html(self, extension=''):
         snippet = ""
         for key in self.kvpairs.iterkeys():
             val = self.kvpairs[key]
             snippet += key + ':<select name="%s">' % key
-            for opt in self.valid_values:
-                snippet += opt + ":"
+            valid_values = self.valid_values
+            if key in self.valid_paramset:
+                valid_values = self.valid_paramset[key]
+            for opt in valid_values:
                 if opt == val['value']:
-                    snippet += '<option value="%s" selected>%s</option>' % (
+                    snippet += '<option value="%s" selected>%s</option>\r' % (
                         opt, opt)
                 else:
-                    snippet += '<option value="%s">%s</option>' % (opt, opt)
+                    snippet += '<option value="%s">%s</option>\r' % (opt, opt)
             snippet += '</select>'
             snippet += '<input type="checkbox" name="restexplorerhonorkey" '
-            snippet += 'value="{0}">'.format(key)
+            snippet += 'value="{0}"><br>\r'.format(key)
         return snippet
 
 
@@ -355,12 +358,26 @@ class BootDevice(ConfluentChoiceMessage):
         'cd',
     ])
 
-    def __init__(self, node, device):
+    valid_bootmodes = set([
+        'unspecified',
+        'bios',
+        'uefi',
+    ])
+
+    valid_paramset = {
+        'bootmode': valid_bootmodes,
+        }
+    
+
+    def __init__(self, node, device, bootmode='unspecified'):
         if device not in self.valid_values:
             raise Exception("Invalid boot device argument passed in:" + device)
+        if bootmode not in self.valid_bootmodes:
+            raise Exception("Invalid boot mode argument passed in:" + bootmode)
         self.kvpairs = {
             node: {
                 'nextdevice': {'value': device},
+                'bootmode': {'value': bootmode },
             }
         }
 
@@ -368,6 +385,7 @@ class BootDevice(ConfluentChoiceMessage):
 class InputBootDevice(BootDevice):
     def __init__(self, path, nodes, inputdata):
         self.bootdevbynode = {}
+        self.bootmodebynode = {}
         if not inputdata:
             raise exc.InvalidArgumentException()
         if 'nextdevice' not in inputdata:
@@ -383,6 +401,12 @@ class InputBootDevice(BootDevice):
                         datum['nextdevice'] + ' is not one of ' +
                         ','.join(self.valid_values))
                 self.bootdevbynode[key] = datum['nextdevice']
+                if 'bootmode' in datum:
+                    if datum['bootmode'] not in self.valid_bootmodes:
+                        raise exc.InvalidArgumentException(
+                            datum['bootmode'] + ' is not one of ' +
+                            ','.join(self.valid_bootmodes))
+                    self.bootmodebynode[key] = datum['bootmode']
         else:
             datum = inputdata
             if 'nextdevice' not in datum:
@@ -394,9 +418,14 @@ class InputBootDevice(BootDevice):
                     ','.join(self.valid_values))
             for node in nodes:
                 self.bootdevbynode[node] = datum['nextdevice']
+                if 'bootmode' in datum:
+                    self.bootmodebynode[node] = datum['bootmode']
 
     def bootdevice(self, node):
         return self.bootdevbynode[node]
+
+    def bootmode(self, node):
+        return self.bootmodebynode.get(node, 'unspecified')
 
 
 class PowerState(ConfluentChoiceMessage):
