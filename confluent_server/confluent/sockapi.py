@@ -19,6 +19,7 @@
 # It implement unix and tls sockets
 # 
 
+import atexit
 import os
 import pwd
 import stat
@@ -222,6 +223,11 @@ def _tlsstartup(cnn):
                           server_side=True)
     sessionhdl(cnn, authname)
 
+def removesocket():
+    try:
+        os.remove("/var/run/confluent/api.sock")
+    except OSError:
+        pass
 
 def _unixdomainhandler():
     unixsocket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -233,6 +239,7 @@ def _unixdomainhandler():
     os.chmod("/var/run/confluent/api.sock",
              stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |
              stat.S_IRGRP | stat.S_IWUSR | stat.S_IRUSR)
+    atexit.register(removesocket)
     unixsocket.listen(5)
     while True:
         cnn, addr = unixsocket.accept()

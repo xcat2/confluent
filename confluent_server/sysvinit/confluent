@@ -21,8 +21,10 @@ fi
 
 case $1 in
 	restart)
-		echo -n 'Stopping Confluent '
-		/opt/confluent/bin/confetty shutdown /
+	    if [ -S /var/run/confluent/api.sock ]; then
+		    echo -n 'Stopping Confluent '
+		    /opt/confluent/bin/confetty shutdown /
+		fi
 		echo -n 'Starting Confluent '
 		/opt/confluent/bin/confluent
 		$LOG_SUCCESS
@@ -34,7 +36,9 @@ case $1 in
 		;;
 	stop)
 		echo -n 'Stopping Confluent '
-		/opt/confluent/bin/confetty shutdown /
+		if [ -S /var/run/confluent/api.sock ]; then
+		    /opt/confluent/bin/confetty shutdown /
+		fi
 		$LOG_SUCCESS
 		;;
 esac
