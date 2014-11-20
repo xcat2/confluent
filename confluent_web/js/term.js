@@ -168,7 +168,7 @@ function Terminal(options) {
     options.colors = options.colors.slice(0, -2).concat(
       Terminal._colors.slice(8, -2), options.colors.slice(-2));
   } else if (options.colors.length === 18) {
-    options.colors = options.colors.concat(
+    options.colors = options.colors.slice(0, -2).concat(
       Terminal._colors.slice(16, -2), options.colors.slice(-2));
   }
   this.colors = options.colors;
@@ -214,7 +214,7 @@ function Terminal(options) {
   this.searchMode = false;
   this.searchDown;
   this.entry = '';
-  this.entryPrefix = '';
+  this.entryPrefix = 'Search: ';
   this._real;
   this._selected;
   this._textarea;
@@ -470,8 +470,8 @@ Terminal.prototype.initGlobal = function() {
 
   Terminal.bindCopy(document);
 
-  if (this.isIpad) {
-    Terminal.fixIpad(document);
+  if (this.isMobile) {
+    this.fixMobile(document);
   }
 
   if (this.useStyle) {
@@ -598,10 +598,12 @@ Terminal.bindCopy = function(document) {
 };
 
 /**
- * Fix iPad - no idea if this works
+ * Fix Mobile
  */
 
-Terminal.fixIpad = function(document) {
+Terminal.prototype.fixMobile = function(document) {
+  var self = this;
+
   var textarea = document.createElement('textarea');
   textarea.style.position = 'absolute';
   textarea.style.left = '-32000px';
@@ -612,6 +614,8 @@ Terminal.fixIpad = function(document) {
   textarea.style.backgroundColor = 'transparent';
   textarea.style.borderStyle = 'none';
   textarea.style.outlineStyle = 'none';
+  textarea.autocapitalize = 'none';
+  textarea.autocorrect = 'off';
 
   document.getElementsByTagName('body')[0].appendChild(textarea);
 
@@ -620,6 +624,15 @@ Terminal.fixIpad = function(document) {
   setTimeout(function() {
     textarea.focus();
   }, 1000);
+
+  if (this.isAndroid) {
+    on(textarea, 'change', function() {
+      var value = textarea.textContent || textarea.value;
+      textarea.value = '';
+      textarea.textContent = '';
+      self.send(value + '\r');
+    });
+  }
 };
 
 /**
@@ -652,6 +665,19 @@ Terminal.insertStyle = function(document, bg, fg) {
     + '  background: ' + fg + ';\n'
     + '}\n';
 
+  // var out = '';
+  // each(Terminal.colors, function(color, i) {
+  //   if (i === 256) {
+  //     out += '\n.term-bg-color-default { background-color: ' + color + '; }';
+  //   }
+  //   if (i === 257) {
+  //     out += '\n.term-fg-color-default { color: ' + color + '; }';
+  //   }
+  //   out += '\n.term-bg-color-' + i + ' { background-color: ' + color + '; }';
+  //   out += '\n.term-fg-color-' + i + ' { color: ' + color + '; }';
+  // });
+  // style.innerHTML += out + '\n';
+
   head.insertBefore(style, head.firstChild);
 };
 
@@ -679,6 +705,9 @@ Terminal.prototype.open = function(parent) {
   if (this.context.navigator && this.context.navigator.userAgent) {
     this.isMac = !!~this.context.navigator.userAgent.indexOf('Mac');
     this.isIpad = !!~this.context.navigator.userAgent.indexOf('iPad');
+    this.isIphone = !!~this.context.navigator.userAgent.indexOf('iPhone');
+    this.isAndroid = !!~this.context.navigator.userAgent.indexOf('Android');
+    this.isMobile = this.isIpad || this.isIphone || this.isAndroid;
     this.isMSIE = !!~this.context.navigator.userAgent.indexOf('MSIE');
   }
 
@@ -687,6 +716,7 @@ Terminal.prototype.open = function(parent) {
   this.element.className = 'terminal';
   this.element.style.outline = 'none';
   this.element.setAttribute('tabindex', 0);
+  this.element.setAttribute('spellcheck', 'false');
   this.element.style.backgroundColor = this.colors[256];
   this.element.style.color = this.colors[257];
 
@@ -716,7 +746,7 @@ Terminal.prototype.open = function(parent) {
   // to focus and paste behavior.
   on(this.element, 'focus', function() {
     self.focus();
-    if (self.isIpad) {
+    if (self.isMobile) {
       Terminal._textarea.focus();
     }
   });
@@ -1151,8 +1181,8 @@ Terminal.prototype.refresh = function(start, end) {
     , width
     , data
     , attr
-    , fgColor
-    , bgColor
+    , bg
+    , fg
     , flags
     , row
     , parent;
@@ -1204,8 +1234,8 @@ Terminal.prototype.refresh = function(start, end) {
           } else {
             out += '<span style="';
 
-            bgColor = data & 0x1ff;
-            fgColor = (data >> 9) & 0x1ff;
+            bg = data & 0x1ff;
+            fg = (data >> 9) & 0x1ff;
             flags = data >> 18;
 
             // bold
@@ -1214,7 +1244,7 @@ Terminal.prototype.refresh = function(start, end) {
                 out += 'font-weight:bold;';
               }
               // See: XTerm*boldColors
-              if (fgColor < 8) fgColor += 8;
+              if (fg < 8) fg += 8;
             }
 
             // underline
@@ -1234,11 +1264,11 @@ Terminal.prototype.refresh = function(start, end) {
 
             // inverse
             if (flags & 8) {
-              bgColor = (data >> 9) & 0x1ff;
-              fgColor = data & 0x1ff;
+              bg = (data >> 9) & 0x1ff;
+              fg = data & 0x1ff;
               // Should inverse just be before the
               // above boldColors effect instead?
-              if ((flags & 1) && fgColor < 8) fgColor += 8;
+              if ((flags & 1) && fg < 8) fg += 8;
             }
 
             // invisible
@@ -1246,15 +1276,21 @@ Terminal.prototype.refresh = function(start, end) {
               out += 'visibility:hidden;';
             }
 
-            if (bgColor !== 256) {
+            // out += '" class="'
+            //   + 'term-bg-color-' + bg
+            //   + ' '
+            //   + 'term-fg-color-' + fg
+            //   + '">';
+
+            if (bg !== 256) {
               out += 'background-color:'
-                + this.colors[bgColor]
+                + this.colors[bg]
                 + ';';
             }
 
-            if (fgColor !== 257) {
+            if (fg !== 257) {
               out += 'color:'
-                + this.colors[fgColor]
+                + this.colors[fg]
                 + ';';
             }
 
@@ -1883,12 +1919,16 @@ Terminal.prototype.write = function(data) {
 
           // CSI Pm m  Character Attributes (SGR).
           case 'm':
-            this.charAttributes(this.params);
+            if (!this.prefix) {
+              this.charAttributes(this.params);
+            }
             break;
 
           // CSI Ps n  Device Status Report (DSR).
           case 'n':
-            this.deviceStatus(this.params);
+            if (!this.prefix) {
+              this.deviceStatus(this.params);
+            }
             break;
 
           /**
@@ -2670,6 +2710,7 @@ Terminal.prototype.send = function(data) {
 };
 
 Terminal.prototype.bell = function() {
+  this.emit('bell');
   if (!this.visualBell) return;
   var self = this;
   this.element.style.borderColor = 'white';
@@ -2911,6 +2952,8 @@ Terminal.prototype.reverseIndex = function() {
 
 // ESC c Full Reset (RIS).
 Terminal.prototype.reset = function() {
+  this.options.rows = this.rows;
+  this.options.cols = this.cols;
   Terminal.call(this, this.options);
   this.refresh(0, this.rows - 1);
 };
@@ -4634,7 +4677,7 @@ Terminal.prototype.enterSearch = function(down) {
   this._real.preSearch = this.copyBuffer(this.lines);
   this._real.preSearchX = this.x;
   this._real.preSearchY = this.y;
-  this.entryPrefix = 'Search: ';
+
   var bottom = this.ydisp + this.rows - 1;
   for (var i = 0; i < this.entryPrefix.length; i++) {
     //this.lines[bottom][i][0] = (this.defAttr & ~0x1ff) | 4;
@@ -4644,8 +4687,10 @@ Terminal.prototype.enterSearch = function(down) {
       this.entryPrefix[i]
     ];
   }
+
   this.y = this.rows - 1;
   this.x = this.entryPrefix.length;
+
   this.refresh(this.rows - 1, this.rows - 1);
 };
 
@@ -4974,7 +5019,7 @@ Terminal.prototype.keySelect = function(ev, key) {
     return;
   }
 
-  if (key === 'k') {
+  if (key === 'k' || key === '\x1b[A') {
     var y = this.ydisp + this.y;
     this.y--;
     if (this.y < 0) {
@@ -4989,7 +5034,7 @@ Terminal.prototype.keySelect = function(ev, key) {
     return;
   }
 
-  if (key === 'j') {
+  if (key === 'j' || key === '\x1b[B') {
     var y = this.ydisp + this.y;
     this.y++;
     if (this.y >= this.rows) {
@@ -5004,21 +5049,21 @@ Terminal.prototype.keySelect = function(ev, key) {
     return;
   }
 
-  if (key === 'h') {
+  if (key === 'h' || key === '\x1b[D') {
     var x = this.x;
     this.x--;
     if (this.x < 0) {
       this.x = 0;
     }
     if (this.visualMode) {
-      this.selectText(this.x, x, this.ydisp + this.y, this.ydisp + this.y);
+      this.selectText(x, this.x, this.ydisp + this.y, this.ydisp + this.y);
     } else {
       this.refresh(this.y, this.y);
     }
     return;
   }
 
-  if (key === 'l') {
+  if (key === 'l' || key === '\x1b[C') {
     var x = this.x;
     this.x++;
     if (this.x >= this.cols) {
@@ -5053,7 +5098,7 @@ Terminal.prototype.keySelect = function(ev, key) {
     return;
   }
 
-  if (key === 'q') {
+  if (key === 'q' || key === '\x1b') {
     if (this.visualMode) {
       this.leaveVisual();
     } else {
@@ -5150,7 +5195,7 @@ Terminal.prototype.keySelect = function(ev, key) {
     this.scrollDisp(-this.ydisp + yb);
 
     if (this.visualMode) {
-      this.selectText(this.x, ox, this.ydisp + this.y, oy + oyd);
+      this.selectText(ox, this.x, oy + oyd, this.ydisp + this.y);
     }
     return;
   }
@@ -5222,7 +5267,7 @@ Terminal.prototype.keySelect = function(ev, key) {
     }
 
     if (this.visualMode) {
-      this.selectText(this.x, ox, this.ydisp + this.y, this.ydisp + this.y);
+      this.selectText(ox, this.x, this.ydisp + this.y, this.ydisp + this.y);
     } else {
       this.refresh(this.y, this.y);
     }
