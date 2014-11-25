@@ -341,6 +341,10 @@ class IpmiHandler(object):
             self.ipmicmd.set_identify(on=identifystate)
             return msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node])
+        elif 'read' == self.op:
+            # ipmi has identify as read-only for now
+            return msg.IdentifyState(node=self.node, state='')
+
     def power(self):
         if 'read' == self.op:
             power = self.ipmicmd.get_power()

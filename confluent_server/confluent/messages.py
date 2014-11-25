@@ -452,6 +452,7 @@ class InputBootDevice(BootDevice):
 
 class IdentifyState(ConfluentChoiceMessage):
     valid_values = set([
+        '',  # allowed for output to indicate write-only support
         'on',
         'off',
     ])
