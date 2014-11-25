@@ -112,6 +112,10 @@ def sessionhdl(connection, authname, skipauth=False):
             tlvdata.send(connection, {'errorcode': 504,
                                       'error': 'Unreachable Target'})
             tlvdata.send(connection, {'_requestdone': 1})
+        except exc.NotImplementedException:
+            tlvdata.send(connection, {'errorcode': 501,
+                                      'error': 'Not Implemented'})
+            tlvdata.send(connection, {'_requestdone': 1})
         except SystemExit:
             sys.exit(0)
         except:

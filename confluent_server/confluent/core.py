@@ -110,6 +110,10 @@ noderesources = {
             'default': 'ipmi',
         }),
     },
+    'identify': PluginRoute({
+        'pluginattrs': ['hardwaremanagement.method'],
+        'default': 'ipmi',
+    }),
     'boot': {
         'nextdevice': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
@@ -166,6 +170,8 @@ def show_user(name, configmanager):
 
 def stripnode(iterablersp, node):
     for i in iterablersp:
+        if i is None:
+            raise exc.NotImplementedException("Not Implemented")
         i.strip_node(node)
         yield i
 

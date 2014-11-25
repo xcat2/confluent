@@ -213,6 +213,8 @@ def perform_request(operator, node, element, configdata, inputdata, cfg):
         excmsg = str(ipmiexc)
         if excmsg == 'Session no longer connected':
             return msg.ConfluentTargetTimeout(node)
+        else:
+            raise
 
 
 persistent_ipmicmds = {}
@@ -275,6 +277,8 @@ class IpmiHandler(object):
             return self.bootdevice()
         elif self.element == ['health', 'hardware']:
             return self.health()
+        elif self.element == ['identify']:
+            return self.identify()
 
     @staticmethod
     def _str_health(health):
@@ -331,6 +335,12 @@ class IpmiHandler(object):
             return msg.BootDevice(node=self.node,
                                   device=bootdev['bootdev'])
 
+    def identify(self):
+        if 'update' == self.op:
+            identifystate = self.inputdata.inputbynode[self.node] == 'on'
+            self.ipmicmd.set_identify(on=identifystate)
+            return msg.IdentifyState(
+                node=self.node, state=self.inputdata.inputbynode[self.node])
     def power(self):
         if 'read' == self.op:
             power = self.ipmicmd.get_power()

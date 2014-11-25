@@ -390,8 +390,9 @@ def resourcehandler_backend(env, start_response):
         except exc.TargetEndpointBadCredentials:
             start_response('502 Bad Credentials', headers)
             yield '502 - Bad Credentials'
-
-
+        except exc.NotImplementedException:
+            start_response('501 Not Implemented', headers)
+            yield '501 Not Implemented'
 
 def _assemble_html(responses, resource, querydict, url, extension):
     yield '<html><head><title>' \

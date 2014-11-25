@@ -171,6 +171,13 @@ class ConfluentChoiceMessage(ConfluentMessage):
     valid_values = set()
     valid_paramset = {}
 
+    def __init__(self, node, state):
+        self.kvpairs = {
+            node: {
+                self.keyname: {'value': state},
+            }
+        }
+
     def html(self, extension=''):
         snippet = ""
         for key in self.kvpairs.iterkeys():
@@ -247,6 +254,8 @@ def get_input_message(path, operation, inputdata, nodes=None):
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
+    elif path == [ 'identify' ] and operation != 'retrieve':
+        return InputIdentifyMessage(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -308,7 +317,49 @@ class InputAttributes(ConfluentMessage):
         return nodeattr
 
 
-class InputPowerMessage(ConfluentMessage):
+class ConfluentInputMessage(ConfluentMessage):
+    keyname = 'state'
+
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        if not inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+        if self.keyname not in inputdata:
+            #assume we have nested information
+            for key in nodes:
+                if key not in inputdata:
+                    raise exc.InvalidArgumentException(key + ' not in request')
+                datum = inputdata[key]
+                if self.keyname not in datum:
+                    raise exc.InvalidArgumentException(
+                        'missing {0} argument'.format(self.keyname))
+                elif datum[self.keyname] not in self.valid_values:
+                    raise exc.InvalidArgumentException(
+                        datum[self.keyname] + ' is not one of ' +
+                        ','.join(self.valid_values))
+                self.inputbynode[key] = datum[self.keyname]
+        else:  # we have a state argument not by node
+            datum = inputdata
+            if self.keyname not in datum:
+                raise exc.InvalidArgumentException('missing {0} argument'.format(self.keyname))
+            elif datum[self.keyname] not in self.valid_values:
+                raise exc.InvalidArgumentException(datum[self.keyname] +
+                                                   ' is not one of ' +
+                                                   ','.join(self.valid_values))
+            for node in nodes:
+                self.inputbynode[node] = datum[self.keyname]
+
+
+class InputIdentifyMessage(ConfluentInputMessage):
+    valid_values = set([
+        'on',
+        'off',
+    ])
+
+    keyname = 'identify'
+
+
+class InputPowerMessage(ConfluentInputMessage):
     valid_values = set([
         'on',
         'off',
@@ -316,37 +367,8 @@ class InputPowerMessage(ConfluentMessage):
         'boot',
     ])
 
-    def __init__(self, path, nodes, inputdata):
-        self.powerbynode = {}
-        if not inputdata:
-            raise exc.InvalidArgumentException('missing input data')
-        if 'state' not in inputdata:
-            #assume we have nested information
-            for key in nodes:
-                if key not in inputdata:
-                    raise exc.InvalidArgumentException(key + ' not in request')
-                datum = inputdata[key]
-                if 'state' not in datum:
-                    raise exc.InvalidArgumentException(
-                        'missing state argument')
-                elif datum['state'] not in self.valid_values:
-                    raise exc.InvalidArgumentException(
-                        datum['state'] + ' is not one of ' +
-                        ','.join(self.valid_values))
-                self.powerbynode[key] = datum['state']
-        else:  # we have a state argument not by node
-            datum = inputdata
-            if 'state' not in datum:
-                raise exc.InvalidArgumentException('missing state argument')
-            elif datum['state'] not in self.valid_values:
-                raise exc.InvalidArgumentException(datum['state'] +
-                                                   ' is not one of ' +
-                                                   ','.join(self.valid_values))
-            for node in nodes:
-                self.powerbynode[node] = datum['state']
-
     def powerstate(self, node):
-        return self.powerbynode[node]
+        return self.inputbynode[node]
 
 
 class BootDevice(ConfluentChoiceMessage):
@@ -428,6 +450,14 @@ class InputBootDevice(BootDevice):
         return self.bootmodebynode.get(node, 'unspecified')
 
 
+class IdentifyState(ConfluentChoiceMessage):
+    valid_values = set([
+        'on',
+        'off',
+    ])
+    keyname = 'identify'
+
+
 class PowerState(ConfluentChoiceMessage):
     valid_values = set([
         'on',
@@ -435,13 +465,9 @@ class PowerState(ConfluentChoiceMessage):
         'reset',
         'boot',
     ])
+    keyname = 'state'
 
-    def __init__(self, node, state):
-        self.kvpairs = {
-            node: {
-                'state': {'value': state},
-            }
-        }
+
 
 
 class SensorReadings(ConfluentMessage):
