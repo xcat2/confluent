@@ -2,6 +2,7 @@
  * tty.js
  * Copyright (c) 2012-2013, Christopher Jeffrey (MIT License)
  * Copyright 2014, IBM Corporation
+ * Copyright 2014, Lenovo
  */
 
 ;(function() {
@@ -29,6 +30,23 @@ var EventEmitter = Terminal.EventEmitter
   , off = Terminal.off
   , cancel = Terminal.cancel;
 
+function postRequest(url, data, success) {
+	var request = new XMLHttpRequest();
+	request.open('POST', url, true);
+        request.setRequestHeader('Content-Type', 'application/json');
+        request.setRequestHeader('Accept', 'application/json');
+	request.onload = function() {
+		if (this.status >= 200 && this.status < 400) {
+			success(JSON.parse(this.responseText));
+		}
+	};
+	if (data) {
+		request.send(JSON.stringify(data));
+	} else {
+		request.send("");
+	}
+        request = null;
+}
 /**
  * Console
  */
@@ -191,8 +209,11 @@ ConsoleWindow.prototype.drag = function(ev) {
   function move(ev) {
     el.style.left =
       (drag.left + ev.pageX - drag.pageX) + 'px';
-    el.style.top =
-      (drag.top + ev.pageY - drag.pageY) + 'px';
+    var tmptop = (drag.top + ev.pageY - drag.pageY);
+    if (tmptop < 0) {
+       tmptop = 0;
+    }
+    el.style.top = tmptop + 'px';
   }
 
   function up() {
@@ -434,9 +455,7 @@ function Tab(win, consoleurl) {
   this.waitingdata = false;
   this.sentdata = function(data, textStatus, jqXHR) {
     if (this.waitingdata) {
-      $.ajax({type: 'POST', url: consoleurl,
-        data: { session: this.sessid, bytes: this.waitingdata },
-        success: this.sentdata, dataType: 'json'});
+      postRequest(consoleurl,  { session: this.sessid, bytes: this.waitingdata }, this.sentdata);
       this.waitingdata = false;
     } else {
         this.datapending = false;
@@ -453,8 +472,7 @@ function Tab(win, consoleurl) {
       return;
     }
     this.datapending = true;
-    $.ajax({type: 'POST', url: consoleurl, data: { session: this.sessid, bytes: data },
-            success: this.sentdata, dataType: 'json'});
+    postRequest(consoleurl,  { session: this.sessid, bytes: data }, this.sentdata);
   }.bind(this));
   this.gotdata = function(data, textStatus, jqXHR) {
     if ("data" in data) {
@@ -492,16 +510,13 @@ function Tab(win, consoleurl) {
             this.window.title.innerHTML = this.window.nodename;
         }
     }
-    $.ajax({type: 'POST', url: consoleurl, data: { session: this.sessid },
-            success: this.gotdata, dataType: 'json'});
+    postRequest(consoleurl,  { session: this.sessid }, this.gotdata);
   }.bind(this);
   this.gotsession = function(data, textStatus, jqXHR) {
     this.sessid = data.session
-    $.ajax({type: 'POST', url: consoleurl, data: { session: this.sessid },
-            success: this.gotdata, dataType: 'json'});
+    postRequest(consoleurl,  { session: this.sessid }, this.gotdata);
   }.bind(this);
-  $.ajax({type: "POST", url: consoleurl, success: this.gotsession,
-          dataType: 'json'});
+  postRequest(consoleurl,  false, this.gotsession);
 
   win.tabs.push(this);
 };
