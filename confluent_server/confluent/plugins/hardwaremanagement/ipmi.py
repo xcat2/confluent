@@ -319,7 +319,7 @@ class IpmiHandler(object):
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
             bootmode = 'unspecified'
             if 'uefimode' in bootdev:
-                if bootmode['uefimode']:
+                if bootdev['uefimode']:
                     bootmode = 'uefi'
                 else:
                     bootmode = 'bios'
