@@ -393,9 +393,11 @@ class BootDevice(ConfluentChoiceMessage):
 
     def __init__(self, node, device, bootmode='unspecified'):
         if device not in self.valid_values:
-            raise Exception("Invalid boot device argument passed in:" + device)
+            raise Exception("Invalid boot device argument passed in:" +
+                            repr(device))
         if bootmode not in self.valid_bootmodes:
-            raise Exception("Invalid boot mode argument passed in:" + bootmode)
+            raise Exception("Invalid boot mode argument passed in:" +
+                            repr(bootmode))
         self.kvpairs = {
             node: {
                 'nextdevice': {'value': device},
