@@ -42,7 +42,10 @@ import confluent.core as pluginapi
 
 tracelog = None
 auditlog = None
-SO_PEERCRED = 17
+try:
+    SO_PEERCRED = socket.SO_PEERCRED
+except AttributeError:
+    SO_PEERCRED = 17
 
 
 class ClientConsole(object):
