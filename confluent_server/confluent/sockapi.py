@@ -248,8 +248,8 @@ def _unixdomainhandler():
     while True:
         cnn, addr = unixsocket.accept()
         creds = cnn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED,
-                               struct.calcsize('3i'))
-        pid, uid, gid = struct.unpack('3i', creds)
+                               struct.calcsize('iII'))
+        pid, uid, gid = struct.unpack('iII', creds)
         skipauth = False
         if uid in (os.getuid(), 0):
             #this is where we happily accept the person
