@@ -61,7 +61,8 @@ class ConfluentMessage(object):
         return self.kvpairs
 
     def strip_node(self, node):
-        self.kvpairs = self.kvpairs[node]
+        if self.kvpairs is not None:
+            self.kvpairs = self.kvpairs[node]
 
     def html(self, extension=''):
         #this is used to facilitate the api explorer feature
@@ -199,9 +200,12 @@ class ConfluentChoiceMessage(ConfluentMessage):
 
 
 class LinkRelation(ConfluentMessage):
+    kvpairs = None
+
     def __init__(self):
         self.href = ''
         self.rel = ''
+
 
     def json(self):
         """Provide json_hal style representation of the relation.

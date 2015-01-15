@@ -32,6 +32,15 @@ console.session.threading = eventlet.green.threading
 _ipmithread = None
 _ipmiwaiters = []
 
+sensor_categories = {
+    'temperature': frozenset(['Temperature']),
+    'power': frozenset(['Current', 'Battery']),
+    'fans': frozenset(['Fan', 'Cooling Device']),
+}
+
+def simplify_name(name):
+    return name.lower().replace(' ', '_')
+
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
@@ -222,6 +231,7 @@ persistent_ipmicmds = {}
 
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg):
+        self.sensormap = {}
         self.broken = False
         self.error = None
         eventlet.sleep(0)
@@ -279,6 +289,35 @@ class IpmiHandler(object):
             return self.health()
         elif self.element == ['identify']:
             return self.identify()
+        elif self.element[0] == 'sensors':
+            return self.handle_sensors()
+
+    def make_sensor_map(self, sensors=None):
+        if sensors is None:
+            sensors = self.ipmicmd.get_sensor_descriptions()
+        for sensor in sensors:
+            resourcename = sensor['name']
+            self.sensormap[simplify_name(resourcename)] = resourcename
+
+
+    def handle_sensors(self):
+        if self.element[-1] == '':
+            self.element = self.element[:-1]
+        if len(self.element) == 3:  # list sensors per category
+            category = self.element[2]
+            return self.list_sensors(category)
+
+    def list_sensors(self, category):
+        sensors = self.ipmicmd.get_sensor_descriptions()
+        yield msg.ChildCollection('all')
+        if category == 'all':
+            for sensor in sensors:
+                yield msg.ChildCollection(simplify_name(sensor['name']))
+        else:
+            for sensor in sensors:
+                if sensor['type'] in sensor_categories[category]:
+                    yield msg.ChildCollection(simplify_name(sensor['name']))
+
 
     @staticmethod
     def _str_health(health):

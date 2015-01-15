@@ -42,11 +42,20 @@ import sys
 
 pluginmap = {}
 
+def seek_element(currplace, currkey):
+    try:
+        return currplace[currkey]
+    except TypeError:
+        if isinstance(currplace, PluginCollection):
+            # we hit a plugin curated collection, all children
+            # are up to the plugin to comprehend
+            return currplace
+        raise
 
 def nested_lookup(nestdict, key):
     try:
-        return reduce(dict.__getitem__, key, nestdict)
-    except TypeError:
+        return reduce(seek_element, key, nestdict)
+    except TypeError as e:
         raise exc.NotFoundException("Invalid element requested")
 
 
@@ -83,6 +92,10 @@ rootcollections = ['nodes/', 'nodegroups/', 'users/']
 
 
 class PluginRoute(object):
+    def __init__(self, routedict):
+        self.routeinfo = routedict
+
+class PluginCollection(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
 
@@ -123,6 +136,26 @@ noderesources = {
     'attributes': {
         'all': PluginRoute({'handler': 'attributes'}),
         'current': PluginRoute({'handler': 'attributes'}),
+    },
+    'sensors': {
+        'hardware': {
+            'all': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'temperature': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'power': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'fans': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+        },
     },
 }
 
@@ -336,6 +369,8 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 raise exc.NotFoundException("Invalid element requested")
             if isinstance(routespec, dict):
                 iscollection = True
+            elif isinstance(routespec, PluginCollection):
+                iscollection = False  # it is a collection, but plugin defined
         if iscollection:
             if operation == "delete":
                 return delete_node_collection(pathcomponents, configmanager)
