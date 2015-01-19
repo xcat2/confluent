@@ -52,7 +52,12 @@ class IpmiCommandWrapper(ipmicommand.Command):
         super(self.__class__, self).__init__(**kwargs)
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
-        self.ipmi_session._mark_broken()
+        try:
+            self.ipmi_session._mark_broken()
+        except AttributeError:
+            # if ipmi_session doesn't already exist,
+            # then do nothing
+            pass
 
 def _ipmi_evtloop():
     while True:
