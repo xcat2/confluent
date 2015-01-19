@@ -250,11 +250,15 @@ class IpmiHandler(object):
         if ((node, tenant) not in persistent_ipmicmds or
                 not persistent_ipmicmds[(node, tenant)].ipmi_session.logged):
             self._logevt = threading.Event()
-            persistent_ipmicmds[(node, tenant)] = IpmiCommandWrapper(
-                node, cfg, bmc=connparams['bmc'],
-                userid=connparams['username'],
-                password=connparams['passphrase'], kg=connparams['kg'],
-                port=connparams['port'], onlogon=self.logged)
+            try:
+                persistent_ipmicmds[(node, tenant)] = IpmiCommandWrapper(
+                    node, cfg, bmc=connparams['bmc'],
+                    userid=connparams['username'],
+                    password=connparams['passphrase'], kg=connparams['kg'],
+                    port=connparams['port'], onlogon=self.logged)
+            except socket.gaierror as ge:
+                if ge[0] == -2:
+                    raise exc.TargetEndpointUnreachable(ge[1])
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
 
     bootdevices = {
