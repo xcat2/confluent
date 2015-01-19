@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +33,7 @@ def send(handle, data):
         handle.sendall(data)
     elif isinstance(data, dict):  # JSON currently only goes to 4 bytes
         # Some structured message, like what would be seen in http responses
-        sdata = json.dumps(data, separators=(',', ':'))
+        sdata = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
         tl = len(sdata)
         if tl > 16777215:
             raise Exception("JSON data exceeds protocol limits")

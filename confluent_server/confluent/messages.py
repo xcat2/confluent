@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,16 +27,17 @@ def _htmlify_structure(indict):
     if isinstance(indict, dict):
         for key in indict.iterkeys():
             ret += "<li>{0}: ".format(key)
-            if type(indict[key]) in (str, unicode):
-                ret += indict[key]
+            if type(indict[key]) in (str, unicode, float, int):
+                ret += str(indict[key])
             else:
                 ret += _htmlify_structure(indict[key])
     elif isinstance(indict, list):
-        if type(indict[0]) in (str, unicode):
-            ret += ",".join(indict)
-        else:
-            for v in indict:
-                ret += _htmlify_structure(v)
+        if len(indict) > 0:
+            if type(indict[0]) in (str, unicode):
+                ret += ",".join(indict)
+            else:
+                for v in indict:
+                    ret += _htmlify_structure(v)
     return ret + '</ul>'
 
 

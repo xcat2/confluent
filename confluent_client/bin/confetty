@@ -2,6 +2,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -108,7 +109,7 @@ def updatestatus(stateinfo={}):
 def recurse_format(datum, levels=0):
     ret = ''
     import json
-    return json.dumps(datum, indent=1)
+    return json.dumps(datum, ensure_ascii=False, indent=1)
     if isinstance(datum, dict):
         for key in datum.iterkeys():
             if datum[key] is None:

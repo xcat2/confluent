@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -395,7 +396,7 @@ def resourcehandler_backend(env, start_response):
             yield '501 Not Implemented'
 
 def _assemble_html(responses, resource, querydict, url, extension):
-    yield '<html><head><title>' \
+    yield '<html><head><meta charset="UTF-8"><title>' \
           'Confluent REST Explorer: ' + url + '</title></head>' \
                                               '<body><form action="' + \
                                               resource + '" method="post">'
@@ -486,7 +487,7 @@ def _assemble_json(responses, resource, url, extension):
                 else:
                     rspdata[dk] = rsp[dk]
     rspdata["_links"] = links
-    yield json.dumps(rspdata, sort_keys=True, indent=4)
+    yield json.dumps(rspdata, sort_keys=True, indent=4, ensure_ascii=False)
 
 
 def serve():
