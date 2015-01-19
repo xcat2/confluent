@@ -1,4 +1,5 @@
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -232,6 +233,7 @@ persistent_ipmicmds = {}
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg):
         self.sensormap = {}
+        self.sensorcategory = None
         self.broken = False
         self.error = None
         eventlet.sleep(0)
@@ -300,23 +302,51 @@ class IpmiHandler(object):
             self.sensormap[simplify_name(resourcename)] = resourcename
 
 
+    def read_sensors(self, sensorname):
+        if sensorname == 'all':
+            sensors = self.ipmicmd.get_sensor_descriptions()
+            readings = []
+            for sensor in filter(self.match_sensor, sensors):
+                try:
+                    reading = self.ipmicmd.get_sensor_reading(sensor['name'])
+                except pygexc.IpmiException as ie:
+                    if ie.ipmicode == 203:
+                        continue
+                    raise
+                readings.append(self._dict_sensor(reading))
+            yield msg.SensorReadings(readings, name=self.node)
+        else:
+            self.make_sensor_map()
+            if sensorname not in self.sensormap:
+                raise exc.NotFoundException('No such sensor')
+            reading = self.ipmicmd.get_sensor_reading(
+                self.sensormap[sensorname])
+            yield msg.SensorReadings([self._dict_sensor(reading)],
+                                     name=self.node)
+
     def handle_sensors(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
+        if len(self.element) < 3:
+            return
+        self.sensorcategory = self.element[2]
         if len(self.element) == 3:  # list sensors per category
-            category = self.element[2]
-            return self.list_sensors(category)
+            return self.list_sensors()
+        elif len(self.element) == 4:  # resource requested
+            return self.read_sensors(self.element[-1])
 
-    def list_sensors(self, category):
+    def match_sensor(self, sensor):
+        if self.sensorcategory == 'all':
+            return True
+        if sensor['type'] in sensor_categories[self.sensorcategory]:
+            return True
+        return False
+
+    def list_sensors(self):
         sensors = self.ipmicmd.get_sensor_descriptions()
         yield msg.ChildCollection('all')
-        if category == 'all':
-            for sensor in sensors:
-                yield msg.ChildCollection(simplify_name(sensor['name']))
-        else:
-            for sensor in sensors:
-                if sensor['type'] in sensor_categories[category]:
-                    yield msg.ChildCollection(simplify_name(sensor['name']))
+        for sensor in filter(self.match_sensor, sensors):
+            yield msg.ChildCollection(simplify_name(sensor['name']))
 
 
     @staticmethod
@@ -333,7 +363,7 @@ class IpmiHandler(object):
 
     def _dict_sensor(self, pygreading):
         retdict = {'name': pygreading.name, 'value': pygreading.value,
-                   'states': pygreading.states,
+                   'states': pygreading.states, 'units': pygreading.units,
                    'health': self._str_health(pygreading.health)}
         return retdict
 
