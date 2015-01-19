@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,6 +65,7 @@ import anydbm as dbm
 import ast
 import base64
 import confluent.config.attributes as allattributes
+import confluent.log as log
 import confluent.util
 import copy
 import cPickle
@@ -82,6 +84,7 @@ _masterkey = None
 _masterintegritykey = None
 _dirtylock = threading.RLock()
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
+tracelog = None
 
 def _mkpath(pathname):
     try:
@@ -917,7 +920,14 @@ class ConfigManager(object):
                         }
         for watcher in notifdata.itervalues():
             callback = watcher['callback']
-            callback(nodeattribs=watcher['nodeattrs'], configmanager=self)
+            try:
+                callback(nodeattribs=watcher['nodeattrs'], configmanager=self)
+            except Exception:
+                global tracelog
+                if tracelog is None:
+                    tracelog = log.Logger('trace')
+                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                             event=log.Events.stacktrace)
 
     def del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
