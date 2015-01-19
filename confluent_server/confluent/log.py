@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,6 +67,7 @@ import json
 import os
 import struct
 import time
+import traceback
 
 # on conserving filehandles:
 # upon write, if file not open, open it for append
@@ -235,7 +237,7 @@ class Logger(object):
         :param data: data to log
         """
         if data != '\n':  # 'print' likes to do '\n' by itself, skip that
-            self.log(data)
+            self.log(traceback.format_stack(limit=2)[0][:-1] + ": " + data)
 
     def flush(self):
         pass
