@@ -258,7 +258,10 @@ def print_result(res):
             output = '{0:<40} {1:>39}'.format(attrstr, notestr)
         else:
             output = attrstr
-        print(output)
+        try:
+            print(output)
+        except UnicodeDecodeError:
+            print(output.encode('utf-8'))
 
 
 def do_command(command, server):
