@@ -14,5 +14,7 @@ setup(
     install_requires=['pycrypto>=2.6', 'confluent_client>=0.1.0', 'eventlet',
                       'pyghmi>=0.6.5'],
     scripts=['bin/confluent'],
-    data_files=[('/etc/init.d', ['sysvinit/confluent'])],
+    data_files=[('/etc/init.d', ['sysvinit/confluent']),
+		('/opt/confluent/lib/python/confluent/plugins/console/', [])],
+
 )
