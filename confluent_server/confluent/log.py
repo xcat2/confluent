@@ -60,7 +60,7 @@
 #    or other fields)
 
 import collections
-import confluent.config.configmanager as configuration
+import confluent.config.configmanager
 import eventlet
 import fcntl
 import json
@@ -120,7 +120,7 @@ class Logger(object):
             # we are just a copy of the same object
             return
         self.initialized = True
-        self.filepath = configuration.get_global("logdirectory")
+        self.filepath = confluent.config.configmanager.get_global("logdirectory")
         if self.filepath is None:
             self.filepath = "/var/log/confluent/"
         self.isconsole = console

@@ -65,7 +65,7 @@ import anydbm as dbm
 import ast
 import base64
 import confluent.config.attributes as allattributes
-import confluent.log as log
+import confluent.log
 import confluent.util
 import copy
 import cPickle
@@ -925,7 +925,7 @@ class ConfigManager(object):
             except Exception:
                 global tracelog
                 if tracelog is None:
-                    tracelog = log.Logger('trace')
+                    tracelog = confluent.log.Logger('trace')
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                              event=log.Events.stacktrace)
 
