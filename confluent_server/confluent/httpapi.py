@@ -48,9 +48,10 @@ opmap = {
     'DELETE': 'delete',
 }
 
+
 class RobustCookie(Cookie.SimpleCookie):
     # this is very bad form, but BaseCookie has a terrible flaw
-    def _BaseCookie__set(selfself, K, rval, cval):
+    def _BaseCookie__set(self, K, rval, cval):
         try:
             super(RobustCookie, self)._BaseCookie__set(K, rval, cval)
         except Cookie.CookieError:
