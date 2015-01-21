@@ -48,6 +48,14 @@ opmap = {
     'DELETE': 'delete',
 }
 
+class RobustCookie(Cookie.SimpleCookie):
+    # this is very bad form, but BaseCookie has a terrible flaw
+    def _BaseCookie__set(selfself, K, rval, cval):
+        try:
+            super(RobustCookie, self)._BaseCookie__set(K, rval, cval)
+        except Cookie.CookieError:
+            # empty value if SimpleCookie rejects
+            dict.__setitem__(self, K, Cookie.Morsel())
 
 def group_creation_resources():
     yield confluent.messages.Attributes(
@@ -154,7 +162,7 @@ def _authorize_request(env, operation):
     cookie = Cookie.SimpleCookie()
     if 'HTTP_COOKIE' in env:
         #attempt to use the cookie.  If it matches
-        cc = Cookie.SimpleCookie()
+        cc = RobustCookie()
         cc.load(env['HTTP_COOKIE'])
         if 'confluentsessionid' in cc:
             sessionid = cc['confluentsessionid'].value
