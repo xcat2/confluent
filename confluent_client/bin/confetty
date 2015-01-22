@@ -57,6 +57,7 @@ import tty
 exitcode = 0
 consoleonly = False
 consolename = ""
+didconsole = False
 target = "/"
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -445,6 +446,8 @@ def fullpath_target(currpath, forcepath=False):
 def startconsole(nodename):
     global inconsole
     global consolename
+    global didconsole
+    didconsole = True
     consolename = nodename
     tty.setraw(sys.stdin.fileno())
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
@@ -452,12 +455,14 @@ def startconsole(nodename):
     inconsole = True
 
 
-def quitconfetty(code=0, fullexit=False):
+def quitconfetty(code=0, fullexit=False, fixterm=True):
     global inconsole
     global currconsole
-    currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
-    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+    global didconsole
+    if fixterm or didconsole:
+        currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     if fullexit:
         sys.exit(code)
     else:
@@ -567,7 +572,7 @@ if len(shellargs) == 1 and ' ' not in shellargs[0]:  # straight to node console
 elif shellargs:
     command = " ".join(shellargs)
     do_command(command, netserver)
-    quitconfetty(fullexit=True)
+    quitconfetty(fullexit=True, fixterm=False)
 while inconsole or not doexit:
     if inconsole:
         rdylist, _, _ = select.select(
