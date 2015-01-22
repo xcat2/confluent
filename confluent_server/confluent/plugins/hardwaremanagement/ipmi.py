@@ -312,26 +312,29 @@ class IpmiHandler(object):
 
 
     def read_sensors(self, sensorname):
-        if sensorname == 'all':
-            sensors = self.ipmicmd.get_sensor_descriptions()
-            readings = []
-            for sensor in filter(self.match_sensor, sensors):
-                try:
-                    reading = self.ipmicmd.get_sensor_reading(sensor['name'])
-                except pygexc.IpmiException as ie:
-                    if ie.ipmicode == 203:
-                        continue
-                    raise
-                readings.append(self._dict_sensor(reading))
-            yield msg.SensorReadings(readings, name=self.node)
-        else:
-            self.make_sensor_map()
-            if sensorname not in self.sensormap:
-                raise exc.NotFoundException('No such sensor')
-            reading = self.ipmicmd.get_sensor_reading(
-                self.sensormap[sensorname])
-            yield msg.SensorReadings([self._dict_sensor(reading)],
-                                     name=self.node)
+        try:
+            if sensorname == 'all':
+                sensors = self.ipmicmd.get_sensor_descriptions()
+                readings = []
+                for sensor in filter(self.match_sensor, sensors):
+                    try:
+                        reading = self.ipmicmd.get_sensor_reading(sensor['name'])
+                    except pygexc.IpmiException as ie:
+                        if ie.ipmicode == 203:
+                            continue
+                        raise
+                    readings.append(self._dict_sensor(reading))
+                yield msg.SensorReadings(readings, name=self.node)
+            else:
+                self.make_sensor_map()
+                if sensorname not in self.sensormap:
+                    raise exc.NotFoundException('No such sensor')
+                reading = self.ipmicmd.get_sensor_reading(
+                    self.sensormap[sensorname])
+                yield msg.SensorReadings([self._dict_sensor(reading)],
+                                         name=self.node)
+        except pygexc.IpmiException:
+            yield msg.ConfluentTargetTimeout(self.node)
 
     def handle_sensors(self):
         if self.element[-1] == '':
@@ -352,7 +355,10 @@ class IpmiHandler(object):
         return False
 
     def list_sensors(self):
-        sensors = self.ipmicmd.get_sensor_descriptions()
+        try:
+            sensors = self.ipmicmd.get_sensor_descriptions()
+        except pygexc.IpmiException:
+            yield msg.ConfluentTargetTimeout(self.node)
         yield msg.ChildCollection('all')
         for sensor in filter(self.match_sensor, sensors):
             yield msg.ChildCollection(simplify_name(sensor['name']))
@@ -378,7 +384,11 @@ class IpmiHandler(object):
 
     def health(self):
         if 'read' == self.op:
-            response = self.ipmicmd.get_health()
+            try:
+                response = self.ipmicmd.get_health()
+            except pygexc.IpmiException:
+                yield msg.ConfluentTargetTimeout(self.node)
+                return
             health = response['health']
             health = self._str_health(health)
             yield msg.HealthSummary(health, self.node)

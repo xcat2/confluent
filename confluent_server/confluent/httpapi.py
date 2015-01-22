@@ -58,6 +58,7 @@ class RobustCookie(Cookie.SimpleCookie):
             # empty value if SimpleCookie rejects
             dict.__setitem__(self, K, Cookie.Morsel())
 
+
 def group_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
