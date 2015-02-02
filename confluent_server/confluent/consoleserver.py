@@ -449,7 +449,8 @@ class ConsoleSession(object):
     :param node: Name of the node for which this session will be created
     """
 
-    def __init__(self, node, configmanager, username, datacallback=None):
+    def __init__(self, node, configmanager, username, datacallback=None,
+                 skipreplay=False):
         self.tenant = configmanager.tenant
         if not configmanager.is_node(node):
             raise exc.NotFoundException("Invalid node")
@@ -466,12 +467,14 @@ class ConsoleSession(object):
             self.reaper = eventlet.spawn_after(15, self.destroy)
             self.databuffer = collections.deque([])
             self.reghdl = _handled_consoles[consk].register_rcpt(self.got_data)
-            self.databuffer.extend(_handled_consoles[consk].get_recent())
+            if not skipreplay:
+                self.databuffer.extend(_handled_consoles[consk].get_recent())
         else:
             self.reghdl = _handled_consoles[consk].register_rcpt(datacallback)
-            for recdata in _handled_consoles[consk].get_recent():
-                if recdata:
-                    datacallback(recdata)
+            if not skipreplay:
+                for recdata in _handled_consoles[consk].get_recent():
+                    if recdata:
+                        datacallback(recdata)
 
     def send_break(self):
         self.conshdl.send_break()

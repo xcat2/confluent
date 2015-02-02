@@ -167,9 +167,12 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
                 raise exc.InvalidArgumentException()
             node = elems[2]
             ccons = ClientConsole(connection)
+            skipreplay = False
+            if params and 'skipreplay' in params and params['skipreplay']:
+                skipreplay = True
             consession = consoleserver.ConsoleSession(
                 node=node, configmanager=cfm, username=authname,
-                datacallback=ccons.sendall)
+                datacallback=ccons.sendall, skipreplay=skipreplay)
             if consession is None:
                 raise Exception("TODO")
             tlvdata.send(connection, {'started': 1})

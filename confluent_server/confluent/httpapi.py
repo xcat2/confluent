@@ -311,10 +311,13 @@ def resourcehandler_backend(env, start_response):
                 auditmsg['tenant'] = authorized['tenant']
             auditlog.log(auditmsg)
             # Request for new session
+            skipreplay = False
+            if 'skipreplay' in querydict and querydict['skipreplay']:
+                skipreplay = True
             try:
                 consession = consoleserver.ConsoleSession(
                     node=nodename, configmanager=cfgmgr,
-                    username=authorized['username'])
+                    username=authorized['username'], skipreplay=skipreplay)
             except exc.NotFoundException:
                 start_response("404 Not found", headers)
                 yield "404 - Request Path not recognized"

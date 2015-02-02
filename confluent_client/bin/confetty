@@ -49,6 +49,7 @@ import os
 import readline
 import select
 import shlex
+import socket
 import sys
 import termios
 import time
@@ -312,8 +313,13 @@ def do_command(command, server):
         targpath = fullpath_target(argv[1])
         nodename = targpath.split('/')[-3]
         currconsole = targpath
+        startrequest = {'operation': 'start', 'path': targpath,
+                        'parameters': {}}
+        for param in argv[2:]:
+            (parmkey, parmval) = param.split("=")
+            startrequest['parameters'][parmkey] = parmval
         tlvdata.send(
-            session.connection, {'operation': 'start', 'path': targpath})
+            session.connection, startrequest)
         status = tlvdata.recv(session.connection)
         if 'error' in status:
             if 'errorcode' in status:
@@ -322,7 +328,6 @@ def do_command(command, server):
             while '_requestdone' not in status:
                 status = tlvdata.recv(session.connection)
             return
-        print '[console session started]'
         startconsole(nodename)
         return
     elif argv[0] == 'set':
@@ -534,27 +539,36 @@ parser.add_option("-c", "--control", dest="controlpath",
                   help="Path to offer terminal control",
                   metavar="PATH")
 opts, shellargs = parser.parse_args()
-if opts.controlpath:
-    termhandler.TermHandler(opts.controlpath)
-if opts.netserver:  # going over a TLS network
-    session = client.Command(opts.netserver)
-elif 'CONFLUENT_HOST' in os.environ:
-    session = client.Command(os.environ['CONFLUENT_HOST'])
-else:  # unix domain
-    session = client.Command()
 
-#Next stop, reading and writing from whichever of stdin and server goes first.
-#see pyghmi code for solconnect.py
-if not session.authenticated and 'CONFLUENT_USER' in os.environ:
-    username = os.environ['CONFLUENT_USER']
-    passphrase = os.environ['CONFLUENT_PASSPHRASE']
-    session.authenticate(username, passphrase)
-while not session.authenticated:
-    username = raw_input("Name: ")
-    readline.clear_history()
-    passphrase = getpass.getpass("Passphrase: ")
-    session.authenticate(username, passphrase)
-# clear on start can help with readable of TUI, but it
+username = None
+passphrase = None
+def server_connect():
+    global session, username, passphrase
+    if opts.controlpath:
+        termhandler.TermHandler(opts.controlpath)
+    if opts.netserver:  # going over a TLS network
+        session = client.Command(opts.netserver)
+    elif 'CONFLUENT_HOST' in os.environ:
+        session = client.Command(os.environ['CONFLUENT_HOST'])
+    else:  # unix domain
+        session = client.Command()
+
+    # Next stop, reading and writing from whichever of stdin and server goes first.
+    #see pyghmi code for solconnect.py
+    if not session.authenticated and username is not None:
+        session.authenticate(username, passphrase)
+    if not session.authenticated and 'CONFLUENT_USER' in os.environ:
+        username = os.environ['CONFLUENT_USER']
+        passphrase = os.environ['CONFLUENT_PASSPHRASE']
+        session.authenticate(username, passphrase)
+    while not session.authenticated:
+        username = raw_input("Name: ")
+        readline.clear_history()
+        passphrase = getpass.getpass("Passphrase: ")
+        session.authenticate(username, passphrase)
+
+
+server_connect()# clear on start can help with readable of TUI, but it
 # can be annoying, so for now don't do it.
 # sys.stdout.write('\x1b[H\x1b[J')
 # sys.stdout.flush()
@@ -601,9 +615,25 @@ while inconsole or not doexit:
                         updatestatus()
                     sys.stdout.flush()
                 else:
-                    doexit = True
-                    inconsole = False
-                    sys.stdout.write("\r\n[remote disconnected]\r\n")
+                    deadline = 5
+                    connected = False
+                    while not connected and deadline > 0:
+                        try:
+                            server_connect()
+                            connected = True
+                        except socket.gaierror:
+                            pass
+                        if not connected:
+                            time.sleep(1)
+                            deadline -=1
+                    if connected:
+                        do_command(
+                            "start /nodes/%s/console/session skipreplay=True" % consolename,
+                            netserver)
+                    else:
+                        doexit = True
+                        inconsole = False
+                        sys.stdout.write("\r\n[remote disconnected]\r\n")
                     break
             else:
                 myinput = fh.read()
