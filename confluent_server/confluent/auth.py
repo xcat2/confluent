@@ -160,7 +160,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         pammy.authenticate()
         pammy.acct_mgmt()
         del pammy
-        return authorize(user, element, tenant, skipuserobj=True)
+        return authorize(user, element, tenant, skipuserobj=False)
     except PAM.error:
         if credobj.haspam:
             return None
