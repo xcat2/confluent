@@ -570,7 +570,14 @@ def server_connect():
         session.authenticate(username, passphrase)
 
 
-server_connect()# clear on start can help with readable of TUI, but it
+try:
+    server_connect()
+except EOFError, KeyboardInterrupt:
+    sys.exit(0)
+except socket.gaierror:
+    sys.stderr.write('Could not connect to confluent\n')
+    sys.exit(1)
+# clear on start can help with readable of TUI, but it
 # can be annoying, so for now don't do it.
 # sys.stdout.write('\x1b[H\x1b[J')
 # sys.stdout.flush()
@@ -623,7 +630,7 @@ while inconsole or not doexit:
                         try:
                             server_connect()
                             connected = True
-                        except socket.gaierror:
+                        except socket.gaierror, socket.error:
                             pass
                         if not connected:
                             time.sleep(1)
@@ -644,5 +651,13 @@ while inconsole or not doexit:
                     tlvdata.send(session.connection, myinput)
     else:
         currcommand = prompt()
-        do_command(currcommand, netserver)
+        try:
+            do_command(currcommand, netserver)
+        except socket.error:
+            try:
+                server_connect()
+                do_command(currcommand, netserver)
+            except socket.error:
+                doexit = True
+                sys.stdout.write('Lost connection to server')
 quitconfetty(fullexit=True)
