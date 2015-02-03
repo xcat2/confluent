@@ -169,14 +169,16 @@ def completer(text, state):
     try:
         return rcompleter(text, state)
     except:
-        import traceback
-        traceback.print_exc()
+        pass
+        #import traceback
+        #traceback.print_exc()
 
 
 def rcompleter(text, state):
     global candidates
     global valid_commands
     cline = readline.get_line_buffer()
+    cline = cline[:readline.get_endidx()]
     if len(text):
         cline = cline[:-len(text)]
     args = shlex.split(cline, posix=True)
