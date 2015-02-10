@@ -71,7 +71,10 @@ import confluent.client as client
 
 conserversequence = '\x05c'  # ctrl-e, c
 
-oldtcattr = termios.tcgetattr(sys.stdin.fileno())
+oldtcattr = None
+fd = sys.stdin
+if fd.isatty():
+    oldtcattr = termios.tcgetattr(fd.fileno())
 netserver = None
 laststate = {}
 
@@ -469,7 +472,8 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
     if fixterm or didconsole:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+        if oldtcattr is not None:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     if fullexit:
         sys.exit(code)
     else:
@@ -596,6 +600,7 @@ elif shellargs:
     command = " ".join(shellargs)
     do_command(command, netserver)
     quitconfetty(fullexit=True, fixterm=False)
+
 while inconsole or not doexit:
     if inconsole:
         rdylist, _, _ = select.select(
