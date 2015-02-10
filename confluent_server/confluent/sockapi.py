@@ -45,7 +45,11 @@ auditlog = None
 try:
     SO_PEERCRED = socket.SO_PEERCRED
 except AttributeError:
-    SO_PEERCRED = 17
+    import platform
+    if "ppc64" in platform.machine():
+        SO_PEERCRED = 21
+	else:
+        SO_PEERCRED = 17
 
 
 class ClientConsole(object):
