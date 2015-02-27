@@ -319,6 +319,11 @@ class _ConsoleHandler(object):
             edata = self.users[username]
         else:
             edata = 2
+        if edata < 0:
+            _tracelog.log('client count negative' + traceback.format_exc(),
+              ltype=log.DataTypes.event,
+              event=log.Events.stacktrace)
+            edata = 0
         self.log(
             logdata=username, ltype=log.DataTypes.event,
             event=log.Events.clientdisconnect, eventdata=edata)
@@ -456,6 +461,7 @@ class ConsoleSession(object):
 
     def __init__(self, node, configmanager, username, datacallback=None,
                  skipreplay=False):
+        self.registered = False
         self.tenant = configmanager.tenant
         if not configmanager.is_node(node):
             raise exc.NotFoundException("Invalid node")
@@ -463,6 +469,7 @@ class ConsoleSession(object):
         self.ckey = consk
         self.username = username
         connect_node(node, configmanager)
+        self.registered = True
         _handled_consoles[consk].attachuser(username)
         self._evt = None
         self.node = node
@@ -494,8 +501,9 @@ class ConsoleSession(object):
         self.conshdl.reopen()
 
     def destroy(self):
-        _handled_consoles[self.ckey].detachuser(self.username)
-        _handled_consoles[self.ckey].unregister_rcpt(self.reghdl)
+        if self.registered:
+            _handled_consoles[self.ckey].detachuser(self.username)
+            _handled_consoles[self.ckey].unregister_rcpt(self.reghdl)
         self.databuffer = None
         self._evt = None
         self.reghdl = None
