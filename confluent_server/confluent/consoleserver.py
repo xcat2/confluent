@@ -304,6 +304,11 @@ class _ConsoleHandler(object):
             # clearly indicate redundant connections
             # not connection count
             edata = 2
+        if edata < 0:
+            _tracelog.log('client count negative' + traceback.format_exc(),
+                          ltype=log.DataTypes.event,
+                          event=log.Events.stacktrace)
+            edata = 0
         self.log(
             logdata=username, ltype=log.DataTypes.event,
             event=log.Events.clientconnect, eventdata=edata)
