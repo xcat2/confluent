@@ -48,7 +48,7 @@ except AttributeError:
     import platform
     if "ppc64" in platform.machine():
         SO_PEERCRED = 21
-	else:
+    else:
         SO_PEERCRED = 17
 
 
