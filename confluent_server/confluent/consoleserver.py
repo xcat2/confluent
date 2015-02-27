@@ -227,6 +227,17 @@ class _ConsoleHandler(object):
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
+        except Exception:
+            _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                          event=log.Events.stacktrace)
+            self.error = 'unknown'
+            self.connectstate = 'unconnected'
+            self._send_rcpts({'connectstate': self.connectstate,
+                              'error': self.error})
+            retrytime = 30 + (30 * random.random())
+            if not self.reconnect:
+                self.reconnect = eventlet.spawn_after(retrytime, self._connect)
+            return
         self._got_connected()
 
     def _got_connected(self):
