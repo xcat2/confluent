@@ -58,6 +58,10 @@ class ExecConsole(conapi.Console):
                         eventlet.sleep(0)
                         somedata = os.read(self._master, 128)
                 except OSError as e:
+                    if e.errno == 5:
+                        self._datacallback(conapi.ConsoleEvent.Disconnect)
+                        self.subproc = None
+                        return
                     if e.errno != 11:
                         raise
             if self.subproc.stderr in rdylist:
@@ -79,10 +83,15 @@ class ExecConsole(conapi.Console):
         self._datacallback = callback
         master, slave = pty.openpty()
         self._master = master
-        self.subproc = subprocess.Popen(
-            [self.executable], env=self.subenv,
-            stdin=slave, stdout=slave,
-            stderr=subprocess.PIPE, close_fds=True)
+        try:
+            self.subproc = subprocess.Popen(
+                [self.executable], env=self.subenv,
+                stdin=slave, stdout=slave,
+                stderr=subprocess.PIPE, close_fds=True)
+        except OSError:
+            print "Unable to execute " + self.executable + " (permissions?)"
+            self.close()
+            return
         os.close(slave)
         fcntl.fcntl(master, fcntl.F_SETFL, os.O_NONBLOCK)
         fcntl.fcntl(self.subproc.stderr.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
@@ -92,7 +101,10 @@ class ExecConsole(conapi.Console):
         os.write(self._master, data)
 
     def close(self):
-        os.close(self._master)
+        try:
+            os.close(self._master)
+        except OSError:
+            print "Error closing master of child process, ignoring"
         if self.subproc is None or self.subproc.poll() is not None:
             return
         self.subproc.terminate()
