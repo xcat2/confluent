@@ -18,35 +18,32 @@
 # considered ast, but a number of things violate python grammar like [] in
 # the middle of strings and use of @ for anything is not in their syntax
 
-#construct custom grammar with pyparsing
 
-#>>> grammar = pyparsing.Word(pyparsing.alphanums+'/', pyparsing.alphanums+'[]-.*') | ',-' | ',' | '@'
-#>>> parser = pyparsing.nestedExpr('(',')',content=grammar)
-#>>> parser.parseString("(n1-n4,compute,(foo@bar),-bob,bob)").asList()
-#[['n1-n4', ',', 'compute', ',', ['foo', '@', 'bar'], ',-', 'bob', ',', 'bob']]
-import pyparsing
+import itertools
+import pyparsing as pp
 import re
 
+# construct custom grammar with pyparsing
+_nodeword = pp.Word(pp.alphanums + '/=-:.*+')
+_nodebracket = pp.QuotedString(quoteChar='[', endQuoteChar=']',
+                               unquoteResults=False)
+_nodeatom = pp.Group(pp.OneOrMore(_nodeword | _nodebracket))
+_grammar = _nodeatom | ',-' | ',' | '@'
+_parser = pp.nestedExpr(content=_grammar)
 
+_numextractor = pp.OneOrMore(pp.Word(pp.alphas + '-') | pp.Word(pp.nums))
+
+#TODO: pagination operators <pp.nums and >pp.nums for begin and end respective
 class NodeRange(object):
     """Iterate over a noderange
 
     :param noderange: string representing a noderange to evaluate
     :param verify: whether or not to perform lookups in the config
     """
-    _grammar = \
-        pyparsing.Word(
-            pyparsing.alphanums + '/', pyparsing.alphanums + '=[]-:.*+') | \
-        ',-' | ',' | '@'
-    _parser = pyparsing.nestedExpr(content=_grammar)
-    _bracketgrammar = (
-        pyParsing.Word(pyparsing.alphanums + '-:') | '[' | ']') * (None, None)
-    _nodenamegrammar = (
-        pyParsing.Word(pyparsing.alphas + '-.') | pyparsing.nums ) * (None, None)
 
     def __init__(self, noderange, verify=True):
         self.verify = verify
-        elements = self._parser.parseString("(" + noderange + ")").asList()
+        elements = _parser.parseString("(" + noderange + ")").asList()[0]
         self._noderange = self._evaluate(elements)
 
     @property
@@ -56,7 +53,7 @@ class NodeRange(object):
     def _evaluate(self, parsetree):
         current_op = 0  # enum, 0 union, 1 subtract, 2 intersect
         current_range = set([])
-        if not isinstance(parsetree, list):  # down to a plain text thing
+        if not isinstance(parsetree[0], list):  # down to a plain text thing
             return self._expandstring(parsetree)
         for elem in parsetree:
             if elem == ',-':
@@ -73,44 +70,81 @@ class NodeRange(object):
                 current_range &= self._evaluate(elem)
         return current_range
 
-    def parsenumeric(self, piece):
-        return NodeRange(piece, verify=False).nodes
+    def failorreturn(self, atom):
+        if self.verify:
+            raise Exception(atom + " not valid")
+        return set([atom])
 
-    def expandbracketed(self, element):
-        pieces = self._bracketgrammar.parseString(element)
-        formatstring = ''
-        inbracket = False
+    def expandrange(self, range, delimiter):
+        pieces = range.split(delimiter)
+        if len(pieces) % 2 != 0:
+            return self.failorreturn(range)
+        halflen = len(pieces) / 2
+        left = delimiter.join(pieces[:halflen])
+        right = delimiter.join(pieces[halflen:])
+        leftbits = _numextractor.parseString(left).asList()
+        rightbits = _numextractor.parseString(right).asList()
+        if len(leftbits) != len(rightbits):
+            return self.failorreturn(range)
+        finalfmt = ''
         iterators = []
-        for piece in pieces:
-            if inbracket:
-                if piece == ']':
-                    inbracket = False
-                else:
-                    iterators.append(self.parsenumeric(piece))
+        for idx in xrange(len(leftbits)):
+            if leftbits[idx] == rightbits[idx]:
+                finalfmt += leftbits[idx]
+            elif leftbits[idx][0] in pp.alphas:
+                # if string portion unequal, not going to work
+                return self.failorreturn(range)
             else:
-                if piece == '[':
-                    inbracket = True
-                else:
-                    formatstring += piece
-
-
-
-        raise Exception("TODO: [] in expression")
+                curseq = []
+                finalfmt += '{%d}' % len(iterators)
+                iterators.append(curseq)
+                leftnum = int(leftbits[idx])
+                rightnum = int(rightbits[idx])
+                if leftnum > rightnum:
+                    width = len(rightbits[idx])
+                    minnum = rightnum
+                    maxnum = leftnum + 1  # xrange goes to n-1...
+                elif rightnum > leftnum:
+                    width = len(leftbits[idx])
+                    minnum = leftnum
+                    maxnum = rightnum + 1
+                else:  # differently padded, but same number...
+                    return self.failorreturn(range)
+                numformat = '{0:0%d}' % width
+                for num in xrange(minnum, maxnum):
+                    curseq.append(numformat.format(num))
+        results = set([])
+        for combo in itertools.product(*iterators):
+            results.add(finalfmt.format(*combo))
+        return results
 
     def _expandstring(self, element):
+        prefix = ''
+        for idx in xrange(len(element)):
+            if element[idx][0] == '[':
+                nodes = set([])
+                for numeric in NodeRange(element[idx][1:-1], False).nodes:
+                    nodes |= self._expandstring(
+                            [prefix + numeric] + element[idx + 1:])
+                return nodes
+            else:
+                prefix += element[idx]
+        element = prefix
+        nodes = set([])
         if self.verify:
             #this is where we would check for exactly this
             raise Exception("TODO: link with actual config")
         #this is where we would check for a literal groupname
         #ok, now time to understand the various things
-        if '[' in element:  # [] style expansion
-            return self.expandbracketed(element)
-        elif '-' in element and ':' not in element:
-            # *POSSIBLE* range, could just be part of name
-            if self.verify:
-                raise Exception("TODO: check for node, group, alias with name")
-            raise Exception("TODO: ranged expression")
+        if '-' in element and ':' not in element:
+            return self.expandrange(element, '-')
         elif ':' in element:  # : range for less ambiguity
-            raise Exception("TODO: ranged expression")
+            return self.expandrange(element, ':')
+        elif '=' in element:
+            raise Exception('TODO: criteria noderange')
+        elif element[0] in ('/', '~'):
+            raise Exception('TODO: regex noderange')
+        elif '+' in element:
+            raise Exception('TODO: plus range')
         if not self.verify:
             return set([element])
