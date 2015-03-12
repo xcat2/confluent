@@ -55,6 +55,8 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
             currattr = grpcfg[attribute]
             if attribute == 'nodes':
                 desc = 'The nodes belonging to this group'
+            elif attribute == 'noderange':
+                desc = 'A dynamic noderange that this group refers to in noderange expansion'
             else:
                 try:
                     desc = allattributes.node[attribute]['description']

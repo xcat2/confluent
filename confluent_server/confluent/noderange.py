@@ -139,7 +139,8 @@ class NodeRange(object):
                 grpcfg = self.cfm.get_nodegroup_attributes(element)
                 nodes = grpcfg['nodes']
                 if 'noderange' in grpcfg and grpcfg['noderange']:
-                    nodes |= NodeRange(grpcfg['noderange'], self.cfm).nodes
+                    nodes |= NodeRange(
+                        grpcfg['noderange']['value'], self.cfm).nodes
                 return nodes
         if '-' in element and ':' not in element:
             return self.expandrange(element, '-')

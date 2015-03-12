@@ -819,8 +819,6 @@ class ConfigManager(object):
             for attr in attribmap[group].iterkeys():
                 if attr == 'nodes':
                     newdict = set(attribmap[group][attr])
-                elif attr == 'noderange':
-                    newdict = attribmap[group][attr]
                 elif (isinstance(attribmap[group][attr], str) or
                         isinstance(attribmap[group][attr], unicode)):
                     newdict = {'value': attribmap[group][attr]}
