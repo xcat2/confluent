@@ -796,7 +796,7 @@ class ConfigManager(object):
             if not autocreate and group not in self._cfgstore['nodegroups']:
                 raise ValueError("{0} group does not exist".format(group))
             for attr in attribmap[group].iterkeys():
-                if (attr != 'nodes' and
+                if (attr not in ('nodes', 'noderange') and
                         (attr not in allattributes.node or
                          ('type' in allattributes.node[attr] and
                           not isinstance(attribmap[group][attr],
@@ -819,6 +819,8 @@ class ConfigManager(object):
             for attr in attribmap[group].iterkeys():
                 if attr == 'nodes':
                     newdict = set(attribmap[group][attr])
+                elif attr == 'noderange':
+                    newdict = attribmap[group][attr]
                 elif (isinstance(attribmap[group][attr], str) or
                         isinstance(attribmap[group][attr], unicode)):
                     newdict = {'value': attribmap[group][attr]}
@@ -832,7 +834,7 @@ class ConfigManager(object):
                     self._sync_nodes_to_group(group=group,
                                               nodes=attribmap[group]['nodes'],
                                               changeset=changeset)
-                else:  # update inheritence
+                elif attr != 'noderange':  # update inheritence
                     for node in cfgobj['nodes']:
                         nodecfg = self._cfgstore['nodes'][node]
                         self._do_inheritance(nodecfg, attr, node, changeset,

@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +22,6 @@
 
 import itertools
 import pyparsing as pp
-import re
 
 # construct custom grammar with pyparsing
 _nodeword = pp.Word(pp.alphanums + '/=-:.*+')
@@ -33,16 +33,17 @@ _parser = pp.nestedExpr(content=_grammar)
 
 _numextractor = pp.OneOrMore(pp.Word(pp.alphas + '-') | pp.Word(pp.nums))
 
-#TODO: pagination operators <pp.nums and >pp.nums for begin and end respective
+
+# TODO: pagination operators <pp.nums and >pp.nums for begin and end respective
 class NodeRange(object):
     """Iterate over a noderange
 
     :param noderange: string representing a noderange to evaluate
-    :param verify: whether or not to perform lookups in the config
+    :param config: Config manager object to use to vet elements
     """
 
-    def __init__(self, noderange, verify=True):
-        self.verify = verify
+    def __init__(self, noderange, config=None):
+        self.cfm = config
         elements = _parser.parseString("(" + noderange + ")").asList()[0]
         self._noderange = self._evaluate(elements)
 
@@ -71,21 +72,21 @@ class NodeRange(object):
         return current_range
 
     def failorreturn(self, atom):
-        if self.verify:
+        if self.cfm is not None:
             raise Exception(atom + " not valid")
         return set([atom])
 
-    def expandrange(self, range, delimiter):
-        pieces = range.split(delimiter)
+    def expandrange(self, seqrange, delimiter):
+        pieces = seqrange.split(delimiter)
         if len(pieces) % 2 != 0:
-            return self.failorreturn(range)
+            return self.failorreturn(seqrange)
         halflen = len(pieces) / 2
         left = delimiter.join(pieces[:halflen])
         right = delimiter.join(pieces[halflen:])
         leftbits = _numextractor.parseString(left).asList()
         rightbits = _numextractor.parseString(right).asList()
         if len(leftbits) != len(rightbits):
-            return self.failorreturn(range)
+            return self.failorreturn(seqrange)
         finalfmt = ''
         iterators = []
         for idx in xrange(len(leftbits)):
@@ -93,7 +94,7 @@ class NodeRange(object):
                 finalfmt += leftbits[idx]
             elif leftbits[idx][0] in pp.alphas:
                 # if string portion unequal, not going to work
-                return self.failorreturn(range)
+                return self.failorreturn(seqrange)
             else:
                 curseq = []
                 finalfmt += '{%d}' % len(iterators)
@@ -109,7 +110,7 @@ class NodeRange(object):
                     minnum = leftnum
                     maxnum = rightnum + 1
                 else:  # differently padded, but same number...
-                    return self.failorreturn(range)
+                    return self.failorreturn(seqrange)
                 numformat = '{0:0%d}' % width
                 for num in xrange(minnum, maxnum):
                     curseq.append(numformat.format(num))
@@ -123,19 +124,23 @@ class NodeRange(object):
         for idx in xrange(len(element)):
             if element[idx][0] == '[':
                 nodes = set([])
-                for numeric in NodeRange(element[idx][1:-1], False).nodes:
+                for numeric in NodeRange(element[idx][1:-1]).nodes:
                     nodes |= self._expandstring(
-                            [prefix + numeric] + element[idx + 1:])
+                        [prefix + numeric] + element[idx + 1:])
                 return nodes
             else:
                 prefix += element[idx]
         element = prefix
-        nodes = set([])
-        if self.verify:
-            #this is where we would check for exactly this
-            raise Exception("TODO: link with actual config")
-        #this is where we would check for a literal groupname
-        #ok, now time to understand the various things
+        if self.cfm is not None:
+            # this is where we would check for exactly this
+            if self.cfm.is_node(element):
+                return set([element])
+            if self.cfm.is_nodegroup(element):
+                grpcfg = self.cfm.get_nodegroup_attributes(element)
+                nodes = grpcfg['nodes']
+                if 'noderange' in grpcfg and grpcfg['noderange']:
+                    nodes |= NodeRange(grpcfg['noderange'], self.cfm).nodes
+                return nodes
         if '-' in element and ':' not in element:
             return self.expandrange(element, '-')
         elif ':' in element:  # : range for less ambiguity
@@ -146,5 +151,6 @@ class NodeRange(object):
             raise Exception('TODO: regex noderange')
         elif '+' in element:
             raise Exception('TODO: plus range')
-        if not self.verify:
+        if self.cfm is None:
             return set([element])
+        raise Exception(element + ' not a recognized node, group, or alias')
