@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,6 +37,7 @@ import confluent.config.attributes as attrscheme
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.noderange as noderange
 import confluent.shellmodule as shellmodule
 import os
 import sys
@@ -88,7 +90,7 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-rootcollections = ['nodes/', 'nodegroups/', 'users/']
+rootcollections = ['noderange/', 'nodes/', 'nodegroups/', 'users/']
 
 
 class PluginRoute(object):
@@ -258,13 +260,16 @@ def enumerate_nodegroup_collection(collectionpath, configmanager):
 
 
 def enumerate_node_collection(collectionpath, configmanager):
+    print repr(collectionpath)
     if collectionpath == ['nodes']:  # it is just '/node/', need to list nodes
         return iterate_collections(configmanager.list_nodes())
-    node = collectionpath[1]
-    if not configmanager.is_node(node):
+    nodeorrange = collectionpath[1]
+    if collectionpath[0] == 'nodes' and not configmanager.is_node(nodeorrange):
         raise exc.NotFoundException("Invalid element requested")
-    del collectionpath[0:2]
-    collection = nested_lookup(noderesources, collectionpath)
+    collection = nested_lookup(noderesources, collectionpath[2:])
+    if len(collectionpath) == 2 and collectionpath[0] == 'noderange':
+        collection['nodes'] = {}
+        print repr(collection)
     if not isinstance(collection, dict):
         raise exc.NotFoundException("Invalid element requested")
     return iterate_resources(collection)
@@ -301,6 +306,128 @@ def enumerate_collections(collections):
         yield msg.ChildCollection(collection)
 
 
+def handle_noderange_request(configmanager, operation, pathcomponents):
+    if len(pathcomponents) < 2:
+        return iterate_collections([])
+    nrange = pathcomponents[1]
+    try:
+        nodelist = noderange.NodeRange(nrange, configmanager).nodes
+    except Exception:
+        raise exc.NotFoundException("Invalid noderange")
+    if len(pathcomponents) == 2:
+        if operation != "retrieve":
+            raise exc.InvalidArgumentException(
+                "Noderange collections are read only")
+        return enumerate_node_collection(pathcomponents, configmanager)
+
+
+def handle_nodegroup_request(configmanager, inputdata,
+                             pathcomponents, operation):
+    iscollection = False
+    if len(pathcomponents) < 2:
+        if operation == "create":
+            inputdata = msg.InputAttributes(pathcomponents, inputdata)
+            create_group(inputdata.attribs, configmanager)
+        return iterate_collections(configmanager.get_groups())
+    elif len(pathcomponents) == 2:
+        iscollection = True
+    else:
+        try:
+            routespec = nested_lookup(nodegroupresources, pathcomponents[2:])
+            if isinstance(routespec, dict):
+                iscollection = True
+            elif isinstance(routespec, PluginCollection):
+                iscollection = False  # it is a collection, but plugin defined
+        except KeyError:
+            raise exc.NotFoundException("Invalid element requested")
+    if iscollection:
+        if operation == "delete":
+            return delete_nodegroup_collection(pathcomponents,
+                                                 configmanager)
+        elif operation == "retrieve":
+            return enumerate_nodegroup_collection(pathcomponents,
+                                                    configmanager)
+        else:
+            raise Exception("TODO")
+    plugroute = routespec.routeinfo
+    inputdata = msg.get_input_message(
+        pathcomponents[2:], operation, inputdata)
+    if 'handler' in plugroute:  # fixed handler definition
+        hfunc = getattr(pluginmap[plugroute['handler']], operation)
+        return hfunc(
+            nodes=None, element=pathcomponents,
+            configmanager=configmanager,
+            inputdata=inputdata)
+    raise Exception("unknown case encountered")
+
+
+def handle_node_request(configmanager, inputdata, operation,
+                        pathcomponents):
+    iscollection = False
+    try:
+        node = pathcomponents[1]
+        if not configmanager.is_node(node):
+            raise exc.NotFoundException("Invalid Node")
+    except IndexError:  # doesn't actually have a long enough path
+        # this is enumerating a list of nodes
+        if operation == "delete":
+            raise exc.InvalidArgumentException()
+        if operation == "create":
+            inputdata = msg.InputAttributes(pathcomponents, inputdata)
+            create_node(inputdata.attribs, configmanager)
+        return iterate_collections(configmanager.list_nodes())
+    if len(pathcomponents) == 2:
+        iscollection = True
+    else:
+        try:
+            routespec = nested_lookup(noderesources, pathcomponents[2:])
+        except KeyError:
+            raise exc.NotFoundException("Invalid element requested")
+        if isinstance(routespec, dict):
+            iscollection = True
+        elif isinstance(routespec, PluginCollection):
+            iscollection = False  # it is a collection, but plugin defined
+    if iscollection:
+        if operation == "delete":
+            return delete_node_collection(pathcomponents, configmanager)
+        elif operation == "retrieve":
+            return enumerate_node_collection(pathcomponents, configmanager)
+        else:
+            raise Exception("TODO here")
+    del pathcomponents[0:2]
+    passvalue = None
+    plugroute = routespec.routeinfo
+    inputdata = msg.get_input_message(
+        pathcomponents, operation, inputdata, (node,))
+    if 'handler' in plugroute:  # fixed handler definition
+        hfunc = getattr(pluginmap[plugroute['handler']], operation)
+        passvalue = hfunc(
+            nodes=(node,), element=pathcomponents,
+            configmanager=configmanager,
+            inputdata=inputdata)
+    elif 'pluginattrs' in plugroute:
+        nodeattr = configmanager.get_node_attributes(
+            [node], plugroute['pluginattrs'])
+        if node not in nodeattr:
+            raise exc.NotFoundException("Invalid node %s" % node)
+        plugpath = None
+        if 'default' in plugroute:
+            plugpath = plugroute['default']
+        for attrname in plugroute['pluginattrs']:
+            if attrname in nodeattr[node]:
+                plugpath = nodeattr[node][attrname]['value']
+        if plugpath is not None:
+            hfunc = getattr(pluginmap[plugpath], operation)
+            passvalue = hfunc(
+                nodes=(node,), element=pathcomponents,
+                configmanager=configmanager,
+                inputdata=inputdata)
+    if isinstance(passvalue, console.Console):
+        return passvalue
+    else:
+        return stripnode(passvalue, node)
+
+
 def handle_path(path, operation, configmanager, inputdata=None):
     """Given a full path request, return an object.
 
@@ -308,108 +435,23 @@ def handle_path(path, operation, configmanager, inputdata=None):
     An exception is made for console/session, which should return
     a class with connect(), read(), write(bytes), and close()
     """
-    iscollection = False
     pathcomponents = path.split('/')
     del pathcomponents[0]  # discard the value from leading /
     if pathcomponents[-1] == '':
-        iscollection = True
         del pathcomponents[-1]
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
+    elif pathcomponents[0] == 'noderange':
+        return handle_noderange_request(configmanager, operation,
+                                          pathcomponents)
     elif pathcomponents[0] == 'nodegroups':
-        if len(pathcomponents) < 2:
-            if operation == "create":
-                inputdata = msg.InputAttributes(pathcomponents, inputdata)
-                create_group(inputdata.attribs, configmanager)
-            return iterate_collections(configmanager.get_groups())
-        if len(pathcomponents) == 2:
-            iscollection = True
-        if iscollection:
-            if operation == "delete":
-                return delete_nodegroup_collection(pathcomponents,
-                                                   configmanager)
-            elif operation == "retrieve":
-                return enumerate_nodegroup_collection(pathcomponents,
-                                                      configmanager)
-            else:
-                raise Exception("TODO")
-        try:
-            plugroute = nested_lookup(
-                nodegroupresources, pathcomponents[2:]).routeinfo
-        except KeyError:
-            raise exc.NotFoundException("Invalid element requested")
-        inputdata = msg.get_input_message(
-            pathcomponents[2:], operation, inputdata)
-        if 'handler' in plugroute:  # fixed handler definition
-            hfunc = getattr(pluginmap[plugroute['handler']], operation)
-            return hfunc(
-                nodes=None, element=pathcomponents,
-                configmanager=configmanager,
-                inputdata=inputdata)
+        return handle_nodegroup_request(configmanager, inputdata,
+                                          pathcomponents,
+                                          operation)
     elif pathcomponents[0] == 'nodes':
         #single node request of some sort
-        try:
-            node = pathcomponents[1]
-            if not configmanager.is_node(node):
-                raise exc.NotFoundException("Invalid Node")
-        except IndexError:  # doesn't actually have a long enough path
-            # this is enumerating a list of nodes
-            if operation == "delete":
-                raise exc.InvalidArgumentException()
-            if operation == "create":
-                inputdata = msg.InputAttributes(pathcomponents, inputdata)
-                create_node(inputdata.attribs, configmanager)
-            return iterate_collections(configmanager.list_nodes())
-        if len(pathcomponents) == 2:
-            iscollection = True
-        else:
-            try:
-                routespec = nested_lookup(noderesources, pathcomponents[2:])
-            except KeyError:
-                raise exc.NotFoundException("Invalid element requested")
-            if isinstance(routespec, dict):
-                iscollection = True
-            elif isinstance(routespec, PluginCollection):
-                iscollection = False  # it is a collection, but plugin defined
-        if iscollection:
-            if operation == "delete":
-                return delete_node_collection(pathcomponents, configmanager)
-            elif operation == "retrieve":
-                return enumerate_node_collection(pathcomponents, configmanager)
-            else:
-                raise Exception("TODO here")
-        del pathcomponents[0:2]
-        passvalue = None
-        plugroute = routespec.routeinfo
-        inputdata = msg.get_input_message(
-            pathcomponents, operation, inputdata, (node,))
-        if 'handler' in plugroute:  # fixed handler definition
-            hfunc = getattr(pluginmap[plugroute['handler']], operation)
-            passvalue = hfunc(
-                nodes=(node,), element=pathcomponents,
-                configmanager=configmanager,
-                inputdata=inputdata)
-        elif 'pluginattrs' in plugroute:
-            nodeattr = configmanager.get_node_attributes(
-                [node], plugroute['pluginattrs'])
-            if node not in nodeattr:
-                raise exc.NotFoundException("Invalid node %s" % node)
-            plugpath = None
-            if 'default' in plugroute:
-                plugpath = plugroute['default']
-            for attrname in plugroute['pluginattrs']:
-                if attrname in nodeattr[node]:
-                    plugpath = nodeattr[node][attrname]['value']
-            if plugpath is not None:
-                hfunc = getattr(pluginmap[plugpath], operation)
-                passvalue = hfunc(
-                    nodes=(node,), element=pathcomponents,
-                    configmanager=configmanager,
-                    inputdata=inputdata)
-        if isinstance(passvalue, console.Console):
-            return passvalue
-        else:
-            return stripnode(passvalue, node)
+        return handle_node_request(configmanager, inputdata,
+                                     operation, pathcomponents)
     elif pathcomponents[0] == 'users':
         #TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
