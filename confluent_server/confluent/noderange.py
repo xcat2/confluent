@@ -116,9 +116,24 @@ class NodeRange(object):
                     curseq.append(numformat.format(num))
         results = set([])
         for combo in itertools.product(*iterators):
-            results.add(finalfmt.format(*combo))
+            entname = finalfmt.format(*combo)
+            results |= self.expand_entity(entname)
         return results
 
+    def expand_entity(self, entname):
+        if self.cfm is None or self.cfm.is_node(entname):
+            return set([entname])
+        if self.cfm.is_node(entname):
+            return set([entname])
+        if self.cfm.is_nodegroup(entname):
+            nodes = set([])
+            grpcfg = self.cfm.get_nodegroup_attributes(entname)
+            nodes = grpcfg['nodes']
+            if 'noderange' in grpcfg and grpcfg['noderange']:
+                nodes |= NodeRange(
+                    grpcfg['noderange']['value'], self.cfm).nodes
+            return nodes
+        
     def _expandstring(self, element):
         prefix = ''
         for idx in xrange(len(element)):
