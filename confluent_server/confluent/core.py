@@ -39,6 +39,7 @@ import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.noderange as noderange
 import confluent.shellmodule as shellmodule
+import itertools
 import os
 import sys
 
@@ -306,21 +307,6 @@ def enumerate_collections(collections):
         yield msg.ChildCollection(collection)
 
 
-def handle_noderange_request(configmanager, operation, pathcomponents):
-    if len(pathcomponents) < 2:
-        return iterate_collections([])
-    nrange = pathcomponents[1]
-    try:
-        nodelist = noderange.NodeRange(nrange, configmanager).nodes
-    except Exception:
-        raise exc.NotFoundException("Invalid noderange")
-    if len(pathcomponents) == 2:
-        if operation != "retrieve":
-            raise exc.InvalidArgumentException(
-                "Noderange collections are read only")
-        return enumerate_node_collection(pathcomponents, configmanager)
-
-
 def handle_nodegroup_request(configmanager, inputdata,
                              pathcomponents, operation):
     iscollection = False
@@ -364,18 +350,43 @@ def handle_nodegroup_request(configmanager, inputdata,
 def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents):
     iscollection = False
+    routespec = None
+    if pathcomponents[0] == 'noderange':
+        if len(pathcomponents) > 3 and pathcomponents[2] == 'nodes':
+            # transform into a normal looking node request
+            # this does mean we don't see if it is a valid
+            # child, but that's not a goal for the noderange
+            # facility anyway
+            isnoderange = False
+            pathcomponents = pathcomponents[2:]
+        else:
+            isnoderange = True
+    else:
+        isnoderange = False
     try:
-        node = pathcomponents[1]
-        if not configmanager.is_node(node):
+        nodeorrange = pathcomponents[1]
+        if not isnoderange and not configmanager.is_node(nodeorrange):
             raise exc.NotFoundException("Invalid Node")
+        if isnoderange:
+            try:
+                nodes = noderange.NodeRange(nodeorrange, configmanager).nodes
+            except Exception:
+                raise exc.NotFoundException("Invalid Noderange")
+        else:
+            nodes = (nodeorrange,)
     except IndexError:  # doesn't actually have a long enough path
-        # this is enumerating a list of nodes
-        if operation == "delete":
+        # this is enumerating a list of nodes or just empty noderange
+        if isnoderange and operation == "retrieve":
+            return iterate_collections([])
+        elif isnoderange or operation == "delete":
             raise exc.InvalidArgumentException()
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
             create_node(inputdata.attribs, configmanager)
         return iterate_collections(configmanager.list_nodes())
+    if isnoderange and len(pathcomponents) == 3 and pathcomponents[2] == 'nodes':
+        # this means that it's a list of relevant nodes
+        return iterate_collections(nodes)
     if len(pathcomponents) == 2:
         iscollection = True
     else:
@@ -395,38 +406,42 @@ def handle_node_request(configmanager, inputdata, operation,
         else:
             raise Exception("TODO here")
     del pathcomponents[0:2]
-    passvalue = None
+    passvalues = []
     plugroute = routespec.routeinfo
     inputdata = msg.get_input_message(
-        pathcomponents, operation, inputdata, (node,))
-    if 'handler' in plugroute:  # fixed handler definition
+        pathcomponents, operation, inputdata, nodes)
+    if 'handler' in plugroute:  # fixed handler definition, easy enough
         hfunc = getattr(pluginmap[plugroute['handler']], operation)
-        passvalue = hfunc(
-            nodes=(node,), element=pathcomponents,
+        passvalue =hfunc(
+            nodes=nodes, element=pathcomponents,
             configmanager=configmanager,
             inputdata=inputdata)
+        if isnoderange:
+            return passvalue
+        else:
+            return stripnode(passvalue, nodes[0])
     elif 'pluginattrs' in plugroute:
         nodeattr = configmanager.get_node_attributes(
-            [node], plugroute['pluginattrs'])
-        if node not in nodeattr:
-            raise exc.NotFoundException("Invalid node %s" % node)
+            nodes, plugroute['pluginattrs'])
         plugpath = None
         if 'default' in plugroute:
             plugpath = plugroute['default']
-        for attrname in plugroute['pluginattrs']:
-            if attrname in nodeattr[node]:
-                plugpath = nodeattr[node][attrname]['value']
-        if plugpath is not None:
-            hfunc = getattr(pluginmap[plugpath], operation)
-            passvalue = hfunc(
-                nodes=(node,), element=pathcomponents,
-                configmanager=configmanager,
-                inputdata=inputdata)
-    if isinstance(passvalue, console.Console):
-        return passvalue
-    else:
-        return stripnode(passvalue, node)
-
+        for node in nodes:
+            for attrname in plugroute['pluginattrs']:
+                if attrname in nodeattr[node]:
+                    plugpath = nodeattr[node][attrname]['value']
+            if plugpath is not None:
+                hfunc = getattr(pluginmap[plugpath], operation)
+                passvalues.append(hfunc(
+                    nodes=(node,), element=pathcomponents,
+                    configmanager=configmanager,
+                    inputdata=inputdata))
+        if isnoderange:
+            return itertools.chain(*passvalues)
+        elif isinstance(passvalues[0], console.Console):
+            return passvalues[0]
+        else:
+            return stripnode(passvalues[0], nodes[0])
 
 def handle_path(path, operation, configmanager, inputdata=None):
     """Given a full path request, return an object.
@@ -442,7 +457,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'noderange':
-        return handle_noderange_request(configmanager, operation,
+        return handle_node_request(configmanager, inputdata, operation,
                                           pathcomponents)
     elif pathcomponents[0] == 'nodegroups':
         return handle_nodegroup_request(configmanager, inputdata,
