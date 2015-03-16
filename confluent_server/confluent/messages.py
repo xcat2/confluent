@@ -48,6 +48,7 @@ class ConfluentMessage(object):
 
     def __init__(self):
         self.desc = ''
+        self.stripped = False
         self.kvpairs = {}
         raise NotImplementedError("Must be subclassed!")
 
@@ -63,14 +64,27 @@ class ConfluentMessage(object):
         return self.kvpairs
 
     def strip_node(self, node):
+        self.stripped = True
         if self.kvpairs is not None:
             self.kvpairs = self.kvpairs[node]
 
     def html(self, extension=''):
         #this is used to facilitate the api explorer feature
+        if not hasattr(self, 'stripped'):
+            self.stripped = False
+        if self.stripped:
+            return self._generic_html_value(self.kvpairs)
+        if not self.stripped:
+            htmlout = ''
+            for node in self.kvpairs.iterkeys():
+                htmlout += '{0}:{1}\n'.format(
+                    node, self._generic_html_value(self.kvpairs[node]))
+            return htmlout
+
+    def _generic_html_value(self, pairs):
         snippet = ""
-        for key in self.kvpairs.iterkeys():
-            val = self.kvpairs[key]
+        for key in pairs.iterkeys():
+            val = pairs[key]
             value = self.defaultvalue
             valtype = self.defaulttype
             notes = []
@@ -175,6 +189,7 @@ class ConfluentChoiceMessage(ConfluentMessage):
     valid_paramset = {}
 
     def __init__(self, node, state):
+        self.stripped = False
         self.kvpairs = {
             node: {
                 self.keyname: {'value': state},
@@ -182,9 +197,19 @@ class ConfluentChoiceMessage(ConfluentMessage):
         }
 
     def html(self, extension=''):
-        snippet = ""
-        for key in self.kvpairs.iterkeys():
-            val = self.kvpairs[key]
+        if hasattr(self, 'stripped') and self.stripped:
+            return self._create_option(self.kvpairs)
+        else:
+            htmlout = ''
+            for node in self.kvpairs.iterkeys():
+                htmlout += '{0}:{1}\n'.format(
+                    node, self._create_option(self.kvpairs[node]))
+            return htmlout
+
+    def _create_option(self, pairdata):
+        snippet = ''
+        for key in pairdata.iterkeys():
+            val = pairdata[key]
             snippet += key + ':<select name="%s">' % key
             valid_values = self.valid_values
             if key in self.valid_paramset:
@@ -328,6 +353,7 @@ class ConfluentInputMessage(ConfluentMessage):
 
     def __init__(self, path, nodes, inputdata):
         self.inputbynode = {}
+        self.stripped = False
         if not inputdata:
             raise exc.InvalidArgumentException('missing input data')
         if self.keyname not in inputdata:
@@ -511,6 +537,7 @@ class HealthSummary(ConfluentMessage):
     ])
 
     def __init__(self, health, name=None):
+        self.stripped = False
         if health not in self.valid_values:
             raise ValueError("%d is not a valid health state" % health)
         if name is None:

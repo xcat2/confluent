@@ -671,6 +671,7 @@ class ConfigManager(object):
 
     def get_node_attributes(self, nodelist, attributes=()):
         retdict = {}
+        relattribs = attributes
         if isinstance(nodelist, str) or isinstance(nodelist, unicode):
             nodelist = [nodelist]
         for node in nodelist:
@@ -679,8 +680,8 @@ class ConfigManager(object):
             cfgnodeobj = self._cfgstore['nodes'][node]
             nodeobj = {}
             if len(attributes) == 0:
-                attributes = cfgnodeobj.iterkeys()
-            for attribute in attributes:
+                relattribs = cfgnodeobj.iterkeys()
+            for attribute in relattribs:
                 if attribute.startswith('_'):
                     # skip private things
                     continue
