@@ -248,11 +248,14 @@ def print_result(res):
             attrstr = '%s="%s"' % (key, res[key]['value'])
         elif 'value' in res[key] and res[key]['value'] is None:
             attrstr = '%s=""' % key
+        elif 'isset' in res[key] and res[key]['isset']:
+            attrstr = '%s="********"' % key
+        elif 'isset' in res[key] or not res[key]:
+            attrstr = '%s=""' % key
         else:
-            if 'isset' in res[key] and res[key]['isset']:
-                attrstr = '%s="********"' % key
-            else:
-                attrstr = '%s=""' % key
+            sys.stdout.write('{0}: '.format(key))
+            print_result(res[key])
+            continue
         if res[key] is not None and 'inheritedfrom' in res[key]:
             notes.append(
                 'Inherited from %s' % res[key]['inheritedfrom'])
