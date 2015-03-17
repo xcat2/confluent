@@ -20,7 +20,7 @@ import eventlet
 import eventlet.event
 import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
-import eventlet.queue
+import eventlet.queue as queue
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.console as console
@@ -29,6 +29,8 @@ import socket
 
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
+
+_ipmiworkers = greenpool.GreenPool()
 
 _ipmithread = None
 _ipmiwaiters = []
@@ -39,6 +41,7 @@ sensor_categories = {
     'fans': frozenset(['Fan', 'Cooling Device']),
 }
 
+
 def simplify_name(name):
     return name.lower().replace(' ', '_')
 
@@ -46,9 +49,9 @@ def simplify_name(name):
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         self._attribwatcher = cfm.watch_attributes(
-            (node,),('secret.hardwaremanagementuser',
-                     'secret.hardwaremanagementpassword', 'secret.ipmikg',
-                     'hardwaremanagement.manager'), self._attribschanged)
+            (node,), ('secret.hardwaremanagementuser',
+                      'secret.hardwaremanagementpassword', 'secret.ipmikg',
+                      'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
@@ -58,6 +61,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
             # if ipmi_session doesn't already exist,
             # then do nothing
             pass
+
 
 def _ipmi_evtloop():
     while True:
@@ -89,8 +93,8 @@ def get_conn_params(node, configdata):
         kg = configdata['secret.ipmikg']['value']
     else:
         kg = passphrase
-    #TODO(jbjohnso): check if the end has some number after a : without []
-    #for non default port
+    # TODO(jbjohnso): check if the end has some number after a : without []
+    # for non default port
     return {
         'username': username,
         'passphrase': passphrase,
@@ -189,55 +193,54 @@ class IpmiConsole(conapi.Console):
         self.solconnection.send_break()
 
 
-class IpmiIterator(object):
-    def __init__(self, operator, nodes, element, cfg, inputdata):
-        self.currdata = None
-        crypt = cfg.decrypt
-        cfg.decrypt = True
-        configdata = cfg.get_node_attributes(nodes, _configattributes)
-        cfg.decrypt = crypt
-        self.gpile = greenpool.GreenPile()
-        for node in nodes:
-            self.gpile.spawn(perform_request, operator, node, element,
-                             configdata, inputdata, cfg)
-
-    def __iter__(self):
-        return self
-
-    def next(self):
-        if self.currdata is None:
-            self.currdata = self.gpile.next()
-        # need to apply any translations between pyghmi and confluent
-        try:
-            retdata = self.currdata.next()
-        except AttributeError:
-            if hasattr(self.currdata, 'next'):
-                # the attribute error is not the immediate
-                # one, raise it to be caught as normal
-                raise
-            retdata = self.currdata
-            self.currdata = None
-        return retdata
-
-
-def perform_request(operator, node, element, configdata, inputdata, cfg):
-    try:
-        return IpmiHandler(operator, node, element, configdata, inputdata, cfg
-                           ).handle_request()
-    except pygexc.IpmiException as ipmiexc:
-        excmsg = str(ipmiexc)
-        if excmsg == 'Session no longer connected':
-            return msg.ConfluentTargetTimeout(node)
+def perform_requests(operator, nodes, element, cfg, inputdata):
+    cryptit = cfg.decrypt
+    cfg.decrypt = True
+    configdata = cfg.get_node_attributes(nodes, _configattributes)
+    cfg.decrypt = cryptit
+    resultdata = queue.LightQueue()
+    pendingnum = len(nodes)
+    for node in nodes:
+        _ipmiworkers.spawn_n(
+            perform_request, operator, node, element, configdata, inputdata,
+            cfg, resultdata)
+    while pendingnum:
+        datum = resultdata.get()
+        if datum == 'Done':
+            pendingnum -= 1
         else:
-            raise
+            yield datum
+
+
+def perform_request(operator, node, element,
+                    configdata, inputdata, cfg, results):
+        try:
+            return IpmiHandler(operator, node, element, configdata, inputdata,
+                               cfg, results).handle_request()
+        except pygexc.IpmiException as ipmiexc:
+            excmsg = str(ipmiexc)
+            if excmsg == 'Session no longer connected':
+                results.put(msg.ConfluentTargetTimeout(node))
+            else:
+                raise
+        finally:
+            results.put('Done')
 
 
 persistent_ipmicmds = {}
 
 
+def _dict_sensor(pygreading):
+    retdict = {'name': pygreading.name, 'value': pygreading.value,
+               'states': pygreading.states, 'units': pygreading.units,
+               'health': _str_health(pygreading.health)}
+    return retdict
+
+
 class IpmiHandler(object):
-    def __init__(self, operation, node, element, cfd, inputdata, cfg):
+    def __init__(self, operation, node, element, cfd, inputdata, cfg, output):
         self.sensormap = {}
+        self.output = output
         self.sensorcategory = None
         self.broken = False
         self.error = None
@@ -284,24 +287,23 @@ class IpmiHandler(object):
         self._logevt = None
         if self.broken:
             if self.error == 'timeout':
-                return iter([msg.ConfluentTargetTimeout(self.node)])
+                self.output.put(msg.ConfluentTargetTimeout(self.node))
             elif ('Unauthorized' in self.error or
                     'Incorrect password' in self.error):
-                return iter([msg.ConfluentTargetInvalidCredentials(self.node)])
-            elif 'Incorrect password' in self.error:
-                return iter([C])
+                self.output.put(
+                    msg.ConfluentTargetInvalidCredentials(self.node))
             else:
                 raise Exception(self.error)
         if self.element == ['power', 'state']:
-            return self.power()
+            self.power()
         elif self.element == ['boot', 'nextdevice']:
-            return self.bootdevice()
+            self.bootdevice()
         elif self.element == ['health', 'hardware']:
-            return self.health()
+            self.health()
         elif self.element == ['identify']:
-            return self.identify()
+            self.identify()
         elif self.element[0] == 'sensors':
-            return self.handle_sensors()
+            self.handle_sensors()
 
     def make_sensor_map(self, sensors=None):
         if sensors is None:
@@ -310,7 +312,6 @@ class IpmiHandler(object):
             resourcename = sensor['name']
             self.sensormap[simplify_name(resourcename)] = resourcename
 
-
     def read_sensors(self, sensorname):
         try:
             if sensorname == 'all':
@@ -318,23 +319,25 @@ class IpmiHandler(object):
                 readings = []
                 for sensor in filter(self.match_sensor, sensors):
                     try:
-                        reading = self.ipmicmd.get_sensor_reading(sensor['name'])
+                        reading = self.ipmicmd.get_sensor_reading(
+                            sensor['name'])
                     except pygexc.IpmiException as ie:
                         if ie.ipmicode == 203:
                             continue
                         raise
-                    readings.append(self._dict_sensor(reading))
-                yield msg.SensorReadings(readings, name=self.node)
+                    readings.append(_dict_sensor(reading))
+                self.output.put(msg.SensorReadings(readings, name=self.node))
             else:
                 self.make_sensor_map()
                 if sensorname not in self.sensormap:
                     raise exc.NotFoundException('No such sensor')
                 reading = self.ipmicmd.get_sensor_reading(
                     self.sensormap[sensorname])
-                yield msg.SensorReadings([self._dict_sensor(reading)],
-                                         name=self.node)
+                self.output.put(
+                    msg.SensorReadings([_dict_sensor(reading)],
+                                       name=self.node))
         except pygexc.IpmiException:
-            yield msg.ConfluentTargetTimeout(self.node)
+            self.output.put(msg.ConfluentTargetTimeout(self.node))
 
     def handle_sensors(self):
         if self.element[-1] == '':
@@ -358,45 +361,27 @@ class IpmiHandler(object):
         try:
             sensors = self.ipmicmd.get_sensor_descriptions()
         except pygexc.IpmiException:
-            yield msg.ConfluentTargetTimeout(self.node)
-        yield msg.ChildCollection('all')
+            self.output.put(msg.ConfluentTargetTimeout(self.node))
+            return
+        self.output.put(msg.ChildCollection('all'))
         for sensor in filter(self.match_sensor, sensors):
-            yield msg.ChildCollection(simplify_name(sensor['name']))
-
-
-    @staticmethod
-    def _str_health(health):
-        if pygconstants.Health.Failed & health:
-            health = 'failed'
-        elif pygconstants.Health.Critical & health:
-            health = 'critical'
-        elif pygconstants.Health.Warning & health:
-            health = 'warning'
-        else:
-            health = 'ok'
-        return health
-
-    def _dict_sensor(self, pygreading):
-        retdict = {'name': pygreading.name, 'value': pygreading.value,
-                   'states': pygreading.states, 'units': pygreading.units,
-                   'health': self._str_health(pygreading.health)}
-        return retdict
+            self.output.put(msg.ChildCollection(simplify_name(sensor['name'])))
 
     def health(self):
         if 'read' == self.op:
             try:
                 response = self.ipmicmd.get_health()
             except pygexc.IpmiException:
-                yield msg.ConfluentTargetTimeout(self.node)
+                self.output.put(msg.ConfluentTargetTimeout(self.node))
                 return
             health = response['health']
-            health = self._str_health(health)
-            yield msg.HealthSummary(health, self.node)
+            health = _str_health(health)
+            self.output.put(msg.HealthSummary(health, self.node))
             if 'badreadings' in response:
                 badsensors = []
                 for reading in response['badreadings']:
-                    badsensors.append(self._dict_sensor(reading))
-                yield msg.SensorReadings(badsensors, name=self.node)
+                    badsensors.append(_dict_sensor(reading))
+                self.output.put(msg.SensorReadings(badsensors, name=self.node))
         else:
             raise exc.InvalidArgumentException('health is read-only')
 
@@ -411,40 +396,54 @@ class IpmiHandler(object):
                     bootmode = 'uefi'
                 else:
                     bootmode = 'bios'
-            return msg.BootDevice(node=self.node,
-                                  device=bootdev['bootdev'],
-                                  bootmode=bootmode)
+            self.output.put(msg.BootDevice(node=self.node,
+                                           device=bootdev['bootdev'],
+                                           bootmode=bootmode))
         elif 'update' == self.op:
             bootdev = self.inputdata.bootdevice(self.node)
-            bootmode = self.inputdata.bootmode(self.node)
-            bootdev = self.ipmicmd.set_bootdev(bootdev)
+            douefi = False
+            if self.inputdata.bootmode(self.node) == 'uefi':
+                douefi = True
+            bootdev = self.ipmicmd.set_bootdev(bootdev, uefiboot=douefi)
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
-            return msg.BootDevice(node=self.node,
-                                  device=bootdev['bootdev'])
+            self.output.put(msg.BootDevice(node=self.node,
+                                           device=bootdev['bootdev']))
 
     def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
             self.ipmicmd.set_identify(on=identifystate)
-            return msg.IdentifyState(
-                node=self.node, state=self.inputdata.inputbynode[self.node])
+            self.output.put(msg.IdentifyState(
+                node=self.node, state=self.inputdata.inputbynode[self.node]))
         elif 'read' == self.op:
             # ipmi has identify as read-only for now
-            return msg.IdentifyState(node=self.node, state='')
+            self.output.put(msg.IdentifyState(node=self.node, state=''))
 
     def power(self):
         if 'read' == self.op:
             power = self.ipmicmd.get_power()
-            return msg.PowerState(node=self.node,
-                                  state=power['powerstate'])
+            self.output.put(msg.PowerState(node=self.node,
+                                           state=power['powerstate']))
         elif 'update' == self.op:
             powerstate = self.inputdata.powerstate(self.node)
-            #TODO: call with wait argument
+            # TODO: call with wait argument
             self.ipmicmd.set_power(powerstate)
             power = self.ipmicmd.get_power()
-            return msg.PowerState(node=self.node,
-                                  state=power['powerstate'])
+            self.output.put(msg.PowerState(node=self.node,
+                                           state=power['powerstate']))
+
+
+def _str_health(health):
+    if pygconstants.Health.Failed & health:
+        health = 'failed'
+    elif pygconstants.Health.Critical & health:
+        health = 'critical'
+    elif pygconstants.Health.Warning & health:
+        health = 'warning'
+    else:
+        health = 'ok'
+    return health
 
 
 def initthread():
@@ -460,7 +459,8 @@ def create(nodes, element, configmanager, inputdata):
             raise Exception("_console/session does not support multiple nodes")
         return IpmiConsole(nodes[0], configmanager)
     else:
-        return IpmiIterator('update', nodes, element, configmanager, inputdata)
+        return perform_requests(
+            'update', nodes, element, configmanager, inputdata)
 
 
 def update(nodes, element, configmanager, inputdata):
@@ -470,4 +470,4 @@ def update(nodes, element, configmanager, inputdata):
 
 def retrieve(nodes, element, configmanager, inputdata):
     initthread()
-    return IpmiIterator('read', nodes, element, configmanager, inputdata)
+    return perform_requests('read', nodes, element, configmanager, inputdata)
