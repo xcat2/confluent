@@ -426,16 +426,22 @@ def handle_node_request(configmanager, inputdata, operation,
         plugpath = None
         if 'default' in plugroute:
             plugpath = plugroute['default']
+        nodesbyhandler = {}
         for node in nodes:
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
                     plugpath = nodeattr[node][attrname]['value']
             if plugpath is not None:
                 hfunc = getattr(pluginmap[plugpath], operation)
-                passvalues.append(hfunc(
-                    nodes=(node,), element=pathcomponents,
-                    configmanager=configmanager,
-                    inputdata=inputdata))
+                if hfunc in nodesbyhandler:
+                    nodesbyhandler[hfunc].append(node)
+                else:
+                    nodesbyhandler[hfunc] = [node]
+        for hfunc in nodesbyhandler.iterkeys():
+            passvalues.append(hfunc(
+                nodes=nodesbyhandler[hfunc], element=pathcomponents,
+                configmanager=configmanager,
+                inputdata=inputdata))
         if isnoderange:
             return itertools.chain(*passvalues)
         elif isinstance(passvalues[0], console.Console):
