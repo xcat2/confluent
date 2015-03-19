@@ -236,7 +236,8 @@ currchildren = None
 
 
 def print_result(res):
-    if 'errorcode' in res:
+    if 'errorcode' in res or 'error' in res:
+        print res['error']
         return
     for key in res.iterkeys():
         notes = []

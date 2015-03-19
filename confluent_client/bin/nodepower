@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,14 +19,22 @@ import os
 import sys
 
 path = os.path.dirname(os.path.realpath(__file__))
-path = os.path.realpath(os.path.join(path, '..'))
-sys.path.append(path)
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
 
 import confluent.client as client
 
 
-node = sys.argv[1]
+noderange = sys.argv[1]
+setstate = None
+if len(sys.argv) > 2:
+    if setstate == 'softoff':
+        setstate = 'shutdown'
+    elif not sys.argv[2] in ('stat', 'state', 'status'):
+        setstate = sys.argv[2]
 
 session = client.Command()
-for res in session.read("/node/{0}/power/state".format(node)):
-    print("%s: %s" % (node, res['state']['value']))
+exitcode = 0
+sys.exit(
+    session.simple_noderange_command(noderange, '/power/state', setstate))

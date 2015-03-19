@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@ import hashlib
 import os
 import socket
 import ssl
+import sys
 import confluent.tlvdata as tlvdata
 
 SO_PASSCRED = 16
@@ -43,8 +45,14 @@ class Command(object):
 
     def __init__(self, server="/var/run/confluent/api.sock"):
         self.connection = None
-        self.serverloc = server
-        if os.path.isabs(server) and os.path.exists(server):
+        if server is None:
+            if 'CONFLUENT_HOST' in os.environ:
+                self.serverloc = os.environ['CONFLUENT_HOST']
+            else:
+                self.serverloc = '/var/run/confluent/api.sock'
+        else:
+            self.serverloc = server
+        if os.path.isabs(self.serverloc) and os.path.exists(self.serverloc):
             self._connect_unix()
         else:
             self._connect_tls()
@@ -61,6 +69,43 @@ class Command(object):
         authdata = tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
+
+    def handle_results(self, ikey, rc, res):
+        if 'error' in res and type(res['error']) in (str, unicode):
+            sys.stderr.write('Error: {0}\n'.format(res['error']))
+            if 'errorcode' in res:
+                return res['errorcode']
+            else:
+                return 1
+        for node in res:
+            if 'error' in res[node]:
+                sys.stderr.write('{0}: Error: {1}\n'.format(
+                    node, res[node]['error']))
+                if 'errorcode' in res[node]:
+                    rc |= res[node]['errorcode']
+                else:
+                    rc |= 1
+            else:
+                print('{0}: {1}'.format(node, res[node][ikey]['value']))
+        return rc
+
+    def simple_noderange_command(self, noderange, resource, input=None):
+        rc = 0
+        if resource[0] == '/':
+            resource = resource[1:]
+        # The implicit key is the resource basename
+        ikey = resource.rpartition('/')[-1]
+        if input is None:
+            for res in self.read('/noderange/{0}/{1}'.format(
+                    noderange, resource)):
+                rc = self.handle_results(ikey, rc, res)
+        else:
+            for res in self.update('/noderange/{0}/{1}'.format(
+                    noderange, resource), {ikey: input}):
+                rc = self.handle_results(ikey, rc, res)
+        return rc
+
+
 
     def read(self, path, parameters=None):
         return send_request('retrieve', path, self.connection, parameters)
@@ -155,3 +200,6 @@ def send_request(operation, path, server, parameters=None):
     while '_requestdone' not in result:
         yield result
         result = tlvdata.recv(server)
+
+
+
