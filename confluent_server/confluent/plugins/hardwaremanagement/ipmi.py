@@ -222,10 +222,9 @@ def perform_request(operator, node, element,
             if excmsg == 'Session no longer connected':
                 results.put(msg.ConfluentTargetTimeout(node))
             else:
-                raise
+                results.put(msg.ConfluentNodeError(node, excmsg))
         finally:
             results.put('Done')
-
 
 persistent_ipmicmds = {}
 
@@ -427,8 +426,7 @@ class IpmiHandler(object):
                                            state=power['powerstate']))
         elif 'update' == self.op:
             powerstate = self.inputdata.powerstate(self.node)
-            # TODO: call with wait argument
-            self.ipmicmd.set_power(powerstate)
+            self.ipmicmd.set_power(powerstate, wait=30)
             power = self.ipmicmd.get_power()
             self.output.put(msg.PowerState(node=self.node,
                                            state=power['powerstate']))

@@ -144,10 +144,9 @@ class ConfluentMessage(object):
 
 
 class ConfluentNodeError(object):
-    def __init__(self, node):
+    def __init__(self, node, errorstr):
         self.node = node
-        self.error = None
-        raise NotImplementedError  # this is an abstract base class
+        self.error = errorstr
 
     def raw(self):
         return {self.node: {'error': self.error}}
@@ -158,7 +157,7 @@ class ConfluentNodeError(object):
     def strip_node(self, node):
         #NOTE(jbjohnso): For single node errors, raise exception to
         #trigger what a developer of that medium would expect
-        raise NotImplementedError
+        raise Exception(self.error)
 
 
 class ConfluentTargetTimeout(ConfluentNodeError):
