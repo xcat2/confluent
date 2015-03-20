@@ -271,7 +271,7 @@ def print_result(res):
             output = attrstr
         try:
             print(output)
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, UnicodeEncodeError):
             print(output.encode('utf-8'))
 
 
