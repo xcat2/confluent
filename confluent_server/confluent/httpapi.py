@@ -25,6 +25,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
+import confluent.tlvdata as tlvdata
 import confluent.util as util
 import copy
 import eventlet
@@ -500,7 +501,9 @@ def _assemble_json(responses, resource, url, extension):
                 else:
                     rspdata[dk] = rsp[dk]
     rspdata["_links"] = links
-    yield json.dumps(rspdata, sort_keys=True, indent=4, ensure_ascii=False)
+    tlvdata.unicode_dictvalues(rspdata)
+    yield json.dumps(
+        rspdata, sort_keys=True, indent=4, ensure_ascii=False).encode('utf-8')
 
 
 def serve():

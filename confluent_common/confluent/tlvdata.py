@@ -20,20 +20,36 @@ import json
 import struct
 
 
+def unicode_dictvalues(dictdata):
+    for key in dictdata:
+        if isinstance(dictdata[key], str):
+            dictdata[key] = dictdata[key].decode('utf-8')
+        elif isinstance(dictdata[key], list):
+            for i in xrange(len(dictdata[key])):
+                if isinstance(dictdata[key][i], str):
+                    dictdata[key][i] = dictdata[key][i].decode('utf-8')
+                elif isinstance(dictdata[key][i], dict):
+                    unicode_dictvalues(dictdata[key][i])
+        elif isinstance(dictdata[key], dict):
+            unicode_dictvalues(dictdata[key])
+
+
 def send(handle, data):
     if isinstance(data, str):
         # plain text, e.g. console data
         tl = len(data)
         if tl < 16777216:
-            #type for string is '0', so we don't need
-            #to xor anything in
+            # type for string is '0', so we don't need
+            # to xor anything in
             handle.sendall(struct.pack("!I", tl))
         else:
             raise Exception("String data length exceeds protocol")
         handle.sendall(data)
     elif isinstance(data, dict):  # JSON currently only goes to 4 bytes
         # Some structured message, like what would be seen in http responses
+        unicode_dictvalues(data)  # make everything unicode, assuming UTF-8
         sdata = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+        sdata = sdata.encode('utf-8')
         tl = len(sdata)
         if tl > 16777215:
             raise Exception("JSON data exceeds protocol limits")
