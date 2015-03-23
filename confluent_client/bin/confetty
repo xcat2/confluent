@@ -239,6 +239,9 @@ def print_result(res):
     if 'errorcode' in res or 'error' in res:
         print res['error']
         return
+    if 'databynode' in res:
+        print_result(res['databynode'])
+        return
     for key in res.iterkeys():
         notes = []
         if res[key] is None:

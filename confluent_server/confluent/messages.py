@@ -54,14 +54,20 @@ class ConfluentMessage(object):
 
     def json(self):
         # This will create the canonical json representation of this message
-        jsonsnippet = json.dumps(self.kvpairs, separators=(',', ':'))[1:-1]
+        if self.stripped:
+            datasource = self.kvpairs
+        else:
+            datasource = {'databynode': self.kvpairs}
+        jsonsnippet = json.dumps(datasource, separators=(',', ':'))[1:-1]
         return jsonsnippet
 
     def raw(self):
         """Return pythonic representation of the response.
 
         Used by httpapi while assembling data prior to json serialization"""
-        return self.kvpairs
+        if self.stripped:
+            return self.kvpairs
+        return {'databynode': self.kvpairs}
 
     def strip_node(self, node):
         self.stripped = True

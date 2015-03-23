@@ -71,12 +71,15 @@ class Command(object):
             self.authenticated = True
 
     def handle_results(self, ikey, rc, res):
-        if 'error' in res and type(res['error']) in (str, unicode):
+        if 'error' in res:
             sys.stderr.write('Error: {0}\n'.format(res['error']))
             if 'errorcode' in res:
                 return res['errorcode']
             else:
                 return 1
+        if 'databynode' not in res:
+            return 0
+        res = res['databynode']
         for node in res:
             if 'error' in res[node]:
                 sys.stderr.write('{0}: Error: {1}\n'.format(
