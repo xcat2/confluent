@@ -54,7 +54,7 @@ class ConfluentMessage(object):
 
     def json(self):
         # This will create the canonical json representation of this message
-        if self.stripped:
+        if hasattr(self, 'stripped') and self.stripped:
             datasource = self.kvpairs
         else:
             datasource = {'databynode': self.kvpairs}
@@ -65,7 +65,7 @@ class ConfluentMessage(object):
         """Return pythonic representation of the response.
 
         Used by httpapi while assembling data prior to json serialization"""
-        if self.stripped:
+        if hasattr(self, 'stripped') and self.stripped:
             return self.kvpairs
         return {'databynode': self.kvpairs}
 
@@ -155,7 +155,7 @@ class ConfluentNodeError(object):
         self.error = errorstr
 
     def raw(self):
-        return {self.node: {'error': self.error}}
+        return {'databynode': {self.node: {'error': self.error}}}
 
     def html(self):
         return self.node + ":" + self.error
@@ -174,6 +174,14 @@ class ConfluentTargetTimeout(ConfluentNodeError):
     def strip_node(self, node):
         raise exc.TargetEndpointUnreachable
 
+
+class ConfluentTargetNotFound(ConfluentNodeError):
+    def __init__(self, node, errorstr='not found'):
+        self.node = node
+        self.error = errorstr
+
+    def strip_node(self, node):
+        raise exc.NotFoundException(self.error)
 
 class ConfluentTargetInvalidCredentials(ConfluentNodeError):
     def __init__(self, node):

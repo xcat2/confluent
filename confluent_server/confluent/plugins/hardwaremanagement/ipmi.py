@@ -329,7 +329,10 @@ class IpmiHandler(object):
             else:
                 self.make_sensor_map()
                 if sensorname not in self.sensormap:
-                    raise exc.NotFoundException('No such sensor')
+                    self.output.put(
+                        msg.ConfluentTargetNotFound(self.node,
+                                                    'Sensor not found'))
+                    return
                 reading = self.ipmicmd.get_sensor_reading(
                     self.sensormap[sensorname])
                 self.output.put(

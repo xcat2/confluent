@@ -123,6 +123,14 @@ def sessionhdl(connection, authname, skipauth=False):
             tlvdata.send(connection, {'errorcode': 501,
                                       'error': 'Not Implemented'})
             tlvdata.send(connection, {'_requestdone': 1})
+        except exc.NotFoundException as nfe:
+            tlvdata.send(connection, {'errorcode': 404,
+                                      'error': str(nfe)})
+            tlvdata.send(connection, {'_requestdone': 1})
+        except exc.InvalidArgumentException as iae:
+            tlvdata.send(connection, {'errorcode': 400,
+                                      'error': 'Bad Request - ' + str(iae)})
+            tlvdata.send(connection, {'_requestdone': 1})
         except SystemExit:
             sys.exit(0)
         except:
