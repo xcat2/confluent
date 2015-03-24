@@ -261,7 +261,6 @@ def enumerate_nodegroup_collection(collectionpath, configmanager):
 
 
 def enumerate_node_collection(collectionpath, configmanager):
-    print repr(collectionpath)
     if collectionpath == ['nodes']:  # it is just '/node/', need to list nodes
         return iterate_collections(configmanager.list_nodes())
     nodeorrange = collectionpath[1]
