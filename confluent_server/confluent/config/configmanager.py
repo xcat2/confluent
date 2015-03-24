@@ -444,6 +444,76 @@ class ConfigManager(object):
             self._cfgstore['nodes'] = {}
         self._bg_sync_to_file()
 
+    def filter_node_attributes(self, expression, nodes=None):
+        """Filtered nodelist according to expression
+
+        expression may be:
+        attribute.name=value
+        attribute.name==value
+        attribute.name=~value
+        attribute.name!=value
+        attribute.name!~value
+
+        == and != do strict equality.  The ~ operators do a regular expression.
+        ! negates the sense of the match
+
+        :param expression: The expression containing the criteria to match
+        :param nodes: Optional iterable set of nodes to limit the check
+        """
+        exmatch = None
+        yieldmatches = True
+        if nodes is None:
+            nodes = self._cfgstore['nodes']
+        if '==' in expression:
+            attribute, match = expression.split('==')
+        elif '!=' in expression:
+            attribute, match = expression.split('!=')
+            yieldmatches = False
+        elif '=~' in expression:
+            attribute, match = expression.split('=~')
+            exmatch = re.compile(match)
+        elif '!~' in expression:
+            attribute, match = expression.split('!~')
+            exmatch = re.compile(match)
+            yieldmatches = False
+        elif '=' in expression:
+            attribute, match = expression.split('=')
+        else:
+            raise Exception('Invalid Expression')
+        for node in nodes:
+            try:
+                currval = self._cfgstore['nodes'][node][attribute]['value']
+            except KeyError:
+                # Let's treat 'not set' as being an empty string for this path
+                currval = ''
+            if exmatch:
+                if yieldmatches:
+                    if exmatch.search(currval):
+                        yield node
+                else:
+                    if not exmatch.search(currval):
+                        yield node
+            else:
+                if yieldmatches:
+                    if match == currval:
+                        yield node
+                else:
+                    if match != currval:
+                        yield node
+
+    def filter_nodenames(self, expression, nodes=None):
+        """Filter nodenames by regular expression
+
+        :param expression: Regular expression for matching nodenames
+        :param nodes: Optional iterable of candidates
+        """
+        if nodes is None:
+            nodes = self._cfgstore['nodes']
+        expression = re.compile(expression)
+        for node in nodes:
+            if expression.search(node):
+                yield node
+
     def watch_attributes(self, nodes, attributes, callback):
         """
         Watch a list of attributes for changes on a list of nodes
@@ -680,7 +750,7 @@ class ConfigManager(object):
             cfgnodeobj = self._cfgstore['nodes'][node]
             nodeobj = {}
             if len(attributes) == 0:
-                relattribs = cfgnodeobj.iterkeys()
+                relattribs = cfgnodeobj
             for attribute in relattribs:
                 if attribute.startswith('_'):
                     # skip private things

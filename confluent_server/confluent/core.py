@@ -269,7 +269,6 @@ def enumerate_node_collection(collectionpath, configmanager):
     collection = nested_lookup(noderesources, collectionpath[2:])
     if len(collectionpath) == 2 and collectionpath[0] == 'noderange':
         collection['nodes'] = {}
-        print repr(collection)
     if not isinstance(collection, dict):
         raise exc.NotFoundException("Invalid element requested")
     return iterate_resources(collection)

@@ -24,7 +24,7 @@ import itertools
 import pyparsing as pp
 
 # construct custom grammar with pyparsing
-_nodeword = pp.Word(pp.alphanums + '/=-:.*+')
+_nodeword = pp.Word(pp.alphanums + '~^$/=-:.*+!')
 _nodebracket = pp.QuotedString(quoteChar='[', endQuoteChar=']',
                                unquoteResults=False)
 _nodeatom = pp.Group(pp.OneOrMore(_nodeword | _nodebracket))
@@ -51,11 +51,11 @@ class NodeRange(object):
     def nodes(self):
         return self._noderange
 
-    def _evaluate(self, parsetree):
+    def _evaluate(self, parsetree, filternodes=None):
         current_op = 0  # enum, 0 union, 1 subtract, 2 intersect
         current_range = set([])
         if not isinstance(parsetree[0], list):  # down to a plain text thing
-            return self._expandstring(parsetree)
+            return self._expandstring(parsetree, filternodes)
         for elem in parsetree:
             if elem == ',-':
                 current_op = 1
@@ -66,9 +66,9 @@ class NodeRange(object):
             elif current_op == 0:
                 current_range |= self._evaluate(elem)
             elif current_op == 1:
-                current_range -= self._evaluate(elem)
+                current_range -= self._evaluate(elem, current_range)
             elif current_op == 2:
-                current_range &= self._evaluate(elem)
+                current_range &= self._evaluate(elem, current_range)
         return current_range
 
     def failorreturn(self, atom):
@@ -134,7 +134,7 @@ class NodeRange(object):
                     grpcfg['noderange']['value'], self.cfm).nodes
             return nodes
         
-    def _expandstring(self, element):
+    def _expandstring(self, element, filternodes=None):
         prefix = ''
         for idx in xrange(len(element)):
             if element[idx][0] == '[':
@@ -161,10 +161,15 @@ class NodeRange(object):
             return self.expandrange(element, '-')
         elif ':' in element:  # : range for less ambiguity
             return self.expandrange(element, ':')
-        elif '=' in element:
-            raise Exception('TODO: criteria noderange')
+        elif '=' in element or '!~' in element:
+            if self.cfm is None:
+                raise Exception('Verification configmanager required')
+            return set(self.cfm.filter_node_attributes(element, filternodes))
         elif element[0] in ('/', '~'):
-            raise Exception('TODO: regex noderange')
+            nameexpression = element[1:]
+            if self.cfm is None:
+                raise Exception('Verification configmanager required')
+            return set(self.cfm.filter_nodenames(nameexpression, filternodes))
         elif '+' in element:
             raise Exception('TODO: plus range')
         if self.cfm is None:
