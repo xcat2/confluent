@@ -78,7 +78,9 @@ class ConfluentMessage(object):
         #this is used to facilitate the api explorer feature
         if not hasattr(self, 'stripped'):
             self.stripped = False
-        if self.stripped:
+        if not hasattr(self, 'notnode'):
+            self.notnode = False
+        if self.stripped or self.notnode:
             return self._generic_html_value(self.kvpairs)
         if not self.stripped:
             htmlout = ''
@@ -523,6 +525,7 @@ class SensorReadings(ConfluentMessage):
 
     def __init__(self, sensors=(), name=None):
         readings = []
+        self.notnode = name is None
         for sensor in sensors:
             sensordict = {'name': sensor['name']}
             if 'value' in sensor:
@@ -534,7 +537,7 @@ class SensorReadings(ConfluentMessage):
             if 'health' in sensor:
                 sensordict['health'] = sensor['health']
             readings.append(sensordict)
-        if name is None:
+        if self.notnode:
             self.kvpairs = {'sensors': readings}
         else:
             self.kvpairs = {name: {'sensors': readings}}
@@ -551,9 +554,10 @@ class HealthSummary(ConfluentMessage):
 
     def __init__(self, health, name=None):
         self.stripped = False
+        self.notnode = name is None
         if health not in self.valid_values:
             raise ValueError("%d is not a valid health state" % health)
-        if name is None:
+        if self.notnode:
             self.kvpairs = {'health': {'value': health}}
         else:
             self.kvpairs = {name: {'health': {'value': health}}}
@@ -563,12 +567,13 @@ class Attributes(ConfluentMessage):
     def __init__(self, name=None, kv=None, desc=''):
         self.desc = desc
         nkv = {}
+        self.notnode = name is None
         for key in kv.iterkeys():
             if type(kv[key]) in (str, unicode):
                 nkv[key] = {'value': kv[key]}
             else:
                 nkv[key] = kv[key]
-        if name is None:
+        if self.notnode:
             self.kvpairs = nkv
         else:
             self.kvpairs = {
@@ -577,9 +582,10 @@ class Attributes(ConfluentMessage):
 
 
 class ListAttributes(ConfluentMessage):
-    def __init__(self, node=None, kv=None, desc=''):
+    def __init__(self, name=None, kv=None, desc=''):
         self.desc = desc
-        if node is None:
+        self.notnode = name is None
+        if self.notnode:
             self.kvpairs = kv
         else:
             self.kvpairs = {node: kv}
@@ -588,7 +594,7 @@ class ListAttributes(ConfluentMessage):
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
 
-    def __init__(self, node=None, kv=None, desc=''):
+    def __init__(self, name=None, kv=None, desc=''):
         # for now, just keep the dictionary keys and discard crypt value
         self.desc = desc
         nkv = {}
@@ -600,7 +606,8 @@ class CryptedAttributes(Attributes):
                     nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
             except KeyError:
                 pass
-        if node is None:
+        self.notnode = name is None
+        if self.notnode:
             self.kvpairs = nkv
         else:
             self.kvpairs = {
