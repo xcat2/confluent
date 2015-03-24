@@ -15,9 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import csv
 import optparse
 import os
 import sys
+import time
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -42,7 +44,8 @@ argparser.add_option('-i', '--interval', type='int',
                      help='Interval to do repeated samples over')
 argparser.add_option('-n', '--numreadings', type='int',
                      help='Number of readings to gather')
-argparser.add_option('-c', '--csv', action='store_true')
+argparser.add_option('-c', '--csv', action='store_true',
+                     help='Output in CSV format')
 (options, args) = argparser.parse_args()
 repeatmode = False
 if options.interval:
@@ -56,7 +59,7 @@ noderange = args[0]
 sensors = []
 for sensorgroup in args[1:]:
     for sensor in sensorgroup.split(','):
-        sensor = sensor.replace('.', '/').replace(' ', '_').lower()
+        sensor = sensor.replace(' ', '_').lower()
         if '/' not in sensor:
             if sensor in sensorcollections:
                 sensors.append(sensorcollections[sensor])
@@ -67,13 +70,15 @@ if not sensors:
 
 session = client.Command()
 exitcode = 0
-sensornames = set([])
+sensorheaders = {}
 
-def sensorpass(showout=True):
+
+def sensorpass(showout=True, appendtime=False):
     global exitcode
     resultdata = {}
     for reqsensor in sensors:
-        for reading in session.read('/noderange/' + noderange + '/' + reqsensor):
+        for reading in session.read(
+                '/noderange/' + noderange + '/' + reqsensor):
             if 'error' in reading:
                 sys.stderr.write('Error: {0}\n'.format(reading['error']))
                 if 'errorcode' in reading:
@@ -84,6 +89,8 @@ def sensorpass(showout=True):
                 continue
             reading = reading['databynode']
             for node in reading:
+                if node not in resultdata:
+                    resultdata[node] = {}
                 if 'error' in reading[node]:
                     sys.stderr.write(
                         '{0}: Error: {1}\n'.format(node,
@@ -91,28 +98,95 @@ def sensorpass(showout=True):
                 if 'sensors' not in reading[node]:
                     continue
                 for sensedata in reading[node]['sensors']:
-                    sensornames.add(sensedata['name'])
-                    try:
-                        sensedata['states'].remove('Ok')
-                    except ValueError:
-                        pass
-                    resultdata[sensedata['name']] = sensedata
+                    for redundant_state in ('Ok', 'Non-Critical', 'Critical'):
+                        try:
+                            sensedata['states'].remove(redundant_state)
+                        except ValueError:
+                            pass
+                    resultdata[node][sensedata['name']] = sensedata
+                    sensorname = sensedata['name']
+                    sensorheaders[sensorname] = sensorname
+                    if sensedata['units'] not in (None, u''):
+                        sensorheaders[sensorname] += u' ({0})'.format(
+                            sensedata['units'])
                     if showout:
-                        if sensedata['units'] is not None:
-                            showval = u'{0} {1}'.format(
-                                sensedata['value'], sensedata['units'])
-                        else:
-                            showval = sensedata['value']
-                        if showval is None:
+                        if sensedata['value'] is None:
                             showval = ''
+                        else:
+                            showval = u' {0} '.format(sensedata['value'])
+                        if sensedata['units'] not in (None, u''):
+                            showval += sensedata['units']
                         datadescription = [sensedata['health']]
                         datadescription.extend(sensedata['states'])
-                        showval += ' ({0})'.format(','.join(datadescription))
-                        print(u'{0}: {1}: {2}'.format(
+                        showval += u' ({0})'.format(','.join(datadescription))
+                        if appendtime:
+                            showval += ' @' + time.strftime(
+                                '%Y-%m-%dT%H:%M:%S')
+                        print(u'{0}: {1}:{2}'.format(
                             node, sensedata['name'], showval).encode('utf-8'))
+    return resultdata
 
 
+def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
+    for nodekey in resdata:
+        if showtime:
+            rowdata = [time.strftime('%Y-%m-%dT%H:%M:%S'), nodekey]
+        else:
+            rowdata = [nodekey]
+        for sensorkey in orderedsensors:
+            try:
+                datum = resdata[nodekey][sensorkey]['value']
+                if datum is None:
+                    datum = resdata[nodekey][sensorkey]['health']
+                    if resdata[nodekey][sensorkey]['states']:
+                        datum += ',' + ','.join(
+                            resdata[nodekey][sensorkey]['states'])
+                rowdata.append(datum)
+            except KeyError:
+                rowdata.append('N/A')
+        csvwriter.writerow(rowdata)
 
 
+def main():
+    linebyline = True
+    headernames = []
+    orderedsensors = []
+    csvwriter = None
+    if options.interval or options.csv:
+        resdata = sensorpass(False)
+        for name in sensorheaders:
+            orderedsensors.append(name)
+        orderedsensors.sort()
+        for name in orderedsensors:
+            headernames.append(sensorheaders[name].encode('utf-8'))
+    if options.csv:
+        linebyline = False
+        csvwriter = csv.writer(sys.stdout)
+        if options.interval:
+            csvwriter.writerow(['time', 'node'] + headernames)
+        else:
+            csvwriter.writerow(['node'] + headernames)
+    if options.interval:
+        # first do a pass to swallow up probable causes of uneven timing
+        # for example if some have sdrs fetch and others not, this should
+        # get a common baseline going
+        while True:
+            nextstart = os.times()[4] + options.interval
+            resdata = sensorpass(linebyline, True)
+            if options.csv:
+                format_csv(csvwriter, orderedsensors, resdata)
+            if options.numreadings:
+                options.numreadings -= 1
+                if options.numreadings <= 0:
+                    sys.exit(exitcode)
+            sleeptime = nextstart - os.times()[4]
+            if sleeptime > 0:
+                time.sleep(nextstart - os.times()[4])
+    else:
+        if options.csv:
+            format_csv(csvwriter, orderedsensors, resdata, showtime=False)
+        else:
+            sensorpass(True)
 
-sensorpass()
+
+main()
