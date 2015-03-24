@@ -98,7 +98,7 @@ def sensorpass(showout=True, appendtime=False):
                 if 'sensors' not in reading[node]:
                     continue
                 for sensedata in reading[node]['sensors']:
-                    for redundant_state in ('Ok', 'Non-Critical', 'Critical'):
+                    for redundant_state in ('Non-Critical', 'Critical'):
                         try:
                             sensedata['states'].remove(redundant_state)
                         except ValueError:
@@ -116,9 +116,18 @@ def sensorpass(showout=True, appendtime=False):
                             showval = u' {0} '.format(sensedata['value'])
                         if sensedata['units'] not in (None, u''):
                             showval += sensedata['units']
-                        datadescription = [sensedata['health']]
+                        if sensedata['health'] != 'ok':
+                            datadescription = [sensedata['health']]
+                        else:
+                            datadescription = []
                         datadescription.extend(sensedata['states'])
-                        showval += u' ({0})'.format(','.join(datadescription))
+                        if datadescription:
+                            if showval == '':
+                                showval += u' {0}'.format(
+                                    ','.join(datadescription))
+                            else:
+                                showval += u' ({0})'.format(
+                                    ','.join(datadescription))
                         if appendtime:
                             showval += ' @' + time.strftime(
                                 '%Y-%m-%dT%H:%M:%S')
@@ -137,10 +146,17 @@ def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
             try:
                 datum = resdata[nodekey][sensorkey]['value']
                 if datum is None:
-                    datum = resdata[nodekey][sensorkey]['health']
+                    if resdata[nodekey][sensorkey]['health'] != 'ok':
+                        datum = resdata[nodekey][sensorkey]['health']
+                    else:
+                        datum = ''
                     if resdata[nodekey][sensorkey]['states']:
-                        datum += ',' + ','.join(
+                        healthstates = ','.join(
                             resdata[nodekey][sensorkey]['states'])
+                        if datum != '':
+                            datum = ','.join([datum, healthstates])
+                        else:
+                            datum = healthstates
                 rowdata.append(datum)
             except KeyError:
                 rowdata.append('N/A')
