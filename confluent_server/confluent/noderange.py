@@ -28,7 +28,9 @@ _nodeword = pp.Word(pp.alphanums + '~^$/=-:.*+!')
 _nodebracket = pp.QuotedString(quoteChar='[', endQuoteChar=']',
                                unquoteResults=False)
 _nodeatom = pp.Group(pp.OneOrMore(_nodeword | _nodebracket))
-_grammar = _nodeatom | ',-' | ',' | '@'
+_paginationstart = pp.Word('<', pp.nums)
+_paginationend = pp.Word('>', pp.nums)
+_grammar = _nodeatom | ',-' | ',' | '@' | _paginationstart | _paginationend
 _parser = pp.nestedExpr(content=_grammar)
 
 _numextractor = pp.OneOrMore(pp.Word(pp.alphas + '-') | pp.Word(pp.nums))
@@ -43,13 +45,23 @@ class NodeRange(object):
     """
 
     def __init__(self, noderange, config=None):
+        self.beginpage = None
+        self.endpage = None
         self.cfm = config
         elements = _parser.parseString("(" + noderange + ")").asList()[0]
         self._noderange = self._evaluate(elements)
 
     @property
     def nodes(self):
-        return self._noderange
+        if self.beginpage is None and self.endpage is None:
+            return self._noderange
+        sortedlist = list(self._noderange)
+        sortedlist.sort()
+        if self.beginpage is not None:
+            sortedlist = sortedlist[self.beginpage:]
+        if self.endpage is not None:
+            sortedlist = sortedlist[:self.endpage]
+        return set(sortedlist)
 
     def _evaluate(self, parsetree, filternodes=None):
         current_op = 0  # enum, 0 union, 1 subtract, 2 intersect
@@ -188,6 +200,12 @@ class NodeRange(object):
                 right += '.' + domain
             nrange = left + ':' + right
             return self.expandrange(nrange, ':')
+        elif '<' in element:
+            self.beginpage = int(element[1:])
+            return set([])
+        elif '>' in element:
+            self.endpage = int(element[1:])
+            return set([])
         if self.cfm is None:
             return set([element])
         raise Exception(element + ' not a recognized node, group, or alias')
