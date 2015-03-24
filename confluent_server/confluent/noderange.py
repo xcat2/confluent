@@ -126,7 +126,6 @@ class NodeRange(object):
         if self.cfm.is_node(entname):
             return set([entname])
         if self.cfm.is_nodegroup(entname):
-            nodes = set([])
             grpcfg = self.cfm.get_nodegroup_attributes(entname)
             nodes = grpcfg['nodes']
             if 'noderange' in grpcfg and grpcfg['noderange']:
@@ -171,7 +170,24 @@ class NodeRange(object):
                 raise Exception('Verification configmanager required')
             return set(self.cfm.filter_nodenames(nameexpression, filternodes))
         elif '+' in element:
-            raise Exception('TODO: plus range')
+            element, increment = element.split('+')
+            try:
+                nodename, domain = element.split('.')
+            except ValueError:
+                nodename = element
+                domain = ''
+            increment = int(increment)
+            elembits = _numextractor.parseString(nodename).asList()
+            endnum = str(int(elembits[-1]) + increment)
+            left = ''.join(elembits)
+            if domain:
+                left += '.' + domain
+            right = ''.join(elembits[:-1])
+            right += endnum
+            if domain:
+                right += '.' + domain
+            nrange = left + ':' + right
+            return self.expandrange(nrange, ':')
         if self.cfm is None:
             return set([element])
         raise Exception(element + ' not a recognized node, group, or alias')
