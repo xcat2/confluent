@@ -88,16 +88,20 @@ class Command(object):
                     rc |= res[node]['errorcode']
                 else:
                     rc |= 1
-            else:
+            elif ikey in res[node]:
                 print('{0}: {1}'.format(node, res[node][ikey]['value']))
         return rc
 
-    def simple_noderange_command(self, noderange, resource, input=None):
+    def simple_noderange_command(self, noderange, resource, input=None,
+                                 key=None):
         rc = 0
         if resource[0] == '/':
             resource = resource[1:]
         # The implicit key is the resource basename
-        ikey = resource.rpartition('/')[-1]
+        if key is None:
+            ikey = resource.rpartition('/')[-1]
+        else:
+            ikey = key
         if input is None:
             for res in self.read('/noderange/{0}/{1}'.format(
                     noderange, resource)):
