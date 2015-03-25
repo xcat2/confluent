@@ -28,7 +28,11 @@ import confluent.client as client
 
 sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
-noderange = sys.argv[1]
+try:
+    noderange = sys.argv[1]
+except IndexError:
+    sys.stderr.write('Usage: {0} <noderange>\n'.format(sys.argv[0]))
+    sys.exit(1)
 
 session = client.Command()
 exitcode = 0
@@ -53,9 +57,11 @@ for health in session.read('/noderange/{0}/health/hardware'.format(noderange)):
             for sensor in health[node]['sensors']:
                 explanation = sensor['name'] + ':'
                 if sensor['value'] is not None:
-                    explanation += sensor['value']
+                    explanation += str(sensor['value'])
                     if sensor['units'] is not None:
                         explanation += sensor['units']
+                    if sensor['states']:
+                        explanation += ','
                 if sensor['states']:
                     explanation += ','.join(sensor['states'])
                 healthexplanations[node].append(explanation)

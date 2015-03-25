@@ -54,8 +54,11 @@ if options.numreadings:
     repeatmode = options.numreadings
     if options.interval is None:
         options.interval = 1
-
-noderange = args[0]
+try:
+    noderange = args[0]
+except IndexError:
+    argparser.print_usage()
+    sys.exit(1)
 sensors = []
 for sensorgroup in args[1:]:
     for sensor in sensorgroup.split(','):

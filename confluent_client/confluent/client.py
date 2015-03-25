@@ -43,7 +43,7 @@ def _parseserver(string):
 
 class Command(object):
 
-    def __init__(self, server="/var/run/confluent/api.sock"):
+    def __init__(self, server=None):
         self.connection = None
         if server is None:
             if 'CONFLUENT_HOST' in os.environ:
@@ -62,6 +62,10 @@ class Command(object):
             self.authenticated = True
         else:
             self.authenticated = False
+        if not self.authenticated and 'CONFLUENT_USER' in os.environ:
+            username = os.environ['CONFLUENT_USER']
+            passphrase = os.environ['CONFLUENT_PASSPHRASE']
+            self.authenticate(username, passphrase)
 
     def authenticate(self, username, password):
         tlvdata.send(self.connection,

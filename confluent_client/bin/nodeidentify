@@ -25,8 +25,12 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
+try:
+    noderange = sys.argv[1]
+except IndexError:
+    sys.stderr.write('Usage: {0} <noderange> [on|off]\n'.format(sys.argv[0]))
+    sys.exit(1)
 
-noderange = sys.argv[1]
 identifystate = None
 if len(sys.argv) > 2:
     identifystate = sys.argv[2]
