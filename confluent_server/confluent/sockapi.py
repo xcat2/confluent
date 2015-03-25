@@ -214,9 +214,9 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
             configmanager.ConfigManager.shutdown()
         else:
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
-    except exc.NotFoundException:
+    except exc.NotFoundException as e:
         tlvdata.send(connection, {"errorcode": 404,
-                                  "error": "Target not found"})
+                                  "error": "Target not found - " + str(e)})
         tlvdata.send(connection, {"_requestdone": 1})
     except exc.InvalidArgumentException as e:
         tlvdata.send(connection, {"errorcode": 400,

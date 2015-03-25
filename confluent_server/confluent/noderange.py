@@ -22,18 +22,29 @@
 
 import itertools
 import pyparsing as pp
+import re
 
 # construct custom grammar with pyparsing
 _nodeword = pp.Word(pp.alphanums + '~^$/=-:.*+!')
 _nodebracket = pp.QuotedString(quoteChar='[', endQuoteChar=']',
                                unquoteResults=False)
 _nodeatom = pp.Group(pp.OneOrMore(_nodeword | _nodebracket))
-_paginationstart = pp.Word('<', pp.nums)
-_paginationend = pp.Word('>', pp.nums)
+_paginationstart = pp.Group(pp.Word('<', pp.nums))
+_paginationend = pp.Group(pp.Word('>', pp.nums))
 _grammar = _nodeatom | ',-' | ',' | '@' | _paginationstart | _paginationend
 _parser = pp.nestedExpr(content=_grammar)
 
 _numextractor = pp.OneOrMore(pp.Word(pp.alphas + '-') | pp.Word(pp.nums))
+
+numregex = re.compile('([0-9]+)')
+def humanify_nodename(nodename):
+    """Analyzes nodename in a human way to enable natural sort
+
+    :param nodename: The node name to analyze
+    :returns: A structure that can be consumed by 'sorted'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(numregex, nodename)]
 
 
 # TODO: pagination operators <pp.nums and >pp.nums for begin and end respective
@@ -48,15 +59,27 @@ class NodeRange(object):
         self.beginpage = None
         self.endpage = None
         self.cfm = config
-        elements = _parser.parseString("(" + noderange + ")").asList()[0]
-        self._noderange = self._evaluate(elements)
+        try:
+            elements = _parser.parseString("(" + noderange + ")").asList()[0]
+        except pp.ParseException as pe:
+            raise Exception("Invalid syntax")
+        if noderange[0] in ('<', '>'):
+            # pagination across all nodes
+            self._evaluate(elements)
+            self._noderange = set(self.cfm.list_nodes())
+        else:
+            self._noderange = self._evaluate(elements)
 
     @property
     def nodes(self):
         if self.beginpage is None and self.endpage is None:
             return self._noderange
         sortedlist = list(self._noderange)
-        sortedlist.sort()
+        try:
+            sortedlist.sort(key=humanify_nodename)
+        except TypeError:
+            # The natural sort attempt failed, fallback to ascii sort
+            sortedlist.sort()
         if self.beginpage is not None:
             sortedlist = sortedlist[self.beginpage:]
         if self.endpage is not None:
@@ -135,8 +158,6 @@ class NodeRange(object):
     def expand_entity(self, entname):
         if self.cfm is None or self.cfm.is_node(entname):
             return set([entname])
-        if self.cfm.is_node(entname):
-            return set([entname])
         if self.cfm.is_nodegroup(entname):
             grpcfg = self.cfm.get_nodegroup_attributes(entname)
             nodes = grpcfg['nodes']
@@ -144,6 +165,7 @@ class NodeRange(object):
                 nodes |= NodeRange(
                     grpcfg['noderange']['value'], self.cfm).nodes
             return nodes
+        raise Exception('Unknown node ' + entname)
         
     def _expandstring(self, element, filternodes=None):
         prefix = ''

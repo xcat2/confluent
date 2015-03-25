@@ -393,9 +393,9 @@ def resourcehandler_backend(env, start_response):
                     pagecontent += datum
             start_response('200 OK', headers)
             yield pagecontent
-        except exc.NotFoundException:
+        except exc.NotFoundException as ne:
             start_response('404 Not found', headers)
-            yield "404 - Request path not recognized"
+            yield "404 - Request path not recognized - " + str(ne)
         except exc.InvalidArgumentException as e:
             start_response('400 Bad Request - ' + str(e), headers)
             yield '400 - Bad Request - ' + str(e)

@@ -262,7 +262,12 @@ def enumerate_nodegroup_collection(collectionpath, configmanager):
 
 def enumerate_node_collection(collectionpath, configmanager):
     if collectionpath == ['nodes']:  # it is just '/node/', need to list nodes
-        return iterate_collections(configmanager.list_nodes())
+        allnodes = list(configmanager.list_nodes())
+        try:
+            allnodes.sort(key=noderange.humanify_nodename)
+        except TypeError:
+            allnodes.sort()
+        return iterate_collections(allnodes)
     nodeorrange = collectionpath[1]
     if collectionpath[0] == 'nodes' and not configmanager.is_node(nodeorrange):
         raise exc.NotFoundException("Invalid element requested")
@@ -368,8 +373,8 @@ def handle_node_request(configmanager, inputdata, operation,
         if isnoderange:
             try:
                 nodes = noderange.NodeRange(nodeorrange, configmanager).nodes
-            except Exception:
-                raise exc.NotFoundException("Invalid Noderange")
+            except Exception as e:
+                raise exc.NotFoundException("Invalid Noderange: " + str(e))
         else:
             nodes = (nodeorrange,)
     except IndexError:  # doesn't actually have a long enough path
@@ -381,9 +386,19 @@ def handle_node_request(configmanager, inputdata, operation,
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
             create_node(inputdata.attribs, configmanager)
-        return iterate_collections(configmanager.list_nodes())
+        allnodes = list(configmanager.list_nodes())
+        try:
+            allnodes.sort(key=noderange.humanify_nodename)
+        except TypeError:
+            allnodes.sort()
+        return iterate_collections(allnodes)
     if isnoderange and len(pathcomponents) == 3 and pathcomponents[2] == 'nodes':
         # this means that it's a list of relevant nodes
+        nodes = list(nodes)
+        try:
+            nodes.sort(key=noderange.humanify_nodename)
+        except TypeError:
+            nodes.sort()
         return iterate_collections(nodes)
     if len(pathcomponents) == 2:
         iscollection = True
