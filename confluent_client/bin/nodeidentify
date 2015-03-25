@@ -27,10 +27,10 @@ import confluent.client as client
 
 
 noderange = sys.argv[1]
-bootdev = None
+identifystate = None
 if len(sys.argv) > 2:
-    bootdev = sys.argv[2]
+    identifystate = sys.argv[2]
 session = client.Command()
 exitcode = 0
 sys.exit(
-    session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev))
+    session.simple_noderange_command(noderange, 'identify', identifystate))
