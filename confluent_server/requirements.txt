@@ -1,2 +1,3 @@
 confluent_client>=0.1
 pycrypto>=2.6
+pyparsing
