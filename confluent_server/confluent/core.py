@@ -317,7 +317,12 @@ def handle_nodegroup_request(configmanager, inputdata,
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
             create_group(inputdata.attribs, configmanager)
-        return iterate_collections(configmanager.get_groups())
+        allgroups = list(configmanager.get_groups())
+        try:
+            allgroups.sort(key=noderange.humanify_nodename)
+        except TypeError:
+            allgroups.sort()
+        return iterate_collections(allgroups)
     elif len(pathcomponents) == 2:
         iscollection = True
     else:
