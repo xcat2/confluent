@@ -50,6 +50,10 @@ for health in session.read('/noderange/{0}/health/hardware'.format(noderange)):
         continue
     health = health['databynode']
     for node in health:
+        if 'error' in health[node]:
+            sys.stderr.write('{0}: Error: {1}\n'.format(
+                node, health[node]['error']))
+            exitcode |= 1
         if 'health' in health[node]:
             healthbynode[node] = health[node]['health']['value']
         if 'sensors' in health[node]:
