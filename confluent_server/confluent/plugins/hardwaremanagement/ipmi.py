@@ -294,10 +294,12 @@ class IpmiHandler(object):
                 self.error = self.error.replace(' reported in RAKP4','')
                 self.output.put(msg.ConfluentTargetTimeout(
                     self.node, self.error))
+                return
             elif ('Unauthorized' in self.error or
                     'Incorrect password' in self.error):
                 self.output.put(
                     msg.ConfluentTargetInvalidCredentials(self.node))
+                return
             else:
                 raise Exception(self.error)
         if self.element == ['power', 'state']:
@@ -408,6 +410,7 @@ class IpmiHandler(object):
             self.output.put(msg.BootDevice(node=self.node,
                                            device=bootdev['bootdev'],
                                            bootmode=bootmode))
+            return
         elif 'update' == self.op:
             bootdev = self.inputdata.bootdevice(self.node)
             douefi = False
@@ -425,21 +428,25 @@ class IpmiHandler(object):
             self.ipmicmd.set_identify(on=identifystate)
             self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
+            return
         elif 'read' == self.op:
             # ipmi has identify as read-only for now
             self.output.put(msg.IdentifyState(node=self.node, state=''))
+            return
 
     def power(self):
         if 'read' == self.op:
             power = self.ipmicmd.get_power()
             self.output.put(msg.PowerState(node=self.node,
                                            state=power['powerstate']))
+            return
         elif 'update' == self.op:
             powerstate = self.inputdata.powerstate(self.node)
             self.ipmicmd.set_power(powerstate, wait=30)
             power = self.ipmicmd.get_power()
             self.output.put(msg.PowerState(node=self.node,
                                            state=power['powerstate']))
+            return
 
 
 def _str_health(health):

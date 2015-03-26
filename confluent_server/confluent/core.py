@@ -455,7 +455,7 @@ def handle_node_request(configmanager, inputdata, operation,
                     nodesbyhandler[hfunc].append(node)
                 else:
                     nodesbyhandler[hfunc] = [node]
-        for hfunc in nodesbyhandler.iterkeys():
+        for hfunc in nodesbyhandler:
             passvalues.append(hfunc(
                 nodes=nodesbyhandler[hfunc], element=pathcomponents,
                 configmanager=configmanager,
