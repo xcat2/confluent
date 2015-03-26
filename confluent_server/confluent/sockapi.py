@@ -115,9 +115,10 @@ def sessionhdl(connection, authname, skipauth=False):
             tlvdata.send(connection, {'errorcode': 502,
                                       'error': 'Bad Credentials'})
             tlvdata.send(connection, {'_requestdone': 1})
-        except exc.TargetEndpointUnreachable:
+        except exc.TargetEndpointUnreachable as tu:
             tlvdata.send(connection, {'errorcode': 504,
-                                      'error': 'Unreachable Target'})
+                                      'error': 'Unreachable Target - ' + str(
+                                          tu)})
             tlvdata.send(connection, {'_requestdone': 1})
         except exc.NotImplementedException:
             tlvdata.send(connection, {'errorcode': 501,

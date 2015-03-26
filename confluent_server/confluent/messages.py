@@ -169,12 +169,12 @@ class ConfluentNodeError(object):
 
 
 class ConfluentTargetTimeout(ConfluentNodeError):
-    def __init__(self, node):
+    def __init__(self, node, errstr='timeout'):
         self.node = node
-        self.error = 'timeout'
+        self.error = errstr
 
     def strip_node(self, node):
-        raise exc.TargetEndpointUnreachable
+        raise exc.TargetEndpointUnreachable(self.error)
 
 
 class ConfluentTargetNotFound(ConfluentNodeError):
@@ -300,7 +300,7 @@ def get_input_message(path, operation, inputdata, nodes=None):
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
-    elif path == [ 'identify' ] and operation != 'retrieve':
+    elif path == ['identify'] and operation != 'retrieve':
         return InputIdentifyMessage(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()

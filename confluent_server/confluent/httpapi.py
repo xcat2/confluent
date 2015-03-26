@@ -399,9 +399,9 @@ def resourcehandler_backend(env, start_response):
         except exc.InvalidArgumentException as e:
             start_response('400 Bad Request - ' + str(e), headers)
             yield '400 - Bad Request - ' + str(e)
-        except exc.TargetEndpointUnreachable:
+        except exc.TargetEndpointUnreachable as tu:
             start_response('504 Unreachable Target', headers)
-            yield '504 - Unreachable Target'
+            yield '504 - Unreachable Target - ' + str(tu)
         except exc.TargetEndpointBadCredentials:
             start_response('502 Bad Credentials', headers)
             yield '502 - Bad Credentials'

@@ -223,6 +223,10 @@ def perform_request(operator, node, element,
                 results.put(msg.ConfluentTargetTimeout(node))
             else:
                 results.put(msg.ConfluentNodeError(node, excmsg))
+        except exc.TargetEndpointUnreachable as tu:
+            results.put(msg.ConfluentTargetTimeout(str(tu)))
+        except Exception as e:
+            results.put(msg.ConfluentNodeError(node, str(e)))
         finally:
             results.put('Done')
 
@@ -285,8 +289,11 @@ class IpmiHandler(object):
             self._logevt.wait()
         self._logevt = None
         if self.broken:
-            if self.error == 'timeout':
-                self.output.put(msg.ConfluentTargetTimeout(self.node))
+            if (self.error == 'timeout' or
+                        'Insufficient resources' in self.error):
+                self.error = self.error.replace(' reported in RAKP4','')
+                self.output.put(msg.ConfluentTargetTimeout(
+                    self.node, self.error))
             elif ('Unauthorized' in self.error or
                     'Incorrect password' in self.error):
                 self.output.put(
