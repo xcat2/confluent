@@ -208,4 +208,8 @@ def main():
             sensorpass(True)
 
 
-main()
+try:
+    main()
+except KeyboardInterrupt:
+    print('')
+    sys.exit(0)

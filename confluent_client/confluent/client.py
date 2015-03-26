@@ -98,23 +98,27 @@ class Command(object):
 
     def simple_noderange_command(self, noderange, resource, input=None,
                                  key=None):
-        rc = 0
-        if resource[0] == '/':
-            resource = resource[1:]
-        # The implicit key is the resource basename
-        if key is None:
-            ikey = resource.rpartition('/')[-1]
-        else:
-            ikey = key
-        if input is None:
-            for res in self.read('/noderange/{0}/{1}'.format(
-                    noderange, resource)):
-                rc = self.handle_results(ikey, rc, res)
-        else:
-            for res in self.update('/noderange/{0}/{1}'.format(
-                    noderange, resource), {ikey: input}):
-                rc = self.handle_results(ikey, rc, res)
-        return rc
+        try:
+            rc = 0
+            if resource[0] == '/':
+                resource = resource[1:]
+            # The implicit key is the resource basename
+            if key is None:
+                ikey = resource.rpartition('/')[-1]
+            else:
+                ikey = key
+            if input is None:
+                for res in self.read('/noderange/{0}/{1}'.format(
+                        noderange, resource)):
+                    rc = self.handle_results(ikey, rc, res)
+            else:
+                for res in self.update('/noderange/{0}/{1}'.format(
+                        noderange, resource), {ikey: input}):
+                    rc = self.handle_results(ikey, rc, res)
+            return rc
+        except KeyboardInterrupt:
+            print('')
+            return 0
 
 
 
