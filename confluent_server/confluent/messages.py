@@ -588,7 +588,7 @@ class ListAttributes(ConfluentMessage):
         if self.notnode:
             self.kvpairs = kv
         else:
-            self.kvpairs = {node: kv}
+            self.kvpairs = {name: kv}
 
 
 class CryptedAttributes(Attributes):
@@ -611,5 +611,5 @@ class CryptedAttributes(Attributes):
             self.kvpairs = nkv
         else:
             self.kvpairs = {
-                node: nkv
+                name: nkv
             }
