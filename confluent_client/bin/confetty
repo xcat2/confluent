@@ -642,7 +642,7 @@ while inconsole or not doexit:
                         try:
                             server_connect()
                             connected = True
-                        except socket.gaierror, socket.error:
+                        except (socket.gaierror, socket.error):
                             pass
                         if not connected:
                             time.sleep(1)
