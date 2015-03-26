@@ -154,6 +154,7 @@ class Command(object):
             try:
                 self.connection.settimeout(5)
                 self.connection.connect(sa)
+                self.connection.settimeout(None)
             except:
                 raise
                 self.connection.close()
