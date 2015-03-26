@@ -231,7 +231,7 @@ def perform_request(operator, node, element,
             else:
                 results.put(msg.ConfluentNodeError(node, excmsg))
         except exc.TargetEndpointUnreachable as tu:
-            results.put(msg.ConfluentTargetTimeout(str(tu)))
+            results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except Exception as e:
             results.put(msg.ConfluentNodeError(node, str(e)))
         finally:
