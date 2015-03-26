@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.messages as msg
@@ -29,6 +30,12 @@ import socket
 
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
+
+
+def exithandler():
+    console.session.iothread.join()
+
+atexit.register(exithandler)
 
 _ipmiworkers = greenpool.GreenPool()
 
