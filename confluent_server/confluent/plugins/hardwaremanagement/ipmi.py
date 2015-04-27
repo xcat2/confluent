@@ -412,16 +412,18 @@ class IpmiHandler(object):
         raise Exception('Unsupported scenario...')
 
     def read_inventory(self, component):
+        invitems = []
         if component == 'all':
             for invdata in self.ipmicmd.get_inventory():
                 if invdata[1] is None:
                     newinf = {'present': False, 'information': None}
                 else:
+                    sanitize_invdata(invdata[1])
                     newinf = {'present': True, 'information': invdata[1]}
                 newinf['name'] = invdata[0]
-                newinvdata = {'inventory': [newinf]}
-                sanitize_invdata(newinvdata['inventory'][0])
-                self.output.put(msg.KeyValueData(newinvdata, self.node))
+                invitems.append(newinf)
+            newinvdata = {'inventory': invitems}
+            self.output.put(msg.KeyValueData(newinvdata, self.node))
 
     def handle_sensors(self):
         if self.element[-1] == '':
