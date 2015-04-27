@@ -33,8 +33,14 @@ def _htmlify_structure(indict):
                 ret += _htmlify_structure(indict[key])
     elif isinstance(indict, list):
         if len(indict) > 0:
-            if type(indict[0]) in (str, unicode):
-                ret += ",".join(indict)
+            if type(indict[0]) in (str, unicode, None):
+                nd = []
+                for datum in indict:
+                    if datum is None:
+                        nd.append('')
+                    else:
+                        nd.append(datum)
+                ret += ",".join(nd)
             else:
                 for v in indict:
                     ret += _htmlify_structure(v)
@@ -75,7 +81,7 @@ class ConfluentMessage(object):
             self.kvpairs = self.kvpairs[node]
 
     def html(self, extension=''):
-        #this is used to facilitate the api explorer feature
+        # this is used to facilitate the api explorer feature
         if not hasattr(self, 'stripped'):
             self.stripped = False
         if not hasattr(self, 'notnode'):
@@ -96,6 +102,27 @@ class ConfluentMessage(object):
             value = self.defaultvalue
             valtype = self.defaulttype
             notes = []
+
+            if isinstance(val, list):
+                snippet += key + ":"
+                if len(val) == 0 and not self.readonly:
+                    snippet += ('<input type="{0}" name="{1}" value="" '
+                                ' "title="{2}">'
+                                ).format(valtype, key, self.desc)
+                for v in val:
+                    if self.readonly:
+                        snippet += _htmlify_structure(v)
+                    else:
+                        snippet += ('<input type="{0}" name="{1}" value="{2}" '
+                                    ' "title="{3}">'
+                                    ).format(valtype, key, v, self.desc)
+                if not self.readonly:
+                    snippet += (
+                        '<input type="{0}" name="{1}" value="" title="{2}">'
+                        '<input type="checkbox" name="restexplorerhonorkey" '
+                        'value="{1}">').format(valtype, key, self.desc)
+                return snippet
+            snippet += repr(val)
             if val is not None and 'value' in val:
                 value = val['value']
                 if 'inheritedfrom' in val:
@@ -119,25 +146,6 @@ class ConfluentMessage(object):
                 if 'inheritedfrom' in val:
                     notes.append('Inherited from %s' % val['inheritedfrom'])
                 value = '********'
-            if isinstance(val, list):
-                snippet += key + ":"
-                if len(val) == 0 and not self.readonly:
-                    snippet += ('<input type="{0}" name="{1}" value="" '
-                                ' "title="{2}">'
-                                ).format(valtype, key, self.desc)
-                for v in val:
-                    if self.readonly:
-                        snippet += _htmlify_structure(v)
-                    else:
-                        snippet += ('<input type="{0}" name="{1}" value="{2}" '
-                                    ' "title="{3}">'
-                                    ).format(valtype, key, v, self.desc)
-                if not self.readonly:
-                    snippet += (
-                        '<input type="{0}" name="{1}" value="" title="{2}">'
-                        '<input type="checkbox" name="restexplorerhonorkey" '
-                        'value="{1}">').format(valtype, key, self.desc)
-                return snippet
             if self.readonly:
                 snippet += "{0}: {1}".format(key, value)
             else:
@@ -163,8 +171,8 @@ class ConfluentNodeError(object):
         return self.node + ":" + self.error
 
     def strip_node(self, node):
-        #NOTE(jbjohnso): For single node errors, raise exception to
-        #trigger what a developer of that medium would expect
+        # NOTE(jjohnson2): For single node errors, raise exception to
+        # trigger what a developer of that medium would expect
         raise Exception(self.error)
 
 
@@ -184,6 +192,7 @@ class ConfluentTargetNotFound(ConfluentNodeError):
 
     def strip_node(self, node):
         raise exc.NotFoundException(self.error)
+
 
 class ConfluentTargetInvalidCredentials(ConfluentNodeError):
     def __init__(self, node):
@@ -247,7 +256,6 @@ class LinkRelation(ConfluentMessage):
     def __init__(self):
         self.href = ''
         self.rel = ''
-
 
     def json(self):
         """Provide json_hal style representation of the relation.
@@ -372,7 +380,7 @@ class ConfluentInputMessage(ConfluentMessage):
         if not inputdata:
             raise exc.InvalidArgumentException('missing input data')
         if self.keyname not in inputdata:
-            #assume we have nested information
+            # assume we have nested information
             for key in nodes:
                 if key not in inputdata:
                     raise exc.InvalidArgumentException(key + ' not in request')
@@ -388,7 +396,8 @@ class ConfluentInputMessage(ConfluentMessage):
         else:  # we have a state argument not by node
             datum = inputdata
             if self.keyname not in datum:
-                raise exc.InvalidArgumentException('missing {0} argument'.format(self.keyname))
+                raise exc.InvalidArgumentException(
+                    'missing {0} argument'.format(self.keyname))
             elif datum[self.keyname] not in self.valid_values:
                 raise exc.InvalidArgumentException(datum[self.keyname] +
                                                    ' is not one of ' +
@@ -448,7 +457,7 @@ class BootDevice(ConfluentChoiceMessage):
         self.kvpairs = {
             node: {
                 'nextdevice': {'value': device},
-                'bootmode': {'value': bootmode },
+                'bootmode': {'value': bootmode},
             }
         }
 
@@ -518,8 +527,6 @@ class PowerState(ConfluentChoiceMessage):
     keyname = 'state'
 
 
-
-
 class SensorReadings(ConfluentMessage):
     readonly = True
 
@@ -542,6 +549,16 @@ class SensorReadings(ConfluentMessage):
         else:
             self.kvpairs = {name: {'sensors': readings}}
 
+
+class KeyValueData(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, kvdata, name=None):
+        self.notnode = name is None
+        if self.notnode:
+            self.kvpairs = kvdata
+        else:
+            self.kvpairs = {name: kvdata}
 
 class HealthSummary(ConfluentMessage):
     readonly = True

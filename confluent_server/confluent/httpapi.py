@@ -429,7 +429,6 @@ def _assemble_html(responses, resource, querydict, url, extension):
         iscollection = True
         yield '<a rel="collection" href="../{0}">../{0}</a><br>'.format(
             extension)
-
     else:
         iscollection = False
         yield '<a rel="collection" href="./{0}">./{0}</a><br>'.format(

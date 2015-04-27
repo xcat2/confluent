@@ -53,6 +53,34 @@ def simplify_name(name):
     return name.lower().replace(' ', '_')
 
 
+def sanitize_invdata(indata):
+    """Sanitize pyghmi data
+
+    pyghmi will return bytearrays when it has no idea what to do.  In our
+    case, we will change those to hex strings.  Additionally, ignore 'extra'
+    fields if the oem_parser is set
+    """
+    if 'oem_parser' in indata and indata['oem_parser'] is not None:
+        if 'board_extra' in indata:
+            del indata['board_extra']
+        if 'chassis_extra' in indata:
+            del indata['chassis_extra']
+        if 'product_extra' in indata:
+            del indata['product_extra']
+    for k in indata:
+        if isinstance(indata[k], bytearray):
+            indata[k] = '0x' + ''.join(format(x, '02x') for x in indata[k])
+        elif isinstance(indata[k], dict):
+            sanitize_invdata(indata[k])
+        elif isinstance(indata[k], list):
+            for idx, value in enumerate(indata[k]):
+                if isinstance(value, bytearray):
+                    indata[k][idx] = '0x' + ''.join(
+                        format(x, '02x') for x in indata[k][idx])
+
+
+
+
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         self._attribwatcher = cfm.watch_attributes(
@@ -233,7 +261,8 @@ def perform_request(operator, node, element,
         except exc.TargetEndpointUnreachable as tu:
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except Exception as e:
-            results.put(msg.ConfluentNodeError(node, str(e)))
+            results.put(msg.ConfluentNodeError(
+                node, 'IPMI PluginException: ' + str(e)))
         finally:
             results.put('Done')
 
@@ -250,6 +279,7 @@ def _dict_sensor(pygreading):
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg, output):
         self.sensormap = {}
+        self.invmap = {}
         self.output = output
         self.sensorcategory = None
         self.broken = False
@@ -319,6 +349,13 @@ class IpmiHandler(object):
             self.identify()
         elif self.element[0] == 'sensors':
             self.handle_sensors()
+        elif self.element[0] == 'inventory':
+            self.handle_inventory()
+
+    def make_inventory_map(self):
+        invnames = self.ipmicmd.get_inventory_descriptions()
+        for name in invnames:
+            self.invmap[simplify_name(name)] = name
 
     def make_sensor_map(self, sensors=None):
         if sensors is None:
@@ -356,6 +393,35 @@ class IpmiHandler(object):
                                        name=self.node))
         except pygexc.IpmiException:
             self.output.put(msg.ConfluentTargetTimeout(self.node))
+
+    def list_inventory(self):
+        try:
+            components = self.ipmicmd.get_inventory_descriptions()
+        except pygexc.IpmiException:
+            self.output.put(msg.ConfluentTargetTimeout(self.node))
+            return
+        self.output.put(msg.ChildCollection('all'))
+        for component in components:
+            self.output.put(msg.ChildCollection(simplify_name(component)))
+
+    def handle_inventory(self):
+        if len(self.element) == 3:  # list things in inventory
+            return self.list_inventory()
+        elif len(self.element) == 4:  # actually read inventory data
+            return self.read_inventory(self.element[-1])
+        raise Exception('Unsupported scenario...')
+
+    def read_inventory(self, component):
+        if component == 'all':
+            for invdata in self.ipmicmd.get_inventory():
+                if invdata[1] is None:
+                    newinf = {'present': False, 'information': None}
+                else:
+                    newinf = {'present': True, 'information': invdata[1]}
+                newinf['name'] = invdata[0]
+                newinvdata = {'inventory': [newinf]}
+                sanitize_invdata(newinvdata['inventory'][0])
+                self.output.put(msg.KeyValueData(newinvdata, self.node))
 
     def handle_sensors(self):
         if self.element[-1] == '':

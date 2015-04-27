@@ -45,6 +45,7 @@ import sys
 
 pluginmap = {}
 
+
 def seek_element(currplace, currkey):
     try:
         return currplace[currkey]
@@ -55,10 +56,11 @@ def seek_element(currplace, currkey):
             return currplace
         raise
 
+
 def nested_lookup(nestdict, key):
     try:
         return reduce(seek_element, key, nestdict)
-    except TypeError as e:
+    except TypeError:
         raise exc.NotFoundException("Invalid element requested")
 
 
@@ -72,7 +74,7 @@ def load_plugins():
         if not os.path.isdir(plugindir):
             continue
         sys.path.append(plugindir)
-        #two passes, to avoid adding both py and pyc files
+        # two passes, to avoid adding both py and pyc files
         for plugin in os.listdir(plugindir):
             if plugin.startswith('.'):
                 continue
@@ -98,6 +100,7 @@ class PluginRoute(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
 
+
 class PluginCollection(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
@@ -111,7 +114,7 @@ noderesources = {
         }),
     },
     'console': {
-        #this is a dummy value, http or socket must handle special
+        # this is a dummy value, http or socket must handle special
         'session': PluginRoute({}),
     },
     'power': {
@@ -139,6 +142,14 @@ noderesources = {
     'attributes': {
         'all': PluginRoute({'handler': 'attributes'}),
         'current': PluginRoute({'handler': 'attributes'}),
+    },
+    'inventory': {
+        'hardware': {
+            'all': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+        },
     },
     'sensors': {
         'hardware': {
@@ -313,6 +324,7 @@ def enumerate_collections(collections):
 def handle_nodegroup_request(configmanager, inputdata,
                              pathcomponents, operation):
     iscollection = False
+    routespec = None
     if len(pathcomponents) < 2:
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
@@ -337,10 +349,10 @@ def handle_nodegroup_request(configmanager, inputdata,
     if iscollection:
         if operation == "delete":
             return delete_nodegroup_collection(pathcomponents,
-                                                 configmanager)
+                                               configmanager)
         elif operation == "retrieve":
             return enumerate_nodegroup_collection(pathcomponents,
-                                                    configmanager)
+                                                  configmanager)
         else:
             raise Exception("TODO")
     plugroute = routespec.routeinfo
@@ -430,7 +442,7 @@ def handle_node_request(configmanager, inputdata, operation,
         pathcomponents, operation, inputdata, nodes)
     if 'handler' in plugroute:  # fixed handler definition, easy enough
         hfunc = getattr(pluginmap[plugroute['handler']], operation)
-        passvalue =hfunc(
+        passvalue = hfunc(
             nodes=nodes, element=pathcomponents,
             configmanager=configmanager,
             inputdata=inputdata)
@@ -467,6 +479,7 @@ def handle_node_request(configmanager, inputdata, operation,
         else:
             return stripnode(passvalues[0], nodes[0])
 
+
 def handle_path(path, operation, configmanager, inputdata=None):
     """Given a full path request, return an object.
 
@@ -482,17 +495,17 @@ def handle_path(path, operation, configmanager, inputdata=None):
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'noderange':
         return handle_node_request(configmanager, inputdata, operation,
-                                          pathcomponents)
+                                   pathcomponents)
     elif pathcomponents[0] == 'nodegroups':
         return handle_nodegroup_request(configmanager, inputdata,
-                                          pathcomponents,
-                                          operation)
+                                        pathcomponents,
+                                        operation)
     elif pathcomponents[0] == 'nodes':
-        #single node request of some sort
+        # single node request of some sort
         return handle_node_request(configmanager, inputdata,
-                                     operation, pathcomponents)
+                                   operation, pathcomponents)
     elif pathcomponents[0] == 'users':
-        #TODO: when non-administrator accounts exist,
+        # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
         try:
             user = pathcomponents[1]
