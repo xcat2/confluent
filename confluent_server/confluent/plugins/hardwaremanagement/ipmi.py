@@ -422,8 +422,22 @@ class IpmiHandler(object):
                     newinf = {'present': True, 'information': invdata[1]}
                 newinf['name'] = invdata[0]
                 invitems.append(newinf)
-            newinvdata = {'inventory': invitems}
-            self.output.put(msg.KeyValueData(newinvdata, self.node))
+        else:
+            self.make_inventory_map()
+            compname = self.invmap.get(component, None)
+            if compname is None:
+                self.output.put(msg.ConfluentTargetNotFound())
+                return
+            invdata = self.ipmicmd.get_inventory_of_component(compname)
+            if invdata is None:
+                newinf = {'present': False, 'information': None}
+            else:
+                sanitize_invdata(invdata)
+                newinf = {'present': True, 'information': invdata}
+            newinf['name'] = compname
+            invitems.append(newinf)
+        newinvdata = {'inventory': invitems}
+        self.output.put(msg.KeyValueData(newinvdata, self.node))
 
     def handle_sensors(self):
         if self.element[-1] == '':
