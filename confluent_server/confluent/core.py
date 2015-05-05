@@ -82,7 +82,7 @@ def load_plugins():
             if plugtype == '.sh':
                 pluginmap[plugin] = shellmodule.Plugin(
                     os.path.join(plugindir, plugin + '.sh'))
-            else:
+            elif "__init__" not in plugin: 
                 plugins.add(plugin)
         for plugin in plugins:
             tmpmod = __import__(plugin)
