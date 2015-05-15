@@ -428,6 +428,7 @@ class InputPowerMessage(ConfluentInputMessage):
         'off',
         'reset',
         'boot',
+        'shutdown',
     ])
 
     def powerstate(self, node):
