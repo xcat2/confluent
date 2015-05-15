@@ -117,6 +117,14 @@ noderesources = {
         # this is a dummy value, http or socket must handle special
         'session': PluginRoute({}),
     },
+    'events': {
+      'hardware': {
+          'log': PluginRoute({
+              'pluginattrs': ['hardwaremanagement.method'],
+              'default': 'ipmi',
+          })
+      }
+    },
     'power': {
         'state': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],

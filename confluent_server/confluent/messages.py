@@ -21,6 +21,13 @@
 import confluent.exceptions as exc
 import json
 
+valid_health_values = set([
+    'ok',
+    'warning',
+    'critical',
+    'failed',
+    'unknown',
+])
 
 def _htmlify_structure(indict):
     ret = "<ul>"
@@ -527,6 +534,44 @@ class PowerState(ConfluentChoiceMessage):
     keyname = 'state'
 
 
+class EventCollection(ConfluentMessage):
+    """A collection of events
+
+    This conveys a representation of an iterable of events.  The following
+    fields are supported:
+    id (some data giving the class of event without the specific data of the
+        event.  For example, 'overtemp (1000 degrees celsius)' would have
+        the same 'id' as 'overtemp (200 degrees celsius)
+    component  (specific name of the component this event references if any)
+    component_type (A description of the sort of device component is)
+    event (A text description of the event that occurred)
+    severity (The text 'ok', 'warning', 'critical', 'failed', or 'unknown')
+    timestamp (ISO 8601 compliant timestamp if available)
+    """
+    readonly = True
+
+    def __init__(self, events=(), name=None):
+        eventdata = []
+        self.notnode = name is None
+        for event in events:
+            entry = {
+                'id': event.get('id', None),
+                'component': event.get('component', None),
+                'component_type': event.get('component_type', None),
+                'event': event.get('event', None),
+                'severity': event['severity'],
+                'timestamp': event.get('timestamp', None),
+            }
+            if event['severity'] not in valid_health_values:
+                raise exc.NotImplementedException(
+                    'Invalid severity - ' + repr(event['severity']))
+            eventdata.append(entry)
+        if self.notnode:
+            self.kvpairs = {'events': eventdata}
+        else:
+            self.kvpairs = {name: {'events': eventdata}}
+
+
 class SensorReadings(ConfluentMessage):
     readonly = True
 
@@ -562,12 +607,7 @@ class KeyValueData(ConfluentMessage):
 
 class HealthSummary(ConfluentMessage):
     readonly = True
-    valid_values = set([
-        'ok',
-        'warning',
-        'critical',
-        'failed',
-    ])
+    valid_values = valid_health_values
 
     def __init__(self, health, name=None):
         self.stripped = False

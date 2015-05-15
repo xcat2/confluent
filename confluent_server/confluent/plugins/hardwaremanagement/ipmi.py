@@ -79,8 +79,6 @@ def sanitize_invdata(indata):
                         format(x, '02x') for x in indata[k][idx])
 
 
-
-
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         self._attribwatcher = cfm.watch_attributes(
@@ -262,7 +260,8 @@ def perform_request(operator, node, element,
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except Exception as e:
             results.put(msg.ConfluentNodeError(
-                node, 'IPMI PluginException: ' + str(e)))
+                node, 'IPMI PluginException (see stderr log): ' + str(e)))
+            raise
         finally:
             results.put('Done')
 
@@ -327,8 +326,8 @@ class IpmiHandler(object):
         self._logevt = None
         if self.broken:
             if (self.error == 'timeout' or
-                        'Insufficient resources' in self.error):
-                self.error = self.error.replace(' reported in RAKP4','')
+                    'Insufficient resources' in self.error):
+                self.error = self.error.replace(' reported in RAKP4', '')
                 self.output.put(msg.ConfluentTargetTimeout(
                     self.node, self.error))
                 return
@@ -351,6 +350,22 @@ class IpmiHandler(object):
             self.handle_sensors()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
+        elif self.element == ['events', 'hardware', 'log']:
+            self.do_eventlog()
+        else:
+            raise Exception('Not Implemented')
+
+    def do_eventlog(self):
+        eventout = []
+        for event in self.ipmicmd.get_event_log():
+            event['severity'] = _str_health(event['severity'])
+            if 'event_data' in event:
+                event['event'] = '{0} - {1}'.format(
+                    event['event'], event['event_data'])
+            event['id'] = '{0}.{1}'.format(event['event_id'],
+                                           event['component_type_id'])
+            eventout.append(event)
+        self.output.put(msg.EventCollection(eventout, name=self.node))
 
     def make_inventory_map(self):
         invnames = self.ipmicmd.get_inventory_descriptions()
