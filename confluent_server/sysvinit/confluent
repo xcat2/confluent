@@ -19,27 +19,40 @@ else
     exit 1
 fi
 
+confluent=/opt/confluent/bin/confluent
+confetty=/opt/confluent/bin/confetty
+
+stop() {
+	echo -n 'Stopping Confluent: '
+	if [ -S /var/run/confluent/api.sock ]; then
+		$confetty shutdown /
+	fi
+	$LOG_SUCCESS
+	echo
+	return
+}
+
+start() {
+	echo -n 'Starting Confluent: '
+	$confluent
+	$LOG_SUCCESS
+	echo
+	return
+}
+
 case $1 in
 	restart)
-	    if [ -S /var/run/confluent/api.sock ]; then
-		    echo -n 'Stopping Confluent '
-		    /opt/confluent/bin/confetty shutdown /
-		fi
-		echo -n 'Starting Confluent '
-		/opt/confluent/bin/confluent
-		$LOG_SUCCESS
+		stop
+		start
 		;;
 	start)
-		echo -n 'Starting Confluent '
-		/opt/confluent/bin/confluent
-		$LOG_SUCCESS
+		start
 		;;
 	stop)
-		echo -n 'Stopping Confluent '
-		if [ -S /var/run/confluent/api.sock ]; then
-		    /opt/confluent/bin/confetty shutdown /
-		fi
-		$LOG_SUCCESS
+		stop
+		;;
+	status)
+		status -p /var/run/confluent/pid $confluent
 		;;
 esac
 
