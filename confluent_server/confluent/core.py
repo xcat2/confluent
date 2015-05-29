@@ -118,6 +118,16 @@ noderesources = {
             'default': 'ipmi',
         }),
     },
+    'configuration': {
+        'management_controller': {
+            'alerts': {
+                'destinations': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+            }
+        }
+    },
     '_console': {
         'session': PluginRoute({
             'pluginattrs': ['console.method'],
@@ -128,12 +138,12 @@ noderesources = {
         'session': PluginRoute({}),
     },
     'events': {
-      'hardware': {
-          'log': PluginRoute({
-              'pluginattrs': ['hardwaremanagement.method'],
-              'default': 'ipmi',
-          })
-      }
+        'hardware': {
+            'log': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            })
+        },
     },
     'health': {
         'hardware': PluginRoute({
@@ -417,7 +427,8 @@ def handle_node_request(configmanager, inputdata, operation,
         except TypeError:
             allnodes.sort()
         return iterate_collections(allnodes)
-    if isnoderange and len(pathcomponents) == 3 and pathcomponents[2] == 'nodes':
+    if (isnoderange and len(pathcomponents) == 3 and
+            pathcomponents[2] == 'nodes'):
         # this means that it's a list of relevant nodes
         nodes = list(nodes)
         try:
@@ -447,7 +458,7 @@ def handle_node_request(configmanager, inputdata, operation,
     passvalues = []
     plugroute = routespec.routeinfo
     inputdata = msg.get_input_message(
-        pathcomponents, operation, inputdata, nodes)
+        pathcomponents, operation, inputdata, nodes, isnoderange)
     if 'handler' in plugroute:  # fixed handler definition, easy enough
         hfunc = getattr(pluginmap[plugroute['handler']], operation)
         passvalue = hfunc(

@@ -348,12 +348,56 @@ class IpmiHandler(object):
             self.identify()
         elif self.element[0] == 'sensors':
             self.handle_sensors()
+        elif self.element[0] == 'configuration':
+            self.handle_configuration()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
         elif self.element == ['events', 'hardware', 'log']:
             self.do_eventlog()
         else:
             raise Exception('Not Implemented')
+
+    def handle_configuration(self):
+        if self.element[1:3] == ['management_controller', 'alerts' ]:
+            return self.handle_alerts()
+        raise Exception('Not implemented')
+
+    def handle_alerts(self):
+        if self.element[3] == 'destinations':
+            if len(self.element) == 4:
+                # A list of destinations
+                maxdest = self.ipmicmd.get_alert_destination_count()
+                for alertidx in xrange(0, maxdest + 1):
+                    self.output.put(msg.ChildCollection(alertidx))
+                return
+            elif len(self.element) == 5:
+                alertidx = int(self.element[-1])
+                if self.op == 'read':
+                    destdata = self.ipmicmd.get_alert_destination(alertidx)
+                    self.output.put(msg.AlertDestination(
+                        ip=destdata['address'],
+                        acknowledge=destdata['acknowledge_required'],
+                        retries=destdata['retries'],
+                        name=self.node))
+                    return
+                elif self.op == 'update':
+                    alertparms = self.inputdata.alert_params_by_node(
+                        self.node)
+                    alertargs = {}
+                    if 'acknowledge' in alertparms:
+                        alertargs['acknowledge_required'] = alertparms['acknowledge']
+                    if 'ip' in alertparms:
+                        alertargs['ip'] = alertparms['ip']
+                    if 'retries' in alertparms:
+                        alertargs['retries'] = alertparms['retries']
+                    self.ipmicmd.set_alert_destination(destination=alertidx,
+                                                       **alertargs)
+                    return
+                elif self.op == 'delete':
+                    self.ipmicmd.clear_alert_destination(alertidx)
+                    return
+        raise Exception('Not implemented')
+
 
     def do_eventlog(self):
         eventout = []

@@ -121,15 +121,14 @@ class ConfluentMessage(object):
                         snippet += _htmlify_structure(v)
                     else:
                         snippet += ('<input type="{0}" name="{1}" value="{2}" '
-                                    ' "title="{3}">'
+                                    ' "title="{3}">\r'
                                     ).format(valtype, key, v, self.desc)
                 if not self.readonly:
                     snippet += (
                         '<input type="{0}" name="{1}" value="" title="{2}">'
                         '<input type="checkbox" name="restexplorerhonorkey" '
-                        'value="{1}">').format(valtype, key, self.desc)
+                        'value="{1}">\r').format(valtype, key, self.desc)
                 return snippet
-            snippet += repr(val)
             if val is not None and 'value' in val:
                 value = val['value']
                 if 'inheritedfrom' in val:
@@ -159,7 +158,7 @@ class ConfluentMessage(object):
                 snippet += (key + ":" +
                             '<input type="{0}" name="{1}" value="{2}" '
                             'title="{3}"><input type="checkbox" '
-                            'name="restexplorerhonorkey" value="{1}">'
+                            'name="restexplorerhonorkey" value="{1}"><br>\r'
                             ).format(valtype, key, value, self.desc)
             if len(notes) > 0:
                 snippet += '(' + ','.join(notes) + ')'
@@ -308,13 +307,17 @@ class ChildCollection(LinkRelation):
                                                                   extension)
 
 
-def get_input_message(path, operation, inputdata, nodes=None):
+def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
     elif path[0] in ('attributes', 'users') and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)
+    elif (len(path) == 5 and
+            path[:4] == ['configuration', 'management_controller', 'alerts',
+                         'destinations'] and operation != 'retrieve'):
+        return InputAlertDestination(path, nodes, inputdata, multinode)
     elif path == ['identify'] and operation != 'retrieve':
         return InputIdentifyMessage(path, nodes, inputdata)
     elif inputdata:
@@ -571,6 +574,53 @@ class EventCollection(ConfluentMessage):
             self.kvpairs = {'events': eventdata}
         else:
             self.kvpairs = {name: {'events': eventdata}}
+
+
+class AlertDestination(ConfluentMessage):
+    def __init__(self, ip, acknowledge=False, retries=0, name=None):
+        self.desc = 'foo'
+        self.stripped = False
+        self.notnode = name is None
+        kvpairs = {'ip': {'value': ip},
+                   'acknowledge': {'value': acknowledge},
+                   'retries': {'value': retries}}
+        if self.notnode:
+            self.kvpairs = kvpairs
+        else:
+            self.kvpairs = {name: kvpairs}
+
+
+class InputAlertDestination(ConfluentMessage):
+    valid_alert_params = (
+        'acknowledge',
+        'ip',
+        'retries'
+    )
+
+    def __init__(self, path, nodes, inputdata, multinode=False):
+        self.alertcfg = {}
+        if multinode:  # keys are node names
+            for node in inputdata:
+                self.alertcfg[node] = inputdata[node]
+                for key in inputdata[node]:
+                    if key not in self.valid_alert_params:
+                        raise exc.InvalidArgumentException(
+                            'Unrecognized alert parameter ' + key)
+                    if isinstance(inputdata[node][key], dict):
+                        self.alertcfg[node][key] = \
+                            inputdata[node][key]['value']
+        else:
+            for key in inputdata:
+                if key not in self.valid_alert_params:
+                    raise exc.InvalidArgumentException(
+                            'Unrecognized alert parameter ' + key)
+                if isinstance(inputdata[key], dict):
+                    inputdata[key] = inputdata[key]['value']
+            for node in nodes:
+                self.alertcfg[node] = inputdata
+
+    def alert_params_by_node(self, node):
+        return self.alertcfg[node]
 
 
 class SensorReadings(ConfluentMessage):
