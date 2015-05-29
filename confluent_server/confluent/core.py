@@ -108,6 +108,16 @@ class PluginCollection(object):
 # _ prefix indicates internal use (e.g. special console scheme) and should not
 # be enumerated in any collection
 noderesources = {
+    'attributes': {
+        'all': PluginRoute({'handler': 'attributes'}),
+        'current': PluginRoute({'handler': 'attributes'}),
+    },
+    'boot': {
+        'nextdevice': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
+    },
     '_console': {
         'session': PluginRoute({
             'pluginattrs': ['console.method'],
@@ -125,12 +135,6 @@ noderesources = {
           })
       }
     },
-    'power': {
-        'state': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-    },
     'health': {
         'hardware': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
@@ -141,16 +145,6 @@ noderesources = {
         'pluginattrs': ['hardwaremanagement.method'],
         'default': 'ipmi',
     }),
-    'boot': {
-        'nextdevice': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-    },
-    'attributes': {
-        'all': PluginRoute({'handler': 'attributes'}),
-        'current': PluginRoute({'handler': 'attributes'}),
-    },
     'inventory': {
         'hardware': {
             'all': PluginCollection({
@@ -158,6 +152,12 @@ noderesources = {
                 'default': 'ipmi',
             }),
         },
+    },
+    'power': {
+        'state': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
     },
     'sensors': {
         'hardware': {
