@@ -104,20 +104,24 @@ def _derive_keys(password, salt):
                         lambda p, s: HMAC.new(p, s, SHA256).digest())
     finalkey = KDF.PBKDF2(tmpkey, salt, 32, 50000,
                           lambda p, s: HMAC.new(p, s, SHA256).digest())
-    return finalkey[:32], finalkey[32:]
+    return finalkey[:16], finalkey[16:]
 
 
-def _get_protected_key(keydict, password):
-    if keydict['unencryptedvalue']:
+def _get_protected_key(keydict, password, paramname):
+    if password and 'unencryptedvalue' in keydict:
+        set_global(paramname, _format_key(
+            keydict['unencryptedvalue'],
+            password=password))
+    if 'unencryptedvalue' in keydict:
         return keydict['unencryptedvalue']
     # TODO(jbjohnso): check for TPM sealing
     if 'passphraseprotected' in keydict:
         if password is None:
             raise Exception("Passphrase protected secret requires password")
-        for pp in keydict['passphraseprotected']:
-            salt = pp[0]
-            privkey, integkey = _derive_keys(password, salt)
-            return decrypt_value(pp[1:], key=privkey, integritykey=integkey)
+        pp = keydict['passphraseprotected']
+        salt = pp[0]
+        privkey, integkey = _derive_keys(password, salt)
+        return decrypt_value(pp[1:], key=privkey, integritykey=integkey)
     else:
         raise Exception("No available decryption key")
 
@@ -127,7 +131,7 @@ def _format_key(key, password=None):
         salt = os.urandom(32)
         privkey, integkey = _derive_keys(password, salt)
         cval = crypt_value(key, key=privkey, integritykey=integkey)
-        return {"passphraseprotected": cval}
+        return {"passphraseprotected": (salt,) + cval}
     else:
         return {"unencryptedvalue": key}
 
@@ -138,7 +142,7 @@ def init_masterkey(password=None):
     cfgn = get_global('master_privacy_key')
 
     if cfgn:
-        _masterkey = _get_protected_key(cfgn, password=password)
+        _masterkey = _get_protected_key(cfgn, password, 'master_privacy_key')
     else:
         _masterkey = os.urandom(32)
         set_global('master_privacy_key', _format_key(
@@ -146,7 +150,8 @@ def init_masterkey(password=None):
             password=password))
     cfgn = get_global('master_integrity_key')
     if cfgn:
-        _masterintegritykey = _get_protected_key(cfgn, password=password)
+        _masterintegritykey = _get_protected_key(cfgn, password,
+                                                 'master_integrity_key')
     else:
         _masterintegritykey = os.urandom(64)
         set_global('master_integrity_key', _format_key(
@@ -155,15 +160,18 @@ def init_masterkey(password=None):
 
 
 def decrypt_value(cryptvalue,
-                  key=_masterkey,
-                  integritykey=_masterintegritykey):
+                  key=None,
+                  integritykey=None):
     iv, cipherdata, hmac = cryptvalue
-    if _masterkey is None or _masterintegritykey is None:
-        init_masterkey()
-    check_hmac = HMAC.new(_masterintegritykey, cipherdata, SHA256).digest()
+    if key is None and integritykey is None:
+        if _masterkey is None or _masterintegritykey is None:
+            init_masterkey()
+        key = _masterkey
+        integritykey = _masterintegritykey
+    check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
     if hmac != check_hmac:
         raise Exception("bad HMAC value on crypted value")
-    decrypter = AES.new(_masterkey, AES.MODE_CBC, iv)
+    decrypter = AES.new(key, AES.MODE_CBC, iv)
     value = decrypter.decrypt(cipherdata)
     padsize = ord(value[-1])
     pad = value[-padsize:]
@@ -176,13 +184,14 @@ def decrypt_value(cryptvalue,
 
 
 def crypt_value(value,
-                key=_masterkey,
-                integritykey=_masterintegritykey):
+                key=None,
+                integritykey=None):
     # encrypt given value
     # PKCS7 is the padding scheme to employ, if no padded needed, pad with 16
     # check HMAC prior to attempting decrypt
     if key is None or integritykey is None:
-        init_masterkey()
+        if _masterkey is None or _masterintegritykey is None:
+            init_masterkey()
         key = _masterkey
         integritykey = _masterintegritykey
     iv = os.urandom(16)
