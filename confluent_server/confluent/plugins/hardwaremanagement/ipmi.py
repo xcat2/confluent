@@ -256,6 +256,7 @@ def perform_request(operator, node, element,
                 results.put(msg.ConfluentTargetTimeout(node))
             else:
                 results.put(msg.ConfluentNodeError(node, excmsg))
+                raise
         except exc.TargetEndpointUnreachable as tu:
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except Exception as e:
@@ -402,12 +403,13 @@ class IpmiHandler(object):
     def do_eventlog(self):
         eventout = []
         for event in self.ipmicmd.get_event_log():
-            event['severity'] = _str_health(event['severity'])
+            event['severity'] = _str_health(event.get('severity'), 'unknown')
             if 'event_data' in event:
                 event['event'] = '{0} - {1}'.format(
                     event['event'], event['event_data'])
-            event['id'] = '{0}.{1}'.format(event['event_id'],
-                                           event['component_type_id'])
+            if 'event_id' in event:
+                event['id'] = '{0}.{1}'.format(event['event_id'],
+                                               event['component_type_id'])
             eventout.append(event)
         self.output.put(msg.EventCollection(eventout, name=self.node))
 
@@ -598,6 +600,8 @@ class IpmiHandler(object):
 
 
 def _str_health(health):
+    if health == 'unknown':
+        return health
     if pygconstants.Health.Failed & health:
         health = 'failed'
     elif pygconstants.Health.Critical & health:
