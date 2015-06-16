@@ -33,6 +33,7 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
+import confluent.alerts as alerts
 import confluent.config.attributes as attrscheme
 import confluent.interface.console as console
 import confluent.exceptions as exc
@@ -93,7 +94,7 @@ def load_plugins():
                 pluginmap[plugin] = tmpmod
 
 
-rootcollections = ['noderange/', 'nodes/', 'nodegroups/', 'users/']
+rootcollections = ['noderange/', 'nodes/', 'nodegroups/', 'users/', 'events/']
 
 
 class PluginRoute(object):
@@ -142,7 +143,11 @@ noderesources = {
             'log': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
-            })
+            }),
+            'decode': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
         },
     },
     'health': {
@@ -386,7 +391,7 @@ def handle_nodegroup_request(configmanager, inputdata,
 
 
 def handle_node_request(configmanager, inputdata, operation,
-                        pathcomponents):
+                        pathcomponents, autostrip=True):
     iscollection = False
     routespec = None
     if pathcomponents[0] == 'noderange':
@@ -491,7 +496,7 @@ def handle_node_request(configmanager, inputdata, operation,
                 nodes=nodesbyhandler[hfunc], element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata))
-        if isnoderange:
+        if isnoderange or not autostrip:
             return itertools.chain(*passvalues)
         elif isinstance(passvalues[0], console.Console):
             return passvalues[0]
@@ -499,7 +504,7 @@ def handle_node_request(configmanager, inputdata, operation,
             return stripnode(passvalues[0], nodes[0])
 
 
-def handle_path(path, operation, configmanager, inputdata=None):
+def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
 
     The plugins should generally return some sort of iterator.
@@ -514,7 +519,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'noderange':
         return handle_node_request(configmanager, inputdata, operation,
-                                   pathcomponents)
+                                   pathcomponents, autostrip)
     elif pathcomponents[0] == 'nodegroups':
         return handle_nodegroup_request(configmanager, inputdata,
                                         pathcomponents,
@@ -522,7 +527,7 @@ def handle_path(path, operation, configmanager, inputdata=None):
     elif pathcomponents[0] == 'nodes':
         # single node request of some sort
         return handle_node_request(configmanager, inputdata,
-                                   operation, pathcomponents)
+                                   operation, pathcomponents, autostrip)
     elif pathcomponents[0] == 'users':
         # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
@@ -546,5 +551,16 @@ def handle_path(path, operation, configmanager, inputdata=None):
                 pathcomponents, operation, inputdata)
             update_user(user, inputdata.attribs, configmanager)
             return show_user(user, configmanager)
+    elif pathcomponents[0] == 'events':
+        try:
+            element = pathcomponents[1]
+        except IndexError:
+            if operation != 'retrieve':
+                raise exc.InvalidArgumentException('Target is read-only')
+            return (msg.ChildCollection('decode'),)
+        if element != 'decode':
+            raise exc.NotFoundException()
+        if operation == 'update':
+            return alerts.decode_alert(inputdata, configmanager)
     else:
         raise exc.NotFoundException()
