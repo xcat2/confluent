@@ -46,7 +46,6 @@ import math
 import getpass
 import optparse
 import os
-import readline
 import select
 import shlex
 import socket
@@ -601,9 +600,11 @@ except socket.gaierror:
 # sys.stdout.write('\x1b[H\x1b[J')
 # sys.stdout.flush()
 
-readline.parse_and_bind("tab: complete")
-readline.parse_and_bind("set bell-style none")
-readline.set_completer(completer)
+if sys.stdout.isatty():
+	import readline
+	readline.parse_and_bind("tab: complete")
+	readline.parse_and_bind("set bell-style none")
+	readline.set_completer(completer)
 doexit = False
 inconsole = False
 pendingcommand = ""
