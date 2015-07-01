@@ -48,6 +48,14 @@ sensor_categories = {
     'fans': frozenset(['Fan', 'Cooling Device']),
 }
 
+def hex2bin(hexstring):
+    hexvals = hexstring.split(':')
+    if len(hexvals) < 2:
+        hexvals = hexstring.split(' ')
+    if len(hexvals) < 2:
+        hexvals = [hexstring[i:i+2] for i in xrange(0, len(hexstring), 2)]
+    bytedata = [int(i, 16) for i in hexvals]
+    return bytearray(bytedata)
 
 def simplify_name(name):
     return name.lower().replace(' ', '_')
@@ -355,6 +363,8 @@ class IpmiHandler(object):
             self.handle_inventory()
         elif self.element == ['events', 'hardware', 'log']:
             self.do_eventlog()
+        elif self.element == ['events', 'hardware', 'decode']:
+            self.decode_alert()
         else:
             raise Exception('Not Implemented')
 
@@ -362,6 +372,18 @@ class IpmiHandler(object):
         if self.element[1:3] == ['management_controller', 'alerts' ]:
             return self.handle_alerts()
         raise Exception('Not implemented')
+
+    def decode_alert(self):
+        inputdata = self.inputdata.get_alert(self.node)
+        specifictrap = int(inputdata['.1.3.6.1.6.3.1.1.4.1.0'].rpartition(
+            '.')[-1])
+        for tmpvarbind in inputdata:
+            if tmpvarbind.endswith('3183.1.1'):
+                varbinddata = inputdata[tmpvarbind]
+        varbinddata = hex2bin(varbinddata)
+        event = self.ipmicmd.decode_pet(specifictrap, varbinddata)
+        self.pyghmi_event_to_confluent(event)
+        self.output.put(msg.EventCollection((event,), name=self.node))
 
     def handle_alerts(self):
         if self.element[3] == 'destinations':
@@ -399,19 +421,21 @@ class IpmiHandler(object):
                     return
         raise Exception('Not implemented')
 
-
     def do_eventlog(self):
         eventout = []
         for event in self.ipmicmd.get_event_log():
-            event['severity'] = _str_health(event.get('severity'), 'unknown')
-            if 'event_data' in event:
-                event['event'] = '{0} - {1}'.format(
-                    event['event'], event['event_data'])
-            if 'event_id' in event:
-                event['id'] = '{0}.{1}'.format(event['event_id'],
-                                               event['component_type_id'])
+            self.pyghmi_event_to_confluent(event)
             eventout.append(event)
         self.output.put(msg.EventCollection(eventout, name=self.node))
+
+    def pyghmi_event_to_confluent(self, event):
+        event['severity'] = _str_health(event.get('severity', 'unknown'))
+        if 'event_data' in event:
+            event['event'] = '{0} - {1}'.format(
+                event['event'], event['event_data'])
+        if 'event_id' in event:
+            event['id'] = '{0}.{1}'.format(event['event_id'],
+                                           event['component_type_id'])
 
     def make_inventory_map(self):
         invnames = self.ipmicmd.get_inventory_descriptions()

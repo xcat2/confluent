@@ -320,8 +320,32 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
         return InputAlertDestination(path, nodes, inputdata, multinode)
     elif path == ['identify'] and operation != 'retrieve':
         return InputIdentifyMessage(path, nodes, inputdata)
+    elif path == ['events', 'hardware', 'decode']:
+        return InputAlertData(path, inputdata, nodes)
     elif inputdata:
         raise exc.InvalidArgumentException()
+
+
+class InputAlertData(ConfluentMessage):
+
+    def __init__(self, path, inputdata, nodes=None):
+        self.alertparams = inputdata
+        # first migrate snmpv1 input to snmpv2 format
+        if 'specifictrap' in self.alertparams:
+            # If we have a 'specifictrap', convert to SNMPv2 per RFC 2576
+            # This way
+            enterprise = self.alertparams['enterprise']
+            specifictrap = self.alertparams['specifictrap']
+            self.alertparams['.1.3.6.1.6.3.1.1.4.1.0'] = enterprise + '.0.' + \
+                str(specifictrap)
+        if '1.3.6.1.6.3.1.1.4.1.0' in self.alertparams:
+            self.alertparams['.1.3.6.1.6.3.1.1.4.1.0'] = \
+                self.alertparams['1.3.6.1.6.3.1.1.4.1.0']
+        if '.1.3.6.1.6.3.1.1.4.1.0' not in self.alertparams:
+            raise exc.InvalidArgumentException('Missing SNMP Trap OID')
+
+    def get_alert(self, node=None):
+        return self.alertparams
 
 
 class InputAttributes(ConfluentMessage):
