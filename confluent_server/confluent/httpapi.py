@@ -487,6 +487,8 @@ def _assemble_json(responses, resource, url, extension):
                         links[hk].append(haldata[hk])
                     else:
                         links[hk] = [links[hk], haldata[hk]]
+                elif hk == 'item':
+                    links[hk] = [haldata[hk],]
                 else:
                     links[hk] = haldata[hk]
         else:
