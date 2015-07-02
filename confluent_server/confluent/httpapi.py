@@ -507,7 +507,7 @@ def _assemble_json(responses, resource, url, extension):
         rspdata, sort_keys=True, indent=4, ensure_ascii=False).encode('utf-8')
 
 
-def serve():
+def serve(bind_host, bind_port):
     # TODO(jbjohnso): move to unix socket and explore
     # either making apache deal with it
     # or just supporting nginx or lighthttpd
@@ -519,20 +519,22 @@ def serve():
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
     eventlet.wsgi.server(
-        eventlet.listen(('::', 4005, 0, 0), family=socket.AF_INET6),
+        eventlet.listen((bind_host, bind_port, 0, 0), family=socket.AF_INET6),
         resourcehandler, log=False, log_output=False, debug=False)
 
 
 class HttpApi(object):
-    def __init__(self):
+    def __init__(self, bind_host=None, bind_port=None):
         self.server = None
+        self.bind_host = bind_host or '::'
+        self.bind_port = bind_port or 4005
 
     def start(self):
         global auditlog
         global tracelog
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
-        self.server = eventlet.spawn(serve)
+        self.server = eventlet.spawn(serve, self.bind_host, self.bind_port)
 
 
 _cleaner = eventlet.spawn(_sessioncleaner)
