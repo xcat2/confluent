@@ -107,7 +107,10 @@ class ConfluentMessage(object):
         for key in pairs.iterkeys():
             val = pairs[key]
             value = self.defaultvalue
-            valtype = self.defaulttype
+            if isinstance(val, dict) and 'type' in val:
+                valtype = val['type']
+            else:
+                valtype = self.defaulttype
             notes = []
 
             if isinstance(val, list):
@@ -322,6 +325,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
         return InputIdentifyMessage(path, nodes, inputdata)
     elif path == ['events', 'hardware', 'decode']:
         return InputAlertData(path, inputdata, nodes)
+    elif (path[:3] == ['configuration', 'management_controller', 'users'] and
+            operation != 'retrieve'):
+        return InputCredential(path, inputdata, nodes)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -405,6 +411,61 @@ class InputAttributes(ConfluentMessage):
         return nodeattr
 
 
+class InputCredential(ConfluentMessage):
+    valid_privilege_levels = set([
+        'callback',
+        'user',
+        'operator',
+        'administrator',
+        'proprietary',
+        'no_access',
+    ])
+
+    def __init__(self, path, inputdata, nodes=None):
+        self.credentials = {}
+        nestedmode = False
+        if not inputdata:
+            raise exc.InvalidArgumentException('no request data provided')
+
+        if len(path) == 4:
+            inputdata['uid'] = path[-1]
+
+        if ('uid' not in inputdata or 'privilege_level' not in inputdata
+            or 'username' not in inputdata or 'password' not in inputdata):
+            raise exc.InvalidArgumentException('missing arguments')
+
+        if not inputdata['uid'].isdigit():
+            raise exc.InvalidArgumentException('uid must be a number')
+        else:
+            inputdata['uid'] = int(inputdata['uid'])
+        if inputdata['privilege_level'] not in self.valid_privilege_levels:
+            raise exc.InvalidArgumentException('privilege_level is not one of '
+                                        + ','.join(self.valid_privilege_levels))
+
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for node in nodes:
+            self.credentials[node] = inputdata
+
+    def get_attributes(self, node):
+        if node not in self.credentials:
+            return {}
+        credential = self.credentials[node]
+        for attr in credentials:
+            if type(credentials[attr]) in (str, unicode):
+                try:
+                    # as above, use format() to see if string follows
+                    # expression, store value back in case of escapes
+                    tv = credential[attr].format()
+                    credential[attr] = tv
+                except (KeyError, IndexError):
+                    # an expression string will error if format() done
+                    # use that as cue to put it into config as an expr
+                    credential[attr] = {'expression': credential[attr]}
+        return credential
+
+
 class ConfluentInputMessage(ConfluentMessage):
     keyname = 'state'
 
@@ -480,7 +541,7 @@ class BootDevice(ConfluentChoiceMessage):
     valid_paramset = {
         'bootmode': valid_bootmodes,
         }
-    
+
 
     def __init__(self, node, device, bootmode='unspecified'):
         if device not in self.valid_values:
@@ -599,6 +660,21 @@ class EventCollection(ConfluentMessage):
             self.kvpairs = {'events': eventdata}
         else:
             self.kvpairs = {name: {'events': eventdata}}
+
+
+class User(ConfluentMessage):
+    def __init__(self, uid, username, privilege_level, name=None):
+        self.desc = 'foo'
+        self.stripped = False
+        self.notnode = name is None
+        kvpairs = {'username': {'value': username},
+                   'password': {'value': '', 'type': 'password'},
+                   'privilege_level': {'value': privilege_level}
+                   }
+        if self.notnode:
+            self.kvpairs = kvpairs
+        else:
+            self.kvpairs = {name: kvpairs}
 
 
 class AlertDestination(ConfluentMessage):

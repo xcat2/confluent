@@ -103,9 +103,36 @@ def node_creation_resources():
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
 
 
+def user_creation_resources():
+    credential = {
+        'uid': {
+            'description': (''),
+        },
+        'username': {
+            'description': (''),
+        },
+        'password': {
+            'description': (''),
+        },
+        'privilege_level': {
+            'description': (''),
+        },
+    }
+    for attr in sorted(credential.iterkeys()):
+        if attr == "password":
+            yield confluent.messages.CryptedAttributes(
+                kv={attr: None},
+                desc=credential[attr]['description']).html() + '<br>\n'
+        else:
+            yield confluent.messages.Attributes(
+                kv={attr: None},
+                desc=credential[attr]['description']).html() + '<br>\n'
+
+
 create_resource_functions = {
-    '/nodes/': node_creation_resources,
-    '/groups/': group_creation_resources,
+    'nodes': node_creation_resources,
+    'groups': group_creation_resources,
+    'users': user_creation_resources,
 }
 
 
@@ -444,11 +471,15 @@ def _assemble_html(responses, resource, querydict, url, extension):
     if iscollection:
         # localpath = url[:-2] (why was this here??)
         try:
+            if url == '/users/':
+                return
             firstpass = True
-            for y in create_resource_functions[url]():
+            module = url.split('/')
+            if not module:
+                return
+            for y in create_resource_functions[module[-2]]():
                 if firstpass:
-                    yield "<hr>Define new resource in %s:<BR>" % \
-                          url.split("/")[-2]
+                    yield "<hr>Define new resource in %s:<BR>" % module[-2]
                 firstpass = False
                 yield y
             yield ('<input value="create" name="restexplorerop" type="submit">'

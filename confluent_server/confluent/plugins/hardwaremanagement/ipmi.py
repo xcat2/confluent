@@ -371,6 +371,8 @@ class IpmiHandler(object):
     def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts' ]:
             return self.handle_alerts()
+        elif self.element[1:3] == ['management_controller', 'users' ]:
+            return self.handle_users()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -420,6 +422,39 @@ class IpmiHandler(object):
                     self.ipmicmd.clear_alert_destination(alertidx)
                     return
         raise Exception('Not implemented')
+
+    def handle_users(self):
+        if len(self.element) == 3:
+            if self.op == 'update':
+                user = self.inputdata.credentials[self.node]
+                self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
+                                    password=user['password'], channel=1,
+                                    callback=True,link_auth=True, ipmi_msg=True,
+                                    privilege_level=user['privilege_level'])
+            # A list of users
+            for user in self.ipmicmd.get_users(channel=1):
+                self.output.put(msg.ChildCollection(user))
+            return
+        elif len(self.element) == 4:
+            user = int(self.element[-1])
+            if self.op == 'read':
+                data = self.ipmicmd.get_user(uid=user, channel=1)
+                self.output.put(msg.User(
+                    uid=data['uid'],
+                    username=data['name'],
+                    privilege_level=data['access']['privilege_level'],
+                    name=self.node))
+                return
+            elif self.op == 'update':
+                user = self.inputdata.credentials[self.node]
+                self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
+                    password=user['password'], channel=1,
+                    callback=True,link_auth=True, ipmi_msg=True,
+                    privilege_level=user['privilege_level'])
+                return
+            elif self.op == 'delete':
+                self.ipmicmd.user_delete(uid=user, channel=1)
+                return
 
     def do_eventlog(self):
         eventout = []
