@@ -116,7 +116,6 @@ def doexit():
 
 
 def run():
-    configfile = "/etc/confluent/service.cfg"
     _checkpidfile()
     confluentcore.load_plugins()
     _daemonize()
@@ -129,19 +128,25 @@ def run():
     #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
     #                           family=socket.AF_UNIX)
     #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
-    config = ConfigParser.ConfigParser()
-    config.read(configfile)
-    try:
-        bind_host = config.get('http', 'bindhost')
-        bind_port = config.getint('http', 'bindport')
-    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError) as e:
-        bind_host = None
-        bind_port = None
+    http_bind_host, http_bind_port = _get_connector_config('http')
+    sock_bind_host, sock_bind_port = _get_connector_config('socket')
     consoleserver.start_console_sessions()
-    webservice = httpapi.HttpApi(bind_host, bind_port)
+    webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
-    sockservice = sockapi.SockApi()
+    sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
     sockservice.start()
     atexit.register(doexit)
     while 1:
         eventlet.sleep(100)
+
+def _get_connector_config(session):
+    configfile = "/etc/confluent/service.cfg"
+    config = ConfigParser.ConfigParser()
+    config.read(configfile)
+    try:
+        host = config.get(session, 'bindhost')
+        port = config.getint(session, 'bindport')
+    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError) as e:
+        host = None
+        port = None
+    return (host, port)

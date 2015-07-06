@@ -236,11 +236,11 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
     return
 
 
-def _tlshandler():
+def _tlshandler(bind_host, bind_port):
     plainsocket = socket.socket(socket.AF_INET6)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    plainsocket.bind(('::', 13001, 0, 0))
+    plainsocket.bind((bind_host, bind_port, 0, 0))
     plainsocket.listen(5)
     while (1):  # TODO: exithook
         cnn, addr = plainsocket.accept()
@@ -299,14 +299,17 @@ def _unixdomainhandler():
 
 
 class SockApi(object):
-    def __init__(self):
+    def __init__(self, bindhost=None, bindport=None):
         self.tlsserver = None
         self.unixdomainserver = None
+        self.bind_host = bindhost or '::'
+        self.bind_port = bindport or 13001
 
     def start(self):
         global auditlog
         global tracelog
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
-        self.tlsserver = eventlet.spawn(_tlshandler)
+        self.tlsserver = eventlet.spawn(
+            _tlshandler, self.bind_host, self.bind_port)
         self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
