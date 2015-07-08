@@ -432,6 +432,9 @@ def resourcehandler_backend(env, start_response):
         except exc.TargetEndpointBadCredentials:
             start_response('502 Bad Credentials', headers)
             yield '502 - Bad Credentials'
+        except exc.LockedCredentials:
+            start_response('500 Locked credential store', headers)
+            yield '500 - Credential store locked'
         except exc.NotImplementedException:
             start_response('501 Not Implemented', headers)
             yield '501 Not Implemented'

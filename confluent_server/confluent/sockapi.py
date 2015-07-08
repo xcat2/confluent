@@ -141,6 +141,10 @@ def sessionhdl(connection, authname, skipauth=False):
             send_data(connection, {'errorcode': 400,
                                       'error': 'Bad Request - ' + str(iae)})
             send_data(connection, {'_requestdone': 1})
+        except exc.LockedCredentials as lockedcred:
+            send_data(connection, {'errorcode': 500,
+                                      'error': 'Locked Credential Store'})
+            send_data(connection, {'_requestdone': 1})
         except SystemExit:
             sys.exit(0)
         except:

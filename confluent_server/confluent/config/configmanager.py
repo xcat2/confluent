@@ -67,6 +67,7 @@ import base64
 import confluent.config.attributes as allattributes
 import confluent.log
 import confluent.util
+import confluent.exceptions as exc
 import copy
 import cPickle
 import errno
@@ -117,13 +118,13 @@ def _get_protected_key(keydict, password, paramname):
     # TODO(jbjohnso): check for TPM sealing
     if 'passphraseprotected' in keydict:
         if password is None:
-            raise Exception("Passphrase protected secret requires password")
+            raise exc.LockedCredentials("Passphrase protected secret requires password")
         pp = keydict['passphraseprotected']
         salt = pp[0]
         privkey, integkey = _derive_keys(password, salt)
         return decrypt_value(pp[1:], key=privkey, integritykey=integkey)
     else:
-        raise Exception("No available decryption key")
+        raise exc.LockedCredentials("No available decryption key")
 
 
 def _format_key(key, password=None):

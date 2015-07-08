@@ -42,6 +42,11 @@ class TargetEndpointBadCredentials(ConfluentException):
     # failed
     pass
 
+class LockedCredentials(ConfluentException):
+    # A request was performed that required a credential, but the credential
+    # store is locked
+    pass
+
 
 class ForbiddenRequest(ConfluentException):
     # The client request is not allowed by authorization engine
