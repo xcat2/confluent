@@ -27,6 +27,7 @@
 
 import atexit
 import confluent.auth as auth
+import confluent.config.configmanager as configmanager
 import confluent.consoleserver as consoleserver
 import confluent.core as confluentcore
 import confluent.httpapi as httpapi
@@ -115,8 +116,20 @@ def doexit():
         os.remove('/var/run/confluent/pid')
 
 
+def _initsecurity(config):
+    if config.has_option('security', 'externalcfgkey'):
+        keyfile = config.get('security', 'externalcfgkey')
+        with open(keyfile, 'r') as keyhandle:
+            key = keyhandle.read()
+        configmanager.init_masterkey(key)
+
+
 def run():
     _checkpidfile()
+    configfile = "/etc/confluent/service.cfg"
+    config = ConfigParser.ConfigParser()
+    config.read(configfile)
+    _initsecurity(config)
     confluentcore.load_plugins()
     _daemonize()
     _updatepidfile()
@@ -128,8 +141,8 @@ def run():
     #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
     #                           family=socket.AF_UNIX)
     #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
-    http_bind_host, http_bind_port = _get_connector_config('http')
-    sock_bind_host, sock_bind_port = _get_connector_config('socket')
+    http_bind_host, http_bind_port = _get_connector_config(config, 'http')
+    sock_bind_host, sock_bind_port = _get_connector_config(config, 'socket')
     consoleserver.start_console_sessions()
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
@@ -139,10 +152,8 @@ def run():
     while 1:
         eventlet.sleep(100)
 
-def _get_connector_config(session):
-    configfile = "/etc/confluent/service.cfg"
-    config = ConfigParser.ConfigParser()
-    config.read(configfile)
+
+def _get_connector_config(config, session):
     try:
         host = config.get(session, 'bindhost')
         port = config.getint(session, 'bindport')
