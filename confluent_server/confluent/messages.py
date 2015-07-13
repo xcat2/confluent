@@ -740,6 +740,8 @@ class SensorReadings(ConfluentMessage):
                 sensordict['states'] = sensor['states']
             if 'health' in sensor:
                 sensordict['health'] = sensor['health']
+            if 'type' in sensor:
+                sensordict['type'] = sensor['type']
             readings.append(sensordict)
         if self.notnode:
             self.kvpairs = {'sensors': readings}

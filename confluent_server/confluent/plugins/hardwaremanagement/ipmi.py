@@ -280,7 +280,9 @@ persistent_ipmicmds = {}
 def _dict_sensor(pygreading):
     retdict = {'name': pygreading.name, 'value': pygreading.value,
                'states': pygreading.states, 'units': pygreading.units,
-               'health': _str_health(pygreading.health)}
+               'health': _str_health(pygreading.health),
+               'type': pygreading.type,
+               }
     return retdict
 
 
