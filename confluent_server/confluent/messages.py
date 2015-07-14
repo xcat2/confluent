@@ -693,7 +693,7 @@ class AlertDestination(ConfluentMessage):
 
 class InputAlertDestination(ConfluentMessage):
     valid_alert_params = {
-        'acknowledge': lambda x: x,
+        'acknowledge': lambda x: False if type(x) in (unicode,str) and x.lower() == 'false' else bool(x),
         'ip': lambda x: x,
         'retries': lambda x: int(x)
     }
