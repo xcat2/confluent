@@ -75,7 +75,7 @@ def main():
                     healthexplanations[node].append(explanation)
             if node in healthbynode and node in healthexplanations:
                 if healthexplanations[node]:
-                    print('{0}: {1} ({2})'.format(
+                    print(u'{0}: {1} ({2})'.format(
                         node, healthbynode[node],
                         ','.join(healthexplanations[node])))
                 else:
