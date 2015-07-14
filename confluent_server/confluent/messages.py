@@ -692,11 +692,11 @@ class AlertDestination(ConfluentMessage):
 
 
 class InputAlertDestination(ConfluentMessage):
-    valid_alert_params = (
-        'acknowledge',
-        'ip',
-        'retries'
-    )
+    valid_alert_params = {
+        'acknowledge': lambda x: x,
+        'ip': lambda x: x,
+        'retries': lambda x: int(x)
+    }
 
     def __init__(self, path, nodes, inputdata, multinode=False):
         self.alertcfg = {}
@@ -709,14 +709,22 @@ class InputAlertDestination(ConfluentMessage):
                             'Unrecognized alert parameter ' + key)
                     if isinstance(inputdata[node][key], dict):
                         self.alertcfg[node][key] = \
-                            inputdata[node][key]['value']
+                            self.valid_alert_params[key](
+                                inputdata[node][key]['value'])
+                    else:
+                        self.alertcfg[node][key] = \
+                            self.valid_alert_params[key](inputdata[node][key])
         else:
             for key in inputdata:
                 if key not in self.valid_alert_params:
                     raise exc.InvalidArgumentException(
                             'Unrecognized alert parameter ' + key)
                 if isinstance(inputdata[key], dict):
-                    inputdata[key] = inputdata[key]['value']
+                    inputdata[key] = self.valid_alert_params[key](
+                        inputdata[key]['value'])
+                else:
+                    inputdata[key] = self.valid_alert_params[key](
+                        inputdata[key])
             for node in nodes:
                 self.alertcfg[node] = inputdata
 
