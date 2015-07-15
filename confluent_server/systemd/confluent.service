@@ -1,0 +1,12 @@
+# IBM(c) 2015 Apache 2.0
+[Unit]
+Description=Confluent hardware manager 
+
+[Service]
+Type=forking
+PIDFile=/var/run/confluent/pid
+ExecStart=/opt/confluent/bin/confluent
+
+[Install]
+WantedBy=multi-user.target
+

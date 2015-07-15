@@ -15,6 +15,7 @@ setup(
                       'pyghmi>=0.6.5'],
     scripts=['bin/confluent'],
     data_files=[('/etc/init.d', ['sysvinit/confluent']),
+                ('/usr/lib/systemd/system', ['systemd/confluent.service']),
 		('/opt/confluent/lib/python/confluent/plugins/console/', [])],
 
 )
