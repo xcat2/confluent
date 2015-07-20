@@ -746,6 +746,8 @@ class SensorReadings(ConfluentMessage):
                 sensordict['units'] = sensor['units']
             if 'states' in sensor:
                 sensordict['states'] = sensor['states']
+            if 'state_ids' in sensor:
+                sensordict['state_ids'] = sensor['state_ids']
             if 'health' in sensor:
                 sensordict['health'] = sensor['health']
             if 'type' in sensor:
