@@ -326,7 +326,7 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif path == ['events', 'hardware', 'decode']:
         return InputAlertData(path, inputdata, nodes)
     elif (path[:3] == ['configuration', 'management_controller', 'users'] and
-            operation != 'retrieve'):
+            operation != 'retrieve' and operation != 'delete'):
         return InputCredential(path, inputdata, nodes)
     elif inputdata:
         raise exc.InvalidArgumentException()
