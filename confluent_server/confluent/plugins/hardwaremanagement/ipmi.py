@@ -436,7 +436,7 @@ class IpmiHandler(object):
                                     privilege_level=user['privilege_level'])
             # A list of users
             for user in self.ipmicmd.get_users(channel=1):
-                self.output.put(msg.ChildCollection(user))
+                self.output.put(msg.ChildCollection(user, candelete=True))
             return
         elif len(self.element) == 4:
             user = int(self.element[-1])
@@ -700,3 +700,8 @@ def update(nodes, element, configmanager, inputdata):
 def retrieve(nodes, element, configmanager, inputdata):
     initthread()
     return perform_requests('read', nodes, element, configmanager, inputdata)
+
+def delete(nodes, element, configmanager, inputdata):
+    initthread()
+    return perform_requests(
+        'delete', nodes, element, configmanager, inputdata)

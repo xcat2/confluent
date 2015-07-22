@@ -515,6 +515,8 @@ def _assemble_json(responses, resource, url, extension):
             haldata = rsp.raw()
             for hk in haldata.iterkeys():
                 if 'href' in haldata[hk]:
+                    if isinstance(haldata[hk]['href'], int):
+                        haldata[hk]['href'] = str(haldata[hk]['href'])
                     haldata[hk]['href'] += extension
                 if hk in links:
                     if isinstance(links[hk], list):
