@@ -427,21 +427,23 @@ class IpmiHandler(object):
         raise Exception('Not implemented')
 
     def handle_users(self):
+        # Create user
         if len(self.element) == 3:
             if self.op == 'update':
                 user = self.inputdata.credentials[self.node]
                 self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
-                                    password=user['password'], channel=1,
+                                    password=user['password'],
                                     callback=True,link_auth=True, ipmi_msg=True,
                                     privilege_level=user['privilege_level'])
             # A list of users
-            for user in self.ipmicmd.get_users(channel=1):
+            for user in self.ipmicmd.get_users():
                 self.output.put(msg.ChildCollection(user, candelete=True))
             return
+        # Update user
         elif len(self.element) == 4:
             user = int(self.element[-1])
             if self.op == 'read':
-                data = self.ipmicmd.get_user(uid=user, channel=1)
+                data = self.ipmicmd.get_user(uid=user)
                 self.output.put(msg.User(
                     uid=data['uid'],
                     username=data['name'],
@@ -450,13 +452,21 @@ class IpmiHandler(object):
                 return
             elif self.op == 'update':
                 user = self.inputdata.credentials[self.node]
-                self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
-                    password=user['password'], channel=1,
-                    callback=True,link_auth=True, ipmi_msg=True,
-                    privilege_level=user['privilege_level'])
+
+                if 'username' in user:
+                    self.ipmicmd.set_user_name(uid=user['uid'],
+                                               name=user['username'])
+                if 'privilege_level' in user:
+                    self.ipmicmd.set_user_access(uid=user['uid'],
+                                    privilege_level=user['privilege_level'])
+                if 'password' in user:
+                    self.ipmicmd.set_user_password(uid=user['uid'],
+                                                   password=user['password'])
+                    self.ipmicmd.set_user_password(uid=user['uid'],
+                                    mode='enable', password=user['password'])
                 return
             elif self.op == 'delete':
-                self.ipmicmd.user_delete(uid=user, channel=1)
+                self.ipmicmd.user_delete(uid=user)
                 return
 
     def do_eventlog(self):

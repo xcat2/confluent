@@ -429,18 +429,27 @@ class InputCredential(ConfluentMessage):
 
         if len(path) == 4:
             inputdata['uid'] = path[-1]
+        # if the operation is 'create' check if all fields are present
+        elif ('uid' not in inputdata or 'privilege_level' not in inputdata or
+                'username' not in inputdata or 'password' not in inputdata):
+            raise exc.InvalidArgumentException('all fields are required')
 
-        if ('uid' not in inputdata or 'privilege_level' not in inputdata
-            or 'username' not in inputdata or 'password' not in inputdata):
-            raise exc.InvalidArgumentException('missing arguments')
-
-        if not inputdata['uid'].isdigit():
+        if 'uid' not in inputdata:
+            raise exc.InvalidArgumentException('uid is missing')
+        if (isinstance(inputdata['uid'], str) and
+                not inputdata['uid'].isdigit()):
             raise exc.InvalidArgumentException('uid must be a number')
         else:
             inputdata['uid'] = int(inputdata['uid'])
-        if inputdata['privilege_level'] not in self.valid_privilege_levels:
+        if ('privilege_level' in inputdata and
+              inputdata['privilege_level'] not in self.valid_privilege_levels):
             raise exc.InvalidArgumentException('privilege_level is not one of '
                                         + ','.join(self.valid_privilege_levels))
+        if 'username' in inputdata and len(inputdata['username']) > 16:
+            raise exc.InvalidArgumentException(
+                                        'name must be less than or = 16 chars')
+        if 'password' in inputdata and len(inputdata['password']) > 20:
+            raise exc.InvalidArgumentException('password has limit of 20 chars')
 
         if nodes is None:
             raise exc.InvalidArgumentException(
