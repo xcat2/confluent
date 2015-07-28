@@ -129,8 +129,17 @@ def run():
     configfile = "/etc/confluent/service.cfg"
     config = ConfigParser.ConfigParser()
     config.read(configfile)
-    _initsecurity(config)
-    confluentcore.load_plugins()
+    try:
+        _initsecurity(config)
+    except:
+        sys.stderr.write("Error unlocking credential store\n")
+        doexit()
+        sys.exit(1)
+    try:
+        confluentcore.load_plugins()
+    except:
+        doexit()
+        raise
     _daemonize()
     _updatepidfile()
     auth.init_auth()
