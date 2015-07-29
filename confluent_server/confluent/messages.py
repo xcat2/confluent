@@ -748,19 +748,19 @@ class SensorReadings(ConfluentMessage):
         readings = []
         self.notnode = name is None
         for sensor in sensors:
-            sensordict = {'name': sensor['name']}
-            if 'value' in sensor:
-                sensordict['value'] = sensor['value']
-            if 'units' in sensor:
-                sensordict['units'] = sensor['units']
-            if 'states' in sensor:
-                sensordict['states'] = sensor['states']
-            if 'state_ids' in sensor:
-                sensordict['state_ids'] = sensor['state_ids']
-            if 'health' in sensor:
-                sensordict['health'] = sensor['health']
-            if 'type' in sensor:
-                sensordict['type'] = sensor['type']
+            sensordict = {'name': sensor.name}
+            if hasattr(sensor, 'value'):
+                sensordict['value'] = sensor.value
+            if hasattr(sensor, 'units'):
+                sensordict['units'] = sensor.units
+            if hasattr(sensor, 'states'):
+                sensordict['states'] = sensor.states
+            if hasattr(sensor, 'state_ids'):
+                sensordict['state_ids'] = sensor.state_ids
+            if hasattr(sensor, 'health'):
+                sensordict['health'] = sensor.health
+            if hasattr(sensor, 'type'):
+                sensordict['type'] = sensor.type
             readings.append(sensordict)
         if self.notnode:
             self.kvpairs = {'sensors': readings}

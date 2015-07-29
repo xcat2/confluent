@@ -276,17 +276,6 @@ def perform_request(operator, node, element,
 
 persistent_ipmicmds = {}
 
-
-def _dict_sensor(pygreading):
-    retdict = {'name': pygreading.name, 'value': pygreading.value,
-               'states': pygreading.states, 'state_ids': pygreading.state_ids,
-               'units': pygreading.units,
-               'health': _str_health(pygreading.health),
-               'type': pygreading.type,
-               }
-    return retdict
-
-
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg, output):
         self.sensormap = {}
@@ -532,7 +521,9 @@ class IpmiHandler(object):
                         if ie.ipmicode == 203:
                             continue
                         raise
-                    readings.append(_dict_sensor(reading))
+                    if hasattr(reading, 'health'):
+                        reading.health = _str_health(reading.health)
+                    readings.append(reading)
                 self.output.put(msg.SensorReadings(readings, name=self.node))
             else:
                 self.make_sensor_map()
@@ -543,8 +534,10 @@ class IpmiHandler(object):
                     return
                 reading = self.ipmicmd.get_sensor_reading(
                     self.sensormap[sensorname])
+                if hasattr(reading, 'health'):
+                    reading.health = _str_health(reading.health)
                 self.output.put(
-                    msg.SensorReadings([_dict_sensor(reading)],
+                    msg.SensorReadings([reading],
                                        name=self.node))
         except pygexc.IpmiException:
             self.output.put(msg.ConfluentTargetTimeout(self.node))
@@ -635,7 +628,9 @@ class IpmiHandler(object):
             if 'badreadings' in response:
                 badsensors = []
                 for reading in response['badreadings']:
-                    badsensors.append(_dict_sensor(reading))
+                    if hasattr(reading, 'health'):
+                        reading.health = _str_health(reading.health)
+                    badsensors.append(reading)
                 self.output.put(msg.SensorReadings(badsensors, name=self.node))
         else:
             raise exc.InvalidArgumentException('health is read-only')
