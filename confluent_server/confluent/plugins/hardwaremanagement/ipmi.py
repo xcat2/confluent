@@ -372,10 +372,12 @@ class IpmiHandler(object):
             raise Exception('Not Implemented')
 
     def handle_configuration(self):
-        if self.element[1:3] == ['management_controller', 'alerts' ]:
+        if self.element[1:3] == ['management_controller', 'alerts']:
             return self.handle_alerts()
-        elif self.element[1:3] == ['management_controller', 'users' ]:
+        elif self.element[1:3] == ['management_controller', 'users']:
             return self.handle_users()
+        elif self.element[1:3] == ['management_controller', 'net_interfaces']:
+            return self.handle_nets()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -425,6 +427,26 @@ class IpmiHandler(object):
                     self.ipmicmd.clear_alert_destination(alertidx)
                     return
         raise Exception('Not implemented')
+
+    def handle_nets(self):
+        if len(self.element) == 3:
+            if self.op != 'read':
+                self.output.put(
+                    msg.ConfluentNodeError(self.node, 'Unsupported operation'))
+                return
+            self.output.put(msg.ChildCollection('management'))
+        elif len(self.element) == 4 and self.element[-1] == 'management':
+            if self.op == 'read':
+                lancfg = self.ipmicmd.get_net_configuration()
+                self.output.put(msg.NetworkConfiguration(
+                    self.node, ipv4addr=lancfg['ipv4_address'],
+                    ipv4gateway=lancfg['ipv4_gateway'],
+                    ipv4cfgmethod=lancfg['ipv4_configuration'],
+                    hwaddr=lancfg['mac_address']
+                ))
+            else:
+                self.output.put(msg.ConfluentNodeError(self.node,
+                                                       'Not yet implemented'))
 
     def handle_users(self):
         # Create user

@@ -778,6 +778,27 @@ class KeyValueData(ConfluentMessage):
         else:
             self.kvpairs = {name: kvdata}
 
+
+class NetworkConfiguration(ConfluentMessage):
+    desc = 'Network configuration'
+
+    def __init__(self, name=None, ipv4addr=None, ipv4gateway=None,
+                 ipv4cfgmethod=None, hwaddr=None):
+        self.notnode = name is None
+        self.stripped = False
+
+        kvpairs = {
+            'ipv4_address': {'value': ipv4addr},
+            'ipv4_gateway': {'value': ipv4gateway},
+            'ipv4_configuration': {'value': ipv4cfgmethod},
+            'hw_addr': {'value': hwaddr},
+        }
+        if self.notnode:
+            self.kvpairs = kvpairs
+        else:
+            self.kvpairs = {name: kvpairs}
+
+
 class HealthSummary(ConfluentMessage):
     readonly = True
     valid_values = valid_health_values

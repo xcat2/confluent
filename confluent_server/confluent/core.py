@@ -131,6 +131,10 @@ noderesources = {
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'net_interfaces': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
         }
     },
     '_console': {
