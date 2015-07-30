@@ -62,12 +62,20 @@
 import collections
 import confluent.config.configmanager
 import eventlet
-import fcntl
 import json
 import os
 import struct
 import time
 import traceback
+
+try:
+    from fcntl import flock, LOCK_EX, LOCK_UN, LOCK_SH
+except ImportError:
+    flock = lambda file, flag: True
+    LOCK_EX = None
+    LOCK_UN = None
+    LOCK_SH = None
+
 
 # on conserving filehandles:
 # upon write, if file not open, open it for append
@@ -156,7 +164,7 @@ class Logger(object):
             elif not self.isconsole:
                 textdate = time.strftime(
                     '%b %d %H:%M:%S ', time.localtime(tstamp))
-            fcntl.flock(self.textfile, fcntl.LOCK_EX)
+            flock(self.textfile, LOCK_EX)
             offset = self.textfile.tell() + len(textdate)
             datalen = len(data)
             eventaux = entry[4]
@@ -176,10 +184,10 @@ class Logger(object):
                 if not textrecord.endswith('\n'):
                     textrecord += '\n'
             self.textfile.write(textrecord)
-            fcntl.flock(self.textfile, fcntl.LOCK_UN)
-            fcntl.flock(self.binfile, fcntl.LOCK_EX)
+            flock(self.textfile, LOCK_UN)
+            flock(self.binfile, LOCK_EX)
             self.binfile.write(binrecord)
-            fcntl.flock(self.binfile, fcntl.LOCK_UN)
+            flock(self.binfile, LOCK_UN)
         self.textfile.flush()
         self.binfile.flush()
         if self.closer is None:
@@ -192,7 +200,7 @@ class Logger(object):
             binfile = open(self.binpath, mode='r')
         except IOError:
             return '', 0, 0
-        fcntl.flock(binfile, fcntl.LOCK_SH)
+        flock(binfile, LOCK_SH)
         binfile.seek(0, 2)
         binidx = binfile.tell() - 16
         currsize = 0
@@ -213,15 +221,15 @@ class Logger(object):
             offsets.append((offset, datalen))
             if termstate is None:
                 termstate = eventaux
-        fcntl.flock(binfile, fcntl.LOCK_UN)
+        flock(binfile, LOCK_UN)
         binfile.close()
         textdata = ''
-        fcntl.flock(textfile, fcntl.LOCK_SH)
+        flock(textfile, LOCK_SH)
         while offsets:
             (offset, length) = offsets.pop()
             textfile.seek(offset, 0)
             textdata += textfile.read(length)
-        fcntl.flock(textfile, fcntl.LOCK_UN)
+        flock(textfile, LOCK_UN)
         textfile.close()
         if termstate is None:
             termstate = 0
