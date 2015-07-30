@@ -41,7 +41,6 @@
 # esc-( would interfere with normal esc use too much
 # ~ I will not use for now...
 
-import fcntl
 import math
 import getpass
 import optparse
@@ -50,9 +49,13 @@ import select
 import shlex
 import socket
 import sys
-import termios
 import time
-import tty
+try:
+    import fcntl
+    import termios
+    import tty
+except ImportError:
+    pass
 
 exitcode = 0
 consoleonly = False
@@ -72,8 +75,11 @@ conserversequence = '\x05c'  # ctrl-e, c
 
 oldtcattr = None
 fd = sys.stdin
-if fd.isatty():
-    oldtcattr = termios.tcgetattr(fd.fileno())
+try:
+    if fd.isatty():
+        oldtcattr = termios.tcgetattr(fd.fileno())
+except NameError:
+    pass
 netserver = None
 laststate = {}
 

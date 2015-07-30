@@ -32,10 +32,18 @@ import confluent.consoleserver as consoleserver
 import confluent.core as confluentcore
 import confluent.httpapi as httpapi
 import confluent.log as log
-import confluent.sockapi as sockapi
+try:
+    import confluent.sockapi as sockapi
+except ImportError:
+    #On platforms without pwd, give up on the sockapi in general and be http
+    #only for now
+    pass
 import eventlet
 #import eventlet.backdoor as backdoor
-import fcntl
+try:
+    import fcntl
+except ImportError:
+    pass
 #import multiprocessing
 import sys
 import os
@@ -44,6 +52,8 @@ import ConfigParser
 
 
 def _daemonize():
+    if not 'fork' in os.__dict__:
+        return
     thispid = os.fork()
     if thispid > 0:
         os.waitpid(thispid, 0)
@@ -110,6 +120,8 @@ def terminate(signalname, frame):
 
 
 def doexit():
+    if 'fcntl' not in locals():
+        return
     pidfile = open('/var/run/confluent/pid')
     pid = pidfile.read()
     if pid == str(os.getpid()):
@@ -125,7 +137,8 @@ def _initsecurity(config):
 
 
 def run():
-    _checkpidfile()
+    if 'fcntl' in locals():
+        _checkpidfile()
     configfile = "/etc/confluent/service.cfg"
     config = ConfigParser.ConfigParser()
     config.read(configfile)
@@ -141,7 +154,8 @@ def run():
         doexit()
         raise
     _daemonize()
-    _updatepidfile()
+    if 'fcntl' in locals():
+        _updatepidfile()
     auth.init_auth()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
@@ -155,8 +169,11 @@ def run():
     consoleserver.start_console_sessions()
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
-    sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
-    sockservice.start()
+    try:
+        sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
+        sockservice.start()
+    except NameError:
+        pass
     atexit.register(doexit)
     while 1:
         eventlet.sleep(100)
