@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import confluent.exceptions as exc
-import confluent.messages as msg
-import confluent.config.attributes as allattributes
+import confluentd.exceptions as exc
+import confluentd.messages as msg
+import confluentd.config.attributes as allattributes
 
 
 def retrieve(nodes, element, configmanager, inputdata):

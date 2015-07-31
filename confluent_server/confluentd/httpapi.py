@@ -18,15 +18,15 @@
 # It additionally manages httprequest console sessions
 import base64
 import Cookie
-import confluent.auth as auth
-import confluent.config.attributes as attribs
-import confluent.consoleserver as consoleserver
-import confluent.exceptions as exc
-import confluent.log as log
-import confluent.messages
-import confluent.core as pluginapi
-import confluent.tlvdata as tlvdata
-import confluent.util as util
+import confluentd.auth as auth
+import confluentd.config.attributes as attribs
+import confluentd.consoleserver as consoleserver
+import confluentd.exceptions as exc
+import confluentd.log as log
+import confluentd.messages
+import confluentd.core as pluginapi
+import confluent.tlvdata
+import confluentd.util as util
 import copy
 import eventlet
 import json
@@ -36,6 +36,7 @@ import time
 import urlparse
 import eventlet.wsgi
 #scgi = eventlet.import_patched('flup.server.scgi')
+tlvdata = confluent.tlvdata
 
 
 auditlog = None
@@ -61,44 +62,44 @@ class RobustCookie(Cookie.SimpleCookie):
 
 
 def group_creation_resources():
-    yield confluent.messages.Attributes(
+    yield confluentd.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
-    yield confluent.messages.ListAttributes(kv={'nodes': []},
+    yield confluentd.messages.ListAttributes(kv={'nodes': []},
                                             desc='Nodes to add to the group'
                                             ).html() + '<br>\n'
     for attr in sorted(attribs.node.iterkeys()):
         if attr == 'groups':
             continue
         if attr.startswith("secret."):
-            yield confluent.messages.CryptedAttributes(
+            yield confluentd.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
         elif ('type' in attribs.node[attr] and
                 list == attribs.node[attr]['type']):
-            yield confluent.messages.ListAttributes(
+            yield confluentd.messages.ListAttributes(
                 kv={attr: []},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
         else:
-            yield confluent.messages.Attributes(
+            yield confluentd.messages.Attributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
 
 
 def node_creation_resources():
-    yield confluent.messages.Attributes(
+    yield confluentd.messages.Attributes(
         kv={'name': None}, desc="Name of the node").html() + '<br>'
     for attr in sorted(attribs.node.iterkeys()):
         if attr.startswith("secret."):
-            yield confluent.messages.CryptedAttributes(
+            yield confluentd.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
         elif ('type' in attribs.node[attr] and
                 list == attribs.node[attr]['type']):
-            yield confluent.messages.ListAttributes(
+            yield confluentd.messages.ListAttributes(
                 kv={attr: []},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
         else:
-            yield confluent.messages.Attributes(
+            yield confluentd.messages.Attributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
 
@@ -120,11 +121,11 @@ def user_creation_resources():
     }
     for attr in sorted(credential.iterkeys()):
         if attr == "password":
-            yield confluent.messages.CryptedAttributes(
+            yield confluentd.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=credential[attr]['description']).html() + '<br>\n'
         else:
-            yield confluent.messages.Attributes(
+            yield confluentd.messages.Attributes(
                 kv={attr: None},
                 desc=credential[attr]['description']).html() + '<br>\n'
 
@@ -465,7 +466,7 @@ def _assemble_html(responses, resource, querydict, url, extension):
             extension)
     pendingrsp = []
     for rsp in responses:
-        if isinstance(rsp, confluent.messages.LinkRelation):
+        if isinstance(rsp, confluentd.messages.LinkRelation):
             yield rsp.html(extension) + "<br>"
         else:
             pendingrsp.append(rsp)
@@ -511,7 +512,7 @@ def _assemble_json(responses, resource, url, extension):
         links['collection'] = {"href": "./" + extension}
     rspdata = {}
     for rsp in responses:
-        if isinstance(rsp, confluent.messages.LinkRelation):
+        if isinstance(rsp, confluentd.messages.LinkRelation):
             haldata = rsp.raw()
             for hk in haldata.iterkeys():
                 if 'href' in haldata[hk]:

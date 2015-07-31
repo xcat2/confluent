@@ -30,9 +30,9 @@
 
 __author__ = 'jjohnson2'
 
-import confluent.exceptions as exc
-import confluent.lookuptools as lookuptools
-import confluent.core
+import confluentd.exceptions as exc
+import confluentd.lookuptools as lookuptools
+import confluentd.core
 
 def decode_alert(varbinds, configmanager):
     """Decode an SNMP alert for a server
@@ -53,7 +53,7 @@ def decode_alert(varbinds, configmanager):
     if node is None:
         raise exc.InvalidArgumentException(
             'Unable to find a node with specified manager')
-    return confluent.core.handle_path(
+    return confluentd.core.handle_path(
         '/nodes/{0}/events/hardware/decode'.format(node), 'update',
         configmanager, varbinds, autostrip=False)
 

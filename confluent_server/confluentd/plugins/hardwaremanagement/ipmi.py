@@ -14,9 +14,9 @@
 # limitations under the License.
 
 import atexit
-import confluent.exceptions as exc
-import confluent.interface.console as conapi
-import confluent.messages as msg
+import confluentd.exceptions as exc
+import confluentd.interface.console as conapi
+import confluentd.messages as msg
 import eventlet
 import eventlet.event
 import eventlet.green.threading as threading

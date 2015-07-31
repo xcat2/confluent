@@ -64,10 +64,10 @@ from Crypto.Hash import SHA256
 import anydbm as dbm
 import ast
 import base64
-import confluent.config.attributes as allattributes
-import confluent.log
-import confluent.util
-import confluent.exceptions as exc
+import confluentd.config.attributes as allattributes
+import confluentd.log
+import confluentd.util
+import confluentd.exceptions as exc
 import copy
 import cPickle
 import errno
@@ -276,11 +276,11 @@ def _generate_new_id():
     # generate a random id outside the usual ranges used for normal users in
     # /etc/passwd.  Leave an equivalent amount of space near the end disused,
     # just in case
-    uid = str(confluent.util.securerandomnumber(65537, 4294901759))
+    uid = str(confluentd.util.securerandomnumber(65537, 4294901759))
     if 'idmap' not in _cfgstore['main']:
         return uid
     while uid in _cfgstore['main']['idmap']:
-        uid = str(confluent.util.securerandomnumber(65537, 4294901759))
+        uid = str(confluentd.util.securerandomnumber(65537, 4294901759))
     return uid
 
 
@@ -415,7 +415,11 @@ def hook_new_configmanagers(callback):
 
 
 class ConfigManager(object):
-    _cfgdir = "/etc/confluent/cfg/"
+    if os.name == 'nt':
+        _cfgdir = os.path.join(
+            os.getenv('SystemDrive'), '\\ProgramData', 'confluent', 'cfg')
+    else:
+        _cfgdir = "/etc/confluent/cfg"
     _cfgwriter = None
     _writepending = False
     _syncrunning = False
@@ -1009,7 +1013,7 @@ class ConfigManager(object):
             except Exception:
                 global tracelog
                 if tracelog is None:
-                    tracelog = confluent.log.Logger('trace')
+                    tracelog = confluentd.log.Logger('trace')
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                              event=log.Events.stacktrace)
 
@@ -1207,15 +1211,15 @@ class ConfigManager(object):
         global _cfgstore
         _cfgstore = {}
         rootpath = cls._cfgdir
-        _load_dict_from_dbm(['globals'], rootpath + "/globals")
+        _load_dict_from_dbm(['globals'], os.path.join(rootpath, "globals"))
         for confarea in _config_areas:
-            _load_dict_from_dbm(['main', confarea], rootpath + "/" + confarea)
+            _load_dict_from_dbm(['main', confarea], os.path.join(rootpath, confarea))
         try:
-            for tenant in os.listdir(rootpath + '/tenants/'):
+            for tenant in os.listdir(os.path.join(rootpath, 'tenants')):
                 for confarea in _config_areas:
                     _load_dict_from_dbm(
                         ['main', tenant, confarea],
-                        "%s/%s/%s" % (rootpath, tenant, confarea))
+                        os.path.join(rootpath, tenant, confarea))
         except OSError:
             pass
 
@@ -1246,7 +1250,7 @@ class ConfigManager(object):
                 dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
                 del _cfgstore['dirtyglobals']
             _mkpath(cls._cfgdir)
-            globalf = dbm.open(cls._cfgdir + "/globals", 'c', 384)  # 0600
+            globalf = dbm.open(os.path.join(cls._cfgdir, "globals"), 'c', 384)  # 0600
             try:
                 for globalkey in dirtyglobals:
                     if globalkey in _cfgstore['globals']:
@@ -1267,11 +1271,11 @@ class ConfigManager(object):
                     pathname = cls._cfgdir
                     currdict = _cfgstore['main']
                 else:
-                    pathname = cls._cfgdir + '/tenants/' + tenant + '/'
+                    pathname = os.path.join(cls._cfgdir, 'tenants', tenant)
                     currdict = _cfgstore['tenant'][tenant]
                 for category in dkdict.iterkeys():
                     _mkpath(pathname)
-                    dbf = dbm.open(pathname + category, 'c', 384)  # 0600
+                    dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
                     try:
                         for ck in dkdict[category]:
                             if ck not in currdict[category]:
@@ -1325,7 +1329,8 @@ def dump_db_to_directory(location, password, redact=None):
         cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
         cfgfile.write('\n')
     try:
-        for tenant in os.listdir(ConfigManager._cfgdir + '/tenants/'):
+        for tenant in os.listdir(
+                os.path.join(ConfigManager._cfgdir, '/tenants/')):
             with open(os.path.join(location, tenant + '.json'), 'w') as cfgfile:
                 cfgfile.write(ConfigManager(tenant=tenant)._dump_to_json(
                     redact=redact))

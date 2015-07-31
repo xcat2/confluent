@@ -26,14 +26,14 @@
 # It also will optionally snoop SLP DA requests
 
 import atexit
-import confluent.auth as auth
-import confluent.config.configmanager as configmanager
-import confluent.consoleserver as consoleserver
-import confluent.core as confluentcore
-import confluent.httpapi as httpapi
-import confluent.log as log
+import confluentd.auth as auth
+import confluentd.config.configmanager as configmanager
+import confluentd.consoleserver as consoleserver
+import confluentd.core as confluentcore
+import confluentd.httpapi as httpapi
+import confluentd.log as log
 try:
-    import confluent.sockapi as sockapi
+    import confluentd.sockapi as sockapi
 except ImportError:
     #On platforms without pwd, give up on the sockapi in general and be http
     #only for now
@@ -139,6 +139,9 @@ def _initsecurity(config):
 def run():
     if 'fcntl' in locals():
         _checkpidfile()
+    if os.name == 'nt':
+        configfile = os.path.join(os.getenv('SystemDrive'), '\\ProgramData',
+                                  'confluent', 'cfg', 'service.cfg')
     configfile = "/etc/confluent/service.cfg"
     config = ConfigParser.ConfigParser()
     config.read(configfile)
