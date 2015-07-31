@@ -60,7 +60,7 @@
 #    or other fields)
 
 import collections
-import confluent.config.configmanager
+import confluentd.config.configmanager
 import eventlet
 import json
 import os
@@ -128,9 +128,14 @@ class Logger(object):
             # we are just a copy of the same object
             return
         self.initialized = True
-        self.filepath = confluent.config.configmanager.get_global("logdirectory")
+        self.filepath = confluentd.config.configmanager.get_global("logdirectory")
         if self.filepath is None:
-            self.filepath = "/var/log/confluent/"
+            if os.name == 'nt':
+                self.filepath = os.path.join(
+                    os.getenv('SystemDrive'), '\\ProgramData', 'confluent',
+                    'logs')
+            else:
+                self.filepath = "/var/log/confluent/"
         self.isconsole = console
         if console:
             self.filepath += "consoles/"

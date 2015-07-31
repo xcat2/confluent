@@ -19,7 +19,7 @@
 # the PBKDF2 transform is skipped unless a user has been idle for sufficient
 # time
 
-import confluent.config.configmanager as configmanager
+import confluentd.config.configmanager as configmanager
 import eventlet
 import eventlet.tpool
 import Crypto.Protocol.KDF as KDF

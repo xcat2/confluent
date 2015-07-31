@@ -33,14 +33,14 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
-import confluent.alerts as alerts
-import confluent.config.attributes as attrscheme
-import confluent.interface.console as console
-import confluent.exceptions as exc
-import confluent.messages as msg
-import confluent.noderange as noderange
+import confluentd.alerts as alerts
+import confluentd.config.attributes as attrscheme
+import confluentd.interface.console as console
+import confluentd.exceptions as exc
+import confluentd.messages as msg
+import confluentd.noderange as noderange
 try:
-    import confluent.shellmodule as shellmodule
+    import confluentd.shellmodule as shellmodule
 except ImportError:
     pass
 import itertools

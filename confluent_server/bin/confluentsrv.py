@@ -23,17 +23,17 @@ print(path)
 if path.startswith('/opt'):
     # if installed into system path, do not muck with things
     sys.path.append(path)
-from confluent import main
+import confluentd.main
 
 #import cProfile
 #import time
 #p = cProfile.Profile(time.clock)
 #p.enable()
 #try:
+import multiprocessing
 if __name__ == '__main__':
-    import multiprocessing
     multiprocessing.freeze_support()
-    main.run()
+    confluentd.main.run()
 #except:
 #   pass
 #p.disable()
