@@ -447,8 +447,16 @@ class IpmiHandler(object):
                                     callback=True,link_auth=True, ipmi_msg=True,
                                     privilege_level=user['privilege_level'])
             # A list of users
+            self.output.put(msg.ChildCollection('all'))
             for user in self.ipmicmd.get_users():
                 self.output.put(msg.ChildCollection(user, candelete=True))
+            return
+        # List all users
+        elif len(self.element) == 4 and self.element[-1] == 'all':
+            users = []
+            for user in self.ipmicmd.get_users():
+                users.append(self.ipmicmd.get_user(uid=user))
+            self.output.put(msg.UserCollection(users=users, name=self.node))
             return
         # Update user
         elif len(self.element) == 4:
