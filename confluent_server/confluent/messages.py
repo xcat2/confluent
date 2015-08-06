@@ -326,7 +326,7 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif path == ['events', 'hardware', 'decode']:
         return InputAlertData(path, inputdata, nodes)
     elif (path[:3] == ['configuration', 'management_controller', 'users'] and
-            operation != 'retrieve' and operation != 'delete'):
+            operation not in ('retrieve', 'delete') and path[-1] != 'all'):
         return InputCredential(path, inputdata, nodes)
     elif inputdata:
         raise exc.InvalidArgumentException()
@@ -684,6 +684,26 @@ class User(ConfluentMessage):
             self.kvpairs = kvpairs
         else:
             self.kvpairs = {name: kvpairs}
+
+
+class UserCollection(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, users=(), name=None):
+        self.notnode = name is None
+        self.desc = 'list of users'
+        userlist = []
+        for user in users:
+            entry = {
+                'uid': user['uid'],
+                'username': user['name'],
+                'privilege_level': user['access']['privilege_level']
+            }
+            userlist.append(entry)
+        if self.notnode:
+            self.kvpairs = {'users': userlist}
+        else:
+            self.kvpairs = {name: {'users': userlist}}
 
 
 class AlertDestination(ConfluentMessage):
