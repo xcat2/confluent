@@ -874,6 +874,9 @@ class ConfigManager(object):
     def set_group_attributes(self, attribmap, autocreate=False):
         changeset = {}
         for group in attribmap.iterkeys():
+            if group == '':
+                raise ValueError('"{0}" is not a valid group name'.format(
+                    group))
             if not autocreate and group not in self._cfgstore['nodegroups']:
                 raise ValueError("{0} group does not exist".format(group))
             for attr in attribmap[group].iterkeys():
@@ -1080,6 +1083,8 @@ class ConfigManager(object):
         # this mitigates risk of arguments being partially applied
         for node in attribmap.iterkeys():
             node = node.encode('utf-8')
+            if node == '':
+                raise ValueError('"{0}" is not a valid node name'.format(node))
             if autocreate is False and node not in self._cfgstore['nodes']:
                 raise ValueError("node {0} does not exist".format(node))
             for attrname in attribmap[node].iterkeys():
