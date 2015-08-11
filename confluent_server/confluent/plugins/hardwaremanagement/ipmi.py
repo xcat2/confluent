@@ -490,7 +490,10 @@ class IpmiHandler(object):
 
     def do_eventlog(self):
         eventout = []
-        for event in self.ipmicmd.get_event_log():
+        clear = False
+        if self.op == 'delete':
+            clear = True
+        for event in self.ipmicmd.get_event_log(clear):
             self.pyghmi_event_to_confluent(event)
             eventout.append(event)
         self.output.put(msg.EventCollection(eventout, name=self.node))

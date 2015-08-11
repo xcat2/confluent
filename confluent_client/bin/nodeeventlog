@@ -1,0 +1,86 @@
+#!/usr/bin/python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from datetime import datetime as dt
+import os
+import sys
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+
+try:
+    noderange = sys.argv[1]
+except IndexError:
+    sys.stderr.write(
+        'Usage: {0} <noderange> [clear]\n'.format(
+            sys.argv[0]))
+    sys.exit(1)
+
+deletemode = False
+if len(sys.argv) == 3:
+    if sys.argv[2] == 'clear':
+        deletemode = True
+
+session = client.Command()
+exitcode = 0
+
+def format_event(evt):
+    retparts = []
+    if 'timestamp' in evt:
+        display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
+        retparts.append(display.strftime('%m/%d/%Y %H:%M:%S'))
+    dscparts = []
+    if 'component_type' in evt:
+        dscparts.append(evt['component_type'])
+    if 'component' in evt and evt['component'] is not None:
+        dscparts.append(evt['component'])
+    if 'event' in evt:
+        evttext = evt['event']
+        try:
+            if evttext.startswith(evt['component'] + ' - '):
+                evttext = evt['event'].replace(evt['component'] + ' - ', '')
+        except (KeyError, TypeError):
+            pass
+        dscparts.append(evttext)
+    retparts.append(' - '.join(dscparts))
+    return ' '.join(retparts)
+
+
+if deletemode:
+    func = session.delete
+else:
+    func = session.read
+for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
+    if 'error' in rsp:
+        sys.stderr.write(rsp['error'] + '\n')
+        exitcode |= rsp['errorcode']
+    if 'databynode' in rsp:
+       nodedata = rsp['databynode']
+       for node in nodedata:
+           thisdata = nodedata[node]
+            if 'error' in thisdata:
+               sys.stderr.write('{0}: {1}\n'.format(node, thisdata['error']))
+               exitcode |= 1
+           if 'events' in thisdata:
+               evtdata = thisdata['events']
+               for evt in evtdata:
+                   print '{0}: {1}'.format(node, format_event(evt))
