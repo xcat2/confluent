@@ -22,7 +22,7 @@
 # only by the process owner and such an owner would be able to read a file
 # anyway.  Regardless, it is advisable to 'unset'
 
-import confluentd.interface.console as conapi
+import confluent.interface.console as conapi
 import eventlet
 import eventlet.green.select as select
 import eventlet.green.subprocess as subprocess

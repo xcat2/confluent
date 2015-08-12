@@ -32,13 +32,13 @@ import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 import eventlet
 
-import confluentd.auth as auth
+import confluent.auth as auth
 import confluent.tlvdata as tlvdata
-import confluentd.consoleserver as consoleserver
-import confluentd.config.configmanager as configmanager
-import confluentd.exceptions as exc
-import confluentd.log as log
-import confluentd.core as pluginapi
+import confluent.consoleserver as consoleserver
+import confluent.config.configmanager as configmanager
+import confluent.exceptions as exc
+import confluent.log as log
+import confluent.core as pluginapi
 
 
 tracelog = None

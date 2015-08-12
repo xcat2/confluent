@@ -25,7 +25,7 @@
 # service should have a null tenant and a tenant entry that correlates)
 __author__ = 'jjohnson2'
 
-import confluentd.config.configmanager as configmanager
+import confluent.config.configmanager as configmanager
 import itertools
 import socket
 
