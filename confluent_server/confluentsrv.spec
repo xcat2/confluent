@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['c:/Python27/Scripts/confluentsrv.py'],
-             pathex=['c:\\Users\\jjohnson2\\Development\\confluent\\confluent_server'],
+             pathex=[],
              hiddenimports=['pyghmi.constants', 'pyghmi.exceptions', 'pyghmi.ipmi.console', 'pyghmi.ipmi.private.constants', 'pyghmi.ipmi.private', 'pyghmi.ipmi.private.session', 'pyghmi.ipmi.command', 'pyghmi.ipmi.events', 'pyghmi.ipmi.fru', 'pyghmi.ipmi.private.spd', 'pyghmi.ipmi.oem.lookup', 'pyghmi.ipmi.oem.generic', 'pyghmi.ipmi.oem.lenovo', 'pyghmi.ipmi.private.util', 'pyghmi.ipmi.sdr'],
              hookspath=None,
              runtime_hooks=None,
@@ -24,7 +24,7 @@ coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
                a.datas,
-	       Tree('confluentd/plugins', prefix='confluentd/plugins'),
+	       Tree('confluent/plugins', prefix='confluent/plugins'),
                strip=None,
                upx=True,
                name='confluentsrv')

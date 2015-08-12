@@ -18,7 +18,7 @@
 # This module implements client/server messages emitted from plugins.
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
-import confluentd.exceptions as exc
+import confluent.exceptions as exc
 import json
 
 valid_health_values = set([

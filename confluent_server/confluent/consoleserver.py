@@ -21,12 +21,12 @@
 #we track nodes that are actively being logged, watched, or have attached
 #there should be no more than one handler per node
 import collections
-import confluentd.config.configmanager as configmodule
-import confluentd.exceptions as exc
-import confluentd.interface.console as conapi
-import confluentd.log as log
-import confluentd.core as plugin
-import confluentd.util as util
+import confluent.config.configmanager as configmodule
+import confluent.exceptions as exc
+import confluent.interface.console as conapi
+import confluent.log as log
+import confluent.core as plugin
+import confluent.util as util
 import eventlet
 import eventlet.event
 import random

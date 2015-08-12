@@ -60,7 +60,7 @@
 #    or other fields)
 
 import collections
-import confluentd.config.configmanager
+import confluent.config.configmanager
 import eventlet
 import json
 import os
@@ -128,7 +128,7 @@ class Logger(object):
             # we are just a copy of the same object
             return
         self.initialized = True
-        self.filepath = confluentd.config.configmanager.get_global("logdirectory")
+        self.filepath = confluent.config.configmanager.get_global("logdirectory")
         if self.filepath is None:
             if os.name == 'nt':
                 self.filepath = os.path.join(

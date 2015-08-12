@@ -64,10 +64,10 @@ from Crypto.Hash import SHA256
 import anydbm as dbm
 import ast
 import base64
-import confluentd.config.attributes as allattributes
-import confluentd.log
-import confluentd.util
-import confluentd.exceptions as exc
+import confluent.config.attributes as allattributes
+import confluent.log
+import confluent.util
+import confluent.exceptions as exc
 import copy
 import cPickle
 import errno
@@ -276,11 +276,11 @@ def _generate_new_id():
     # generate a random id outside the usual ranges used for normal users in
     # /etc/passwd.  Leave an equivalent amount of space near the end disused,
     # just in case
-    uid = str(confluentd.util.securerandomnumber(65537, 4294901759))
+    uid = str(confluent.util.securerandomnumber(65537, 4294901759))
     if 'idmap' not in _cfgstore['main']:
         return uid
     while uid in _cfgstore['main']['idmap']:
-        uid = str(confluentd.util.securerandomnumber(65537, 4294901759))
+        uid = str(confluent.util.securerandomnumber(65537, 4294901759))
     return uid
 
 
@@ -1013,7 +1013,7 @@ class ConfigManager(object):
             except Exception:
                 global tracelog
                 if tracelog is None:
-                    tracelog = confluentd.log.Logger('trace')
+                    tracelog = confluent.log.Logger('trace')
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                              event=log.Events.stacktrace)
 

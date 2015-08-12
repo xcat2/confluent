@@ -26,14 +26,14 @@
 # It also will optionally snoop SLP DA requests
 
 import atexit
-import confluentd.auth as auth
-import confluentd.config.configmanager as configmanager
-import confluentd.consoleserver as consoleserver
-import confluentd.core as confluentcore
-import confluentd.httpapi as httpapi
-import confluentd.log as log
+import confluent.auth as auth
+import confluent.config.configmanager as configmanager
+import confluent.consoleserver as consoleserver
+import confluent.core as confluentcore
+import confluent.httpapi as httpapi
+import confluent.log as log
 try:
-    import confluentd.sockapi as sockapi
+    import confluent.sockapi as sockapi
 except ImportError:
     #On platforms without pwd, give up on the sockapi in general and be http
     #only for now
