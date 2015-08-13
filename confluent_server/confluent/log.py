@@ -135,14 +135,14 @@ class Logger(object):
                     os.getenv('SystemDrive'), '\\ProgramData', 'confluent',
                     'logs')
             else:
-                self.filepath = "/var/log/confluent/"
+                self.filepath = "/var/log/confluent"
         self.isconsole = console
         if console:
-            self.filepath += "consoles/"
+            self.filepath = os.path.join(self.filepath, "consoles")
         if not os.path.isdir(self.filepath):
             os.makedirs(self.filepath, 448)
-        self.textpath = self.filepath + logname
-        self.binpath = self.filepath + logname + ".cbl"
+        self.textpath = os.path.join(self.filepath, logname)
+        self.binpath = os.path.join(self.filepath, logname + ".cbl")
         self.writer = None
         self.closer = None
         self.textfile = None
