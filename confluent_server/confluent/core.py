@@ -175,6 +175,12 @@ noderesources = {
                 'default': 'ipmi',
             }),
         },
+        'firmware': {
+            'all': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+        },
     },
     'power': {
         'state': PluginRoute({

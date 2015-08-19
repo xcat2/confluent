@@ -799,6 +799,18 @@ class SensorReadings(ConfluentMessage):
             self.kvpairs = {name: {'sensors': readings}}
 
 
+class Firmware(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, data, name):
+        self.notnode = name is None
+        self.desc = 'Firmware information'
+        if self.notnode:
+            self.kvpairs = {'firmware': data}
+        else:
+            self.kvpairs = {name:  {'firmware': data}}
+
+
 class KeyValueData(ConfluentMessage):
     readonly = True
 

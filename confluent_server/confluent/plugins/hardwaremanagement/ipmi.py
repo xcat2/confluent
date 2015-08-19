@@ -569,11 +569,29 @@ class IpmiHandler(object):
         for component in components:
             self.output.put(msg.ChildCollection(simplify_name(component)))
 
+    def list_firmware(self):
+        self.output.put(msg.ChildCollection('all'))
+        for id, data in self.ipmicmd.get_firmware():
+            self.output.put(msg.ChildCollection(simplify_name(id)))
+
+    def read_firmware(self, component):
+        items = []
+        for id, data in self.ipmicmd.get_firmware():
+            if component == 'all' or component == simplify_name(id):
+                items.append({id: data})
+        self.output.put(msg.Firmware(items, self.node))
+
     def handle_inventory(self):
-        if len(self.element) == 3:  # list things in inventory
-            return self.list_inventory()
-        elif len(self.element) == 4:  # actually read inventory data
-            return self.read_inventory(self.element[-1])
+        if self.element[1] == 'firmware':
+            if len(self.element) == 3:
+                return self.list_firmware()
+            elif len(self.element) == 4:
+                return self.read_firmware(self.element[-1])
+        elif self.element[1] == 'hardware':
+            if len(self.element) == 3:  # list things in inventory
+                return self.list_inventory()
+            elif len(self.element) == 4:  # actually read inventory data
+                return self.read_inventory(self.element[-1])
         raise Exception('Unsupported scenario...')
 
     def read_inventory(self, component):
