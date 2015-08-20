@@ -822,6 +822,21 @@ class KeyValueData(ConfluentMessage):
             self.kvpairs = {name: kvdata}
 
 
+class LEDStatus(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, data, name):
+        self.notnode = name is None
+        self.desc = 'led status'
+
+        self.kvpairs = {}
+        for led_category in data:
+            self.kvpairs[led_category] = [data[led_category]]
+
+        if not self.notnode:
+            self.kvpairs = {name: self.kvpairs}
+
+
 class NetworkConfiguration(ConfluentMessage):
     desc = 'Network configuration'
 

@@ -594,6 +594,12 @@ class IpmiHandler(object):
                 return self.read_inventory(self.element[-1])
         raise Exception('Unsupported scenario...')
 
+    def list_leds(self):
+        led_categories = {}
+        for category, leds in self.ipmicmd.get_leds():
+            led_categories[category] = leds
+        self.output.put(msg.LEDStatus(led_categories, self.node))
+
     def read_inventory(self, component):
         invitems = []
         if component == 'all':
@@ -628,8 +634,11 @@ class IpmiHandler(object):
         if len(self.element) < 3:
             return
         self.sensorcategory = self.element[2]
-        if len(self.element) == 3:  # list sensors per category
+        # list sensors per category
+        if len(self.element) == 3 and self.element[-2] == 'hardware':
             return self.list_sensors()
+        elif len(self.element) == 3 and self.element[-2] == 'led':
+            return self.list_leds()
         elif len(self.element) == 4:  # resource requested
             return self.read_sensors(self.element[-1])
 

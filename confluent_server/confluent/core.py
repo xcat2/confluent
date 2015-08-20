@@ -207,6 +207,12 @@ noderesources = {
                 'default': 'ipmi',
             }),
         },
+        'led': {
+            'all': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            })
+        }
     },
 }
 
