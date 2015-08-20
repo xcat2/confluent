@@ -421,6 +421,11 @@ class InputCredential(ConfluentMessage):
         'no_access',
     ])
 
+    valid_enabled_values = set([
+        'yes',
+        'no'
+    ])
+
     def __init__(self, path, inputdata, nodes=None):
         self.credentials = {}
         nestedmode = False
@@ -450,6 +455,11 @@ class InputCredential(ConfluentMessage):
                                         'name must be less than or = 16 chars')
         if 'password' in inputdata and len(inputdata['password']) > 20:
             raise exc.InvalidArgumentException('password has limit of 20 chars')
+
+        if ('enabled' in inputdata and
+            inputdata['enabled'] not in self.valid_enabled_values):
+            raise exc.InvalidArgumentException('valid values for enabled are '
+                                                            + 'yes and no')
 
         if nodes is None:
             raise exc.InvalidArgumentException(
@@ -678,7 +688,8 @@ class User(ConfluentMessage):
         self.notnode = name is None
         kvpairs = {'username': {'value': username},
                    'password': {'value': '', 'type': 'password'},
-                   'privilege_level': {'value': privilege_level}
+                   'privilege_level': {'value': privilege_level},
+                   'enabled': {'value': ''}
                    }
         if self.notnode:
             self.kvpairs = kvpairs

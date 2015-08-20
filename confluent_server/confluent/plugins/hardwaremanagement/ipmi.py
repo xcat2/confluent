@@ -483,6 +483,12 @@ class IpmiHandler(object):
                                                    password=user['password'])
                     self.ipmicmd.set_user_password(uid=user['uid'],
                                     mode='enable', password=user['password'])
+                if 'enabled' in user:
+                    if user['enabled'] == 'yes':
+                        mode = 'enable'
+                    else:
+                        mode = 'disable'
+                    self.ipmicmd.disable_user(user['uid'], mode)
                 return
             elif self.op == 'delete':
                 self.ipmicmd.user_delete(uid=user)
