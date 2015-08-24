@@ -569,12 +569,36 @@ class IpmiHandler(object):
         for component in components:
             self.output.put(msg.ChildCollection(simplify_name(component)))
 
+    def list_firmware(self):
+        self.output.put(msg.ChildCollection('all'))
+        for id, data in self.ipmicmd.get_firmware():
+            self.output.put(msg.ChildCollection(simplify_name(id)))
+
+    def read_firmware(self, component):
+        items = []
+        for id, data in self.ipmicmd.get_firmware():
+            if component == 'all' or component == simplify_name(id):
+                items.append({id: data})
+        self.output.put(msg.Firmware(items, self.node))
+
     def handle_inventory(self):
-        if len(self.element) == 3:  # list things in inventory
-            return self.list_inventory()
-        elif len(self.element) == 4:  # actually read inventory data
-            return self.read_inventory(self.element[-1])
+        if self.element[1] == 'firmware':
+            if len(self.element) == 3:
+                return self.list_firmware()
+            elif len(self.element) == 4:
+                return self.read_firmware(self.element[-1])
+        elif self.element[1] == 'hardware':
+            if len(self.element) == 3:  # list things in inventory
+                return self.list_inventory()
+            elif len(self.element) == 4:  # actually read inventory data
+                return self.read_inventory(self.element[-1])
         raise Exception('Unsupported scenario...')
+
+    def list_leds(self):
+        led_categories = {}
+        for category, leds in self.ipmicmd.get_leds():
+            led_categories[category] = leds
+        self.output.put(msg.LEDStatus(led_categories, self.node))
 
     def read_inventory(self, component):
         invitems = []
@@ -610,8 +634,11 @@ class IpmiHandler(object):
         if len(self.element) < 3:
             return
         self.sensorcategory = self.element[2]
-        if len(self.element) == 3:  # list sensors per category
+        # list sensors per category
+        if len(self.element) == 3 and self.element[-2] == 'hardware':
             return self.list_sensors()
+        elif len(self.element) == 3 and self.element[-2] == 'led':
+            return self.list_leds()
         elif len(self.element) == 4:  # resource requested
             return self.read_sensors(self.element[-1])
 

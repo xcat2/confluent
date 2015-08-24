@@ -799,6 +799,18 @@ class SensorReadings(ConfluentMessage):
             self.kvpairs = {name: {'sensors': readings}}
 
 
+class Firmware(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, data, name):
+        self.notnode = name is None
+        self.desc = 'Firmware information'
+        if self.notnode:
+            self.kvpairs = {'firmware': data}
+        else:
+            self.kvpairs = {name:  {'firmware': data}}
+
+
 class KeyValueData(ConfluentMessage):
     readonly = True
 
@@ -808,6 +820,21 @@ class KeyValueData(ConfluentMessage):
             self.kvpairs = kvdata
         else:
             self.kvpairs = {name: kvdata}
+
+
+class LEDStatus(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, data, name):
+        self.notnode = name is None
+        self.desc = 'led status'
+
+        self.kvpairs = {}
+        for led_category in data:
+            self.kvpairs[led_category] = [data[led_category]]
+
+        if not self.notnode:
+            self.kvpairs = {name: self.kvpairs}
 
 
 class NetworkConfiguration(ConfluentMessage):

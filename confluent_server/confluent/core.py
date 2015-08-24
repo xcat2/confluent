@@ -175,6 +175,12 @@ noderesources = {
                 'default': 'ipmi',
             }),
         },
+        'firmware': {
+            'all': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+        },
     },
     'power': {
         'state': PluginRoute({
@@ -201,6 +207,12 @@ noderesources = {
                 'default': 'ipmi',
             }),
         },
+        'led': {
+            'all': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            })
+        }
     },
 }
 
