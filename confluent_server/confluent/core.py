@@ -208,11 +208,11 @@ noderesources = {
             }),
         },
         'led': {
-            'all': PluginRoute({
+            'all': PluginCollection({
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             })
-        }
+        },
     },
 }
 

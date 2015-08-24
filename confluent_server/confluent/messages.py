@@ -829,12 +829,10 @@ class LEDStatus(ConfluentMessage):
         self.notnode = name is None
         self.desc = 'led status'
 
-        self.kvpairs = {}
-        for led_category in data:
-            self.kvpairs[led_category] = [data[led_category]]
-
-        if not self.notnode:
-            self.kvpairs = {name: self.kvpairs}
+        if self.notnode:
+            self.kvpairs = {'leds':data}
+        else:
+            self.kvpairs = {name: {'leds':data}}
 
 
 class NetworkConfiguration(ConfluentMessage):
