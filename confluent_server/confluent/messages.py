@@ -674,6 +674,7 @@ class PowerState(ConfluentChoiceMessage):
         'off',
         'reset',
         'boot',
+        'shutdown',
         'diag',
     ])
     keyname = 'state'
