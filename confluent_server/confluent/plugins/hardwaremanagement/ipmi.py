@@ -367,6 +367,8 @@ class IpmiHandler(object):
             return self.handle_users()
         elif self.element[1:3] == ['management_controller', 'net_interfaces']:
             return self.handle_nets()
+        elif self.element[1:3] == ['management_controller', 'reset']:
+            return self.handle_reset()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -737,6 +739,15 @@ class IpmiHandler(object):
             power = self.ipmicmd.get_power()
             self.output.put(msg.PowerState(node=self.node,
                                            state=power['powerstate']))
+            return
+
+    def handle_reset(self):
+        if 'read' == self.op:
+            self.output.put(msg.BMCReset(node=self.node,
+                                         state='reset'))
+            return
+        elif 'update' == self.op:
+            self.ipmicmd.reset_bmc()
             return
 
 
