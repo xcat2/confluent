@@ -328,6 +328,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:3] == ['configuration', 'management_controller', 'users'] and
             operation not in ('retrieve', 'delete') and path[-1] != 'all'):
         return InputCredential(path, inputdata, nodes)
+    elif (path[:3] == ['configuration', 'management_controller', 'reset']
+            and operation != 'retrieve'):
+        return InputBMCReset(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -535,10 +538,20 @@ class InputPowerMessage(ConfluentInputMessage):
         'off',
         'reset',
         'boot',
+        'diag',
         'shutdown',
     ])
 
     def powerstate(self, node):
+        return self.inputbynode[node]
+
+
+class InputBMCReset(ConfluentInputMessage):
+    valid_values = set([
+        'reset',
+    ])
+
+    def state(self, node):
         return self.inputbynode[node]
 
 
@@ -638,6 +651,14 @@ class PowerState(ConfluentChoiceMessage):
         'off',
         'reset',
         'boot',
+        'diag',
+    ])
+    keyname = 'state'
+
+
+class BMCReset(ConfluentChoiceMessage):
+    valid_values = set([
+        'reset',
     ])
     keyname = 'state'
 
