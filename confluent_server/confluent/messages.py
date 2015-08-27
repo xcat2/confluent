@@ -538,6 +538,7 @@ class InputPowerMessage(ConfluentInputMessage):
         'off',
         'reset',
         'boot',
+        'diag',
         'shutdown',
     ])
 
@@ -650,6 +651,7 @@ class PowerState(ConfluentChoiceMessage):
         'off',
         'reset',
         'boot',
+        'diag',
     ])
     keyname = 'state'
 
