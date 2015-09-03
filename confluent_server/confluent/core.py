@@ -139,6 +139,10 @@ noderesources = {
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'power_capping': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
             'identifier': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',

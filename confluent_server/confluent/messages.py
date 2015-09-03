@@ -331,6 +331,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:3] == ['configuration', 'management_controller', 'reset']
             and operation != 'retrieve'):
         return InputBMCReset(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller',
+            'power_capping'] and operation != 'retrieve'):
+        return InputPowerCapping(path, nodes, inputdata)
     elif (path[:3] == ['configuration', 'management_controller', 'identifier']
             and operation != 'retrieve'):
         return InputMCI(path, nodes, inputdata)
@@ -634,6 +637,17 @@ class InputDomainName(ConfluentInputMessage):
     def domain_name(self, node):
         return self.inputbynode[node]
 
+
+class InputPowerCapping(ConfluentInputMessage):
+    valid_values = set([
+        'on',
+        'off',
+    ])
+
+    def powercapping(self, node):
+        return self.inputbynode[node]
+
+
 class BootDevice(ConfluentChoiceMessage):
     valid_values = set([
         'network',
@@ -741,6 +755,25 @@ class BMCReset(ConfluentChoiceMessage):
         'reset',
     ])
     keyname = 'state'
+
+
+class PowerCapping(ConfluentChoiceMessage):
+    valid_values = set([
+        'on',
+        'off',
+    ])
+
+    def __init__(self, node, enabled):
+        self.stripped = False
+        if enabled:
+            state = 'on'
+        else:
+            state = 'off'
+        self.kvpairs = {
+            node: {
+                'state': {'value': state},
+            }
+        }
 
 
 class EventCollection(ConfluentMessage):

@@ -369,6 +369,8 @@ class IpmiHandler(object):
             return self.handle_nets()
         elif self.element[1:3] == ['management_controller', 'reset']:
             return self.handle_reset()
+        elif self.element[1:3] == ['management_controller', 'power_capping']:
+            return self.handle_powercapping()
         elif self.element[1:3] == ['management_controller', 'identifier']:
             return self.handle_identifier()
         elif self.element[1:3] == ['management_controller', 'domain_name']:
@@ -775,6 +777,20 @@ class IpmiHandler(object):
         elif 'update' == self.op:
             dn = self.inputdata.domain_name(self.node)
             self.ipmicmd.set_domain_name(dn)
+            return
+
+    def handle_powercapping(self):
+        if 'read' == self.op:
+            state = self.ipmicmd.get_capping_enabled()
+            self.output.put(msg.PowerCapping(self.node, state))
+            return
+        elif 'update' == self.op:
+            state = self.inputdata.powercapping(self.node)
+            if state == 'on':
+                enable = True
+            else:
+                enable = False
+            self.ipmicmd.set_capping_enabled(enable)
             return
 
 def _str_health(health):
