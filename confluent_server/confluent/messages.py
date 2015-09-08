@@ -331,6 +331,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:3] == ['configuration', 'management_controller', 'reset']
             and operation != 'retrieve'):
         return InputBMCReset(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller', 'identifier']
+            and operation != 'retrieve'):
+        return InputMCI(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -553,6 +556,23 @@ class InputBMCReset(ConfluentInputMessage):
 
     def state(self, node):
         return self.inputbynode[node]
+
+
+class InputMCI(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata or 'identifier' not in inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+        if len(inputdata['identifier']) > 64:
+            raise exc.InvalidArgumentException(
+                'identifier must be less than or = 64 chars')
+
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for node in nodes:
+            self.mci[node] = inputdata
 
 
 class BootDevice(ConfluentChoiceMessage):
@@ -913,6 +933,18 @@ class ListAttributes(ConfluentMessage):
     def __init__(self, name=None, kv=None, desc=''):
         self.desc = desc
         self.notnode = name is None
+        if self.notnode:
+            self.kvpairs = kv
+        else:
+            self.kvpairs = {name: kv}
+
+
+class MCI(ConfluentMessage):
+    def __init__(self, name=None, mci=None):
+        self.notnode = name is None
+        self.desc = 'BMC identifier'
+
+        kv = {'identifier': {'value': mci}}
         if self.notnode:
             self.kvpairs = kv
         else:
