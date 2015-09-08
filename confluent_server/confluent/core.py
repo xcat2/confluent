@@ -170,6 +170,10 @@ noderesources = {
     'console': {
         # this is a dummy value, http or socket must handle special
         'session': PluginRoute({}),
+        'license': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
     },
     'events': {
         'hardware': {

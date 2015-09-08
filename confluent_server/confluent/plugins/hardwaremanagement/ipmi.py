@@ -357,6 +357,8 @@ class IpmiHandler(object):
             self.do_eventlog()
         elif self.element == ['events', 'hardware', 'decode']:
             self.decode_alert()
+        elif self.element == ['console', 'license']:
+            self.handle_license()
         else:
             raise Exception('Not Implemented')
 
@@ -818,6 +820,11 @@ class IpmiHandler(object):
                         server = self.inputdata.ntp_server(self.node)
                         self.ipmicmd.set_ntp_server(server, idx)
                         return
+
+    def handle_license(self):
+        available = self.ipmicmd.get_remote_kvm_available()
+        self.output.put(msg.License(self.node, available))
+        return
 
 def _str_health(health):
     if health == 'unknown':

@@ -1105,6 +1105,21 @@ class NTPServer(ConfluentMessage):
             self.kvpairs = {name: kv}
 
 
+class License(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, name=None, kvm=None):
+        self.notnode = name is None
+        self.desc = 'License'
+
+        kv = []
+        kv.append({'kvm_availability': str(kvm)})
+        if self.notnode:
+            self.kvpairs = {'License': kv}
+        else:
+            self.kvpairs = {name: {'License': kv}}
+
+
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
 
