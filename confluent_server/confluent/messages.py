@@ -572,7 +572,10 @@ class InputMCI(ConfluentInputMessage):
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
         for node in nodes:
-            self.mci[node] = inputdata
+            self.inputbynode[node] = inputdata
+
+    def mci(self, node):
+        return self.inputbynode[node]['identifier']
 
 
 class BootDevice(ConfluentChoiceMessage):
