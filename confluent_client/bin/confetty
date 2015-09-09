@@ -496,6 +496,18 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
         inconsole = False
 
 
+def get_session_node(shellargs):
+    # straight to node console
+    if len(shellargs) == 1 and ' ' not in shellargs[0]:
+        return shellargs[0]
+    if len(shellargs) == 2 and shellargs[0] == 'start':
+        args = [s for s in shellargs[1].split('/') if s]
+        if len(args) == 4 and args[0] == 'nodes' and args[2] == 'console' and \
+                args[3] == 'session':
+            return args[1]
+    return None
+
+
 def conserver_command(filehandle, command):
     # x - conserver has that as 'show baud', I am inclined to replace that with
     #     'request exclusive'
@@ -601,16 +613,19 @@ except socket.gaierror:
 # sys.stdout.flush()
 
 if sys.stdout.isatty():
-	import readline
-	readline.parse_and_bind("tab: complete")
-	readline.parse_and_bind("set bell-style none")
-	readline.set_completer(completer)
+    import readline
+
+    readline.parse_and_bind("tab: complete")
+    readline.parse_and_bind("set bell-style none")
+    readline.set_completer(completer)
+
 doexit = False
 inconsole = False
 pendingcommand = ""
-if len(shellargs) == 1 and ' ' not in shellargs[0]:  # straight to node console
+session_node = get_session_node(shellargs)
+if session_node is not None:
     consoleonly = True
-    do_command("start /nodes/%s/console/session" % shellargs[0], netserver)
+    do_command("start /nodes/%s/console/session" % session_node, netserver)
     doexit = True
 elif shellargs:
     command = " ".join(shellargs)
