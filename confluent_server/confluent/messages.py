@@ -334,6 +334,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:3] == ['configuration', 'management_controller', 'identifier']
             and operation != 'retrieve'):
         return InputMCI(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller', 'domain_name']
+            and operation != 'retrieve'):
+        return InputDomainName(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -577,6 +580,25 @@ class InputMCI(ConfluentInputMessage):
     def mci(self, node):
         return self.inputbynode[node]['identifier']
 
+
+class InputDomainName(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata or 'domain_name' not in inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+        if len(inputdata['domain_name']) > 256:
+            raise exc.InvalidArgumentException(
+                'identifier must be less than or = 256 chars')
+
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for node in nodes:
+            self.inputbynode[node] = inputdata['domain_name']
+
+    def domain_name(self, node):
+        return self.inputbynode[node]
 
 class BootDevice(ConfluentChoiceMessage):
     valid_values = set([
@@ -948,6 +970,18 @@ class MCI(ConfluentMessage):
         self.desc = 'BMC identifier'
 
         kv = {'identifier': {'value': mci}}
+        if self.notnode:
+            self.kvpairs = kv
+        else:
+            self.kvpairs = {name: kv}
+
+
+class DomainName(ConfluentMessage):
+    def __init__(self, name=None, dn=None):
+        self.notnode = name is None
+        self.desc = 'BMC domain name'
+
+        kv = {'domain_name': {'value': dn}}
         if self.notnode:
             self.kvpairs = kv
         else:

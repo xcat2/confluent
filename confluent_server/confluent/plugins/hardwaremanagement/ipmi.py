@@ -371,6 +371,8 @@ class IpmiHandler(object):
             return self.handle_reset()
         elif self.element[1:3] == ['management_controller', 'identifier']:
             return self.handle_identifier()
+        elif self.element[1:3] == ['management_controller', 'domain_name']:
+            return self.handle_domain_name()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -760,6 +762,16 @@ class IpmiHandler(object):
         elif 'update' == self.op:
             mci = self.inputdata.mci(self.node)
             self.ipmicmd.set_mci(mci)
+            return
+
+    def handle_domain_name(self):
+        if 'read' == self.op:
+            dn = self.ipmicmd.get_domain_name()
+            self.output.put(msg.DomainName(self.node, dn))
+            return
+        elif 'update' == self.op:
+            dn = self.inputdata.domain_name(self.node)
+            self.ipmicmd.set_domain_name(dn)
             return
 
 def _str_health(health):
