@@ -334,6 +334,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:3] == ['configuration', 'management_controller', 'identifier']
             and operation != 'retrieve'):
         return InputMCI(path, nodes, inputdata)
+    elif (path[:4] == ['configuration', 'management_controller',
+            'net_interfaces', 'management'] and operation != 'retrieve'):
+        return InputNetworkConfiguration(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -576,6 +579,39 @@ class InputMCI(ConfluentInputMessage):
 
     def mci(self, node):
         return self.inputbynode[node]['identifier']
+
+
+class InputNetworkConfiguration(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+
+        if 'hw_addr' in inputdata:
+            raise exc.InvalidArgumentException('hw_addr is a read only field')
+
+        if 'ipv4_address' not in inputdata:
+            inputdata['ipv4_address'] = None
+
+        if 'ipv4_gateway' not in inputdata:
+            inputdata['ipv4_gateway'] = None
+
+        if 'ipv4_configuration' in inputdata:
+            if inputdata['ipv4_configuration'].lower() not in ['dhcp','static']:
+                raise exc.InvalidArgumentException(
+                                            'Unrecognized ipv4_configuration')
+        else:
+            inputdata['ipv4_configuration'] = None
+
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for node in nodes:
+            self.inputbynode[node] = inputdata
+
+    def netconfig(self, node):
+        return self.inputbynode[node]
 
 
 class BootDevice(ConfluentChoiceMessage):
