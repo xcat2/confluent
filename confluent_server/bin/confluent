@@ -19,7 +19,6 @@ import sys
 import os
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
-print(path)
 if path.startswith('/opt'):
     # if installed into system path, do not muck with things
     sys.path.append(path)
