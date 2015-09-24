@@ -27,6 +27,7 @@
 
 import atexit
 import confluent.auth as auth
+import confluent.config.conf as conf
 import confluent.config.configmanager as configmanager
 import confluent.consoleserver as consoleserver
 import confluent.core as confluentcore
@@ -40,7 +41,6 @@ import fcntl
 import sys
 import os
 import signal
-import ConfigParser
 
 
 def _daemonize():
@@ -126,10 +126,9 @@ def _initsecurity(config):
 
 def run():
     _checkpidfile()
-    configfile = "/etc/confluent/service.cfg"
-    config = ConfigParser.ConfigParser()
-    config.read(configfile)
+    conf.init_config()
     try:
+        config = conf.get_config()
         _initsecurity(config)
     except:
         sys.stderr.write("Error unlocking credential store\n")
@@ -150,8 +149,8 @@ def run():
     #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
     #                           family=socket.AF_UNIX)
     #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
-    http_bind_host, http_bind_port = _get_connector_config(config, 'http')
-    sock_bind_host, sock_bind_port = _get_connector_config(config, 'socket')
+    http_bind_host, http_bind_port = _get_connector_config('http')
+    sock_bind_host, sock_bind_port = _get_connector_config('socket')
     consoleserver.start_console_sessions()
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
@@ -161,12 +160,7 @@ def run():
     while 1:
         eventlet.sleep(100)
 
-
-def _get_connector_config(config, session):
-    try:
-        host = config.get(session, 'bindhost')
-        port = config.getint(session, 'bindport')
-    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError) as e:
-        host = None
-        port = None
+def _get_connector_config(session):
+    host = conf.get_option(session, 'bindhost')
+    port = conf.get_int_option(session, 'bindport')
     return (host, port)
