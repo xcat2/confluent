@@ -409,7 +409,7 @@ class InputAttributes(ConfluentMessage):
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
                     tv = nodeattr[attr].format()
-                    nodeattr[attr] = tv
+                    nodeattr[attr] = str(tv)
                 except (KeyError, IndexError):
                     # an expression string will error if format() done
                     # use that as cue to put it into config as an expr
