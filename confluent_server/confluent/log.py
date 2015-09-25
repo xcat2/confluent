@@ -71,11 +71,18 @@ import traceback
 try:
     from fcntl import flock, LOCK_EX, LOCK_UN, LOCK_SH
 except ImportError:
-    flock = lambda file, flag: True
-    LOCK_EX = None
-    LOCK_UN = None
-    LOCK_SH = None
-
+    if os.name == 'nt':
+        import msvcrt
+        LOCK_SH = msvcrt.LK_LOCK  # no shared, degrade to exclusive
+        LOCK_EX = msvcrt.LK_LOCK
+        LOCK_UN = msvcrt.LK_UNLCK
+        def flock(file, flag):
+            oldoffset = file.tell()
+            file.seek(0)
+            msvcrt.locking(file.fileno(), flag, 1)
+            file.seek(oldoffset)
+    else:
+        raise
 
 # on conserving filehandles:
 # upon write, if file not open, open it for append
@@ -152,8 +159,10 @@ class Logger(object):
     def writedata(self):
         if self.textfile is None:
             self.textfile = open(self.textpath, mode='ab')
+            self.textfile.seek(0, 2)
         if self.binfile is None:
             self.binfile = open(self.binpath, mode='ab')
+            self.binfile.seek(0, 2)
         while self.logentries:
             entry = self.logentries.popleft()
             ltype = entry[0]
