@@ -651,12 +651,12 @@ class IpmiHandler(object):
         self.sensorcategory = self.element[2]
         # list sensors per category
         if len(self.element) == 3 and self.element[-2] == 'hardware':
+            if self.sensorcategory == 'leds':
+                return self.list_leds()
             return self.list_sensors()
-        elif len(self.element) == 3 and self.element[-2] == 'led':
-            return self.list_leds()
-        elif len(self.element) == 4 and self.element[1] == 'led':
-            return self.read_leds(self.element[-1])
         elif len(self.element) == 4:  # resource requested
+            if self.sensorcategory == 'leds':
+                return self.read_leds(self.element[-1])
             return self.read_sensors(self.element[-1])
 
     def match_sensor(self, sensor):

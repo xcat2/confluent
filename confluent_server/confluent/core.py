@@ -218,13 +218,12 @@ noderesources = {
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
-        },
-        'led': {
-            'all': PluginCollection({
+            'leds': PluginCollection({
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
-            })
+            }),
         },
+
     },
 }
 
