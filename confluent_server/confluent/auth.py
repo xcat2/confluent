@@ -26,7 +26,10 @@ import Crypto.Protocol.KDF as KDF
 import hashlib
 import hmac
 import multiprocessing
-import PAM
+try:
+    import PAM
+except ImportError:
+    pass
 import time
 
 _pamservice = 'confluent'
@@ -161,6 +164,8 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         pammy.acct_mgmt()
         del pammy
         return authorize(user, element, tenant, skipuserobj=False)
+    except NameError:
+        pass
     except PAM.error:
         if credobj.haspam:
             return None

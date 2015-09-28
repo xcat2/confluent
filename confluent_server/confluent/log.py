@@ -64,7 +64,6 @@ import confluent.config.configmanager
 import confluent.config.conf as conf
 import confluent.exceptions as exc
 import eventlet
-import fcntl
 import glob
 import json
 import os
@@ -73,6 +72,22 @@ import stat
 import struct
 import time
 import traceback
+
+try:
+    from fcntl import flock, LOCK_EX, LOCK_UN, LOCK_SH
+except ImportError:
+    if os.name == 'nt':
+        import msvcrt
+        LOCK_SH = msvcrt.LK_LOCK  # no shared, degrade to exclusive
+        LOCK_EX = msvcrt.LK_LOCK
+        LOCK_UN = msvcrt.LK_UNLCK
+        def flock(file, flag):
+            oldoffset = file.tell()
+            file.seek(0)
+            msvcrt.locking(file.fileno(), flag, 1)
+            file.seek(oldoffset)
+    else:
+        raise
 
 # on conserving filehandles:
 # upon write, if file not open, open it for append
@@ -114,16 +129,18 @@ class BaseRotatingHandler(object):
         Use the specified filename for streamed logging
         """
         self.filepath = filepath
-        self.textpath = self.filepath +logname
-        self.binpath = self.filepath + logname + ".cbl"
+        self.textpath = os.path.join(self.filepath, logname)
+        self.binpath = os.path.join(self.filepath, logname + ".cbl")
         self.textfile = None
         self.binfile = None
 
     def open(self):
         if self.textfile is None:
             self.textfile = open(self.textpath, mode='ab')
+            self.textfile.seek(0, 2)
         if self.binfile is None:
             self.binfile = open(self.binpath, mode='ab')
+            self.binfile.seek(0, 2)
         return self.textfile, self.binfile
 
     def try_emit(self, binrecord, textrecord):
@@ -487,10 +504,15 @@ class Logger(object):
         self.initialized = True
         self.filepath = confluent.config.configmanager.get_global("logdirectory")
         if self.filepath is None:
-            self.filepath = "/var/log/confluent/"
+            if os.name == 'nt':
+                self.filepath = os.path.join(
+                    os.getenv('SystemDrive'), '\\ProgramData', 'confluent',
+                    'logs')
+            else:
+                self.filepath = "/var/log/confluent"
         self.isconsole = console
         if console:
-            self.filepath += "consoles/"
+            self.filepath = os.path.join(self.filepath, "consoles")
         if not os.path.isdir(self.filepath):
             os.makedirs(self.filepath, 448)
         self.writer = None
@@ -524,7 +546,7 @@ class Logger(object):
             elif not self.isconsole:
                 textdate = time.strftime(
                     '%b %d %H:%M:%S ', time.localtime(tstamp))
-            self._lock(fcntl.LOCK_EX)
+            flock(self.textfile, LOCK_EX)
             offset = textfile.tell() + len(textdate)
             datalen = len(data)
             eventaux = entry[4]
@@ -547,6 +569,9 @@ class Logger(object):
             if not files:
                 self.handler.emit(binrecord, textrecord)
             else:
+                # Release the lock that was held to preserve the correct offset
+                # binrecord value is to be discarded anyway
+                flock(self.textfile, LOCK_UN)
                 # Log the rolling event at first, then log the last data
                 # which cause the rolling event.
                 to_bfile, to_tfile = files
@@ -554,7 +579,6 @@ class Logger(object):
                 roll_data = "rename:%s>%s" % (self.handler.textpath, to_tfile)
                 self.logentries.appendleft([DataTypes.event, tstamp, roll_data,
                                             Events.logrollover, None])
-            self._lock(fcntl.LOCK_UN)
         if self.closer is None:
             self.closer = eventlet.spawn_after(15, self.closelog)
         self.writer = None
@@ -578,7 +602,7 @@ class Logger(object):
             binfile = open(binpath, mode='r')
         except IOError:
             return '', 0, 0
-        self._lock(fcntl.LOCK_SH)
+        flock(binfile, LOCK_SH)
         binfile.seek(0, 2)
         binidx = binfile.tell()
         currsize = 0
@@ -586,6 +610,7 @@ class Logger(object):
         termstate = None
         recenttimestamp = 0
         access_last_rename = False
+        flock(textfile, LOCK_SH)
         while binidx > 0 and currsize < size:
             binidx -= 16
             binfile.seek(binidx, 0)
@@ -604,11 +629,13 @@ class Logger(object):
                                                              datalen)
                 # Rolling event detected, close the current bin file, then open
                 # the renamed bin file.
+                flock(binfile, LOCK_UN)
                 binfile.close()
                 try:
                     binfile = open(binpath, mode='r')
                 except IOError:
                     return '', 0, 0
+                flock(binfile, LOCK_SH)
                 binfile.seek(0, 2)
                 binidx = binfile.tell()
             elif ltype != 2:
@@ -619,11 +646,13 @@ class Logger(object):
             offsets.append((offset, datalen, textpath))
             if termstate is None:
                 termstate = eventaux
+        flock(binfile, LOCK_UN)
         binfile.close()
         textdata = ''
         while offsets:
             (offset, length, textpath) = offsets.pop()
             if textfile.name != textpath:
+                flock(textfile, LOCK_UN)
                 textfile.close()
                 try:
                     textfile = open(textpath)
@@ -631,7 +660,7 @@ class Logger(object):
                     return '', 0, 0
             textfile.seek(offset, 0)
             textdata += textfile.read(length)
-        self._lock(fcntl.LOCK_UN)
+        flock(textfile, LOCK_UN)
         textfile.close()
         if termstate is None:
             termstate = 0

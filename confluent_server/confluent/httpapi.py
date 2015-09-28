@@ -25,7 +25,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
-import confluent.tlvdata as tlvdata
+import confluent.tlvdata
 import confluent.util as util
 import copy
 import eventlet
@@ -36,6 +36,7 @@ import time
 import urlparse
 import eventlet.wsgi
 #scgi = eventlet.import_patched('flup.server.scgi')
+tlvdata = confluent.tlvdata
 
 
 auditlog = None

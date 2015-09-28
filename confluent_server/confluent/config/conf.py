@@ -17,12 +17,16 @@
 
 #This defines config variable to store the global configuration for confluent
 import ConfigParser
+import os
 
 _config = None
 
 def init_config():
     global _config
     configfile = "/etc/confluent/service.cfg"
+    if os.name == 'nt':
+        configfile = os.path.join(os.getentv('SystemDrive'), '\\ProgramData',
+                                  'confluent', 'cfg', 'service.cfg')
     _config = ConfigParser.ConfigParser()
     _config.read(configfile)
 
