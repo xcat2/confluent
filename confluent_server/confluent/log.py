@@ -551,7 +551,7 @@ class Logger(object):
                 # which cause the rolling event.
                 to_bfile, to_tfile = files
                 self.logentries.appendleft(entry)
-                roll_data = "rename:%s>%s" % (self.handler.textpath, to_tfile)
+                roll_data = json.dumps({'previouslogfile': to_tfile})
                 self.logentries.appendleft([DataTypes.event, tstamp, roll_data,
                                             Events.logrollover, None])
             self._lock(fcntl.LOCK_UN)
@@ -563,7 +563,7 @@ class Logger(object):
 
         def parse_last_rolling_files(textfile, offset, datalen):
             textfile.seek(offset, 0)
-            textpath = textfile.read(datalen).split('>')[1]
+            textpath = json.loads(textfile.read(datalen))['previouslogfile']
             dir_name, base_name = os.path.split(textpath)
             temp = base_name.split('.')
             temp.insert(1,'cbl')
