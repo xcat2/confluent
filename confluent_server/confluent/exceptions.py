@@ -57,3 +57,7 @@ class NotImplementedException(ConfluentException):
     # The current configuration/plugin is unable to perform
     # the requested task. http code 501
     pass
+
+class GlobalConfigError(ConfluentException):
+    # The configuration in the global config file is not right
+    pass

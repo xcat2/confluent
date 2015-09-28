@@ -11,9 +11,11 @@
 if [ -f /etc/init.d/functions ]; then
     . /etc/init.d/functions
     LOG_SUCCESS=success
+    LOG_FAILURE=failure
 elif [ -f /lib/lsb/init-functions ]; then
     . /lib/lsb/init-functions
     LOG_SUCCESS=log_success_msg
+    LOG_FAILURE=log_failure_msg
 else
     echo "Unknown platform"
     exit 1
@@ -35,9 +37,15 @@ stop() {
 start() {
 	echo -n 'Starting Confluent: '
 	$confluent
-	$LOG_SUCCESS
-	echo
-	return
+	if [ $? -eq 0 ]; then
+		$LOG_SUCCESS
+		echo
+		return 0
+	else
+		$LOG_FAILURE
+		echo
+		return 1
+	fi
 }
 
 case $1 in

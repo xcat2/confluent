@@ -337,6 +337,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:4] == ['configuration', 'management_controller',
             'net_interfaces', 'management'] and operation != 'retrieve'):
         return InputNetworkConfiguration(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller', 'domain_name']
+            and operation != 'retrieve'):
+        return InputDomainName(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -412,7 +415,7 @@ class InputAttributes(ConfluentMessage):
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
                     tv = nodeattr[attr].format()
-                    nodeattr[attr] = tv
+                    nodeattr[attr] = str(tv)
                 except (KeyError, IndexError):
                     # an expression string will error if format() done
                     # use that as cue to put it into config as an expr
@@ -603,7 +606,6 @@ class InputNetworkConfiguration(ConfluentInputMessage):
                                             'Unrecognized ipv4_configuration')
         else:
             inputdata['ipv4_configuration'] = None
-
         if nodes is None:
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
@@ -613,6 +615,24 @@ class InputNetworkConfiguration(ConfluentInputMessage):
     def netconfig(self, node):
         return self.inputbynode[node]
 
+
+class InputDomainName(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata or 'domain_name' not in inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+        if len(inputdata['domain_name']) > 256:
+            raise exc.InvalidArgumentException(
+                'identifier must be less than or = 256 chars')
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for node in nodes:
+            self.inputbynode[node] = inputdata['domain_name']
+
+    def domain_name(self, node):
+        return self.inputbynode[node]
 
 class BootDevice(ConfluentChoiceMessage):
     valid_values = set([
@@ -710,6 +730,7 @@ class PowerState(ConfluentChoiceMessage):
         'off',
         'reset',
         'boot',
+        'shutdown',
         'diag',
     ])
     keyname = 'state'
@@ -984,6 +1005,18 @@ class MCI(ConfluentMessage):
         self.desc = 'BMC identifier'
 
         kv = {'identifier': {'value': mci}}
+        if self.notnode:
+            self.kvpairs = kv
+        else:
+            self.kvpairs = {name: kv}
+
+
+class DomainName(ConfluentMessage):
+    def __init__(self, name=None, dn=None):
+        self.notnode = name is None
+        self.desc = 'BMC domain name'
+
+        kv = {'domain_name': {'value': dn}}
         if self.notnode:
             self.kvpairs = kv
         else:
