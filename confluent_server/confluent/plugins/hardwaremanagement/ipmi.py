@@ -439,9 +439,12 @@ class IpmiHandler(object):
                     ipv4cfgmethod=lancfg['ipv4_configuration'],
                     hwaddr=lancfg['mac_address']
                 ))
-            else:
-                self.output.put(msg.ConfluentNodeError(self.node,
-                                                       'Not yet implemented'))
+            elif self.op == 'update':
+                config = self.inputdata.netconfig(self.node)
+                self.ipmicmd.set_net_configuration(
+                                ipv4_address=config['ipv4_address'],
+                                ipv4_configuration=config['ipv4_configuration'],
+                                ipv4_gateway=config['ipv4_gateway'])
 
     def handle_users(self):
         # Create user
