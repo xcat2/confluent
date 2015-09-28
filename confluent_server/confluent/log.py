@@ -152,6 +152,7 @@ class BaseRotatingHandler(object):
         """
         rolling_type = self.shouldRollover(binrecord, textrecord)
         if rolling_type:
+            flock(self.textfile, LOCK_UN)
             return self.doRollover(rolling_type)
         return None
 
@@ -172,10 +173,12 @@ class BaseRotatingHandler(object):
 
     def close(self):
         if self.textfile:
-            self.textfile.close
+            if not self.textfile.closed:
+                self.textfile.close()
             self.textfile = None
         if self.binfile:
-            self.binfile.close
+            if not self.binfile.closed:
+                self.binfile.close()
             self.binfile = None
 
 
@@ -523,12 +526,6 @@ class Logger(object):
         self.logname = logname
         self.logentries = collections.deque()
 
-    def _lock(self, arrribute):
-        if self.lockfile is None or self.lockfile.closed:
-            lockpath = os.path.join(self.filepath, "%s-lock" % self.logname)
-            self.lockfile = open(lockpath, 'a')
-        fcntl.flock(self.lockfile, arrribute)
-
     def writedata(self):
         while self.logentries:
             textfile, binfile = self.handler.open()
@@ -546,7 +543,7 @@ class Logger(object):
             elif not self.isconsole:
                 textdate = time.strftime(
                     '%b %d %H:%M:%S ', time.localtime(tstamp))
-            flock(self.textfile, LOCK_EX)
+            flock(textfile, LOCK_EX)
             offset = textfile.tell() + len(textdate)
             datalen = len(data)
             eventaux = entry[4]
@@ -568,10 +565,8 @@ class Logger(object):
             files = self.handler.try_emit(binrecord, textrecord)
             if not files:
                 self.handler.emit(binrecord, textrecord)
+                flock(textfile, LOCK_UN)
             else:
-                # Release the lock that was held to preserve the correct offset
-                # binrecord value is to be discarded anyway
-                flock(self.textfile, LOCK_UN)
                 # Log the rolling event at first, then log the last data
                 # which cause the rolling event.
                 to_bfile, to_tfile = files

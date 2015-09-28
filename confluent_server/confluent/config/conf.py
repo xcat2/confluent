@@ -25,7 +25,7 @@ def init_config():
     global _config
     configfile = "/etc/confluent/service.cfg"
     if os.name == 'nt':
-        configfile = os.path.join(os.getentv('SystemDrive'), '\\ProgramData',
+        configfile = os.path.join(os.getenv('SystemDrive'), '\\ProgramData',
                                   'confluent', 'cfg', 'service.cfg')
     _config = ConfigParser.ConfigParser()
     _config.read(configfile)
