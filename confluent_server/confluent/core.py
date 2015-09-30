@@ -39,7 +39,10 @@ import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.noderange as noderange
-import confluent.shellmodule as shellmodule
+try:
+    import confluent.shellmodule as shellmodule
+except ImportError:
+    pass
 import itertools
 import os
 import sys
