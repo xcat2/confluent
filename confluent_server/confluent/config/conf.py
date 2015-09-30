@@ -15,11 +15,12 @@
 # limitations under the License.
 
 
-#This defines config variable to store the global configuration for confluent
+# This defines config variable to store the global configuration for confluent
 import ConfigParser
 import os
 
 _config = None
+
 
 def init_config():
     global _config
@@ -30,24 +31,38 @@ def init_config():
     _config = ConfigParser.ConfigParser()
     _config.read(configfile)
 
+
 def get_config():
+    if _config is None:
+        init_config()
     return _config
 
+
 def get_int_option(section, option):
+    if _config is None:
+        init_config()
     try:
         return _config.getint(section, option)
     except (
-    ConfigParser.NoSectionError, ConfigParser.NoOptionError, ValueError):
+            ConfigParser.NoSectionError, ConfigParser.NoOptionError,
+            ValueError):
         return None
 
+
 def get_boolean_option(section, option):
+    if _config is None:
+        init_config()
     try:
         return _config.getboolean(section, option)
     except (
-    ConfigParser.NoSectionError, ConfigParser.NoOptionError, ValueError):
+            ConfigParser.NoSectionError, ConfigParser.NoOptionError,
+            ValueError):
         return None
 
+
 def get_option(section, option):
+    if _config is None:
+        init_config()
     try:
         return _config.get(section, option)
     except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
