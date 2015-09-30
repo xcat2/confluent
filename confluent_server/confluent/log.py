@@ -633,6 +633,9 @@ class Logger(object):
                 flock(binfile, LOCK_SH)
                 binfile.seek(0, 2)
                 binidx = binfile.tell()
+                # things have been set up for next iteration to dig to
+                # previous log file, go to next iteration
+                continue
             elif ltype != 2:
                 continue
             if tstamp > recenttimestamp:
