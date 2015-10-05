@@ -79,6 +79,7 @@ import re
 import string
 import sys
 import threading
+import traceback
 
 
 _masterkey = None
@@ -990,7 +991,16 @@ class ConfigManager(object):
             if node not in attribwatchers:
                 continue
             attribwatcher = attribwatchers[node]
-            for attrname in nodeattrs[node].iterkeys():
+            # usually, we will only look at the specific attribute keys that
+            # have had change flagged, so set up to iterate through only those
+            checkattrs = nodeattrs[node]
+            if '_nodedeleted' in nodeattrs[node]:
+                # in the case of a deleted node, we want to iterate through
+                # *all* attributes that the node might have had set prior
+                # to deletion, to make all watchers aware of the removed
+                # node and take appropriate action
+                checkattrs = attribwatcher
+            for attrname in checkattrs:
                 if attrname not in attribwatcher:
                     continue
                 for notifierid in attribwatcher[attrname].iterkeys():
@@ -1023,6 +1033,9 @@ class ConfigManager(object):
                 watcher(added=[], deleting=nodes, configmanager=self)
         changeset = {}
         for node in nodes:
+            # set a reserved attribute for the sake of the change notification
+            # framework to trigger on
+            changeset[node] = {'_nodedeleted': 1}
             node = node.encode('utf-8')
             if node in self._cfgstore['nodes']:
                 self._sync_groups_to_node(node=node, groups=[],
