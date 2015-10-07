@@ -340,6 +340,12 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:3] == ['configuration', 'management_controller', 'domain_name']
             and operation != 'retrieve'):
         return InputDomainName(path, nodes, inputdata)
+    elif (path[:4] == ['configuration', 'management_controller', 'ntp',
+            'enabled'] and operation != 'retrieve'):
+        return InputNTPEnabled(path, nodes, inputdata)
+    elif (path[:4] == ['configuration', 'management_controller', 'ntp',
+            'servers'] and operation != 'retrieve' and len(path) == 5):
+        return InputNTPServer(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException()
 
@@ -634,6 +640,37 @@ class InputDomainName(ConfluentInputMessage):
     def domain_name(self, node):
         return self.inputbynode[node]
 
+
+class InputNTPServer(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata or 'server' not in inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+        if len(inputdata['server']) > 256:
+            raise exc.InvalidArgumentException(
+                'identifier must be less than or = 256 chars')
+
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for node in nodes:
+            self.inputbynode[node] = inputdata['server']
+
+    def ntp_server(self, node):
+        return self.inputbynode[node]
+
+
+class InputNTPEnabled(ConfluentInputMessage):
+    valid_values = set([
+        'True',
+        'False'
+    ])
+
+    def ntp_enabled(self, node):
+        return self.inputbynode[node]
+
+
 class BootDevice(ConfluentChoiceMessage):
     valid_values = set([
         'network',
@@ -741,6 +778,21 @@ class BMCReset(ConfluentChoiceMessage):
         'reset',
     ])
     keyname = 'state'
+
+
+class NTPEnabled(ConfluentChoiceMessage):
+    valid_values = set([
+        'True',
+        'False',
+    ])
+
+    def __init__(self, node, enabled):
+        self.stripped = False
+        self.kvpairs = {
+            node: {
+                'state': {'value': str(enabled)},
+            }
+        }
 
 
 class EventCollection(ConfluentMessage):
@@ -1017,6 +1069,36 @@ class DomainName(ConfluentMessage):
         self.desc = 'BMC domain name'
 
         kv = {'domain_name': {'value': dn}}
+        if self.notnode:
+            self.kvpairs = kv
+        else:
+            self.kvpairs = {name: kv}
+
+
+class NTPServers(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, name=None, servers=None):
+        self.notnode = name is None
+        self.desc = 'NTP Server'
+
+        kv = []
+        for idx in range(0, len(servers)):
+            kv.append({str(idx+1): servers[idx]})
+        if self.notnode:
+            self.kvpairs = {'ntp_servers': kv}
+        else:
+            self.kvpairs = {name: {'ntp_servers': kv}}
+
+
+class NTPServer(ConfluentMessage):
+    def __init__(self, name=None, server=None):
+        self.notnode = name is None
+        self.desc = 'NTP Server'
+
+        kv = {
+            'server': {'value': server},
+        }
         if self.notnode:
             self.kvpairs = kv
         else:
