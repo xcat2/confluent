@@ -25,7 +25,7 @@ import pyparsing as pp
 import re
 
 # construct custom grammar with pyparsing
-_nodeword = pp.Word(pp.alphanums + '~^$/=-:.*+!')
+_nodeword = pp.Word(pp.alphanums + '~^$/=-_:.*+!')
 _nodebracket = pp.QuotedString(quoteChar='[', endQuoteChar=']',
                                unquoteResults=False)
 _nodeatom = pp.Group(pp.OneOrMore(_nodeword | _nodebracket))
