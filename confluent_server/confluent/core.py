@@ -150,6 +150,16 @@ noderesources = {
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'ntp': {
+                'enabled': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'servers': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+            },
         }
     },
     '_console': {
@@ -160,6 +170,10 @@ noderesources = {
     'console': {
         # this is a dummy value, http or socket must handle special
         'session': PluginRoute({}),
+        'license': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
     },
     'events': {
         'hardware': {

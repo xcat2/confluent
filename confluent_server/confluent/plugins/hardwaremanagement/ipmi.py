@@ -357,6 +357,8 @@ class IpmiHandler(object):
             self.do_eventlog()
         elif self.element == ['events', 'hardware', 'decode']:
             self.decode_alert()
+        elif self.element == ['console', 'license']:
+            self.handle_license()
         else:
             raise Exception('Not Implemented')
 
@@ -373,6 +375,8 @@ class IpmiHandler(object):
             return self.handle_identifier()
         elif self.element[1:3] == ['management_controller', 'domain_name']:
             return self.handle_domain_name()
+        elif self.element[1:3] == ['management_controller', 'ntp']:
+            return self.handle_ntp()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -776,6 +780,51 @@ class IpmiHandler(object):
             dn = self.inputdata.domain_name(self.node)
             self.ipmicmd.set_domain_name(dn)
             return
+
+    def handle_ntp(self):
+        if self.element[3] == 'enabled':
+            if 'read' == self.op:
+                enabled = self.ipmicmd.get_ntp_enabled()
+                self.output.put(msg.NTPEnabled(self.node, enabled))
+                return
+            elif 'update' == self.op:
+                enabled = self.inputdata.ntp_enabled(self.node)
+                self.ipmicmd.set_ntp_enabled(enabled == 'True')
+                return
+        elif self.element[3] == 'servers':
+            if len(self.element) == 4:
+                self.output.put(msg.ChildCollection('all'))
+                size = len(self.ipmicmd.get_ntp_servers())
+                for idx in range(1, size + 1):
+                    self.output.put(msg.ChildCollection(idx))
+            else:
+                if 'read' == self.op:
+                    if self.element[-1] == 'all':
+                        servers = self.ipmicmd.get_ntp_servers()
+                        self.output.put(msg.NTPServers(self.node, servers))
+                        return
+                    else:
+                        idx = int(self.element[-1]) - 1
+                        servers = self.ipmicmd.get_ntp_servers()
+                        self.output.put(msg.NTPServer(self.node, servers[idx]))
+                        return
+                elif self.op in ('update', 'create'):
+                    if self.element[-1] == 'all':
+                        servers = self.inputdata.ntp_servers(self.node)
+                        for idx in servers:
+                            self.ipmicmd.set_ntp_server(server[idx],
+                                                        int(idx[-1])-1)
+                        return
+                    else:
+                        idx = int(self.element[-1]) - 1
+                        server = self.inputdata.ntp_server(self.node)
+                        self.ipmicmd.set_ntp_server(server, idx)
+                        return
+
+    def handle_license(self):
+        available = self.ipmicmd.get_remote_kvm_available()
+        self.output.put(msg.License(self.node, available))
+        return
 
 def _str_health(health):
     if health == 'unknown':
