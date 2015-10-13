@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import optparse
+import os
+import sys
+
+confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
+argparser = optparse.OptionParser(
+    usage="Usage: %prog [options] node",
+    epilog="Command sequences are available while connected to a console, hit "
+           "ctrl-'e', then release ctrl, then 'c', then '?' for a full list. "
+           "For example, ctrl-'e', then 'c', then '.' will exit the current "
+           "console")
+(options, args) = argparser.parse_args()
+if len(args) != 1:
+    argparser.print_help()
+    sys.exit(1)
+os.execl(confettypath, confettypath, 'start',
+         '/nodes/{0}/console/session'.format(args[0]))
