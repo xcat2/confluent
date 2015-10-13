@@ -655,7 +655,7 @@ class InputNTPServer(ConfluentInputMessage):
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
         for node in nodes:
-            self.inputbynode[node] = inputdata['server']
+            self.inputbynode[node] = str(inputdata['server'])
 
     def ntp_server(self, node):
         return self.inputbynode[node]
