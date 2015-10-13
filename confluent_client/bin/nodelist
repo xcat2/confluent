@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+__author__ = 'jjohnson2'
+
+import optparse
+import os
+import sys
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+argparser = optparse.OptionParser(
+    usage="Usage: %prog [options] noderange [list of attributes")
+argparser.add_option('-b', '--blame', action='store_true',
+                     help='Show information about how attributes inherited')
+(options, args) = argparser.parse_args()
+try:
+    noderange = args[0]
+except IndexError:
+    argparser.print_help()
+    sys.exit(1)
+session = client.Command()
+exitcode = 0
+if len(args) > 1:
+    seenattributes = set([])
+    for res in session.read('/noderange/{0}/attributes/all'.format(noderange)):
+        for node in res['databynode']:
+            for attr in res['databynode'][node]:
+                seenattributes.add(attr)
+                currattr = res['databynode'][node][attr]
+                if attr in args[1:]:
+                    if 'value' in currattr:
+                        if currattr['value'] is not None:
+                           attrout = '{0}: {1}: {2}'.format(
+                                node, attr, currattr['value'])
+                        else:
+                            attrout = '{0}: {1}:'.format(node, attr)
+                    elif 'isset' in currattr:
+                        if currattr['isset']:
+                            attrout = '{0}: {1}: ********'.format(node, attr)
+                        else:
+                            attrout = '{0}: {1}:'.format(node, attr)
+                    if options.blame:
+                        blamedata = []
+                        if 'inheritedfrom' in currattr:
+                            blamedata.append('inherited from group {0}'.format(
+                                currattr['inheritedfrom']
+                            ))
+                        if 'expression' in currattr:
+                            blamedata.append(
+                                'derived from expression "{0}"'.format(
+                                    currattr['expression']))
+                        if blamedata:
+                            attrout += ' (' + ', '.join(blamedata) + ')'
+                    print attrout
+
+    for attr in args[1:]:
+        if attr not in seenattributes:
+            sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
+            exitcode = 1
+else:
+    for res in session.read('/noderange/{0}/nodes/'.format(noderange)):
+        print res['item']['href'].replace('/', '')
+sys.exit(exitcode)
