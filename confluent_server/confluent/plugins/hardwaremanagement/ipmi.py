@@ -406,6 +406,7 @@ class IpmiHandler(object):
                     self.output.put(msg.AlertDestination(
                         ip=destdata['address'],
                         acknowledge=destdata['acknowledge_required'],
+                        acknowledge_timeout=destdata.get('acknowledge_timeout', None),
                         retries=destdata['retries'],
                         name=self.node))
                     return
@@ -415,6 +416,8 @@ class IpmiHandler(object):
                     alertargs = {}
                     if 'acknowledge' in alertparms:
                         alertargs['acknowledge_required'] = alertparms['acknowledge']
+                    if 'acknowledge_timeout' in alertparms:
+                        alertargs['acknowledge_timeout'] = alertparms['acknowledge_timeout']
                     if 'ip' in alertparms:
                         alertargs['ip'] = alertparms['ip']
                     if 'retries' in alertparms:
