@@ -34,9 +34,9 @@ argparser.add_option('-b', '--blame', action='store_true',
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
+    nodelist = '/noderange/{0}/nodes/'.format(noderange)
 except IndexError:
-    argparser.print_help()
-    sys.exit(1)
+    nodelist = '/nodes/'
 session = client.Command()
 exitcode = 0
 if len(args) > 1:
@@ -77,6 +77,10 @@ if len(args) > 1:
             sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
             exitcode = 1
 else:
-    for res in session.read('/noderange/{0}/nodes/'.format(noderange)):
-        print res['item']['href'].replace('/', '')
+    for res in session.read(nodelist):
+        if 'error' in res:
+            sys.stderr.write(res['error'] + '\n')
+            exitcode = 1
+        else:
+            print res['item']['href'].replace('/', '')
 sys.exit(exitcode)
