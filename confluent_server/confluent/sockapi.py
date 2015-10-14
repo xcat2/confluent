@@ -17,7 +17,7 @@
 
 # This is the socket api layer.
 # It implement unix and tls sockets
-# 
+#
 
 import atexit
 import errno
@@ -271,6 +271,8 @@ def _unixdomainhandler():
         os.remove("/var/run/confluent/api.sock")
     except OSError:  # if file does not exist, no big deal
         pass
+    if not os.path.isdir("/var/run/confluent"):
+        os.makedirs('/var/run/confluent', 0755)
     unixsocket.bind("/var/run/confluent/api.sock")
     os.chmod("/var/run/confluent/api.sock",
              stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |
