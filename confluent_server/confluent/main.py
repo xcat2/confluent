@@ -41,10 +41,11 @@ except ImportError:
     pass
 import eventlet
 #import eventlet.backdoor as backdoor
+havefcntl = True
 try:
     import fcntl
 except ImportError:
-    pass
+    havefcntl = False
 #import multiprocessing
 import sys
 import os
@@ -120,7 +121,7 @@ def terminate(signalname, frame):
 
 
 def doexit():
-    if 'fcntl' not in locals():
+    if havefcntl:
         return
     pidfile = open('/var/run/confluent/pid')
     pid = pidfile.read()
@@ -137,7 +138,7 @@ def _initsecurity(config):
 
 
 def run():
-    if 'fcntl' in locals():
+    if havefcntl:
         _checkpidfile()
     conf.init_config()
     try:
@@ -153,7 +154,7 @@ def run():
         doexit()
         raise
     _daemonize()
-    if 'fcntl' in locals():
+    if havefcntl:
         _updatepidfile()
     auth.init_auth()
     signal.signal(signal.SIGINT, terminate)
