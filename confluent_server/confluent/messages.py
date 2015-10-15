@@ -631,6 +631,7 @@ class InputDomainName(ConfluentInputMessage):
         if len(inputdata['domain_name']) > 256:
             raise exc.InvalidArgumentException(
                 'identifier must be less than or = 256 chars')
+
         if nodes is None:
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
@@ -871,12 +872,13 @@ class UserCollection(ConfluentMessage):
 
 
 class AlertDestination(ConfluentMessage):
-    def __init__(self, ip, acknowledge=False, retries=0, name=None):
+    def __init__(self, ip, acknowledge=False, acknowledge_timeout=None, retries=0, name=None):
         self.desc = 'foo'
         self.stripped = False
         self.notnode = name is None
         kvpairs = {'ip': {'value': ip},
                    'acknowledge': {'value': acknowledge},
+                   'acknowledge_timeout': {'value': acknowledge_timeout},
                    'retries': {'value': retries}}
         if self.notnode:
             self.kvpairs = kvpairs
@@ -887,6 +889,7 @@ class AlertDestination(ConfluentMessage):
 class InputAlertDestination(ConfluentMessage):
     valid_alert_params = {
         'acknowledge': lambda x: False if type(x) in (unicode,str) and x.lower() == 'false' else bool(x),
+        'acknowledge_timeout': lambda x: int(x) if x and x.isdigit() else None,
         'ip': lambda x: x,
         'retries': lambda x: int(x)
     }
