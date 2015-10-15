@@ -1,3 +1,8 @@
 cd `dirname $0`
-VERSION=`cat VERSION`
+VERSION=`git tag -l|tail -n 1`
+NUMCOMMITS=`git rev-list $VERSION..HEAD|wc -l`
+if [ "$NUMCOMMITS" -ne 0 ]; then
+    VERSION=$VERSION.dev$NUMCOMMITS.g`git rev-parse --short HEAD`
+fi
+echo $VERSION > VERSION
 sed -e "s/#VERSION#/$VERSION/" setup.py.tmpl > setup.py
