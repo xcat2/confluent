@@ -121,7 +121,7 @@ def terminate(signalname, frame):
 
 
 def doexit():
-    if havefcntl:
+    if not havefcntl:
         return
     pidfile = open('/var/run/confluent/pid')
     pid = pidfile.read()
