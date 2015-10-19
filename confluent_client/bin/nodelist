@@ -42,6 +42,10 @@ exitcode = 0
 if len(args) > 1:
     seenattributes = set([])
     for res in session.read('/noderange/{0}/attributes/all'.format(noderange)):
+        if 'error' in res:
+            sys.stderr.write(res['error'])
+            exitcode = 1
+            continue
         for node in res['databynode']:
             for attr in res['databynode'][node]:
                 seenattributes.add(attr)
@@ -71,11 +75,11 @@ if len(args) > 1:
                         if blamedata:
                             attrout += ' (' + ', '.join(blamedata) + ')'
                     print attrout
-
-    for attr in args[1:]:
-        if attr not in seenattributes:
-            sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
-            exitcode = 1
+    if not exitcode:
+        for attr in args[1:]:
+            if attr not in seenattributes:
+                sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
+                exitcode = 1
 else:
     for res in session.read(nodelist):
         if 'error' in res:
