@@ -74,13 +74,13 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
         sys.stderr.write(rsp['error'] + '\n')
         exitcode |= rsp['errorcode']
     if 'databynode' in rsp:
-       nodedata = rsp['databynode']
-       for node in nodedata:
-           thisdata = nodedata[node]
+        nodedata = rsp['databynode']
+        for node in nodedata:
+            thisdata = nodedata[node]
             if 'error' in thisdata:
                sys.stderr.write('{0}: {1}\n'.format(node, thisdata['error']))
                exitcode |= 1
-           if 'events' in thisdata:
+            if 'events' in thisdata:
                evtdata = thisdata['events']
                for evt in evtdata:
                    print '{0}: {1}'.format(node, format_event(evt))
