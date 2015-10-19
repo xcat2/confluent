@@ -58,7 +58,7 @@ def hex2bin(hexstring):
     return bytearray(bytedata)
 
 def simplify_name(name):
-    return name.lower().replace(' ', '_')
+    return name.lower().replace(' ', '_').replace('/', '-')
 
 
 def sanitize_invdata(indata):
