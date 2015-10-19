@@ -43,7 +43,7 @@ if len(args) > 1:
     seenattributes = set([])
     for res in session.read('/noderange/{0}/attributes/all'.format(noderange)):
         if 'error' in res:
-            sys.stderr.write(res['error'])
+            sys.stderr.write(res['error'] + '\n')
             exitcode = 1
             continue
         for node in res['databynode']:
