@@ -38,6 +38,9 @@ def send(handle, data):
     if isinstance(data, str):
         # plain text, e.g. console data
         tl = len(data)
+        if tl == 0:
+            # if you don't have anything to say, don't say anything at all
+            return
         if tl < 16777216:
             # type for string is '0', so we don't need
             # to xor anything in
@@ -76,6 +79,8 @@ def recv(handle):
     # 4 byte tlv
     dlen = tl & 16777215  # grab lower 24 bits
     datatype = (tl & 2130706432) >> 24  # grab 7 bits from near beginning
+    if dlen == 0:
+        return None
     data = handle.recv(dlen)
     while len(data) < dlen:
         ndata = handle.recv(dlen - len(data))

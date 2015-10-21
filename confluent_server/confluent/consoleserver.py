@@ -347,6 +347,9 @@ class _ConsoleHandler(object):
             if data == conapi.ConsoleEvent.Disconnect:
                 self._got_disconnected()
             return
+        elif data == '':
+            # ignore empty strings from a cconsole provider
+            return
         if '\x1b[?1l' in data:  # request for ansi mode cursor keys
             self.appmodedetected = False
         if '\x1b[?1h' in data:  # remember the session wants the client to use
