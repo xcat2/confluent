@@ -365,7 +365,10 @@ class _ConsoleHandler(object):
             eventdata |= 2
         self.log(data, eventdata=eventdata)
         self.lasttime = util.monotonic_time()
-        self.buffer += data
+        if isinstance(data, bytearray) or isinstance(data, bytes):
+            self.buffer += data
+        else:
+            self.buffer += data.encode('utf-8')
         #TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
