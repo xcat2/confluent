@@ -38,6 +38,9 @@ def send(handle, data):
     if isinstance(data, str):
         # plain text, e.g. console data
         tl = len(data)
+        if tl == 0:
+            # if you don't have anything to say, don't say anything at all
+            return
         if tl < 16777216:
             # type for string is '0', so we don't need
             # to xor anything in
