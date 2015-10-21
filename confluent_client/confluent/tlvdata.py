@@ -76,6 +76,8 @@ def recv(handle):
     # 4 byte tlv
     dlen = tl & 16777215  # grab lower 24 bits
     datatype = (tl & 2130706432) >> 24  # grab 7 bits from near beginning
+    if dlen == 0:
+        return None
     data = handle.recv(dlen)
     while len(data) < dlen:
         ndata = handle.recv(dlen - len(data))
