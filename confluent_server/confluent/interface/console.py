@@ -28,7 +28,7 @@ class Console(object):
     """This is the class defining the interface a console plugin must return
     for the _console/session element"""
     def __init__(self, node, config):
-        raise NotImplementedError("Subclassing required")
+        return
 
     def connect(self, callback):
         raise NotImplementedError("Subclassing required")
@@ -36,13 +36,10 @@ class Console(object):
     def write(self, data):
         raise NotImplementedError("Subclassing required")
 
-    def wait_for_data(self, timeout=600):
-        raise NotImplementedError("Subclassing required")
-
     def send_break(self):
         """This function is how a plugin should implement sending a break to
         the remote console"""
-        pass
+        return
 
     def ping(self):
         """This function is a hint to the console plugin that now would be a
@@ -54,4 +51,4 @@ class Console(object):
         as well, so consoles can schedule a health check to run at this time.
         No return is expected, any error condition can be reported by sending
         ConsoleEvent.Disconnect, just like normal."""
-        pass
+        return
