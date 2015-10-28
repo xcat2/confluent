@@ -167,6 +167,12 @@ noderesources = {
             'pluginattrs': ['console.method'],
         }),
     },
+    '_shell': {
+        'session': PluginRoute({
+            # For now, not configurable, wait until there's demand
+            'default': 'ssh',
+        })
+    },
     'console': {
         # this is a dummy value, http or socket must handle special
         'session': PluginRoute({}),
