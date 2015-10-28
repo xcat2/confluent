@@ -50,6 +50,8 @@ except ImportError:
 import sys
 import os
 import signal
+import time
+import traceback
 
 
 def _daemonize():
@@ -119,6 +121,11 @@ def _checkpidfile():
 def terminate(signalname, frame):
     sys.exit(0)
 
+def dumptrace(signalname, frame):
+    ht = open('/var/log/confluent/hangtraces', 'a')
+    ht.write('Dumping active trace on ' + time.strftime('%X %x\n'))
+    ht.write(''.join(traceback.format_stack(frame)))
+    ht.close()
 
 def doexit():
     if not havefcntl:
@@ -138,6 +145,7 @@ def _initsecurity(config):
 
 
 def run():
+    signal.signal(signal.SIGUSR1, dumptrace)
     if havefcntl:
         _checkpidfile()
     conf.init_config()
