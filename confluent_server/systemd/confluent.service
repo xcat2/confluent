@@ -6,6 +6,7 @@ Description=Confluent hardware manager
 Type=forking
 PIDFile=/var/run/confluent/pid
 ExecStart=/opt/confluent/bin/confluent
+ExecStop=/opt/confluent/bin/confetty shutdown /
 
 [Install]
 WantedBy=multi-user.target
