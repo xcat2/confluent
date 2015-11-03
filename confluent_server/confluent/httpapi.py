@@ -537,7 +537,13 @@ def _assemble_json(responses, resource, url, extension):
                     else:
                         rspdata[dk] = [rspdata[dk], rsp[dk]]
                 else:
-                    rspdata[dk] = rsp[dk]
+                    if dk == 'databynode':
+                        # a quirk, databynode suggests noderange
+                        # multi response.  This should *always* be a list,
+                        # even if it will be length 1
+                        rspdata[dk] = [rsp[dk]]
+                    else:
+                        rspdata[dk] = rsp[dk]
     rspdata["_links"] = links
     tlvdata.unicode_dictvalues(rspdata)
     yield json.dumps(
