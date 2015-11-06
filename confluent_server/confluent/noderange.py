@@ -20,6 +20,7 @@
 # the middle of strings and use of @ for anything is not in their syntax
 
 
+import copy
 import itertools
 import pyparsing as pp
 import re
@@ -160,7 +161,7 @@ class NodeRange(object):
             return set([entname])
         if self.cfm.is_nodegroup(entname):
             grpcfg = self.cfm.get_nodegroup_attributes(entname)
-            nodes = grpcfg['nodes']
+            nodes = copy.copy(grpcfg['nodes'])
             if 'noderange' in grpcfg and grpcfg['noderange']:
                 nodes |= NodeRange(
                     grpcfg['noderange']['value'], self.cfm).nodes
@@ -185,7 +186,7 @@ class NodeRange(object):
                 return set([element])
             if self.cfm.is_nodegroup(element):
                 grpcfg = self.cfm.get_nodegroup_attributes(element)
-                nodes = grpcfg['nodes']
+                nodes = copy.copy(grpcfg['nodes'])
                 if 'noderange' in grpcfg and grpcfg['noderange']:
                     nodes |= NodeRange(
                         grpcfg['noderange']['value'], self.cfm).nodes
