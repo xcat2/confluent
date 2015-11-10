@@ -601,7 +601,6 @@ def server_connect():
         session.authenticate(username, passphrase)
     while not session.authenticated:
         username = raw_input("Name: ")
-        readline.clear_history()
         passphrase = getpass.getpass("Passphrase: ")
         session.authenticate(username, passphrase)
 
