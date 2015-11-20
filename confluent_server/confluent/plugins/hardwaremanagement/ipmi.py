@@ -17,6 +17,7 @@ import atexit
 import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.messages as msg
+import confluent.util as util
 import eventlet
 import eventlet.event
 import eventlet.green.threading as threading
@@ -94,6 +95,9 @@ class IpmiCommandWrapper(ipmicommand.Command):
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
                       'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
+        self.register_key_handler(
+            util.TLSCertVerifier(
+                cfm, node, 'pubkeys.tls_hardwaremanager').verify_cert)
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:

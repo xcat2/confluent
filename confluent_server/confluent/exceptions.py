@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 
 class ConfluentException(Exception):
-    pass
+    apierrorcode = 500
+    apierrorstr = 'Unexpected Error'
+
+    def get_error_body(self):
+        return self.apierrorstr
 
 
 class NotFoundException(ConfluentException):
@@ -42,6 +49,7 @@ class TargetEndpointBadCredentials(ConfluentException):
     # failed
     pass
 
+
 class LockedCredentials(ConfluentException):
     # A request was performed that required a credential, but the credential
     # store is locked
@@ -58,6 +66,20 @@ class NotImplementedException(ConfluentException):
     # the requested task. http code 501
     pass
 
+
 class GlobalConfigError(ConfluentException):
     # The configuration in the global config file is not right
     pass
+
+
+class PubkeyInvalid(ConfluentException):
+    apierrorcode = 502
+    apierrorstr = '502 - Invalid certificate or key on target'
+
+    def __init__(self, text, fingerprint, attribname):
+        super(PubkeyInvalid, self).__init__(self, text)
+        self.fingerprint = fingerprint
+        self.errorbody = json.dumps({attribname: fingerprint})
+
+    def get_error_body(self):
+        return self.errorbody

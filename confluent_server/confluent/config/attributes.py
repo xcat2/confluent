@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -262,5 +263,19 @@ node = {
                         'this class of protocols, SNMP, and IPMI, SNMP and '
                         'IPMI are given their own settings with distinct '
                         'behaviors'),
+    },
+    'pubkeys.addpolicy': {
+        'description': ('Policy to use when encountering unknown public '
+                        'keys.  Choices are "automatic" to accept and '
+                        'store new key if no key known and "manual" '
+                        'to always reject a new key, even if no key known'
+                        'Note that if the trusted CA verifies the certificate,'
+                        ' that is accepted ignoring this policy.  Default '
+                        'policy is "automatic"'),
+        'valid_values': ('automatic', 'manual'),
+    },
+    'pubkeys.tls_hardwaremanager': {
+        'description':  ('Fingerprint of the TLS certificate recognized as'
+                         'belonging to the hardware manager of the server'),
     },
 }

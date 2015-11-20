@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -144,6 +145,14 @@ def sessionhdl(connection, authname, skipauth=False):
         except exc.LockedCredentials as lockedcred:
             send_data(connection, {'errorcode': 500,
                                       'error': 'Locked Credential Store'})
+            send_data(connection, {'_requestdone': 1})
+        except exc.ConfluentException as e:
+            if e.apierrorcode == 500:
+                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                         event=log.Events.stacktrace)
+            send_data(connection, {'errorcode': e.apierrorcode,
+                                   'error': e.apierrorstr,
+                                   'detail': e.get_error_body()})
             send_data(connection, {'_requestdone': 1})
         except SystemExit:
             sys.exit(0)

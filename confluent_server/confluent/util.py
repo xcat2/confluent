@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2015 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +17,9 @@
 
 # Various utility functions that do not neatly fit into one category or another
 import base64
+import confluent.exceptions as cexc
+import confluent.log as log
+import hashlib
 import os
 import struct
 
@@ -56,3 +60,37 @@ def monotonic_time():
     """
     # for now, just support POSIX systems
     return os.times()[4]
+
+class TLSCertVerifier(object):
+    def __init__(self, configmanager, node, fieldname):
+        self.cfm = configmanager
+        self.node = node
+        self.fieldname = fieldname
+
+    def verify_cert(self, certificate):
+        fingerprint = 'sha512$' + hashlib.sha512(certificate).hexdigest()
+        storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
+                                                   )
+        if self.fieldname not in storedprint[self.node]:  # no stored value, check
+                                                   # policy for next action
+            newpolicy = self.cfm.get_node_attributes(self.node,
+                                                     ('pubkeys.addpolicy',))
+            if ('pubkeys.addpolicy' in newpolicy[self.node] and
+                    'value' in newpolicy[self.node]['pubkeys.addpolicy'] and
+                    newpolicy[self.node]['pubkeys.addpolicy']['value'] == 'manual'):
+                # manual policy means always raise unless a match is set
+                # manually
+                raise cexc.PubkeyInvalid('New certificate detected',
+                                         fingerprint, self.fieldname)
+            # since the policy is not manual, go ahead and add new key
+            # after logging to audit log
+            auditlog = log.Logger('audit')
+            auditlog.log({'node': self.node, 'event': 'certautoadd',
+                          'fingerprint': fingerprint})
+            self.cfm.set_node_attributes(
+                {self.node: {self.fieldname: fingerprint}})
+            return True
+        elif storedprint[self.node][self.fieldname]['value'] == fingerprint:
+            return True
+        raise cexc.PubKeyInvalid(
+            'Mismatched certificate detected', fingerprint, self.fieldname)

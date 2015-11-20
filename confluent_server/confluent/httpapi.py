@@ -439,6 +439,12 @@ def resourcehandler_backend(env, start_response):
         except exc.NotImplementedException:
             start_response('501 Not Implemented', headers)
             yield '501 Not Implemented'
+        except exc.ConfluentException as e:
+            if e.apierrorcode == 500:
+                # raise generics to trigger the tracelog
+                raise
+            start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr))
+            yield e.get_error_body()
 
 def _assemble_html(responses, resource, querydict, url, extension):
     yield '<html><head><meta charset="UTF-8"><title>' \
