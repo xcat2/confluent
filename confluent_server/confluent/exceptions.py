@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import json
 
 
@@ -76,10 +77,13 @@ class PubkeyInvalid(ConfluentException):
     apierrorcode = 502
     apierrorstr = '502 - Invalid certificate or key on target'
 
-    def __init__(self, text, fingerprint, attribname):
+    def __init__(self, text, certificate, fingerprint, attribname):
         super(PubkeyInvalid, self).__init__(self, text)
         self.fingerprint = fingerprint
-        self.errorbody = json.dumps({attribname: fingerprint})
+        bodydata = {'fingerprint': fingerprint,
+                    'fingerprintfield': attribname,
+                    'certificate': base64.b64encode(certificate)}
+        self.errorbody = json.dumps(bodydata)
 
     def get_error_body(self):
         return self.errorbody

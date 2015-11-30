@@ -93,4 +93,5 @@ class TLSCertVerifier(object):
         elif storedprint[self.node][self.fieldname]['value'] == fingerprint:
             return True
         raise cexc.PubKeyInvalid(
-            'Mismatched certificate detected', fingerprint, self.fieldname)
+            'Mismatched certificate detected', certificate, fingerprint,
+            self.fieldname)
