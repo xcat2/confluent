@@ -81,7 +81,8 @@ class TLSCertVerifier(object):
                 # manual policy means always raise unless a match is set
                 # manually
                 raise cexc.PubkeyInvalid('New certificate detected',
-                                         fingerprint, self.fieldname)
+                                         certificate, fingerprint,
+                                         self.fieldname)
             # since the policy is not manual, go ahead and add new key
             # after logging to audit log
             auditlog = log.Logger('audit')
