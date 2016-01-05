@@ -173,6 +173,10 @@ noderesources = {
             'default': 'ssh',
         })
     },
+    'shell': {
+        # another special case similar to console
+        'sessions': [],
+    },
     'console': {
         # this is a dummy value, http or socket must handle special
         'session': PluginRoute({}),
