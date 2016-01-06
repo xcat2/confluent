@@ -170,7 +170,7 @@ noderesources = {
     '_shell': {
         'session': PluginRoute({
             # For now, not configurable, wait until there's demand
-            'default': 'ssh',
+            'handler': 'ssh',
         })
     },
     'shell': {
@@ -529,6 +529,8 @@ def handle_node_request(configmanager, inputdata, operation,
             configmanager=configmanager,
             inputdata=inputdata)
         if isnoderange:
+            return passvalue
+        elif isinstance(passvalue, console.Console):
             return passvalue
         else:
             return stripnode(passvalue, nodes[0])
