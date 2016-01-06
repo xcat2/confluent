@@ -88,10 +88,13 @@ class ShellSession(consoleserver.ConsoleSession):
     def connect_session(self):
         global activesessions
         tenant = self.configmanager.tenant
-        if self.sessionid is None:
-            self.sessionid = str(uuid.uuid4())
         if (self.configmanager.tenant, self.node) not in activesessions:
             activesessions[(tenant, self.node)] = {}
+        if self.sessionid is None:
+            self.sessionid = 1
+            while str(self.sessionid) in activesessions[(tenant, self.node)]:
+                self.sessionid += 1
+            self.sessionid = str(self.sessionid)
         if self.sessionid not in activesessions[(tenant, self.node)]:
             activesessions[(tenant, self.node)][self.sessionid] = _ShellHandler(self.node, self.configmanager)
         self.conshdl = activesessions[(self.configmanager.tenant, self.node)][self.sessionid]
