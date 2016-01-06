@@ -175,11 +175,11 @@ noderesources = {
     },
     'shell': {
         # another special case similar to console
-        'sessions': [],
+        'sessions': {},
     },
     'console': {
         # this is a dummy value, http or socket must handle special
-        'session': PluginRoute({}),
+        'session': None,
         'license': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
             'default': 'ipmi',
@@ -510,6 +510,8 @@ def handle_node_request(configmanager, inputdata, operation,
             iscollection = True
         elif isinstance(routespec, PluginCollection):
             iscollection = False  # it is a collection, but plugin defined
+        elif routespec is None:
+            raise exc.InvalidArgumentException('Custom interface required for resource')
     if iscollection:
         if operation == "delete":
             return delete_node_collection(pathcomponents, configmanager)
