@@ -25,6 +25,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
+import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
 import copy
@@ -326,9 +327,15 @@ def resourcehandler_backend(env, start_response):
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
-    if '/console/session' in env['PATH_INFO']:
+    if (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
+            '/shell/sessions/' in env['PATH_INFO'])):
         #hard bake JSON into this path, do not support other incarnations
-        prefix, _, _ = env['PATH_INFO'].partition('/console/session')
+        if '/console/session' in env['PATH_INFO']:
+            prefix, _, _ = env['PATH_INFO'].partition('/console/session')
+            shellsession = False
+        elif '/shell/sessions/' in env['PATH_INFO']:
+            prefix, _, _ = env['PATH_INFO'].partition('/shell/sessions')
+            shellsession = True
         _, _, nodename = prefix.rpartition('/')
         if 'session' not in querydict.keys() or not querydict['session']:
             auditmsg = {
@@ -344,9 +351,14 @@ def resourcehandler_backend(env, start_response):
             if 'skipreplay' in querydict and querydict['skipreplay']:
                 skipreplay = True
             try:
-                consession = consoleserver.ConsoleSession(
-                    node=nodename, configmanager=cfgmgr,
-                    username=authorized['username'], skipreplay=skipreplay)
+                if shellsession:
+                    consession = shellserver.ShellSession(
+                        node=nodename, configmanager=cfgmgr,
+                        username=authorized['username'], skipreplay=skipreplay)
+                else:
+                    consession = consoleserver.ConsoleSession(
+                        node=nodename, configmanager=cfgmgr,
+                        username=authorized['username'], skipreplay=skipreplay)
             except exc.NotFoundException:
                 start_response("404 Not found", headers)
                 yield "404 - Request Path not recognized"
