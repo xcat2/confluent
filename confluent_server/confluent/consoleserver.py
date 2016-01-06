@@ -35,13 +35,13 @@ import traceback
 
 _handled_consoles = {}
 
-_genwatchattribs = frozenset(('console.method', 'console.logging'))
-
 _tracelog = None
 
 
 class ConsoleHandler(object):
     _plugin_path = '/nodes/{0}/_console/session'
+    _logtobuffer = True
+    _genwatchattribs = frozenset(('console.method', 'console.logging'))
 
     def __init__(self, node, configmanager):
         self._dologging = True
@@ -53,10 +53,13 @@ class ConsoleHandler(object):
         self.connectstate = 'unconnected'
         self.clientcount = 0
         self._isalive = True
-        self.logger = log.Logger(node, console=True,
-                                 tenant=configmanager.tenant)
         self.buffer = bytearray()
-        (text, termstate, timestamp) = self.logger.read_recent_text(8192)
+        if self._logtobuffer:
+            self.logger = log.Logger(node, console=True,
+                                     tenant=configmanager.tenant)
+            (text, termstate, timestamp) = self.logger.read_recent_text(8192)
+        else:
+            (text, termstate, timestamp) = ('', 0, False)
         # when reading from log file, we will use wall clock
         # it should usually match walltime.
         self.lasttime = 0
@@ -81,8 +84,9 @@ class ConsoleHandler(object):
         self._console = None
         self.connectionthread = None
         self.send_break = None
-        self._attribwatcher = self.cfgmgr.watch_attributes(
-            (self.node,), _genwatchattribs, self._attribschanged)
+        if self._genwatchattribs:
+            self._attribwatcher = self.cfgmgr.watch_attributes(
+                (self.node,), self._genwatchattribs, self._attribschanged)
         self.check_isondemand()
         if not self._isondemand:
             eventlet.spawn(self._connect)
@@ -204,11 +208,12 @@ class ConsoleHandler(object):
             self.cfgmgr.remove_watcher(self._attribwatcher)
             self._attribwatcher = None
         if hasattr(self._console, "configattributes"):
-            attribstowatch = self._console.configattributes | _genwatchattribs
+            attribstowatch = self._console.configattributes | self._genwatchattribs
         else:
-            attribstowatch = _genwatchattribs
-        self._attribwatcher = self.cfgmgr.watch_attributes(
-            (self.node,), attribstowatch, self._attribschanged)
+            attribstowatch = self._genwatchattribs
+        if self._genwatchattribs:
+            self._attribwatcher = self.cfgmgr.watch_attributes(
+                (self.node,), attribstowatch, self._attribschanged)
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointBadCredentials:

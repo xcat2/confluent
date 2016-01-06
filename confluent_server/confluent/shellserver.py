@@ -27,6 +27,12 @@ activesessions = {}
 
 class _ShellHandler(consoleserver.ConsoleHandler):
     _plugin_path = '/nodes/{0}/_shell/session'
+    _genwatchattribs = False
+    _logtobuffer = False
+
+    def log(self, *args, **kwargs):
+        # suppress logging through proving a stub 'log' function
+        return
 
 
 
