@@ -89,7 +89,7 @@ def sessionhdl(connection, authname, skipauth=False):
     cfm = None
     if skipauth:
         authenticated = True
-        cfm = configmanager.ConfigManager(tenant=None)
+        cfm = configmanager.ConfigManager(tenant=None, username=authname)
     elif authname:
         authdata = auth.authorize(authname, element=None)
         if authdata is not None:
