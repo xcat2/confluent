@@ -29,6 +29,7 @@ class SshShell(conapi.Console):
 
     def __init__(self, node, config, username='', password=''):
         self.node = node
+        self.ssh = None
         self.nodeconfig = config
         self.username = username
         self.password = password
@@ -96,7 +97,8 @@ class SshShell(conapi.Console):
             self.shell.sendall(data)
 
     def close(self):
-        self.ssh.close()
+        if self.ssh is not None:
+            self.ssh.close()
 
 def create(nodes, element, configmanager, inputdata):
     if len(nodes) == 1:
