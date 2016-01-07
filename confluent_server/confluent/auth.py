@@ -116,7 +116,7 @@ def authorize(name, element, tenant=False, operation='create',
     user, tenant = _get_usertenant(name, tenant)
     if tenant is not None and not configmanager.is_tenant(tenant):
         return None
-    manager = configmanager.ConfigManager(tenant)
+    manager = configmanager.ConfigManager(tenant, username=user)
     if skipuserobj:
         return None, manager, user, tenant, skipuserobj
     userobj = manager.get_user(user)
@@ -178,7 +178,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
             # invalidate cache and force the slower check
             del _passcache[(user, tenant)]
             return None
-    cfm = configmanager.ConfigManager(tenant)
+    cfm = configmanager.ConfigManager(tenant, username=user)
     ucfg = cfm.get_user(user)
     if ucfg is None or 'cryptpass' not in ucfg:
         eventlet.sleep(0.05)  # stall even on test for existence of a username

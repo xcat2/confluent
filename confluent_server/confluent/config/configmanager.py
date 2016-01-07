@@ -429,9 +429,10 @@ class ConfigManager(object):
     _nodecollwatchers = {}
     _notifierids = {}
 
-    def __init__(self, tenant, decrypt=False):
+    def __init__(self, tenant, decrypt=False, username=None):
         global _cfgstore
         self.decrypt = decrypt
+        self.current_user = username
         if tenant is None:
             self.tenant = None
             if 'main' not in _cfgstore:

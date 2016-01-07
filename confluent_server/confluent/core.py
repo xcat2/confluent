@@ -70,6 +70,7 @@ def nested_lookup(nestdict, key):
 
 def load_plugins():
     # To know our plugins directory, we get the parent path of 'bin'
+    _init_core()
     path = os.path.dirname(os.path.realpath(__file__))
     plugintop = os.path.realpath(os.path.join(path, 'plugins'))
     plugins = set()
@@ -109,157 +110,163 @@ class PluginCollection(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
 
-# _ prefix indicates internal use (e.g. special console scheme) and should not
-# be enumerated in any collection
-noderesources = {
-    'attributes': {
-        'all': PluginRoute({'handler': 'attributes'}),
-        'current': PluginRoute({'handler': 'attributes'}),
-    },
-    'boot': {
-        'nextdevice': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-    },
-    'configuration': {
-        'management_controller': {
-            'alerts': {
-                'destinations': PluginCollection({
+def _init_core():
+    global noderesources
+    global nodegroupresources
+    import confluent.shellserver as shellserver
+    # _ prefix indicates internal use (e.g. special console scheme) and should not
+    # be enumerated in any collection
+    noderesources = {
+        'attributes': {
+            'all': PluginRoute({'handler': 'attributes'}),
+            'current': PluginRoute({'handler': 'attributes'}),
+        },
+        'boot': {
+            'nextdevice': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+        },
+        'configuration': {
+            'management_controller': {
+                'alerts': {
+                    'destinations': PluginCollection({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                },
+                'users': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'net_interfaces': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'reset': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'identifier': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'domain_name': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'ntp': {
+                    'enabled': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'servers': PluginCollection({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                },
+            }
+        },
+        '_console': {
+            'session': PluginRoute({
+                'pluginattrs': ['console.method'],
+            }),
+        },
+        '_shell': {
+            'session': PluginRoute({
+                # For now, not configurable, wait until there's demand
+                'handler': 'ssh',
+            }),
+        },
+        'shell': {
+            # another special case similar to console
+            'sessions': PluginCollection({
+                    'handler': shellserver,
+            }),
+        },
+        'console': {
+            # this is a dummy value, http or socket must handle special
+            'session': None,
+            'license': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+        },
+        'events': {
+            'hardware': {
+                'log': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'decode': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
             },
-            'users': PluginCollection({
+        },
+        'health': {
+            'hardware': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
-            'net_interfaces': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'reset': PluginRoute({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'identifier': PluginRoute({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'domain_name': PluginRoute({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'ntp': {
-                'enabled': PluginRoute({
-                    'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
-                }),
-                'servers': PluginCollection({
+        },
+        'identify': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
+        'inventory': {
+            'hardware': {
+                'all': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
             },
-        }
-    },
-    '_console': {
-        'session': PluginRoute({
-            'pluginattrs': ['console.method'],
-        }),
-    },
-    '_shell': {
-        'session': PluginRoute({
-            # For now, not configurable, wait until there's demand
-            'handler': 'ssh',
-        })
-    },
-    'shell': {
-        # another special case similar to console
-        'sessions': {},
-    },
-    'console': {
-        # this is a dummy value, http or socket must handle special
-        'session': None,
-        'license': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-    },
-    'events': {
-        'hardware': {
-            'log': PluginRoute({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'decode': PluginRoute({
+            'firmware': {
+                'all': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+            },
+        },
+        'power': {
+            'state': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
         },
-    },
-    'health': {
-        'hardware': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-    },
-    'identify': PluginRoute({
-        'pluginattrs': ['hardwaremanagement.method'],
-        'default': 'ipmi',
-    }),
-    'inventory': {
-        'hardware': {
-            'all': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-        },
-        'firmware': {
-            'all': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-        },
-    },
-    'power': {
-        'state': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-    },
-    'sensors': {
-        'hardware': {
-            'all': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'temperature': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'power': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'fans': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-            'leds': PluginCollection({
-                'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
-            }),
-        },
+        'sensors': {
+            'hardware': {
+                'all': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'temperature': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'power': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'fans': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'leds': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+            },
 
-    },
-}
+        },
+    }
 
-nodegroupresources = {
-    'attributes': {
-        'all': PluginRoute({'handler': 'attributes'}),
-        'current': PluginRoute({'handler': 'attributes'}),
-    },
-}
+    nodegroupresources = {
+        'attributes': {
+            'all': PluginRoute({'handler': 'attributes'}),
+            'current': PluginRoute({'handler': 'attributes'}),
+        },
+    }
 
 
 def create_user(inputdata, configmanager):
@@ -525,7 +532,10 @@ def handle_node_request(configmanager, inputdata, operation,
     inputdata = msg.get_input_message(
         pathcomponents, operation, inputdata, nodes, isnoderange)
     if 'handler' in plugroute:  # fixed handler definition, easy enough
-        hfunc = getattr(pluginmap[plugroute['handler']], operation)
+        if isinstance(plugroute['handler'], str):
+            hfunc = getattr(pluginmap[plugroute['handler']], operation)
+        else:
+            hfunc = getattr(plugroute['handler'], operation)
         passvalue = hfunc(
             nodes=nodes, element=pathcomponents,
             configmanager=configmanager,

@@ -20,8 +20,8 @@
 
 
 import confluent.consoleserver as consoleserver
-import uuid
-
+import confluent.exceptions as exc
+import confluent.messages as msg
 activesessions = {}
 
 
@@ -99,3 +99,14 @@ class ShellSession(consoleserver.ConsoleSession):
             activesessions[(tenant, self.node)][self.sessionid] = _ShellHandler(self.node, self.configmanager)
         self.conshdl = activesessions[(self.configmanager.tenant, self.node)][self.sessionid]
 
+def create(nodes, element, configmanager, inputdata):
+    # For creating a resource, it really has to be handled
+    # in httpapi/sockapi specially, like a console.
+    raise exc.InvalidArgumentException('Special client code required')
+
+def retrieve(nodes, element, configmanager, inputdata):
+    tenant = configmanager.tenant
+    user = configmanager.current_user
+    if (tenant, nodes[0]) in activesessions:
+        for sessionid in activesessions[(tenant, nodes[0])]:
+            yield msg.ChildCollection(sessionid)
