@@ -89,6 +89,7 @@ class ConsoleHandler(object):
                 (self.node,), self._genwatchattribs, self._attribschanged)
         self.check_isondemand()
         if not self._isondemand:
+            self.connectstate = 'connecting'
             eventlet.spawn(self._connect)
 
     def check_isondemand(self):
