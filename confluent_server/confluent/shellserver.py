@@ -37,6 +37,8 @@ class _ShellHandler(consoleserver.ConsoleHandler):
     def _got_disconnected(self):
         self.connectstate = 'closed'
         self._send_rcpts({'connectstate': self.connectstate})
+        for session in self.livesessions:
+            session.destroy()
 
 
 
@@ -102,6 +104,10 @@ class ShellSession(consoleserver.ConsoleSession):
         if self.sessionid not in activesessions[(tenant, self.node)]:
             activesessions[(tenant, self.node)][self.sessionid] = _ShellHandler(self.node, self.configmanager)
         self.conshdl = activesessions[(self.configmanager.tenant, self.node)][self.sessionid]
+
+    def destroy(self):
+        del activesessions[(self.configmanager.tenant, self.node)][self.sessionid]
+        super(ShellSession, self).destroy()
 
 def create(nodes, element, configmanager, inputdata):
     # For creating a resource, it really has to be handled
