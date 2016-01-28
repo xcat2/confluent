@@ -208,6 +208,8 @@ def send_request(operation, path, server, parameters=None):
     :param server: The socket to send data over
     :param parameters:  Parameters if any to send along with the request
     """
+    if not self.authenticated:
+        raise Exception('Unauthenticated')
     payload = {'operation': operation, 'path': path}
     if parameters is not None:
         payload['parameters'] = parameters
