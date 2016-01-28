@@ -264,7 +264,7 @@ def _pick_mimetype(env):
         return 'application/json; charset=utf-8', '.json'
     elif env['PATH_INFO'].endswith('.html'):
         return 'text/html', '.html'
-    elif 'application/json' in env['HTTP_ACCEPT']:
+    elif 'HTTP_ACCEPT' in env and 'application/json' in env['HTTP_ACCEPT']:
         return 'application/json; charset=utf-8', ''
     else:
         return 'text/html', ''
