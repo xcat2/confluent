@@ -25,6 +25,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
+import confluent.requestmultiplexer
 import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
@@ -352,7 +353,9 @@ def resourcehandler_backend(env, start_response):
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
-    if (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
+    if (operation == 'create') and env['PATH_INFO'] == '/multiplexer':
+        confluent.multiplexer.handle_http(env, querydict)
+    elif (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
             '/shell/sessions/' in env['PATH_INFO'])):
         #hard bake JSON into this path, do not support other incarnations
         if '/console/session' in env['PATH_INFO']:
