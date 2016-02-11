@@ -14,15 +14,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__author__ = 'jjohnson2'
 
 # This plugin provides an ssh implementation comforming to the 'console'
 # specification.  consoleserver or shellserver would be equally likely
 # to use this.
 
+import confluent.exceptions as cexc
 import confluent.interface.console as conapi
+import confluent.log as log
 import eventlet
+import hashlib
 paramiko = eventlet.import_patched('paramiko')
+
+
+class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
+
+    def __init__(self, configmanager, node):
+        self.cfm = configmanager
+        self.node = node
+
+    def missing_host_key(self, client, hostname, key):
+        fingerprint = 'sha512$' + hashlib.sha512(key).hexdigest()
+        cfg = self.cfm.get_node_attributes(
+                self.node, ('pubkeys.ssh', 'pubkeys.addpolicy'))
+        if 'pubkeys.ssh' not in cfg[self.node]:
+            if ('pubkeys.addpolicy' in cfg[self.node] and
+                    cfg[self.node]['pubkeys.addpolicy'] and
+                    cfg[self.node]['pubkeys.addpolicy']['value'] == 'manual'):
+                raise cexc.PubkeyInvalid('New ssh key detected',
+                                         key, fingerprint, 'pubkeys.ssh')
+            auditlog = log.Logger('audit')
+            auditlog.log({'node': self.node, 'event': 'sshautoadd',
+                          'fingerprint': fingerprint})
+            self.cfm.set_node_attributes(
+                    {self.node: {'pubkeys.ssh': fingerprint}})
+            return True
+        elif cfg[self.node]['pubkeys.ssh']['value'] == fingerprint:
+            return True
+        raise cexc.PubKeyInvalid(
+            'Mismatched SSH host key detected', key, fingerprint, 'pubkeys.ssh'
+        )
 
 
 class SshShell(conapi.Console):
@@ -33,7 +64,7 @@ class SshShell(conapi.Console):
         self.nodeconfig = config
         self.username = username
         self.password = password
-        self.inputmode = 0 # 0 = username, 1 = password...
+        self.inputmode = 0  # 0 = username, 1 = password...
 
     def recvdata(self):
         while self.connected:
@@ -45,7 +76,7 @@ class SshShell(conapi.Console):
 
     def connect(self, callback):
         # for now, we just use the nodename as the presumptive ssh destination
-        #TODO(jjohnson2): use a 'nodeipget' utility function for architectures
+        # TODO(jjohnson2): use a 'nodeipget' utility function for architectures
         # that would rather not use the nodename as anything but an opaque
         # identifier
         self.datacallback = callback
