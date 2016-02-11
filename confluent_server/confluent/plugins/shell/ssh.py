@@ -34,7 +34,7 @@ class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
         self.node = node
 
     def missing_host_key(self, client, hostname, key):
-        fingerprint = 'sha512$' + hashlib.sha512(key).hexdigest()
+        fingerprint = 'sha512$' + hashlib.sha512(key.asbytes()).hexdigest()
         cfg = self.cfm.get_node_attributes(
                 self.node, ('pubkeys.ssh', 'pubkeys.addpolicy'))
         if 'pubkeys.ssh' not in cfg[self.node]:
@@ -89,7 +89,8 @@ class SshShell(conapi.Console):
 
     def logon(self):
         self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(paramiko.client.AutoAddPolicy())
+        self.ssh.set_missing_host_key_policy(
+                HostKeyHandler(self.nodeconfig, self.node))
         try:
             self.ssh.connect(self.node, username=self.username,
                              password=self.password, allow_agent=False,
