@@ -82,7 +82,7 @@ class TLSCertVerifier(object):
                 # manually
                 raise cexc.PubkeyInvalid('New certificate detected',
                                          certificate, fingerprint,
-                                         self.fieldname)
+                                         self.fieldname, 'newkey')
             # since the policy is not manual, go ahead and add new key
             # after logging to audit log
             auditlog = log.Logger('audit')
@@ -95,4 +95,4 @@ class TLSCertVerifier(object):
             return True
         raise cexc.PubkeyInvalid(
             'Mismatched certificate detected', certificate, fingerprint,
-            self.fieldname)
+            self.fieldname, 'mismatch')

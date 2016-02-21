@@ -43,7 +43,7 @@ class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
                     cfg[self.node]['pubkeys.addpolicy']['value'] == 'manual'):
                 raise cexc.PubkeyInvalid('New ssh key detected',
                                          key.asbytes(), fingerprint,
-                                         'pubkeys.ssh')
+                                         'pubkeys.ssh', 'newkey')
             auditlog = log.Logger('audit')
             auditlog.log({'node': self.node, 'event': 'sshautoadd',
                           'fingerprint': fingerprint})
@@ -54,7 +54,7 @@ class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
             return True
         raise cexc.PubkeyInvalid(
             'Mismatched SSH host key detected', key.asbytes(), fingerprint,
-                'pubkeys.ssh'
+                'pubkeys.ssh', 'mismatch'
         )
 
 

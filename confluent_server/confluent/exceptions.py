@@ -77,10 +77,12 @@ class PubkeyInvalid(ConfluentException):
     apierrorcode = 502
     apierrorstr = '502 - Invalid certificate or key on target'
 
-    def __init__(self, text, certificate, fingerprint, attribname):
+    def __init__(self, text, certificate, fingerprint, attribname, event):
         super(PubkeyInvalid, self).__init__(self, text)
         self.fingerprint = fingerprint
-        bodydata = {'fingerprint': fingerprint,
+        bodydata = {'message': text,
+                    'event': event,
+                    'fingerprint': fingerprint,
                     'fingerprintfield': attribname,
                     'certificate': base64.b64encode(certificate)}
         self.errorbody = json.dumps(bodydata)
