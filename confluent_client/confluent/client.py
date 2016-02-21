@@ -123,15 +123,23 @@ class Command(object):
 
 
     def read(self, path, parameters=None):
+        if not self.authenticated:
+            raise Exception('Unauthenticated')
         return send_request('retrieve', path, self.connection, parameters)
 
     def update(self, path, parameters=None):
+        if not self.authenticated:
+            raise Exception('Unauthenticated')
         return send_request('update', path, self.connection, parameters)
 
     def create(self, path, parameters=None):
+        if not self.authenticated:
+            raise Exception('Unauthenticated')
         return send_request('create', path, self.connection, parameters)
 
     def delete(self, path, parameters=None):
+        if not self.authenticated:
+            raise Exception('Unauthenticated')
         return send_request('delete', path, self.connection, parameters)
 
     def _connect_unix(self):
@@ -208,8 +216,6 @@ def send_request(operation, path, server, parameters=None):
     :param server: The socket to send data over
     :param parameters:  Parameters if any to send along with the request
     """
-    if not self.authenticated:
-        raise Exception('Unauthenticated')
     payload = {'operation': operation, 'path': path}
     if parameters is not None:
         payload['parameters'] = parameters
