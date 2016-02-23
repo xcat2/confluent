@@ -388,7 +388,7 @@ def resourcehandler_backend(env, start_response):
                 return
             consolesessions[sessid]['expiry'] = time.time() + 90
             outdata = consolesessions[sessid]['session'].get_next_output(
-                timeout=45)
+                timeout=25)
             bufferage = False
             if 'stampsent' not in consolesessions[sessid]:
                 consolesessions[sessid]['stampsent'] = True
