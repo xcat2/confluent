@@ -306,18 +306,17 @@ def resourcehandler_backend(env, start_response):
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
     authorized = _authorize_request(env, operation)
+    if 'HTTP_SUPPRESSAUTHHEADER' in env:
+        badauth = [('Content-type', 'text/plain')]
+    else:
+        badauth = [('Content-type', 'text/plain'),
+                   ('WWW-Authenticate', 'Basic realm="confluent"')]
     if authorized['code'] == 401:
-        start_response(
-            '401 Authentication Required',
-            [('Content-type', 'text/plain'),
-             ('WWW-Authenticate', 'Basic realm="confluent"')])
+        start_response('401 Authentication Required', badauth)
         yield 'authentication required'
         return
     if authorized['code'] == 403:
-        start_response(
-            '403 Forbidden',
-            [('Content-type', 'text/plain'),
-             ('WWW-Authenticate', 'Basic realm="confluent"')])
+        start_response('403 Forbidden', badauth)
         yield 'authorization failed'
         return
     if authorized['code'] != 200:
