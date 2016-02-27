@@ -199,12 +199,17 @@ def _authorize_request(env, operation):
         if 'confluentsessionid' in cc:
             sessionid = cc['confluentsessionid'].value
             if sessionid in httpsessions:
+                if env['PATH_INFO'] == '/session/logout':
+                    del httpsessions[sessionid]
+                    return ('logout',)
                 httpsessions[sessionid]['expiry'] = time.time() + 90
                 name = httpsessions[sessionid]['name']
                 authdata = auth.authorize(
                     name, element=None,
                     skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
+        if env['PATH_INFO'] == '/session/logout':
+            return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, element=None)
@@ -306,6 +311,10 @@ def resourcehandler_backend(env, start_response):
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
     authorized = _authorize_request(env, operation)
+    if 'logout' in authorized:
+        start_response('200 Sucessful logout')
+        yield('200 - Successful logout')
+        return
     if 'HTTP_SUPPRESSAUTHHEADER' in env:
         badauth = [('Content-type', 'text/plain')]
     else:
