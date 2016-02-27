@@ -208,7 +208,7 @@ def _authorize_request(env, operation):
         if 'confluentsessionid' in cc:
             sessionid = cc['confluentsessionid'].value
             if sessionid in httpsessions:
-                if env['PATH_INFO'] == '/session/logout':
+                if env['PATH_INFO'] == '/sessions/current/logout':
                     targets = []
                     for mythread in httpsessions[sessionid]['inflight']:
                         targets.append(mythread)
@@ -222,7 +222,7 @@ def _authorize_request(env, operation):
                     name, element=None,
                     skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
-        if env['PATH_INFO'] == '/session/logout':
+        if env['PATH_INFO'] == '/sessions/current/logout':
             return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
