@@ -425,6 +425,7 @@ def resourcehandler_backend(env, start_response):
             httpsessions[authorized['sessionid']]['inflight'].discard(
                     greenlet.getcurrent())
             if loggedout is not None:
+                consolesessions[sessid]['session'].destroy()
                 start_response('401 Logged out', [])
                 yield 'Logged out'
                 return
