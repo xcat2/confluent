@@ -347,7 +347,7 @@ def resourcehandler_backend(env, start_response):
         return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
-    headers = [('Content-Type', mimetype)]
+    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache')]
     headers.extend(
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
@@ -426,8 +426,8 @@ def resourcehandler_backend(env, start_response):
                     greenlet.getcurrent())
             if loggedout is not None:
                 consolesessions[sessid]['session'].destroy()
-                start_response('401 Logged out', [])
-                yield 'Logged out'
+                start_response('401 Logged out', headers)
+                yield '{"loggedout": 1}'
                 return
             bufferage = False
             if 'stampsent' not in consolesessions[sessid]:
@@ -495,7 +495,8 @@ def resourcehandler_backend(env, start_response):
             if e.apierrorcode == 500:
                 # raise generics to trigger the tracelog
                 raise
-            start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr))
+            start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr),
+                           headers)
             yield e.get_error_body()
 
 def _assemble_html(responses, resource, querydict, url, extension):
