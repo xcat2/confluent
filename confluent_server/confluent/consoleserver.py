@@ -560,6 +560,8 @@ class ConsoleSession(object):
         instead of polling mode.
         """
         self.reaper.cancel()
+        # postpone death to be 15 seconds after this would timeout
+        self.reaper = eventlet.spawn_after(timeout + 15, self.destroy)
         if self._evt:
             raise Exception('get_next_output is not re-entrant')
         if not self.databuffer:
@@ -568,16 +570,12 @@ class ConsoleSession(object):
                 self._evt.wait()
             self._evt = None
         if not self.databuffer:
-            self.reaper = eventlet.spawn_after(15, self.destroy)
             return ""
         currdata = self.databuffer.popleft()
         if isinstance(currdata, dict):
-            self.reaper = eventlet.spawn_after(15, self.destroy)
             return currdata
         retval = currdata
         while self.databuffer and not isinstance(self.databuffer[0], dict):
             retval += self.databuffer.popleft()
-        # the client has 15 seconds to make a new request for data before
-        # they are given up on
-        self.reaper = eventlet.spawn_after(15, self.destroy)
+
         return retval
