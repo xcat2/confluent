@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import confluent.tlvdata
 import confluent.util as util
 import copy
 import eventlet
+import eventlet.greenthread
+import greenlet
 import json
 import socket
 import traceback
@@ -141,12 +143,18 @@ create_resource_functions = {
 def _sessioncleaner():
     while True:
         currtime = time.time()
-        for session in httpsessions.keys():
+        targsessions = []
+        for session in httpsessions:
             if httpsessions[session]['expiry'] < currtime:
-                del httpsessions[session]
-        for session in consolesessions.keys():
+                targsessions.append(session)
+        for session in targsessions:
+            del httpsessions[session]
+        targsessions = []
+        for session in consolesessions:
             if consolesessions[session]['expiry'] < currtime:
-                del consolesessions[session]
+                targsessions.append(session)
+        for session in targsessions:
+            del consolesessions[session]
         eventlet.sleep(10)
 
 
@@ -191,6 +199,7 @@ def _authorize_request(env, operation):
     """
     authdata = None
     name = ''
+    sessionid = None
     cookie = Cookie.SimpleCookie()
     if 'HTTP_COOKIE' in env:
         #attempt to use the cookie.  If it matches
@@ -200,6 +209,11 @@ def _authorize_request(env, operation):
             sessionid = cc['confluentsessionid'].value
             if sessionid in httpsessions:
                 if env['PATH_INFO'] == '/session/logout':
+                    targets = []
+                    for mythread in httpsessions[sessionid]['inflight']:
+                        targets.append(mythread)
+                    for mythread in targets:
+                        eventlet.greenthread.kill(mythread)
                     del httpsessions[sessionid]
                     return ('logout',)
                 httpsessions[sessionid]['expiry'] = time.time() + 90
@@ -219,7 +233,8 @@ def _authorize_request(env, operation):
         while sessid in httpsessions:
             sessid = util.randomstring(32)
         httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
-                                'skipuserobject': authdata[4]}
+                                'skipuserobject': authdata[4],
+                                'inflight': set([])}
         cookie['confluentsessionid'] = sessid
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
@@ -242,6 +257,8 @@ def _authorize_request(env, operation):
             auditmsg['tenant'] = authdata[3]
             authinfo['tenant'] = authdata[3]
         auditmsg['user'] = authdata[2]
+        if sessionid is not None:
+            authinfo['sessionid'] = sessionid
         if not skiplog:
             auditlog.log(auditmsg)
         return authinfo
@@ -277,7 +294,7 @@ def _pick_mimetype(env):
 
 def _assign_consessionid(consolesession):
     sessid = util.randomstring(32)
-    while sessid in consolesessions.keys():
+    while sessid in consolesessions:
         sessid = util.randomstring(32)
     consolesessions[sessid] = {'session': consolesession,
                                'expiry': time.time() + 60}
@@ -312,7 +329,7 @@ def resourcehandler_backend(env, start_response):
         del querydict['restexplorerop']
     authorized = _authorize_request(env, operation)
     if 'logout' in authorized:
-        start_response('200 Sucessful logout')
+        start_response('200 Sucessful logout', [])
         yield('200 - Successful logout')
         return
     if 'HTTP_SUPPRESSAUTHHEADER' in env:
@@ -395,8 +412,22 @@ def resourcehandler_backend(env, start_response):
                 start_response('400 Expired Session', headers)
                 return
             consolesessions[sessid]['expiry'] = time.time() + 90
-            outdata = consolesessions[sessid]['session'].get_next_output(
-                timeout=25)
+            # add our thread to the 'inflight' to have a hook to terminate
+            # a long polling request
+            loggedout = None
+            httpsessions[authorized['sessionid']]['inflight'].add(
+                    greenlet.getcurrent())
+            try:
+                outdata = consolesessions[sessid]['session'].get_next_output(
+                    timeout=25)
+            except greenlet.GreenletExit as ge:
+                loggedout = ge
+            httpsessions[authorized['sessionid']]['inflight'].discard(
+                    greenlet.getcurrent())
+            if loggedout is not None:
+                start_response('401 Logged out', [])
+                yield 'Logged out'
+                return
             bufferage = False
             if 'stampsent' not in consolesessions[sessid]:
                 consolesessions[sessid]['stampsent'] = True
