@@ -536,6 +536,8 @@ class ConsoleSession(object):
         if self.registered:
             self.conshdl.detachsession(self)
         self.databuffer = None
+        if self._evt:
+            self._evt.send()
         self._evt = None
         self.reghdl = None
 

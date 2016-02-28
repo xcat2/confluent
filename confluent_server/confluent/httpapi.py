@@ -406,10 +406,17 @@ def resourcehandler_backend(env, start_response):
             start_response('200 OK', headers)
             yield json.dumps({'session': querydict['session']})
             return  # client has requests to send or receive, not both...
+        elif 'closesession' in querydict:
+            consolesessions[querydict['session']]['session'].destroy()
+            del consolesessions[querydict['session']]
+            start_response('200 OK', headers)
+            yield '{"sessionclosed": true}'
+            return
         else:  # no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             if sessid not in consolesessions:
                 start_response('400 Expired Session', headers)
+                yield ''
                 return
             consolesessions[sessid]['expiry'] = time.time() + 90
             # add our thread to the 'inflight' to have a hook to terminate
@@ -424,6 +431,10 @@ def resourcehandler_backend(env, start_response):
                 loggedout = ge
             httpsessions[authorized['sessionid']]['inflight'].discard(
                     greenlet.getcurrent())
+            if sessid not in consolesessions:
+                start_response('400 Expired Session', headers)
+                yield ''
+                return
             if loggedout is not None:
                 consolesessions[sessid]['session'].destroy()
                 start_response('401 Logged out', headers)
