@@ -468,6 +468,10 @@ def resourcehandler_backend(env, start_response):
         url = env['PATH_INFO']
         url = url.replace('.json', '')
         url = url.replace('.html', '')
+        if url == '/sessions/current/info':
+            start_response('200 OK', headers)
+            yield json.dumps({'username': authorized['username']})
+            return
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
         try:
