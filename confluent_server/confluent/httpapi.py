@@ -317,6 +317,7 @@ def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
     mimetype, extension = _pick_mimetype(env)
+    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache')]
     reqbody = None
     reqtype = None
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
@@ -329,8 +330,8 @@ def resourcehandler_backend(env, start_response):
         del querydict['restexplorerop']
     authorized = _authorize_request(env, operation)
     if 'logout' in authorized:
-        start_response('200 Sucessful logout', [])
-        yield('200 - Successful logout')
+        start_response('200 Sucessful logout', headers)
+        yield('{"result": "200 - Successful logout"}')
         return
     if 'HTTP_SUPPRESSAUTHHEADER' in env:
         badauth = [('Content-type', 'text/plain')]
@@ -347,7 +348,6 @@ def resourcehandler_backend(env, start_response):
         return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")
-    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache')]
     headers.extend(
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
