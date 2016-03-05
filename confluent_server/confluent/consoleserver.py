@@ -552,6 +552,7 @@ class ConsoleSession(object):
         self.databuffer.append(data)
         if self._evt:
             self._evt.send()
+            self._evt = None
 
     def get_next_output(self, timeout=45):
         """Poll for next available output on this console.
