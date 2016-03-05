@@ -422,15 +422,15 @@ def resourcehandler_backend(env, start_response):
             # add our thread to the 'inflight' to have a hook to terminate
             # a long polling request
             loggedout = None
-            httpsessions[authorized['sessionid']]['inflight'].add(
-                    greenlet.getcurrent())
+            mythreadid = greenlet.getcurrent()
+            httpsessions[authorized['sessionid']]['inflight'].add(mythreadid)
             try:
                 outdata = consolesessions[sessid]['session'].get_next_output(
                     timeout=25)
             except greenlet.GreenletExit as ge:
                 loggedout = ge
             httpsessions[authorized['sessionid']]['inflight'].discard(
-                    greenlet.getcurrent())
+                    mythreadid)
             if sessid not in consolesessions:
                 start_response('400 Expired Session', headers)
                 yield ''
