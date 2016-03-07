@@ -40,7 +40,10 @@ except ImportError:
     #only for now
     pass
 import eventlet
-#import eventlet.backdoor as backdoor
+dbgif = False
+if  map(int, (eventlet.__version__.split('.'))) > [0, 18]:
+    import eventlet.backdoor as backdoor
+    dbgif = True
 havefcntl = True
 try:
     import fcntl
@@ -169,9 +172,10 @@ def run():
     signal.signal(signal.SIGTERM, terminate)
     #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code
     #works with bugs fixed
-    #dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
-    #                           family=socket.AF_UNIX)
-    #eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
+    if dbgif:
+        dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
+                                   family=socket.AF_UNIX)
+        eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     consoleserver.start_console_sessions()
