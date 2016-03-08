@@ -1238,10 +1238,14 @@ class ConfigManager(object):
             pass
 
     @classmethod
-    def shutdown(cls):
+    def wait_for_sync(cls):
         cls._bg_sync_to_file()
         if cls._cfgwriter is not None:
             cls._cfgwriter.join()
+
+    @classmethod
+    def shutdown(cls):
+        cls.wait_for_sync()
         sys.exit(0)
 
     @classmethod

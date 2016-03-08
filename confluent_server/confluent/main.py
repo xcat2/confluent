@@ -145,6 +145,9 @@ def _initsecurity(config):
         with open(keyfile, 'r') as keyhandle:
             key = keyhandle.read()
         configmanager.init_masterkey(key)
+        # We don't want to os._exit() until sync finishes from
+        # init above
+        configmanager.ConfigManager.wait_for_sync()
 
 
 def run():
