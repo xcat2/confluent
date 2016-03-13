@@ -185,15 +185,15 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
         authdata = auth.authorize(authdata[2], path, authdata[3], operation)
         auditmsg = {
             'operation': operation,
-            'user': authdata[2],
             'target': path,
         }
-        if authdata[3] is not None:
-            auditmsg['tenant'] = authdata[3]
         if authdata is None:
             auditmsg['allowed'] = False
             auditlog.log(auditmsg)
             raise exc.ForbiddenRequest()
+        auditmsg['user'] = authdata[2]
+        if authdata[3] is not None:
+            auditmsg['tenant'] = authdata[3]
         auditmsg['allowed'] = True
         auditlog.log(auditmsg)
     try:
