@@ -87,11 +87,13 @@ laststate = {}
 def updatestatus(stateinfo={}):
     status = consolename
     info = []
-    for statekey in stateinfo.iterkeys():
+    for statekey in stateinfo:
         laststate[statekey] = stateinfo[statekey]
     if ('connectstate' in laststate and
             laststate['connectstate'] != 'connected'):
         info.append(laststate['connectstate'])
+        if laststate['connectstate'] == 'closed':
+            quitconfetty(fullexit=consoleonly)
     if 'error' in laststate:
         info.append(laststate['error'])
         # error will be repeated if relevant
