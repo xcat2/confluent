@@ -95,18 +95,18 @@ class ShellSession(consoleserver.ConsoleSession):
         global activesessions
         tenant = self.configmanager.tenant
         if (self.configmanager.tenant, self.node) not in activesessions:
-            activesessions[(tenant, self.node)] = {}
+            activesessions[(tenant, self.node, self.username)] = {}
         if self.sessionid is None:
             self.sessionid = 1
-            while str(self.sessionid) in activesessions[(tenant, self.node)]:
+            while str(self.sessionid) in activesessions[(tenant, self.node, self.username)]:
                 self.sessionid += 1
             self.sessionid = str(self.sessionid)
-        if self.sessionid not in activesessions[(tenant, self.node)]:
-            activesessions[(tenant, self.node)][self.sessionid] = _ShellHandler(self.node, self.configmanager)
-        self.conshdl = activesessions[(self.configmanager.tenant, self.node)][self.sessionid]
+        if self.sessionid not in activesessions[(tenant, self.node, self.username)]:
+            activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager)
+        self.conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
 
     def destroy(self):
-        del activesessions[(self.configmanager.tenant, self.node)][self.sessionid]
+        del activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
         super(ShellSession, self).destroy()
 
 def create(nodes, element, configmanager, inputdata):
@@ -117,6 +117,6 @@ def create(nodes, element, configmanager, inputdata):
 def retrieve(nodes, element, configmanager, inputdata):
     tenant = configmanager.tenant
     user = configmanager.current_user
-    if (tenant, nodes[0]) in activesessions:
-        for sessionid in activesessions[(tenant, nodes[0])]:
+    if (tenant, nodes[0], user) in activesessions:
+        for sessionid in activesessions[(tenant, nodes[0], user)]:
             yield msg.ChildCollection(sessionid)
