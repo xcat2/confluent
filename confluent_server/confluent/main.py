@@ -53,6 +53,7 @@ except ImportError:
 import sys
 import os
 import signal
+import socket
 import time
 import traceback
 
@@ -133,6 +134,7 @@ def dumptrace(signalname, frame):
 def doexit():
     if not havefcntl:
         return
+    os.remove('/var/run/confluent/dbg.sock')
     pidfile = open('/var/run/confluent/pid')
     pid = pidfile.read()
     if pid == str(os.getpid()):
@@ -176,9 +178,11 @@ def run():
     #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code
     #works with bugs fixed
     if dbgif:
+        oumask = os.umask(0077)
         dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
                                    family=socket.AF_UNIX)
         eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
+        os.umask(oumask)
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     consoleserver.start_console_sessions()
