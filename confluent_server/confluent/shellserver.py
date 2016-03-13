@@ -106,7 +106,11 @@ class ShellSession(consoleserver.ConsoleSession):
         self.conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
 
     def destroy(self):
-        del activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
+        try:
+            del activesessions[(self.configmanager.tenant, self.node,
+                                self.username)][self.sessionid]
+        except KeyError:
+            pass
         super(ShellSession, self).destroy()
 
 def create(nodes, element, configmanager, inputdata):
