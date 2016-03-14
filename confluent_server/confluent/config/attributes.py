@@ -81,6 +81,18 @@ node = {
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},
+    'location.room': {
+        'description': 'Room description for the node',
+    },
+    'location.row': {
+        'description': 'Row description for the rack the node is in',
+    },
+    'location.rack': {
+        'description': 'Rack number of the rack the node is in',
+    },
+    'location.u': {
+        'description': 'Position in the rack of the node',
+    },
 #    'location.timezone': {
 #        'description': 'POSIX timezone to apply to this node',
 #    },
@@ -182,14 +194,14 @@ node = {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
     },
-#    'enclosure.manager': {
-#        'description': "The management device for this node's chassis",
+    'enclosure.manager': {
+        'description': "The management device for this node's chassis",
 #        'appliesto': ['system'],
-#    },
-#    'enclosure.bay': {
-#        'description': 'The bay in the enclosure, if any',
+    },
+    'enclosure.bay': {
+         'description': 'The bay in the enclosure, if any',
 #        'appliesto': ['system'],
-#    },
+    },
 #    'enclosure.type': {
 #        'description': '''The type of enclosure in use (e.g. IBM BladeCenter,
 #IBM Flex)''',
