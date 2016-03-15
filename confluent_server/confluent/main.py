@@ -134,7 +134,10 @@ def dumptrace(signalname, frame):
 def doexit():
     if not havefcntl:
         return
-    os.remove('/var/run/confluent/dbg.sock')
+    try:
+        os.remove('/var/run/confluent/dbg.sock')
+    except OSError:
+        pass
     pidfile = open('/var/run/confluent/pid')
     pid = pidfile.read()
     if pid == str(os.getpid()):
