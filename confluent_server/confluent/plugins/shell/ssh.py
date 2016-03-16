@@ -72,6 +72,7 @@ class SshShell(conapi.Console):
         while self.connected:
             pendingdata = self.shell.recv(8192)
             if pendingdata == '':
+                self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
             self.datacallback(pendingdata)
 
