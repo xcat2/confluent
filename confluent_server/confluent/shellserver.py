@@ -37,7 +37,7 @@ class _ShellHandler(consoleserver.ConsoleHandler):
     def _got_disconnected(self):
         self.connectstate = 'closed'
         self._send_rcpts({'connectstate': self.connectstate})
-        for session in self.livesessions:
+        for session in list(self.livesessions):
             session.destroy()
 
 
