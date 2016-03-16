@@ -535,7 +535,6 @@ class ConsoleSession(object):
     def destroy(self):
         if self.registered:
             self.conshdl.detachsession(self)
-        self.databuffer = None
         if self._evt:
             self._evt.send()
         self._evt = None
