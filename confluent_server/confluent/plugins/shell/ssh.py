@@ -72,7 +72,6 @@ class SshShell(conapi.Console):
         while self.connected:
             pendingdata = self.shell.recv(8192)
             if pendingdata == '':
-                self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
             self.datacallback(pendingdata)
 
@@ -98,6 +97,13 @@ class SshShell(conapi.Console):
                              password=self.password, allow_agent=False,
                              look_for_keys=False)
         except paramiko.AuthenticationException:
+            self.inputmode = 0
+            self.username = ''
+            self.password = ''
+            self.datacallback('\r\nlogin as: ')
+            return
+        except paramiko.ssh_exception.NoValidConnectionsError as e:
+            self.datacallback(str(e))
             self.inputmode = 0
             self.username = ''
             self.password = ''
