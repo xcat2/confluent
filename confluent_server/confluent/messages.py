@@ -835,6 +835,13 @@ class EventCollection(ConfluentMessage):
             self.kvpairs = {name: {'events': eventdata}}
 
 
+class AsyncSession(ConfluentMessage):
+    def __init__(self, id):
+        self.desc = 'foo'
+        self.notnode = True
+        self.stripped = True
+        self.kvpairs = {'asyncid': id}
+
 class User(ConfluentMessage):
     def __init__(self, uid, username, privilege_level, name=None):
         self.desc = 'foo'

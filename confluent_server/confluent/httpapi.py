@@ -25,7 +25,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
-import confluent.requestmultiplexer
+import confluent.asynchttp
 import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
@@ -353,8 +353,14 @@ def resourcehandler_backend(env, start_response):
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
-    if (operation == 'create') and env['PATH_INFO'] == '/multiplexer':
-        confluent.multiplexer.handle_http(env, querydict)
+    if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
+        pagecontent = ""
+        for rsp in _assemble_json(
+                confluent.asynchttp.handle_async(env, querydict)):
+            pagecontent += rsp
+        start_response("200 OK", headers)
+        yield pagecontent
+        return
     elif (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
             '/shell/sessions/' in env['PATH_INFO'])):
         #hard bake JSON into this path, do not support other incarnations
@@ -480,7 +486,11 @@ def resourcehandler_backend(env, start_response):
         try:
             hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
-
+            if 'HTTP_CONFLUENTASYNCID' in env:
+                asynchttp.run_handler(hdlr, env)
+                start_response('202 Accepted', headers)
+                yield 'Request queued'
+                return
             pagecontent = ""
             if mimetype == 'text/html':
                 for datum in _assemble_html(hdlr, resource, lquerydict, url,
@@ -572,21 +582,21 @@ def _assemble_html(responses, resource, querydict, url, extension):
                '</form></body></html>')
 
 
-def _assemble_json(responses, resource, url, extension):
+def _assemble_json(responses, resource=None, url=None, extension=None):
     #NOTE(jbjohnso) I'm considering giving up on yielding bit by bit
     #in json case over http.  Notably, duplicate key values from plugin
     #overwrite, but we'd want to preserve them into an array instead.
     #the downside is that http would just always blurt it ll out at
     #once and hold on to all the data in memory
-    links = {
-        'self': {"href": resource + extension},
-    }
-    if url == '/':
-        pass
-    elif resource[-1] == '/':
-        links['collection'] = {"href": "../" + extension}
-    else:
-        links['collection'] = {"href": "./" + extension}
+    links = {}
+    if resource is not None:
+        links['self'] = {"href": resource + extension}
+        if url == '/':
+            pass
+        elif resource[-1] == '/':
+            links['collection'] = {"href": "../" + extension}
+        else:
+            links['collection'] = {"href": "./" + extension}
     rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
