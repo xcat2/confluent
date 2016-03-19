@@ -487,7 +487,7 @@ def resourcehandler_backend(env, start_response):
             hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
             if 'HTTP_CONFLUENTASYNCID' in env:
-                asynchttp.run_handler(hdlr, env)
+                confluent.asynchttp.run_handler(hdlr, env)
                 start_response('202 Accepted', headers)
                 yield 'Request queued'
                 return

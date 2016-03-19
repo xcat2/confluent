@@ -835,6 +835,24 @@ class EventCollection(ConfluentMessage):
             self.kvpairs = {name: {'events': eventdata}}
 
 
+class AsyncCompletion(ConfluentMessage):
+    def __init__(self):
+        self.stripped = True
+        self.notnode = True
+
+    def raw(self):
+        return {'_requestdone': True}
+
+class AsyncMessage(ConfluentMessage):
+    def __init__(self, pair):
+        self.stripped = True
+        self.notnode = True
+        self.msgpair = pair
+
+    def raw(self):
+        return {'requestid': self.msgpair[0],
+                'response': self.msgpair[1].raw()}
+
 class AsyncSession(ConfluentMessage):
     def __init__(self, id):
         self.desc = 'foo'

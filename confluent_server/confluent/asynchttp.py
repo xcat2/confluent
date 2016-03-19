@@ -66,7 +66,7 @@ class AsyncSession(object):
         self.reaper = eventlet.spawn_after(15, self.destroy)
 
     def add(self, rsp, requestid):
-        self.responses.append(rsp, requestid)
+        self.responses.append((rsp, requestid))
         if self._evt:
             self._evt.send()
             self._evt = None
@@ -79,19 +79,19 @@ class AsyncSession(object):
 
     def run_handler(self, handler, requestid):
         for rsp in handler:
-            self.add(rsp, requestid)
-        self.add({'_requestdone': True}, requestid)
+            self.add(requestid, rsp)
+        self.add(requestid, messages.AsyncCompletion())
 
     def get_responses(self, timeout=25):
         self.reaper.cancel()
         self.reaper = eventlet.spawn_after(timeout + 15, self.destroy)
-        if self._evt():
+        if self._evt:
             # TODO(jjohnson2): This precludes the goal of 'double barreled'
             # access....  revisit if this could matter
             raise Exception('get_responses is not re-entrant')
         if not self.responses:  # wait to accumulate some
             self._evt = eventlet.event.Event()
-            with eventlet.Timout(timeout, False):
+            with eventlet.Timeout(timeout, False):
                 self._evt.wait()
             self._evt = None
         while self.responses:
@@ -101,7 +101,7 @@ class AsyncSession(object):
 def run_handler(hdlr, env):
     asyncsessid = env['HTTP_CONFLUENTASYNCID']
     try:
-        asyncsession = _asyncsessions[asyncsessid]
+        asyncsession = _asyncsessions[asyncsessid]['asyncsession']
         requestid = env['HTTP_CONFLUENTREQUESTID']
     except KeyError:
         raise exc.InvalidArgumentException(
@@ -122,7 +122,7 @@ def handle_async(env, querydict):
         return
     currsess = _asyncsessions[querydict['asyncid']]['asyncsession']
     for rsp in currsess.get_responses():
-        yield rsp
+        yield messages.AsyncMessage(rsp)
 
 
 
