@@ -850,8 +850,9 @@ class AsyncMessage(ConfluentMessage):
         self.msgpair = pair
 
     def raw(self):
-        return {'requestid': self.msgpair[0],
-                'response': self.msgpair[1].raw()}
+        return {'asyncresponse':
+            {'requestid': self.msgpair[0],
+             'response': self.msgpair[1].raw()}}
 
 class AsyncSession(ConfluentMessage):
     def __init__(self, id):
