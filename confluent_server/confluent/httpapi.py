@@ -355,12 +355,22 @@ def resourcehandler_backend(env, start_response):
     cfgmgr = authorized['cfgmgr']
     if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
         pagecontent = ""
-        for rsp in _assemble_json(
-                confluent.asynchttp.handle_async(env, querydict)):
-            pagecontent += rsp
-        start_response("200 OK", headers)
-        yield pagecontent
-        return
+        try:
+            for rsp in _assemble_json(
+                    confluent.asynchttp.handle_async(
+                            env, querydict,
+                            httpsessions[authorized['sessionid']]['inflight'])):
+                pagecontent += rsp
+            start_response("200 OK", headers)
+            yield pagecontent
+            return
+        except exc.ConfluentException as e:
+            if e.apierrorcode == 500:
+                # raise generics to trigger the tracelog
+                raise
+            start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr),
+                           headers)
+            yield e.get_error_body()
     elif (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
             '/shell/sessions/' in env['PATH_INFO'])):
         #hard bake JSON into this path, do not support other incarnations

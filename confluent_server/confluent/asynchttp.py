@@ -44,6 +44,7 @@ import confluent.exceptions as exc
 import confluent.messages as messages
 import confluent.util as util
 import eventlet
+import greenlet
 
 _asyncsessions = {}
 _cleanthread = None
@@ -110,7 +111,7 @@ def run_handler(hdlr, env):
     return requestid
 
 
-def handle_async(env, querydict):
+def handle_async(env, querydict, threadset):
     global _cleanthread
     # This may be one of two things, a request for a new async stream
     # or a request for next data from async stream
@@ -120,9 +121,17 @@ def handle_async(env, querydict):
         currsess = AsyncSession()
         yield messages.AsyncSession(currsess.asyncid)
         return
-    currsess = _asyncsessions[querydict['asyncid']]['asyncsession']
-    for rsp in currsess.get_responses():
-        yield messages.AsyncMessage(rsp)
-
-
-
+    mythreadid = greenlet.getcurrent()
+    threadset.add(mythreadid)
+    loggedout = None
+    currsess = None
+    try:
+        currsess = _asyncsessions[querydict['asyncid']]['asyncsession']
+        for rsp in currsess.get_responses():
+            yield messages.AsyncMessage(rsp)
+    except greenlet.GreenletExit as ge:
+        loggedout = ge
+    threadset.discard(mythreadid)
+    if loggedout is not None:
+        currsess.destroy()
+        raise exc.LoggedOut()

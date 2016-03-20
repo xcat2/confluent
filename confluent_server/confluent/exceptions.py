@@ -89,3 +89,10 @@ class PubkeyInvalid(ConfluentException):
 
     def get_error_body(self):
         return self.errorbody
+
+class LoggedOut(ConfluentException):
+    apierrorcode = 401
+    apierrorstr = '401 - Logged out'
+
+    def get_error_body(self):
+        return '{"loggedout": 1}'
