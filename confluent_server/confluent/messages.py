@@ -489,8 +489,8 @@ class InputCredential(ConfluentMessage):
         if node not in self.credentials:
             return {}
         credential = self.credentials[node]
-        for attr in credentials:
-            if type(credentials[attr]) in (str, unicode):
+        for attr in credential:
+            if type(credential[attr]) in (str, unicode):
                 try:
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
@@ -843,6 +843,7 @@ class AsyncCompletion(ConfluentMessage):
     def raw(self):
         return {'_requestdone': True}
 
+
 class AsyncMessage(ConfluentMessage):
     def __init__(self, pair):
         self.stripped = True
@@ -851,8 +852,8 @@ class AsyncMessage(ConfluentMessage):
 
     def raw(self):
         return {'asyncresponse':
-            {'requestid': self.msgpair[0],
-             'response': self.msgpair[1].raw()}}
+                    {'requestid': self.msgpair[0],
+                      'response': self.msgpair[1].raw()}}
 
 class AsyncSession(ConfluentMessage):
     def __init__(self, id):

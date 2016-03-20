@@ -634,7 +634,7 @@ def _assemble_json(responses, resource=None, url=None, extension=None):
                     else:
                         rspdata[dk] = [rspdata[dk], rsp[dk]]
                 else:
-                    if dk == 'databynode':
+                    if dk == 'databynode' or dk == 'asyncresponse':
                         # a quirk, databynode suggests noderange
                         # multi response.  This should *always* be a list,
                         # even if it will be length 1
