@@ -197,7 +197,7 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
             self.when = conf.get_option('log', 'when').upper()
         except (AttributeError):
             self.when = 'D'
-        self.backupCount = conf.get_int_option('log', 'backup_count') or 3
+        self.backupCount = conf.get_int_option('log', 'backup_count') or 0
         self.maxBytes = conf.get_int_option(
             'log','max_bytes') or 4 * 1024 * 1024 * 1024
         if self.maxBytes < 8192:
