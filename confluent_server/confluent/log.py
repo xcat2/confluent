@@ -625,6 +625,8 @@ class Logger(object):
                     binfile = open(binpath, mode='r')
                     textfile = open(textpath, mode='r')
                 except IOError:
+                    binfile = None
+                    textfile = None
                     break
                 flock(binfile, LOCK_SH)
                 flock(textfile, LOCK_SH)
@@ -649,11 +651,15 @@ class Logger(object):
         textdata = ''
         while offsets:
             (offset, length, textpath) = offsets.pop()
+            if textfile is None:
+                textfile = open(textpath, mode='r')
+                flock(textfile, LOCK_SH)
             if textfile.name != textpath:
                 try:
                     flock(textfile, LOCK_UN)
                     textfile.close()
                     textfile = open(textpath, mode='r')
+                    flock(textfile, LOCK_SH)
                 except (ValueError, IOError) as e:
                     break
             try:
