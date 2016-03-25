@@ -45,9 +45,11 @@ import confluent.messages as messages
 import confluent.util as util
 import eventlet
 import greenlet
+import time
 
 _asyncsessions = {}
 _cleanthread = None
+_consolesessions = None
 
 
 def _assign_asyncid(asyncsession):
@@ -58,12 +60,26 @@ def _assign_asyncid(asyncsession):
     return sessid
 
 
+class AsyncTermRelation(object):
+    # Need to keep an association of term object to async
+    # This allows the async handler to know the context of
+    # outgoing data to provide to calling code
+    def __init__(self, termid, async):
+        self.async = async
+        self.termid = termid
+
+    def got_data(self, data):
+        self.async.add(data, self.termid)
+
+
 class AsyncSession(object):
 
     def __init__(self):
         self.asyncid = _assign_asyncid(self)
         self.responses = collections.deque()
         self._evt = None
+        self.termrelations = []
+        self.consoles = set([])
         self.reaper = eventlet.spawn_after(15, self.destroy)
 
     def add(self, rsp, requestid):
@@ -71,6 +87,18 @@ class AsyncSession(object):
         if self._evt:
             self._evt.send()
             self._evt = None
+
+    def set_term_relation(self, env):
+        # need a term relation to keep track of what data belongs
+        # to what object (since the callback does not provide context
+        # for data, and here ultimately the client is responsible
+        # for sorting out which is which.
+        termrel = AsyncTermRelation(['HTTP_CONFLUENTREQUESTID'], self)
+        self.termrelations.append(termrel)
+        return termrel
+
+    def add_console_session(self, sessionid):
+        self.consoles.add(sessionid)
 
     def destroy(self):
         if self._evt:
@@ -85,6 +113,9 @@ class AsyncSession(object):
 
     def get_responses(self, timeout=25):
         self.reaper.cancel()
+        nextexpiry = time.time() + 90
+        for csess in self.consoles:
+            _consolesessions[csess]['expiry'] = nextexpiry
         self.reaper = eventlet.spawn_after(timeout + 15, self.destroy)
         if self._evt:
             # TODO(jjohnson2): This precludes the goal of 'double barreled'
@@ -111,6 +142,11 @@ def run_handler(hdlr, env):
     return requestid
 
 
+def get_async(env, querydict):
+    global _cleanthread
+    return _asyncsessions[querydict['asyncid']]['asyncsession']
+
+
 def handle_async(env, querydict, threadset):
     global _cleanthread
     # This may be one of two things, a request for a new async stream
@@ -135,3 +171,8 @@ def handle_async(env, querydict, threadset):
     if loggedout is not None:
         currsess.destroy()
         raise exc.LoggedOut()
+
+
+def set_console_sessions(consolesessions):
+    global _consolesessions
+    _consolesessions = consolesessions

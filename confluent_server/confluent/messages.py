@@ -851,9 +851,17 @@ class AsyncMessage(ConfluentMessage):
         self.msgpair = pair
 
     def raw(self):
+        rsp = self.msgpair[1]
+        rspdict = None
+        if isinstance(rsp, ConfluentMessage):
+            rspdict = rsp.raw()
+        elif isinstance(rsp, dict):  # console metadata
+            rspdict = rsp
+        else: # terminal text
+            rspdict = {'data': rsp}
         return {'asyncresponse':
                     {'requestid': self.msgpair[0],
-                      'response': self.msgpair[1].raw()}}
+                      'response': rspdict}}
 
 class AsyncSession(ConfluentMessage):
     def __init__(self, id):

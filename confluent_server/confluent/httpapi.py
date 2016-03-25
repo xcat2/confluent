@@ -46,6 +46,7 @@ tlvdata = confluent.tlvdata
 auditlog = None
 tracelog = None
 consolesessions = {}
+confluent.asynchttp.set_console_sessions(consolesessions)
 httpsessions = {}
 opmap = {
     'POST': 'create',
@@ -394,15 +395,25 @@ def resourcehandler_backend(env, start_response):
             skipreplay = False
             if 'skipreplay' in querydict and querydict['skipreplay']:
                 skipreplay = True
+            datacallback = None
+            async = None
+            if 'HTTP_CONFLUENTASYNCID' in env:
+                async = confluent.asynchttp.get_async(env, querydict)
+                termrel = async.set_term_relation(env)
+                datacallback = termrel.got_data
             try:
                 if shellsession:
                     consession = shellserver.ShellSession(
                         node=nodename, configmanager=cfgmgr,
-                        username=authorized['username'], skipreplay=skipreplay)
+                        username=authorized['username'], skipreplay=skipreplay,
+                        datacallback=datacallback
+                    )
                 else:
                     consession = consoleserver.ConsoleSession(
                         node=nodename, configmanager=cfgmgr,
-                        username=authorized['username'], skipreplay=skipreplay)
+                        username=authorized['username'], skipreplay=skipreplay,
+                        datacallback=datacallback
+                    )
             except exc.NotFoundException:
                 start_response("404 Not found", headers)
                 yield "404 - Request Path not recognized"
@@ -411,6 +422,8 @@ def resourcehandler_backend(env, start_response):
                 start_response("500 Internal Server Error", headers)
                 return
             sessid = _assign_consessionid(consession)
+            if async:
+                async.add_consolesession(sessid)
             start_response('200 OK', headers)
             yield '{"session":"%s","data":""}' % sessid
             return
