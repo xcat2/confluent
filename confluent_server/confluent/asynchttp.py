@@ -118,8 +118,11 @@ class AsyncSession(object):
         self.reaper.cancel()
         self.reaper = eventlet.spawn_after(timeout + 15, self.destroy)
         nextexpiry = time.time() + 90
-        for csess in self.consoles:
-            _consolesessions[csess]['expiry'] = nextexpiry
+        for csess in list(self.consoles):
+            try:
+                _consolesessions[csess]['expiry'] = nextexpiry
+            except KeyError:  # session has been closed elsewhere
+                self.consoles.discard(csess)
         if self._evt:
             # TODO(jjohnson2): This precludes the goal of 'double barreled'
             # access....  revisit if this could matter
