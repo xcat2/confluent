@@ -19,15 +19,25 @@ import confluent.tlv as tlv
 import json
 import struct
 
+def decodestr(value):
+    ret = None
+    try:
+        ret = value.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            ret = value.decode('cp437')
+        except UnicodeDecodeError:
+            ret = value
+    return ret
 
 def unicode_dictvalues(dictdata):
     for key in dictdata:
         if isinstance(dictdata[key], str):
-            dictdata[key] = dictdata[key].decode('utf-8')
+            dictdata[key] = decodestr(dictdata[key])
         elif isinstance(dictdata[key], list):
             for i in xrange(len(dictdata[key])):
                 if isinstance(dictdata[key][i], str):
-                    dictdata[key][i] = dictdata[key][i].decode('utf-8')
+                    dictdata[key][i] = decodestr(dictdata[key][i])
                 elif isinstance(dictdata[key][i], dict):
                     unicode_dictvalues(dictdata[key][i])
         elif isinstance(dictdata[key], dict):
