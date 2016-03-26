@@ -104,6 +104,9 @@ class AsyncSession(object):
         if self._evt:
             self._evt.send()
             self._evt = None
+        for console in self.consoles:
+            _consolesessions[console]['session'].destroy()
+        self.consoles = None
         del _asyncsessions[self.asyncid]
 
     def run_handler(self, handler, requestid):
@@ -113,10 +116,10 @@ class AsyncSession(object):
 
     def get_responses(self, timeout=25):
         self.reaper.cancel()
+        self.reaper = eventlet.spawn_after(timeout + 15, self.destroy)
         nextexpiry = time.time() + 90
         for csess in self.consoles:
             _consolesessions[csess]['expiry'] = nextexpiry
-        self.reaper = eventlet.spawn_after(timeout + 15, self.destroy)
         if self._evt:
             # TODO(jjohnson2): This precludes the goal of 'double barreled'
             # access....  revisit if this could matter
