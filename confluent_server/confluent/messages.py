@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -489,8 +489,8 @@ class InputCredential(ConfluentMessage):
         if node not in self.credentials:
             return {}
         credential = self.credentials[node]
-        for attr in credentials:
-            if type(credentials[attr]) in (str, unicode):
+        for attr in credential:
+            if type(credential[attr]) in (str, unicode):
                 try:
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
@@ -834,6 +834,41 @@ class EventCollection(ConfluentMessage):
         else:
             self.kvpairs = {name: {'events': eventdata}}
 
+
+class AsyncCompletion(ConfluentMessage):
+    def __init__(self):
+        self.stripped = True
+        self.notnode = True
+
+    def raw(self):
+        return {'_requestdone': True}
+
+
+class AsyncMessage(ConfluentMessage):
+    def __init__(self, pair):
+        self.stripped = True
+        self.notnode = True
+        self.msgpair = pair
+
+    def raw(self):
+        rsp = self.msgpair[1]
+        rspdict = None
+        if isinstance(rsp, ConfluentMessage):
+            rspdict = rsp.raw()
+        elif isinstance(rsp, dict):  # console metadata
+            rspdict = rsp
+        else: # terminal text
+            rspdict = {'data': rsp}
+        return {'asyncresponse':
+                    {'requestid': self.msgpair[0],
+                      'response': rspdict}}
+
+class AsyncSession(ConfluentMessage):
+    def __init__(self, id):
+        self.desc = 'foo'
+        self.notnode = True
+        self.stripped = True
+        self.kvpairs = {'asyncid': id}
 
 class User(ConfluentMessage):
     def __init__(self, uid, username, privilege_level, name=None):

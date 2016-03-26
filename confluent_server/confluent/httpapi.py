@@ -25,6 +25,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
+import confluent.asynchttp
 import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
@@ -45,6 +46,7 @@ tlvdata = confluent.tlvdata
 auditlog = None
 tracelog = None
 consolesessions = {}
+confluent.asynchttp.set_console_sessions(consolesessions)
 httpsessions = {}
 opmap = {
     'POST': 'create',
@@ -352,7 +354,25 @@ def resourcehandler_backend(env, start_response):
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
-    if (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
+    if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
+        pagecontent = ""
+        try:
+            for rsp in _assemble_json(
+                    confluent.asynchttp.handle_async(
+                            env, querydict,
+                            httpsessions[authorized['sessionid']]['inflight'])):
+                pagecontent += rsp
+            start_response("200 OK", headers)
+            yield pagecontent
+            return
+        except exc.ConfluentException as e:
+            if e.apierrorcode == 500:
+                # raise generics to trigger the tracelog
+                raise
+            start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr),
+                           headers)
+            yield e.get_error_body()
+    elif (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
             '/shell/sessions/' in env['PATH_INFO'])):
         #hard bake JSON into this path, do not support other incarnations
         if '/console/session' in env['PATH_INFO']:
@@ -375,15 +395,25 @@ def resourcehandler_backend(env, start_response):
             skipreplay = False
             if 'skipreplay' in querydict and querydict['skipreplay']:
                 skipreplay = True
+            datacallback = None
+            async = None
+            if 'HTTP_CONFLUENTASYNCID' in env:
+                async = confluent.asynchttp.get_async(env, querydict)
+                termrel = async.set_term_relation(env)
+                datacallback = termrel.got_data
             try:
                 if shellsession:
                     consession = shellserver.ShellSession(
                         node=nodename, configmanager=cfgmgr,
-                        username=authorized['username'], skipreplay=skipreplay)
+                        username=authorized['username'], skipreplay=skipreplay,
+                        datacallback=datacallback
+                    )
                 else:
                     consession = consoleserver.ConsoleSession(
                         node=nodename, configmanager=cfgmgr,
-                        username=authorized['username'], skipreplay=skipreplay)
+                        username=authorized['username'], skipreplay=skipreplay,
+                        datacallback=datacallback
+                    )
             except exc.NotFoundException:
                 start_response("404 Not found", headers)
                 yield "404 - Request Path not recognized"
@@ -392,6 +422,8 @@ def resourcehandler_backend(env, start_response):
                 start_response("500 Internal Server Error", headers)
                 return
             sessid = _assign_consessionid(consession)
+            if async:
+                async.add_console_session(sessid)
             start_response('200 OK', headers)
             yield '{"session":"%s","data":""}' % sessid
             return
@@ -477,7 +509,11 @@ def resourcehandler_backend(env, start_response):
         try:
             hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
-
+            if 'HTTP_CONFLUENTASYNCID' in env:
+                confluent.asynchttp.run_handler(hdlr, env)
+                start_response('202 Accepted', headers)
+                yield 'Request queued'
+                return
             pagecontent = ""
             if mimetype == 'text/html':
                 for datum in _assemble_html(hdlr, resource, lquerydict, url,
@@ -569,21 +605,21 @@ def _assemble_html(responses, resource, querydict, url, extension):
                '</form></body></html>')
 
 
-def _assemble_json(responses, resource, url, extension):
+def _assemble_json(responses, resource=None, url=None, extension=None):
     #NOTE(jbjohnso) I'm considering giving up on yielding bit by bit
     #in json case over http.  Notably, duplicate key values from plugin
     #overwrite, but we'd want to preserve them into an array instead.
     #the downside is that http would just always blurt it ll out at
     #once and hold on to all the data in memory
-    links = {
-        'self': {"href": resource + extension},
-    }
-    if url == '/':
-        pass
-    elif resource[-1] == '/':
-        links['collection'] = {"href": "../" + extension}
-    else:
-        links['collection'] = {"href": "./" + extension}
+    links = {}
+    if resource is not None:
+        links['self'] = {"href": resource + extension}
+        if url == '/':
+            pass
+        elif resource[-1] == '/':
+            links['collection'] = {"href": "../" + extension}
+        else:
+            links['collection'] = {"href": "./" + extension}
     rspdata = {}
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
@@ -611,7 +647,7 @@ def _assemble_json(responses, resource, url, extension):
                     else:
                         rspdata[dk] = [rspdata[dk], rsp[dk]]
                 else:
-                    if dk == 'databynode':
+                    if dk == 'databynode' or dk == 'asyncresponse':
                         # a quirk, databynode suggests noderange
                         # multi response.  This should *always* be a list,
                         # even if it will be length 1
