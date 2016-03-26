@@ -50,6 +50,8 @@ try:
 except ImportError:
     havefcntl = False
 #import multiprocessing
+import gc
+from greenlet import greenlet
 import sys
 import os
 import signal
@@ -129,6 +131,13 @@ def dumptrace(signalname, frame):
     ht = open('/var/log/confluent/hangtraces', 'a')
     ht.write('Dumping active trace on ' + time.strftime('%X %x\n'))
     ht.write(''.join(traceback.format_stack(frame)))
+    for o in gc.get_objects():
+        if not isinstance(o, greenlet):
+            continue
+        if not o:
+            continue
+        ht.write('Thread trace:\n')
+        ht.write(''.join(traceback.format_stack(o.gr_frame)))
     ht.close()
 
 def doexit():
