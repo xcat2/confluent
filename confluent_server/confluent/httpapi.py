@@ -423,7 +423,7 @@ def resourcehandler_backend(env, start_response):
                 return
             sessid = _assign_consessionid(consession)
             if async:
-                async.add_consolesession(sessid)
+                async.add_console_session(sessid)
             start_response('200 OK', headers)
             yield '{"session":"%s","data":""}' % sessid
             return

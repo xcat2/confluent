@@ -69,7 +69,7 @@ class AsyncTermRelation(object):
         self.termid = termid
 
     def got_data(self, data):
-        self.async.add(data, self.termid)
+        self.async.add(self.termid, data)
 
 
 class AsyncSession(object):
@@ -82,8 +82,8 @@ class AsyncSession(object):
         self.consoles = set([])
         self.reaper = eventlet.spawn_after(15, self.destroy)
 
-    def add(self, rsp, requestid):
-        self.responses.append((rsp, requestid))
+    def add(self, requestid, rsp):
+        self.responses.append((requestid, rsp))
         if self._evt:
             self._evt.send()
             self._evt = None
@@ -93,7 +93,7 @@ class AsyncSession(object):
         # to what object (since the callback does not provide context
         # for data, and here ultimately the client is responsible
         # for sorting out which is which.
-        termrel = AsyncTermRelation(['HTTP_CONFLUENTREQUESTID'], self)
+        termrel = AsyncTermRelation(env['HTTP_CONFLUENTREQUESTID'], self)
         self.termrelations.append(termrel)
         return termrel
 
@@ -144,7 +144,7 @@ def run_handler(hdlr, env):
 
 def get_async(env, querydict):
     global _cleanthread
-    return _asyncsessions[querydict['asyncid']]['asyncsession']
+    return _asyncsessions[env['HTTP_CONFLUENTASYNCID']]['asyncsession']
 
 
 def handle_async(env, querydict, threadset):
