@@ -853,7 +853,8 @@ class AsyncMessage(ConfluentMessage):
     def raw(self):
         rsp = self.msgpair[1]
         rspdict = None
-        if isinstance(rsp, ConfluentMessage):
+        if (isinstance(rsp, ConfluentMessage) or
+                isinstance(rsp, ConfluentNodeError)):
             rspdict = rsp.raw()
         elif isinstance(rsp, dict):  # console metadata
             rspdict = rsp
