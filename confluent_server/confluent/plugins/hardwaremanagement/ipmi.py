@@ -102,6 +102,9 @@ class IpmiCommandWrapper(ipmicommand.Command):
         self.register_key_handler(util.TLSCertVerifier(
             self.cfm, self.node, 'pubkeys.tls_hardwaremanager').verify_cert)
 
+    def close_confluent(self):
+        self.cfm.remove_watcher(self._attribwatcher)
+
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:
             self.ipmi_session._mark_broken()
@@ -305,6 +308,10 @@ class IpmiHandler(object):
         if ((node, tenant) not in persistent_ipmicmds or
                 not persistent_ipmicmds[(node, tenant)].ipmi_session.logged):
             self._logevt = threading.Event()
+            try:
+                persistent_ipmicmds[(node, tenant)].close_confluent()
+            except KeyError:  # was no previous session
+                pass
             try:
                 persistent_ipmicmds[(node, tenant)] = IpmiCommandWrapper(
                     node, cfg, bmc=connparams['bmc'],
