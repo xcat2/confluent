@@ -1,5 +1,5 @@
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -90,14 +90,17 @@ def sanitize_invdata(indata):
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
+        self.cfm = cfm
+        self.node = node
         self._attribwatcher = cfm.watch_attributes(
             (node,), ('secret.hardwaremanagementuser',
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
                       'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
-        self.register_key_handler(
-            util.TLSCertVerifier(
-                cfm, node, 'pubkeys.tls_hardwaremanager').verify_cert)
+
+    def setup_confluent_keyhandler(self):
+        self.register_key_handler(util.TLSCertVerifier(
+            self.cfm, self.node, 'pubkeys.tls_hardwaremanager').verify_cert)
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:
@@ -323,6 +326,7 @@ class IpmiHandler(object):
             self.error = response['error']
         else:
             self.loggedin = True
+        self.ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):
