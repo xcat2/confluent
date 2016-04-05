@@ -326,7 +326,7 @@ class IpmiHandler(object):
             self.error = response['error']
         else:
             self.loggedin = True
-        self.ipmicmd.setup_confluent_keyhandler()
+            ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):
