@@ -194,6 +194,25 @@ def _get_query_dict(env, reqbody, reqtype):
         qdict = nqdict
     return qdict
 
+def _should_skip_authlog(env):
+    if ('/console/session' in env['PATH_INFO'] or
+            '/shell/sessions/' in env['PATH_INFO']):
+        # we should only log starting of a console
+        return True
+    if '/sessions/current/async' in env['PATH_INFO']:
+        # this is effectively invisible
+        return True
+    if (env['REQUEST_METHOD'] == 'GET' and
+            ('/sensors/' in env['PATH_INFO'] or
+             '/health/' in env['PATH_INFO'] or
+             '/power/state' in env['PATH_INFO'] or
+             '/nodes/' == env['PATH_INFO'] or
+             '/sessions/current/info' == env['PATH_INFO'] or
+                 (env['PATH_INFO'].startswith('/noderange/') and
+                  env['PATH_INFO'].endswith('/nodes/')))):
+        # these are pretty innocuous, and noisy to log.
+        return True
+    return False
 
 def _authorize_request(env, operation):
     """Grant/Deny access based on data from wsgi env
@@ -241,9 +260,7 @@ def _authorize_request(env, operation):
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
         cookie['confluentsessionid']['path'] = '/'
-    skiplog = False
-    if '/console/session' in env['PATH_INFO']:
-        skiplog = True
+    skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
             'user': name,
