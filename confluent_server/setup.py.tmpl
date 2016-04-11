@@ -12,7 +12,7 @@ setup(
               'confluent/plugins/hardwaremanagement/',
               'confluent/plugins/shell/',
               'confluent/plugins/configuration/'],
-    install_requires=['pycrypto>=2.6', 'confluent_client>=0.1.0', 'eventlet',
+    install_requires=['paramiko', 'pycrypto>=2.6', 'confluent_client>=0.1.0', 'eventlet',
                       'pyghmi>=0.6.5'],
     scripts=['bin/confluent'],
     data_files=[('/etc/init.d', ['sysvinit/confluent']),
