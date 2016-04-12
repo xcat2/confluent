@@ -123,7 +123,11 @@ class IpmiCommandWrapper(ipmicommand.Command):
                 eventlet.sleep(0.1)
             return self._lasthealth
         self._inhealth = True
-        self._lasthealth = super(IpmiCommandWrapper, self).get_health()
+        try:
+            self._lasthealth = super(IpmiCommandWrapper, self).get_health()
+        except Exception:
+            self._inhealth = False
+            raise
         self._inhealth = False
         return self._lasthealth
 
