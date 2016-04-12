@@ -105,7 +105,9 @@ class IpmiCommandWrapper(ipmicommand.Command):
             self.cfm, self.node, 'pubkeys.tls_hardwaremanager').verify_cert)
 
     def close_confluent(self):
-        self.cfm.remove_watcher(self._attribwatcher)
+        if self._attribwatcher:
+            self.cfm.remove_watcher(self._attribwatcher)
+            self._attribwatcher = None
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:
