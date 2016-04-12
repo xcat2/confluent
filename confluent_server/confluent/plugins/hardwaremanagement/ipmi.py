@@ -92,6 +92,8 @@ class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         self.cfm = cfm
         self.node = node
+        self._inhealth = False
+        self._lasthealth = None
         self._attribwatcher = cfm.watch_attributes(
             (node,), ('secret.hardwaremanagementuser',
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
@@ -112,6 +114,16 @@ class IpmiCommandWrapper(ipmicommand.Command):
             # if ipmi_session doesn't already exist,
             # then do nothing
             pass
+
+    def get_health(self):
+        if self._inhealth:
+            while self._inhealth:
+                eventlet.sleep(0.1)
+            return self._lasthealth
+        self._inhealth = True
+        self._lasthealth = super(IpmiCommandWrapper, self).get_health()
+        self._inhealth = False
+        return self._lasthealth
 
 
 def _ipmi_evtloop():
@@ -845,7 +857,7 @@ class IpmiHandler(object):
         return
 
 def _str_health(health):
-    if health == 'unknown':
+    if isinstance(health, str):
         return health
     if pygconstants.Health.Failed & health:
         health = 'failed'
