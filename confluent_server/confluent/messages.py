@@ -78,7 +78,8 @@ class ConfluentMessage(object):
         """Return pythonic representation of the response.
 
         Used by httpapi while assembling data prior to json serialization"""
-        if hasattr(self, 'stripped') and self.stripped:
+        if ((hasattr(self, 'stripped') and self.stripped) or
+                (hasattr(self, 'notnode') and self.notnode)):
             return self.kvpairs
         return {'databynode': self.kvpairs}
 
