@@ -19,6 +19,7 @@
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
 import confluent.exceptions as exc
+from datetime import datetime
 import json
 
 valid_health_values = set([
@@ -36,6 +37,8 @@ def _htmlify_structure(indict):
             ret += "<li>{0}: ".format(key)
             if type(indict[key]) in (str, unicode, float, int):
                 ret += str(indict[key])
+            elif isinstance(indict[key], datetime):
+                ret += indict[key].strftime('%Y-%m-%dT%H:%M:%S')
             else:
                 ret += _htmlify_structure(indict[key])
     elif isinstance(indict, list):

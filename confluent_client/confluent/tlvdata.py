@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import confluent.tlv as tlv
+from datetime import datetime
 import json
 import struct
 
@@ -34,6 +35,8 @@ def unicode_dictvalues(dictdata):
     for key in dictdata:
         if isinstance(dictdata[key], str):
             dictdata[key] = decodestr(dictdata[key])
+        elif isinstance(dictdata[key], datetime):
+            dictdata[key] = dictdata[key].strftime('%Y-%m-%dT%H:%M:%S')
         elif isinstance(dictdata[key], list):
             for i in xrange(len(dictdata[key])):
                 if isinstance(dictdata[key][i], str):
