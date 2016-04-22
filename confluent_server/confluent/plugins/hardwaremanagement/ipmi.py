@@ -29,6 +29,9 @@ console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
 
+console.session.select = eventlet.green.select
+console.session.threading = eventlet.green.threading
+
 
 def exithandler():
     console.session.iothread.join()
