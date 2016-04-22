@@ -25,12 +25,9 @@ import eventlet.greenpool as greenpool
 import eventlet.queue as queue
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
-import pyghmi.ipmi.console as console
-import pyghmi.ipmi.command as ipmicommand
+console = eventlet.import_patched('pyghmi.ipmi.console')
+ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
-
-console.session.select = eventlet.green.select
-console.session.threading = eventlet.green.threading
 
 
 def exithandler():
