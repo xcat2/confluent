@@ -747,16 +747,22 @@ class IpmiHandler(object):
                     bootmode = 'uefi'
                 else:
                     bootmode = 'bios'
+            persistent = False
+            if 'persistent' in bootdev:
+                persistent = bootdev['persistent']
             self.output.put(msg.BootDevice(node=self.node,
                                            device=bootdev['bootdev'],
-                                           bootmode=bootmode))
+                                           bootmode=bootmode,
+                                           persistent=persistent))
             return
         elif 'update' == self.op:
             bootdev = self.inputdata.bootdevice(self.node)
             douefi = False
             if self.inputdata.bootmode(self.node) == 'uefi':
                 douefi = True
-            bootdev = self.ipmicmd.set_bootdev(bootdev, uefiboot=douefi)
+            persistent = self.inputdata.persistent(self.node)
+            bootdev = self.ipmicmd.set_bootdev(bootdev, uefiboot=douefi,
+                                               persist=persistent)
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
             self.output.put(msg.BootDevice(node=self.node,

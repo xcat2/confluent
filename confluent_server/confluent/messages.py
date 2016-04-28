@@ -693,10 +693,10 @@ class BootDevice(ConfluentChoiceMessage):
 
     valid_paramset = {
         'bootmode': valid_bootmodes,
+        'persistent': set([True, False]),
         }
 
-
-    def __init__(self, node, device, bootmode='unspecified'):
+    def __init__(self, node, device, bootmode='unspecified', persistent=False):
         if device not in self.valid_values:
             raise Exception("Invalid boot device argument passed in:" +
                             repr(device))
@@ -707,6 +707,7 @@ class BootDevice(ConfluentChoiceMessage):
             node: {
                 'nextdevice': {'value': device},
                 'bootmode': {'value': bootmode},
+                'persistent': {'value': persistent},
             }
         }
 
@@ -715,6 +716,7 @@ class InputBootDevice(BootDevice):
     def __init__(self, path, nodes, inputdata):
         self.bootdevbynode = {}
         self.bootmodebynode = {}
+        self.persistentbynode = {}
         if not inputdata:
             raise exc.InvalidArgumentException()
         if 'nextdevice' not in inputdata:
@@ -736,6 +738,8 @@ class InputBootDevice(BootDevice):
                             datum['bootmode'] + ' is not one of ' +
                             ','.join(self.valid_bootmodes))
                     self.bootmodebynode[key] = datum['bootmode']
+                if 'persistent' in datum:
+                    self.bootmodebynode[key] = datum['persistent']
         else:
             datum = inputdata
             if 'nextdevice' not in datum:
@@ -749,12 +753,17 @@ class InputBootDevice(BootDevice):
                 self.bootdevbynode[node] = datum['nextdevice']
                 if 'bootmode' in datum:
                     self.bootmodebynode[node] = datum['bootmode']
+                if 'persistent' in datum:
+                    self.persistentbynode[node] = datum['persistent']
 
     def bootdevice(self, node):
         return self.bootdevbynode[node]
 
     def bootmode(self, node):
         return self.bootmodebynode.get(node, 'unspecified')
+
+    def persistent(self, node):
+        return self.persistentbynode.get(node, False)
 
 
 class IdentifyState(ConfluentChoiceMessage):
