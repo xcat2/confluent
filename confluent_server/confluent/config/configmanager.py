@@ -214,8 +214,14 @@ def _load_dict_from_dbm(dpath, tdb):
             if elem not in currdict:
                 currdict[elem] = {}
             currdict = currdict[elem]
-        for tk in dbe.iterkeys():
-            currdict[tk] = cPickle.loads(dbe[tk])
+        try:
+            for tk in dbe.iterkeys():
+                currdict[tk] = cPickle.loads(dbe[tk])
+        except AttributeError:
+            tk = dbe.firstkey()
+            while tk != None:
+                currdict[tk] = cPickle.loads(dbe[tk])
+                tk = dbe.nextkey(tk)
     except dbm.error:
         return
 
