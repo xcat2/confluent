@@ -309,11 +309,27 @@ def do_command(command, server):
             target = fullpath_target(argv[1], forcepath=True)
         else:  # cd by itself, go 'home'
             target = '/'
-        for res in session.read(target, server):
-            if 'errorcode' in res:
-                exitcode = res['errorcode']
-            if 'error' in res:
-                sys.stderr.write(target + ': ' + res['error'] + '\n')
+        if target[-1] == '/':
+            parentpath = target[:-1]
+        else:
+            parentpath = target
+        if parentpath:
+            childname = '{0}/'.format(parentpath[parentpath.rindex('/') + 1:])
+            parentpath = parentpath[:parentpath.rindex('/') + 1]
+            foundchild = False
+            for res in session.read(parentpath, server):
+                try:
+                    if res['item']['href'] == childname:
+                        foundchild = True
+                except KeyError:
+                    pass
+                if 'errorcode' in res:
+                    exitcode = res['errorcode']
+                if 'error' in res:
+                    sys.stderr.write(target + ': ' + res['error'] + '\n')
+                    target = otarget
+            if not foundchild:
+                sys.stderr.write(target + ': Target not found - \n')
                 target = otarget
     elif argv[0] in ('cat', 'show', 'ls', 'dir'):
         if len(argv) > 1:
