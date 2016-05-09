@@ -53,7 +53,7 @@ def format_event(evt):
         dscparts.append(evt['component_type'])
     if 'component' in evt and evt['component'] is not None:
         dscparts.append(evt['component'])
-    if 'event' in evt:
+    if 'event' in evt and evt['event']:
         evttext = evt['event']
         try:
             if evttext.startswith(evt['component'] + ' - '):
