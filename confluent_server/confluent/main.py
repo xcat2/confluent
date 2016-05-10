@@ -164,7 +164,19 @@ def _initsecurity(config):
         configmanager.ConfigManager.wait_for_sync()
 
 
+def setlimits():
+    try:
+        import resource
+        currlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if currlimit[0] < currlimit[1]:
+            resource.setrlimit(
+                resource.RLIMIT_NOFILE, (currlimit[1], currlimit[1]))
+    except Exception:
+        pass
+
+
 def run():
+    setlimits()
     signal.signal(signal.SIGUSR1, dumptrace)
     if havefcntl:
         _checkpidfile()
