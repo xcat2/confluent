@@ -221,7 +221,7 @@ class ConsoleHandler(object):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
-            retrytime = 30 + (30 * random.random())
+            retrytime = 120 + (120 * random.random())
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
@@ -230,7 +230,7 @@ class ConsoleHandler(object):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
-            retrytime = 30 + (30 * random.random())
+            retrytime = 120 + (120 * random.random())
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
@@ -241,7 +241,7 @@ class ConsoleHandler(object):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
-            retrytime = 30 + (30 * random.random())
+            retrytime = 120 + (120 * random.random())
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
