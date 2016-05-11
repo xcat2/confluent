@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ class Command(object):
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
-                                 key=None):
+                                 key=None, **kwargs):
         try:
             rc = 0
             if resource[0] == '/':
@@ -112,8 +112,9 @@ class Command(object):
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res)
             else:
+                kwargs[ikey] = input
                 for res in self.update('/noderange/{0}/{1}'.format(
-                        noderange, resource), {ikey: input}):
+                        noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res)
             return rc
         except KeyboardInterrupt:

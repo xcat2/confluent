@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import optparse
 import os
 import sys
 
@@ -25,9 +26,19 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
+argparser = optparse.OptionParser()
+argparser.add_option('-b', '--bios', dest='biosmode',
+                     action='store_true', default=False,
+                     help='Request BIOS style boot (rather than UEFI)')
+argparser.add_option('-p', '--persist', dest='persist', action='store_true',
+                     default=False,
+                     help='Request the boot device be persistent rather than '
+                          'one time')
+
+(options, args) = argparser.parse_args()
 
 try:
-    noderange = sys.argv[1]
+    noderange = args[0]
 except IndexError:
     sys.stderr.write(
         'Usage: {0} <noderange> [default|cd|network|setup|hd]\n'.format(
@@ -40,5 +51,11 @@ if len(sys.argv) > 2:
         bootdev = 'network'
 session = client.Command()
 exitcode = 0
+if options.biosmode:
+    bootmode = 'bios'
+else:
+    bootmode = 'uefi'
 sys.exit(
-    session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev))
+    session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
+                                     bootmode=bootmode,
+                                     persistent=options.persist))

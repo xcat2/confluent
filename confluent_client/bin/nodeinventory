@@ -1,0 +1,85 @@
+#!/usr/bin/python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2016 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import sys
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+
+def print_mem_info(node, prefix, meminfo):
+    capacity = meminfo['capacity_mb'] / 1024
+    memdescfmt = '{0}GB PC'
+    if meminfo['memory_type'] == 'DDR3 SDRAM':
+        memdescfmt += '3-{1} '
+    elif meminfo['memory_type'] == 'DDR4 SDRAM':
+        memdescfmt += '4-{1} '
+    if meminfo['ecc']:
+        memdescfmt += 'ECC '
+    memdescfmt += meminfo['module_type']
+    memdesc = memdescfmt.format(capacity, meminfo['speed'])
+    print('{0}: {1} description: {2}'.format(node, prefix, memdesc))
+    print('{0}: {1} manufacturer: {2}'.format(
+        node, prefix, meminfo['manufacturer']))
+    print('{0}: {1} model: {2}'.format(node, prefix, meminfo['model']))
+    print('{0}: {1} serial number: {2}'.format(node, prefix,
+                                               meminfo['serial']))
+    print('{0}: {1} manufacture date: {2}'.format(node, prefix,
+                                                  meminfo['manufacture_date']))
+    print('{0}: {1} manufacture location: {2}'.format(
+        node, prefix, meminfo['manufacture_location']))
+
+
+try:
+    noderange = sys.argv[1]
+except IndexError:
+    sys.stderr.write(
+        'Usage: {0} <noderange>\n'.format(
+            sys.argv[0]))
+    sys.exit(1)
+try:
+    session = client.Command()
+    for res in session.read('/noderange/{0}/inventory/hardware/all/all'.format(
+            noderange)):
+        for node in res['databynode']:
+            for inv in res['databynode'][node]['inventory']:
+                prefix = inv['name']
+                if not inv['present']:
+                    print '{0}: {1}: Not Present'.format(node, prefix)
+                    continue
+                info = inv['information']
+                info.pop('board_extra', None)
+                info.pop('oem_parser', None)
+                info.pop('chassis_extra', None)
+                info.pop('product_extra', None)
+                if 'memory_type' in info:
+                    print_mem_info(node, prefix, info)
+                    continue
+                for datum in info:
+                    if info[datum] is None:
+                        continue
+                    print('{0}: {1} {2}: {3}'.format(node, prefix, datum,
+                                                     info[datum]))
+    exitcode = 0
+    sys.exit(
+        session.simple_noderange_command(noderange, '/inventory/hardware/all/all'))
+except KeyboardInterrupt:
+    print('')
