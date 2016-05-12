@@ -54,6 +54,20 @@ def print_mem_info(node, prefix, meminfo):
     print('{0}: {1} manufacture location: {2}'.format(
         node, prefix, meminfo['manufacture_location']))
 
+exitcode = 0
+
+def printerror(res, node=None):
+    global exitcode
+    if 'errorcode' in res:
+        exitcode = res['errorcode']
+    if 'error' in res:
+        if node:
+            sys.stderr.write('{0}: {1}\n'.format(node, res['error']))
+        else:
+            sys.stderr.write('{0}\n'.format(res['error']))
+        if 'errorcode' not in res:
+            exitcode = 1
+
 
 try:
     noderange = sys.argv[1]
@@ -66,7 +80,13 @@ try:
     session = client.Command()
     for res in session.read('/noderange/{0}/inventory/hardware/all/all'.format(
             noderange)):
+        printerror(res)
+        if 'databynode' not in res:
+            continue
         for node in res['databynode']:
+            printerror(res['databynode'][node], node)
+            if 'inventory' not in res['databynode'][node]:
+                continue
             for inv in res['databynode'][node]['inventory']:
                 prefix = inv['name']
                 if not inv['present']:
@@ -86,8 +106,6 @@ try:
                     print('{0}: {1} {2}: {3}'.format(node, prefix,
                                                      pretty(datum),
                                                      info[datum]))
-    exitcode = 0
-    sys.exit(
-        session.simple_noderange_command(noderange, '/inventory/hardware/all/all'))
 except KeyboardInterrupt:
     print('')
+sys.exit(exitcode)
