@@ -25,6 +25,13 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 
+def pretty(text):
+    if text == 'pcislot':
+        return 'PCI slot'
+    if text == 'partnumber':
+        return 'part number'
+    return text
+
 def print_mem_info(node, prefix, meminfo):
     capacity = meminfo['capacity_mb'] / 1024
     memdescfmt = '{0}GB PC'
@@ -76,7 +83,8 @@ try:
                 for datum in info:
                     if info[datum] is None:
                         continue
-                    print('{0}: {1} {2}: {3}'.format(node, prefix, datum,
+                    print('{0}: {1} {2}: {3}'.format(node, prefix,
+                                                     pretty(datum),
                                                      info[datum]))
     exitcode = 0
     sys.exit(
