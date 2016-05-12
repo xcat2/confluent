@@ -1,0 +1,83 @@
+#!/usr/bin/python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2016 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import sys
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+
+exitcode = 0
+
+def printerror(res, node=None):
+    global exitcode
+    if 'errorcode' in res:
+        exitcode = res['errorcode']
+    if 'error' in res:
+        if node:
+            sys.stderr.write('{0}: {1}\n'.format(node, res['error']))
+        else:
+            sys.stderr.write('{0}\n'.format(res['error']))
+        if 'errorcode' not in res:
+            exitcode = 1
+
+
+def printfirm(node, prefix, data):
+    if 'model' in data:
+        prefix += ' ' + data['model']
+    builddesc = []
+    if 'build' in data:
+        builddesc.append(data['build'])
+    if 'date' in data:
+        builddesc.append(data['date'])
+    if 'version' in data:
+        version = data['version']
+        if builddesc:
+            version += ' ({0})'.format(' '.join(builddesc))
+    else:
+        version = ' '.join(builddesc)
+    print('{0}: {1}: {2}'.format(node, prefix, version))
+
+
+try:
+    noderange = sys.argv[1]
+except IndexError:
+    sys.stderr.write(
+        'Usage: {0} <noderange>\n'.format(
+            sys.argv[0]))
+    sys.exit(1)
+try:
+    session = client.Command()
+    for res in session.read('/noderange/{0}/inventory/firmware/all/all'.format(
+            noderange)):
+        printerror(res)
+        if 'databynode' not in res:
+            continue
+        for node in res['databynode']:
+            printerror(res['databynode'][node], node)
+            if 'firmware' not in res['databynode'][node]:
+                continue
+            for inv in res['databynode'][node]['firmware']:
+                for prefix in inv:
+                    printfirm(node, prefix, inv[prefix])
+except KeyboardInterrupt:
+    print('')
+sys.exit(exitcode)
