@@ -46,6 +46,8 @@ argparser.add_option('-n', '--numreadings', type='int',
                      help='Number of readings to gather')
 argparser.add_option('-c', '--csv', action='store_true',
                      help='Output in CSV format')
+argparser.add_option('-s', '--skipnumberless', action='store_true',
+                     help='Output in CSV format')
 (options, args) = argparser.parse_args()
 repeatmode = False
 if options.interval:
@@ -101,6 +103,8 @@ def sensorpass(showout=True, appendtime=False):
                 if 'sensors' not in reading[node]:
                     continue
                 for sensedata in reading[node]['sensors']:
+                    if sensedata['value'] is None and options.skipnumberless:
+                        continue
                     for redundant_state in ('Non-Critical', 'Critical'):
                         try:
                             sensedata['states'].remove(redundant_state)
