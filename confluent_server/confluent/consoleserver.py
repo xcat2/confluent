@@ -180,6 +180,8 @@ class ConsoleHandler(object):
             self.connectionthread.kill()
             self.connectionthread = None
         self.connectionthread = eventlet.spawn(self._connect_backend)
+        # in 60 seconds, kick connect() if it didn't complete
+        self.kickconnect = eventlet.spawn_after(60, self._connect)
 
     def _connect_backend(self):
         if self._console:
@@ -217,6 +219,9 @@ class ConsoleHandler(object):
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointBadCredentials:
+            if self.kickconnect:
+                self.kickconnect.cancel()
+                self.kickconnect = None
             self.error = 'badcredentials'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -226,6 +231,9 @@ class ConsoleHandler(object):
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
         except exc.TargetEndpointUnreachable:
+            if self.kickconnect:
+                self.kickconnect.cancel()
+                self.kickconnect = None
             self.error = 'unreachable'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -237,6 +245,9 @@ class ConsoleHandler(object):
         except Exception:
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
+            if self.kickconnect:
+                self.kickconnect.cancel()
+                self.kickconnect = None
             self.error = 'unknown'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -248,6 +259,9 @@ class ConsoleHandler(object):
         self._got_connected()
 
     def _got_connected(self):
+        if self.kickconnect:
+            self.kickconnect.cancel()
+            self.kickconnect = None
         self.connectstate = 'connected'
         self.log(
             logdata='console connected', ltype=log.DataTypes.event,
