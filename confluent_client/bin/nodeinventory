@@ -103,7 +103,7 @@ try:
                 for datum in info:
                     if info[datum] is None:
                         continue
-                    print('{0}: {1} {2}: {3}'.format(node, prefix,
+                    print(u'{0}: {1} {2}: {3}'.format(node, prefix,
                                                      pretty(datum),
                                                      info[datum]))
 except KeyboardInterrupt:
