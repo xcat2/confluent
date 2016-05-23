@@ -25,7 +25,6 @@ import eventlet.greenpool as greenpool
 import eventlet.queue as queue
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
-import random
 console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
@@ -204,18 +203,12 @@ class IpmiConsole(conapi.Console):
         self.bmc = connparams['bmc']
         self.port = connparams['port']
         self.connected = False
-        self.checker = None
         # Cannot actually create console until 'connect', when we get callback
 
     def __del__(self):
         self.solconnection = None
 
     def handle_data(self, data):
-        if self.checker:
-            # if we got data from remote, delay the ping check
-            self.checker.cancel()
-        self.checker = eventlet.spawn_after(290 + random.random() * 30,
-                                            self.ping)
         if type(data) == dict:
             if 'error' in data:
                 self.solconnection = None
@@ -252,14 +245,8 @@ class IpmiConsole(conapi.Console):
             self.connected = True
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))
-        if self.checker:
-            self.checker.cancel()
-        self.checker = eventlet.spawn_after(290 + random.random() * 30,
-                                            self.ping)
 
     def close(self):
-        if self.checker:
-            self.checker.cancel()
         if self.solconnection is not None:
             # break the circular reference here
             self.solconnection.out_handler = _donothing
