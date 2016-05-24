@@ -7,6 +7,9 @@ setup(
     author_email='jjohnson2@lenovo.com',
     url='http://xcat.sf.net/',
     packages=['confluent'],
-    scripts=['bin/confetty', 'bin/nodeconsole', 'bin/nodeeventlog', 'bin/nodehealth', 'bin/nodeidentify', 'bin/nodelist', 'bin/nodepower', 'bin/nodesensors', 'bin/nodesetboot'],
+    scripts=['bin/confetty', 'bin/nodeconsole', 'bin/nodeeventlog',
+             'bin/nodefirmware', 'bin/nodehealth', 'bin/nodeidentify',
+             'bin/nodeinventory', ''bin/nodelist', 'bin/nodepower',
+             'bin/nodesensors', 'bin/nodesetboot'],
     data_files=[('/etc/profile.d', ['confluent_env.sh'])],
 )
