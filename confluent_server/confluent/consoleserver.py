@@ -306,8 +306,6 @@ class ConsoleHandler(object):
                 self.reconnect = None
             self.connectstate = 'connecting'
             eventlet.spawn(self._connect)
-        else:
-            self._console.ping()
 
 
 

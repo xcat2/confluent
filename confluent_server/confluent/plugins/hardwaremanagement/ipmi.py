@@ -261,15 +261,6 @@ class IpmiConsole(conapi.Console):
     def send_break(self):
         self.solconnection.send_break()
 
-    def ping(self):
-        if not self.solconnection:
-            return False
-        rsp = self.solconnection.ipmi_session.raw_command(netfn=6,
-                                                          command=0x4b,
-                                                          data=(1, 1))
-        self.solconnection._got_payload_instance_info(rsp)
-        return True
-
 
 def perform_requests(operator, nodes, element, cfg, inputdata):
     cryptit = cfg.decrypt
