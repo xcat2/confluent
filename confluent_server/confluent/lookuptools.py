@@ -27,7 +27,7 @@ __author__ = 'jjohnson2'
 
 import confluent.config.configmanager as configmanager
 import itertools
-import socket
+from eventlet.support import greendns
 
 manager_to_nodemap = {}
 
@@ -46,7 +46,7 @@ def node_by_manager(manager):
     """
 
     manageraddresses = []
-    for tmpaddr in socket.getaddrinfo(manager, None):
+    for tmpaddr in greendns.getaddrinfo(manager, None):
         manageraddresses.append(tmpaddr[4][0])
     cfm = configmanager.ConfigManager(None)
     if manager in manager_to_nodemap:
@@ -67,7 +67,7 @@ def node_by_manager(manager):
         if currhm in manageraddresses:
             manager_to_nodemap[manager] = node
             return node
-        for curraddr in socket.getaddrinfo(currhm, None):
+        for curraddr in greendns.getaddrinfo(currhm, None):
             curraddr = curraddr[4][0]
             if curraddr in manageraddresses:
                 manager_to_nodemap[manager] = node

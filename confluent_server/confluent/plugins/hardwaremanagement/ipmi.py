@@ -23,6 +23,7 @@ import eventlet.event
 import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
 import eventlet.queue as queue
+import eventlet.support.greendns
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
 console = eventlet.import_patched('pyghmi.ipmi.console')
@@ -31,6 +32,7 @@ import socket
 
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
+console.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
 def exithandler():
@@ -854,7 +856,7 @@ class IpmiHandler(object):
                     if self.element[-1] == 'all':
                         servers = self.inputdata.ntp_servers(self.node)
                         for idx in servers:
-                            self.ipmicmd.set_ntp_server(server[idx],
+                            self.ipmicmd.set_ntp_server(servers[idx],
                                                         int(idx[-1])-1)
                         return
                     else:
