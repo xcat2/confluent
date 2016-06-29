@@ -37,53 +37,67 @@ def _get_transport(name):
         return snmp.UdpTransportTarget(res[0][4])
 
 
-def walk(server, oid, secret, username=None, context=None):
-    """Walk over children of a given OID
+class Session(object):
 
-    This is roughly equivalent to snmpwalk.  It will automatically try to be
-    an snmpbulkwalk if possible.  If username is not given, it is assumed that
-    the secret is a community string, and v2c is used.  If a username given,
-    it'll assume SHA auth and DES privacy with the secret being the same for
-    both.
+    def __init__(self, server, secret, username=None, context=None):
+        """Create a new session to interrogate a switch
 
-    :param server: The network name/address to target
-    :param oid: The SNMP object identifier
-    :param secret: The community string or password
-    :param username: The username for SNMPv3
-    :param context: The SNMPv3 context or index for community string indexing
-    """
-    # SNMP is a complicated mess of things.  Will endeavor to shield caller
-    # from as much as possible, assuming reasonable defaults where possible.
-    # there may come a time where we add more parameters to override the
-    # automatic behavior (e.g. DES is weak, so it's a likely candidate to be
-    # overriden, but some devices only support DES)
-    tp = _get_transport(server)
-    ctx = snmp.ContextData(context)
-    if '::' in oid:
-        mib, field = oid.split('::')
-        obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
-    else:
-        obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
-    eng = snmp.SnmpEngine()
-    if username is None:
-        # SNMP v2c
-        authdata = snmp.CommunityData(secret, mpModel=1)
-    else:
-        authdata = snmp.UsmUserData(username, authKey=secret, privKey=secret)
-    walking = snmp.bulkCmd(eng, authdata, tp, ctx, 0, 10, obj,
-                           lexicographicMode=False)
-    for rsp in walking:
-        errstr, errnum, erridx, answers = rsp
-        if errstr:
-            raise exc.TargetEndpointUnreachable(str(errstr))
-        elif errnum:
-            raise exc.ConfluentException(errnum.prettyPrint())
-        for ans in answers:
-            yield ans
+        If username is not given, it is assumed that
+        the secret is community string, and v2c is used.  If a username given,
+        it'll assume SHA auth and DES privacy with the secret being the same
+        for both.
+
+        :param server: The network name/address to target
+        :param secret: The community string or password
+        :param username: The username for SNMPv3
+        :param context: The SNMPv3 context or index for community indexing
+        """
+        self.server = server
+        self.context = context
+        if username is None:
+            # SNMP v2c
+            self.authdata = snmp.CommunityData(secret, mpModel=1)
+        else:
+            self.authdata = snmp.UsmUserData(username, authKey=secret,
+                                             privKey=secret)
+        self.eng = snmp.SnmpEngine()
+
+    def walk(self, oid):
+        """Walk over children of a given OID
+
+        This is roughly equivalent to snmpwalk.  It will automatically try to
+        be a snmpbulkwalk if possible.
+
+        :param oid: The SNMP object identifier
+        """
+        # SNMP is a complicated mess of things.  Will endeavor to shield caller
+        # from as much as possible, assuming reasonable defaults when possible.
+        # there may come a time where we add more parameters to override the
+        # automatic behavior (e.g. DES is weak, so it's likely to be
+        # overriden, but some devices only support DES)
+        tp = _get_transport(self.server)
+        ctx = snmp.ContextData(self.context)
+        if '::' in oid:
+            mib, field = oid.split('::')
+            obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
+        else:
+            obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
+
+        walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+                               lexicographicMode=False)
+        for rsp in walking:
+            errstr, errnum, erridx, answers = rsp
+            if errstr:
+                raise exc.TargetEndpointUnreachable(str(errstr))
+            elif errnum:
+                raise exc.ConfluentException(errnum.prettyPrint())
+            for ans in answers:
+                yield ans
 
 
 if __name__ == '__main__':
     import sys
-    for kp in walk(sys.argv[1], sys.argv[2], 'public'):
+    ts = Session(sys.argv[1], 'public')
+    for kp in ts.walk(sys.argv[2]):
         print(str(kp[0]))
         print(str(kp[1]))
