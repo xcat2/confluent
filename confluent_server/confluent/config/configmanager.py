@@ -761,7 +761,9 @@ class ConfigManager(object):
                                                    decrypt=self.decrypt)
         return nodeobj
 
-    def get_node_attributes(self, nodelist, attributes=()):
+    def get_node_attributes(self, nodelist, attributes=(), decrypt=None):
+        if decrypt is None:
+            decrypt = self.decrypt
         retdict = {}
         relattribs = attributes
         if isinstance(nodelist, str) or isinstance(nodelist, unicode):
@@ -783,7 +785,7 @@ class ConfigManager(object):
                 # skipped.  The decryption, however, we want to do only on
                 # demand
                 nodeobj[attribute] = _decode_attribute(attribute, cfgnodeobj,
-                                                       decrypt=self.decrypt)
+                                                       decrypt=decrypt)
             retdict[node] = nodeobj
         return retdict
 
