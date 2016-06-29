@@ -722,3 +722,11 @@ class Logger(object):
     def closelog(self):
         self.handler.close()
         self.closer = None
+
+globaleventlog = None
+
+
+def log(logdata=None, ltype=None, event=0, eventdata=None):
+    if globaleventlog is None:
+        globaleventlog = Logger('events')
+    globaleventlog.log(logdata, ltype, event, eventdata)

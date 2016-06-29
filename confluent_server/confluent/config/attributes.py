@@ -207,16 +207,19 @@ node = {
 #IBM Flex)''',
 #        'appliesto': ['system'],
 #    },
-#    'inventory.serialnumber': {
+#    'id.serial': {
 #        'description': 'The manufacturer serial number of node',
 #    },
-#    'inventory.uuid': {
+#    'id.uuid': {
 #        'description': 'The UUID of the node as presented in DMI',
 #    },
-#    'inventory.modelnumber': {
+#    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
 #    },
-#    'inventory.snmpengineid': {
+#    'id.modelname': {
+#        'description': 'The manufacturer model label for the node',
+#    },
+#    'id.snmpengineid': {
 #        'description': 'The SNMP Engine id used by this node',
 #    },
 #    'secret.snmpuser': {
@@ -235,7 +238,7 @@ node = {
 #        'description': ('SNMPv1 community string, it is highly recommended to'
 #                        'step up to SNMPv3'),
 #    },
-#    'secret.localadminpassphrase': {
+#    'secret.adminpassword': {
 #        'description': ('The passphrase to apply to local root/administrator '
 #                        'account. '
 #                        'If the environment is 100% Linux, the value may be '
