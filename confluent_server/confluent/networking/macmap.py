@@ -33,11 +33,14 @@
 
 import confluent.exceptions as exc
 import confluent.snmputil as snmp
+import confluent.util as util
+import eventlet
+from eventlet.greenpool import GreenPool
 
 _macmap = {}
 
 
-def _map_switch(switch, password, user=None):
+def _map_switch(args):
     """Manipulate portions of mac address map relevant to a given switch
     """
 
@@ -53,6 +56,8 @@ def _map_switch(switch, password, user=None):
     #  .1.3.6.1.2.1.2.2.1.2 - ifDescr, usually useless, but a
     #   fallback if ifName is empty
     #
+    global _macmap
+    switch, password, user = args
     haveqbridge = False
     mactobridge = {}
     conn = snmp.Session(switch, password, user)
@@ -85,10 +90,47 @@ def _map_switch(switch, password, user=None):
             ifidx, ifname = vb
             ifidx = int(str(ifidx).rsplit('.', 1)[1])
             ifnamemap[ifidx] = str(ifname)
-    localmap = {}
     for mac in mactobridge:
-        localmap[mac] = ifnamemap[bridgetoifmap[mactobridge[mac]]]
-    print(repr(localmap))
+        _macmap[mac] = (switch, ifnamemap[bridgetoifmap[mactobridge[mac]]],
+                        util.monotonic_time())
+
+
+def update_macmap(configmanager):
+    """Interrogate switches to build/update mac table
+
+    Begin a rebuild process.  This process is a generator that will yield
+    as each switch interrogation completes, allowing a caller to
+    recheck the cache as results become possible, rather
+    than having to wait for the process to complete to interrogate.
+    """
+    if configmanager.tenant is not None:
+        raise exc.ForbiddenRequest('Network topology not available to tenants')
+    nodelocations = configmanager.get_node_attributes(
+        configmanager.list_nodes(), ('hardwaremanagement.switch',))
+    switches = set([])
+    for node in nodelocations:
+        cfg = nodelocations[node]
+        if 'hardwaremanagement.switch' in cfg:
+            switches.add(cfg['hardwaremanagement.switch']['value'])
+    switchcfg = configmanager.get_node_attributes(
+        switches, ('secret.hardwaremanagementuser',
+                   'secret.hardwaremanagementpassword'), decrypt=True)
+    switchauth = []
+    for switch in switches:
+        password = 'public'
+        user = None
+        if (switch in switchcfg and
+                'secret.hardwaremanagementpassword' in switchcfg[switch]):
+            password = switchcfg[switch]['secret.hardwaremanagementpassword'][
+                'value']
+            if 'secret.hardwaremanagementuser' in switchcfg[switch]:
+                user = switchcfg[switch]['secret.hardwaremanagementuser'][
+                    'value']
+        switchauth.append((switch, password, user))
+    pool = GreenPool()
+    for res in pool.imap(_map_switch, switchauth):
+        yield res
+        print(repr(_macmap))
 
 
 if __name__ == '__main__':
