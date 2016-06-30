@@ -32,6 +32,7 @@
 # This functionality is restricted to the null tenant
 
 import confluent.exceptions as exc
+import confluent.log as log
 import confluent.snmputil as snmp
 import confluent.util as util
 import eventlet
@@ -39,8 +40,13 @@ from eventlet.greenpool import GreenPool
 
 _macmap = {}
 
-
 def _map_switch(args):
+    try:
+        return _map_switch_backend(args)
+    except Exception as e:
+        log.logtrace()
+
+def _map_switch_backend(args):
     """Manipulate portions of mac address map relevant to a given switch
     """
 
@@ -64,6 +70,8 @@ def _map_switch(args):
     for vb in conn.walk('1.3.6.1.2.1.17.7.1.2.2.1.2'):
         haveqbridge = True
         oid, bridgeport = vb
+        if not bridgeport:
+            continue
         oid = str(oid).rsplit('.', 6)  # if 7, then oid[1] would be vlan id
         macaddr = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'.format(
             *([int(x) for x in oid[-6:]])
@@ -90,9 +98,21 @@ def _map_switch(args):
             ifidx, ifname = vb
             ifidx = int(str(ifidx).rsplit('.', 1)[1])
             ifnamemap[ifidx] = str(ifname)
+    maccounts = {}
     for mac in mactobridge:
-        _macmap[mac] = (switch, ifnamemap[bridgetoifmap[mactobridge[mac]]],
-                        util.monotonic_time())
+        ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+        if ifname not in maccounts:
+            maccounts[ifname] = 1
+        else:
+            maccounts[ifname] += 1
+    for mac in mactobridge:
+        # We want to merge it so that when a mac appears in multiple
+        # places, it is captured.
+        ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+        if mac in _macmap:
+            _macmap[mac].append((switch, ifname, maccounts[ifname]))
+        else:
+            _macmap[mac] = [(switch, ifname, maccounts[ifname])]
 
 
 def update_macmap(configmanager):
@@ -103,6 +123,9 @@ def update_macmap(configmanager):
     recheck the cache as results become possible, rather
     than having to wait for the process to complete to interrogate.
     """
+    global _macmap
+    # Clear all existing entries
+    _macmap = {}
     if configmanager.tenant is not None:
         raise exc.ForbiddenRequest('Network topology not available to tenants')
     nodelocations = configmanager.get_node_attributes(

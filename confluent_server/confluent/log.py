@@ -724,9 +724,16 @@ class Logger(object):
         self.closer = None
 
 globaleventlog = None
-
+tracelog = None
 
 def log(logdata=None, ltype=None, event=0, eventdata=None):
     if globaleventlog is None:
         globaleventlog = Logger('events')
     globaleventlog.log(logdata, ltype, event, eventdata)
+
+def logtrace():
+    global tracelog
+    if tracelog is None:
+        tracelog = Logger('trace')
+    tracelog.log(traceback.format_exc(), ltype=DataTypes.event,
+                 event=Events.stacktrace)
