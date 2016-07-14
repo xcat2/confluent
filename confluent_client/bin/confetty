@@ -2,7 +2,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2016 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -316,21 +316,31 @@ def do_command(command, server):
         if parentpath:
             childname = '{0}/'.format(parentpath[parentpath.rindex('/') + 1:])
             parentpath = parentpath[:parentpath.rindex('/') + 1]
-            foundchild = False
-            for res in session.read(parentpath, server):
-                try:
-                    if res['item']['href'] == childname:
-                        foundchild = True
-                except KeyError:
-                    pass
-                if 'errorcode' in res:
-                    exitcode = res['errorcode']
-                if 'error' in res:
-                    sys.stderr.write(target + ': ' + res['error'] + '\n')
+            if parentpath == '/noderange/':
+                for res in session.read(target, server):
+                    if 'errorcode' in res:
+                        exitcode = res['errorcode']
+                        target = otarget
+                    if 'error' in res:
+                        sys.stderr.write(target + ': ' + res['error'] + '\n')
+                        target = otarget
+            else:
+                foundchild = False
+                for res in session.read(parentpath, server):
+                    try:
+                        if res['item']['href'] == childname:
+                            foundchild = True
+                    except KeyError:
+                        pass
+                    if 'errorcode' in res:
+                        exitcode = res['errorcode']
+                        target = otarget
+                    if 'error' in res:
+                        sys.stderr.write(target + ': ' + res['error'] + '\n')
+                        target = otarget
+                if not foundchild:
+                    sys.stderr.write(target + ': Target not found - \n')
                     target = otarget
-            if not foundchild:
-                sys.stderr.write(target + ': Target not found - \n')
-                target = otarget
     elif argv[0] in ('cat', 'show', 'ls', 'dir'):
         if len(argv) > 1:
             targpath = fullpath_target(argv[1])
