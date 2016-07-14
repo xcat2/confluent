@@ -19,6 +19,7 @@
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
 import confluent.exceptions as exc
+from copy import deepcopy
 from datetime import datetime
 import json
 
@@ -418,7 +419,7 @@ class InputAttributes(ConfluentMessage):
     def get_attributes(self, node):
         if node not in self.nodeattribs:
             return {}
-        nodeattr = self.nodeattribs[node]
+        nodeattr = deepcopy(self.nodeattribs[node])
         for attr in nodeattr:
             if type(nodeattr[attr]) in (str, unicode):
                 try:
@@ -492,7 +493,7 @@ class InputCredential(ConfluentMessage):
     def get_attributes(self, node):
         if node not in self.credentials:
             return {}
-        credential = self.credentials[node]
+        credential = deepcopy(self.credentials[node])
         for attr in credential:
             if type(credential[attr]) in (str, unicode):
                 try:
