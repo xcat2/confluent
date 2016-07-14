@@ -34,17 +34,74 @@
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.snmputil as snmp
-import confluent.util as util
-import eventlet
 from eventlet.greenpool import GreenPool
+import re
 
 _macmap = {}
+_macsbyswitch = {}
+_nodesbymac = {}
+_switchportmap = {}
+
+
+_whitelistnames = (
+    # 3com
+    re.compile(r'^RMON Port (\d+) on unit \d+'),
+    # Dell
+    re.compile(r'^Unit \d+ Port (\d+)\Z'),
+)
+
+_blacklistnames = (
+    re.compile(r'vl'),
+    re.compile(r'Nu'),
+    re.compile(r'RMON'),
+    re.compile(r'onsole'),
+    re.compile(r'Stack'),
+    re.compile(r'Trunk'),
+    re.compile(r'po\d'),
+    re.compile(r'XGE'),
+    re.compile(r'LAG'),
+    re.compile(r'CPU'),
+    re.compile(r'Management'),
+)
+
+
+def _namesmatch(switchdesc, userdesc):
+    if switchdesc == userdesc:
+        return True
+    try:
+        portnum = int(userdesc)
+    except ValueError:
+        portnum = None
+    if portnum is not None:
+        for exp in _whitelistnames:
+            match = exp.match(switchdesc)
+            if match:
+                snum = int(match.groups()[0])
+                if snum == portnum:
+                    return True
+    anymatch = re.search(r'[^0123456789]' + userdesc + r'(\.0)?\Z', switchdesc)
+    if not anymatch:
+        return False
+    for blexp in _blacklistnames:
+        if blexp.match(switchdesc):
+            return False
+
 
 def _map_switch(args):
     try:
         return _map_switch_backend(args)
     except Exception as e:
         log.logtrace()
+
+
+def _nodelookup(switch, ifname):
+    """Get a nodename for a given switch and interface name
+    """
+    for portdesc in _switchportmap.get(switch, {}):
+        if _namesmatch(ifname, portdesc):
+            return _switchportmap[switch][portdesc]
+    return None
+
 
 def _map_switch_backend(args):
     """Manipulate portions of mac address map relevant to a given switch
@@ -105,6 +162,7 @@ def _map_switch_backend(args):
             maccounts[ifname] = 1
         else:
             maccounts[ifname] += 1
+    _macsbyswitch[switch] = {}
     for mac in mactobridge:
         # We want to merge it so that when a mac appears in multiple
         # places, it is captured.
@@ -113,6 +171,18 @@ def _map_switch_backend(args):
             _macmap[mac].append((switch, ifname, maccounts[ifname]))
         else:
             _macmap[mac] = [(switch, ifname, maccounts[ifname])]
+        if ifname in _macsbyswitch[switch]:
+            _macsbyswitch[switch][ifname].append(mac)
+        else:
+            _macsbyswitch[switch][ifname] = [mac]
+        nodename = _nodelookup(switch, ifname)
+        if nodename is not None:
+            if mac in _nodesbymac and _nodesbymac[mac] != nodename:
+                log.log({'warning': '{0} and {1} described by ambiguous'
+                                    ' switch topology values'.format(nodename,
+                                                              _nodesbymac[mac]
+                                                              )})
+            _nodesbymac[mac] = nodename
 
 
 def update_macmap(configmanager):
@@ -124,17 +194,34 @@ def update_macmap(configmanager):
     than having to wait for the process to complete to interrogate.
     """
     global _macmap
+    global _nodesbymac
+    global _switchportmap
     # Clear all existing entries
     _macmap = {}
+    _nodesbymac = {}
+    _switchportmap = {}
     if configmanager.tenant is not None:
         raise exc.ForbiddenRequest('Network topology not available to tenants')
     nodelocations = configmanager.get_node_attributes(
-        configmanager.list_nodes(), ('hardwaremanagement.switch',))
+        configmanager.list_nodes(), ('hardwaremanagement.switch',
+                                     'hardwaremanagement.switchport'))
     switches = set([])
     for node in nodelocations:
         cfg = nodelocations[node]
         if 'hardwaremanagement.switch' in cfg:
-            switches.add(cfg['hardwaremanagement.switch']['value'])
+            curswitch = cfg['hardwaremanagement.switch']['value']
+            switches.add(curswitch)
+            if 'hardwaremanagement.switchport' in cfg:
+                portname = cfg['hardwaremanagement.switchport']['value']
+                if curswitch not in _switchportmap:
+                    _switchportmap[curswitch] = {}
+                if portname in _switchportmap[curswitch]:
+                    log.log({'warning': 'Duplicate switch topology config for '
+                                        '{0} and {1}'.format(node,
+                                                             _switchportmap[
+                                                                 curswitch][
+                                                                 portname])})
+                _switchportmap[curswitch][portname] = node
     switchcfg = configmanager.get_node_attributes(
         switches, ('secret.hardwaremanagementuser',
                    'secret.hardwaremanagementpassword'), decrypt=True)

@@ -726,6 +726,7 @@ class Logger(object):
 globaleventlog = None
 tracelog = None
 
+
 def log(logdata=None, ltype=None, event=0, eventdata=None):
     if globaleventlog is None:
         globaleventlog = Logger('events')
