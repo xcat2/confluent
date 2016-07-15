@@ -80,12 +80,12 @@ def _namesmatch(switchdesc, userdesc):
                 if snum == portnum:
                     return True
     anymatch = re.search(r'[^0123456789]' + userdesc + r'(\.0)?\Z', switchdesc)
-    if not anymatch:
-        return False
-    for blexp in _blacklistnames:
-        if blexp.match(switchdesc):
-            return False
-
+    if anymatch:
+        for blexp in _blacklistnames:
+            if blexp.match(switchdesc):
+                return False
+        return True
+    return False
 
 def _map_switch(args):
     try:
