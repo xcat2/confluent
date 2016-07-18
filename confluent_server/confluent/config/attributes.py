@@ -188,11 +188,23 @@ node = {
 #        'appliesto': ['vm'],
 #    },
     'hardwaremanagement.manager': {
-        'description': 'The management address dedicated to this node',
+        'description': 'The management address dedicated to this node.  This '
+                       'is the address of, for example, the Lenovo IMM.',
     },
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
+    },
+    'hardwaremanagement.switch': {
+        'description': 'The switch to which the hardware manager is connected.'
+                       ' Only relevant if using switch based discovery via the'
+                       ' hardware manager (Lenovo IMMs and CMMs).  Not '
+                       'applicable to Lenovo Flex nodes.'
+    },
+    'hardwaremanagement.switchport': {
+        'description': 'The port of the switch that the hardware manager is '
+                       'connected.  See documentation of '
+                       'hardwaremanagement.switch for more detail.'
     },
     'enclosure.manager': {
         'description': "The management device for this node's chassis",
@@ -202,40 +214,44 @@ node = {
          'description': 'The bay in the enclosure, if any',
 #        'appliesto': ['system'],
     },
+
 #    'enclosure.type': {
 #        'description': '''The type of enclosure in use (e.g. IBM BladeCenter,
 #IBM Flex)''',
 #        'appliesto': ['system'],
 #    },
-#    'inventory.serialnumber': {
+#    'id.serial': {
 #        'description': 'The manufacturer serial number of node',
 #    },
-#    'inventory.uuid': {
+#    'id.uuid': {
 #        'description': 'The UUID of the node as presented in DMI',
 #    },
-#    'inventory.modelnumber': {
+#    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
 #    },
-#    'inventory.snmpengineid': {
+#    'id.modelname': {
+#        'description': 'The manufacturer model label for the node',
+#    },
+#    'id.snmpengineid': {
 #        'description': 'The SNMP Engine id used by this node',
 #    },
 #    'secret.snmpuser': {
 #        'description': 'The user to use for SNMPv3 access to this node',
 #    },
-#    'secret.snmppassphrase': {
-#        'description': 'The passphrase to use for SNMPv3 access to this node',
+#    'secret.snmppassword': {
+#        'description': 'The password to use for SNMPv3 access to this node',
 #    },
+    'secret.snmpcommunity': {
+        'description': ('SNMPv1 community string, it is highly recommended to'
+                        'step up to SNMPv3'),
+    },
 #    'secret.snmplocalizedkey': {
 #        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
 #                        'This can be used in lieu of snmppassphrase to avoid'
 #                        'retaining the passphrase TODO: document procedure'
 #                        'to commit passphrase to localized key'),
 #    },
-#    'secret.snmpcommunity': {
-#        'description': ('SNMPv1 community string, it is highly recommended to'
-#                        'step up to SNMPv3'),
-#    },
-#    'secret.localadminpassphrase': {
+#    'secret.adminpassword': {
 #        'description': ('The passphrase to apply to local root/administrator '
 #                        'account. '
 #                        'If the environment is 100% Linux, the value may be '
@@ -246,35 +262,18 @@ node = {
 #                        'AD')
 #    },
     'secret.ipmikg': {
-        'description': 'Optional Integrity key for IPMI communication'
+        'description': 'Optional Integrity key for IPMI communication.  This '
+                       'should generally be ignored, as mutual authentication '
+                       'is normally done with the password alone (which is a '
+                       'shared secret in IPMI)'
     },
-#    'secret.ipmiuser': {
-#        'description': ('The username to use to log into IPMI device related '
-#                        'to the node.  For setting username, default '
-#                        'behavior is to randomize username, for using '
-#                        'username if not set, USERID is assumed'),
-#    },
-#    'secret.ipmipassphrase': {
-#        'description': ('The key to use to authenticate to IPMI device '
-#                        'related to the node.  For setting passphrase, '
-#                        'default behavior is to randomize passphrase and '
-#                        'store it here.  If going to connect over the '
-#                        'network and value is not set, PASSW0RD is attempted')
-#    },
     'secret.hardwaremanagementuser': {
-        'description': ('Username to be set and used by protocols like SSH '
-                        'and HTTP where client provides passphrase over the '
-                        'network. Given the distinct security models betwen '
-                        'this class of protocols and SNMP and IPMI, snmp and '
-                        'ipmi utilize dedicated values.'),
+        'description': ('The username to use when connecting to the hardware '
+                        'manager'),
     },
     'secret.hardwaremanagementpassword': {
-        'description': ('Passphrase to be set and used by protocols like SSH '
-                        'and HTTP, where client sends passphrase over the '
-                        'network.  Given distinct security models between '
-                        'this class of protocols, SNMP, and IPMI, SNMP and '
-                        'IPMI are given their own settings with distinct '
-                        'behaviors'),
+        'description': ('Password to use when connecting to the hardware '
+                        'manager'),
     },
     'pubkeys.addpolicy': {
         'description': ('Policy to use when encountering unknown public '
