@@ -51,6 +51,7 @@ sensor_categories = {
     'fans': frozenset(['Fan', 'Cooling Device']),
 }
 
+
 def hex2bin(hexstring):
     hexvals = hexstring.split(':')
     if len(hexvals) < 2:
@@ -59,6 +60,7 @@ def hex2bin(hexstring):
         hexvals = [hexstring[i:i+2] for i in xrange(0, len(hexstring), 2)]
     bytedata = [int(i, 16) for i in hexvals]
     return bytearray(bytedata)
+
 
 def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-')
