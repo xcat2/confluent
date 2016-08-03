@@ -117,6 +117,13 @@ class SshShell(conapi.Console):
 
     def write(self, data):
         if self.inputmode == 0:
+            while len(data) > 0 and data[0] == b'\x7f':
+                self.datacallback('\b \b')  # erase previously echoed value
+                self.username = self.username[:-1]
+                data = data[1:]
+            while b'\x7f' in data:
+                delidx = data.index(b'\x7f')
+                data = data[:delidx - 1] + data[delidx + 1:]
             self.username += data
             if '\r' in self.username:
                 self.username, self.password = self.username.split('\r')
@@ -125,10 +132,16 @@ class SshShell(conapi.Console):
                     self.datacallback(lastdata)
                 self.datacallback('\r\nEnter password: ')
                 self.inputmode = 1
-            else:
+            elif len(data) > 0:
                 # echo back typed data
                 self.datacallback(data)
         elif self.inputmode == 1:
+            while len(data) > 0 and data[0] == b'\x7f':
+                self.password = self.password[:-1]
+                data = data[1:]
+            while b'\x7f' in data:
+                delidx = data.index(b'\x7f')
+                data = data[:delidx - 1] + data[delidx + 1:]
             self.password += data
             if '\r' in self.password:
                 self.password = self.password.split('\r')[0]
