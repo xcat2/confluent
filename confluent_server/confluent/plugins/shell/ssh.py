@@ -117,9 +117,11 @@ class SshShell(conapi.Console):
 
     def write(self, data):
         if self.inputmode == 0:
-            while len(data) > 0 and data[0] == b'\x7f':
+            while len(data) and data[0] == b'\x7f' and len(self.username):
                 self.datacallback('\b \b')  # erase previously echoed value
                 self.username = self.username[:-1]
+                data = data[1:]
+            while len(data) and data[0] == b'\x7f':
                 data = data[1:]
             while b'\x7f' in data:
                 delidx = data.index(b'\x7f')
