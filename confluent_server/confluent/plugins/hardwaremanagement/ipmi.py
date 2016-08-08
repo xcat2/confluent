@@ -852,7 +852,12 @@ class IpmiHandler(object):
                     else:
                         idx = int(self.element[-1]) - 1
                         servers = self.ipmicmd.get_ntp_servers()
-                        self.output.put(msg.NTPServer(self.node, servers[idx]))
+                        if len(servers) > idx:
+                            self.output.put(msg.NTPServer(self.node, servers[idx]))
+                        else:
+                            self.output.put(
+                                msg.ConfluentTargetNotFound(
+                                    self.node, 'Requested NTP configuration not found'))
                         return
                 elif self.op in ('update', 'create'):
                     if self.element[-1] == 'all':
