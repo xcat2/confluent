@@ -349,7 +349,7 @@ def resourcehandler_backend(env, start_response):
         del querydict['restexplorerop']
     authorized = _authorize_request(env, operation)
     if 'logout' in authorized:
-        start_response('200 Sucessful logout', headers)
+        start_response('200 Successful logout', headers)
         yield('{"result": "200 - Successful logout"}')
         return
     if 'HTTP_SUPPRESSAUTHHEADER' in env:
@@ -461,6 +461,17 @@ def resourcehandler_backend(env, start_response):
             start_response('200 OK', headers)
             yield '{"sessionclosed": true}'
             return
+        elif 'action' in querydict:
+            if querydict['action'] == 'break':
+                consolesessions[querydict['session']]['session'].send_break()
+            elif querydict['action'] == 'reopen':
+                consolesessions[querydict['session']]['session'].reopen()
+            else:
+                start_response('400 Bad Request')
+                yield 'Unrecognized action ' + querydict['action']
+                return
+            start_response('200 OK', headers)
+            yield json.dumps({'session': querydict['session']})
         else:  # no keys, but a session, means it's hooking to receive data
             sessid = querydict['session']
             if sessid not in consolesessions:
