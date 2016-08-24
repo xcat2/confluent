@@ -100,7 +100,8 @@ def load_plugins():
         sys.path.pop(1)
 
 
-rootcollections = ['noderange/', 'nodes/', 'nodegroups/', 'users/', 'events/']
+rootcollections = ['discovery/',
+                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'events/']
 
 
 class PluginRoute(object):
@@ -587,6 +588,10 @@ def handle_node_request(configmanager, inputdata, operation,
         #     return stripnode(passvalues[0], nodes[0])
 
 
+def handle_discovery(pathcomponents, operation, configmanager, inputdata):
+    if pathcomponents[0] == 'detected':
+        pass
+
 def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
 
@@ -645,5 +650,8 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
             raise exc.NotFoundException()
         if operation == 'update':
             return alerts.decode_alert(inputdata, configmanager)
+    elif pathcomponents[0] == 'discovery':
+        return handle_discovery(pathcomponents[1:], operation, configmanager,
+                                inputdata)
     else:
         raise exc.NotFoundException()
