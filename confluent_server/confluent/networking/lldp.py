@@ -60,7 +60,7 @@ import re
 #                            a potential exception would be pulling in things
 #                            that are fundamentally network equipment,
 #                            where significant ambiguity may exist.
-#                            While in a 'host' scenario, there is some ambiguity
+#                            While in a 'host' scenario, there is ambiguity
 #                            it is more controlled (virtual machines are given
 #                            special treatment, and strategies exist for
 #                            disambiguating shared management/data port, and

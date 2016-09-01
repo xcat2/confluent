@@ -71,7 +71,6 @@ user = {
 node = {
     'groups': {
         'type': list,
-        'default': 'all',
         'description': ('List of static groups for which this node is '
                         'considered a member'),
     },
@@ -81,6 +80,36 @@ node = {
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},
+    # autonode is the feature of generating nodes based on connectivity to
+    # current node.  Interisting point, need to think hard about recursive
+    # autonode (switch generates an enclosure manager, which in turn generates
+    # nodes, perhaps even having the enclosure manager be ephemeral?
+    'autonode.nametemplate': {
+        'description': ('Template for creating nodenames for automatic '
+                        'creation of nodes detected as children of '
+                        'this node.  For example, a node in a server '
+                        'enclosure bay or a server connected to a switch or '
+                        'an enclosure manager connected to a switch.  Certain '
+                        'special template parameters are available and can '
+                        'be used alongside usual config template directives. '
+                        '"discovered.nodenumber" will be replaced with the '
+                        'bay or port number where the child node is connected.'
+                        ),
+    },
+    'autonode.nodegroups': {
+        'type': list,
+        'description': ('A list of groups to which discovered nodes will '
+                        'belong to.  As in nametemplate, "discovered." '
+                        'namespace values will be substituted')
+    },
+    'autonode.copyattribs': {
+        'type': list,
+        'description': ('A list of attributes to copy from the node generator '
+                        'to the generated node.  Expressions will be copied '
+                        'over without evaluation, so will be evaluated '
+                        'in the context of the generated node, rather than the'
+                        'parent node.')
+    },
     'location.room': {
         'description': 'Room description for the node',
     },
