@@ -246,4 +246,4 @@ def update_macmap(configmanager):
 if __name__ == '__main__':
     # invoke as switch community
     import sys
-    _map_switch(sys.argv[1], sys.argv[2])
+    _map_switch((sys.argv[1], sys.argv[2]))
