@@ -49,11 +49,11 @@ def format_event(evt):
         display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
         retparts.append(display.strftime('%m/%d/%Y %H:%M:%S'))
     dscparts = []
-    if 'component_type' in evt:
+    if 'component_type' in evt and evt['component_type'] is not None:
         dscparts.append(evt['component_type'])
     if 'component' in evt and evt['component'] is not None:
         dscparts.append(evt['component'])
-    if 'event' in evt and evt['event']:
+    if 'event' in evt and evt['event'] and evt['event'] is not None:
         evttext = evt['event']
         try:
             if evttext.startswith(evt['component'] + ' - '):
