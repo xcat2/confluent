@@ -255,11 +255,12 @@ class ConsoleHandler(object):
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
-        self.connectstate = 'unconnected'
-        self.log(
-            logdata='console disconnected', ltype=log.DataTypes.event,
-            event=log.Events.consoledisconnect)
-        self._send_rcpts({'connectstate': self.connectstate})
+        if self.connectstate != 'unconnected':
+            self.connectstate = 'unconnected'
+            self.log(
+                logdata='console disconnected', ltype=log.DataTypes.event,
+                event=log.Events.consoledisconnect)
+            self._send_rcpts({'connectstate': self.connectstate})
         if self._isalive:
             self._connect()
 

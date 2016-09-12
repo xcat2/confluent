@@ -219,6 +219,7 @@ class IpmiConsole(conapi.Console):
                 self.broken = True
                 self.error = data['error']
                 if self.connected:
+                    self.connected = False
                     self.datacallback(conapi.ConsoleEvent.Disconnect)
         else:
             self.datacallback(data)
