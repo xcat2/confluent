@@ -209,7 +209,6 @@ def run():
         os.umask(oumask)
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
-    consoleserver.start_console_sessions()
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
     try:
@@ -218,6 +217,8 @@ def run():
     except NameError:
         pass
     atexit.register(doexit)
+    eventlet.sleep(1)
+    consoleserver.start_console_sessions()
     while 1:
         eventlet.sleep(100)
 
