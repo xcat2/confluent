@@ -194,6 +194,8 @@ class ConsoleHandler(object):
             self._console = plugin.handle_path(
                 self._plugin_path.format(self.node),
                 "create", self.cfgmgr)
+        except exc.NotImplementedException:
+            self._console = None
         except:
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
