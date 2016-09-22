@@ -176,7 +176,7 @@ def send_response(responses, connection):
 
 def process_request(connection, request, cfm, authdata, authname, skipauth):
     if not isinstance(request, dict):
-        raise ValueError
+        raise exc.InvalidArgumentException
     operation = request['operation']
     path = request['path']
     params = request.get('parameters', {})
