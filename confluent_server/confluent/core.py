@@ -572,10 +572,19 @@ def handle_node_request(configmanager, inputdata, operation,
                 inputdata=inputdata))
         if isnoderange or not autostrip:
             return itertools.chain(*passvalues)
-        elif isinstance(passvalues[0], console.Console):
-            return passvalues[0]
         else:
-            return stripnode(passvalues[0], nodes[0])
+            if len(passvalues) > 0:
+                if isinstance(passvalues[0], console.Console):
+                    return passvalues[0]
+                else:
+                    return stripnode(passvalues[0], nodes[0])
+            else:
+                raise exc.NotImplementedException()
+
+        # elif isinstance(passvalues[0], console.Console):
+        #     return passvalues[0]
+        # else:
+        #     return stripnode(passvalues[0], nodes[0])
 
 
 def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
