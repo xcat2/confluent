@@ -588,26 +588,9 @@ def resourcehandler_backend(env, start_response):
                     pagecontent += datum
             start_response('200 OK', headers)
             yield pagecontent
-        except exc.NotFoundException as ne:
-            start_response('404 Not found', headers)
-            yield "404 - Request path not recognized - " + str(ne)
-        except exc.InvalidArgumentException as e:
-            start_response('400 Bad Request - ' + str(e), headers)
-            yield '400 - Bad Request - ' + str(e)
-        except exc.TargetEndpointUnreachable as tu:
-            start_response('504 Unreachable Target', headers)
-            yield '504 - Unreachable Target - ' + str(tu)
-        except exc.TargetEndpointBadCredentials:
-            start_response('502 Bad Credentials', headers)
-            yield '502 - Bad Credentials'
-        except exc.LockedCredentials:
-            start_response('500 Locked credential store', headers)
-            yield '500 - Credential store locked'
-        except exc.NotImplementedException:
-            start_response('501 Not Implemented', headers)
-            yield '501 Not Implemented'
         except exc.ConfluentException as e:
-            if e.apierrorcode == 500:
+            if ((not isinstance(e, exc.LockedCredentials)) and
+                    e.apierrorcode == 500):
                 # raise generics to trigger the tracelog
                 raise
             start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr),
