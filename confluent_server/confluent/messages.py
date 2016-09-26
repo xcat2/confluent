@@ -182,7 +182,8 @@ class ConfluentNodeError(object):
         self.error = errorstr
 
     def raw(self):
-        return {'databynode': {self.node: {'error': self.error}}}
+        return {'databynode': {self.node: {'errorcode': self.apicode,
+                                           'error': self.error}}}
 
     def html(self):
         return self.node + ":" + self.error
