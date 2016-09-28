@@ -880,6 +880,11 @@ class AsyncMessage(ConfluentMessage):
         if (isinstance(rsp, ConfluentMessage) or
                 isinstance(rsp, ConfluentNodeError)):
             rspdict = rsp.raw()
+        elif isinstance(rsp, exc.ConfluentException):
+            rspdict = {'exceptioncode': rsp.apierrorcode,
+                       'exception': rsp.get_error_body()}
+        elif isinstance(rsp, Exception):
+            rspdict = {'exceptioncode': 500, 'exception': str(rsp)}
         elif isinstance(rsp, dict):  # console metadata
             rspdict = rsp
         else: # terminal text
