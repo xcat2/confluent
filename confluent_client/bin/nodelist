@@ -42,7 +42,7 @@ def attrrequested(attr, attrlist, seenattributes):
             return True
     return False
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [list of attributes")
+    usage="Usage: %prog [options] noderange [attributes...]")
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
 (options, args) = argparser.parse_args()

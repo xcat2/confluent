@@ -78,7 +78,7 @@ def load_plugins():
         plugindir = os.path.join(plugintop, plugindir)
         if not os.path.isdir(plugindir):
             continue
-        sys.path.append(plugindir)
+        sys.path.insert(1, plugindir)
         # two passes, to avoid adding both py and pyc files
         for plugin in os.listdir(plugindir):
             if plugin.startswith('.'):
@@ -96,6 +96,8 @@ def load_plugins():
                     pluginmap[name] = tmpmod
             else:
                 pluginmap[plugin] = tmpmod
+        # restore path to not include the plugindir
+        sys.path.pop(1)
 
 
 rootcollections = ['noderange/', 'nodes/', 'nodegroups/', 'users/', 'events/']

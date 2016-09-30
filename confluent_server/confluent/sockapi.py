@@ -118,37 +118,9 @@ def sessionhdl(connection, authname, skipauth=False):
         try:
             process_request(
                 connection, request, cfm, authdata, authname, skipauth)
-        except exc.ForbiddenRequest:
-            send_data(connection, {'errorcode': 403,
-                                      'error': 'Forbidden'})
-            send_data(connection, {'_requestdone': 1})
-        except exc.TargetEndpointBadCredentials:
-            send_data(connection, {'errorcode': 502,
-                                      'error': 'Bad Credentials'})
-            send_data(connection, {'_requestdone': 1})
-        except exc.TargetEndpointUnreachable as tu:
-            send_data(connection, {'errorcode': 504,
-                                      'error': 'Unreachable Target - ' + str(
-                                          tu)})
-            send_data(connection, {'_requestdone': 1})
-        except exc.NotImplementedException:
-            send_data(connection, {'errorcode': 501,
-                                      'error': 'Not Implemented'})
-            send_data(connection, {'_requestdone': 1})
-        except exc.NotFoundException as nfe:
-            send_data(connection, {'errorcode': 404,
-                                      'error': str(nfe)})
-            send_data(connection, {'_requestdone': 1})
-        except exc.InvalidArgumentException as iae:
-            send_data(connection, {'errorcode': 400,
-                                      'error': 'Bad Request - ' + str(iae)})
-            send_data(connection, {'_requestdone': 1})
-        except exc.LockedCredentials as lockedcred:
-            send_data(connection, {'errorcode': 500,
-                                      'error': 'Locked Credential Store'})
-            send_data(connection, {'_requestdone': 1})
         except exc.ConfluentException as e:
-            if e.apierrorcode == 500:
+            if ((not isinstance(e, exc.LockedCredentials)) and
+                    e.apierrorcode == 500):
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)
             send_data(connection, {'errorcode': e.apierrorcode,
@@ -176,7 +148,7 @@ def send_response(responses, connection):
 
 def process_request(connection, request, cfm, authdata, authname, skipauth):
     if not isinstance(request, dict):
-        raise ValueError
+        raise exc.InvalidArgumentException
     operation = request['operation']
     path = request['path']
     params = request.get('parameters', {})

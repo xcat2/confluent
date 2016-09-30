@@ -24,53 +24,61 @@ class ConfluentException(Exception):
     apierrorstr = 'Unexpected Error'
 
     def get_error_body(self):
-        return self.apierrorstr
+        errstr = ' - '.join((self.apierrorstr, str(self)))
+        return json.dumps({'error': errstr })
 
 
 class NotFoundException(ConfluentException):
     # Something that could be construed as a name was not found
     # basically, picture an http error code 404
-    pass
+    apierrorcode = 404
+    apierrorstr = 'Request path not recognized'
 
 
 class InvalidArgumentException(ConfluentException):
     # Something from the remote client wasn't correct
     # like http code 400
-    pass
+    apierrorcode = 400
+    apierrorstr = 'Bad Request'
 
 
 class TargetEndpointUnreachable(ConfluentException):
     # A target system was unavailable.  For example, a BMC
     # was unreachable.  http code 504
-    pass
+    apierrorcode = 504
+    apierrorstr = 'Unreachable Target'
 
 
 class TargetEndpointBadCredentials(ConfluentException):
     # target was reachable, but authentication/authorization
     # failed
-    pass
+    apierrorcode = 502
+    apierrorstr = 'Bad Credentials'
 
 
 class LockedCredentials(ConfluentException):
     # A request was performed that required a credential, but the credential
     # store is locked
-    pass
+    apierrorstr = 'Credential store locked'
 
 
 class ForbiddenRequest(ConfluentException):
     # The client request is not allowed by authorization engine
-    pass
+    apierrorcode = 403
+    apierrorstr = 'Forbidden'
 
 
 class NotImplementedException(ConfluentException):
     # The current configuration/plugin is unable to perform
     # the requested task. http code 501
-    pass
+    apierrorcode = 501
+    apierrorstr = '501 - Not Implemented'
+
 
 
 class GlobalConfigError(ConfluentException):
     # The configuration in the global config file is not right
-    pass
+    apierrorstr = 'Global configuration contains an error'
 
 
 class PubkeyInvalid(ConfluentException):

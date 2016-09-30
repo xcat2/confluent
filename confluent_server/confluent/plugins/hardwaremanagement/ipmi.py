@@ -51,6 +51,7 @@ sensor_categories = {
     'fans': frozenset(['Fan', 'Cooling Device']),
 }
 
+
 def hex2bin(hexstring):
     hexvals = hexstring.split(':')
     if len(hexvals) < 2:
@@ -59,6 +60,7 @@ def hex2bin(hexstring):
         hexvals = [hexstring[i:i+2] for i in xrange(0, len(hexstring), 2)]
     bytedata = [int(i, 16) for i in hexvals]
     return bytearray(bytedata)
+
 
 def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-')
@@ -343,6 +345,7 @@ class IpmiHandler(object):
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
+        self.ipmicmd.setup_confluent_keyhandler()
 
     bootdevices = {
         'optical': 'cd'
@@ -354,7 +357,6 @@ class IpmiHandler(object):
             self.error = response['error']
         else:
             self.loggedin = True
-            ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):
@@ -851,7 +853,12 @@ class IpmiHandler(object):
                     else:
                         idx = int(self.element[-1]) - 1
                         servers = self.ipmicmd.get_ntp_servers()
-                        self.output.put(msg.NTPServer(self.node, servers[idx]))
+                        if len(servers) > idx:
+                            self.output.put(msg.NTPServer(self.node, servers[idx]))
+                        else:
+                            self.output.put(
+                                msg.ConfluentTargetNotFound(
+                                    self.node, 'Requested NTP configuration not found'))
                         return
                 elif self.op in ('update', 'create'):
                     if self.element[-1] == 'all':

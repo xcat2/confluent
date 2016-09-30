@@ -39,7 +39,7 @@ sensorcollections = {
 
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [sensor(s)")
+    usage="Usage: %prog [options] noderange [sensor(s)]")
 argparser.add_option('-i', '--interval', type='int',
                      help='Interval to do repeated samples over')
 argparser.add_option('-n', '--numreadings', type='int',

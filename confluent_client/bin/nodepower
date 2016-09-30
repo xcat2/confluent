@@ -15,9 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import optparse
 import os
 import sys
 
+valid_states = ('on', 'off', 'boot', 'reset', 'shutdown')
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -25,21 +27,26 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
+argparser = optparse.OptionParser(
+    usage="Usage: %prog [options] noderange [{0}]".format(
+        '|'.join(valid_states)))
+(options, args) = argparser.parse_args()
 
 try:
-    noderange = sys.argv[1]
+    noderange = args[0]
 except IndexError:
-    sys.stderr.write(
-        'Usage: {0} <noderange> ([status|on|off|shutdown|boot|reset]\n'.format(
-            sys.argv[0]))
+    argparser.print_usage()
     sys.exit(1)
 
 setstate = None
-if len(sys.argv) > 2:
+if len(args) > 1:
+    if not args[1] in ('stat', 'state', 'status'):
+        setstate = args[1]
     if setstate == 'softoff':
         setstate = 'shutdown'
-    elif not sys.argv[2] in ('stat', 'state', 'status'):
-        setstate = sys.argv[2]
+    if setstate is not None and setstate not in valid_states:
+        argparser.print_usage()
+        sys.exit(1)
 
 session = client.Command()
 exitcode = 0
