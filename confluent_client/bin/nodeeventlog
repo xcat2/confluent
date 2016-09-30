@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from datetime import datetime as dt
+import optparse
 import os
 import sys
 
@@ -26,19 +27,23 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
+argparser = optparse.OptionParser(
+    usage="Usage: %prog [options] noderange [clear]")
+(options, args) = argparser.parse_args()
 
 try:
-    noderange = sys.argv[1]
+    noderange = args[0]
 except IndexError:
-    sys.stderr.write(
-        'Usage: {0} <noderange> [clear]\n'.format(
-            sys.argv[0]))
+    argparser.print_usage()
     sys.exit(1)
 
 deletemode = False
-if len(sys.argv) == 3:
-    if sys.argv[2] == 'clear':
+if len(args) == 2:
+    if args[1] == 'clear':
         deletemode = True
+    else:
+        argparser.print_usage()
+        sys.exit(1)
 
 session = client.Command()
 exitcode = 0
@@ -81,6 +86,10 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
                sys.stderr.write('{0}: {1}\n'.format(node, thisdata['error']))
                exitcode |= 1
             if 'events' in thisdata:
-               evtdata = thisdata['events']
-               for evt in evtdata:
-                   print '{0}: {1}'.format(node, format_event(evt))
+                evtdata = thisdata['events']
+                for evt in evtdata:
+                    try:
+                        print('{0}: {1}'.format(node, format_event(evt)))
+                    except IOError:
+                        sys.exit(0)
+
