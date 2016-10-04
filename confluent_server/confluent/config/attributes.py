@@ -81,10 +81,15 @@ node = {
     #    'description': ('Numeric identifier for node')
     #},
     # autonode is the feature of generating nodes based on connectivity to
-    # current node.  Interisting point, need to think hard about recursive
-    # autonode (switch generates an enclosure manager, which in turn generates
-    # nodes, perhaps even having the enclosure manager be ephemeral?
-    'autonode.nametemplate': {
+    # current node.  In recursive autonode, for now we just allow endpoint to
+    # either be a server directly *or* a server enclosure.  This precludes
+    # for the moment a concept of nested arbitrarily deep, but for now do this.
+    # hypothetically, one could imagine supporting an array and 'popping'
+    # names until reaching end.  Not worth implementing at this point.  If
+    # a traditional switch is added, it needs some care and feeding anyway.
+    # If a more exciting scheme presents itself, well we won't have to
+    # own discovering switches anyway.
+    'autonode.servername': {
         'description': ('Template for creating nodenames for automatic '
                         'creation of nodes detected as children of '
                         'this node.  For example, a node in a server '
@@ -96,20 +101,28 @@ node = {
                         'bay or port number where the child node is connected.'
                         ),
     },
+    'autonode.enclosurename': {
+        'description': ('Template for cerating nodenames when the discovered '
+                        'node is an enclosure that will in turn generate nodes.')
+    }
     'autonode.nodegroups': {
         'type': list,
         'description': ('A list of groups to which discovered nodes will '
-                        'belong to.  As in nametemplate, "discovered." '
-                        'namespace values will be substituted')
+                        'belong to.  As in autonode.servername, "discovered." '
+                        'variable names will be substituted in special context')
     },
-    'autonode.copyattribs': {
-        'type': list,
-        'description': ('A list of attributes to copy from the node generator '
-                        'to the generated node.  Expressions will be copied '
-                        'over without evaluation, so will be evaluated '
-                        'in the context of the generated node, rather than the'
-                        'parent node.')
-    },
+#For now, we consider this eventuality if needed.  For now emphasize paradigm
+# of group membership and see how far that goes.
+#    'autonode.copyattribs': {
+#        'type': list,
+#        'description': ('A list of attributes to copy from the node generator '
+#                        'to the generated node.  Expressions will be copied '
+#                        'over without evaluation, so will be evaluated '
+#                        'in the context of the generated node, rather than the'
+#                        'parent node.  By default, an enclosure will copy over'
+#                        'autonode.servername, so that would not need to be '
+#                        'copied ')
+#    },
     'location.room': {
         'description': 'Room description for the node',
     },

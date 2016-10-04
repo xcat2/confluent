@@ -25,7 +25,7 @@
 # SSD
 
 # Also there are location provider concept.
-# * 
+# *
 
 # We normalize discovered node data to the following pieces of information:
 # * Detected node name (if available, from switch discovery or similar or
