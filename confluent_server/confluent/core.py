@@ -592,6 +592,10 @@ def handle_discovery(pathcomponents, operation, configmanager, inputdata):
     if pathcomponents[0] == 'detected':
         pass
 
+def handle_discovery(pathcomponents, operation, configmanager, inputdata):
+    if pathcomponents[0] == 'detected':
+        pass
+
 def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
 
