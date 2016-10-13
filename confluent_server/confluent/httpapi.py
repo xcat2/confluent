@@ -369,7 +369,12 @@ def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
     mimetype, extension = _pick_mimetype(env)
-    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache')]
+    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache'),
+               ('X-Content-Type-Options', 'nosniff'),
+               ('Content-Security-Policy', "default-src 'self'"),
+               ('X-XSS-Protection', '1'), ('X-Frame-Options', 'deny'),
+               ('Strict-Transport-Security', 'max-age=86400'),
+               ('X-Permitted-Cross-Domain-Policies', 'none')]
     reqbody = None
     reqtype = None
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
