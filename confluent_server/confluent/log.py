@@ -444,12 +444,17 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
         # As time rolling happens, reset statistics count
         self.sizeRollingCount = 0
         dbfn = self.binpath + "." + time.strftime(self.suffix, timeTuple)
+        odbfn = dbfn
         dtfn = self.textpath + "." + time.strftime(self.suffix, timeTuple)
-
-        if os.path.exists(dbfn):
-            os.remove(dbfn)
-        if os.path.exists(dtfn):
-            os.remove(dtfn)
+        odtfn = dtfn
+        append=1
+        while os.path.exists(dbfn):
+            dbfn = odbfn + '.{}'.format(append)
+            append += 1
+        append=1
+        while os.path.exists(dtfn):
+            dtfn = odtfn + '.{}'.format(append)
+            append += 1
         if os.path.exists(self.binpath):
             os.rename(self.binpath, dbfn)
         if os.path.exists(self.textpath):
