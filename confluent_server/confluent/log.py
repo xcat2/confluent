@@ -613,8 +613,14 @@ class Logger(object):
                 struct.unpack(">BBIHIBBH", recbytes)
             # rolling events found.
             if ltype == DataTypes.event and evtdata == Events.logrollover:
-                textpath, binpath = parse_last_rolling_files(textfile, offset,
-                                                             datalen)
+                txtpath, bpath = parse_last_rolling_files(textfile, offset,
+                                                          datalen)
+                if txtpath == textpath:
+                    break
+                if bpath == binpath:
+                    break
+                textpath = txtpath
+                binpath = bpath
                 # Rolling event detected, close the current bin file, then open
                 # the renamed bin file.
                 flock(binfile, LOCK_UN)
