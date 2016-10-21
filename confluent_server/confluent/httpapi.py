@@ -290,7 +290,6 @@ def _authorize_request(env, operation):
         cookie['confluentsessionid'] = sessid
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
-        cookie['confluentsessionid']['path'] = '/'
     skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
