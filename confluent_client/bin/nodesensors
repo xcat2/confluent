@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import csv
+import datetime
 import optparse
 import os
 import sys
@@ -40,7 +41,7 @@ sensorcollections = {
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] noderange [sensor(s)")
-argparser.add_option('-i', '--interval', type='int',
+argparser.add_option('-i', '--interval', type='float',
                      help='Interval to do repeated samples over')
 argparser.add_option('-n', '--numreadings', type='int',
                      help='Number of readings to gather')
@@ -146,7 +147,12 @@ def sensorpass(showout=True, appendtime=False):
 def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
     for nodekey in resdata:
         if showtime:
-            rowdata = [time.strftime('%Y-%m-%dT%H:%M:%S'), nodekey]
+            if showtime.is_integer():
+                rowdata = [time.strftime('%Y-%m-%dT%H:%M:%S'), nodekey]
+            else:
+                rowdata = [time.strftime('%Y-%m-%dT%H:%M:%S.') +
+                           str(datetime.datetime.now().microsecond//1000),
+                           nodekey]
         else:
             rowdata = [nodekey]
         for sensorkey in orderedsensors:
@@ -197,7 +203,8 @@ def main():
             nextstart = os.times()[4] + options.interval
             resdata = sensorpass(linebyline, True)
             if options.csv:
-                format_csv(csvwriter, orderedsensors, resdata)
+                format_csv(csvwriter, orderedsensors, resdata,
+                           showtime=options.interval)
             if options.numreadings:
                 options.numreadings -= 1
                 if options.numreadings <= 0:
