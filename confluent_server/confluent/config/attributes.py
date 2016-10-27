@@ -101,15 +101,21 @@ node = {
                         'bay or port number where the child node is connected.'
                         ),
     },
-    'autonode.enclosurename': {
-        'description': ('Template for cerating nodenames when the discovered '
-                        'node is an enclosure that will in turn generate nodes.')
-    }
-    'autonode.nodegroups': {
+    'autonode.servergroups': {
         'type': list,
         'description': ('A list of groups to which discovered nodes will '
                         'belong to.  As in autonode.servername, "discovered." '
                         'variable names will be substituted in special context')
+    },
+    'autonode.enclosurename': {
+        'description': ('Template for creating nodenames when the discovered '
+                        'node is an enclosure that will in turn generate nodes.'
+                        )
+    },
+    'autonode.enclosuregroups': {
+        'type': list,
+        'description': ('A list of groups to which a discovered node will be'
+                        'placed, presuming that node is an enclosure.')
     },
 #For now, we consider this eventuality if needed.  For now emphasize paradigm
 # of group membership and see how far that goes.
