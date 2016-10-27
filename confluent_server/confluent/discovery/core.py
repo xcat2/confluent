@@ -16,6 +16,47 @@
 # Discovery sources may implement scans and may be passive or may provide
 # both.
 
+# The phases and actions:
+# - Detect - Notice the existance of a potentially supported target
+#        - Potentially apply a secure replacement for default credential
+#           (perhaps using some key identifier combined with some string
+#            denoting temporary use, and use confluent master integrity key
+#            to generate a password in a formulaic way?)
+#       - Do some universal reconfiguration if applicable (e.g. if something is
+#         part of an enclosure with an optionally enabled enclosure manager,
+#         check and request enclosure manager enablement
+#       - Throughout all of this, at this phase no sensitive data is divulged,
+#         only using credentials that are factory default or equivalent to
+#         factory default
+#       - Request transition to Locate
+# - Locate - Use available cues to ascertain the physical location.  This may
+#         be mac address lookup through switch or correlated by a server
+#         enclosure manager.  If the location data suggests a node identity,
+#         then proceed to the 'verify' state
+# - Verify - Given the current information and candidate upstream verifier,
+#            verify the authenticity of the servers claim in an automated way
+#            if possible.  A few things may happen at this juncture
+#               - Verification outright fails (confirmed negative response)
+#                    - Audit log entry created, element is not *allowed* to
+#                      proceed
+#               - Verification not possible (neither good or bad)
+#                   - If security policy is set to low, proceed to 'Manage'
+#                   - Otherwise, log the detection event and stop (user
+#                     would then manually bless the endpoint if applicable
+#               - Verification succeeds
+#                   - If security policy is set to strict (or manual, whichever
+#                     word works best, note the successfull verification, but do
+#                     not manage
+#                   - Otherwise, proceed to 'Manage'
+#  - Manage
+#     - Create the node if autonode
+#     - If there is not a defined ip address, collect the current LLA and use
+#       that value.
+#     - If no username/password defined, generate a unique password, 20 bytes
+#       long, written to pass most complexity rules (15 random bytes, base64,
+#       retry until uppercase, lowercase, digit, and symbol all present)
+#     - Apply defined configuration to endpoint
+
 # Passive-only auto-detection protocols:
 # PXE
 
@@ -46,6 +87,7 @@ def add_validated_fingerprint(nodename, fingerprint, role='manager'):
     When a secure validater validates a fingerprint, this function is used to
     mark that fingerprint as validated.
     """
+    pass
 
 class DiscoveredNode(object):
 
@@ -118,4 +160,6 @@ class DiscoveredNode(object):
         # If no fe80 possible *and* no existing value, error and do nothing
         # if security policy not set, this should only proceed if fingerprint is
         # validated by a secure validator.
+        pass
 
+def start_detection():
