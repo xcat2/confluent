@@ -55,11 +55,6 @@ if options.biosmode:
     bootmode = 'bios'
 else:
     bootmode = 'uefi'
-rc = session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
+sys.exit(session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
                                      bootmode=bootmode,
-                                     persistent=options.persist)
-
-if rc:
-    sys.exit(rc)
-else:
-    sys.exit(session.simple_noderange_command(noderange, '/power/state', 'boot'))
+                                     persistent=options.persist))
