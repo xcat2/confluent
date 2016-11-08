@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import optparse
+import os
+import sys
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+argparser = optparse.OptionParser()
+argparser.add_option('-b', '--bios', dest='biosmode',
+                     action='store_true', default=False,
+                     help='Request BIOS style boot (rather than UEFI)')
+argparser.add_option('-p', '--persist', dest='persist', action='store_true',
+                     default=False,
+                     help='Request the boot device be persistent rather than '
+                          'one time')
+
+(options, args) = argparser.parse_args()
+
+try:
+    noderange = args[0]
+except IndexError:
+    sys.stderr.write(
+        'Usage: {0} <noderange> [default|cd|network|setup|hd]\n'.format(
+            sys.argv[0]))
+    sys.exit(1)
+bootdev = None
+if len(sys.argv) > 2:
+    bootdev = sys.argv[2]
+    if bootdev in ('net', 'pxe'):
+        bootdev = 'network'
+session = client.Command()
+exitcode = 0
+if options.biosmode:
+    bootmode = 'bios'
+else:
+    bootmode = 'uefi'
+
+rc = session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
+                                     bootmode=bootmode,
+                                     persistent=options.persist)
+
+if rc:
+    sys.exit(rc)
+else:
+    sys.exit(session.simple_noderange_command(noderange, '/power/state', 'boot'))
