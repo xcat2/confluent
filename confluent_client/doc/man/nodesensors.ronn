@@ -30,7 +30,7 @@ interval of 1 second is used.
   otherwise indicated.
 
 ## EXAMPLES
-* Retrieving all temperature related sensors from one system
+* Retrieving all temperature related sensors from one system  
   `# nodesensors n1 temperature`  
   `n1: CPU 1 Overtemp: Ok`  
   `n1: CPU 2 Overtemp: Ok`  
@@ -38,18 +38,18 @@ interval of 1 second is used.
   `n1: PCH Overtemp: Ok`  
   `n1: LOM Temp: Ok`  
 
-* Retrieving a sensor named "Inlet Temp" for 4 systems over a 3 second period of time:
-   'nodesensors n1-n4 'Inlet Temp' -c -n 3
-   'time,node,Inlet Temp (°C)`  
-   '2016-10-04T15:09:20,n1,19.0`  
-   '2016-10-04T15:09:20,n2,18.0`  
-   '2016-10-04T15:09:20,n3,18.0`  
-   '2016-10-04T15:09:20,n4,17.0`  
-   '2016-10-04T15:09:21,n1,19.0`  
-   '2016-10-04T15:09:21,n2,18.0`  
-   '2016-10-04T15:09:21,n3,18.0`  
-   '2016-10-04T15:09:21,n4,17.0`  
-   '2016-10-04T15:09:22,n1,19.0`  
-   '2016-10-04T15:09:22,n2,18.0`  
-   '2016-10-04T15:09:22,n3,18.0`  
-   '2016-10-04T15:09:22,n4,17.0`  
+* Retrieving a sensor named "Inlet Temp" for 4 systems over a 3 second period of time:  
+   `# nodesensors n1-n4 'Inlet Temp' -c -n 3`  
+   `time,node,Inlet Temp (°C)`  
+   `2016-10-04T15:09:20,n1,19.0`  
+   `2016-10-04T15:09:20,n2,18.0`  
+   `2016-10-04T15:09:20,n3,18.0`  
+   `2016-10-04T15:09:20,n4,17.0`  
+   `2016-10-04T15:09:21,n1,19.0`  
+   `2016-10-04T15:09:21,n2,18.0`  
+   `2016-10-04T15:09:21,n3,18.0`  
+   `2016-10-04T15:09:21,n4,17.0`  
+   `2016-10-04T15:09:22,n1,19.0`  
+   `2016-10-04T15:09:22,n2,18.0`  
+   `2016-10-04T15:09:22,n3,18.0`  
+   `2016-10-04T15:09:22,n4,17.0`  

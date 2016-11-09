@@ -290,6 +290,7 @@ def _authorize_request(env, operation):
         cookie['confluentsessionid'] = sessid
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
+        cookie['confluentsessionid']['path'] = '/'
     skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
@@ -306,8 +307,8 @@ def _authorize_request(env, operation):
             auditmsg['tenant'] = authdata[3]
             authinfo['tenant'] = authdata[3]
         auditmsg['user'] = authdata[2]
-        if sessionid is not None:
-            authinfo['sessionid'] = sessionid
+        if sessid is not None:
+            authinfo['sessionid'] = sessid
         if not skiplog:
             auditlog.log(auditmsg)
         if 'csrftoken' in httpsessions[sessid]:
