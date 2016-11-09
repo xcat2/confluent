@@ -16,6 +16,18 @@
 
 # Documented somewhat at
 # http://buildingskb.schneider-electric.com/view.php?AID=15197
+
+# Here is the payload of an SSDP 'announce', sent to the multicast v4/v6 1900
+# NOTIFY * HTTP/1.1
+# HOST: 239.255.255.250:1900
+# CACHE-CONTROL: max-age=1800
+# AL: https://172.30.254.151:8080/redfish/v1
+# SERVER: Linux/3.14.28-ltsi Redfish/1.0
+# NT: urn:dmtf-org:service:redfish-rest:1
+# USN: uuid:00000000-0000-0000-0005-000000000001::urn:dmtf-org:service:redfish-rest:1
+# NTS: ssdp:alive
+
+
 import confluent.util as util
 import select
 import socket
