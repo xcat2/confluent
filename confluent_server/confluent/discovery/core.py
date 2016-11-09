@@ -81,6 +81,10 @@
 # * Management TLS fingerprint if validated (by switch publication or enclosure)
 # * System TLS fingerprint if validated (by switch publication or system manager)
 
+_slp_services = set([
+    'service:management-hardware.IBM:integrated-management-module2',
+
+])
 def add_validated_fingerprint(nodename, fingerprint, role='manager'):
     """Add a physically validated certificate fingerprint
 
@@ -161,5 +165,7 @@ class DiscoveredNode(object):
         # if security policy not set, this should only proceed if fingerprint is
         # validated by a secure validator.
         pass
+
+def detect_endpoint(mac, peers, services):
 
 def start_detection():

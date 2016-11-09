@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import netifaces
 import os
 import random
 import select
 import socket
 import struct
 import subprocess
+import confluent.util as util
 
 
 # SLP has a lot of ambition that was unfulfilled in practice.
@@ -66,15 +66,6 @@ def _refresh_neigh():
     if os.times()[4] > (neightime + 30):
         update_neigh()
 
-
-def _list_ips():
-    # Used for getting addresses to indicate the multicast address
-    # as well as getting all the broadcast addresses
-    for iface in netifaces.interfaces():
-        addrs = netifaces.ifaddresses(iface)
-        if netifaces.AF_INET in addrs:
-            for addr in addrs[netifaces.AF_INET]:
-                yield addr
 
 
 def _parse_slp_header(packet):
@@ -152,22 +143,6 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
         parsed['addresses'] = [peer]
     if parsed['function'] == 2:  # A service reply
         _parse_SrvRply(parsed)
-
-
-def list_interface_indexes():
-    # Getting the interface indexes in a portable manner
-    # would be better, but there's difficulty from a python perspective.
-    # For now be linux specific
-    try:
-        for iface in os.listdir('/sys/class/net/'):
-            ifile = open('/sys/class/net/{0}/ifindex'.format(iface), 'r')
-            intidx = int(ifile.read())
-            ifile.close()
-            yield intidx
-    except (IOError, WindowsError):
-        # Probably situation is non-Linux, just do limited support for
-        # such platforms until other people come alonge
-        return
 
 
 def _v6mcasthash(srvtype):
@@ -249,7 +224,7 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
         # local that do not work with link local
         v6addrs.append(('ff01::1:' + v6hash, 427, 0, 0))
         v6addrs.append(('ff02::1:' + v6hash, 427, 0, 0))
-        for idx in list_interface_indexes():
+        for idx in util.list_interface_indexes():
             # IPv6 multicast is by index, so lead with that
             net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, idx)
             for sa in v6addrs:
@@ -260,7 +235,7 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
                     # this can cause an error, skip such an interface
                     # case in point, 'lo'
                     pass
-        for i4 in _list_ips():
+        for i4 in util.list_ips():
             if 'broadcast' not in i4:
                 continue
             addr = i4['addr']
@@ -424,6 +399,8 @@ def snoop_slp(handler):
     slpmcast = socket.inet_pton(socket.AF_INET, '239.255.255.253') + \
                struct.pack('=I', socket.INADDR_ANY)
     net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, slpmcast)
+    net.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net.bind(('', 427))
     net4.bind(('', 427))
     peerbymacaddress = {}
