@@ -25,6 +25,14 @@
 import eventlet.green.socket as socket
 import struct
 
+pxearchs = {
+    '\x00\x00': 'bios-x86',
+    '\x00\x07': 'uefi-x64',
+    '\x00\x09': 'uefi-x64',
+    '\x00\x0b': 'uefi-aarch64',
+}
+
+
 def decode_uuid(rawguid):
     lebytes = struct.unpack_from('<IHH', buffer(rawguid[:8]))
     bebytes = struct.unpack_from('>HHI', buffer(rawguid[8:]))
@@ -32,28 +40,36 @@ def decode_uuid(rawguid):
         lebytes[0], lebytes[1], lebytes[2], bebytes[0], bebytes[1], bebytes[2])
 
 
-def find_uuid_in_options(rq, optidx):
+def find_info_in_options(rq, optidx):
     uuid = None
+    arch = None
     try:
-        while uuid is None:
+        while uuid is None or arch is None:
             if rq[optidx] == 53:  # DHCP message type
                 # we want only length 1 and only discover (type 2)
                 if rq[optidx + 1] != 1 or rq[optidx + 2] != 1:
-                    return None
+                    return uuid, arch
                 optidx += 3
             elif rq[optidx] == 97:
-                if rq[optidx + 1] == 17:
+                if rq[optidx + 1] != 17:
                     # 16 bytes of uuid and one reserved byte
-                    if rq[optidx + 2] != 0:  # the reserved byte should be zero,
-                        # anything else would be a new spec that we don't know yet
-                        return None
-                    return decode_uuid(rq[optidx + 3:optidx + 19])
-                return None
+                    return uuid, arch
+                if rq[optidx + 2] != 0:  # the reserved byte should be zero,
+                    # anything else would be a new spec that we don't know yet
+                    return uuid, arch
+                uuid = decode_uuid(rq[optidx + 3:optidx + 19])
+                optidx += 19
+            elif rq[optidx] == 93:
+                if rq[optidx + 1] != 2:
+                    return uuid, arch
+                archraw = bytes(rq[optidx + 2:optidx + 4])
+                if archraw in pxearchs:
+                    arch = pxearchs[archraw]
             else:
                 optidx += rq[optidx + 1] + 2
     except IndexError:
-        return None
-
+        return uuid, arch
+    return uuid, arch
 
 def snoop(handler):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
@@ -82,15 +98,16 @@ def snoop(handler):
                 optidx = rq.index('\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
-            uuid = find_uuid_in_options(rq, optidx)
+            uuid, arch = find_info_in_options(rq, optidx)
             if uuid is None:
                 continue
-            handler(netaddr, uuid)
+            handler(netaddr, uuid, arch)
 
 if __name__ == '__main__':
-    def testsnoop(addr, uuid):
+    def testsnoop(addr, uuid, arch):
         print(addr)
         print(uuid)
+        print(arch)
     snoop(testsnoop)
 
 
