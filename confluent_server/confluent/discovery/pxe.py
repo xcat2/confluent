@@ -20,5 +20,77 @@
 # Goal is to detect and act on a DHCPDISCOVER, without actually having to do
 # any offer
 
-# option 97 = UUID (looks like the horrible 'wire format' that pyghmi reorders)
+# option 97 = UUID (wireformat)
+
+import eventlet.green.socket as socket
+import struct
+
+def decode_uuid(rawguid):
+    lebytes = struct.unpack_from('<IHH', buffer(rawguid[:8]))
+    bebytes = struct.unpack_from('>HHI', buffer(rawguid[8:]))
+    return '{0:08X}-{1:04X}-{2:04X}-{3:04X}-{4:04X}{5:08X}'.format(
+        lebytes[0], lebytes[1], lebytes[2], bebytes[0], bebytes[1], bebytes[2])
+
+
+def find_uuid_in_options(rq, optidx):
+    uuid = None
+    try:
+        while uuid is None:
+            if rq[optidx] == 53:  # DHCP message type
+                # we want only length 1 and only discover (type 2)
+                if rq[optidx + 1] != 1 or rq[optidx + 2] != 1:
+                    return None
+                optidx += 3
+            elif rq[optidx] == 97:
+                if rq[optidx + 1] == 17:
+                    # 16 bytes of uuid and one reserved byte
+                    if rq[optidx + 2] != 0:  # the reserved byte should be zero,
+                        # anything else would be a new spec that we don't know yet
+                        return None
+                    return decode_uuid(rq[optidx + 3:optidx + 19])
+                return None
+            else:
+                optidx += rq[optidx + 1] + 2
+    except IndexError:
+        return None
+
+
+def snoop(handler):
+    #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
+    #prominent
+    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.bind(('', 67))
+    while True:
+        # Just need some delay, picked a prime number so that overlap with other
+        # timers might be reduced, though it really is probably nothing
+        (rq, peer) = net4.recvfrom(9000)
+        # if we have a small packet, just skip, it can't possible hold enough
+        # data and avoids some downstream IndexErrors that would be messy
+        # with try/except
+        if len(rq) < 64:
+            continue
+        rq = bytearray(rq)
+        if rq[0] == 1:  # Boot request
+            addrlen = rq[2]
+            if addrlen > 16:  # max address size in bootp is 16 bytes
+                continue
+            netaddr = rq[28:28+addrlen]
+            netaddr = ':'.join(['{0:02x}'.format(x) for x in netaddr])
+            optidx = 0
+            try:
+                optidx = rq.index('\x63\x82\x53\x63') + 4
+            except ValueError:
+                continue
+            uuid = find_uuid_in_options(rq, optidx)
+            if uuid is None:
+                continue
+            handler(netaddr, uuid)
+
+if __name__ == '__main__':
+    def testsnoop(addr, uuid):
+        print(addr)
+        print(uuid)
+    snoop(testsnoop)
+
 

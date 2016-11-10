@@ -376,7 +376,7 @@ def query_srvtypes(target):
         return stypes.split(',')
 
 
-def snoop_slp(handler):
+def snoop(handler):
     """Watch for SLP activity
 
     handler will be called with mac address, a list of sockaddrs, and
