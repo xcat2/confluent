@@ -16,8 +16,8 @@
 
 import os
 import random
-import select
-import socket
+import eventlet.green.select as select
+import eventlet.green.socket as socket
 import struct
 import subprocess
 import confluent.util as util
@@ -390,7 +390,7 @@ def snoop(handler):
     net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
     slpg2 = socket.inet_pton(socket.AF_INET6, 'ff02::123')
-    for i6idx in list_interface_indexes():
+    for i6idx in util.list_interface_indexes():
         mreq = slpg + struct.pack('=I', i6idx)
         net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
         mreq = slpg2 + struct.pack('=I', i6idx)

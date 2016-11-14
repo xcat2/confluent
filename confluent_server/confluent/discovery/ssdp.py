@@ -29,12 +29,15 @@
 
 
 import confluent.util as util
-import select
-import socket
+import eventlet.green.select as select
+import eventlet.green.socket as socket
+import struct
 
 mcastv4addr = '239.255.255.250'
 mcastv6addr = 'ff02::c'
-
+ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
+             struct.pack('=I', socket.INADDR_ANY)
+ssdp6mcast = socket.inet_pton(socket.AF_INET6, mcastv6addr)
 smsg = ('M-SEARCH * HTTP/1.1\r\n'
         'HOST: {0}:1900\r\n'
         'MAN: "ssdp:discover"\r\n'
@@ -45,6 +48,45 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
 def find_targets(services, target=None):
     for service in services:
         _find_service(service, target)
+
+
+def snoop(handler, byehandler=None):
+    """Watch for SSDP notify messages
+
+    The handler shall be called on any service coming online.
+    byehandler is called whenever a system advertises that it is departing.
+    If no byehandler is specified, byebye messages are ignored.  The handler is
+    given (as possible), the mac address, a list of viable sockaddrs to reference
+    the peer, and the notification type (e.g.
+    'urn:dmtf-org:service:redfish-rest:1'
+
+    :param handler:  A handler for online notifications from network
+    :param byehandler: Optional handler for devices going off the network
+    """
+    # Normally, I like using v6/v4 agnostic socket. However, since we are
+    # dabbling in multicast wizardry here, such sockets can cause big problems,
+    # so we will have two distinct sockets
+    net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    for ifidx in util.list_interface_indexes():
+        v6grp = ssdp6mcast + struct.pack('=I', ifidx)
+        net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
+    net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, ssdp4mcast)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.bind(('', 1900))
+    net6.bind(('', 1900))
+    while True:
+        r, _, _ = select.select((net4, net6), (), (), 60)
+        while r:
+            for s in r:
+                (rsp, peer) = s.recvfrom(9000)
+                ip = peer[0].partition('%')[0]
+                rsp = rsp.split('\r\n')
+                print(repr(ip))
+                print(repr(rsp))
+            r, _, _ = select.select((net4, net6), (), (), 0.1)
 
 
 def _find_service(service, target):
@@ -89,6 +131,10 @@ def _find_service(service, target):
                 print(repr(peer))
             r, _, _ = select.select((net4, net6), (), (), 1)
 
-
 if __name__ == '__main__':
-    find_targets(['urn:dmtf-org:service:redfish-rest:1'])
+#    find_targets(['urn:dmtf-org:service:redfish-rest:1'])
+     def fun(a, b, c):
+          print(repr(a))
+          print(repr(b))
+          print(repr(c))
+     snoop(fun)
