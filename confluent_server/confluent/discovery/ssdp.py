@@ -28,6 +28,7 @@
 # NTS: ssdp:alive
 
 
+import confluent.neighutil as neighutil
 import confluent.util as util
 import eventlet.green.select as select
 import eventlet.green.socket as socket
@@ -66,6 +67,7 @@ def snoop(handler, byehandler=None):
     # Normally, I like using v6/v4 agnostic socket. However, since we are
     # dabbling in multicast wizardry here, such sockets can cause big problems,
     # so we will have two distinct sockets
+    known_peers = set([])
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     for ifidx in util.list_interface_indexes():
@@ -77,16 +79,52 @@ def snoop(handler, byehandler=None):
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.bind(('', 1900))
     net6.bind(('', 1900))
+    peerbymacaddress = {}
     while True:
+        newmacs = set([])
+        machandlers = {}
         r, _, _ = select.select((net4, net6), (), (), 60)
+        neighutil.update_neigh()
         while r:
             for s in r:
                 (rsp, peer) = s.recvfrom(9000)
-                ip = peer[0].partition('%')[0]
                 rsp = rsp.split('\r\n')
-                print(repr(ip))
-                print(repr(rsp))
+                method, _, _ = rsp[0].split(' ', 2)
+                if method == 'NOTIFY':
+                    ip = peer[0].partition('%')[0]
+                    if ip not in neighutil.neightable:
+                        continue
+                    if peer in known_peers:
+                        continue
+                    mac = neighutil.neightable[ip]
+                    known_peers.add(peer)
+                    newmacs.add(mac)
+                    if mac in peerbymacaddress:
+                        peerbymacaddress[mac]['peers'].append(peer)
+                    else:
+                        peerbymacaddress[mac] = {
+                            'hwaddr': mac,
+                            'peers': [peer],
+                        }
+                        peerdata = peerbymacaddress[mac]
+                        for headline in rsp[1:]:
+                            if not headline:
+                                continue
+                            header, _, value = headline.partition(':')
+                            header = header.strip()
+                            value = value.strip()
+                            if header == 'NT':
+                                peerdata['service'] = value
+                            elif header == 'NTS':
+                                if value == 'ssdp:byebye':
+                                    machandlers[mac] = byehandler
+                                elif value == 'ssdp:alive':
+                                    machandlers[mac] = handler
             r, _, _ = select.select((net4, net6), (), (), 0.1)
+        for mac in newmacs:
+            thehandler = machandlers[mac]
+            if thehandler:
+                thehandler(peerbymacaddress[mac])
 
 
 def _find_service(service, target):
@@ -127,14 +165,28 @@ def _find_service(service, target):
         while r:
             for s in r:
                 (rsp, peer) = s.recvfrom(9000)
-                print(repr(rsp))
-                print(repr(peer))
+                headlines = rsp.split('\r\n')
+                _, code, _ = headlines[0].split(' ', 2)
+                if code == '200':
+                    peerdata = {
+                        'peers': [peer],
+                    }
+                    for headline in headlines[1:]:
+                        if not headline:
+                            continue
+                        header, _, value = headline.partition(':')
+                        header = header.strip()
+                        value = value.strip()
+                        if header == 'AL' or header == 'LOCATION':
+                            peerdata['url'] = value
+                    print(repr(peerdata))
             r, _, _ = select.select((net4, net6), (), (), 1)
 
 if __name__ == '__main__':
-#    find_targets(['urn:dmtf-org:service:redfish-rest:1'])
-     def fun(a, b, c):
-          print(repr(a))
-          print(repr(b))
-          print(repr(c))
-     snoop(fun)
+
+    find_targets(['urn:dmtf-org:service:redfish-rest:1'])
+    def fun(a):
+        print(repr(a))
+    def byefun(a):
+        print('bye' + repr(a))
+    snoop(fun, byefun)

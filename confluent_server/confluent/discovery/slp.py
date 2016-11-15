@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import confluent.neighutil as neighutil
+import confluent.util as util
 import os
 import random
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import struct
 import subprocess
-import confluent.util as util
 
 
 # SLP has a lot of ambition that was unfulfilled in practice.
@@ -30,42 +31,6 @@ srvreqfooter = b'\x00\x07DEFAULT\x00\x00\x00\x00'
 # An empty instance of the attribute list extension
 # which is defined in RFC 3059, used to indicate support for that capability
 attrlistext = b'\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00'
-
-
-neightable = {}
-mactable = {}
-neightime = 0
-
-
-def update_neigh():
-    global neightable
-    neightable = {}
-    mactable = {}
-    if os.name == 'nt':
-        return
-    ipn = subprocess.Popen(['ip', 'neigh'], stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-    (neighdata, err) = ipn.communicate()
-    for entry in neighdata.split('\n'):
-        entry = entry.split(' ')
-        if len(entry) < 5 or not entry[4]:
-            continue
-        neightable[entry[0]] = entry[4]
-        if entry[4] in mactable:
-            mactable[entry[4]].append(entry[0])
-        else:
-            mactable[entry[4]] = [entry[0]]
-    neightime = os.times()[4]
-
-
-def _refresh_neigh():
-    global neightime
-    if os.name == 'nt':
-        return
-    if os.times()[4] > (neightime + 30):
-        update_neigh()
-
 
 
 def _parse_slp_header(packet):
@@ -122,8 +87,8 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
     if '%' in addr:
         addr = addr[:addr.index('%')]
     mac = None
-    if addr in neightable:
-        identifier = neightable[addr]
+    if addr in neighutil.neightable:
+        identifier = neighutil.neightable[addr]
         mac = identifier
     else:
         identifier = addr
@@ -251,7 +216,7 @@ def _grab_rsps(socks, rsps, interval, xidmap):
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
-            _refresh_neigh()
+            neighutil.refresh_neigh()
             _parse_slp_packet(rsp, peer, rsps, xidmap)
             r, _, _ = select.select(socks, (), (), interval)
 
@@ -379,8 +344,7 @@ def query_srvtypes(target):
 def snoop(handler):
     """Watch for SLP activity
 
-    handler will be called with mac address, a list of sockaddrs, and
-     a list of relevant service types as the three arguments
+    handler will be called with a dictionary of relevant attributes
 
     :param handler:
     :return:
@@ -407,20 +371,18 @@ def snoop(handler):
     while True:
         newmacs = set([])
         r, _, _ = select.select((net, net4), (), (), 60)
-        update_neigh()
+        neighutil.update_neigh()
         while r:
             for s in r:
                 (rsp, peer) = s.recvfrom(9000)
                 ip = peer[0].partition('%')[0]
-                if ip not in neightable:
+                if ip not in neighutil.neightable:
                     continue
                 if peer in known_peers:
                     continue
                 known_peers.add(peer)
-                mac = neightable[ip]
-
+                mac = neighutil.neightable[ip]
                 if mac in peerbymacaddress:
-                    newmacs.add(mac)
                     peerbymacaddress[mac]['peers'].append(peer)
                 else:
                     q = query_srvtypes(peer)
@@ -429,15 +391,19 @@ def snoop(handler):
                         # ignore for now
                         known_peers.discard(peer)
                         continue
-                    newmacs.add(mac)
                     peerbymacaddress[mac] = {
                         'services': q,
                         'peers': [peer],
                     }
+                newmacs.add(mac)
             r, _, _ = select.select((net, net4), (), (), 0.1)
         for mac in newmacs:
-            handler(mac, peerbymacaddress[mac]['peers'],
-                    peerbymacaddress[mac]['services'])
+            peerinfo = {
+                'hwaddr': mac,
+                'peers': peerbymacaddress[mac]['peers'],
+                'services': peerbymacaddress[mac]['services'],
+            }
+            handler(peerinfo)
 
 
 def find_targets(srvtypes, addresses=None):

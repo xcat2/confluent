@@ -74,6 +74,8 @@ def find_info_in_options(rq, optidx):
 def snoop(handler):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
+    #TODO(jjohnson2): IP_PKTINFO, recvmsg to get the destination ip, per
+    #proxydhcp.c from xCAT
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.bind(('', 67))
