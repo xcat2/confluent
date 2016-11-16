@@ -406,7 +406,7 @@ def snoop(handler):
             handler(peerinfo)
 
 
-def find_targets(srvtypes, addresses=None):
+def scan(srvtypes, addresses=None):
     """Find targets providing matching requested srvtypes
 
     This is a generator that will iterate over respondants to the SrvType
@@ -450,12 +450,13 @@ def find_targets(srvtypes, addresses=None):
         del rsps[id]['payload']
         del rsps[id]['function']
         del rsps[id]['xid']
-        print(repr(rsps[id]))
+        yield rsps[id]
 
 
 if __name__ == '__main__':
-    find_targets(
-        ["service:management-hardware.IBM:integrated-management-module2"])
+    for rsp in scan(
+            ["service:management-hardware.IBM:integrated-management-module2"]):
+        print(repr(rsp))
     def testsnoop(a):
         print(repr(a))
     snoop(testsnoop)

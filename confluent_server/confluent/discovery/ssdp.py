@@ -46,7 +46,7 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
         'MX: 3\r\n\r\n')
 
 
-def find_targets(services, target=None):
+def scan(services, target=None):
     for service in services:
         for rply in _find_service(service, target):
             yield rply
@@ -220,7 +220,7 @@ def _parse_ssdp(peer, rsp, peerdata):
 
 if __name__ == '__main__':
 
-    for rsp in find_targets(['urn:dmtf-org:service:redfish-rest:1']):
+    for rsp in scan(['urn:dmtf-org:service:redfish-rest:1']):
         print(repr(rsp))
     def fun(a):
         print(repr(a))

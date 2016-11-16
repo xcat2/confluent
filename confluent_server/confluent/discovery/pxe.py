@@ -103,13 +103,11 @@ def snoop(handler):
             uuid, arch = find_info_in_options(rq, optidx)
             if uuid is None:
                 continue
-            handler(netaddr, uuid, arch)
+            handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch})
 
 if __name__ == '__main__':
-    def testsnoop(addr, uuid, arch):
-        print(addr)
-        print(uuid)
-        print(arch)
+    def testsnoop(info):
+        print(repr(info))
     snoop(testsnoop)
 
 
