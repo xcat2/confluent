@@ -48,7 +48,8 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
 
 def find_targets(services, target=None):
     for service in services:
-        _find_service(service, target)
+        for rply in _find_service(service, target):
+            yield rply
 
 
 def snoop(handler, byehandler=None):
@@ -161,30 +162,66 @@ def _find_service(service, target):
             net4.sendto(smsg.format(mcastv4addr, service),
                         (mcastv4addr, 1900))
             net4.sendto(smsg.format(bcast, service), (bcast, 1900))
-        r, _, _ = select.select((net4, net6), (), (), 1)
-        while r:
-            for s in r:
-                (rsp, peer) = s.recvfrom(9000)
-                headlines = rsp.split('\r\n')
-                _, code, _ = headlines[0].split(' ', 2)
-                if code == '200':
-                    peerdata = {
-                        'peers': [peer],
-                    }
-                    for headline in headlines[1:]:
-                        if not headline:
-                            continue
-                        header, _, value = headline.partition(':')
-                        header = header.strip()
-                        value = value.strip()
-                        if header == 'AL' or header == 'LOCATION':
-                            peerdata['url'] = value
-                    print(repr(peerdata))
-            r, _, _ = select.select((net4, net6), (), (), 1)
+    # SSDP by spec encourages responses to spread out over a 3 second interval
+    # hence we must be a bit more patient
+    r, _, _ = select.select((net4, net6), (), (), 4)
+    peerdata = {}
+    while r:
+        for s in r:
+            (rsp, peer) = s.recvfrom(9000)
+            neighutil.refresh_neigh()
+            _parse_ssdp(peer, rsp, peerdata)
+        r, _, _ = select.select((net4, net6), (), (), 4)
+    for nid in peerdata:
+        yield peerdata[nid]
+
+
+def _parse_ssdp(peer, rsp, peerdata):
+    ip = peer[0].partition('%')[0]
+    nid = ip
+    mac = None
+    if ip in neighutil.neightable:
+        nid = neighutil.neightable[ip]
+        mac = nid
+    headlines = rsp.split('\r\n')
+    try:
+        _, code, _ = headlines[0].split(' ', 2)
+    except ValueError:
+        return
+    myurl = None
+    if code == '200':
+        if nid in peerdata:
+            peerdatum = peerdata[nid]
+        else:
+            peerdatum = {
+                'peers': [peer],
+                'hwaddr': mac,
+            }
+            peerdata[nid] = peerdatum
+        for headline in headlines[1:]:
+            if not headline:
+                continue
+            header, _, value = headline.partition(':')
+            header = header.strip()
+            value = value.strip()
+            if header == 'AL' or header == 'LOCATION':
+                myurl = value
+                if 'urls' not in peerdatum:
+                    peerdatum['urls'] = [value]
+                elif value not in peerdatum['urls']:
+                    peerdatum['urls'].append(value)
+            elif header == 'ST':
+                if 'services' not in peerdatum:
+                    peerdatum['services'] = [value]
+                elif value not in peerdatum['services']:
+                    peerdatum['services'].append(value)
+
+
 
 if __name__ == '__main__':
 
-    find_targets(['urn:dmtf-org:service:redfish-rest:1'])
+    for rsp in find_targets(['urn:dmtf-org:service:redfish-rest:1']):
+        print(repr(rsp))
     def fun(a):
         print(repr(a))
     def byefun(a):
