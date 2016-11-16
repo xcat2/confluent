@@ -456,3 +456,6 @@ def find_targets(srvtypes, addresses=None):
 if __name__ == '__main__':
     find_targets(
         ["service:management-hardware.IBM:integrated-management-module2"])
+    def testsnoop(a):
+        print(repr(a))
+    snoop(testsnoop)
