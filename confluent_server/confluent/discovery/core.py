@@ -57,6 +57,11 @@
 #       retry until uppercase, lowercase, digit, and symbol all present)
 #     - Apply defined configuration to endpoint
 
+import confluent.discovery.pxe as pxe
+import confluent.discovery.ssdp as ssdp
+import confluent.discovery.slp as slp
+import eventlet
+
 # Passive-only auto-detection protocols:
 # PXE
 
@@ -65,8 +70,10 @@
 # mDNS
 # SSD
 
-# Also there are location provider concept.
-# *
+# Also there are location providers
+# Switch
+# chassis
+# chassis may in turn describe more chassis
 
 # We normalize discovered node data to the following pieces of information:
 # * Detected node name (if available, from switch discovery or similar or
@@ -118,7 +125,7 @@ class DiscoveredNode(object):
         """
         self.uuid = uuid
         self.serial = serial
-        self.netinfo = netinfo
+        #self.netinfo = netinfo
         self.fingerprints = {}
         self.model = model
         self.modelnumber = modelnumber
@@ -166,5 +173,18 @@ class DiscoveredNode(object):
         pass
 
 def detect_endpoint(mac, peers, services):
+    pass
+
+def ondisco(info):
+    print(repr(info))
+
 
 def start_detection():
+    eventlet.spawn_n(slp.snoop, ondisco)
+    eventlet.spawn_n(ssdp.snoop, ondisco)
+    eventlet.spawn_n(pxe.snoop, ondisco)
+
+if __name__ == '__main__':
+    start_detection()
+    while True:
+        eventlet.sleep(30)
