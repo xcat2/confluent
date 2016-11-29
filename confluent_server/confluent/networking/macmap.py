@@ -120,7 +120,11 @@ def _map_switch_backend(args):
     #   fallback if ifName is empty
     #
     global _macmap
-    switch, password, user = args
+    if len(args) == 3:
+        switch, password, user = args
+    else:
+        switch, password = args
+        user = None
     haveqbridge = False
     mactobridge = {}
     conn = snmp.Session(switch, password, user)
