@@ -194,6 +194,8 @@ class ConsoleHandler(object):
             self._console = plugin.handle_path(
                 self._plugin_path.format(self.node),
                 "create", self.cfgmgr)
+        except exc.NotImplementedException:
+            self._console = None
         except:
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
@@ -255,11 +257,12 @@ class ConsoleHandler(object):
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
-        self.connectstate = 'unconnected'
-        self.log(
-            logdata='console disconnected', ltype=log.DataTypes.event,
-            event=log.Events.consoledisconnect)
-        self._send_rcpts({'connectstate': self.connectstate})
+        if self.connectstate != 'unconnected':
+            self.connectstate = 'unconnected'
+            self.log(
+                logdata='console disconnected', ltype=log.DataTypes.event,
+                event=log.Events.consoledisconnect)
+            self._send_rcpts({'connectstate': self.connectstate})
         if self._isalive:
             self._connect()
 

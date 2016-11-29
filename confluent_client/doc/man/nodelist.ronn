@@ -1,0 +1,48 @@
+nodelist(1) -- List confluent nodes and their attributes
+=========================================================
+
+## SYNOPSIS
+
+`nodelist` `noderange`  
+`nodelist` `noderange` [-b] [<nodeattribute>...]  
+
+## DESCRIPTION
+
+**nodelist** queries the confluent server to get information about nodes.  In
+the simplest form, it simply takes the given noderange(5) and lists the
+matching nodes, one line at a time.
+
+If a list of node attribute names are given, the value of those are also
+displayed.  If `-b` is specified, it will also display information on
+how inherited and expression based attributes are defined.  There is more
+information on node attributes in nodeattributes(5) man page.
+
+## OPTIONS
+
+* `-b`, `--blame`:
+  Annotate inherited and expression based attributes to show their base value.
+
+## EXAMPLES
+* Listing matching nodes of a simple noderange:
+  `# nodelist n1-n4`  
+  `n1`  
+  `n2`  
+  `n3`  
+  `n4`  
+
+* Getting an attribute of nodes matching a noderange:
+  `# nodelist n1,n2 hardwaremanagement.manager`  
+  `n1: hardwaremanagement.manager: 172.30.3.1`  
+  `n2: hardwaremanagement.manager: 172.30.3.2`  
+
+* Getting a group of attributes while determining what group defines them:
+  `# nodelist n1,n2 hardwaremanegement --blame`  
+  `n1: hardwaremanagement.manager: 172.30.3.1`  
+  `n1: hardwaremanagement.method: ipmi (inherited from group everything)`  
+  `n1: hardwaremanagement.switch: r8e1`  
+  `n1: hardwaremanagement.switchport: 14`  
+  `n2: hardwaremanagement.manager: 172.30.3.2`  
+  `n2: hardwaremanagement.method: ipmi (inherited from group everything)`  
+  `n2: hardwaremanagement.switch: r8e1`  
+  `n2: hardwaremanagement.switchport: 2`  
+

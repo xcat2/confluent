@@ -110,9 +110,12 @@ class AsyncSession(object):
         del _asyncsessions[self.asyncid]
 
     def run_handler(self, handler, requestid):
-        for rsp in handler:
-            self.add(requestid, rsp)
-        self.add(requestid, messages.AsyncCompletion())
+        try:
+            for rsp in handler:
+                self.add(requestid, rsp)
+            self.add(requestid, messages.AsyncCompletion())
+        except Exception as e:
+            self.add(requestid, e)
 
     def get_responses(self, timeout=25):
         self.reaper.cancel()

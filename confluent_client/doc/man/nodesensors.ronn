@@ -1,0 +1,55 @@
+nodesensors(1) --- Retrieve telemetry for sensors of confluent nodes
+====================================================================
+
+## SYNOPSIS
+
+`nodesensors` `noderange` [-c] [-i <interval>] [-n <samplecount>]  [<sensor name  or category>...]  
+
+
+## DESCRIPTION
+
+**nodesensors** queries the confluent server to get telemetry from nodes.  Telemetry can include
+data such as temperature, power, and so forth.  Without arguments, it lists all available sensors
+and their current values.  If `-c` is specified, CSV format is used for output.  Normally
+nodesensors outputs once and exits.  Repeated periodic gathering can be done with `-i` to specify
+interval and `-n` to specify number of requests.  If `-i` is specified without `-n`, then it will
+retrieve data at the requested interval indefinitely.  If '-n' is specified without `-i`, an
+interval of 1 second is used.
+
+## OPTIONS
+
+* `-c`, `--csv`:
+  Organize output into CSV format, one sensor per column.
+
+* `-i`, `--interval`=**SECONDS**:
+  Repeat data gathering waiting, waiting the specified time between samples.  Unless `-n` is
+  specified, indefinite retrieval is assumed.
+
+* `-n`, `--numreadings`=**SAMPLES**:
+  Perform the specified number of readings, waiting `-i` indicated interval or 1 second if not
+  otherwise indicated.
+
+## EXAMPLES
+* Retrieving all temperature related sensors from one system  
+  `# nodesensors n1 temperature`  
+  `n1: CPU 1 Overtemp: Ok`  
+  `n1: CPU 2 Overtemp: Ok`  
+  `n1: Inlet Temp: 16.0 °C`  
+  `n1: PCH Overtemp: Ok`  
+  `n1: LOM Temp: Ok`  
+
+* Retrieving a sensor named "Inlet Temp" for 4 systems over a 3 second period of time:  
+   `# nodesensors n1-n4 'Inlet Temp' -c -n 3`  
+   `time,node,Inlet Temp (°C)`  
+   `2016-10-04T15:09:20,n1,19.0`  
+   `2016-10-04T15:09:20,n2,18.0`  
+   `2016-10-04T15:09:20,n3,18.0`  
+   `2016-10-04T15:09:20,n4,17.0`  
+   `2016-10-04T15:09:21,n1,19.0`  
+   `2016-10-04T15:09:21,n2,18.0`  
+   `2016-10-04T15:09:21,n3,18.0`  
+   `2016-10-04T15:09:21,n4,17.0`  
+   `2016-10-04T15:09:22,n1,19.0`  
+   `2016-10-04T15:09:22,n2,18.0`  
+   `2016-10-04T15:09:22,n3,18.0`  
+   `2016-10-04T15:09:22,n4,17.0`  

@@ -59,6 +59,7 @@ def _htmlify_structure(indict):
 
 
 class ConfluentMessage(object):
+    apicode = 200
     readonly = False
     defaultvalue = ''
     defaulttype = 'text'
@@ -174,12 +175,15 @@ class ConfluentMessage(object):
 
 
 class ConfluentNodeError(object):
+    apicode = 500
+
     def __init__(self, node, errorstr):
         self.node = node
         self.error = errorstr
 
     def raw(self):
-        return {'databynode': {self.node: {'error': self.error}}}
+        return {'databynode': {self.node: {'errorcode': self.apicode,
+                                           'error': self.error}}}
 
     def html(self):
         return self.node + ":" + self.error
@@ -191,15 +195,20 @@ class ConfluentNodeError(object):
 
 
 class ConfluentTargetTimeout(ConfluentNodeError):
+    apicode = 504
+
     def __init__(self, node, errstr='timeout'):
         self.node = node
         self.error = errstr
+
 
     def strip_node(self, node):
         raise exc.TargetEndpointUnreachable(self.error)
 
 
 class ConfluentTargetNotFound(ConfluentNodeError):
+    apicode = 404
+
     def __init__(self, node, errorstr='not found'):
         self.node = node
         self.error = errorstr
@@ -209,6 +218,7 @@ class ConfluentTargetNotFound(ConfluentNodeError):
 
 
 class ConfluentTargetInvalidCredentials(ConfluentNodeError):
+    apicode = 502
     def __init__(self, node):
         self.node = node
         self.error = 'bad credentials'
@@ -870,6 +880,11 @@ class AsyncMessage(ConfluentMessage):
         if (isinstance(rsp, ConfluentMessage) or
                 isinstance(rsp, ConfluentNodeError)):
             rspdict = rsp.raw()
+        elif isinstance(rsp, exc.ConfluentException):
+            rspdict = {'exceptioncode': rsp.apierrorcode,
+                       'exception': rsp.get_error_body()}
+        elif isinstance(rsp, Exception):
+            rspdict = {'exceptioncode': 500, 'exception': str(rsp)}
         elif isinstance(rsp, dict):  # console metadata
             rspdict = rsp
         else: # terminal text

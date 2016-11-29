@@ -219,6 +219,7 @@ class IpmiConsole(conapi.Console):
                 self.broken = True
                 self.error = data['error']
                 if self.connected:
+                    self.connected = False
                     self.datacallback(conapi.ConsoleEvent.Disconnect)
         else:
             self.datacallback(data)
@@ -344,6 +345,7 @@ class IpmiHandler(object):
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
+        self.ipmicmd.setup_confluent_keyhandler()
 
     bootdevices = {
         'optical': 'cd'
@@ -355,7 +357,6 @@ class IpmiHandler(object):
             self.error = response['error']
         else:
             self.loggedin = True
-            ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):

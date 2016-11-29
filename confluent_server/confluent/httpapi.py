@@ -214,6 +214,33 @@ def _should_skip_authlog(env):
         return True
     return False
 
+def _csrf_valid(env, session):
+    # This could be simplified into a statement, but this is more readable
+    # to have it broken out
+    if (env['REQUEST_METHOD'] == 'GET' and
+            env['PATH_INFO'] == '/sessions/current/info'):
+        # Provide a web client a safe hook to request the CSRF token
+        # This means that we consider GET of /sessions/current/info to be
+        # a safe thing to inflict via CSRF, since CORS should prevent
+        # hypothetical attacker from reading the data and it has no
+        # side effects to speak of
+        return True
+    if 'csrftoken' not in session:
+        # The client has not (yet) requested CSRF protection
+        # so we return true
+        if 'HTTP_CONFLUENTAUTHTOKEN' in env:
+            # The client has requested CSRF countermeasures,
+            # oblige the request and apply a new token to the
+            # session
+            session['csrftoken'] = util.randomstring(32)
+        return True
+    # The session has CSRF protection enabled, only mark valid if
+    # the client has provided an auth token and that token matches the
+    # value protecting the session
+    return ('HTTP_CONFLUENTAUTHTOKEN' in env and
+            env['HTTP_CONFLUENTAUTHTOKEN'] == session['csrftoken'])
+
+
 def _authorize_request(env, operation):
     """Grant/Deny access based on data from wsgi env
 
@@ -228,6 +255,7 @@ def _authorize_request(env, operation):
         cc.load(env['HTTP_COOKIE'])
         if 'confluentsessionid' in cc:
             sessionid = cc['confluentsessionid'].value
+            sessid = sessionid
             if sessionid in httpsessions:
                 if env['PATH_INFO'] == '/sessions/current/logout':
                     targets = []
@@ -237,11 +265,12 @@ def _authorize_request(env, operation):
                         eventlet.greenthread.kill(mythread)
                     del httpsessions[sessionid]
                     return ('logout',)
-                httpsessions[sessionid]['expiry'] = time.time() + 90
-                name = httpsessions[sessionid]['name']
-                authdata = auth.authorize(
-                    name, element=None,
-                    skipuserobj=httpsessions[sessionid]['skipuserobject'])
+                if _csrf_valid(env, httpsessions[sessionid]):
+                    httpsessions[sessionid]['expiry'] = time.time() + 90
+                    name = httpsessions[sessionid]['name']
+                    authdata = auth.authorize(
+                        name, element=None,
+                        skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         if env['PATH_INFO'] == '/sessions/current/logout':
             return ('logout',)
@@ -256,6 +285,8 @@ def _authorize_request(env, operation):
         httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
                                 'skipuserobject': authdata[4],
                                 'inflight': set([])}
+        if 'HTTP_CONFLUENTAUTHTOKEN' in env:
+            httpsessions[sessid]['csrftoken'] = util.randomstring(32)
         cookie['confluentsessionid'] = sessid
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
@@ -276,10 +307,12 @@ def _authorize_request(env, operation):
             auditmsg['tenant'] = authdata[3]
             authinfo['tenant'] = authdata[3]
         auditmsg['user'] = authdata[2]
-        if sessionid is not None:
-            authinfo['sessionid'] = sessionid
+        if sessid is not None:
+            authinfo['sessionid'] = sessid
         if not skiplog:
             auditlog.log(auditmsg)
+        if 'csrftoken' in httpsessions[sessid]:
+            authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
         return authinfo
     else:
         return {'code': 401}
@@ -352,7 +385,7 @@ def resourcehandler_backend(env, start_response):
         start_response('200 Successful logout', headers)
         yield('{"result": "200 - Successful logout"}')
         return
-    if 'HTTP_SUPPRESSAUTHHEADER' in env:
+    if 'HTTP_SUPPRESSAUTHHEADER' in env or 'HTTP_CONFLUENTAUTHTOKEN' in env:
         badauth = [('Content-type', 'text/plain')]
     else:
         badauth = [('Content-type', 'text/plain'),
@@ -530,7 +563,10 @@ def resourcehandler_backend(env, start_response):
         url = url.replace('.html', '')
         if url == '/sessions/current/info':
             start_response('200 OK', headers)
-            yield json.dumps({'username': authorized['username']})
+            sessinfo = {'username': authorized['username']}
+            if 'authtoken' in authorized:
+                sessinfo['authtoken'] = authorized['authtoken']
+            yield json.dumps(sessinfo)
             return
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
@@ -552,26 +588,9 @@ def resourcehandler_backend(env, start_response):
                     pagecontent += datum
             start_response('200 OK', headers)
             yield pagecontent
-        except exc.NotFoundException as ne:
-            start_response('404 Not found', headers)
-            yield "404 - Request path not recognized - " + str(ne)
-        except exc.InvalidArgumentException as e:
-            start_response('400 Bad Request - ' + str(e), headers)
-            yield '400 - Bad Request - ' + str(e)
-        except exc.TargetEndpointUnreachable as tu:
-            start_response('504 Unreachable Target', headers)
-            yield '504 - Unreachable Target - ' + str(tu)
-        except exc.TargetEndpointBadCredentials:
-            start_response('502 Bad Credentials', headers)
-            yield '502 - Bad Credentials'
-        except exc.LockedCredentials:
-            start_response('500 Locked credential store', headers)
-            yield '500 - Credential store locked'
-        except exc.NotImplementedException:
-            start_response('501 Not Implemented', headers)
-            yield '501 Not Implemented'
         except exc.ConfluentException as e:
-            if e.apierrorcode == 500:
+            if ((not isinstance(e, exc.LockedCredentials)) and
+                    e.apierrorcode == 500):
                 # raise generics to trigger the tracelog
                 raise
             start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr),

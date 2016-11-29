@@ -20,9 +20,35 @@ import base64
 import confluent.exceptions as cexc
 import confluent.log as log
 import hashlib
+import netifaces
 import os
 import struct
 
+
+def list_interface_indexes():
+    # Getting the interface indexes in a portable manner
+    # would be better, but there's difficulty from a python perspective.
+    # For now be linux specific
+    try:
+        for iface in os.listdir('/sys/class/net/'):
+            ifile = open('/sys/class/net/{0}/ifindex'.format(iface), 'r')
+            intidx = int(ifile.read())
+            ifile.close()
+            yield intidx
+    except (IOError, WindowsError):
+        # Probably situation is non-Linux, just do limited support for
+        # such platforms until other people come alonge
+        return
+
+
+def list_ips():
+    # Used for getting addresses to indicate the multicast address
+    # as well as getting all the broadcast addresses
+    for iface in netifaces.interfaces():
+        addrs = netifaces.ifaddresses(iface)
+        if netifaces.AF_INET in addrs:
+            for addr in addrs[netifaces.AF_INET]:
+                yield addr
 
 def randomstring(length=20):
     """Generate a random string of requested length
