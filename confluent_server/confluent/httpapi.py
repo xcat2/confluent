@@ -233,6 +233,17 @@ def _csrf_valid(env, session):
             # oblige the request and apply a new token to the
             # session
             session['csrftoken'] = util.randomstring(32)
+        elif 'HTTP_REFERER' in env:
+            # If there is a referrer, make sure it stays consistent
+            # across the session.  A change in referer is a bad thing
+            try:
+                referer = env['HTTP_REFERER'].split('/')[2]
+            except IndexError:
+                return False
+            if 'validreferer' not in session:
+                session['validreferer'] = referer
+            elif session['validreferer'] != referer:
+                return False
         return True
     # The session has CSRF protection enabled, only mark valid if
     # the client has provided an auth token and that token matches the
@@ -274,6 +285,10 @@ def _authorize_request(env, operation):
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         if env['PATH_INFO'] == '/sessions/current/logout':
             return ('logout',)
+        # We do not allow a link into the api browser to come in with just
+        # username and password
+        if 'HTTP_REFERER' in env:
+            return {'code': 401}
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, element=None)
@@ -369,7 +384,7 @@ def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
     mimetype, extension = _pick_mimetype(env)
-    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache'),
+    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-store'),
                ('X-Content-Type-Options', 'nosniff'),
                ('Content-Security-Policy', "default-src 'self'"),
                ('X-XSS-Protection', '1'), ('X-Frame-Options', 'deny'),
