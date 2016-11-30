@@ -268,27 +268,27 @@ def _authorize_request(env, operation):
             sessionid = cc['confluentsessionid'].value
             sessid = sessionid
             if sessionid in httpsessions:
-                if env['PATH_INFO'] == '/sessions/current/logout':
-                    targets = []
-                    for mythread in httpsessions[sessionid]['inflight']:
-                        targets.append(mythread)
-                    for mythread in targets:
-                        eventlet.greenthread.kill(mythread)
-                    del httpsessions[sessionid]
-                    return ('logout',)
                 if _csrf_valid(env, httpsessions[sessionid]):
+                    if env['PATH_INFO'] == '/sessions/current/logout':
+                        targets = []
+                        for mythread in httpsessions[sessionid]['inflight']:
+                            targets.append(mythread)
+                        for mythread in targets:
+                            eventlet.greenthread.kill(mythread)
+                        del httpsessions[sessionid]
+                        return ('logout',)
                     httpsessions[sessionid]['expiry'] = time.time() + 90
                     name = httpsessions[sessionid]['name']
                     authdata = auth.authorize(
                         name, element=None,
                         skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
-        if env['PATH_INFO'] == '/sessions/current/logout':
-            return ('logout',)
         # We do not allow a link into the api browser to come in with just
         # username and password
         if 'HTTP_REFERER' in env:
             return {'code': 401}
+        if env['PATH_INFO'] == '/sessions/current/logout':
+            return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, element=None)
