@@ -387,6 +387,7 @@ def resourcehandler_backend(env, start_response):
     """
     mimetype, extension = _pick_mimetype(env)
     headers = [('Content-Type', mimetype), ('Cache-Control', 'no-store'),
+               ('Pragma', 'no-cache'),
                ('X-Content-Type-Options', 'nosniff'),
                ('Content-Security-Policy', "default-src 'self'"),
                ('X-XSS-Protection', '1'), ('X-Frame-Options', 'deny'),
