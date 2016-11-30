@@ -283,11 +283,13 @@ def _authorize_request(env, operation):
                         name, element=None,
                         skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
-        # We do not allow a link into the api browser to come in with just
-        # username and password
-        if 'HTTP_REFERER' in env:
-            return {'code': 401}
         if env['PATH_INFO'] == '/sessions/current/logout':
+            if 'HTTP_REFERER' in env:
+                # note that this doesn't actually do harm
+                # otherwise, but this way do not give appearance
+                # of something having a side effect if it has the smell
+                # of a CSRF
+                return {'code': 401}
             return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
