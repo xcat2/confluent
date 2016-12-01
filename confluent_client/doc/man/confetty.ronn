@@ -1,0 +1,37 @@
+confetty(1) --- Interactive confluent client
+=================================================
+
+## SYNOPSIS
+
+`confetty`
+
+## DESCRIPTION
+
+**confetty** launches an interactive CLI session to the
+confluent service.  It provides a filesystem-like
+view of the confluent interface.  It is intended to
+be mostly an aid for developing client software, with
+day to day administration generally being easier with
+the various function specific commands.
+
+## COMMANDS
+
+The CLI may be navigated by shell commands and some other
+commands.
+
+* `cd`:
+  Change the location within the tree
+* `ls`:
+  List the elements within the current directory/tree
+* `show` **ELEMENT**, `cat` **ELEMENT**:
+  Display the result of reading a specific element (by full or relative path)
+* `unset` **ELEMENT** **ATTRIBUTE**
+  For an element with attributes, request to clear the value of the attribue
+* `set` **ELEMENT** **ATTRIBUTE**=**VALUE**
+  Set the specified attribute to the given value
+* `start` **ELEMENT**
+  Start a console session indicated by **ELEMENT** (e.g. /nodes/n1/console/session)
+* `rm` **ELEMENT**
+  Request removal of an element.  (e.g. rm events/hardware/log clears log from a node)
+
+
