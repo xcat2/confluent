@@ -344,6 +344,7 @@ class IpmiHandler(object):
             except socket.gaierror as ge:
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
+                raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
         self.ipmicmd.setup_confluent_keyhandler()
 
