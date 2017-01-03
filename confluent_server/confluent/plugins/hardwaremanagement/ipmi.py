@@ -346,7 +346,6 @@ class IpmiHandler(object):
                     raise exc.TargetEndpointUnreachable(ge[1])
                 raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
-        self.ipmicmd.setup_confluent_keyhandler()
 
     bootdevices = {
         'optical': 'cd'
@@ -358,6 +357,7 @@ class IpmiHandler(object):
             self.error = response['error']
         else:
             self.loggedin = True
+            self.ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):
