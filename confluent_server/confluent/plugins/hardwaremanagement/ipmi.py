@@ -345,6 +345,7 @@ class IpmiHandler(object):
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
                 raise
+        self.ipmicmd = persistent_ipmicmds([node, tenant])
 
     bootdevices = {
         'optical': 'cd'
