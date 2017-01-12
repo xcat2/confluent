@@ -233,6 +233,17 @@ def _csrf_valid(env, session):
             # oblige the request and apply a new token to the
             # session
             session['csrftoken'] = util.randomstring(32)
+        elif 'HTTP_REFERER' in env:
+            # If there is a referrer, make sure it stays consistent
+            # across the session.  A change in referer is a bad thing
+            try:
+                referer = env['HTTP_REFERER'].split('/')[2]
+            except IndexError:
+                return False
+            if 'validreferer' not in session:
+                session['validreferer'] = referer
+            elif session['validreferer'] != referer:
+                return False
         return True
     # The session has CSRF protection enabled, only mark valid if
     # the client has provided an auth token and that token matches the
@@ -257,15 +268,15 @@ def _authorize_request(env, operation):
             sessionid = cc['confluentsessionid'].value
             sessid = sessionid
             if sessionid in httpsessions:
-                if env['PATH_INFO'] == '/sessions/current/logout':
-                    targets = []
-                    for mythread in httpsessions[sessionid]['inflight']:
-                        targets.append(mythread)
-                    for mythread in targets:
-                        eventlet.greenthread.kill(mythread)
-                    del httpsessions[sessionid]
-                    return ('logout',)
                 if _csrf_valid(env, httpsessions[sessionid]):
+                    if env['PATH_INFO'] == '/sessions/current/logout':
+                        targets = []
+                        for mythread in httpsessions[sessionid]['inflight']:
+                            targets.append(mythread)
+                        for mythread in targets:
+                            eventlet.greenthread.kill(mythread)
+                        del httpsessions[sessionid]
+                        return ('logout',)
                     httpsessions[sessionid]['expiry'] = time.time() + 90
                     name = httpsessions[sessionid]['name']
                     authdata = auth.authorize(
@@ -273,6 +284,12 @@ def _authorize_request(env, operation):
                         skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         if env['PATH_INFO'] == '/sessions/current/logout':
+            if 'HTTP_REFERER' in env:
+                # note that this doesn't actually do harm
+                # otherwise, but this way do not give appearance
+                # of something having a side effect if it has the smell
+                # of a CSRF
+                return {'code': 401}
             return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
@@ -369,7 +386,13 @@ def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
     mimetype, extension = _pick_mimetype(env)
-    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache')]
+    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-store'),
+               ('Pragma', 'no-cache'),
+               ('X-Content-Type-Options', 'nosniff'),
+               ('Content-Security-Policy', "default-src 'self'"),
+               ('X-XSS-Protection', '1'), ('X-Frame-Options', 'deny'),
+               ('Strict-Transport-Security', 'max-age=86400'),
+               ('X-Permitted-Cross-Domain-Policies', 'none')]
     reqbody = None
     reqtype = None
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:

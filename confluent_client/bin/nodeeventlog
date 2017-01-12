@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from datetime import datetime as dt
+import optparse
 import os
 import sys
 
@@ -26,13 +27,13 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-
+argparser = optparse.OptionParser(
+    usage="Usage: %prog [options] noderange (clear)")
+(options, args) = argparser.parse_args()
 try:
-    noderange = sys.argv[1]
+    noderange = args[0]
 except IndexError:
-    sys.stderr.write(
-        'Usage: {0} <noderange> [clear]\n'.format(
-            sys.argv[0]))
+    argparser.print_help()
     sys.exit(1)
 
 deletemode = False

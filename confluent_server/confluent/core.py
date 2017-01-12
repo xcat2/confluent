@@ -123,6 +123,7 @@ def _init_core():
         'attributes': {
             'all': PluginRoute({'handler': 'attributes'}),
             'current': PluginRoute({'handler': 'attributes'}),
+            'expression': PluginRoute({'handler': 'attributes'}),
         },
         'boot': {
             'nextdevice': PluginRoute({

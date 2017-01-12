@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ sensorcollections = {
 
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [sensor(s)")
+    usage="Usage: %prog [options] noderange ([sensor(s)])")
 argparser.add_option('-i', '--interval', type='float',
                      help='Interval to do repeated samples over')
 argparser.add_option('-n', '--numreadings', type='int',
@@ -60,7 +60,7 @@ if options.numreadings:
 try:
     noderange = args[0]
 except IndexError:
-    argparser.print_usage()
+    argparser.print_help()
     sys.exit(1)
 sensors = []
 for sensorgroup in args[1:]:

@@ -344,8 +344,8 @@ class IpmiHandler(object):
             except socket.gaierror as ge:
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
+                raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
-        self.ipmicmd.setup_confluent_keyhandler()
 
     bootdevices = {
         'optical': 'cd'
@@ -356,7 +356,9 @@ class IpmiHandler(object):
             self.broken = True
             self.error = response['error']
         else:
+            self.ipmicmd = ipmicmd
             self.loggedin = True
+            self.ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):

@@ -761,6 +761,14 @@ class ConfigManager(object):
                                                    decrypt=self.decrypt)
         return nodeobj
 
+    def expand_attrib_expression(self, nodelist, expression):
+        if type(nodelist) in (unicode, str):
+            nodelist = (nodelist,)
+        for node in nodelist:
+            cfgobj = self._cfgstore['nodes'][node]
+            fmt = _ExpressionFormat(cfgobj, node)
+            yield (node, fmt.format(expression))
+
     def get_node_attributes(self, nodelist, attributes=(), decrypt=None):
         if decrypt is None:
             decrypt = self.decrypt

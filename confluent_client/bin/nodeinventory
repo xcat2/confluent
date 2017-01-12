@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import optparse
 import os
 import sys
 path = os.path.dirname(os.path.realpath(__file__))
@@ -69,12 +70,12 @@ def printerror(res, node=None):
             exitcode = 1
 
 
+argparser = optparse.OptionParser(usage="Usage: %prog <noderange>")
+(options, args) = argparser.parse_args()
 try:
     noderange = sys.argv[1]
 except IndexError:
-    sys.stderr.write(
-        'Usage: {0} <noderange>\n'.format(
-            sys.argv[0]))
+    argparser.print_help()
     sys.exit(1)
 try:
     session = client.Command()

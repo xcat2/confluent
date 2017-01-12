@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,9 +95,15 @@ def _checkpidfile():
         fcntl.flock(pidfile, fcntl.LOCK_EX)
         pid = pidfile.read()
         if pid != '':
-            print ('/var/run/confluent/pid exists and indicates %s is still '
-                   'running' % pid)
-            sys.exit(1)
+            try:
+                os.kill(int(pid), 0)
+                print ('/var/run/confluent/pid exists and indicates %s is still '
+                       'running' % pid)
+                sys.exit(1)
+            except OSError:
+                # There is no process running by that pid, must be stale
+                pass
+        pidfile.seek(0)
         pidfile.write(str(os.getpid()))
         fcntl.flock(pidfile, fcntl.LOCK_UN)
         pidfile.close()
@@ -199,10 +205,12 @@ def run():
     auth.init_auth()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
-    #TODO(jbjohnso): eventlet has a bug about unix domain sockets, this code
-    #works with bugs fixed
     if dbgif:
         oumask = os.umask(0077)
+        try:
+            os.remove('/var/run/confluent/dbg.sock')
+        except OSError:
+            pass  # We are not expecting the file to exist
         dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
                                    family=socket.AF_UNIX)
         eventlet.spawn_n(backdoor.backdoor_server, dbgsock)

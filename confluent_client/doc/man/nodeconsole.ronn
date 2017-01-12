@@ -1,0 +1,30 @@
+nodeconsole(1) -- Open a console to a confluent node
+=====================================================
+
+## SYNOPSIS
+`nodeconsole` `node`
+
+## DESCRIPTION
+
+**nodeconsole** opens an interactive console session to a given node.  This is the
+text or serial console of a system.  Exiting is done by hitting `Ctrl-e`, then `c`,
+ then `.`.  Note that console output by default is additionally logged to 
+`/var/log/confluent/consoles/`**NODENAME**.
+
+## ESCAPE SEQUENCE COMMANDS
+
+While connected to a console, a number of commands may be performed through escape
+sequences.  To begin an command escape sequence, hit `Ctrl-e`, then `c`.  The next
+keystroke will be interpreted as a command.  The following commands are available.
+
+* `.`:
+  Exit the session and return to the command prompt
+* `b`:
+  Send a break to the remote console when possible (some console plugins may not support this)
+* `o`:
+  Request confluent to disconnect and reconnect to console.  For example if there is suspicion
+  that the console has gone inoperable, but would work if reconnected.
+* `?`:
+  Get a list of supported commands
+* `<enter>`:
+  Abandon entering an escape sequence command

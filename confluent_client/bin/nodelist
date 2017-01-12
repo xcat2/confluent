@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ def attrrequested(attr, attrlist, seenattributes):
             return True
     return False
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [list of attributes")
+    usage="Usage: %prog [options] noderange [list of attributes]")
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
 (options, args) = argparser.parse_args()
