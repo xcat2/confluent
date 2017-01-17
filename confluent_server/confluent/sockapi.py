@@ -244,7 +244,16 @@ def _tlshandler(bind_host, bind_port):
     plainsocket = socket.socket(socket.AF_INET6)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    plainsocket.bind((bind_host, bind_port, 0, 0))
+    bound = False
+    while not bound:
+        try:
+            plainsocket.bind((bind_host, bind_port, 0, 0))
+            bound = True
+        except socket.error as e:
+            if e.errno != 98:
+                raise
+            sys.stderr.write('TLS Socket in use, retrying in 1 second\n')
+            eventlet.sleep(1)
     plainsocket.listen(5)
     while (1):  # TODO: exithook
         cnn, addr = plainsocket.accept()
