@@ -35,6 +35,7 @@ import eventlet.greenthread
 import greenlet
 import json
 import socket
+import sys
 import traceback
 import time
 import urlparse
@@ -741,9 +742,20 @@ def serve(bind_host, bind_port):
     #but deps are simpler without flup
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
-    eventlet.wsgi.server(
-        eventlet.listen((bind_host, bind_port, 0, 0), family=socket.AF_INET6),
-        resourcehandler, log=False, log_output=False, debug=False)
+    sock = None
+    while not sock:
+        try:
+            sock = eventlet.listen(
+                (bind_host, bind_port, 0, 0), family=socket.AF_INET6)
+        except socket.error as e:
+            if e.errno != 98:
+                raise
+            sys.stderr.write(
+                'Failed to open HTTP due to busy port, trying again in'
+                ' a second\n')
+            eventlet.sleep(1)
+    eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
+                         debug=False)
 
 
 class HttpApi(object):
