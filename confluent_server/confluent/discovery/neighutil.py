@@ -39,6 +39,13 @@ def update_neigh():
         entry = entry.split(' ')
         if len(entry) < 5 or not entry[4]:
             continue
+        if entry[0] in ('192.168.0.100', '192.168.70.100', '192.168.70.125'):
+            # Note that these addresses are common static ip addresses
+            # that are hopelessly ambiguous if there are many
+            # so ignore such entries and move on
+            # ideally the system network steers clear of this landmine of
+            # a subnet, but just in case
+            continue
         neightable[entry[0]] = entry[4]
     neightime = os.times()[4]
 
