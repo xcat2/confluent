@@ -128,6 +128,18 @@ def _get_protected_key(keydict, password, paramname):
         raise exc.LockedCredentials("No available decryption key")
 
 
+def _parse_key(keydata, password=None):
+    if keydata.startswith('*unencrypted:'):
+        return base64.b64decode(keydata[13:])
+    elif password:
+        salt, iv, crypt, hmac = [base64.b64decode(x)
+                                 for x in keydata.split('!')]
+        privkey, integkey = _derive_keys(password, salt)
+        return decrypt_value([iv, crypt, hmac], privkey, integkey)
+    raise(exc.LockedCredentials(
+        "Passphrase protected secret requires password"))
+
+
 def _format_key(key, password=None):
     if password is not None:
         salt = os.urandom(32)
@@ -1343,6 +1355,18 @@ class ConfigManager(object):
                 # it might indeed be a nested structure
                 self._recalculate_expressions(cfgobj[key], formatter, node,
                                               changeset)
+
+
+def _restore_keys(jsond, password, newpassword):
+    # the jsond from the restored file, password (if any) used to protect
+    # the file, and newpassword to use, (also check the service.cfg file)
+    global _masterkey
+    global _masterintegritykey
+    keydata = json.loads(jsond)
+    cryptkey = _parse_key(keydata['cryptkey'], password)
+    integritykey = _parse_key(keydata['integritykey'], password)
+    _masterkey = cryptkey
+    _masterintegritykey = integritykey
 
 
 def _dump_keys(password):
