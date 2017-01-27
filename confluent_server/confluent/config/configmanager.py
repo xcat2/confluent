@@ -65,6 +65,7 @@ import anydbm as dbm
 import ast
 import base64
 import confluent.config.attributes as allattributes
+import confluent.config.conf as conf
 import confluent.log
 import confluent.util
 import confluent.exceptions as exc
@@ -1357,7 +1358,7 @@ class ConfigManager(object):
                                               changeset)
 
 
-def _restore_keys(jsond, password, newpassword):
+def _restore_keys(jsond, password, newpassword=None):
     # the jsond from the restored file, password (if any) used to protect
     # the file, and newpassword to use, (also check the service.cfg file)
     global _masterkey
@@ -1365,8 +1366,20 @@ def _restore_keys(jsond, password, newpassword):
     keydata = json.loads(jsond)
     cryptkey = _parse_key(keydata['cryptkey'], password)
     integritykey = _parse_key(keydata['integritykey'], password)
+    conf.init_config()
+    cfg = conf.get_config()
+    if cfg.has_option('security', 'externalcfgkey'):
+        keyfilename = cfg.get('security', 'externalcfgkey')
+        with open(keyfilename, 'r') as keyfile:
+            newpassword = keyfile.read()
+    set_global('master_privacy_key', _format_key(cryptkey,
+                                                 password=newpassword))
+    set_global('master_integrity_key', _format_key(integritykey,
+                                                   password=newpassword))
     _masterkey = cryptkey
     _masterintegritykey = integritykey
+    ConfigManager.wait_for_sync()
+    # At this point, we should have the key situation all sorted
 
 
 def _dump_keys(password):
