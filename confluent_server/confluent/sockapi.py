@@ -170,7 +170,8 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
         auditlog.log(auditmsg)
     try:
         if operation == 'start':
-            return start_term(authname, cfm, connection, params, path)
+            return start_term(authname, cfm, connection, params, path,
+                              authdata, skipauth)
         elif operation == 'shutdown':
             configmanager.ConfigManager.shutdown()
         else:
@@ -187,7 +188,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
     return
 
 
-def start_term(authname, cfm, connection, params, path):
+def start_term(authname, cfm, connection, params, path, authdata, skipauth):
     elems = path.split('/')
     if len(elems) < 4 or elems[1] != 'nodes':
         raise exc.InvalidArgumentException('Invalid path {0}'.format(path))
@@ -233,7 +234,9 @@ def start_term(authname, cfm, connection, params, path):
                 consession.reopen()
                 continue
             else:
-                raise Exception("TODO")
+                process_request(connection, data, cfm, authdata, authname,
+                                skipauth)
+                continue
         if not data:
             consession.destroy()
             return
