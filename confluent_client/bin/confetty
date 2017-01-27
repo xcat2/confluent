@@ -542,7 +542,7 @@ def get_session_node(shellargs):
     return None
 
 
-def conserver_command(filehandle, command):
+def conserver_command(filehandle, localcommand):
     # x - conserver has that as 'show baud', I am inclined to replace that with
     #     'request exclusive'
     # b - conserver has that as 'broadcast message', I'm tempted to use that
@@ -557,31 +557,114 @@ def conserver_command(filehandle, command):
     # d - down a console... never used this...
     # L - toggle logging
     # w - who is on console
-    while not command:
-        ready, _, _ = select.select((filehandle,), (), (), 1)
-        if ready:
-            command += filehandle.read()
-    if command[0] == '.':
+
+    cmdlen = 1
+    localcommand = get_command_bytes(filehandle, localcommand, cmdlen)
+
+    if localcommand[0] == '.':
         print("disconnect]\r")
         quitconfetty(fullexit=consoleonly)
-    elif command[0] == 'o':
+    elif localcommand[0] == 'o':
         tlvdata.send(session.connection, {'operation': 'reopen',
                                           'path': currconsole})
         print('reopen]\r')
-    elif command[0] == 'b':
+    elif localcommand[0] == 'b':
         tlvdata.send(session.connection, {'operation': 'break',
                                           'path': currconsole})
         print("break sent]\r")
-    elif command[0] == '?':
+    elif localcommand[0] == 'p':  # print
+        cmdlen += 1
+        localcommand = get_command_bytes(filehandle, localcommand, cmdlen)
+
+        if localcommand[1] == 'o': # off
+            print("powering off...")
+            session.simple_noderange_command(consolename, '/power/state', 'off')
+            print("complete]\r")
+        elif localcommand[1] == 's':  # shutdown
+            print("shutting down...")
+            session.simple_noderange_command(consolename, '/power/state', 'shutdown')
+            print("complete]\r")
+        elif localcommand[1] == 'b': # boot
+            cmdlen += 1
+            localcommand = get_command_bytes(filehandle, localcommand, cmdlen)
+
+            if localcommand[2] == 's':  # boot to setup
+                print("booting to setup...")
+
+                bootmode = 'uefi'
+                bootdev = 'setup'
+
+                rc = session.simple_noderange_command(consolename, '/boot/nextdevice', bootdev, bootmode=bootmode)
+
+                if rc:
+                    print("Error]\r")
+                else:
+                    rc = session.simple_noderange_command(consolename, '/power/state', 'boot')
+                    if rc:
+                        print("Error]\r")
+                    else:
+                        print("complete]\r")
+
+            elif localcommand[2] == 'n':  # boot to network
+                print("booting to network...")
+
+                bootmode = 'uefi'
+                bootdev = 'network'
+
+                rc = session.simple_noderange_command(consolename, '/boot/nextdevice', bootdev, bootmode=bootmode)
+
+                if rc:
+                    print("Error]\r")
+                else:
+                    rc = session.simple_noderange_command(consolename, '/power/state', 'boot')
+
+                    if rc:
+                        print("Error]\r")
+                    else:
+                        print("complete]\r")
+
+            elif localcommand[2] == '\x0d':  # boot to default
+                print("booting to default...")
+
+                bootmode = 'uefi'
+                bootdev = 'default'
+
+                rc = session.simple_noderange_command(consolename, '/boot/nextdevice', bootdev, bootmode=bootmode)
+
+                if rc:
+                    print("Error]\r")
+                else:
+                    rc = session.simple_noderange_command(consolename, '/power/state', 'boot')
+
+                    if rc:
+                        print("Error]\r")
+                    else:
+                        print("complete]\r")
+
+            else:
+                print("Unknown boot state.\r")
+
+        else:
+            print("Unknown power state.\r")
+
+    elif localcommand[0] == '?':
         print("help]\r")
         print(".    disconnect\r")
         print("b    break\r")
         print("o    reopen\r")
         print("<cr> abort command\r")
-    elif command[0] == '\x0d':
+    elif localcommand[0] == '\x0d':
         print("ignored]\r")
     else:  # not a command at all..
         print("unknown -- use '?']\r")
+
+
+def get_command_bytes(filehandle, localcommand, cmdlen):
+    while len(localcommand) < cmdlen:
+        ready, _, _ = select.select((filehandle,), (), (), 1)
+        if ready:
+            localcommand += filehandle.read()
+    return localcommand
 
 
 def check_escape_seq(currinput, filehandle):
