@@ -1344,13 +1344,24 @@ class ConfigManager(object):
                 self._recalculate_expressions(cfgobj[key], formatter, node,
                                               changeset)
 
+
 def _dump_keys(password):
     if _masterkey is None or _masterintegritykey is None:
         init_masterkey()
     cryptkey = _format_key(_masterkey, password=password)
-    cryptkey = '!'.join(map(base64.b64encode, cryptkey['passphraseprotected']))
+    if 'passphraseprotected' in cryptkey:
+        cryptkey = '!'.join(map(base64.b64encode,
+                                cryptkey['passphraseprotected']))
+    else:
+        cryptkey = '*unencrypted:{0}'.format(base64.b64encode(
+            cryptkey['unencryptedvalue']))
     integritykey = _format_key(_masterintegritykey, password=password)
-    integritykey = '!'.join(map(base64.b64encode, integritykey['passphraseprotected']))
+    if 'passphraseprotected' in integritykey:
+        integritykey = '!'.join(map(base64.b64encode,
+                                    integritykey['passphraseprotected']))
+    else:
+        integritykey = '*unencrypted:{0}'.format(base64.b64encode(
+            integritykey['unencryptedvalue']))
     return json.dumps({'cryptkey': cryptkey, 'integritykey': integritykey},
                       sort_keys=True, indent=4, separators=(',', ': '))
 
