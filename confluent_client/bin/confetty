@@ -642,16 +642,21 @@ def conserver_command(filehandle, localcommand):
                         print("complete]\r")
 
             else:
-                print("Unknown boot state.\r")
+                print("Unknown boot state.]\r")
 
         else:
-            print("Unknown power state.\r")
+            print("Unknown power state.]\r")
 
     elif localcommand[0] == '?':
         print("help]\r")
-        print(".    disconnect\r")
-        print("b    break\r")
-        print("o    reopen\r")
+        print(".       disconnect\r")
+        print("b       break\r")
+        print("o       reopen\r")
+        print("po      power off\r")
+        print("ps      shutdown\r")
+        print("pbs     boot to setup\r")
+        print("pbn     boot to network\r")
+        print("pb<ent> boot to default\r")
         print("<cr> abort command\r")
     elif localcommand[0] == '\x0d':
         print("ignored]\r")
