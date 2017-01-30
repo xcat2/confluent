@@ -28,7 +28,8 @@ import confluent.config.configmanager as cfm
 import confluent.config.conf as conf
 import confluent.main as main
 
-argparser = optparse.OptionParser(usage="Usage: %prog [options] [dump|restore] [path]")
+argparser = optparse.OptionParser(
+    usage="Usage: %prog [options] [dump|restore] [path]")
 argparser.add_option('-p', '--password',
                      help='Password to use to protect/unlock a protected dump')
 argparser.add_option('-r', '--redact', action='store_true',
@@ -52,15 +53,15 @@ if args[0] == 'restore':
         sys.exit(1)
     cfm.restore_db_from_directory(dumpdir, options.password)
 elif args[0] == 'dump':
-    if options.password is None and not options.unprotected:
+    if options.password is None and not (options.unprotected or options.redact):
         print("Must indicate a password to protect or -u to opt opt of "
-              "secure value protection")
+              "secure value protection or -r to skip all protected data")
         sys.exit(1)
     os.umask(077)
     main._initsecurity(conf.get_config())
     if not os.path.exists(dumpdir):
         os.makedirs(dumpdir)
-    cfm.dump_db_to_directory(dumpdir, options.password)
+    cfm.dump_db_to_directory(dumpdir, options.password, options.redact)
 
 
 
