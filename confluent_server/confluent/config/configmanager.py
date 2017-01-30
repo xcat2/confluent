@@ -1246,7 +1246,9 @@ class ConfigManager(object):
                     pass
         # Now we have to iterate through each fixed up element, using the
         # set attribute to flesh out inheritence and expressions
-        for confarea in tmpconfig:
+        for confarea in _config_areas:
+            if confarea not in tmpconfig:
+                continue
             if confarea == 'nodes':
                 self.set_node_attributes(tmpconfig[confarea], True)
             elif confarea == 'nodegroups':
