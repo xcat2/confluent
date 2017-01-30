@@ -1466,10 +1466,15 @@ def _dump_keys(password):
 
 
 def restore_db_from_directory(location, password):
-    with open(os.path.join(location, 'keys.json'), 'r') as cfgfile:
-        keydata = cfgfile.read()
-        json.loads(keydata)
-        _restore_keys(keydata, password)
+    try:
+        with open(os.path.join(location, 'keys.json'), 'r') as cfgfile:
+            keydata = cfgfile.read()
+            json.loads(keydata)
+            _restore_keys(keydata, password)
+    except IOError as e:
+        if e.errno == 2:
+            raise Exception("Cannot restore without keys, this may be a "
+                            "redacted dump")
     with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
         cfgdata = cfgfile.read()
         ConfigManager(tenant=None)._load_from_json(cfgdata)
