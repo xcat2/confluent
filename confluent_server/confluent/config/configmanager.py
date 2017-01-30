@@ -720,6 +720,8 @@ class ConfigManager(object):
         :param uid: Custom identifier number if desired.  Defaults to random.
         :param displayname: Optional long format name for UI consumption
         """
+        if 'idmap' not in _cfgstore['main']:
+            _cfgstore['main']['idmap'] = {}
         if uid is None:
             uid = _generate_new_id()
         else:
@@ -733,8 +735,6 @@ class ConfigManager(object):
         self._cfgstore['users'][name] = {'id': uid}
         if displayname is not None:
             self._cfgstore['users'][name]['displayname'] = displayname
-        if 'idmap' not in _cfgstore['main']:
-            _cfgstore['main']['idmap'] = {}
         _cfgstore['main']['idmap'][uid] = {
             'tenant': self.tenant,
             'username': name
@@ -1200,6 +1200,68 @@ class ConfigManager(object):
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
+    def _load_from_json(self, jsondata):
+        """Load fresh configuration data from jsondata
+
+        :param jsondata: String of jsondata
+        :return:
+        """
+        dumpdata = json.loads(jsondata)
+        tmpconfig = {}
+        for confarea in _config_areas:
+            if confarea not in dumpdata:
+                continue
+            tmpconfig[confarea] = {}
+            for element in dumpdata[confarea]:
+                newelement = copy.deepcopy(dumpdata[confarea][element])
+                for attribute in dumpdata[confarea][element]:
+                    if newelement[attribute] == '*REDACTED*':
+                        raise Exception(
+                            "Unable to restore from redacted backup")
+                    elif attribute == 'cryptpass':
+                        passparts = newelement[attribute].split('!')
+                        newelement[attribute] = tuple([base64.b64decode(x)
+                                                       for x in passparts])
+                    elif 'cryptvalue' in newelement[attribute]:
+                        bincrypt = newelement[attribute]['cryptvalue']
+                        bincrypt = tuple([base64.b64decode(x)
+                                          for x in bincrypt.split('!')])
+                        newelement[attribute]['cryptvalue'] = bincrypt
+                    elif attribute in ('nodes', '_expressionkeys'):
+                        # A group with nodes
+                        # delete it and defer until nodes are being added
+                        # which will implicitly fill this up
+                        # Or _expressionkeys attribute, which will similarly
+                        # be rebuilt
+                        del newelement[attribute]
+                tmpconfig[confarea][element] = newelement
+        # We made it through above section without an exception, go ahead and
+        # replace
+        # Start by erasing the dbm files if present
+        for confarea in _config_areas:
+            try:
+                os.unlink(os.path.join(self._cfgdir, confarea))
+            except OSError as e:
+                if e.errno == 2:
+                    pass
+        # Now we have to iterate through each fixed up element, using the
+        # set attribute to flesh out inheritence and expressions
+        for confarea in tmpconfig:
+            if confarea == 'nodes':
+                self.set_node_attributes(tmpconfig[confarea], True)
+            elif confarea == 'nodegroups':
+                self.set_group_attributes(tmpconfig[confarea], True)
+            elif confarea == 'users':
+                for user in tmpconfig[confarea]:
+                    uid = tmpconfig[confarea].get('id', None)
+                    displayname = tmpconfig[confarea].get('displayname', None)
+                    self.create_user(user, uid=uid, displayname=displayname)
+                    if 'cryptpass' in tmpconfig[confarea][user]:
+                        self._cfgstore['users'][user]['cryptpass'] = \
+                            tmpconfig[confarea][user]['cryptpass']
+                        _mark_dirtykey('users', user, self.tenant)
+        self._bg_sync_to_file()
+
     def _dump_to_json(self, redact=None):
         """Dump the configuration in json form to output
 
@@ -1403,6 +1465,16 @@ def _dump_keys(password):
                       sort_keys=True, indent=4, separators=(',', ': '))
 
 
+def restore_db_from_directory(location, password):
+    with open(os.path.join(location, 'keys.json'), 'r') as cfgfile:
+        keydata = cfgfile.read()
+        json.loads(keydata)
+        _restore_keys(keydata, password)
+    with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
+        cfgdata = cfgfile.read()
+        ConfigManager(tenant=None)._load_from_json(cfgdata)
+
+
 def dump_db_to_directory(location, password, redact=None):
     with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
         cfgfile.write(_dump_keys(password))
@@ -1413,7 +1485,8 @@ def dump_db_to_directory(location, password, redact=None):
     try:
         for tenant in os.listdir(
                 os.path.join(ConfigManager._cfgdir, '/tenants/')):
-            with open(os.path.join(location, tenant + '.json'), 'w') as cfgfile:
+            with open(os.path.join(location, 'tenants', tenant,
+                                   'main.json'), 'w') as cfgfile:
                 cfgfile.write(ConfigManager(tenant=tenant)._dump_to_json(
                     redact=redact))
                 cfgfile.write('\n')
