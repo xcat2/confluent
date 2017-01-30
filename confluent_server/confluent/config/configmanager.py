@@ -1476,9 +1476,10 @@ def restore_db_from_directory(location, password):
 
 
 def dump_db_to_directory(location, password, redact=None):
-    with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
-        cfgfile.write(_dump_keys(password))
-        cfgfile.write('\n')
+    if not redact:
+        with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
+            cfgfile.write(_dump_keys(password))
+            cfgfile.write('\n')
     with open(os.path.join(location, 'main.json'), 'w') as cfgfile:
         cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
         cfgfile.write('\n')
