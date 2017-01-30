@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+import optparse
+import sys
+import os
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    # if installed into system path, do not muck with things
+    sys.path.append(path)
+import confluent.config.configmanager as cfm
+import confluent.config.conf as conf
+import confluent.main as main
+
+argparser = optparse.OptionParser(usage="Usage: %prog [options] [dump|restore] [path]")
+argparser.add_option('-p', '--password',
+                     help='Password to use to protect/unlock a protected dump')
+argparser.add_option('-r', '--redact', action='store_true',
+                     help='Redact potentially sensitive data rather than store')
+argparser.add_option('-u', '--unprotected', action='store_true',
+                      help='Specify that no password should be used to protect'
+                           ' the key information.  Fields will be encrypted, '
+                           'but keys.json will contain unencrypted decryption'
+                           ' keys that may be used to read the dump')
+(options, args) = argparser.parse_args()
+if len(args) != 2 or args[0] not in ('dump', 'restore'):
+    argparser.print_help()
+    sys.exit(1)
+dumpdir = args[1]
+
+
+if args[0] == 'restore':
+    pid = main.is_running()
+    if pid is not None:
+        print("Confluent is running, must shut down to restore db")
+        sys.exit(1)
+    cfm.restore_db_from_directory(dumpdir, options.password)
+elif args[0] == 'dump':
+    if options.password is None and not options.unprotected:
+        print("Must indicate a password to protect or -u to opt opt of "
+              "secure value protection")
+        sys.exit(1)
+    os.umask(077)
+    main._initsecurity(conf.get_config())
+    if not os.path.exists(dumpdir):
+        os.makedirs(dumpdir)
+    cfm.dump_db_to_directory(dumpdir, options.password)
+
+
+
