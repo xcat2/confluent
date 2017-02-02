@@ -44,6 +44,7 @@ def _parseserver(string):
 class Command(object):
 
     def __init__(self, server=None):
+        self._prevkeyname = None
         self.connection = None
         if server is None:
             if 'CONFLUENT_HOST' in os.environ:
@@ -74,6 +75,9 @@ class Command(object):
         if authdata['authpassed'] == 1:
             self.authenticated = True
 
+    def add_precede_key(self, keyname):
+        self._prevkeyname = keyname
+
     def handle_results(self, ikey, rc, res):
         if 'error' in res:
             sys.stderr.write('Error: {0}\n'.format(res['error']))
@@ -93,7 +97,12 @@ class Command(object):
                 else:
                     rc |= 1
             elif ikey in res[node]:
-                print('{0}: {1}'.format(node, res[node][ikey]['value']))
+                if self._prevkeyname and self._prevkeyname in res[node]:
+                    print('{0}: {2}->{1}'.format(
+                        node, res[node][ikey]['value'],
+                        res[node][self._prevkeyname]['value']))
+                else:
+                    print('{0}: {1}'.format(node, res[node][ikey]['value']))
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
