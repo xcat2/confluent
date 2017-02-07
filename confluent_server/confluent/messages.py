@@ -797,6 +797,11 @@ class PowerState(ConfluentChoiceMessage):
     ])
     keyname = 'state'
 
+    def __init__(self, node, state, oldstate=None):
+        super(PowerState, self).__init__(node, state)
+        if oldstate is not None:
+            self.kvpairs[node]['oldstate'] = {'value': oldstate}
+
 
 class BMCReset(ConfluentChoiceMessage):
     valid_values = set([
