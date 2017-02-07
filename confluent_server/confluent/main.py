@@ -89,6 +89,26 @@ def _updatepidfile():
     pidfile.close()
 
 
+def is_running():
+    # Utility function for utilities to check if confluent is running
+    try:
+        pidfile = open('/var/run/confluent/pid', 'r+')
+        fcntl.flock(pidfile, fcntl.LOCK_SH)
+        pid = pidfile.read()
+        if pid != '':
+            try:
+                os.kill(int(pid), 0)
+                return pid
+            except OSError:
+                # There is no process running by that pid, must be stale
+                pass
+        fcntl.flock(pidfile, fcntl.LOCK_UN)
+        pidfile.close()
+    except IOError:
+        pass
+    return None
+
+
 def _checkpidfile():
     try:
         pidfile = open('/var/run/confluent/pid', 'r+')

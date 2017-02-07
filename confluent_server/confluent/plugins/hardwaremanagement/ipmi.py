@@ -795,10 +795,22 @@ class IpmiHandler(object):
             return
         elif 'update' == self.op:
             powerstate = self.inputdata.powerstate(self.node)
+            oldpower = None
+            if powerstate == 'boot':
+                oldpower = self.ipmicmd.get_power()
+                if 'powerstate' in oldpower:
+                    oldpower = oldpower['powerstate']
             self.ipmicmd.set_power(powerstate, wait=30)
-            power = self.ipmicmd.get_power()
+            if powerstate == 'boot' and oldpower == 'on':
+                power = {'powerstate': 'reset'}
+            else:
+                power = self.ipmicmd.get_power()
+                if powerstate == 'reset' and power['powerstate'] == 'on':
+                    power['powerstate'] = 'reset'
+
             self.output.put(msg.PowerState(node=self.node,
-                                           state=power['powerstate']))
+                                           state=power['powerstate'],
+                                           oldstate=oldpower))
             return
 
     def handle_reset(self):
