@@ -123,7 +123,7 @@ def snoop(handler, byehandler=None):
                                     machandlers[mac] = handler
             r, _, _ = select.select((net4, net6), (), (), 0.1)
         for mac in newmacs:
-            thehandler = machandlers[mac]
+            thehandler = machandlers.get(mac, None)
             if thehandler:
                 thehandler(peerbymacaddress[mac])
 
