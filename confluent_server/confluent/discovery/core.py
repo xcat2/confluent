@@ -90,6 +90,8 @@ import eventlet
 
 _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
+    'service:lenovo-smm',
+
 ])
 def add_validated_fingerprint(nodename, fingerprint, role='manager'):
     """Add a physically validated certificate fingerprint
