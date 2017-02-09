@@ -36,8 +36,7 @@ import struct
 
 mcastv4addr = '239.255.255.250'
 mcastv6addr = 'ff02::c'
-ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
-             struct.pack('=I', socket.INADDR_ANY)
+
 ssdp6mcast = socket.inet_pton(socket.AF_INET6, mcastv6addr)
 smsg = ('M-SEARCH * HTTP/1.1\r\n'
         'HOST: {0}:1900\r\n'
@@ -76,7 +75,11 @@ def snoop(handler, byehandler=None):
         net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
     net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, ssdp4mcast)
+    for i4 in util.list_ips():
+        ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
+                     socket.inet_aton(i4['addr'])
+        net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                        ssdp4mcast)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.bind(('', 1900))
     net6.bind(('', 1900))
