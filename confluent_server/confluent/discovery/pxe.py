@@ -103,7 +103,11 @@ def snoop(handler):
             uuid, arch = find_info_in_options(rq, optidx)
             if uuid is None:
                 continue
-            handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch})
+            # We will fill out service to have something to byte into,
+            # but the nature of the beast is that we do not have peers,
+            # so that will not be present for a pxe snoop
+            handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
+                     'service': 'pxe-client'})
 
 if __name__ == '__main__':
     def testsnoop(info):
