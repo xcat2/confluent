@@ -360,9 +360,12 @@ def snoop(handler):
         mreq = slpg2 + struct.pack('=I', i6idx)
         net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    slpmcast = socket.inet_pton(socket.AF_INET, '239.255.255.253') + \
-               struct.pack('=I', socket.INADDR_ANY)
-    net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, slpmcast)
+    for i4 in util.list_ips():
+        if 'broadcast' not in i4:
+            continue
+        slpmcast = socket.inet_aton('239.255.255.253') + \
+                   socket.inet_aton(i4['addr'])
+        net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, slpmcast)
     net.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net.bind(('', 427))
