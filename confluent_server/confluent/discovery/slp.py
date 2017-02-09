@@ -24,6 +24,12 @@ import struct
 import subprocess
 
 
+_slp_services = set([
+    'service:management-hardware.IBM:integrated-management-module2',
+    'service:lenovo-smm',
+    'service:management-hardware.Lenovo:lenovo-xclarity-controller',
+])
+
 # SLP has a lot of ambition that was unfulfilled in practice.
 # So we have a static footer here to always use 'DEFAULT' scope, no LDAP
 # predicates, and no authentication for service requests
@@ -97,10 +103,10 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
         parsed = rsps[(identifier, parsed['xid'])]
     else:
         rsps[(identifier, parsed['xid'])] = parsed
-    if mac and 'mac' not in parsed:
-        parsed['mac'] = mac
+    if mac and 'hwaddr' not in parsed:
+        parsed['hwaddr'] = mac
     if parsed['xid'] in xidmap:
-        parsed['service'] = xidmap[parsed['xid']]
+        parsed['services'] = [xidmap[parsed['xid']]]
     if 'addresses' in parsed:
         if peer not in parsed['addresses']:
             parsed['addresses'].append(peer)
@@ -282,7 +288,7 @@ def _parse_attrs(data, parsed):
 
 
 def _add_attributes(parsed):
-    attrq = _generate_attr_request(parsed['service'], parsed['xid'])
+    attrq = _generate_attr_request(parsed['services'][0], parsed['xid'])
     target = None
     # prefer reaching out to an fe80 if present, to be highly robust
     # in face of network changes
@@ -350,6 +356,8 @@ def snoop(handler):
     :return:
     """
     known_peers = set([])
+    for scanned in scan(_slp_services):
+        print(repr(scanned))
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
@@ -403,7 +411,7 @@ def snoop(handler):
         for mac in newmacs:
             peerinfo = {
                 'hwaddr': mac,
-                'peers': peerbymacaddress[mac]['peers'],
+                'addresses': peerbymacaddress[mac]['peers'],
                 'services': peerbymacaddress[mac]['services'],
             }
             handler(peerinfo)
@@ -457,9 +465,6 @@ def scan(srvtypes, addresses=None):
 
 
 if __name__ == '__main__':
-    for rsp in scan(
-            ["service:management-hardware.IBM:integrated-management-module2"]):
-        print(repr(rsp))
     def testsnoop(a):
         print(repr(a))
     snoop(testsnoop)
