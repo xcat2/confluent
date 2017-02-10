@@ -76,7 +76,11 @@ if len(args) > 1:
                             attrout = '{0}: {1}: ********'.format(node, attr)
                         else:
                             attrout = '{0}: {1}:'.format(node, attr)
-                    if options.blame:
+                    elif 'broken' in currattr:
+                        attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
+                                  '{2}'.format(node, attr,
+                                               currattr['broken'])
+                    if options.blame or 'broken' in currattr:
                         blamedata = []
                         if 'inheritedfrom' in currattr:
                             blamedata.append('inherited from group {0}'.format(
