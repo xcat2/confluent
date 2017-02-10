@@ -31,6 +31,9 @@
 # this module will provide mac to switch and full 'ifName' label
 # This functionality is restricted to the null tenant
 
+if __name__ == '__main__':
+    import sys
+    import confluent.config.configmanager as cfm
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.snmputil as snmp
@@ -212,7 +215,8 @@ def update_macmap(configmanager):
     switches = set([])
     for node in nodelocations:
         cfg = nodelocations[node]
-        if 'hardwaremanagement.switch' in cfg:
+        if ('hardwaremanagement.switch' in cfg and
+                'value' in cfg['hardwaremanagement.switch']):
             curswitch = cfg['hardwaremanagement.switch']['value']
             switches.add(curswitch)
             if 'hardwaremanagement.switchport' in cfg:
@@ -244,10 +248,16 @@ def update_macmap(configmanager):
     pool = GreenPool()
     for res in pool.imap(_map_switch, switchauth):
         yield res
-        print(repr(_macmap))
 
 
 if __name__ == '__main__':
-    # invoke as switch community
-    import sys
-    _map_switch((sys.argv[1], sys.argv[2]))
+    cg = cfm.ConfigManager(None)
+    for res in update_macmap(cg):
+        print("map has updated")
+    if len(sys.argv) > 1:
+        print(repr(_macmap[sys.argv[1]]))
+        print(repr(_nodesbymac[sys.argv[1]]))
+    else:
+        print(repr(_nodesbymac))
+        print(repr(_macmap))
+        print(repr(_macsbyswitch))
