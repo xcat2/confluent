@@ -234,7 +234,6 @@ def send_request(operation, path, server, parameters=None):
         # their unused data
         result = tlvdata.recv(server)
         while '_requestdone' not in result:
-            yield result
             result = tlvdata.recv(server)
     inflight = True
     payload = {'operation': operation, 'path': path}
