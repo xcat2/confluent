@@ -258,6 +258,9 @@ if __name__ == '__main__':
         print(repr(_macmap[sys.argv[1]]))
         print(repr(_nodesbymac[sys.argv[1]]))
     else:
+        print("Mac to Node lookup table: -------------------")
         print(repr(_nodesbymac))
+        print("Mac to location lookup table: -------------------")
         print(repr(_macmap))
+        print("switch to fdb lookup table: -------------------")
         print(repr(_macsbyswitch))
