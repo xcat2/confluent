@@ -373,7 +373,6 @@ def snoop(handler):
             known_peers.add(addr)
         else:
             handler(scanned)
-    print(repr(scanned))
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
