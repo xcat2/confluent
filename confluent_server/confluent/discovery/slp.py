@@ -237,11 +237,17 @@ def _parse_attrlist(attrstr):
                 return attribs
             currattr = attrstr[1:attrstr.index(')')]
             if '=' not in currattr:  # Not allegedly kosher, but still..
+                currattr = currattr.decode('utf-8')
                 attribs[currattr] = None
             else:
                 attrname, attrval = currattr.split('=')
+                attrname = attrname.decode('utf-8')
                 attribs[attrname] = []
                 for val in attrval.split(','):
+                    try:
+                        val = val.decode('utf-8')
+                    except UnicodeDecodeError:
+                        val = '*DECODEERROR*'
                     if val[:3] == '\\FF':  # we should make this bytes
                         finalval = bytearray([])
                         for bnum in attrval[3:].split('\\'):
@@ -283,7 +289,7 @@ def _parse_attrs(data, parsed):
     if struct.unpack('!H', bytes(payload[:2]))[0] != 0:
         return
     length = struct.unpack('!H', bytes(payload[2:4]))[0]
-    attrstr = bytes(payload[4:4+length]).decode('utf-8')
+    attrstr = bytes(payload[4:4+length])
     parsed['attributes'] = _parse_attrlist(attrstr)
 
 
@@ -378,14 +384,20 @@ def snoop(handler):
         mreq = slpg2 + struct.pack('=I', i6idx)
         net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    net.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     for i4 in util.list_ips():
         if 'broadcast' not in i4:
             continue
         slpmcast = socket.inet_aton('239.255.255.253') + \
-                   socket.inet_aton(i4['addr'])
-        net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, slpmcast)
-    net.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            socket.inet_aton(i4['addr'])
+        try:
+            net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                            slpmcast)
+        except socket.error as e:
+            if e.errno != 98:
+                raise
+            # socket in use can occur when aliased ipv4 are encountered
     net.bind(('', 427))
     net4.bind(('', 427))
 
