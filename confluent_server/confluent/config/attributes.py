@@ -16,12 +16,17 @@
 # limitations under the License.
 
 
-#This defines the attributes of variou classes of things
+#This defines the attributes of various classes of things
 
 # 'nic', meant to be a nested structure under node
 nic = {
     'name': {
         'description': 'Name in ip/ifconfig as desired by administrator',
+    },
+    'biosdevname' {
+        'description': '"biosdevname" scheme to identify the adapter. If not'
+                       'mac address match is preferred, then biosdevname, then'
+                       'name.',
     },
     'port': {
         'description': 'Port that this nic connects to',
@@ -29,9 +34,9 @@ nic = {
     'switch': {
         'description': 'Switch that this nic connects to',
     },
-    'customhardwareaddress': {
-        'description': 'Mac address to push to nic',
-    },
+#    'customhardwareaddress': {
+#        'description': 'Mac address to push to nic',
+#    },
     'dnssuffix': {
         'description': ('String to place after nodename, but before'
                         'Network.Domain to derive FQDN for this NIC'),
