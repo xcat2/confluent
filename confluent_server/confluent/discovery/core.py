@@ -48,8 +48,12 @@
 #                     word works best, note the successfull verification, but do
 #                     not manage
 #                   - Otherwise, proceed to 'Manage'
+#  -Pre-configure - Given data up to this point, try to do some pre-config.
+#                   For example, if located and X, then check for S, enable S
+#                   This happens regardless of verify, as verify may depend on
+#                   S
 #  - Manage
-#     - Create the node if autonode
+#     - Create the node if autonode (Deferred)
 #     - If there is not a defined ip address, collect the current LLA and use
 #       that value.
 #     - If no username/password defined, generate a unique password, 20 bytes
