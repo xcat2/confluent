@@ -173,17 +173,18 @@ class DiscoveredNode(object):
         # validated by a secure validator.
         pass
 
-def detect_endpoint(mac, peers, services):
-    pass
-
 def ondisco(info):
-    print(repr(info))
+    if 'hwaddr' in info:
+        print(repr(info['hwaddr']))
+        print(repr(info['services']))
+
+
 
 
 def start_detection():
     eventlet.spawn_n(slp.snoop, ondisco)
-    eventlet.spawn_n(ssdp.snoop, ondisco)
-    eventlet.spawn_n(pxe.snoop, ondisco)
+    #eventlet.spawn_n(ssdp.snoop, ondisco)
+    #eventlet.spawn_n(pxe.snoop, ondisco)
 
 if __name__ == '__main__':
     start_detection()

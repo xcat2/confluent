@@ -39,6 +39,7 @@ except ImportError:
     #On platforms without pwd, give up on the sockapi in general and be http
     #only for now
     pass
+import confluent.discovery.core as disco
 import eventlet
 dbgif = False
 if  map(int, (eventlet.__version__.split('.'))) > [0, 18]:

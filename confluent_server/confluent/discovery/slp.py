@@ -277,7 +277,6 @@ def _parse_attrlist(attrstr):
             currattr = attrstr
             attribs[currattr] = None
             attrstr = None
-    print(repr(attribs))
     return attribs
 
 
