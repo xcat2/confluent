@@ -23,7 +23,7 @@ nic = {
     'name': {
         'description': 'Name in ip/ifconfig as desired by administrator',
     },
-    'biosdevname' {
+    'biosdevname': {
         'description': '"biosdevname" scheme to identify the adapter. If not'
                        'mac address match is preferred, then biosdevname, then'
                        'name.',
