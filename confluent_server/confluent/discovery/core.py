@@ -61,10 +61,21 @@
 #       retry until uppercase, lowercase, digit, and symbol all present)
 #     - Apply defined configuration to endpoint
 
-import confluent.discovery.pxe as pxe
-import confluent.discovery.ssdp as ssdp
+import confluent.config.configmanager as cfm
+#import confluent.discovery.pxe as pxe
+#import confluent.discovery.ssdp as ssdp
 import confluent.discovery.slp as slp
+import confluent.handlers.xcc as xcc
+import confluent.handlers.bmchandler as bmc
+
+import confluent.networking.macmap as macmap
+
 import eventlet
+
+nodehandlers = {
+    'service:lenovo-smm': bmc,
+    'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
+}
 
 # Passive-only auto-detection protocols:
 # PXE
@@ -173,16 +184,34 @@ class DiscoveredNode(object):
         # validated by a secure validator.
         pass
 
-def ondisco(info):
-    if 'hwaddr' in info:
-        print(repr(info['hwaddr']))
-        print(repr(info['services']))
+known_nodes = set([])
+
+def detected(info):
+    if 'hwaddr' not in info:
+        return  # For now, require hwaddr field to proceed
+        # later, manual and CMM discovery may act on SN and/or UUID
+    if info['hwaddr'] in known_nodes:
+        return
+    andler = None
+    for service in info['services']:
+        if nodehandlers[service]:
+            handler = nodehandlers[service]
+            break
+    else:  # no nodehandler, ignore for now
+        return
+    known_nodes.add(info['hwaddr'])
+    cfg = cfm.ConfigManager(None)
+    handler = handler.NodeHandler(info, cfg)
+    handler.probe()  # unicast interrogation as possible to get more data
+
+
+
 
 
 
 
 def start_detection():
-    eventlet.spawn_n(slp.snoop, ondisco)
+    eventlet.spawn_n(slp.snoop, detected)
     #eventlet.spawn_n(ssdp.snoop, ondisco)
     #eventlet.spawn_n(pxe.snoop, ondisco)
 

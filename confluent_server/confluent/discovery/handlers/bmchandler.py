@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import eventlet
+import confluent.discovery.handlers.generic as generic
+
 import eventlet.green.threading
 import eventlet.support.greendns
 
+# Provide foundation for general IPMI device configuration
+
+import pyghmi.exceptions as pygexc
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 ipmicommand.session.select = eventlet.green.select
 ipmicommand.session.threading = eventlet.green.threading
@@ -24,21 +28,19 @@ ipmicommand.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
 DEFAULT_USER = 'USERID'
 DEFAULT_PASS = 'PASSW0RD'
 
-def interrogate(info):
-    # get the uuid
-    targsa = None
-    # first let us prefer LLA if possible, since that's most stable
-    for sa in info['addresses']:
-        if sa[0].startswith('fe80'):
-            targsa = sa
-            break
-    else:
-        targsa = info['addresses'][0]
-    ipaddr = targsa[0]
-    icmd = pyghmi.ipmi.command.Command(ipaddr, DEFAULT_USER, DEFAULT_PASS)
-    # get the uuid
 
-def preconfig(info):
-    # if stark, enable smm
-    pass
+class NodeHandler(generic.NodeHandler):
 
+    def _get_ipmicmd(self, user=DEFAULT_USER, password=DEFAULT_PASS):
+        return ipmicommand.Command(self.ipaddr, user, password)
+
+    def __init__(self, info, configmanager):
+        super(NodeHandler, self).__init__(info, configmanager)
+
+    def probe(self):
+        return
+        # TODO(jjohnson2): probe serial number and uuid
+
+    def config(self):
+        # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
+        return

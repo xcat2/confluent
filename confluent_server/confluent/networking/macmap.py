@@ -192,6 +192,8 @@ def _map_switch_backend(args):
             _nodesbymac[mac] = nodename
 
 
+def find_mac(mac, configmanager):
+
 def update_macmap(configmanager):
     """Interrogate switches to build/update mac table
 
