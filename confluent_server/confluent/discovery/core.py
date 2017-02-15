@@ -67,7 +67,6 @@ import confluent.config.configmanager as cfm
 import confluent.discovery.slp as slp
 import confluent.handlers.xcc as xcc
 import confluent.handlers.bmchandler as bmc
-
 import confluent.networking.macmap as macmap
 
 import eventlet
@@ -192,7 +191,7 @@ def detected(info):
         # later, manual and CMM discovery may act on SN and/or UUID
     if info['hwaddr'] in known_nodes:
         return
-    andler = None
+    handler = None
     for service in info['services']:
         if nodehandlers[service]:
             handler = nodehandlers[service]
@@ -203,6 +202,13 @@ def detected(info):
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
     handler.probe()  # unicast interrogation as possible to get more data
+    nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
+    if nodename:
+        handler.preconfig()
+    if handler.discoverable_by_switch:
+        dp = cfg.get_node_attributes([nodename], ('discovery.policy',))
+        print(repr(dp))
+
 
 
 

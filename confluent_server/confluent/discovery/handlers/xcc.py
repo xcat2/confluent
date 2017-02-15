@@ -30,6 +30,7 @@ class NodeHandler(bmchandler.NodeHandler):
         ipmicmd.ipmi_session.logout()
     icmd.logout()
 
+    @property
     def discoverable_by_switch(self):
         return self.discoverable
 

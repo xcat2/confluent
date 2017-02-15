@@ -134,6 +134,15 @@ node = {
 #                        'autonode.servername, so that would not need to be '
 #                        'copied ')
 #    },
+    'discovery.policy': {
+        'description':  'Policy to use for auto-configuration of discovered '
+                        'and identified nodes. Valid values are "manual" or '
+                        '"insecure". Default behavior is "manual".  In manual,'
+                        'node discovery does not happen unless a client '
+                        'explicitly approves. With insecure, automatic '
+                        'discovery is allowed to proceed without proving the '
+                        'validity of public key to a trusted peer.',
+    },
     'location.room': {
         'description': 'Room description for the node',
     },

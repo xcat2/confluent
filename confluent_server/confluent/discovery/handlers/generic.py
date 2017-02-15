@@ -36,3 +36,7 @@ class NodeHandler(object):
 
     def preconfig(self):
         return
+
+    @property
+    def discoverable_by_switch(self):
+        return True
