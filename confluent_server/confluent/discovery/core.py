@@ -65,8 +65,8 @@ import confluent.config.configmanager as cfm
 #import confluent.discovery.pxe as pxe
 #import confluent.discovery.ssdp as ssdp
 import confluent.discovery.slp as slp
-import confluent.handlers.xcc as xcc
-import confluent.handlers.bmchandler as bmc
+import confluent.discovery.handlers.xcc as xcc
+import confluent.discovery.handlers.bmchandler as bmc
 import confluent.networking.macmap as macmap
 
 import eventlet
@@ -193,7 +193,7 @@ def detected(info):
         return
     handler = None
     for service in info['services']:
-        if nodehandlers[service]:
+        if nodehandlers.get(service, None):
             handler = nodehandlers[service]
             break
     else:  # no nodehandler, ignore for now

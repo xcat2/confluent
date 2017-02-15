@@ -195,7 +195,7 @@ def _map_switch_backend(args):
 
 
 def find_node_by_mac(mac, configmanager):
-    if util.monotonic_time() - vintage < 90 and mac in _nodesbymac:
+    if vintage and util.monotonic_time() - vintage < 90 and mac in _nodesbymac:
         return _nodesbymac[mac]
     for _ in update_macmap(configmanager):
         if mac in _nodesbymac:

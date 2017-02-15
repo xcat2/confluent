@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.bmchandler as bmchandler
+import pyghmi.exceptions as pygexc
 
 
 class NodeHandler(bmchandler.NodeHandler):
@@ -20,15 +21,20 @@ class NodeHandler(bmchandler.NodeHandler):
     def preconfig(self):
         self.discoverable = True
         # attempt to enable SMM
-        ipmicmd = self._get_ipmicmd()
+        ipmicmd = None
         try:
+            ipmicmd = self._get_ipmicmd()
             ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
             self.discoverable = False
-        except pygexc.IpmiException:
+        except pygexc.IpmiException as e:
             # If the XCC can't do it, that's fine, it wasn't stark
+            print('TODO: MUST DISTINGUISH BETWEEN LOGIN FAILURE')
+            # if login failure, discoverable should alse be false
+            print(repr(e))
+            print(repr(e.ipmicode))
             pass
-        ipmicmd.ipmi_session.logout()
-    icmd.logout()
+        if ipmicmd:
+            ipmicmd.ipmi_session.logout()
 
     @property
     def discoverable_by_switch(self):
