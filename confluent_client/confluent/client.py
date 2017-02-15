@@ -232,7 +232,12 @@ def send_request(operation, path, server, parameters=None):
     tlvdata.send(server, payload)
     result = tlvdata.recv(server)
     while '_requestdone' not in result:
-        yield result
+        try:
+            yield result
+        except GeneratorExit:
+            while '_requestdone' not in result:
+                result = tlvdata.recv(server)
+            raise
         result = tlvdata.recv(server)
 
 
