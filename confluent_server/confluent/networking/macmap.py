@@ -37,6 +37,7 @@ if __name__ == '__main__':
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.snmputil as snmp
+import confluent.util as util
 from eventlet.greenpool import GreenPool
 import re
 
@@ -44,6 +45,7 @@ _macmap = {}
 _macsbyswitch = {}
 _nodesbymac = {}
 _switchportmap = {}
+vintage = None
 
 
 _whitelistnames = (
@@ -192,7 +194,12 @@ def _map_switch_backend(args):
             _nodesbymac[mac] = nodename
 
 
-def find_mac(mac, configmanager):
+def find_node_by_mac(mac, configmanager):
+    if util.monotonic_time() - vintage < 90 and mac in _nodesbymac:
+        return _nodesbymac[mac]
+    for _ in update_macmap(configmanager):
+        if mac in _nodesbymac:
+            return _nodesbymac[mac]
 
 def update_macmap(configmanager):
     """Interrogate switches to build/update mac table
@@ -205,6 +212,8 @@ def update_macmap(configmanager):
     global _macmap
     global _nodesbymac
     global _switchportmap
+    global vintage
+    vintage = util.monotonic_time()
     # Clear all existing entries
     _macmap = {}
     _nodesbymac = {}

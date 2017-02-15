@@ -18,12 +18,18 @@ import confluent.discovery.handlers.bmchandler as bmchandler
 class NodeHandler(bmchandler.NodeHandler):
 
     def preconfig(self):
+        self.discoverable = True
         # attempt to enable SMM
         ipmicmd = self._get_ipmicmd()
         try:
             ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
+            self.discoverable = False
         except pygexc.IpmiException:
             # If the XCC can't do it, that's fine, it wasn't stark
             pass
         ipmicmd.ipmi_session.logout()
     icmd.logout()
+
+    def discoverable_by_switch(self):
+        return self.discoverable
+
