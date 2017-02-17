@@ -136,12 +136,13 @@ node = {
 #    },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
-                        'and identified nodes. Valid values are "manual" or '
-                        '"insecure". Default behavior is "manual".  In manual,'
-                        'node discovery does not happen unless a client '
-                        'explicitly approves. With insecure, automatic '
-                        'discovery is allowed to proceed without proving the '
-                        'validity of public key to a trusted peer.',
+                        'and identified nodes. Valid values are "manual", '
+                        '"permissive", or "open". "manual" means nodes are '
+                        'detected, but not autoconfigured until a user '
+                        'approves. "permissive" indicates to allow discovery, '
+                        'so long as the node has no existing public key. '
+                        '"open" allows discovery even if a known public key '
+                        'is already stored',
     },
     'location.room': {
         'description': 'Room description for the node',

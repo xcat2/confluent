@@ -190,6 +190,8 @@ def detected(info):
         return  # For now, require hwaddr field to proceed
         # later, manual and CMM discovery may act on SN and/or UUID
     if info['hwaddr'] in known_nodes:
+        # we should tee these up for parsing when an enclosure comes up
+        # also when switch config parameters change, should discard
         return
     handler = None
     for service in info['services']:
@@ -202,18 +204,24 @@ def detected(info):
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
     handler.probe()  # unicast interrogation as possible to get more data
+    # for now, we search switch only, ideally we search cmm, smm, and switch
+    # concurrently
     nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     if nodename:
         handler.preconfig()
-    if handler.discoverable_by_switch:
-        dp = cfg.get_node_attributes([nodename], ('discovery.policy',))
-        print(repr(dp))
-
-
-
-
-
-
+        if handler.discoverable_by_switch:
+            # we can and did discover by switch
+            dp = cfg.get_node_attributes([nodename], ('discovery.policy',))
+            policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
+                'value', None)
+            # TODO(jjohnson2): permissive requires we guarantee storage of
+            # the pubkeys, which is deferred for a little bit
+            # Also, 'secure', when we have the needed infrastructure done
+            # in some product or another.
+            if policy == 'permissive':
+                fp = handler.https_cert
+            if policy == 'open':
+                handler.config()
 
 
 def start_detection():

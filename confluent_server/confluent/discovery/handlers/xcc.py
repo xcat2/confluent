@@ -27,12 +27,10 @@ class NodeHandler(bmchandler.NodeHandler):
             ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
             self.discoverable = False
         except pygexc.IpmiException as e:
-            # If the XCC can't do it, that's fine, it wasn't stark
-            print('TODO: MUST DISTINGUISH BETWEEN LOGIN FAILURE')
-            # if login failure, discoverable should alse be false
-            print(repr(e))
-            print(repr(e.ipmicode))
-            pass
+            if e.ipmicode != 193:
+                # Do not try to discover an XCC that can't be preconfigged
+                # can't tell 100% if it's safe to do
+                self.discoverable = False
         if ipmicmd:
             ipmicmd.ipmi_session.logout()
 

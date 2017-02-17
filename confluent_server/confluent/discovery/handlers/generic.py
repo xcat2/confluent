@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import eventlet
+webclient = eventlet.import_patched('pyghmi.util.webclient')
+import hashlib
 
 class NodeHandler(object):
 
     def __init__(self, info, configmanager):
+        self._fp = None
         self.info = info
         self.configmanager = configmanager
         targsa = None
@@ -40,3 +44,19 @@ class NodeHandler(object):
     @property
     def discoverable_by_switch(self):
         return True
+
+    def _savecert(self, certificate):
+        self._fp = 'sha512$' + hashlib.sha512(certificate).hexdigest()
+        return True
+
+    @property
+    def https_cert(self):
+        if self._fp:
+            return self._fp
+        if ':' in self.ipaddr:
+            ip = '[{0}]'.format(self.ipaddr)
+        else:
+            ip = self.ipaddr
+        wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert)
+        wc.connect()
+        return self._fp
