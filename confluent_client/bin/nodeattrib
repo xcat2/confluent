@@ -48,7 +48,7 @@ argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
 (options, args) = argparser.parse_args()
 
-showtype = 'all'
+showtype = 'current'
 requestargs=None
 try:
     noderange = args[0]
