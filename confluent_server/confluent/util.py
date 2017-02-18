@@ -87,6 +87,15 @@ def monotonic_time():
     # for now, just support POSIX systems
     return os.times()[4]
 
+
+def cert_matches(fingerprint, certificate):
+    algo, fp = fingperprint.partition('$')
+    newfp = None
+    if algo == 'sha512':
+        newfp = 'sha512$' + hashlib.sha512(certificate).hexdigest()
+    return newfp and fp == newfp
+
+
 class TLSCertVerifier(object):
     def __init__(self, configmanager, node, fieldname):
         self.cfm = configmanager

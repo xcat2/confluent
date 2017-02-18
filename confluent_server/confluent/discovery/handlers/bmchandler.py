@@ -41,6 +41,22 @@ class NodeHandler(generic.NodeHandler):
         return
         # TODO(jjohnson2): probe serial number and uuid
 
-    def config(self):
+    def config(self, nodename):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
+        # In general, try to use https automation, to make it consistent
+        # between hypothetical secure path and today.
+        # notes for smm:
+        # POST to:
+        # https://172.30.254.160/data/changepwd
+        # oripwd=PASSW0RD&newpwd=Passw0rd!4321
+        # got response:
+        # <?xml version="1.0" encoding="UTF-8"?><root><statusCode>0-ChangePwd</statusCode><fowardUrl>login.html</fowardUrl><status>ok</status></root>
+        # requires relogin
+        # https://172.30.254.160/index.html
+        # post to:
+        # https://172.30.254.160/data/login
+        # with body user=USERID&password=Passw0rd!4321
+        # yields:
+        # <?xml version="1.0" encoding="UTF-8"?><root> <status>ok</status> <authResult>0</authResult> <forwardUrl>index.html</forwardUrl> </root>
+        # note forwardUrl, if password change needed, will indicate something else
         return

@@ -68,6 +68,7 @@ import confluent.discovery.slp as slp
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.bmchandler as bmc
 import confluent.networking.macmap as macmap
+import confluent.util as util
 
 import eventlet
 
@@ -183,15 +184,19 @@ class DiscoveredNode(object):
         # validated by a secure validator.
         pass
 
-known_nodes = set([])
+#TODO: by serial, by uuid, by node
+known_info = {}
+pending_nodes = {}
 
 def detected(info):
     if 'hwaddr' not in info:
         return  # For now, require hwaddr field to proceed
         # later, manual and CMM discovery may act on SN and/or UUID
-    if info['hwaddr'] in known_nodes:
+    if info['hwaddr'] in known_info:
         # we should tee these up for parsing when an enclosure comes up
         # also when switch config parameters change, should discard
+        # and there's also if wiring is fixed...
+        # of course could periodically revisit known_nodes
         return
     handler = None
     for service in info['services']:
@@ -200,7 +205,7 @@ def detected(info):
             break
     else:  # no nodehandler, ignore for now
         return
-    known_nodes.add(info['hwaddr'])
+    known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
     handler.probe()  # unicast interrogation as possible to get more data
@@ -211,17 +216,27 @@ def detected(info):
         handler.preconfig()
         if handler.discoverable_by_switch:
             # we can and did discover by switch
-            dp = cfg.get_node_attributes([nodename], ('discovery.policy',))
+            dp = cfg.get_node_attributes(
+                [nodename], ('discovery.policy',
+                             'pubkeys.tls_hardwaremanager'))
             policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
                 'value', None)
+            lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
+                                              {}).get('value', None)
             # TODO(jjohnson2): permissive requires we guarantee storage of
             # the pubkeys, which is deferred for a little bit
             # Also, 'secure', when we have the needed infrastructure done
             # in some product or another.
-            if policy == 'permissive':
-                fp = handler.https_cert
-            if policy == 'open':
-                handler.config()
+            if policy == 'permissive' and lastfp:
+                # With a permissive policy, do not discover new
+                return
+            elif policy == 'open':
+                if not util.cert_matches(lastfp, handler.https_cert):
+                    handler.config(nodename)
+            return
+        else:
+            # Put this on the list of info pending discovery
+            pending_nodes[nodename] = info
 
 
 def start_detection():

@@ -14,7 +14,6 @@
 
 import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
-import hashlib
 
 class NodeHandler(object):
 
@@ -46,7 +45,7 @@ class NodeHandler(object):
         return True
 
     def _savecert(self, certificate):
-        self._fp = 'sha512$' + hashlib.sha512(certificate).hexdigest()
+        self._fp = certificate
         return True
 
     @property
