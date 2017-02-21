@@ -186,7 +186,14 @@ class DiscoveredNode(object):
 
 #TODO: by serial, by uuid, by node
 known_info = {}
+unknown_info = {}
 pending_nodes = {}
+
+
+def _recheck_nodes(nodeattribs, configmanager):
+    print("time to recheck")
+    # Iterate through unknown_info, maybe there's matches now
+
 
 def detected(info):
     if 'hwaddr' not in info:
@@ -232,15 +239,41 @@ def detected(info):
                 return
             elif policy == 'open':
                 if not util.cert_matches(lastfp, handler.https_cert):
+                    if info['hwaddr'] in unknown_info:
+                        del unknown_info['hwaddr']
                     handler.config(nodename)
             return
         else:
             # Put this on the list of info pending discovery
+            # if not switch discoverable, but was fonud on switch,
+            # this indicates a blade architecture
             pending_nodes[nodename] = info
+    else:
+        unknown_info[info['hwaddr']] = info
 
+attribwatcher = None
+
+
+def newnodes(added, deleting, configmanager):
+    global attribwatcher
+    configmanager.remove_watcher(attribwatcher)
+    allnodes = configmanager.list_nodes()
+    attribwatcher = configmanager.watch_attributes(
+        allnodes, ('discovery.policy', 'hardwaremanagement.switch',
+                   'hardwaremanagement.switchport'), _recheck_nodes)
+    _recheck_nodes(None, configmanager)
 
 def start_detection():
+    global attribwatcher
+    cfg = cfm.ConfigManager(None)
+    allnodes = cfg.list_nodes()
+    attribwatcher = cfg.watch_attributes(
+        allnodes, ('discovery.policy', 'hardwaremanagement.switch',
+                   'hardwaremanagement.switchport'), _recheck_nodes)
+    cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, detected)
+
+
     #eventlet.spawn_n(ssdp.snoop, ondisco)
     #eventlet.spawn_n(pxe.snoop, ondisco)
 
