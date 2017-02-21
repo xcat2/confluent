@@ -59,4 +59,5 @@ class NodeHandler(generic.NodeHandler):
         # yields:
         # <?xml version="1.0" encoding="UTF-8"?><root> <status>ok</status> <authResult>0</authResult> <forwardUrl>index.html</forwardUrl> </root>
         # note forwardUrl, if password change needed, will indicate something else
+        print(repr(nodename))
         return
