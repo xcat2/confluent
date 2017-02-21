@@ -60,4 +60,10 @@ class NodeHandler(generic.NodeHandler):
         # <?xml version="1.0" encoding="UTF-8"?><root> <status>ok</status> <authResult>0</authResult> <forwardUrl>index.html</forwardUrl> </root>
         # note forwardUrl, if password change needed, will indicate something else
         print(repr(nodename))
+        ic = self._get_ipmicmd()
+        currusers = ic.get_users()
+        lanchan = ic.get_network_channel()
+        lockeduserdata = ic.xraw_command(netfn=6, command=0x44, data=(lanchan,
+                                                                      1))
+        print(repr(currusers))
         return

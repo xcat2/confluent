@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -468,12 +468,13 @@ class InputCredential(ConfluentMessage):
         if len(path) == 4:
             inputdata['uid'] = path[-1]
         # if the operation is 'create' check if all fields are present
-        elif ('uid' not in inputdata or 'privilege_level' not in inputdata or
-                'username' not in inputdata or 'password' not in inputdata):
-            raise exc.InvalidArgumentException('all fields are required')
-
-        if 'uid' not in inputdata:
-            raise exc.InvalidArgumentException('uid is missing')
+        missingattrs = []
+        for attrname in ('uid', 'privilege_level', 'username', 'password'):
+            if attrname not in inputdata:
+                missingattrs.append(attrname)
+        if missingattrs:
+            raise exc.InvalidArgumentException(
+                'Required fields missing: {0}'.format(','.join(missingattrs)))
         if (isinstance(inputdata['uid'], str) and
                 not inputdata['uid'].isdigit()):
             raise exc.InvalidArgumentException('uid must be a number')
