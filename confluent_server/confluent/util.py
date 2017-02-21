@@ -89,6 +89,8 @@ def monotonic_time():
 
 
 def cert_matches(fingerprint, certificate):
+    if not fingerprint:
+        return False
     algo, fp = fingerprint.partition('$')
     newfp = None
     if algo == 'sha512':
