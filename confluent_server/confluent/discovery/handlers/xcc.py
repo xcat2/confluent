@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import confluent.discovery.handlers.bmchandler as bmchandler
+import confluent.discovery.handlers.bmc as bmchandler
 import pyghmi.exceptions as pygexc
 
 
