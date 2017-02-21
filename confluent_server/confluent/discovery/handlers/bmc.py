@@ -65,5 +65,6 @@ class NodeHandler(generic.NodeHandler):
         lanchan = ic.get_network_channel()
         lockeduserdata = ic.xraw_command(netfn=6, command=0x44, data=(lanchan,
                                                                       1))
+        print(repr(lockeduserdata))
         print(repr(currusers))
         return

@@ -62,11 +62,11 @@
 #     - Apply defined configuration to endpoint
 
 import confluent.config.configmanager as cfm
-#import confluent.discovery.pxe as pxe
-#import confluent.discovery.ssdp as ssdp
-import confluent.discovery.slp as slp
+#import confluent.discovery.protocols.pxe as pxe
+#import confluent.discovery.protocols.ssdp as ssdp
+import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.xcc as xcc
-import confluent.discovery.handlers.bmchandler as bmc
+import confluent.discovery.handlers.bmc as bmc
 import confluent.networking.macmap as macmap
 import confluent.util as util
 
