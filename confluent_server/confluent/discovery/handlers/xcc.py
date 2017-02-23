@@ -14,9 +14,32 @@
 
 import confluent.discovery.handlers.bmc as bmchandler
 import pyghmi.exceptions as pygexc
+import pyghmi.ipmi.private.util as pygutil
 
 
 class NodeHandler(bmchandler.NodeHandler):
+
+    def probe(self):
+        try:
+            ipmicmd = self._get_ipmicmd()
+            guiddata = ipmicmd.xraw_command(netfn=6, command=8)
+            self.info['uuid'] = pygutil.decode_wireformat_uuid(
+                guiddata['data'])
+            ipmicmd.oem_init()
+            bayid = ipmicmd._oem.immhandler.get_property(
+                '/v2/cmm/sp/7')
+            self.info['enclosure.bay'] = bayid
+            smmid = ipmicmd._oem.immhandler.get_property(
+                '/v2/ibmc/smm/chassis/uuid')
+            smmid = smmid.lower().replace(' ', '')
+            smmid = '{0}-{1}-{2}-{3}-{4}'.format(smmid[:8], smmid[8:12],
+                                                 smmid[12:16], smmid[16:20],
+                                                 smmid[20:])
+            self.info['enclosure.uuid'] = smmid
+            self.info['enclosure.type'] = 'smm'
+        except pygexc.IpmiException as ie:
+            print(repr(ie))
+            raise
 
     def preconfig(self):
         self.discoverable = True
