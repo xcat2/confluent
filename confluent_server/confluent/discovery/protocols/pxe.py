@@ -107,7 +107,7 @@ def snoop(handler):
             # but the nature of the beast is that we do not have peers,
             # so that will not be present for a pxe snoop
             handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
-                     'service': 'pxe-client'})
+                     'services': ('pxe-client',)})
 
 if __name__ == '__main__':
     def testsnoop(info):
