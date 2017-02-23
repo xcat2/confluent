@@ -195,6 +195,13 @@ def _recheck_nodes(nodeattribs, configmanager):
     # Iterate through unknown_info, maybe there's matches now
 
 
+def safe_detected(info):
+    try:
+        return detected(info)
+    except Exception as e:
+        print(repr(e))
+
+
 def detected(info):
     if 'hwaddr' not in info:
         return  # For now, require hwaddr field to proceed
@@ -205,7 +212,6 @@ def detected(info):
         # and there's also if wiring is fixed...
         # of course could periodically revisit known_nodes
         return
-    handler = None
     for service in info['services']:
         if nodehandlers.get(service, None):
             handler = nodehandlers[service]
@@ -215,9 +221,13 @@ def detected(info):
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
-    handler.probe()  # unicast interrogation as possible to get more data
-    # for now, we search switch only, ideally we search cmm, smm, and switch
-    # concurrently
+    try:
+        handler.probe()  # unicast interrogation as possible to get more data
+        # for now, we search switch only, ideally we search cmm, smm, and switch
+        # concurrently
+    except Exception as e:
+        print(repr(e))
+        return
     nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     if nodename:
         handler.preconfig()
@@ -271,11 +281,11 @@ def start_detection():
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
                    'hardwaremanagement.switchport'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
-    eventlet.spawn_n(slp.snoop, detected)
+    eventlet.spawn_n(slp.snoop, safe_detected)
 
 
-    #eventlet.spawn_n(ssdp.snoop, ondisco)
-    #eventlet.spawn_n(pxe.snoop, ondisco)
+    #eventlet.spawn_n(ssdp.snoop, safe_detected)
+    #eventlet.spawn_n(pxe.snoop, safe_detected)
 
 if __name__ == '__main__':
     start_detection()
