@@ -83,8 +83,27 @@ class NodeHandler(generic.NodeHandler):
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address')
         print(repr(cd))
-        print(maxusers)
-        print(enabledusers)
-        print(lockedusers)
-        print(repr(currusers))
+        newuser = cd['secret.hardwaremanagementuser']['value']
+        newpass = cd['secret.hardwaremanagementpassword']['value']
+        for uid in currusers:
+            if currusers[uid]['name'] == newuser:
+                # Use existing account that has been created
+                newuserslot = uid
+                break
+        else:
+            newuserslot = lockedusers + 1
+            if newuserslot < 2:
+                newuserslot = 2
+            ic.set_user_name(newuserslot, newuser)
+            ic.set_user_access(newuserslot, lanchan,
+                               privilege_level='administrator')
+        if newpass != DEFAULT_PASS:  # don't mess with default if user wants
+            ic.set_user_password(newuserslot, password=newpass)
+        # Now to zap others
+        for uid in currusers:
+            if uid != newuserslot:
+                if uid <= lockedusers:  # we cannot delete, settle for disable
+                    ic.disable_user(uid)
+                else:
+                    ic.user_delete(uid)
         return
