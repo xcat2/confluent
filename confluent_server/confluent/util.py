@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -88,14 +88,20 @@ def monotonic_time():
     return os.times()[4]
 
 
+def get_fingerprint(certificate, algo='sha512'):
+    if algo != 'sha512':
+        raise Exception("TODO: Non-sha512")
+    return 'sha512$' + hashlib.sha512(certificate).hexdigest()
+
+
 def cert_matches(fingerprint, certificate):
     if not fingerprint:
         return False
-    algo, fp = fingerprint.partition('$')
+    algo, _, fp = fingerprint.partition('$')
     newfp = None
     if algo == 'sha512':
-        newfp = 'sha512$' + hashlib.sha512(certificate).hexdigest()
-    return newfp and fp == newfp
+        newfp = get_fingerprint(certificate)
+    return newfp and fingerprint == newfp
 
 
 class TLSCertVerifier(object):
@@ -105,7 +111,7 @@ class TLSCertVerifier(object):
         self.fieldname = fieldname
 
     def verify_cert(self, certificate):
-        fingerprint = 'sha512$' + hashlib.sha512(certificate).hexdigest()
+        fingerprint = get_fingerprint(certificate)
         storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
                                                    )
         if self.fieldname not in storedprint[self.node]:  # no stored value, check

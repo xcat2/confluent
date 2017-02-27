@@ -286,9 +286,9 @@ node = {
 #    'id.serial': {
 #        'description': 'The manufacturer serial number of node',
 #    },
-#    'id.uuid': {
-#        'description': 'The UUID of the node as presented in DMI',
-#    },
+    'id.uuid': {
+        'description': 'The UUID of the node as presented in DMI.',
+    },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
 #    },

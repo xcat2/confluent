@@ -231,35 +231,55 @@ def detected(info):
     nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     if nodename:
         handler.preconfig()
-        if handler.discoverable_by_switch:
+        if 'enclosure.bay' in info:
+            nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
+            nl = cfg.filter_node_attributes(
+                'enclosure.bay=' + info['enclosure.bay'], nl)
+            nl = [x for x in nl]  # listify for sake of len
+            if len(nl) != 1:
+                raise Exception("TODO: log ambiguous situation")
+            nodename = nl[0]
+            if not discover_node(cfg, handler, info, nodename):
+                # store it as pending, assuming blocked on enclosure
+                # assurance...
+                pending_nodes[nodename] = info
+        elif handler.discoverable_by_switch:
             # we can and did discover by switch
-            dp = cfg.get_node_attributes(
-                [nodename], ('discovery.policy',
-                             'pubkeys.tls_hardwaremanager'))
-            policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
-                'value', None)
-            lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
-                                              {}).get('value', None)
-            # TODO(jjohnson2): permissive requires we guarantee storage of
-            # the pubkeys, which is deferred for a little bit
-            # Also, 'secure', when we have the needed infrastructure done
-            # in some product or another.
-            if policy == 'permissive' and lastfp:
-                # With a permissive policy, do not discover new
-                return
-            elif policy == 'open':
-                if not util.cert_matches(lastfp, handler.https_cert):
-                    if info['hwaddr'] in unknown_info:
-                        del unknown_info['hwaddr']
-                    handler.config(nodename)
-            return
-        else:
-            # Put this on the list of info pending discovery
-            # if not switch discoverable, but was fonud on switch,
-            # this indicates a blade architecture
-            pending_nodes[nodename] = info
+            discover_node(cfg, handler, info, nodename)
     else:
         unknown_info[info['hwaddr']] = info
+
+
+def discover_node(cfg, handler, info, nodename):
+    dp = cfg.get_node_attributes(
+        [nodename], ('discovery.policy',
+                     'pubkeys.tls_hardwaremanager'))
+    policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
+        'value', None)
+    lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
+                                      {}).get('value', None)
+    # TODO(jjohnson2): permissive requires we guarantee storage of
+    # the pubkeys, which is deferred for a little bit
+    # Also, 'secure', when we have the needed infrastructure done
+    # in some product or another.
+    if policy == 'permissive' and lastfp:
+        return False # With a permissive policy, do not discover new
+    elif policy in ('open', 'permissive'):
+        if not util.cert_matches(lastfp, handler.https_cert):
+            if info['hwaddr'] in unknown_info:
+                del unknown_info['hwaddr']
+            handler.config(nodename)
+            newnodeattribs = {}
+            if 'uuid' in info:
+                newnodeattribs['id.uuid'] = info['uuid']
+            if handler.https_cert:
+                newnodeattribs['pubkeys.tls_hardwaremanager'] = \
+                    util.get_fingerprint(handler.https_cert)
+            if newnodeattribs:
+                cfg.set_node_attributes({nodename: newnodeattribs})
+        return True
+    return False
+
 
 attribwatcher = None
 
