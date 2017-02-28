@@ -1,0 +1,76 @@
+nodeattrib(1) -- List or change confluent nodes attributes
+=========================================================
+
+## SYNOPSIS
+
+`nodeattrib` `noderange` [ current | all ]
+`nodeattrib` `noderange` [-b] [<nodeattribute>...]
+`nodeattrib` `noderange` [<nodeattribute1=value1> <nodeattribute2=value2> ...]
+`nodeattrib` `noderange` [-c] [<nodeattribute1> <nodeattribute2=value2> ...]
+
+## DESCRIPTION
+
+**nodeattrib** queries the confluent server to get information about nodes.  In
+the simplest form, it simply takes the given noderange(5) and lists the
+matching nodes, one line at a time.
+
+If a list of node attribute names are given, the value of those are also
+displayed.  If `-b` is specified, it will also display information on
+how inherited and expression based attributes are defined.  There is more
+information on node attributes in nodeattributes(5) man page.
+If `-c` is specified, this will set the nodeattribute to a null valid.
+This is different from setting the value to an empty string.
+
+## OPTIONS
+
+* `-b`, `--blame`:
+  Annotate inherited and expression based attributes to show their base value.
+* `-c`, `--clear`:
+  Clear given nodeattributes since '' is not the same as empty
+
+## EXAMPLES
+* Listing matching nodes of a simple noderange:
+    `# nodeattrib n1-n2`
+    `n1`: console.method: ipmi
+    `n1`: hardwaremanagement.manager: 172.30.3.1
+    `n2`: console.method: ipmi
+    `n2`: hardwaremanagement.manager: 172.30.3.2
+
+* Getting an attribute of nodes matching a noderange:
+    `# nodeattrib n1,n2 hardwaremanagement.manager`
+    `n1: hardwaremanagement.manager: 172.30.3.1`
+    `n2: hardwaremanagement.manager: 172.30.3.2`
+
+* Getting a group of attributes while determining what group defines them:
+    `# nodeattrib n1,n2 hardwaremanagement --blame`
+    `n1: hardwaremanagement.manager: 172.30.3.1`
+    `n1: hardwaremanagement.method: ipmi (inherited from group everything)`
+    `n1: hardwaremanagement.switch: r8e1`
+    `n1: hardwaremanagement.switchport: 14`
+    `n2: hardwaremanagement.manager: 172.30.3.2`
+    `n2: hardwaremanagement.method: ipmi (inherited from group everything)`
+    `n2: hardwaremanagement.switch: r8e1`
+    `n2: hardwaremanagement.switchport: 2`
+
+  * Listing matching nodes of a simple noderange that are set:
+    `# nodeattrib n1-n2 current`
+    `n1`: console.method: ipmi
+    `n1`: hardwaremanagement.manager: 172.30.3.1
+    `n2`: console.method: ipmi
+    `n2`: hardwaremanagement.manager: 172.30.3.2
+
+  * Change attribute on nodes of a simple noderange:
+    `# nodeattrib n1-n2 console.method=serial`
+    `n1`: console.method: serial
+    `n1`: hardwaremanagement.manager: 172.30.3.1
+    `n2`: console.method: serial
+    `n2`: hardwaremanagement.manager: 172.30.3.2
+
+  * Clear attribute on nodes of a simple noderange:
+    `# nodeattrib n1-n2 -c console.method`
+    `n1`: console.method:
+    `n1`: hardwaremanagement.manager: 172.30.3.1
+    `n2`: console.method:
+    `n2`: hardwaremanagement.manager: 172.30.3.2
+
+
