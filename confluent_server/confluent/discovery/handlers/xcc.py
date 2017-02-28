@@ -28,9 +28,13 @@ class NodeHandler(bmchandler.NodeHandler):
             ipmicmd.oem_init()
             bayid = ipmicmd._oem.immhandler.get_property(
                 '/v2/cmm/sp/7')
+            if not bayid:
+                return
             self.info['enclosure.bay'] = bayid
             smmid = ipmicmd._oem.immhandler.get_property(
                 '/v2/ibmc/smm/chassis/uuid')
+            if not smmid:
+                return
             smmid = smmid.lower().replace(' ', '')
             smmid = '{0}-{1}-{2}-{3}-{4}'.format(smmid[:8], smmid[8:12],
                                                  smmid[12:16], smmid[16:20],

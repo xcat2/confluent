@@ -69,6 +69,7 @@ import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.bmc as bmc
 import confluent.networking.macmap as macmap
 import confluent.util as util
+import traceback
 
 import eventlet
 
@@ -199,7 +200,7 @@ def safe_detected(info):
     try:
         return detected(info)
     except Exception as e:
-        print(repr(e))
+        traceback.print_exc()
 
 
 def detected(info):
@@ -226,7 +227,7 @@ def detected(info):
         # for now, we search switch only, ideally we search cmm, smm, and switch
         # concurrently
     except Exception as e:
-        print(repr(e))
+        traceback.print_exc()
         return
     nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     if nodename:

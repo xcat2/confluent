@@ -95,7 +95,7 @@ def get_fingerprint(certificate, algo='sha512'):
 
 
 def cert_matches(fingerprint, certificate):
-    if not fingerprint:
+    if not fingerprint or not certificate:
         return False
     algo, _, fp = fingerprint.partition('$')
     newfp = None
