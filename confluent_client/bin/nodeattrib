@@ -28,7 +28,6 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-
 def attrrequested(attr, attrlist, seenattributes):
     for candidate in attrlist:
         truename = candidate
@@ -42,10 +41,13 @@ def attrrequested(attr, attrlist, seenattributes):
             return True
     return False
 argparser = optparse.OptionParser(
-    usage='''Usage: %prog [options] noderange [list of attributes]\n  \
-                  %prog [options] noderange attribute1=value1,attribute2=value,...   ''')
+    usage='''\n       %prog [options] noderange [list of attributes]  \
+             \n       %prog [options] noderange attribute1=value1,attribute2=value,...
+             \n ''')
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
+argparser.add_option('-c', '--clear', action='store_true',
+                     help='Clear variables')
 (options, args) = argparser.parse_args()
 
 showtype = 'current'
@@ -58,27 +60,43 @@ except IndexError:
 session = client.Command()
 exitcode = 0
 
+
+#Sets attributes
 if len(args) > 1:
-    if args[1]  == 'all':
-        showtype = 'all'
-    elif args[1] == 'current':
-        showtype = 'current'
-    elif "=" in args[1]:
-        try:
-            if len(args[1:]) > 1:
-                for val in args[1:].split(','):
-                    val = val.split('=')
-                    exitcode=session.simple_noderange_command(noderange, 'attributes/all'.format(noderange), val[1], val[0])
-            else:
-                val=args[1].split('=')
-                exitcode=session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),val[1],val[0])
-        except:
-            sys.stderr.write('Error: {0} not a valid expression\n'.format(str (args[1:])))
-            exitcode = 1
+    #clears attribute
+    if options.clear:
+        targpath = '/noderange/{0}/attributes/all'.format(noderange)
+        keydata = {}
+        for attrib in args[1:]:
+            keydata[attrib] = None
+        for res in session.update(targpath, keydata):
+            if 'error' in res:
+                if 'errorcode' in res:
+                    exitcode = res['errorcode']
+                sys.stderr.write('Error: ' + res['error'] + '\n')
         sys.exit(exitcode)
     else:
-        requestargs = args[1:]
+        if args[1]  == 'all':
+            showtype = 'all'
+        elif args[1] == 'current':
+            showtype = 'current'
+        elif "=" in args[1]:
+            try:
+                if len(args[1:]) > 1:
+                    for val in args[1:]:
+                        val = val.split('=')
+                        exitcode=session.simple_noderange_command(noderange, 'attributes/all'.format(noderange), val[1], val[0])
+                else:
+                    val=args[1].split('=')
+                    exitcode=session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),val[1],val[0])
+            except:
+                sys.stderr.write('Error: {0} not a valid expression\n'.format(str (args[1:])))
+                exitcode = 1
+            sys.exit(exitcode)
+        else:
+            requestargs = args[1:]
 
+# Lists all attributes
 if len(args) > 0:
     seenattributes = set([])
     for res in session.read('/noderange/{0}/attributes/{1}'.format(noderange,showtype)):
