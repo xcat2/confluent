@@ -57,5 +57,8 @@ class NodeHandler(object):
         else:
             ip = self.ipaddr
         wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert)
-        wc.connect()
+        try:
+            wc.connect()
+        except Exception:
+            return None
         return self._fp

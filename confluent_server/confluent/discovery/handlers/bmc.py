@@ -82,7 +82,6 @@ class NodeHandler(generic.NodeHandler):
         else:
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address')
-        print(repr(cd))
         newuser = cd['secret.hardwaremanagementuser']['value']
         newpass = cd['secret.hardwaremanagementpassword']['value']
         for uid in currusers:
