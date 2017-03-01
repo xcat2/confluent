@@ -35,6 +35,9 @@ argparser.add_option('-p', '--persist', dest='persist', action='store_true',
                      default=False,
                      help='Request the boot device be persistent rather than '
                           'one time')
+argparser.add_option('-u', '--uefi', dest='uefi', action='store_true',
+                     default=True,
+                     help='Request UEFI style boot (rather than BIOS)')
 
 (options, args) = argparser.parse_args()
 
