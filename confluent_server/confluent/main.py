@@ -240,6 +240,7 @@ def run():
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
+    disco.start_detection()
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
         sockservice.start()
