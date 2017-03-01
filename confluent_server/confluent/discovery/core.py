@@ -67,6 +67,7 @@ import confluent.config.configmanager as cfm
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.bmc as bmc
+import confluent.discovery.handlers.smm as smm
 import confluent.networking.macmap as macmap
 import confluent.util as util
 import traceback
@@ -74,7 +75,7 @@ import traceback
 import eventlet
 
 nodehandlers = {
-    'service:lenovo-smm': bmc,
+    'service:lenovo-smm': smm,
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
 }
 

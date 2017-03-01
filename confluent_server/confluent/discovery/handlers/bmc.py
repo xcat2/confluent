@@ -41,7 +41,7 @@ class NodeHandler(generic.NodeHandler):
         return
         # TODO(jjohnson2): probe serial number and uuid
 
-    def config(self, nodename):
+    def config(self, nodename, reset=False):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
@@ -105,4 +105,6 @@ class NodeHandler(generic.NodeHandler):
                     ic.disable_user(uid)
                 else:
                     ic.user_delete(uid)
+        if reset:
+            ic.reset_bmc()
         return
