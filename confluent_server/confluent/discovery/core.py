@@ -193,8 +193,30 @@ pending_nodes = {}
 
 
 def _recheck_nodes(nodeattribs, configmanager):
-    print("time to recheck")
-    # Iterate through unknown_info, maybe there's matches now
+    # First we go through ones we did not find earlier
+    for mac in unknown_info:
+        nodename = macmap.find_node_by_mac(info['hwaddr'], configmanager)
+        if nodename:
+            info = unknown_info[mac]
+            for service in info['services']:
+                if nodehandlers.get(service, None):
+                    handler = nodehandlers[service]
+                    break
+            else:  # no nodehandler, ignore for now
+                continue
+            eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
+    # now we go through ones that were identified, but could not pass
+    # policy or hadn't been able to verify key
+    for nodename in pending_nodes:
+        info = pending_nodes[nodename]
+        for service in info['services']:
+            if nodehandlers.get(service, None):
+                handler = nodehandlers[service]
+                break
+        else:  # no nodehandler, ignore for now
+            continue
+        eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
+
 
 
 def safe_detected(info):
@@ -209,6 +231,12 @@ def eval_detected(info):
 
 
 def detected(info):
+    for service in info['services']:
+        if nodehandlers.get(service, None):
+            handler = nodehandlers[service]
+            break
+    else:  # no nodehandler, ignore for now
+        return
     if 'hwaddr' not in info:
         return  # For now, require hwaddr field to proceed
         # later, manual and CMM discovery may act on SN and/or UUID
@@ -217,12 +245,6 @@ def detected(info):
         # also when switch config parameters change, should discard
         # and there's also if wiring is fixed...
         # of course could periodically revisit known_nodes
-        return
-    for service in info['services']:
-        if nodehandlers.get(service, None):
-            handler = nodehandlers[service]
-            break
-    else:  # no nodehandler, ignore for now
         return
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
@@ -236,24 +258,29 @@ def detected(info):
         return
     nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     if nodename:
-        handler.preconfig()
-        if 'enclosure.bay' in info:
-            nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
-            nl = cfg.filter_node_attributes(
-                'enclosure.bay=' + info['enclosure.bay'], nl)
-            nl = [x for x in nl]  # listify for sake of len
-            if len(nl) != 1:
-                raise Exception("TODO: log ambiguous situation")
-            nodename = nl[0]
-            if not discover_node(cfg, handler, info, nodename):
-                # store it as pending, assuming blocked on enclosure
-                # assurance...
-                pending_nodes[nodename] = info
-        elif handler.discoverable_by_switch:
-            # we can and did discover by switch
-            discover_node(cfg, handler, info, nodename)
+        eval_node(cfg, handler, info, nodename)
     else:
         unknown_info[info['hwaddr']] = info
+
+
+def eval_node(cfg, handler, info, nodename):
+    handler.preconfig()
+    if 'enclosure.bay' in info:
+        nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
+        nl = cfg.filter_node_attributes(
+            'enclosure.bay=' + info['enclosure.bay'], nl)
+        nl = [x for x in nl]  # listify for sake of len
+        if len(nl) != 1:
+            raise Exception("TODO: log ambiguous situation")
+        nodename = nl[0]
+        if not discover_node(cfg, handler, info, nodename):
+            # store it as pending, assuming blocked on enclosure
+            # assurance...
+            pending_nodes[nodename] = info
+    elif handler.discoverable_by_switch:
+        # we can and did discover by switch
+        if not discover_node(cfg, handler, info, nodename):
+            pending_nodes[nodename] = info
 
 
 def discover_node(cfg, handler, info, nodename):
@@ -296,7 +323,8 @@ def newnodes(added, deleting, configmanager):
     allnodes = configmanager.list_nodes()
     attribwatcher = configmanager.watch_attributes(
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
-                   'hardwaremanagement.switchport'), _recheck_nodes)
+                   'hardwaremanagement.switchport',
+                   'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     _recheck_nodes(None, configmanager)
 
 def start_detection():
@@ -305,7 +333,8 @@ def start_detection():
     allnodes = cfg.list_nodes()
     attribwatcher = cfg.watch_attributes(
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
-                   'hardwaremanagement.switchport'), _recheck_nodes)
+                   'hardwaremanagement.switchport',
+                   'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
 
