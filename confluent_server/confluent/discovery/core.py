@@ -1,4 +1,4 @@
-# Copyright 2016 Lenovo
+# Copyright 2016-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -197,6 +197,10 @@ def _recheck_nodes(nodeattribs, configmanager):
 
 
 def safe_detected(info):
+    eventlet.spawn_n(eval_detected, info)
+
+
+def eval_detected(info):
     try:
         return detected(info)
     except Exception as e:
