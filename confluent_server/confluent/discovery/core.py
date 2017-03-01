@@ -323,6 +323,7 @@ def newnodes(added, deleting, configmanager):
     allnodes = configmanager.list_nodes()
     attribwatcher = configmanager.watch_attributes(
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
+                   'hardwaremanagement.manager',
                    'hardwaremanagement.switchport',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     _recheck_nodes(None, configmanager)
@@ -333,6 +334,7 @@ def start_detection():
     allnodes = cfg.list_nodes()
     attribwatcher = cfg.watch_attributes(
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
+                   'hardwaremanagement.manager',
                    'hardwaremanagement.switchport',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
