@@ -72,6 +72,7 @@ import confluent.exceptions as exc
 import copy
 import cPickle
 import errno
+import eventlet
 import json
 import operator
 import os
@@ -149,6 +150,18 @@ def _format_key(key, password=None):
         return {"passphraseprotected": (salt,) + cval}
     else:
         return {"unencryptedvalue": key}
+
+
+def _do_notifier(cfg, watcher, callback):
+    try:
+        callback(nodeattribs=watcher['nodeattrs'], configmanager=cfg)
+    except Exception:
+        global tracelog
+        if tracelog is None:
+            tracelog = confluent.log.Logger('trace')
+        tracelog.log(traceback.format_exc(),
+                     ltype=confluent.log.DataTypes.event,
+                     event=confluent.log.Events.stacktrace)
 
 
 def init_masterkey(password=None):
@@ -1048,14 +1061,8 @@ class ConfigManager(object):
                         }
         for watcher in notifdata.itervalues():
             callback = watcher['callback']
-            try:
-                callback(nodeattribs=watcher['nodeattrs'], configmanager=self)
-            except Exception:
-                global tracelog
-                if tracelog is None:
-                    tracelog = confluent.log.Logger('trace')
-                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                             event=log.Events.stacktrace)
+            eventlet.spawn_n(_do_notifier, self, watcher, callback)
+
 
     def del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:

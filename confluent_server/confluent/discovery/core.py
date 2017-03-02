@@ -195,6 +195,7 @@ pending_nodes = {}
 def _recheck_nodes(nodeattribs, configmanager):
     # First we go through ones we did not find earlier
     for mac in unknown_info:
+        info = unknown_info[mac]
         nodename = macmap.find_node_by_mac(info['hwaddr'], configmanager)
         if nodename:
             info = unknown_info[mac]
