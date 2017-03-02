@@ -219,7 +219,10 @@ def _recheck_nodes(nodeattribs, configmanager):
         else:  # no nodehandler, ignore for now
             continue
         eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
-
+    # TODO(jjohnson2): Need to also go over previously discovered to see
+    # if configuration matches reality, so examine known_info to verify match
+    # avoiding probe and preconfig to avoid running afoul of security
+    # detection
 
 def safe_detected(info):
     eventlet.spawn_n(eval_detected, info)
@@ -251,6 +254,17 @@ def detected(info):
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
+    # TODO: first check by filter_attributes for uuid match...
+    # but maybe not..... since UUID uniqueness is a challenge...
+    # but could search by cert fingerprint....
+    nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
+    if nodename:
+        dp = cfg.get_node_attributes([nodename],
+                                     ('pubkeys.tls_hardwaremanager'))
+        lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
+                                          {}).get('value', None)
+        if util.cert_matches(lastfp, handler.https_cert):
+            return  # already known, no need for more
     try:
         handler.probe()  # unicast interrogation as possible to get more data
         # for now, we search switch only, ideally we search cmm, smm, and
@@ -258,7 +272,6 @@ def detected(info):
     except Exception as e:
         traceback.print_exc()
         return
-    nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     if nodename:
         eval_node(cfg, handler, info, nodename)
     else:
