@@ -24,6 +24,7 @@ ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 ipmicommand.session.select = eventlet.green.select
 ipmicommand.session.threading = eventlet.green.threading
 ipmicommand.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
+getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 DEFAULT_USER = 'USERID'
 DEFAULT_PASS = 'PASSW0RD'
@@ -70,6 +71,7 @@ class NodeHandler(generic.NodeHandler):
                 not cd['hardwaremanagement.manager']['value'].startswith(
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
+            newip = getaddrinfo(newip, 0)[0][-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
             plen = netutil.get_prefix_len_for_ip(newip)
