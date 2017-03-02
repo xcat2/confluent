@@ -15,13 +15,18 @@
 # limitations under the License.
 # this will implement noderange grammar
 
+
 import socket
 import struct
+import eventlet.support.greendns
+getaddrinfo = eventlet.support.greendns.getaddrinfo
+
 
 def get_prefix_len_for_ip(ip):
     # for now, we'll use the system route table
     # later may provide for configuration lookup to override the route
     # table
+    ip = getaddrinfo(ip, 0, socket.AF_INET)[0][-1][0]
     try:
         ipn = socket.inet_aton(ip)
     except socket.error:  # For now, assume 64 for ipv6
