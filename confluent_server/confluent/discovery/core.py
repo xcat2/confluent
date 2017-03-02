@@ -45,8 +45,8 @@
 #                     would then manually bless the endpoint if applicable
 #               - Verification succeeds
 #                   - If security policy is set to strict (or manual, whichever
-#                     word works best, note the successfull verification, but do
-#                     not manage
+#                     word works best, note the successfull verification, but
+#                     do not manage
 #                   - Otherwise, proceed to 'Manage'
 #  -Pre-configure - Given data up to this point, try to do some pre-config.
 #                   For example, if located and X, then check for S, enable S
@@ -102,8 +102,9 @@ nodehandlers = {
 # * Network interfaces and addresses
 # * Switch connectivity information
 # * enclosure information
-# * Management TLS fingerprint if validated (by switch publication or enclosure)
-# * System TLS fingerprint if validated (by switch publication or system manager)
+# * Management TLS fingerprint if validated (switch publication or enclosure)
+# * System TLS fingerprint if validated (switch publication or system manager)
+
 
 def add_validated_fingerprint(nodename, fingerprint, role='manager'):
     """Add a physically validated certificate fingerprint
@@ -112,6 +113,7 @@ def add_validated_fingerprint(nodename, fingerprint, role='manager'):
     mark that fingerprint as validated.
     """
     pass
+
 
 class DiscoveredNode(object):
 
@@ -139,7 +141,7 @@ class DiscoveredNode(object):
         """
         self.uuid = uuid
         self.serial = serial
-        #self.netinfo = netinfo
+        # self.netinfo = netinfo
         self.fingerprints = {}
         self.model = model
         self.modelnumber = modelnumber
@@ -182,8 +184,8 @@ class DiscoveredNode(object):
         # to have that value.  Otherwise, if possible, take the current
         # fe80 and store that as hardwaremanagement.manager
         # If no fe80 possible *and* no existing value, error and do nothing
-        # if security policy not set, this should only proceed if fingerprint is
-        # validated by a secure validator.
+        # if security policy not set, this should only proceed if fingerprint
+        # is validated by a secure validator.
         pass
 
 #TODO: by serial, by uuid, by node
@@ -219,7 +221,6 @@ def _recheck_nodes(nodeattribs, configmanager):
         eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
 
 
-
 def safe_detected(info):
     eventlet.spawn_n(eval_detected, info)
 
@@ -252,8 +253,8 @@ def detected(info):
     handler = handler.NodeHandler(info, cfg)
     try:
         handler.probe()  # unicast interrogation as possible to get more data
-        # for now, we search switch only, ideally we search cmm, smm, and switch
-        # concurrently
+        # for now, we search switch only, ideally we search cmm, smm, and
+        # switch concurrently
     except Exception as e:
         traceback.print_exc()
         return
@@ -297,7 +298,7 @@ def discover_node(cfg, handler, info, nodename):
     # Also, 'secure', when we have the needed infrastructure done
     # in some product or another.
     if policy == 'permissive' and lastfp:
-        return False # With a permissive policy, do not discover new
+        return False  # With a permissive policy, do not discover new
     elif policy in ('open', 'permissive'):
         if not util.cert_matches(lastfp, handler.https_cert):
             if info['hwaddr'] in unknown_info:
@@ -329,6 +330,13 @@ def newnodes(added, deleting, configmanager):
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     _recheck_nodes(None, configmanager)
 
+
+def _periodic_recheck(configmanager):
+    while True:
+        eventlet.sleep(900)
+        _recheck_nodes(None, configmanager)
+
+
 def start_detection():
     global attribwatcher
     cfg = cfm.ConfigManager(None)
@@ -340,8 +348,7 @@ def start_detection():
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
-
-
+    eventlet.spawn_n(_periodic_recheck, cfg)
     #eventlet.spawn_n(ssdp.snoop, safe_detected)
     #eventlet.spawn_n(pxe.snoop, safe_detected)
 
