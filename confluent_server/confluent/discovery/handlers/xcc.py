@@ -65,3 +65,7 @@ class NodeHandler(bmchandler.NodeHandler):
     def discoverable_by_switch(self):
         return self.discoverable
 
+    def config(self, nodename):
+        # Stub out XCC discovery until firmware fix
+        return
+

@@ -190,23 +190,22 @@ class DiscoveredNode(object):
 
 #TODO: by serial, by uuid, by node
 known_info = {}
+known_nodes = {}
 unknown_info = {}
 pending_nodes = {}
 
 
 def _recheck_nodes(nodeattribs, configmanager):
     # First we go through ones we did not find earlier
-    for mac in unknown_info:
+    _map_unique_ids(nodeattribs)
+    for node in nodeattribs:
+        if node in known_nodes:
+            unknown_info[known_nodes[node]['hwaddr']] = known_nodes[node]
+    for mac in list(unknown_info):
         info = unknown_info[mac]
-        nodename = macmap.find_node_by_mac(info['hwaddr'], configmanager)
+        handler = info['handler'].NodeHandler(info, configmanager)
+        nodename = get_nodename(configmanager, handler, info)
         if nodename:
-            info = unknown_info[mac]
-            for service in info['services']:
-                if nodehandlers.get(service, None):
-                    handler = nodehandlers[service]
-                    break
-            else:  # no nodehandler, ignore for now
-                continue
             eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
     # now we go through ones that were identified, but could not pass
     # policy or hadn't been able to verify key
@@ -239,6 +238,7 @@ def detected(info):
     for service in info['services']:
         if nodehandlers.get(service, None):
             handler = nodehandlers[service]
+            info['handler'] = handler
             break
     else:  # no nodehandler, ignore for now
         return
@@ -257,7 +257,7 @@ def detected(info):
     # TODO: first check by filter_attributes for uuid match...
     # but maybe not..... since UUID uniqueness is a challenge...
     # but could search by cert fingerprint....
-    nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
+    nodename = get_nodename(cfg, handler, info)
     if nodename:
         dp = cfg.get_node_attributes([nodename],
                                      ('pubkeys.tls_hardwaremanager'))
@@ -278,21 +278,40 @@ def detected(info):
         unknown_info[info['hwaddr']] = info
 
 
+def get_nodename(cfg, handler, info):
+    currcert = handler.https_cert
+    if not currcert:
+        info['discofailure'] = 'nohttps'
+        return None
+    currprint = util.get_fingerprint(currcert)
+    nodename = nodes_by_fprint.get(currprint, None)
+    # TODO, opportunistically check uuid if not nodename
+    if nodename:
+        info['discovermethod'] = 'fingerprint'
+    else:
+        nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
+        if nodename:
+            info['discovermethod'] = 'switch'
+    return nodename
+
+
 def eval_node(cfg, handler, info, nodename):
     handler.preconfig()
-    if 'enclosure.bay' in info:
+    if 'enclosure.bay' in info and info['discovermethod'] == 'switch':
         nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
         nl = cfg.filter_node_attributes(
             'enclosure.bay=' + info['enclosure.bay'], nl)
         nl = [x for x in nl]  # listify for sake of len
         if len(nl) != 1:
-            raise Exception("TODO: log ambiguous situation")
+            info['discofailure'] = 'ambigconfig'
+            raise Exception(
+                "TODO: log ambiguous situation: " + nodename + repr(nl))
         nodename = nl[0]
         if not discover_node(cfg, handler, info, nodename):
             # store it as pending, assuming blocked on enclosure
             # assurance...
             pending_nodes[nodename] = info
-    elif handler.discoverable_by_switch:
+    else:
         # we can and did discover by switch
         if not discover_node(cfg, handler, info, nodename):
             pending_nodes[nodename] = info
@@ -311,11 +330,12 @@ def discover_node(cfg, handler, info, nodename):
     # Also, 'secure', when we have the needed infrastructure done
     # in some product or another.
     if policy == 'permissive' and lastfp:
+        info['discofailure'] = 'fingerprint'
         return False  # With a permissive policy, do not discover new
     elif policy in ('open', 'permissive'):
         if not util.cert_matches(lastfp, handler.https_cert):
             if info['hwaddr'] in unknown_info:
-                del unknown_info['hwaddr']
+                del unknown_info[info['hwaddr']]
             handler.config(nodename)
             newnodeattribs = {}
             if 'uuid' in info:
@@ -325,7 +345,9 @@ def discover_node(cfg, handler, info, nodename):
                     util.get_fingerprint(handler.https_cert)
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
+        known_nodes[nodename] = info
         return True
+    info['discofailure'] = 'policy'
     return False
 
 
@@ -339,7 +361,7 @@ def newnodes(added, deleting, configmanager):
     attribwatcher = configmanager.watch_attributes(
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
                    'hardwaremanagement.manager',
-                   'hardwaremanagement.switchport',
+                   'hardwaremanagement.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     _recheck_nodes(None, configmanager)
 
@@ -352,18 +374,55 @@ def _periodic_recheck(configmanager):
 
 def start_detection():
     global attribwatcher
+    _map_unique_ids()
     cfg = cfm.ConfigManager(None)
     allnodes = cfg.list_nodes()
     attribwatcher = cfg.watch_attributes(
         allnodes, ('discovery.policy', 'hardwaremanagement.switch',
                    'hardwaremanagement.manager',
-                   'hardwaremanagement.switchport',
+                   'hardwaremanagement.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
     eventlet.spawn_n(_periodic_recheck, cfg)
-    #eventlet.spawn_n(ssdp.snoop, safe_detected)
-    #eventlet.spawn_n(pxe.snoop, safe_detected)
+    # eventlet.spawn_n(ssdp.snoop, safe_detected)
+    # eventlet.spawn_n(pxe.snoop, safe_detected)
+
+
+nodes_by_fprint = {}
+nodes_by_uuid = {}
+
+def _map_unique_ids(nodes=None):
+    # Map current known ids based on uuid and fingperprints for fast lookup
+    cfg = cfm.ConfigManager(None)
+    if nodes is None:
+        nodes = cfg.list_nodes()
+    bigmap = cfg.get_node_attributes(nodes,
+                                     ('id.uuid',
+                                      'pubkeys.tls_hardwaremanager'))
+    uuid_by_nodes = {}
+    fprint_by_nodes = {}
+    for uuid in nodes_by_uuid:
+        node = nodes_by_uuid[uuid]
+        if node in bigmap:
+            uuid_by_nodes[node] = uuid
+    for fprint in nodes_by_fprint:
+        node = nodes_by_fprint[fprint]
+        if node in bigmap:
+            fprint_by_nodes[node] =fprint
+    for node in bigmap:
+        if node in uuid_by_nodes:
+            del nodes_by_uuid[uuid_by_nodes[node]]
+        if node in fprint_by_nodes:
+            del nodes_by_fprint[fprint_by_nodes[node]]
+        uuid = bigmap[node].get('id.uuid', {}).get('value', None)
+        if uuid:
+            nodes_by_uuid[uuid] = node
+        fprint = bigmap[node].get(
+            'pubkeys.tls_hardwaremanager', {}).get('value', None)
+        if fprint:
+            nodes_by_fprint[fprint] = node
+
 
 if __name__ == '__main__':
     start_detection()
