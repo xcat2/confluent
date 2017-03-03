@@ -211,12 +211,7 @@ def _recheck_nodes(nodeattribs, configmanager):
     # policy or hadn't been able to verify key
     for nodename in pending_nodes:
         info = pending_nodes[nodename]
-        for service in info['services']:
-            if nodehandlers.get(service, None):
-                handler = nodehandlers[service]
-                break
-        else:  # no nodehandler, ignore for now
-            continue
+        handler = info['handler'].NodeHandler(info, configmanager)
         eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
     # TODO(jjohnson2): Need to also go over previously discovered to see
     # if configuration matches reality, so examine known_info to verify match
@@ -296,8 +291,17 @@ def get_nodename(cfg, handler, info):
 
 
 def eval_node(cfg, handler, info, nodename):
+    # do some preconfig, for example, to bring a SMM online if applicable
     handler.preconfig()
-    if 'enclosure.bay' in info and info['discovermethod'] == 'switch':
+    # first, if had a bay, it was in an enclosure.  If it was discovered by
+    # switch, it is probably the enclosure manager and not
+    # the node directly.  switch is ambiguous and we should leave it alone
+    if 'enclosure.bay' in info:
+        myenclosure = \
+            cfg.ConfigManager(None).get_node_attributes(nodename,
+                                                        ('enclosure.manager',))
+        # if we have an enclosure, that means that this discovery was precise
+        # otherwise, we need to do the next step to see what node we are
         nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
         nl = cfg.filter_node_attributes(
             'enclosure.bay=' + info['enclosure.bay'], nl)
