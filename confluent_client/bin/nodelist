@@ -80,6 +80,16 @@ if len(args) > 1:
                         attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                                   '{2}'.format(node, attr,
                                                currattr['broken'])
+                    elif isinstance(currattr, list) or isinstance(currattr, tuple):
+                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, currattr)))
+                    elif isinstance(currattr, dict):
+                        dictout = []
+                        for k, v in currattr.items:
+                            dictout.append("{0}={1}".format(k, v))
+                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, dictout)))
+                    else:
+                        print ("CODE ERROR" + repr(attr))
+
                     if options.blame or 'broken' in currattr:
                         blamedata = []
                         if 'inheritedfrom' in currattr:
