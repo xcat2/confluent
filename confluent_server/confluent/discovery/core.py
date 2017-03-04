@@ -281,12 +281,8 @@ def get_nodename(cfg, handler, info):
     currprint = util.get_fingerprint(currcert)
     nodename = nodes_by_fprint.get(currprint, None)
     # TODO, opportunistically check uuid if not nodename
-    if nodename:
-        info['discovermethod'] = 'fingerprint'
-    else:
+    if not nodename:
         nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
-        if nodename:
-            info['discovermethod'] = 'switch'
     return nodename
 
 
@@ -298,10 +294,18 @@ def eval_node(cfg, handler, info, nodename):
     # the node directly.  switch is ambiguous and we should leave it alone
     if 'enclosure.bay' in info:
         myenclosure = \
-            cfg.ConfigManager(None).get_node_attributes(nodename,
-                                                        ('enclosure.manager',))
-        # if we have an enclosure, that means that this discovery was precise
-        # otherwise, we need to do the next step to see what node we are
+            cfg.get_node_attributes(nodename, ('enclosure.manager',))
+        myenclosure = myenclosure.get(nodename, {}).get(
+            'enclosure.manager', {}).get('value', None)
+        if myenclosure:  # Discovery mechanism was specific
+            if not discover_node(cfg, handler, info, nodename):
+                pending_nodes[nodename] = info
+            return
+        # we have an enclosure, but we are not defined to be in an
+        # enclosure, so go ahead and assume that we are misidentified
+        # as our enclosure manager
+        # search for nodes fitting our description using filters
+        # lead with the most specific to have a small second pass
         nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
         nl = cfg.filter_node_attributes(
             'enclosure.bay=' + info['enclosure.bay'], nl)
