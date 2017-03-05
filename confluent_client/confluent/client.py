@@ -97,12 +97,17 @@ class Command(object):
                 else:
                     rc |= 1
             elif ikey in res[node]:
+                if 'value' in res[node][ikey]:
+                    val = res[node][ikey]['value']
+                elif 'isset' in res[node][ikey]:
+                    val = '********' if res[node][ikey] else ''
+                else:
+                    val = repr(res[node][ikey])
                 if self._prevkeyname and self._prevkeyname in res[node]:
                     print('{0}: {2}->{1}'.format(
-                        node, res[node][ikey]['value'],
-                        res[node][self._prevkeyname]['value']))
+                        node, val, res[node][self._prevkeyname]['value']))
                 else:
-                    print('{0}: {1}'.format(node, res[node][ikey]['value']))
+                    print('{0}: {1}'.format(node, val))
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
