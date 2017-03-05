@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,6 +95,12 @@ def _namesmatch(switchdesc, userdesc):
 def _map_switch(args):
     try:
         return _map_switch_backend(args)
+    except UnicodeError:
+        log.log({'error': 'Cannot resolve switch "{0}" to an address'.format(
+            args[0])})
+    except exc.TargetEndpointUnreachable:
+        log.log({'error': 'Timeout trying to reach switch "{0}"'.format(
+            args[0])})
     except Exception as e:
         log.logtrace()
 
