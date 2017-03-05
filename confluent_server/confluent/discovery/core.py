@@ -371,13 +371,13 @@ def newnodes(added, deleting, configmanager):
                    'hardwaremanagement.manager',
                    'hardwaremanagement.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
-    _recheck_nodes(None, configmanager)
+    _recheck_nodes((), configmanager)
 
 
 def _periodic_recheck(configmanager):
     while True:
         eventlet.sleep(900)
-        _recheck_nodes(None, configmanager)
+        _recheck_nodes((), configmanager)
 
 
 def start_detection():
