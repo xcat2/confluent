@@ -222,7 +222,6 @@ def run():
     _daemonize()
     if havefcntl:
         _updatepidfile()
-    auth.init_auth()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
     if dbgif:
