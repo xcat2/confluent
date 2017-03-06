@@ -156,12 +156,23 @@ def _do_notifier(cfg, watcher, callback):
     try:
         callback(nodeattribs=watcher['nodeattrs'], configmanager=cfg)
     except Exception:
-        global tracelog
-        if tracelog is None:
-            tracelog = confluent.log.Logger('trace')
-        tracelog.log(traceback.format_exc(),
-                     ltype=confluent.log.DataTypes.event,
-                     event=confluent.log.Events.stacktrace)
+        logException()
+
+
+def logException():
+    global tracelog
+    if tracelog is None:
+        tracelog = confluent.log.Logger('trace')
+    tracelog.log(traceback.format_exc(),
+                 ltype=confluent.log.DataTypes.event,
+                 event=confluent.log.Events.stacktrace)
+
+
+def _do_add_watcher(watcher, added, configmanager):
+    try:
+        watcher(added=added, deleting=[], configmanager=configmanager)
+    except Exception:
+        logException()
 
 
 def init_masterkey(password=None):
@@ -1203,7 +1214,7 @@ class ConfigManager(object):
             if self.tenant in self._nodecollwatchers:
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
                 for watcher in nodecollwatchers.itervalues():
-                    watcher(added=newnodes, deleting=[], configmanager=self)
+                    eventlet.spawn_n(_do_add_watcher, watcher, newnodes, self)
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
