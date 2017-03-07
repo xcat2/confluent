@@ -227,17 +227,15 @@ def update_macmap(configmanager):
     if configmanager.tenant is not None:
         raise exc.ForbiddenRequest('Network topology not available to tenants')
     nodelocations = configmanager.get_node_attributes(
-        configmanager.list_nodes(), ('hardwaremanagement.switch',
-                                     'hardwaremanagement.switchport'))
+        configmanager.list_nodes(), ('net.switch', 'net.switchport'))
     switches = set([])
     for node in nodelocations:
         cfg = nodelocations[node]
-        if ('hardwaremanagement.switch' in cfg and
-                'value' in cfg['hardwaremanagement.switch']):
-            curswitch = cfg['hardwaremanagement.switch']['value']
+        if 'net.switch' in cfg and 'value' in cfg['net.switch']:
+            curswitch = cfg['net.switch']['value']
             switches.add(curswitch)
-            if 'hardwaremanagement.switchport' in cfg:
-                portname = cfg['hardwaremanagement.switchport']['value']
+            if 'net.switchport' in cfg:
+                portname = cfg['net.switchport']['value']
                 if curswitch not in _switchportmap:
                     _switchportmap[curswitch] = {}
                 if portname in _switchportmap[curswitch]:

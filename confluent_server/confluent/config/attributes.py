@@ -258,17 +258,6 @@ node = {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
     },
-    'hardwaremanagement.switch': {
-        'description': 'The switch to which the hardware manager is connected.'
-                       ' Only relevant if using switch based discovery via the'
-                       ' hardware manager (Lenovo IMMs and CMMs).  Not '
-                       'applicable to Lenovo Flex nodes.'
-    },
-    'hardwaremanagement.switchport': {
-        'description': 'The port of the switch that the hardware manager is '
-                       'connected.  See documentation of '
-                       'hardwaremanagement.switch for more detail.'
-    },
     'enclosure.manager': {
         'description': "The management device for this node's chassis",
 #        'appliesto': ['system'],
@@ -288,6 +277,13 @@ node = {
 #    },
     'id.uuid': {
         'description': 'The UUID of the node as presented in DMI.',
+    },
+    # TODO: extend to support 'net.0.switch' for multi-nic support
+    'net.switch': {
+        'description': 'An ethernet switch the node is connected to.'
+    },
+    'net.switchport': {
+        'description': 'The port on the switch that corresponds to this node.'
     },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',

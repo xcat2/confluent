@@ -367,9 +367,8 @@ def newnodes(added, deleting, configmanager):
     configmanager.remove_watcher(attribwatcher)
     allnodes = configmanager.list_nodes()
     attribwatcher = configmanager.watch_attributes(
-        allnodes, ('discovery.policy', 'hardwaremanagement.switch',
-                   'hardwaremanagement.manager',
-                   'hardwaremanagement.switchport', 'id.uuid',
+        allnodes, ('discovery.policy', 'net.switch',
+                   'hardwaremanagement.manager', 'net.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     _recheck_nodes((), configmanager)
 
@@ -386,9 +385,8 @@ def start_detection():
     cfg = cfm.ConfigManager(None)
     allnodes = cfg.list_nodes()
     attribwatcher = cfg.watch_attributes(
-        allnodes, ('discovery.policy', 'hardwaremanagement.switch',
-                   'hardwaremanagement.manager',
-                   'hardwaremanagement.switchport', 'id.uuid',
+        allnodes, ('discovery.policy', 'net.switch',
+                   'hardwaremanagement.manager', 'net.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
