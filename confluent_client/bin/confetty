@@ -776,7 +776,12 @@ while inconsole or not doexit:
                     updatestatus(data)
                     continue
                 if data is not None:
-                    sys.stdout.write(data)
+                    try:
+                        sys.stdout.write(data)
+                    except IOError:  # Some times circumstances are bad
+                        # resort to byte at a time...
+                        for d in data:
+                            sys.stdout.write(d)
                     now = time.time()
                     if ('showtime' not in laststate or
                             (now // 60) != laststate['showtime'] // 60):
