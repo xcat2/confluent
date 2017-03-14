@@ -436,6 +436,7 @@ class ConsoleHandler(object):
         retdata = b'\x1b[H\x1b[J'  # clear screen
         pendingbl = b''  # pending blank lines
         for line in self.buffer.buffer:
+            #TODO (jjohnson2): allow white space to widest data line
             nline, notblank = pytechars2line(line)
             if notblank:
                 if pendingbl:
