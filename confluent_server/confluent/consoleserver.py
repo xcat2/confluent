@@ -29,6 +29,7 @@ import confluent.core as plugin
 import confluent.util as util
 import eventlet
 import eventlet.event
+import pyte
 import random
 import time
 import traceback
@@ -36,6 +37,62 @@ import traceback
 _handled_consoles = {}
 
 _tracelog = None
+
+
+pytecolors2ansi = {
+    'black': 0,
+    'red': 1,
+    'green': 2,
+    'brown': 3,
+    'blue': 4,
+    'magenta': 5,
+    'cyan': 6,
+    'white': 7,
+    'default': 9,
+}
+
+def pytechars2line(chars):
+    # _Char(data=u' ', fg='white', bg='blue', bold=True, italics=False, underscore=False, strikethrough=False, reverse=False)
+
+    line = '\x1b[m'  # start at default params
+    lb = False  # last bold
+    li = False  # last italic
+    lu = False  # last underline
+    ls = False  # last strikethrough
+    lr = False  # last reverse
+    lfg = 'default'  # last fg color
+    lbg = 'default'   # last bg color
+    hasdata = False
+    for char in chars:
+        csi = []
+        if char.fg != lfg:
+            csi.append(30 + pytecolors2ansi[char.fg])
+            lfg = char.fg
+        if char.bg != lbg:
+            csi.append(40 + pytecolors2ansi[char.bg])
+            lbg = char.bg
+        if char.bold != lb:
+            lb = char.bold
+            csi.append(1 if lb else 22)
+        if char.italics != li:
+            li = char.italics
+            csi.append(3 if li else 23)
+        if char.underscore != lu:
+            lu = char.underscore
+            csi.append(4 if lu else 24)
+        if char.strikethrough != ls:
+            ls = char.strikethrough
+            csi.append(9 if ls else 29)
+        if char.reverse != lr:
+            lr = char.reverse
+            csi.append(7 if lr else 27)
+        if csi:
+            line += b'\x1b[' + b';'.join(['{0}'.format(x) for x in csi]) + b'm'
+        if char.data.encode('utf-8').rstrip():
+            hasdata = True
+        line += char.data.encode('utf-8')
+    line = line.rstrip()
+    return line, hasdata
 
 
 class ConsoleHandler(object):
@@ -51,7 +108,9 @@ class ConsoleHandler(object):
         self.node = node
         self.connectstate = 'unconnected'
         self._isalive = True
-        self.buffer = bytearray()
+        self.buffer = pyte.Screen(100, 31)
+        self.termstream = pyte.ByteStream()
+        self.termstream.attach(self.buffer)
         self.livesessions = set([])
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
@@ -70,7 +129,7 @@ class ConsoleHandler(object):
                 # wall clock has gone backwards, use current time as best
                 # guess
                 self.lasttime = util.monotonic_time()
-        self.buffer += text
+        self.termstream.feed(text)
         self.appmodedetected = False
         self.shiftin = None
         self.reconnect = None
@@ -278,12 +337,6 @@ class ConsoleHandler(object):
             self.connectionthread.kill()
             self.connectionthread = None
 
-    def flushbuffer(self):
-        # Logging is handled in a different stream
-        # this buffer is now just for having screen redraw on
-        # connect
-        self.buffer = bytearray(self.buffer[-8192:])
-
     def get_console_output(self, data):
         # Spawn as a greenthread, return control as soon as possible
         # to the console object
@@ -354,15 +407,10 @@ class ConsoleHandler(object):
             eventdata |= 2
         self.log(data, eventdata=eventdata)
         self.lasttime = util.monotonic_time()
-        if isinstance(data, bytearray) or isinstance(data, bytes):
-            self.buffer += data
-        else:
-            self.buffer += data.encode('utf-8')
+        self.termstream.feed(data)
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        if len(self.buffer) > 16384:
-            self.flushbuffer()
         self._send_rcpts(data)
 
     def _send_rcpts(self, data):
@@ -385,6 +433,27 @@ class ConsoleHandler(object):
             'connectstate': self.connectstate,
             'clientcount': len(self.livesessions),
         }
+        retdata = b'\x1b[H\x1b[J'  # clear screen
+        pendingbl = b''  # pending blank lines
+        for line in self.buffer.buffer:
+            nline, notblank = pytechars2line(line)
+            if notblank:
+                if pendingbl:
+                    retdata += pendingbl
+                    pendingbl = b''
+                retdata += nline + '\r\n'
+            else:
+                pendingbl += nline + '\r\n'
+        if self.shiftin is not None:  # detected that terminal requested a
+            # shiftin character set, relay that to the terminal that cannected
+            retdata += '\x1b)' + self.shiftin
+        if self.appmodedetected:
+            retdata += '\x1b[?1h'
+        else:
+            retdata += '\x1b[?1l'
+        return retdata, connstate
+        return '\x1b[H\x1b[J' + "\r\n".join(self.buffer.display).encode(
+            'utf-8'), connstate
         retdata = ''
         if self.shiftin is not None:  # detected that terminal requested a
             # shiftin character set, relay that to the terminal that cannected

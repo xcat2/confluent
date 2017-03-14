@@ -526,6 +526,8 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
         if oldtcattr is not None:
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+    # Request default color scheme, to undo potential weirdness of terminal
+    sys.stdout.write('\x1b[m')
     if fullexit:
         sys.exit(code)
     else:
