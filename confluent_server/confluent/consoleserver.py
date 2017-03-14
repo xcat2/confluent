@@ -452,33 +452,6 @@ class ConsoleHandler(object):
         else:
             retdata += '\x1b[?1l'
         return retdata, connstate
-        return '\x1b[H\x1b[J' + "\r\n".join(self.buffer.display).encode(
-            'utf-8'), connstate
-        retdata = ''
-        if self.shiftin is not None:  # detected that terminal requested a
-            # shiftin character set, relay that to the terminal that cannected
-            retdata += '\x1b)' + self.shiftin
-        if self.appmodedetected:
-            retdata += '\x1b[?1h'
-        else:
-            retdata += '\x1b[?1l'
-        # an alternative would be to emulate a VT100 to know what the
-        # whole screen would look like
-        # this is one scheme to clear screen, move cursor then clear
-        bufidx = self.buffer.rfind('\x1b[H\x1b[J')
-        if bufidx >= 0:
-            return retdata + str(self.buffer[bufidx:]), connstate
-        # another scheme is the 2J scheme
-        bufidx = self.buffer.rfind('\x1b[2J')
-        if bufidx >= 0:
-            # there was some sort of clear screen event
-            # somewhere in the buffer, replay from that point
-            # in hopes that it reproduces the screen
-            return retdata + str(self.buffer[bufidx:]), connstate
-        else:
-            # we have no indication of last erase, play back last kibibyte
-            #  to give some sense of context anyway
-            return retdata + str(self.buffer[-1024:]), connstate
 
     def write(self, data):
         if self.connectstate == 'connected':
