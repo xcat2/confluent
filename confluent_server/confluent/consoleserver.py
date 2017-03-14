@@ -51,7 +51,7 @@ pytecolors2ansi = {
     'default': 9,
 }
 
-def pytechars2line(chars):
+def pytechars2line(chars, trimcnt):
     # _Char(data=u' ', fg='white', bg='blue', bold=True, italics=False, underscore=False, strikethrough=False, reverse=False)
 
     line = '\x1b[m'  # start at default params
@@ -91,7 +91,8 @@ def pytechars2line(chars):
         if char.data.encode('utf-8').rstrip():
             hasdata = True
         line += char.data.encode('utf-8')
-    line = line.rstrip()
+    if trimcnt:
+        line = line[:-trimcnt]
     return line, hasdata
 
 
@@ -435,9 +436,16 @@ class ConsoleHandler(object):
         }
         retdata = b'\x1b[H\x1b[J'  # clear screen
         pendingbl = b''  # pending blank lines
+        maxlen = 0
+        for line in self.buffer.display:
+            line = line.rstrip()
+            if len(line) > maxlen:
+                maxlen = len(line)
+        trimcounts = []
+        for line in self.buffer.display:
+            trimcounts.append(len(line) - maxlen)
         for line in self.buffer.buffer:
-            #TODO (jjohnson2): allow white space to widest data line
-            nline, notblank = pytechars2line(line)
+            nline, notblank = pytechars2line(line, trimcounts.pop(0))
             if notblank:
                 if pendingbl:
                     retdata += pendingbl
