@@ -51,7 +51,7 @@ pytecolors2ansi = {
     'default': 9,
 }
 
-def pytechars2line(chars, trimcnt):
+def pytechars2line(chars, maxlen=None):
     # _Char(data=u' ', fg='white', bg='blue', bold=True, italics=False, underscore=False, strikethrough=False, reverse=False)
 
     line = '\x1b[m'  # start at default params
@@ -63,6 +63,7 @@ def pytechars2line(chars, trimcnt):
     lfg = 'default'  # last fg color
     lbg = 'default'   # last bg color
     hasdata = False
+    len = 1
     for char in chars:
         csi = []
         if char.fg != lfg:
@@ -88,11 +89,12 @@ def pytechars2line(chars, trimcnt):
             csi.append(7 if lr else 27)
         if csi:
             line += b'\x1b[' + b';'.join(['{0}'.format(x) for x in csi]) + b'm'
-        if char.data.encode('utf-8').rstrip():
+        if not hasdata and char.data.encode('utf-8').rstrip():
             hasdata = True
         line += char.data.encode('utf-8')
-    if trimcnt:
-        line = line[:-trimcnt]
+        if maxlen and len >= maxlen:
+            break
+        len += 1
     return line, hasdata
 
 
@@ -441,11 +443,8 @@ class ConsoleHandler(object):
             line = line.rstrip()
             if len(line) > maxlen:
                 maxlen = len(line)
-        trimcounts = []
-        for line in self.buffer.display:
-            trimcounts.append(len(line) - maxlen)
         for line in self.buffer.buffer:
-            nline, notblank = pytechars2line(line, trimcounts.pop(0))
+            nline, notblank = pytechars2line(line, maxlen)
             if notblank:
                 if pendingbl:
                     retdata += pendingbl
