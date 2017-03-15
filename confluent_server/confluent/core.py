@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -459,6 +459,16 @@ def handle_nodegroup_request(configmanager, inputdata,
     raise Exception("unknown case encountered")
 
 
+class BadPlugin(object):
+    def __init__(self, node, plugin):
+        self.node = node
+        self.plugin = plugin
+
+    def error(self, *args, **kwargs):
+        yield msg.ConfluentNodeError(
+            self.node, self.plugin + ' is not a supported plugin')
+
+
 def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
     iscollection = False
@@ -562,7 +572,11 @@ def handle_node_request(configmanager, inputdata, operation,
                 if attrname in nodeattr[node]:
                     plugpath = nodeattr[node][attrname]['value']
             if plugpath is not None:
-                hfunc = getattr(pluginmap[plugpath], operation)
+                try:
+                    hfunc = getattr(pluginmap[plugpath], operation)
+                except KeyError:
+                    nodesbyhandler[BadPlugin(node, plugpath).error] = [node]
+                    continue
                 if hfunc in nodesbyhandler:
                     nodesbyhandler[hfunc].append(node)
                 else:
