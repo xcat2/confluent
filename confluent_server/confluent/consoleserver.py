@@ -56,19 +56,21 @@ pytecolors2ansi = {
 # in the same way that Screen's draw method would do
 # for now at least get some of the arrows in there (note ESC is one
 # of those arrows... so skip it...
-ansichars = dict(zip((24, 25, 26), u'\u2191\u2193\u2192'))
+ansichars = dict(zip(('\x18', '\x19'), u'\u2191\u2193'))
+
 
 def _utf8_normalize(data, shiftin):
     try:
-        data = data.decode('utf-8')
+        data.decode('utf-8')
     except UnicodeDecodeError:
         try:
-            data = data.decode('cp437')
+            data = data.decode('cp437').encode('utf-8')
         except UnicodeDecodeError:
-            data = data.decode('utf-8', 'replace')
+            data = data.decode('utf-8', 'replace').encode('utf-8')
     if shiftin is None:
-        data = data.translate(ansichars)
-    return data.encode('utf-8')
+        for d in ansichars:
+            data = data.replace(d, ansichars[d].encode('utf-8'))
+    return data
 
 
 def pytechars2line(chars, maxlen=None):
