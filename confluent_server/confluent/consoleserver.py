@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,6 +51,25 @@ pytecolors2ansi = {
     'white': 7,
     'default': 9,
 }
+# might be able to use IBMPC map from pyte charsets,
+# in that case, would have to mask out certain things (like ESC)
+# in the same way that Screen's draw method would do
+# for now at least get some of the arrows in there (note ESC is one
+# of those arrows... so skip it...
+ansichars = dict(zip((24, 25, 26), u'\u2191\u2193\u2192'))
+
+def _utf8_normalize(data, shiftin):
+    try:
+        data = data.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            data = data.decode('cp437')
+        except UnicodeDecodeError:
+            data = data.decode('utf-8', 'replace')
+    if shiftin is None:
+        data = data.translate(ansichars)
+    return data.encode('utf-8')
+
 
 def pytechars2line(chars, maxlen=None):
     # _Char(data=u' ', fg='white', bg='blue', bold=True, italics=False, underscore=False, strikethrough=False, reverse=False)
@@ -118,7 +138,7 @@ class ConsoleHandler(object):
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
                                      tenant=configmanager.tenant)
-            (text, termstate, timestamp) = self.logger.read_recent_text(8192)
+            (text, termstate, timestamp) = self.logger.read_recent_text(32768)
         else:
             (text, termstate, timestamp) = ('', 0, False)
         # when reading from log file, we will use wall clock
@@ -414,7 +434,7 @@ class ConsoleHandler(object):
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        self._send_rcpts(data)
+        self._send_rcpts(_utf8_normalize(data, self.shiftin))
 
     def _send_rcpts(self, data):
         for rcpt in self.livesessions:
