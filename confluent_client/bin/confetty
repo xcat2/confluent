@@ -813,10 +813,13 @@ while inconsole or not doexit:
                         sys.stdout.write("\r\n[remote disconnected]\r\n")
                     break
             else:
-                myinput = fh.read()
-                myinput = check_escape_seq(myinput, fh)
-                if myinput:
-                    tlvdata.send(session.connection, myinput)
+                try:
+                    myinput = fh.read()
+                    myinput = check_escape_seq(myinput, fh)
+                    if myinput:
+                        tlvdata.send(session.connection, myinput)
+                except IOError:
+                    pass
     else:
         currcommand = prompt()
         try:
