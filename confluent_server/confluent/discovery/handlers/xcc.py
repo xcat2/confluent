@@ -65,7 +65,7 @@ class NodeHandler(bmchandler.NodeHandler):
     def discoverable_by_switch(self):
         return self.discoverable
 
-    def config(self, nodename):
-        # Stub out XCC discovery until firmware fix
-        return
+# TODO(jjohnson2): web based init config for future prevalidated cert scheme
+#    def config(self, nodename):
+#        return
 
