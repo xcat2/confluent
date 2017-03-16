@@ -252,10 +252,15 @@ class ConsoleHandler(object):
         else:
             self._console.ping()
 
+    def clearbuffer(self):
+        self.termstream.feed('\x1bc[invalid replay buffer]')
+
     def _disconnect(self):
         if self.connectionthread:
             self.connectionthread.kill()
             self.connectionthread = None
+        # clear the terminal buffer when disconnected
+        self.clearbuffer()
         if self._console:
             self.log(
                 logdata='console disconnected', ltype=log.DataTypes.event,
@@ -295,6 +300,7 @@ class ConsoleHandler(object):
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
         if not isinstance(self._console, conapi.Console):
+            self.clearbuffer()
             self.connectstate = 'unconnected'
             self.error = 'misconfigured'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -314,6 +320,7 @@ class ConsoleHandler(object):
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointBadCredentials:
+            self.clearbuffer()
             self.error = 'badcredentials'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -323,6 +330,7 @@ class ConsoleHandler(object):
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
         except exc.TargetEndpointUnreachable:
+            self.clearbuffer()
             self.error = 'unreachable'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -332,6 +340,7 @@ class ConsoleHandler(object):
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
         except Exception:
+            self.clearbuffer()
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
             self.error = 'unknown'
@@ -352,6 +361,7 @@ class ConsoleHandler(object):
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
+        self.clearbuffer()
         if self.connectstate != 'unconnected':
             self.connectstate = 'unconnected'
             self.log(
@@ -485,7 +495,8 @@ class ConsoleHandler(object):
                 retdata += nline + '\r\n'
             else:
                 pendingbl += nline + '\r\n'
-        retdata = retdata[:-2]  # remove the last \r\n
+        if len(retdata) >  6:
+            retdata = retdata[:-2]  # remove the last \r\n
         retdata += b'\x1b[{0};{1}H'.format(self.buffer.cursor.y + 1,
                                            self.buffer.cursor.x + 1)
         if self.shiftin is not None:  # detected that terminal requested a
