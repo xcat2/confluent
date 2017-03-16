@@ -21,6 +21,7 @@
 
 # we track nodes that are actively being logged, watched, or have attached
 # there should be no more than one handler per node
+import codecs
 import collections
 import confluent.config.configmanager as configmodule
 import confluent.exceptions as exc
@@ -56,26 +57,35 @@ pytecolors2ansi = {
 # in the same way that Screen's draw method would do
 # for now at least get some of the arrows in there (note ESC is one
 # of those arrows... so skip it...
-ansichars = dict(zip(('\x18', '\x19'), u'\u2191\u2193'))
+ansichars = dict(zip((0x18, 0x19), u'\u2191\u2193'))
 
 
-def _utf8_normalize(data, shiftin):
+def _utf8_normalize(data, shiftin, decoder):
+    # first we give the stateful decoder a crack at the byte stream,
+    # we may come up empty in the event of a partial multibyte
     try:
-        data.decode('utf-8')
+        data = decoder.decode(data)
     except UnicodeDecodeError:
-        try:
-            data = data.decode('cp437').encode('utf-8')
-        except UnicodeDecodeError:
-            data = data.decode('utf-8', 'replace').encode('utf-8')
+        # first order of business is to reset the state of
+        # the decoder to a clean one, so we can switch back to utf-8
+        # when things change, for example going from an F1 setup menu stuck
+        # in the old days to a modern platform using utf-8
+        decoder.setstate(codecs.getincrementaldecoder('utf-8')().getstate())
+        # Ok, so we have something that is not valid UTF-8,
+        # our next stop is to try CP437.  We don't try incremental
+        # decode, since cp437 is single byte
+        # replace is silly here, since there does not exist invalid c437,
+        # but just in case
+        data = data.decode('cp437', 'replace')
+    # Finally, the low part of ascii is valid utf-8, but we are going to be
+    # more interested in the cp437 versions (since this is console *output*
+    # not input
     if shiftin is None:
-        for d in ansichars:
-            data = data.replace(d, ansichars[d].encode('utf-8'))
-    return data
+        data = data.translate(ansichars)
+    return data.encode('utf-8')
 
 
 def pytechars2line(chars, maxlen=None):
-    # _Char(data=u' ', fg='white', bg='blue', bold=True, italics=False, underscore=False, strikethrough=False, reverse=False)
-
     line = '\x1b[m'  # start at default params
     lb = False  # last bold
     li = False  # last italic
@@ -137,6 +147,7 @@ class ConsoleHandler(object):
         self.termstream = pyte.ByteStream()
         self.termstream.attach(self.buffer)
         self.livesessions = set([])
+        self.utf8decoder = codecs.getincrementaldecoder('utf-8')()
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
                                      tenant=configmanager.tenant)
@@ -436,7 +447,7 @@ class ConsoleHandler(object):
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        self._send_rcpts(_utf8_normalize(data, self.shiftin))
+        self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
 
     def _send_rcpts(self, data):
         for rcpt in self.livesessions:
