@@ -486,8 +486,8 @@ class ConsoleHandler(object):
             else:
                 pendingbl += nline + '\r\n'
         retdata = retdata[:-2]  # remove the last \r\n
-        #TODO: have pyte tell us cursor position and use that?
-        retdata = retdata.rstrip()
+        retdata += b'\x1b[{0};{1}H'.format(self.buffer.cursor.y + 1,
+                                           self.buffer.cursor.x + 1)
         if self.shiftin is not None:  # detected that terminal requested a
             # shiftin character set, relay that to the terminal that cannected
             retdata += '\x1b)' + self.shiftin
