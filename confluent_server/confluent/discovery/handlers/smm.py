@@ -18,7 +18,7 @@ class NodeHandler(bmchandler.NodeHandler):
 
     def config(self, nodename):
         # SMM for now has to reset to assure configuration applies
-        super(NodeHandler, self).config(nodename)
+        super(NodeHandler, self).config(nodename, reset=True)
 
 # notes for smm:
 # POST to:
