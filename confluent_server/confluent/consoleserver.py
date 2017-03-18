@@ -152,9 +152,7 @@ class ConsoleHandler(object):
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
                                      tenant=configmanager.tenant)
-            (text, termstate, timestamp) = self.logger.read_recent_text(32768)
-        else:
-            (text, termstate, timestamp) = ('', 0, False)
+        (text, termstate, timestamp) = (b'', 0, False)
         # when reading from log file, we will use wall clock
         # it should usually match walltime.
         self.lasttime = 0
@@ -166,7 +164,7 @@ class ConsoleHandler(object):
                 # wall clock has gone backwards, use current time as best
                 # guess
                 self.lasttime = util.monotonic_time()
-        self.termstream.feed(text)
+        self.clearbuffer()
         self.appmodedetected = False
         self.shiftin = None
         self.reconnect = None
@@ -256,7 +254,7 @@ class ConsoleHandler(object):
     def clearbuffer(self):
         self.termstream.feed(
             '\x1bc[no replay buffer due to console.logging attribute set to '
-            'none or interactive or connection loss]')
+            'none or interactive, connection loss, or service restart]')
         self.clearpending = True
 
     def _disconnect(self):
