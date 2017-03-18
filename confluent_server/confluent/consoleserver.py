@@ -136,6 +136,7 @@ class ConsoleHandler(object):
     _genwatchattribs = frozenset(('console.method', 'console.logging'))
 
     def __init__(self, node, configmanager):
+        self.clearpending = False
         self._dologging = True
         self._isondemand = False
         self.error = None
@@ -253,7 +254,10 @@ class ConsoleHandler(object):
             self._console.ping()
 
     def clearbuffer(self):
-        self.termstream.feed('\x1bc[invalid replay buffer]')
+        self.termstream.feed(
+            '\x1bc[no replay buffer due to console.logging attribute set to '
+            'none or interactive or connection loss]')
+        self.clearpending = True
 
     def _disconnect(self):
         if self.connectionthread:
@@ -457,6 +461,10 @@ class ConsoleHandler(object):
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
+        if self.clearpending:
+            self.clearpending = False
+            self.termstream.feed(b'\x1bc')
+            self._send_rcpts(b'\x1bc')
         self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
 
     def _send_rcpts(self, data):
