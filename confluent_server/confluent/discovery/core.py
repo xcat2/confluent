@@ -257,7 +257,7 @@ def detected(info):
     nodename = get_nodename(cfg, handler, info)
     if nodename:
         dp = cfg.get_node_attributes([nodename],
-                                     ('pubkeys.tls_hardwaremanager'))
+                                     ('pubkeys.tls_hardwaremanager',))
         lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                           {}).get('value', None)
         if util.cert_matches(lastfp, handler.https_cert):
