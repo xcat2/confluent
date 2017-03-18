@@ -375,8 +375,8 @@ def discover_node(cfg, handler, info, nodename):
                     util.get_fingerprint(handler.https_cert)
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
+            log.log({'info': 'Discovered {0}'.format(nodename)})
         known_nodes[nodename] = info
-        log.log({'info': 'Discovered {0}'.format(nodename)})
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                      'value allowing discovery (open or permissive)'.format(
