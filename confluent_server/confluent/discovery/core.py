@@ -202,7 +202,9 @@ def _recheck_nodes(nodeattribs, configmanager):
         if node in known_nodes:
             unknown_info[known_nodes[node]['hwaddr']] = known_nodes[node]
     for mac in list(unknown_info):
-        info = unknown_info[mac]
+        info = unknown_info.get(mac, None)
+        if not info:
+            continue
         handler = info['handler'].NodeHandler(info, configmanager)
         nodename = get_nodename(configmanager, handler, info)
         if nodename:
@@ -272,7 +274,7 @@ def detected(info):
     else:
         log.log(
             {'info': 'Detected unknown {0} with hwaddr {1} at '
-                     'address {1}'.format(
+                     'address {2}'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                       )})
         unknown_info[info['hwaddr']] = info
