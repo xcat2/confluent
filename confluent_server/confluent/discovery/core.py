@@ -196,11 +196,13 @@ pending_nodes = {}
 
 
 def _recheck_nodes(nodeattribs, configmanager):
-    # First we go through ones we did not find earlier
     _map_unique_ids(nodeattribs)
+    # for the nodes whose attributes have changed, consider them as potential
+    # strangers
     for node in nodeattribs:
         if node in known_nodes:
             unknown_info[known_nodes[node]['hwaddr']] = known_nodes[node]
+    # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
         info = unknown_info.get(mac, None)
         if not info:
@@ -215,10 +217,7 @@ def _recheck_nodes(nodeattribs, configmanager):
         info = pending_nodes[nodename]
         handler = info['handler'].NodeHandler(info, configmanager)
         eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
-    # TODO(jjohnson2): Need to also go over previously discovered to see
-    # if configuration matches reality, so examine known_info to verify match
-    # avoiding probe and preconfig to avoid running afoul of security
-    # detection
+
 
 def safe_detected(info):
     eventlet.spawn_n(eval_detected, info)
@@ -254,6 +253,19 @@ def detected(info):
     # TODO: first check by filter_attributes for uuid match...
     # but maybe not..... since UUID uniqueness is a challenge...
     # but could search by cert fingerprint....
+    # IF not https_cert.... then toss it back to eval in a later pass
+    # we may have a booting xcc or whatever that hasn't gotten the https up
+    # yet, use https as a sign of readiness
+    if not handler.https_cert:
+        log.log(
+            {'info':  '{0} with hwaddr {1} at address {2} is not yet running '
+                      'https, will examine later'.format(
+                        handler.devname, info['hwaddr'], handler.ipaddr
+            )})
+        unknown_info[info['hwaddr']] = info
+        #TODO, eventlet spawn after to recheck sooner, or somehow else
+        # influence periodic recheck to shorten delay?
+        return
     nodename = get_nodename(cfg, handler, info)
     if nodename:
         dp = cfg.get_node_attributes([nodename],
