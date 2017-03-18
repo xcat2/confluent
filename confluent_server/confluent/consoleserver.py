@@ -254,7 +254,7 @@ class ConsoleHandler(object):
     def clearbuffer(self):
         self.termstream.feed(
             '\x1bc[no replay buffer due to console.logging attribute set to '
-            'none or interactive, connection loss, or service restart]')
+            'none or interactive,\r\nconnection loss, or service restart]')
         self.clearpending = True
 
     def _disconnect(self):
