@@ -18,6 +18,7 @@ import pyghmi.ipmi.private.util as pygutil
 
 
 class NodeHandler(bmchandler.NodeHandler):
+    devname = 'XCC'
 
     def probe(self):
         try:

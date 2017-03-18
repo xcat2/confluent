@@ -66,8 +66,8 @@ import confluent.config.configmanager as cfm
 #import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.xcc as xcc
-import confluent.discovery.handlers.bmc as bmc
 import confluent.discovery.handlers.smm as smm
+import confluent.log as log
 import confluent.networking.macmap as macmap
 import confluent.util as util
 import traceback
@@ -270,6 +270,11 @@ def detected(info):
     if nodename:
         eval_node(cfg, handler, info, nodename)
     else:
+        log.log(
+            {'info': 'Detected unknown {0} with hwaddr {1} at '
+                     'address {1}'.format(
+                        handler.devname, info['hwaddr'], handler.ipaddr
+                      )})
         unknown_info[info['hwaddr']] = info
 
 
@@ -312,8 +317,18 @@ def eval_node(cfg, handler, info, nodename):
         nl = [x for x in nl]  # listify for sake of len
         if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
-            raise Exception(
-                "TODO: log ambiguous situation: " + nodename + repr(nl))
+            if len(nl):
+                log.log({'error': 'The following nodes have duplicate '
+                                  'enclosure attributes: ' + ','.join(nl)})
+            else:
+                log.log({'error': 'The {0} in enclosure {1} bay {2} does not '
+                                  'seem to be a defined node ({3})'.format(
+                                        handler.devname, nodename,
+                                        info['enclosure.bay'],
+                                        handler.ipaddr,
+                                    )})
+            unknown_info[info['hwaddr']] = info
+            return
         nodename = nl[0]
         if not discover_node(cfg, handler, info, nodename):
             # store it as pending, assuming blocked on enclosure
@@ -339,6 +354,11 @@ def discover_node(cfg, handler, info, nodename):
     # in some product or another.
     if policy == 'permissive' and lastfp:
         info['discofailure'] = 'fingerprint'
+        log.log({'info': 'Detected replacement of {0} with existing '
+                         'fingerprint and permissive discovery policy, not '
+                         'doing discovery unless discovery.policy=open or '
+                         'pubkeys.tls_hardwaremanager attribute is cleared '
+                         'first'.format(nodename)})
         return False  # With a permissive policy, do not discover new
     elif policy in ('open', 'permissive'):
         if not util.cert_matches(lastfp, handler.https_cert):
@@ -354,7 +374,11 @@ def discover_node(cfg, handler, info, nodename):
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
         known_nodes[nodename] = info
+        log.log({'info': 'Discovered {0}'.format(nodename)})
         return True
+    log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
+                     'value allowing discovery (open or permmissive)'.format(
+                        nodename)})
     info['discofailure'] = 'policy'
     return False
 
