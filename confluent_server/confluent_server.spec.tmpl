@@ -34,7 +34,7 @@ grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
 cat INSTALLED_FILES
 
 %post
-if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent; fi
+if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
 
 %clean
 rm -rf $RPM_BUILD_ROOT
