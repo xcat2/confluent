@@ -355,6 +355,8 @@ def eval_node(cfg, handler, info, nodename):
 
 
 def discover_node(cfg, handler, info, nodename):
+    if info['hwaddr'] in unknown_info:
+        del unknown_info[info['hwaddr']]
     dp = cfg.get_node_attributes(
         [nodename], ('discovery.policy',
                      'pubkeys.tls_hardwaremanager'))
