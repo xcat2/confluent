@@ -59,8 +59,10 @@ class NodeHandler(bmchandler.NodeHandler):
                 # Do not try to discover an XCC that can't be preconfigged
                 # can't tell 100% if it's safe to do
                 self.discoverable = False
-        if ipmicmd:
-            ipmicmd.ipmi_session.logout()
+        #TODO: decide how to clean out if important
+        #as it stands, this can step on itself
+        #if ipmicmd:
+        #    ipmicmd.ipmi_session.logout()
 
     @property
     def discoverable_by_switch(self):
