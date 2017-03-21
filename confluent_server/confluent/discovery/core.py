@@ -333,7 +333,8 @@ def eval_node(cfg, handler, info, nodename):
         # lead with the most specific to have a small second pass
         nl = cfg.filter_node_attributes(
             'enclosure.bay=' + info['enclosure.bay'], nl)
-        if len(list(nl)) != 1:
+        nl = list(nl)
+        if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
             if len(nl):
                 log.log({'error': 'The following nodes have duplicate '
