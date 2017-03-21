@@ -15,6 +15,7 @@
 import confluent.discovery.handlers.bmc as bmchandler
 
 class NodeHandler(bmchandler.NodeHandler):
+    is_enclosure = True
     devname = 'SMM'
 
     def config(self, nodename):

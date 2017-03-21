@@ -315,25 +315,25 @@ def eval_node(cfg, handler, info, nodename):
     # first, if had a bay, it was in an enclosure.  If it was discovered by
     # switch, it is probably the enclosure manager and not
     # the node directly.  switch is ambiguous and we should leave it alone
-    if 'enclosure.bay' in info:
-        myenclosure = \
-            cfg.get_node_attributes(nodename, ('enclosure.manager',))
-        myenclosure = myenclosure.get(nodename, {}).get(
-            'enclosure.manager', {}).get('value', None)
-        if myenclosure:  # Discovery mechanism was specific
-            if not discover_node(cfg, handler, info, nodename):
-                pending_nodes[nodename] = info
+    if 'enclosure.bay' in info and handler.is_enclosure:
+        unknown_info[info['hwaddr']] = info
+        log.log({'error': 'Something that is an enclosure reported a bay, '
+                          'not possible'})
+        return
+    nl = list(cfg.filter_node_attributes('enclosure.manager=' + nodename))
+    if not handler.is_enclosure and nl:
+        # The specified node is an enclosure (has nodes mapped to it), but
+        # what we are talking to is *not* an enclosure
+        if 'enclosure.bay' not in info:
+            unknown_info[info['hwaddr']] = info
+            log.log({'error': '{0} is in {1}, but unable to determine '
+                              'bay number'.format(info['hwaddr'], nodename)})
             return
-        # we have an enclosure, but we are not defined to be in an
-        # enclosure, so go ahead and assume that we are misidentified
-        # as our enclosure manager
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
-        nl = cfg.filter_node_attributes('enclosure.manager=' + nodename)
         nl = cfg.filter_node_attributes(
             'enclosure.bay=' + info['enclosure.bay'], nl)
-        nl = [x for x in nl]  # listify for sake of len
-        if len(nl) != 1:
+        if len(list(nl)) != 1:
             info['discofailure'] = 'ambigconfig'
             if len(nl):
                 log.log({'error': 'The following nodes have duplicate '
@@ -353,7 +353,7 @@ def eval_node(cfg, handler, info, nodename):
             # assurance...
             pending_nodes[nodename] = info
     else:
-        # we can and did discover by switch
+        # we can and did accurately discover by switch or in enclosure
         if not discover_node(cfg, handler, info, nodename):
             pending_nodes[nodename] = info
 
