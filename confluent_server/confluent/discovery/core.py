@@ -196,6 +196,7 @@ pending_nodes = {}
 
 
 def _recheck_nodes(nodeattribs, configmanager):
+    global rechecker
     _map_unique_ids(nodeattribs)
     # for the nodes whose attributes have changed, consider them as potential
     # strangers
@@ -215,6 +216,10 @@ def _recheck_nodes(nodeattribs, configmanager):
                             'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
+            rechecker.cancel()
+            rechecker = eventlet.spawn_after(60, _periodic_recheck,
+                                             configmanager)
+
             continue
         nodename = get_nodename(configmanager, handler, info)
         if nodename:
@@ -239,6 +244,7 @@ def eval_detected(info):
 
 
 def detected(info):
+    global rechecker
     for service in info['services']:
         if nodehandlers.get(service, None):
             handler = nodehandlers[service]
@@ -270,6 +276,8 @@ def detected(info):
                       'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
             )})
+        rechecker.cancel()
+        rechecker = eventlet.spawn_after(60, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         #TODO, eventlet spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
@@ -431,14 +439,18 @@ def newnodes(added, deleting, configmanager):
     _recheck_nodes((), configmanager)
 
 
+rechecker = None
+
+
 def _periodic_recheck(configmanager):
-    while True:
-        eventlet.sleep(900)
-        _recheck_nodes((), configmanager)
+    global rechecker
+    _recheck_nodes((), configmanager)
+    rechecker = eventlet.spawn_after(900, _periodic_recheck, configmanager)
 
 
 def start_detection():
     global attribwatcher
+    global rechecker
     _map_unique_ids()
     cfg = cfm.ConfigManager(None)
     allnodes = cfg.list_nodes()
@@ -448,7 +460,7 @@ def start_detection():
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
-    eventlet.spawn_n(_periodic_recheck, cfg)
+    rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
     # eventlet.spawn_n(ssdp.snoop, safe_detected)
     # eventlet.spawn_n(pxe.snoop, safe_detected)
 
