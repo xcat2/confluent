@@ -208,6 +208,14 @@ def _recheck_nodes(nodeattribs, configmanager):
         if not info:
             continue
         handler = info['handler'].NodeHandler(info, configmanager)
+        if not handler.https_cert:
+            log.log(
+                {
+                    'info': '{0} with hwaddr {1} at address {2} is not yet running '
+                            'https, will examine later'.format(
+                        handler.devname, info['hwaddr'], handler.ipaddr
+                    )})
+            continue
         nodename = get_nodename(configmanager, handler, info)
         if nodename:
             eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
@@ -275,16 +283,9 @@ def detected(info):
         if util.cert_matches(lastfp, handler.https_cert):
             known_nodes[nodename] = info
             return  # already known, no need for more
-    try:
-        handler.probe()  # unicast interrogation as possible to get more data
-        # for now, we search switch only, ideally we search cmm, smm, and
-        # switch concurrently
-    except Exception as e:
-        unknown_info[info['hwaddr']] = info
-        log.log({'error': 'An error occured during discovery, check the '
-                          'trace and stderr logs'})
-        traceback.print_exc()
-        return
+    #TODO(jjohnson2): We might have to get UUID for certain searches...
+    #for now defer probe until inside eval_node.  We might not have
+    #a nodename without probe in the future.
     if nodename:
         eval_node(cfg, handler, info, nodename)
     else:
@@ -310,6 +311,16 @@ def get_nodename(cfg, handler, info):
 
 
 def eval_node(cfg, handler, info, nodename):
+    try:
+        handler.probe()  # unicast interrogation as possible to get more data
+        # for now, we search switch only, ideally we search cmm, smm, and
+        # switch concurrently
+    except Exception as e:
+        unknown_info[info['hwaddr']] = info
+        log.log({'error': 'An error occured during discovery, check the '
+                          'trace and stderr logs'})
+        traceback.print_exc()
+        return
     # do some preconfig, for example, to bring a SMM online if applicable
     handler.preconfig()
     # first, if had a bay, it was in an enclosure.  If it was discovered by
@@ -326,8 +337,10 @@ def eval_node(cfg, handler, info, nodename):
         # what we are talking to is *not* an enclosure
         if 'enclosure.bay' not in info:
             unknown_info[info['hwaddr']] = info
-            log.log({'error': '{0} is in {1}, but unable to determine '
-                              'bay number'.format(info['hwaddr'], nodename)})
+            log.log({'error': '{2} with mac {0} is in {1}, but unable to '
+                              'determine bay number'.format(info['hwaddr'],
+                                                            nodename,
+                                                            handler.ipaddr)})
             return
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass

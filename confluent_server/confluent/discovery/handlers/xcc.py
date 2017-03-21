@@ -59,6 +59,8 @@ class NodeHandler(bmchandler.NodeHandler):
                 # Do not try to discover an XCC that can't be preconfigged
                 # can't tell 100% if it's safe to do
                 self.discoverable = False
+            else:
+                raise
         #TODO: decide how to clean out if important
         #as it stands, this can step on itself
         #if ipmicmd:
