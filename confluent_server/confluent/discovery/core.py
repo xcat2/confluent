@@ -273,12 +273,16 @@ def detected(info):
         lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                           {}).get('value', None)
         if util.cert_matches(lastfp, handler.https_cert):
+            known_nodes[nodename] = info
             return  # already known, no need for more
     try:
         handler.probe()  # unicast interrogation as possible to get more data
         # for now, we search switch only, ideally we search cmm, smm, and
         # switch concurrently
     except Exception as e:
+        unknown_info[info['hwaddr']] = info
+        log.log({'error': 'An error occured during discovery, check the '
+                          'trace and stderr logs'})
         traceback.print_exc()
         return
     if nodename:
