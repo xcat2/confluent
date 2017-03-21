@@ -35,6 +35,7 @@ cat INSTALLED_FILES
 
 %post
 if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
+true
 
 %clean
 rm -rf $RPM_BUILD_ROOT
