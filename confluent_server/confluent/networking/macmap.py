@@ -102,6 +102,8 @@ def _map_switch(args):
         log.log({'error': 'Timeout trying to reach switch "{0}"'.format(
             args[0])})
     except Exception as e:
+        log.log({'error': 'Unexpected condition trying to reach switch "{0}"'
+                          ' check trace log for more'.format(args[0])})
         log.logtrace()
 
 
@@ -133,6 +135,8 @@ def _map_switch_backend(args):
     global _macmap
     if len(args) == 3:
         switch, password, user = args
+        if not user:
+            user = None
     else:
         switch, password = args
         user = None
@@ -250,6 +254,8 @@ def update_macmap(configmanager):
                    'secret.hardwaremanagementpassword'), decrypt=True)
     switchauth = []
     for switch in switches:
+        if not switch:
+            continue
         password = 'public'
         user = None
         if (switch in switchcfg and
