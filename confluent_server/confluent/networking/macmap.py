@@ -197,11 +197,15 @@ def _map_switch_backend(args):
         nodename = _nodelookup(switch, ifname)
         if nodename is not None:
             if mac in _nodesbymac and _nodesbymac[mac] != nodename:
-                log.log({'warning': '{0} and {1} described by ambiguous'
+                # For example, listed on both a real edge port
+                # and by accident a trunk port
+                log.log({'error': '{0} and {1} described by ambiguous'
                                     ' switch topology values'.format(nodename,
                                                               _nodesbymac[mac]
                                                               )})
-            _nodesbymac[mac] = nodename
+                _nodesbymac[mac] = None
+            else:
+                _nodesbymac[mac] = nodename
 
 
 def find_node_by_mac(mac, configmanager):
@@ -243,12 +247,14 @@ def update_macmap(configmanager):
                 if curswitch not in _switchportmap:
                     _switchportmap[curswitch] = {}
                 if portname in _switchportmap[curswitch]:
-                    log.log({'warning': 'Duplicate switch topology config for '
+                    log.log({'error': 'Duplicate switch topology config for '
                                         '{0} and {1}'.format(node,
                                                              _switchportmap[
                                                                  curswitch][
                                                                  portname])})
-                _switchportmap[curswitch][portname] = node
+                    _switchportmap[curswitch][portname] = None
+                else:
+                    _switchportmap[curswitch][portname] = node
     switchcfg = configmanager.get_node_attributes(
         switches, ('secret.hardwaremanagementuser',
                    'secret.hardwaremanagementpassword'), decrypt=True)
