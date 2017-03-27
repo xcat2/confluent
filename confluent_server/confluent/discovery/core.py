@@ -260,6 +260,21 @@ def detected(info):
         # also when switch config parameters change, should discard
         # and there's also if wiring is fixed...
         # of course could periodically revisit known_nodes
+        # replace potentially stale address info
+        #TODO(jjohnson2): remove this
+        # temporary workaround for XCC not doing SLP DA over dedicated port
+        # bz 93219, fix submitted, but not in builds yet
+        # strictly speaking, going ipv4 only legitimately is mistreated here,
+        # but that should be an edge case
+        oldaddr = known_info[info['hwaddr']]['addresses']
+        for addr in info['addresses']:
+            if addr[0].startswith('fe80::'):
+                break
+        else:
+            for addr in oldaddr:
+                if addr[0].startswith('fe80::'):
+                    info['addresses'].append(addr)
+        known_info[info['hwaddr']]['addresses'] = info['addresses']
         return
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)

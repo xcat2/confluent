@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import errno
 import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
@@ -60,6 +61,7 @@ class NodeHandler(object):
         wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert)
         try:
             wc.connect()
-        except Exception:
-            return None
+        except IOError as ie:
+            if ie.errno == errno.ECONNREFUSED:
+                return None
         return self._fp
