@@ -351,6 +351,19 @@ def query_srvtypes(target):
         stypes = payload[4:4+stypelen].decode('utf-8')
         return stypes.split(',')
 
+def rescan(handler):
+    known_peers = set([])
+    for scanned in scan():
+        for addr in scanned['addresses']:
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            if ip not in neighutil.neightable:
+                continue
+            if addr in known_peers:
+                break
+            known_peers.add(addr)
+        else:
+            handler(scanned)
+
 
 def snoop(handler):
     """Watch for SLP activity
@@ -362,7 +375,7 @@ def snoop(handler):
     """
     known_peers = set([])
     peerbymacaddress = {}
-    for scanned in scan(_slp_services):
+    for scanned in scan():
         for addr in scanned['addresses']:
             ip = addr[0].partition('%')[0]  # discard scope if present
             if ip not in neighutil.neightable:
@@ -437,7 +450,7 @@ def snoop(handler):
             handler(peerinfo)
 
 
-def scan(srvtypes, addresses=None):
+def scan(srvtypes=_slp_services, addresses=None):
     """Find targets providing matching requested srvtypes
 
     This is a generator that will iterate over respondants to the SrvType

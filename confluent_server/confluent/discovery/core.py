@@ -266,6 +266,7 @@ def detected(info):
         # bz 93219, fix submitted, but not in builds yet
         # strictly speaking, going ipv4 only legitimately is mistreated here,
         # but that should be an edge case
+        #TODO(jjohnson2): double check https cert for change?
         oldaddr = known_info[info['hwaddr']]['addresses']
         for addr in info['addresses']:
             if addr[0].startswith('fe80::'):
@@ -279,12 +280,6 @@ def detected(info):
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
-    # TODO: first check by filter_attributes for uuid match...
-    # but maybe not..... since UUID uniqueness is a challenge...
-    # but could search by cert fingerprint....
-    # IF not https_cert.... then toss it back to eval in a later pass
-    # we may have a booting xcc or whatever that hasn't gotten the https up
-    # yet, use https as a sign of readiness
     if not handler.https_cert:
         log.log(
             {'info':  '{0} with hwaddr {1} at address {2} is not yet running '
