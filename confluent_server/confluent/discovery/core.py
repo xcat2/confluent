@@ -216,10 +216,12 @@ def _recheck_nodes(nodeattribs, configmanager):
                             'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
-            rechecker.cancel()
-            rechecker = eventlet.spawn_after(60, _periodic_recheck,
-                                             configmanager)
-
+            if rechecker is not None:
+                rechecker.cancel()
+            # if cancel did not result in dead, then we are in progress
+            if rechecker is None or rechecker.dead:
+                rechecker = eventlet.spawn_after(60, _periodic_recheck,
+                                                 configmanager)
             continue
         nodename = get_nodename(configmanager, handler, info)
         if nodename:
@@ -286,8 +288,10 @@ def detected(info):
                       'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
             )})
-        rechecker.cancel()
-        rechecker = eventlet.spawn_after(60, _periodic_recheck, cfg)
+        if rechecker is not None:
+            rechecker.cancel()
+        if rechecker is None or rechecker.dead:
+            rechecker = eventlet.spawn_after(60, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         #TODO, eventlet spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
@@ -454,8 +458,13 @@ rechecker = None
 
 def _periodic_recheck(configmanager):
     global rechecker
+    rechecker = None
     _recheck_nodes((), configmanager)
-    rechecker = eventlet.spawn_after(900, _periodic_recheck, configmanager)
+    # if rechecker is set, it means that an accelerated schedule
+    # for rechecker was requested in the course of recheck_nodes
+    if rechecker is None:
+        rechecker = eventlet.spawn_after(900, _periodic_recheck,
+                                         configmanager)
 
 
 def start_detection():
@@ -470,7 +479,8 @@ def start_detection():
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
-    rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
+    if rechecker is None:
+        rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
     # eventlet.spawn_n(ssdp.snoop, safe_detected)
     # eventlet.spawn_n(pxe.snoop, safe_detected)
 
