@@ -73,6 +73,7 @@ import confluent.util as util
 import traceback
 
 import eventlet
+import eventlet.semaphore
 
 nodehandlers = {
     'service:lenovo-smm': smm,
@@ -454,12 +455,15 @@ def newnodes(added, deleting, configmanager):
 
 
 rechecker = None
-
+rechecklock = eventlet.semaphore.Semaphore()
 
 def _periodic_recheck(configmanager):
     global rechecker
     rechecker = None
-    _recheck_nodes((), configmanager)
+    # There shouldn't be anything causing this to double up, but just in case
+    # use a semaphore to absolutely guarantee this doesn't multiply
+    with rechecklock:
+        _recheck_nodes((), configmanager)
     # if rechecker is set, it means that an accelerated schedule
     # for rechecker was requested in the course of recheck_nodes
     if rechecker is None:
