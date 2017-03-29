@@ -39,6 +39,8 @@ import confluent.log as log
 import confluent.snmputil as snmp
 import confluent.util as util
 from eventlet.greenpool import GreenPool
+import eventlet
+import eventlet.semaphore
 import re
 
 _macmap = {}
@@ -214,10 +216,16 @@ def find_node_by_mac(mac, configmanager):
         return _nodesbymac[mac]
     # do not sweep switches more than once every 10 seconds
     if vintage and now - vintage < 10:
-        return
+        return _nodesbymac.get(mac, None)
     for _ in update_macmap(configmanager):
         if mac in _nodesbymac:
             return _nodesbymac[mac]
+    # If update_mac bailed out, still check one last time
+    return _nodesbymac.get(mac, None)
+
+
+mapupdating = eventlet.semaphore.Semaphore()
+
 
 def update_macmap(configmanager):
     """Interrogate switches to build/update mac table
@@ -231,54 +239,61 @@ def update_macmap(configmanager):
     global _nodesbymac
     global _switchportmap
     global vintage
-    vintage = util.monotonic_time()
-    # Clear all existing entries
-    _macmap = {}
-    _nodesbymac = {}
-    _switchportmap = {}
-    if configmanager.tenant is not None:
-        raise exc.ForbiddenRequest('Network topology not available to tenants')
-    nodelocations = configmanager.get_node_attributes(
-        configmanager.list_nodes(), ('net.switch', 'net.switchport'))
-    switches = set([])
-    for node in nodelocations:
-        cfg = nodelocations[node]
-        if 'net.switch' in cfg and 'value' in cfg['net.switch']:
-            curswitch = cfg['net.switch']['value']
-            switches.add(curswitch)
-            if 'net.switchport' in cfg:
-                portname = cfg['net.switchport']['value']
-                if curswitch not in _switchportmap:
-                    _switchportmap[curswitch] = {}
-                if portname in _switchportmap[curswitch]:
-                    log.log({'error': 'Duplicate switch topology config for '
-                                        '{0} and {1}'.format(node,
-                                                             _switchportmap[
-                                                                 curswitch][
-                                                                 portname])})
-                    _switchportmap[curswitch][portname] = None
-                else:
-                    _switchportmap[curswitch][portname] = node
-    switchcfg = configmanager.get_node_attributes(
-        switches, ('secret.hardwaremanagementuser',
-                   'secret.hardwaremanagementpassword'), decrypt=True)
-    switchauth = []
-    for switch in switches:
-        if not switch:
-            continue
-        password = 'public'
-        user = None
-        if (switch in switchcfg and
-                'secret.hardwaremanagementpassword' in switchcfg[switch]):
-            password = switchcfg[switch]['secret.hardwaremanagementpassword'][
-                'value']
-            if 'secret.hardwaremanagementuser' in switchcfg[switch]:
-                user = switchcfg[switch]['secret.hardwaremanagementuser'][
-                    'value']
-        switchauth.append((switch, password, user))
-    pool = GreenPool()
-    for res in pool.imap(_map_switch, switchauth):
-        yield res
+    if mapupdating.locked():
+        while mapupdating.locked():
+            eventlet.sleep(1)
+            yield None
+        return
+    with mapupdating:
+        vintage = util.monotonic_time()
+        # Clear all existing entries
+        _macmap = {}
+        _nodesbymac = {}
+        _switchportmap = {}
+        if configmanager.tenant is not None:
+            raise exc.ForbiddenRequest(
+                'Network topology not available to tenants')
+        nodelocations = configmanager.get_node_attributes(
+            configmanager.list_nodes(), ('net.switch', 'net.switchport'))
+        switches = set([])
+        for node in nodelocations:
+            cfg = nodelocations[node]
+            if 'net.switch' in cfg and 'value' in cfg['net.switch']:
+                curswitch = cfg['net.switch']['value']
+                switches.add(curswitch)
+                if 'net.switchport' in cfg:
+                    portname = cfg['net.switchport']['value']
+                    if curswitch not in _switchportmap:
+                        _switchportmap[curswitch] = {}
+                    if portname in _switchportmap[curswitch]:
+                        log.log({'error': 'Duplicate switch topology config '
+                                          'for {0} and {1}'.format(
+                                            node,
+                                            _switchportmap[curswitch][
+                                                portname])})
+                        _switchportmap[curswitch][portname] = None
+                    else:
+                        _switchportmap[curswitch][portname] = node
+        switchcfg = configmanager.get_node_attributes(
+            switches, ('secret.hardwaremanagementuser',
+                       'secret.hardwaremanagementpassword'), decrypt=True)
+        switchauth = []
+        for switch in switches:
+            if not switch:
+                continue
+            password = 'public'
+            user = None
+            if (switch in switchcfg and
+                    'secret.hardwaremanagementpassword' in switchcfg[switch]):
+                password = switchcfg[
+                    switch]['secret.hardwaremanagementpassword']['value']
+                if 'secret.hardwaremanagementuser' in switchcfg[switch]:
+                    user = switchcfg[switch]['secret.hardwaremanagementuser'][
+                        'value']
+            switchauth.append((switch, password, user))
+        pool = GreenPool()
+        for ans in pool.imap(_map_switch, switchauth):
+            yield ans
 
 
 if __name__ == '__main__':
