@@ -307,7 +307,10 @@ def _add_attributes(parsed):
         net = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     else:
         net = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    net.connect(target)
+    try:
+        net.connect(target)
+    except socket.error:
+        return
     net.sendall(attrq)
     rsp = net.recv(8192)
     net.close()

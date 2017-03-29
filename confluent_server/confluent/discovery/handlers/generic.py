@@ -64,4 +64,5 @@ class NodeHandler(object):
         except IOError as ie:
             if ie.errno == errno.ECONNREFUSED:
                 return None
+            raise
         return self._fp
