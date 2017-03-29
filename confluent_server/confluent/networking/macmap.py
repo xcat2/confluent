@@ -209,8 +209,12 @@ def _map_switch_backend(args):
 
 
 def find_node_by_mac(mac, configmanager):
-    if vintage and util.monotonic_time() - vintage < 90 and mac in _nodesbymac:
+    now = util.monotonic_time()
+    if vintage and now - vintage < 90 and mac in _nodesbymac:
         return _nodesbymac[mac]
+    # do not sweep switches more than once every 10 seconds
+    if vintage and now - vintage < 10:
+        return
     for _ in update_macmap(configmanager):
         if mac in _nodesbymac:
             return _nodesbymac[mac]
