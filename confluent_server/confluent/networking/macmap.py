@@ -214,10 +214,9 @@ def find_node_by_mac(mac, configmanager):
     now = util.monotonic_time()
     if vintage and now - vintage < 90 and mac in _nodesbymac:
         return _nodesbymac[mac]
-    # do not sweep switches more than once every 10 seconds
-    if vintage and now - vintage < 10:
-        return _nodesbymac.get(mac, None)
-    for _ in update_macmap(configmanager):
+    # do not actually sweep switches more than once every 10 seconds
+    # however, if there is an update in progress, wait on it
+    for _ in update_macmap(configmanager, vintage and now - vintage < 10):
         if mac in _nodesbymac:
             return _nodesbymac[mac]
     # If update_mac bailed out, still check one last time
@@ -227,7 +226,7 @@ def find_node_by_mac(mac, configmanager):
 mapupdating = eventlet.semaphore.Semaphore()
 
 
-def update_macmap(configmanager):
+def update_macmap(configmanager, impatient=False):
     """Interrogate switches to build/update mac table
 
     Begin a rebuild process.  This process is a generator that will yield
@@ -243,6 +242,8 @@ def update_macmap(configmanager):
         while mapupdating.locked():
             eventlet.sleep(1)
             yield None
+        return
+    if impatient:
         return
     with mapupdating:
         vintage = util.monotonic_time()
