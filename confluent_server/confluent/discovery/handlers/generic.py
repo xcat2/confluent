@@ -20,6 +20,7 @@ class NodeHandler(object):
     is_enclosure = False
 
     def __init__(self, info, configmanager):
+        self._certfailreason = None
         self._fp = None
         self.info = info
         self.configmanager = configmanager
@@ -51,6 +52,13 @@ class NodeHandler(object):
         return True
 
     @property
+    def cert_fail_reason(self):
+        if self._certfailreason == 1:
+            return 'refused'
+        elif self._certfailreason == 2:
+            return 'unreachable'
+
+    @property
     def https_cert(self):
         if self._fp:
             return self._fp
@@ -63,6 +71,10 @@ class NodeHandler(object):
             wc.connect()
         except IOError as ie:
             if ie.errno == errno.ECONNREFUSED:
+                self._certfailreason = 1
+                return None
+            elif ie.errno == errno.EHOSTUNREACH:
+                self._certfailreason = 2
                 return None
             raise
         return self._fp

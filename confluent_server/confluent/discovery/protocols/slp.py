@@ -377,7 +377,6 @@ def snoop(handler):
     :return:
     """
     known_peers = set([])
-    peerbymacaddress = {}
     for scanned in scan():
         for addr in scanned['addresses']:
             ip = addr[0].partition('%')[0]  # discard scope if present
@@ -418,6 +417,14 @@ def snoop(handler):
     while True:
         newmacs = set([])
         r, _, _ = select.select((net, net4), (), (), 60)
+        # clear known_peers and peerbymacaddress
+        # to avoid stale info getting in...
+        # rely upon the select(0.2) to catch rapid fire and aggregate ip
+        # addresses that come close together
+        # calling code needs to understand deeper context, as snoop
+        # will now yield dupe info over time
+        known_peers = set([])
+        peerbymacaddress = {}
         neighutil.update_neigh()
         while r:
             for s in r:
@@ -443,7 +450,7 @@ def snoop(handler):
                         'peers': [peer],
                     }
                 newmacs.add(mac)
-            r, _, _ = select.select((net, net4), (), (), 0.1)
+            r, _, _ = select.select((net, net4), (), (), 0.2)
         for mac in newmacs:
             peerinfo = {
                 'hwaddr': mac,

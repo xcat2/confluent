@@ -209,8 +209,24 @@ def _recheck_nodes(nodeattribs, configmanager):
         info = unknown_info.get(mac, None)
         if not info:
             continue
+        if not info.get('addresses', None):
+            log.log({'info': 'Missing address information in ' + repr(info)})
+            continue
         handler = info['handler'].NodeHandler(info, configmanager)
         if not handler.https_cert:
+            if handler.cert_fail_reason == 'unreachable':
+                log.log(
+                    {
+                        'info': '{0} with hwaddr {1} is not reachable at {2}'
+                                ''.format(
+                            handler.devname, info['hwaddr'], handler.ipaddr
+                        )})
+                # addresses data is bad, clear it, to force repair next
+                # opportunity
+                info['addresses'] = []
+                #TODO(jjohnson2):  rescan due to bad peer addr data?
+                # not just
+                return
             log.log(
                 {
                     'info': '{0} with hwaddr {1} at address {2} is not yet running '
@@ -269,7 +285,6 @@ def detected(info):
         # bz 93219, fix submitted, but not in builds yet
         # strictly speaking, going ipv4 only legitimately is mistreated here,
         # but that should be an edge case
-        #TODO(jjohnson2): double check https cert for change?
         oldaddr = known_info[info['hwaddr']]['addresses']
         for addr in info['addresses']:
             if addr[0].startswith('fe80::'):
@@ -278,12 +293,26 @@ def detected(info):
             for addr in oldaddr:
                 if addr[0].startswith('fe80::'):
                     info['addresses'].append(addr)
+        if known_info[info['hwaddr']]['addresses'] == info['addresses']:
+            # if the ip addresses match, then assume no changes
+            # now something resetting to defaults could, in theory
+            # have the same address, but need to be reset
+            # in that case, however, a user can clear pubkeys to force a check
+            return
         known_info[info['hwaddr']]['addresses'] = info['addresses']
-        return
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
     if not handler.https_cert:
+        if handler.cert_fail_reason == 'unreachable':
+            log.log(
+                {
+                    'info': '{0} with hwaddr {1} is not reachable at {2}'
+                            ''.format(
+                        handler.devname, info['hwaddr'], handler.ipaddr
+                    )})
+            info['addresses'] = []
+            return
         log.log(
             {'info':  '{0} with hwaddr {1} at address {2} is not yet running '
                       'https, will examine later'.format(
@@ -466,7 +495,12 @@ def _periodic_recheck(configmanager):
     # There shouldn't be anything causing this to double up, but just in case
     # use a semaphore to absolutely guarantee this doesn't multiply
     with rechecklock:
-        _recheck_nodes((), configmanager)
+        try:
+            _recheck_nodes((), configmanager)
+        except Exception:
+            traceback.print_exc()
+            log.log({'error': 'Unexpected error during discovery, check debug '
+                              'logs'})
     # if rechecker is set, it means that an accelerated schedule
     # for rechecker was requested in the course of recheck_nodes
     if rechecker is None:
