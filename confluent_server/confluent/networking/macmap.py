@@ -98,10 +98,14 @@ def _map_switch(args):
     try:
         return _map_switch_backend(args)
     except UnicodeError:
-        log.log({'error': 'Cannot resolve switch "{0}" to an address'.format(
+        log.log({'error': "Cannot resolve switch '{0}' to an address".format(
             args[0])})
     except exc.TargetEndpointUnreachable:
-        log.log({'error': 'Timeout trying to reach switch "{0}"'.format(
+        log.log({'error': "Timeout or bad SNMPv1 community string trying to "
+                         "reach switch '{0}'".format(
+            args[0])})
+    except exc.TargetEndpointBadCredentials:
+        log.log({'error': "Bad SNMPv3 credentials for \'{0}\'".format(
             args[0])})
     except Exception as e:
         log.log({'error': 'Unexpected condition trying to reach switch "{0}"'
