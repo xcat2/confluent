@@ -341,7 +341,10 @@ def eval_node(cfg, handler, info, nodename):
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         log.log({'error': 'An error occured during discovery, check the '
-                          'trace and stderr logs'})
+                          'trace and stderr logs, mac was {0} and ip was {1}'
+                          ', the node or the containing enclosure was {2}'
+                          ''.format(info['hwaddr'], handler.ipaddr,
+                                    nodename)})
         traceback.print_exc()
         return
     # do some preconfig, for example, to bring a SMM online if applicable
