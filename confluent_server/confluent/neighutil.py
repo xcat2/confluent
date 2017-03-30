@@ -46,6 +46,8 @@ def update_neigh():
             # ideally the system network steers clear of this landmine of
             # a subnet, but just in case
             continue
+        if entry[4] == 'FAILED':
+            continue
         neightable[entry[0]] = entry[4]
     neightime = os.times()[4]
 
