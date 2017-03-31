@@ -68,7 +68,9 @@ import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
+import confluent.exceptions as exc
 import confluent.log as log
+import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.util as util
 import traceback
@@ -127,6 +129,10 @@ known_serials = {}
 known_nodes = {}
 unknown_info = {}
 pending_nodes = {}
+
+
+def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+    raise exc.NotImplementedException()
 
 
 def detected_services():

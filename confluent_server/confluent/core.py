@@ -35,6 +35,7 @@
 
 import confluent.alerts as alerts
 import confluent.config.attributes as attrscheme
+import confluent.discovery.core as disco
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
@@ -635,6 +636,9 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
         # single node request of some sort
         return handle_node_request(configmanager, inputdata,
                                    operation, pathcomponents, autostrip)
+    elif pathcomponents[0] == 'discovery':
+        return disco.handle_api_request(
+            configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'users':
         # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
