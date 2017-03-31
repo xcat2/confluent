@@ -82,6 +82,17 @@ nodehandlers = {
     'service:management-hardware.IBM:integrated-management-module2': imm,
 }
 
+servicenames = {
+    'service:lenovo-smm': 'lenovo-smm',
+    'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
+    'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
+}
+
+servicebyname = {
+    'lenovo-smm': 'service:lenovo-smm',
+    'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
+    'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
+}
 # Passive-only auto-detection protocols:
 # PXE
 
@@ -111,9 +122,48 @@ nodehandlers = {
 
 #TODO: by serial, by uuid, by node
 known_info = {}
+known_services = set([])
+known_serials = {}
 known_nodes = {}
 unknown_info = {}
 pending_nodes = {}
+
+
+def detected_services():
+    for srv in known_services:
+        yield servicenames[srv]
+
+
+def info_by_service(service):
+    service = servicebyname[service]
+    for mac in known_info:
+        info = known_info[mac]
+        for srv in info['services']:
+            if srv == service:
+                yield info
+                break
+
+
+def detected_serials():
+    return iter(known_serials)
+
+
+def info_by_serial(serial):
+    return known_serials.get(serial, None)
+
+
+def detected_models():
+    for info in known_info:
+        info = known_info[info]
+        if 'modelnumber' in info:
+            yield info['modelnumber']
+
+
+def info_by_model(model):
+    for info in known_info:
+        info = known_info[info]
+        if 'modelnumber' in info and info['modelnumber'] == model:
+            yield info
 
 
 def _recheck_nodes(nodeattribs, configmanager):
@@ -184,16 +234,26 @@ def eval_detected(info):
 
 def detected(info):
     global rechecker
+    if 'hwaddr' not in info:
+        return  # For now, require hwaddr field to proceed
+    # later, manual and CMM discovery may act on SN and/or UUID
     for service in info['services']:
         if nodehandlers.get(service, None):
+            known_services.add(service)
             handler = nodehandlers[service]
             info['handler'] = handler
             break
     else:  # no nodehandler, ignore for now
         return
-    if 'hwaddr' not in info:
-        return  # For now, require hwaddr field to proceed
-        # later, manual and CMM discovery may act on SN and/or UUID
+    try:
+        info['serialnumber'] = info['attributes']['enclosure-serial-number'][0]
+        known_serials[info['serialnumber']] = info
+    except (KeyError, IndexError):
+        pass
+    try:
+        info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
+    except (KeyError, IndexError):
+        pass
     if info['hwaddr'] in known_info:
         # we should tee these up for parsing when an enclosure comes up
         # also when switch config parameters change, should discard
@@ -253,6 +313,7 @@ def detected(info):
         lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                           {}).get('value', None)
         if util.cert_matches(lastfp, handler.https_cert):
+            info['nodename'] = nodename
             known_nodes[nodename] = info
             return  # already known, no need for more
     #TODO(jjohnson2): We might have to get UUID for certain searches...
@@ -383,6 +444,7 @@ def discover_node(cfg, handler, info, nodename):
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0}'.format(nodename)})
+        info['nodename'] = nodename
         known_nodes[nodename] = info
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
