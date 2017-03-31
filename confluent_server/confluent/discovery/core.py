@@ -151,8 +151,18 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
                 yield msg.ChildCollection(mac.replace(':', '-'))
         else:
             raise exc.NotFoundException()
+    elif len(pathcomponents) == 3:
+        if pathcomponents[1] == 'by-serial':
+            raise exc.NotFoundException()
+        elif pathcomponents[1] == 'by-model':
+            for info in info_by_model(pathcomponents[2]):
+                yield msg.ChildCollection(info['hwaddr'].replace(':', '-'))
+        elif pathcomponents[1] == 'by-type':
+            for info in info_by_service(pathcomponents[2]):
+                yield msg.ChildCollection(info['hwaddr'].replace(':', '-'))
+
     else:
-        raise exc.NotImplementedException()
+        raise exc.NotFoundException()
 
 
 def detected_services():
@@ -179,9 +189,11 @@ def info_by_serial(serial):
 
 
 def detected_models():
+    knownmodels = set([])
     for info in known_info:
         info = known_info[info]
-        if 'modelnumber' in info:
+        if 'modelnumber' in info and info['modelnumber'] not in knownmodels:
+            knownmodels.add(info['modelnumber'])
             yield info['modelnumber']
 
 
