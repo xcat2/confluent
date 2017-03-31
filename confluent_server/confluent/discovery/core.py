@@ -132,7 +132,27 @@ pending_nodes = {}
 
 
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
-    raise exc.NotImplementedException()
+    if len(pathcomponents) == 1:
+        for coll in ('by-serial/', 'by-model/', 'by-type/', 'by-mac/'):
+            yield msg.ChildCollection(coll)
+    elif len(pathcomponents) == 2:
+        if pathcomponents[1] == 'by-serial':
+            for serial in known_serials:
+                yield msg.ChildCollection(serial)
+        elif pathcomponents[1] == 'by-model':
+            for model in detected_models():
+                yield msg.ChildCollection(model + '/')
+        elif pathcomponents[1] == 'by-type':
+            for model in detected_services():
+                yield msg.ChildCollection(model + '/')
+        elif pathcomponents[1] == 'by-mac':
+            for mac in known_info:
+                # it pains me, but : are url hostile....
+                yield msg.ChildCollection(mac.replace(':', '-'))
+        else:
+            raise exc.NotFoundException()
+    else:
+        raise exc.NotImplementedException()
 
 
 def detected_services():
