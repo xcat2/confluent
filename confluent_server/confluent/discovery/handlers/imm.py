@@ -18,7 +18,7 @@ import pyghmi.ipmi.private.util as pygutil
 
 
 class NodeHandler(bmchandler.NodeHandler):
-    devname = 'XCC'
+    devname = 'IMM'
 
     def probe(self):
         try:
@@ -31,36 +31,13 @@ class NodeHandler(bmchandler.NodeHandler):
                 '/v2/cmm/sp/7')
             if not bayid:
                 return
+            #
             self.info['enclosure.bay'] = bayid
-            smmid = ipmicmd._oem.immhandler.get_property(
-                '/v2/ibmc/smm/chassis/uuid')
-            if not smmid:
-                return
-            smmid = smmid.lower().replace(' ', '')
-            smmid = '{0}-{1}-{2}-{3}-{4}'.format(smmid[:8], smmid[8:12],
-                                                 smmid[12:16], smmid[16:20],
-                                                 smmid[20:])
-            self.info['enclosure.uuid'] = smmid
-            self.info['enclosure.type'] = 'smm'
+            # enclosure.bay only happens for Flex, nextscale doesn't do it
+            # this way
         except pygexc.IpmiException as ie:
             print(repr(ie))
             raise
-
-    def preconfig(self):
-        # attempt to enable SMM
-        #it's normal to get a 'not supported' (193) for systems without an SMM
-        ipmicmd = None
-        try:
-            ipmicmd = self._get_ipmicmd()
-            ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
-        except pygexc.IpmiException as e:
-            if e.ipmicode != 193:
-                # raise an issue if anything other than to be expected
-                raise
-        #TODO: decide how to clean out if important
-        #as it stands, this can step on itself
-        #if ipmicmd:
-        #    ipmicmd.ipmi_session.logout()
 
 
 # TODO(jjohnson2): web based init config for future prevalidated cert scheme

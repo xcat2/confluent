@@ -65,8 +65,9 @@ import confluent.config.configmanager as cfm
 #import confluent.discovery.protocols.pxe as pxe
 #import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
-import confluent.discovery.handlers.xcc as xcc
+import confluent.discovery.handlers.imm as imm
 import confluent.discovery.handlers.smm as smm
+import confluent.discovery.handlers.xcc as xcc
 import confluent.log as log
 import confluent.networking.macmap as macmap
 import confluent.util as util
@@ -78,6 +79,7 @@ import eventlet.semaphore
 nodehandlers = {
     'service:lenovo-smm': smm,
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
+    'service:management-hardware.IBM:integrated-management-module2': imm,
 }
 
 # Passive-only auto-detection protocols:
