@@ -76,5 +76,9 @@ class NodeHandler(object):
             elif ie.errno == errno.EHOSTUNREACH:
                 self._certfailreason = 2
                 return None
-            raise
+            self._certfailreason = 2
+            return None
+        except Exception:
+            self._certfailreason = 2
+            return None
         return self._fp

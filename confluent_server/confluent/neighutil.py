@@ -24,6 +24,10 @@ import os
 neightable = {}
 neightime = 0
 
+import re
+
+_validmac = re.compile('..:..:..:..:..:..')
+
 
 def update_neigh():
     global neightable
@@ -46,7 +50,7 @@ def update_neigh():
             # ideally the system network steers clear of this landmine of
             # a subnet, but just in case
             continue
-        if entry[4] == 'FAILED':
+        if not _validmac.match(entry[4]):
             continue
         neightable[entry[0]] = entry[4]
     neightime = os.times()[4]

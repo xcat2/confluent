@@ -214,48 +214,57 @@ def _recheck_nodes(nodeattribs, configmanager):
             unknown_info[known_nodes[node]['hwaddr']] = known_nodes[node]
     # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
-        info = unknown_info.get(mac, None)
-        if not info:
+        try:
+            _recheck_single_unknown(configmanager, mac)
+        except Exception:
+            traceback.print_exc()
             continue
-        if not info.get('addresses', None):
-            log.log({'info': 'Missing address information in ' + repr(info)})
-            continue
-        handler = info['handler'].NodeHandler(info, configmanager)
-        if not handler.https_cert:
-            if handler.cert_fail_reason == 'unreachable':
-                log.log(
-                    {
-                        'info': '{0} with hwaddr {1} is not reachable at {2}'
-                                ''.format(
-                            handler.devname, info['hwaddr'], handler.ipaddr
-                        )})
-                # addresses data is bad, clear it, to force repair next
-                # opportunity
-                info['addresses'] = []
-                #TODO(jjohnson2):  rescan due to bad peer addr data?
-                # not just
-                return
-            log.log(
-                {
-                    'info': '{0} with hwaddr {1} at address {2} is not yet running '
-                            'https, will examine later'.format(
-                        handler.devname, info['hwaddr'], handler.ipaddr
-                    )})
-            if rechecker is not None:
-                rechecker.cancel()
-            # if cancel did not result in dead, then we are in progress
-            if rechecker is None or rechecker.dead:
-                rechecker = eventlet.spawn_after(60, _periodic_recheck,
-                                                 configmanager)
-            continue
-        nodename = get_nodename(configmanager, handler, info)
-        if nodename:
-            eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
     # now we go through ones that were identified, but could not pass
     # policy or hadn't been able to verify key
     for nodename in pending_nodes:
         info = pending_nodes[nodename]
         handler = info['handler'].NodeHandler(info, configmanager)
+        eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
+
+
+def _recheck_single_unknown(configmanager, mac):
+    global rechecker
+    info = unknown_info.get(mac, None)
+    if not info:
+        return
+    if not info.get('addresses', None):
+        log.log({'info': 'Missing address information in ' + repr(info)})
+        return
+    handler = info['handler'].NodeHandler(info, configmanager)
+    if not handler.https_cert:
+        if handler.cert_fail_reason == 'unreachable':
+            log.log(
+                {
+                    'info': '{0} with hwaddr {1} is not reachable at {2}'
+                            ''.format(
+                        handler.devname, info['hwaddr'], handler.ipaddr
+                    )})
+            # addresses data is bad, clear it, to force repair next
+            # opportunity
+            info['addresses'] = []
+            # TODO(jjohnson2):  rescan due to bad peer addr data?
+            # not just wait around for the next announce
+            return
+        log.log(
+            {
+                'info': '{0} with hwaddr {1} at address {2} is not yet running '
+                        'https, will examine later'.format(
+                    handler.devname, info['hwaddr'], handler.ipaddr
+                )})
+        if rechecker is not None:
+            rechecker.cancel()
+        # if cancel did not result in dead, then we are in progress
+        if rechecker is None or rechecker.dead:
+            rechecker = eventlet.spawn_after(60, _periodic_recheck,
+                                             configmanager)
+        return
+    nodename = get_nodename(configmanager, handler, info)
+    if nodename:
         eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
 
 
@@ -317,7 +326,6 @@ def detected(info):
             # have the same address, but need to be reset
             # in that case, however, a user can clear pubkeys to force a check
             return
-        known_info[info['hwaddr']]['addresses'] = info['addresses']
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
