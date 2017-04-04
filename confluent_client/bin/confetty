@@ -750,6 +750,8 @@ if sys.stdout.isatty():
 
     readline.parse_and_bind("tab: complete")
     readline.parse_and_bind("set bell-style none")
+    dl = readline.get_completer_delims().replace('-', '')
+    readline.set_completer_delims()
     readline.set_completer(completer)
 
 doexit = False
