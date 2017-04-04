@@ -67,6 +67,7 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 
+rawstdout = sys.stdout
 import confluent.termhandler as termhandler
 import confluent.tlvdata as tlvdata
 import confluent.client as client
@@ -783,11 +784,11 @@ while inconsole or not doexit:
                     continue
                 if data is not None:
                     try:
-                        sys.stdout.write(data)
+                        rawstdout.write(data)
                     except IOError:  # Some times circumstances are bad
                         # resort to byte at a time...
                         for d in data:
-                            sys.stdout.write(d)
+                            rawstdout.write(d)
                     now = time.time()
                     if ('showtime' not in laststate or
                             (now // 60) != laststate['showtime'] // 60):
