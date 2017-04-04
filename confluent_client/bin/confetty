@@ -71,7 +71,6 @@ rawstdout = sys.stdout
 import confluent.termhandler as termhandler
 import confluent.tlvdata as tlvdata
 import confluent.client as client
-sys.stdout = rawstdout
 
 conserversequence = '\x05c'  # ctrl-e, c
 
