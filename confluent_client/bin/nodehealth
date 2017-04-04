@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import codecs
 import optparse
 import os
 import sys
@@ -26,8 +25,6 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
-
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
 argparser = optparse.OptionParser(usage="Usage: %prog <noderange>")
 (options, args) = argparser.parse_args()

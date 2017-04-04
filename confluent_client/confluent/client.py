@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import anydbm as dbm
+import codecs
 import errno
 import hashlib
 import os
@@ -25,6 +26,8 @@ import sys
 import confluent.tlvdata as tlvdata
 
 SO_PASSCRED = 16
+sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+
 
 
 def _parseserver(string):
