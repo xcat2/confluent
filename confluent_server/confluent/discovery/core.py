@@ -293,8 +293,10 @@ def detected(info):
     else:  # no nodehandler, ignore for now
         return
     try:
-        info['serialnumber'] = info['attributes']['enclosure-serial-number'][0]
-        known_serials[info['serialnumber']] = info
+        snum = info['attributes']['enclosure-serial-number'][0].rstrip()
+        if snum:
+            info['serialnumber'] = snum
+            known_serials[info['serialnumber']] = info
     except (KeyError, IndexError):
         pass
     try:
