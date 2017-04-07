@@ -185,6 +185,16 @@ class ConsoleHandler(object):
             self.connectstate = 'connecting'
             eventlet.spawn(self._connect)
 
+    def feedbuffer(self, data):
+        try:
+            self.termstream.feed(data)
+        except StopIteration:  # corrupt parser state, start over
+            self.termstream = pyte.ByteStream()
+            self.termstream.attach(self.buffer)
+        except Exception:
+            _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                          event=log.Events.stacktrace)
+
     def check_isondemand(self):
         self._dologging = True
         attrvalue = self.cfgmgr.get_node_attributes(
@@ -252,7 +262,7 @@ class ConsoleHandler(object):
             self._console.ping()
 
     def clearbuffer(self):
-        self.termstream.feed(
+        self.feedbuffer(
             '\x1bc[no replay buffer due to console.logging attribute set to '
             'none or interactive,\r\nconnection loss, or service restart]')
         self.clearpending = True
@@ -455,18 +465,18 @@ class ConsoleHandler(object):
             eventdata |= 2
         self.log(data, eventdata=eventdata)
         self.lasttime = util.monotonic_time()
-        self.termstream.feed(data)
+        self.feedbuffer(data)
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
         if self.clearpending:
             self.clearpending = False
-            self.termstream.feed(b'\x1bc')
+            self.feedbuffer(b'\x1bc')
             self._send_rcpts(b'\x1bc')
         self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
 
     def _send_rcpts(self, data):
-        for rcpt in self.livesessions:
+        for rcpt in list(self.livesessions):
             try:
                 rcpt.data_handler(data)
             except:  # No matter the reason, advance to next recipient
@@ -516,7 +526,12 @@ class ConsoleHandler(object):
 
     def write(self, data):
         if self.connectstate == 'connected':
-            self._console.write(data)
+            try:
+                self._console.write(data)
+            except Exception:
+                _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                              event=log.Events.stacktrace)
+                self._got_disconnected()
 
 
 def disconnect_node(node, configmanager):
