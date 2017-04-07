@@ -131,38 +131,79 @@ unknown_info = {}
 pending_nodes = {}
 
 
+def enumerate_by_serial(model=None, type=None):
+    type = servicebyname.get(type, None)
+    for info in known_info:
+        info = known_info[info]
+        if 'serialnumber' not in info:
+            continue
+        if model and info.get('modelnumber', None) != model:
+            continue
+        if type and type not in info['services']:
+            continue
+        yield msg.ChildCollection(info['serialnumber'])
+
+
+def enumerate_by_mac(model=None, type=None):
+    type = servicebyname.get(type, None)
+    for mac in known_info:
+        info = known_info[mac]
+        if 'hwaddr' not in info:
+            continue
+        if model and info.get('modelnumber', None) != model:
+            continue
+        if type and type not in info['services']:
+            continue
+        yield msg.ChildCollection(mac.replace(':', '-'))
+
+
+def enumerate_types():
+    for model in detected_services():
+        yield msg.ChildCollection(model + '/')
+
+
+def enumerate_models():
+    for model in detected_models():
+        yield msg.ChildCollection(model + '/')
+
+
+disco_info = {
+    'by-serial': enumerate_by_serial,
+    'by-mac': enumerate_by_mac,
+}
+
+category_info = {
+    'by-serial': enumerate_by_serial,
+    'by-mac': enumerate_by_mac,
+    'by-type': enumerate_types,
+    'by-model': enumerate_models,
+}
+
+group_info = {
+    'by-type': disco_info,
+    'by-model': disco_info,
+}
+
+
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if len(pathcomponents) == 1:
-        for coll in ('by-serial/', 'by-model/', 'by-type/', 'by-mac/'):
-            yield msg.ChildCollection(coll)
+        return [ msg.ChildCollection(x + '/') for x in category_info]
     elif len(pathcomponents) == 2:
-        if pathcomponents[1] == 'by-serial':
-            for serial in known_serials:
-                yield msg.ChildCollection(serial)
-        elif pathcomponents[1] == 'by-model':
-            for model in detected_models():
-                yield msg.ChildCollection(model + '/')
-        elif pathcomponents[1] == 'by-type':
-            for model in detected_services():
-                yield msg.ChildCollection(model + '/')
-        elif pathcomponents[1] == 'by-mac':
-            for mac in known_info:
-                # it pains me, but : are url hostile....
-                yield msg.ChildCollection(mac.replace(':', '-'))
-        else:
-            raise exc.NotFoundException()
+        category = pathcomponents[1]
+        if category not in category_info:
+            raise exc.NotFoundException(category + ' not a valid discovery category')
+        return category_info[category]()
     elif len(pathcomponents) == 3:
-        if pathcomponents[1] == 'by-serial':
-            raise exc.NotFoundException()
-        elif pathcomponents[1] == 'by-model':
-            for info in info_by_model(pathcomponents[2]):
-                yield msg.ChildCollection(info['hwaddr'].replace(':', '-'))
+        if pathcomponents[1] in group_info:
+            return [ msg.ChildCollection(x + '/') for x in disco_info ]
+        elif pathcomponents[1] in disco_info:
+            return disco_info[pathcomponents[1]]()
+    elif len(pathcomponents) == 4:
+        if pathcomponents[1] == 'by-model':
+            return disco_info[pathcomponents[3]](model=pathcomponents[2])
         elif pathcomponents[1] == 'by-type':
-            for info in info_by_service(pathcomponents[2]):
-                yield msg.ChildCollection(info['hwaddr'].replace(':', '-'))
-
-    else:
-        raise exc.NotFoundException()
+            return disco_info[pathcomponents[3]](type=pathcomponents[2])
+    raise exc.NotFoundException()
 
 
 def detected_services():
@@ -174,7 +215,7 @@ def info_by_service(service):
     service = servicebyname[service]
     for mac in known_info:
         info = known_info[mac]
-        for srv in info['services']:
+        if srv in info['services']:
             if srv == service:
                 yield info
                 break
