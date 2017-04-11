@@ -494,7 +494,7 @@ class Logger(object):
                      False, events will be formatted like syslog:
                      date: message<CR>
     """
-    def __new__(cls, logname, console=False, tenant=None):
+    def __new__(cls, logname, console=False, tenant=None, buffered=True):
         global _loggers
         if console:
             relpath = 'consoles/' + logname
