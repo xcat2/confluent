@@ -505,11 +505,12 @@ class Logger(object):
         else:
             return object.__new__(cls)
 
-    def __init__(self, logname, console=False, tenant=None):
+    def __init__(self, logname, console=False, tenant=None, buffered=True):
         if hasattr(self, 'initialized'):
             # we are just a copy of the same object
             return
         self.initialized = True
+        self.buffered = buffered
         self.filepath = confluent.config.configmanager.get_global("logdirectory")
         if self.filepath is None:
             if os.name == 'nt':
@@ -727,8 +728,11 @@ class Logger(object):
         else:
             self.logentries.append(
                 [ltype, timestamp, logdata, event, eventdata])
-        if self.writer is None:
-            self.writer = eventlet.spawn_after(2, self.writedata)
+        if self.buffered:
+            if self.writer is None:
+                self.writer = eventlet.spawn_after(2, self.writedata)
+        else:
+            self.writedata()
 
     def closelog(self):
         self.handler.close()
@@ -747,6 +751,6 @@ def log(logdata=None, ltype=None, event=0, eventdata=None):
 def logtrace():
     global tracelog
     if tracelog is None:
-        tracelog = Logger('trace')
+        tracelog = Logger('trace', buffered=False)
     tracelog.log(traceback.format_exc(), ltype=DataTypes.event,
                  event=Events.stacktrace)
