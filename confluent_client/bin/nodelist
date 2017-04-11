@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__author__ = 'jjohnson2'
+__author__ = 'jjohnson2,alin37'
 
 import optparse
 import os
@@ -28,91 +28,35 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-
-def attrrequested(attr, attrlist, seenattributes):
-    for candidate in attrlist:
-        truename = candidate
-        if candidate.startswith('hm'):
-            candidate = candidate.replace('hm', 'hardwaremanagement', 1)
-        if candidate == attr:
-            seenattributes.add(truename)
-            return True
-        elif '.' not in candidate and attr.startswith(candidate + '.'):
-            seenattributes.add(truename)
-            return True
-    return False
-argparser = optparse.OptionParser(
+def main():
+    argparser = optparse.OptionParser(
     usage="Usage: %prog [options] noderange [list of attributes]")
-argparser.add_option('-b', '--blame', action='store_true',
+    argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
-(options, args) = argparser.parse_args()
-try:
-    noderange = args[0]
-    nodelist = '/noderange/{0}/nodes/'.format(noderange)
-except IndexError:
-    nodelist = '/nodes/'
-session = client.Command()
-exitcode = 0
-if len(args) > 1:
-    seenattributes = set([])
-    for res in session.read('/noderange/{0}/attributes/all'.format(noderange)):
-        if 'error' in res:
-            sys.stderr.write(res['error'] + '\n')
-            exitcode = 1
-            continue
-        for node in res['databynode']:
-            for attr in res['databynode'][node]:
-                seenattributes.add(attr)
-                currattr = res['databynode'][node][attr]
-                if attrrequested(attr, args[1:], seenattributes):
-                    if 'value' in currattr:
-                        if currattr['value'] is not None:
-                           attrout = '{0}: {1}: {2}'.format(
-                                node, attr, currattr['value'])
-                        else:
-                            attrout = '{0}: {1}:'.format(node, attr)
-                    elif 'isset' in currattr:
-                        if currattr['isset']:
-                            attrout = '{0}: {1}: ********'.format(node, attr)
-                        else:
-                            attrout = '{0}: {1}:'.format(node, attr)
-                    elif 'broken' in currattr:
-                        attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
-                                  '{2}'.format(node, attr,
-                                               currattr['broken'])
-                    elif isinstance(currattr, list) or isinstance(currattr, tuple):
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, currattr)))
-                    elif isinstance(currattr, dict):
-                        dictout = []
-                        for k, v in currattr.items:
-                            dictout.append("{0}={1}".format(k, v))
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, dictout)))
-                    else:
-                        print ("CODE ERROR" + repr(attr))
-
-                    if options.blame or 'broken' in currattr:
-                        blamedata = []
-                        if 'inheritedfrom' in currattr:
-                            blamedata.append('inherited from group {0}'.format(
-                                currattr['inheritedfrom']
-                            ))
-                        if 'expression' in currattr:
-                            blamedata.append(
-                                'derived from expression "{0}"'.format(
-                                    currattr['expression']))
-                        if blamedata:
-                            attrout += ' (' + ', '.join(blamedata) + ')'
-                    print attrout
-    if not exitcode:
-        for attr in args[1:]:
-            if attr not in seenattributes:
-                sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
+    (options, args) = argparser.parse_args()
+    noderange=""
+    nodelist=""
+    try:
+        noderange = args[0]
+        nodelist = '/noderange/{0}/nodes/'.format(noderange)
+    except IndexError:
+        nodelist = '/nodes/'
+    session = client.Command()
+    exitcode = 0
+    showtype='all'
+    requestargs=args[1:]
+    nodetype='noderange'
+    if len(args) > 1:
+        exitcode=client.printattributes(session,args,requestargs,showtype,nodetype,noderange,options)
+    else:
+        for res in session.read(nodelist):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
                 exitcode = 1
-else:
-    for res in session.read(nodelist):
-        if 'error' in res:
-            sys.stderr.write(res['error'] + '\n')
-            exitcode = 1
-        else:
-            print res['item']['href'].replace('/', '')
-sys.exit(exitcode)
+            else:
+                print res['item']['href'].replace('/', '')
+
+    sys.exit(exitcode)
+
+if __name__ == '__main__':
+    main()
