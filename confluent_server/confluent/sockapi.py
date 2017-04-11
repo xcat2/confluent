@@ -32,7 +32,6 @@ import traceback
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 import eventlet
-import eventlet.semaphore as semaphore
 
 import confluent.auth as auth
 import confluent.tlvdata as tlvdata
@@ -60,15 +59,13 @@ class ClientConsole(object):
     def __init__(self, client):
         self.client = client
         self.xmit = False
-        self.xmitlock = eventlet.semaphore.Semaphore()
         self.pendingdata = []
 
     def sendall(self, data):
         if not self.xmit:
             self.pendingdata.append(data)
             return
-        with self.xmitlock:
-            send_data(self.client, data)
+        send_data(self.client, data)
 
     def startsending(self):
         self.xmit = True
@@ -220,27 +217,26 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
     if consession is None:
         raise Exception("TODO")
     send_data(connection, {'started': 1})
+    ccons.startsending()
     bufferage = consession.get_buffer_age()
     if bufferage is not False:
         send_data(connection, {'bufferage': bufferage})
-    ccons.startsending()
     while consession is not None:
         data = tlvdata.recv(connection)
-        with ccons.xmitlock:
-            if type(data) == dict:
-                if data['operation'] == 'stop':
-                    consession.destroy()
-                    return
-                elif data['operation'] == 'break':
-                    consession.send_break()
-                    continue
-                elif data['operation'] == 'reopen':
-                    consession.reopen()
-                    continue
-                else:
-                    process_request(connection, data, cfm, authdata, authname,
-                                    skipauth)
-                    continue
+        if type(data) == dict:
+            if data['operation'] == 'stop':
+                consession.destroy()
+                return
+            elif data['operation'] == 'break':
+                consession.send_break()
+                continue
+            elif data['operation'] == 'reopen':
+                consession.reopen()
+                continue
+            else:
+                process_request(connection, data, cfm, authdata, authname,
+                                skipauth)
+                continue
         if not data:
             consession.destroy()
             return
