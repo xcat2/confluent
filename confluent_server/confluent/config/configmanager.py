@@ -396,8 +396,8 @@ class _ExpressionFormat(string.Formatter):
             if optype not in self._supported_ops:
                 raise Exception("Unsupported operation")
             op = self._supported_ops[optype]
-            return op(self._handle_ast_node(node.left),
-                      self._handle_ast_node(node.right))
+            return op(int(self._handle_ast_node(node.left)),
+                      int(self._handle_ast_node(node.right)))
 
 
 def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
