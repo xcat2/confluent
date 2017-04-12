@@ -920,11 +920,13 @@ class ConfigManager(object):
                          ('type' in allattributes.node[attr] and
                           not isinstance(attribmap[group][attr],
                                          allattributes.node[attr]['type'])))):
-                    raise ValueError
+                    raise ValueError("nodes attribute is invalid")
                 if attr == 'nodes':
                     if not isinstance(attribmap[group][attr], list):
-                        raise ValueError(
-                            "nodes attribute on group must be list")
+                        if type(attribmap[group][attr]) is unicode or type(attribmap[group][attr]) is str:
+                            attribmap[group][attr]=attribmap[group][attr].split(",")
+                        else:
+                            raise ValueError("nodes attribute on group must be list")
                     for node in attribmap[group]['nodes']:
                         if node not in self._cfgstore['nodes']:
                             raise ValueError(
@@ -1136,7 +1138,21 @@ class ConfigManager(object):
                 raise ValueError("node {0} does not exist".format(node))
             for attrname in attribmap[node].iterkeys():
                 attrval = attribmap[node][attrname]
-                if (attrname not in allattributes.node or
+                try:
+                    if (allattributes.node[attrname]['type'] == 'list' and
+                        type(attrval) in (str, unicode)):
+                        attrval = attrval.split(",")
+                except KeyError:
+                    pass
+                if attrname == 'groups':
+                    for group in attribmap[node]['groups'].split(","):
+                        if group not in self._cfgstore['nodegroups']:
+                            raise ValueError(
+                                "group {0} does not exist".format(group))
+                    if ('everything' in self._cfgstore['nodegroups'] and
+                            'everything' not in attribmap[node]['groups']):
+                        attribmap[node]['groups'].append('everything')
+                elif (attrname not in allattributes.node or
                         ('type' in allattributes.node[attrname] and
                          not isinstance(
                              attrval,
@@ -1144,14 +1160,6 @@ class ConfigManager(object):
                     errstr = "{0} attribute on node {1} is invalid".format(
                         attrname, node)
                     raise ValueError(errstr)
-                if attrname == 'groups':
-                    for group in attribmap[node]['groups']:
-                        if group not in self._cfgstore['nodegroups']:
-                            raise ValueError(
-                                "group {0} does not exist".format(group))
-                    if ('everything' in self._cfgstore['nodegroups'] and
-                            'everything' not in attribmap[node]['groups']):
-                        attribmap[node]['groups'].append('everything')
         for node in attribmap.iterkeys():
             node = node.encode('utf-8')
             exprmgr = None
