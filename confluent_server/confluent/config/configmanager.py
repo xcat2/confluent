@@ -896,6 +896,11 @@ class ConfigManager(object):
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {'groups': [group]}
                 _mark_dirtykey('nodes', node, self.tenant)
+            elif 'value' in self._cfgstore['nodes'][node]['groups']:
+                    tmplist=self._cfgstore['nodes'][node]['groups']['value'].split(",")
+                    tmplist.insert(0, unicode(group))
+                    self._cfgstore['nodes'][node]['groups']['value']=",".join(tmplist)
+                    _mark_dirtykey('nodes', node, self.tenant)
             elif group not in self._cfgstore['nodes'][node]['groups']:
                 self._cfgstore['nodes'][node]['groups'].insert(0, group)
                 _mark_dirtykey('nodes', node, self.tenant)
@@ -1138,14 +1143,18 @@ class ConfigManager(object):
                 raise ValueError("node {0} does not exist".format(node))
             for attrname in attribmap[node].iterkeys():
                 attrval = attribmap[node][attrname]
+                print attrval
+                print allattributes.node[attrname]
                 try:
                     if (allattributes.node[attrname]['type'] == 'list' and
-                        type(attrval) in (str, unicode)):
+                        type(attrval) in (str, unicode)) and type(attrval)==list:
                         attrval = attrval.split(",")
                 except KeyError:
                     pass
                 if attrname == 'groups':
-                    for group in attribmap[node]['groups'].split(","):
+                    if type(attribmap[node]['groups']) != list:
+                        attribmap[node]['groups']=attribmap[node]['groups'].split(",")
+                    for group in attribmap[node]['groups']:
                         if group not in self._cfgstore['nodegroups']:
                             raise ValueError(
                                 "group {0} does not exist".format(group))
