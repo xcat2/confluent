@@ -1143,11 +1143,9 @@ class ConfigManager(object):
                 raise ValueError("node {0} does not exist".format(node))
             for attrname in attribmap[node].iterkeys():
                 attrval = attribmap[node][attrname]
-                print attrval
-                print allattributes.node[attrname]
                 try:
                     if (allattributes.node[attrname]['type'] == 'list' and
-                        type(attrval) in (str, unicode)) and type(attrval)==list:
+                        type(attrval) in (str, unicode)):
                         attrval = attrval.split(",")
                 except KeyError:
                     pass
