@@ -93,35 +93,35 @@ node = {
     # names until reaching end.  Not worth implementing at this point.  If
     # a traditional switch is added, it needs some care and feeding anyway.
     # If a more exciting scheme presents itself, well we won't have to
-    # own discovering switches anyway.
-    'autonode.servername': {
-        'description': ('Template for creating nodenames for automatic '
-                        'creation of nodes detected as children of '
-                        'this node.  For example, a node in a server '
-                        'enclosure bay or a server connected to a switch or '
-                        'an enclosure manager connected to a switch.  Certain '
-                        'special template parameters are available and can '
-                        'be used alongside usual config template directives. '
-                        '"discovered.nodenumber" will be replaced with the '
-                        'bay or port number where the child node is connected.'
-                        ),
-    },
-    'autonode.servergroups': {
-        'type': list,
-        'description': ('A list of groups to which discovered nodes will '
-                        'belong to.  As in autonode.servername, "discovered." '
-                        'variable names will be substituted in special context')
-    },
-    'autonode.enclosurename': {
-        'description': ('Template for creating nodenames when the discovered '
-                        'node is an enclosure that will in turn generate nodes.'
-                        )
-    },
-    'autonode.enclosuregroups': {
-        'type': list,
-        'description': ('A list of groups to which a discovered node will be'
-                        'placed, presuming that node is an enclosure.')
-    },
+#   # own discovering switches anyway.
+#   'autonode.servername': {
+#       'description': ('Template for creating nodenames for automatic '
+#                       'creation of nodes detected as children of '
+#                       'this node.  For example, a node in a server '
+#                       'enclosure bay or a server connected to a switch or '
+#                       'an enclosure manager connected to a switch.  Certain '
+#                       'special template parameters are available and can '
+#                       'be used alongside usual config template directives. '
+#                       '"discovered.nodenumber" will be replaced with the '
+#                       'bay or port number where the child node is connected.'
+#                       ),
+#   },
+#   'autonode.servergroups': {
+#       'type': list,
+#       'description': ('A list of groups to which discovered nodes will '
+#                       'belong to.  As in autonode.servername, "discovered." '
+#                       'variable names will be substituted in special context')
+#   },
+#   'autonode.enclosurename': {
+#       'description': ('Template for creating nodenames when the discovered '
+#                       'node is an enclosure that will in turn generate nodes.'
+#                       )
+#   },
+#   'autonode.enclosuregroups': {
+#       'type': list,
+#       'description': ('A list of groups to which a discovered node will be'
+#                       'placed, presuming that node is an enclosure.')
+#   },
 #For now, we consider this eventuality if needed.  For now emphasize paradigm
 # of group membership and see how far that goes.
 #    'autonode.copyattribs': {
