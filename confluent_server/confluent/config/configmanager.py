@@ -896,11 +896,6 @@ class ConfigManager(object):
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {'groups': [group]}
                 _mark_dirtykey('nodes', node, self.tenant)
-            elif 'value' in self._cfgstore['nodes'][node]['groups']:
-                    tmplist=self._cfgstore['nodes'][node]['groups']['value'].split(",")
-                    tmplist.insert(0, unicode(group))
-                    self._cfgstore['nodes'][node]['groups']['value']=",".join(tmplist)
-                    _mark_dirtykey('nodes', node, self.tenant)
             elif group not in self._cfgstore['nodes'][node]['groups']:
                 self._cfgstore['nodes'][node]['groups'].insert(0, group)
                 _mark_dirtykey('nodes', node, self.tenant)
