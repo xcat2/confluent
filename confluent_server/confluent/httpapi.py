@@ -35,6 +35,7 @@ import eventlet.greenthread
 import greenlet
 import json
 import socket
+import sys
 import traceback
 import time
 import urlparse
@@ -233,6 +234,17 @@ def _csrf_valid(env, session):
             # oblige the request and apply a new token to the
             # session
             session['csrftoken'] = util.randomstring(32)
+        elif 'HTTP_REFERER' in env:
+            # If there is a referrer, make sure it stays consistent
+            # across the session.  A change in referer is a bad thing
+            try:
+                referer = env['HTTP_REFERER'].split('/')[2]
+            except IndexError:
+                return False
+            if 'validreferer' not in session:
+                session['validreferer'] = referer
+            elif session['validreferer'] != referer:
+                return False
         return True
     # The session has CSRF protection enabled, only mark valid if
     # the client has provided an auth token and that token matches the
@@ -257,15 +269,15 @@ def _authorize_request(env, operation):
             sessionid = cc['confluentsessionid'].value
             sessid = sessionid
             if sessionid in httpsessions:
-                if env['PATH_INFO'] == '/sessions/current/logout':
-                    targets = []
-                    for mythread in httpsessions[sessionid]['inflight']:
-                        targets.append(mythread)
-                    for mythread in targets:
-                        eventlet.greenthread.kill(mythread)
-                    del httpsessions[sessionid]
-                    return ('logout',)
                 if _csrf_valid(env, httpsessions[sessionid]):
+                    if env['PATH_INFO'] == '/sessions/current/logout':
+                        targets = []
+                        for mythread in httpsessions[sessionid]['inflight']:
+                            targets.append(mythread)
+                        for mythread in targets:
+                            eventlet.greenthread.kill(mythread)
+                        del httpsessions[sessionid]
+                        return ('logout',)
                     httpsessions[sessionid]['expiry'] = time.time() + 90
                     name = httpsessions[sessionid]['name']
                     authdata = auth.authorize(
@@ -273,6 +285,12 @@ def _authorize_request(env, operation):
                         skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         if env['PATH_INFO'] == '/sessions/current/logout':
+            if 'HTTP_REFERER' in env:
+                # note that this doesn't actually do harm
+                # otherwise, but this way do not give appearance
+                # of something having a side effect if it has the smell
+                # of a CSRF
+                return {'code': 401}
             return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
@@ -369,7 +387,8 @@ def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
     mimetype, extension = _pick_mimetype(env)
-    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-cache'),
+    headers = [('Content-Type', mimetype), ('Cache-Control', 'no-store'),
+               ('Pragma', 'no-cache'),
                ('X-Content-Type-Options', 'nosniff'),
                ('Content-Security-Policy', "default-src 'self'"),
                ('X-XSS-Protection', '1'), ('X-Frame-Options', 'deny'),
@@ -723,9 +742,20 @@ def serve(bind_host, bind_port):
     #but deps are simpler without flup
     #also, the potential for direct http can be handy
     #todo remains unix domain socket for even http
-    eventlet.wsgi.server(
-        eventlet.listen((bind_host, bind_port, 0, 0), family=socket.AF_INET6),
-        resourcehandler, log=False, log_output=False, debug=False)
+    sock = None
+    while not sock:
+        try:
+            sock = eventlet.listen(
+                (bind_host, bind_port, 0, 0), family=socket.AF_INET6)
+        except socket.error as e:
+            if e.errno != 98:
+                raise
+            sys.stderr.write(
+                'Failed to open HTTP due to busy port, trying again in'
+                ' a second\n')
+            eventlet.sleep(1)
+    eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
+                         debug=False)
 
 
 class HttpApi(object):

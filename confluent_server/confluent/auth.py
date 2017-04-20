@@ -37,6 +37,7 @@ _passcache = {}
 _passchecking = {}
 
 authworkers = None
+authcleaner = None
 
 
 class Credentials(object):
@@ -195,6 +196,13 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     #such a beast could be passed into pyghmi as a way for pyghmi to
     #magically get offload of the crypto functions without having
     #to explicitly get into the eventlet tpool game
+    global authworkers
+    global authcleaner
+    if authworkers is None:
+        authworkers = multiprocessing.Pool(processes=1)
+    else:
+        authcleaner.cancel()
+    authcleaner = eventlet.spawn_after(30, _clean_authworkers)
     crypted = eventlet.tpool.execute(_do_pbkdf, passphrase, salt)
     del _passchecking[(user, tenant)]
     eventlet.sleep(0.05)  # either way, we want to stall so that client can't
@@ -211,19 +219,16 @@ def _apply_pbkdf(passphrase, salt):
                       lambda p, s: hmac.new(p, s, hashlib.sha256).digest())
 
 
+def _clean_authworkers():
+    global authworkers
+    global authcleaner
+    authworkers = None
+    authcleaner = None
+
+
 def _do_pbkdf(passphrase, salt):
     # we must get it over to the authworkers pool or else get blocked in
     # compute.  However, we do want to wait for result, so we have
     # one of the exceedingly rare sort of circumstances where 'apply'
     # actually makes sense
     return authworkers.apply(_apply_pbkdf, [passphrase, salt])
-
-
-def init_auth():
-    # have a some auth workers available.  Keep them distinct from
-    # the general populace of workers to avoid unauthorized users
-    # starving out productive work
-    global authworkers
-    # for now we'll just have one auth worker and see if there is any
-    # demand for more.  I personally doubt it.
-    authworkers = multiprocessing.Pool(processes=1)

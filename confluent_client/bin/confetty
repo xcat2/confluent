@@ -235,7 +235,11 @@ def rcompleter(text, state):
 
 
 def parse_command(command):
-    args = shlex.split(command, posix=True)
+    try:
+        args = shlex.split(command, posix=True)
+    except ValueError as ve:
+        print('Error: ' + ve.message)
+        return []
     return args
 
 

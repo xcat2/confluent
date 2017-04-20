@@ -152,6 +152,20 @@ def update_nodegroup(group, element, configmanager, inputdata):
     return retrieve_nodegroup(group, element, configmanager, inputdata)
 
 
+def _expand_expression(nodes, configmanager, inputdata):
+    expression = inputdata.get_attributes(list(nodes)[0])
+    if type(expression) is dict:
+        expression = expression['expression']
+    if type(expression) is dict:
+        expression = expression['expression']
+    for expanded in configmanager.expand_attrib_expression(nodes, expression):
+        yield msg.KeyValueData({'value': expanded[1]}, expanded[0])
+
+
+def create(nodes, element, configmanager, inputdata):
+    if nodes is not None and element[-1] == 'expression':
+        return _expand_expression(nodes, configmanager, inputdata)
+
 def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
     for node in nodes:

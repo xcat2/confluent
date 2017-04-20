@@ -344,8 +344,8 @@ class IpmiHandler(object):
             except socket.gaierror as ge:
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
+                raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
-        self.ipmicmd.setup_confluent_keyhandler()
 
     bootdevices = {
         'optical': 'cd'
@@ -356,7 +356,9 @@ class IpmiHandler(object):
             self.broken = True
             self.error = response['error']
         else:
+            self.ipmicmd = ipmicmd
             self.loggedin = True
+            self.ipmicmd.setup_confluent_keyhandler()
         self._logevt.set()
 
     def handle_request(self):
@@ -793,10 +795,22 @@ class IpmiHandler(object):
             return
         elif 'update' == self.op:
             powerstate = self.inputdata.powerstate(self.node)
+            oldpower = None
+            if powerstate == 'boot':
+                oldpower = self.ipmicmd.get_power()
+                if 'powerstate' in oldpower:
+                    oldpower = oldpower['powerstate']
             self.ipmicmd.set_power(powerstate, wait=30)
-            power = self.ipmicmd.get_power()
+            if powerstate == 'boot' and oldpower == 'on':
+                power = {'powerstate': 'reset'}
+            else:
+                power = self.ipmicmd.get_power()
+                if powerstate == 'reset' and power['powerstate'] == 'on':
+                    power['powerstate'] = 'reset'
+
             self.output.put(msg.PowerState(node=self.node,
-                                           state=power['powerstate']))
+                                           state=power['powerstate'],
+                                           oldstate=oldpower))
             return
 
     def handle_reset(self):

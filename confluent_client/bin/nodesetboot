@@ -26,7 +26,8 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-argparser = optparse.OptionParser()
+argparser = optparse.OptionParser(
+    usage='Usage: %prog [options] noderange [default|cd|network|setup|hd]')
 argparser.add_option('-b', '--bios', dest='biosmode',
                      action='store_true', default=False,
                      help='Request BIOS style boot (rather than UEFI)')
@@ -34,15 +35,16 @@ argparser.add_option('-p', '--persist', dest='persist', action='store_true',
                      default=False,
                      help='Request the boot device be persistent rather than '
                           'one time')
+argparser.add_option('-u', '--uefi', dest='uefi', action='store_true',
+                     default=True,
+                     help='Request UEFI style boot (rather than BIOS)')
 
 (options, args) = argparser.parse_args()
 
 try:
     noderange = args[0]
 except IndexError:
-    sys.stderr.write(
-        'Usage: {0} <noderange> [default|cd|network|setup|hd]\n'.format(
-            sys.argv[0]))
+    argparser.print_help()
     sys.exit(1)
 bootdev = None
 if len(sys.argv) > 2:
