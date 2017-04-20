@@ -42,7 +42,6 @@ def _parseserver(string):
 
 
 class Command(object):
-
     def __init__(self, server=None):
         self._prevkeyname = None
         self.connection = None
@@ -135,7 +134,29 @@ class Command(object):
             print('')
             return 0
 
-
+    def simple_nodegroups_command(self, noderange, resource, input=None, key=None, **kwargs):
+        try:
+            rc = 0
+            if resource[0] == '/':
+                resource = resource[1:]
+            # The implicit key is the resource basename
+            if key is None:
+                ikey = resource.rpartition('/')[-1]
+            else:
+                ikey = key
+            if input is None:
+                for res in self.read('/nodegroups/{0}/{1}'.format(
+                        noderange, resource)):
+                    rc = self.handle_results(ikey, rc, res)
+            else:
+                kwargs[ikey] = input
+                for res in self.update('/nodegroups/{0}/{1}'.format(
+                        noderange, resource), kwargs):
+                    rc = self.handle_results(ikey, rc, res)
+            return rc
+        except KeyboardInterrupt:
+            print('')
+            return 0
 
     def read(self, path, parameters=None):
         if not self.authenticated:
@@ -206,7 +227,7 @@ class Command(object):
         if knownhosts:
             certdata = self.connection.getpeercert(binary_form=True)
             fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
-            hostid = '@'.join((port,server))
+            hostid = '@'.join((port, server))
             khf = dbm.open(os.path.join(clientcfgdir, "knownhosts"), 'c', 384)
             if hostid in khf:
                 if fingerprint == khf[hostid]:
@@ -218,7 +239,6 @@ class Command(object):
                         raise Exception("BAD CERTIFICATE")
             print 'Adding new key for %s:%s' % (server, port)
             khf[hostid] = fingerprint
-
 
 
 def send_request(operation, path, server, parameters=None):
@@ -245,6 +265,7 @@ def send_request(operation, path, server, parameters=None):
             raise
         result = tlvdata.recv(server)
 
+
 def attrrequested(attr, attrlist, seenattributes):
     for candidate in attrlist:
         truename = candidate
@@ -258,10 +279,11 @@ def attrrequested(attr, attrlist, seenattributes):
             return True
     return False
 
-def printattributes(session,args,requestargs,showtype,nodetype, noderange,options):
-    exitcode=0
+
+def printattributes(session, requestargs, showtype, nodetype, noderange, options):
+    exitcode = 0
     seenattributes = set([])
-    for res in session.read('/{0}/{1}/attributes/{2}'.format(nodetype,noderange,showtype)):
+    for res in session.read('/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)):
         if 'error' in res:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
@@ -270,7 +292,7 @@ def printattributes(session,args,requestargs,showtype,nodetype, noderange,option
             for attr in res['databynode'][node]:
                 seenattributes.add(attr)
                 currattr = res['databynode'][node][attr]
-                if (requestargs is None or requestargs == [] or attrrequested(attr, args[1:], seenattributes)):
+                if (requestargs is None or requestargs == [] or attrrequested(attr, requestargs, seenattributes)):
                     if 'value' in currattr:
                         if currattr['value'] is not None:
                             attrout = '{0}: {1}: {2}'.format(
@@ -311,20 +333,78 @@ def printattributes(session,args,requestargs,showtype,nodetype, noderange,option
                     print attrout
     if not exitcode:
         if requestargs:
-            for attr in args[1:]:
+            for attr in requestargs:
                 if attr not in seenattributes:
                     sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
                     exitcode = 1
     return exitcode
 
 
-def updateattrib(session,args,nodetype, noderange, options ):
-    #update attribute
-    exitcode=0
+def printgroupattributes(session, requestargs, showtype, nodetype, noderange, options):
+    exitcode = 0
+    seenattributes = set([])
+    for res in session.read('/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)):
+        if 'error' in res:
+            sys.stderr.write(res['error'] + '\n')
+            exitcode = 1
+            continue
+        for attr in res:
+            seenattributes.add(attr)
+            currattr = res[attr]
+            if (requestargs is None or requestargs == [] or attrrequested(attr, requestargs, seenattributes)):
+                if 'value' in currattr:
+                    if currattr['value'] is not None:
+                        attrout = '{0}: {1}: {2}'.format(
+                            noderange, attr, currattr['value'])
+                    else:
+                        attrout = '{0}: {1}:'.format(noderange, attr)
+                elif 'isset' in currattr:
+                    if currattr['isset']:
+                        attrout = '{0}: {1}: ********'.format(noderange, attr)
+                    else:
+                        attrout = '{0}: {1}:'.format(noderange, attr)
+                elif 'broken' in currattr:
+                    attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
+                              '{2}'.format(noderange, attr,
+                                           currattr['broken'])
+                elif isinstance(currattr, list) or isinstance(currattr, tuple):
+                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ', '.join(map(str, currattr)))
+                elif isinstance(currattr, dict):
+                    dictout = []
+                    for k, v in currattr.items:
+                        dictout.append("{0}={1}".format(k, v))
+                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ', '.join(map(str, dictout)))
+                else:
+                    print ("CODE ERROR" + repr(attr))
+
+                if options.blame or 'broken' in currattr:
+                    blamedata = []
+                    if 'inheritedfrom' in currattr:
+                        blamedata.append('inherited from group {0}'.format(
+                            currattr['inheritedfrom']
+                        ))
+                    if 'expression' in currattr:
+                        blamedata.append(
+                            'derived from expression "{0}"'.format(
+                                currattr['expression']))
+                    if blamedata:
+                        attrout += ' (' + ', '.join(blamedata) + ')'
+                print attrout
+    if not exitcode:
+        if requestargs:
+            for attr in requestargs:
+                if attr not in seenattributes:
+                    sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
+                    exitcode = 1
+    return exitcode
+
+def updateattrib(session, updateargs, nodetype, noderange, options):
+    # update attribute
+    exitcode = 0
     if options.clear:
-        targpath = '/{0}/{1}/attributes/all'.format(nodetype,noderange)
+        targpath = '/{0}/{1}/attributes/all'.format(nodetype, noderange)
         keydata = {}
-        for attrib in args[1:]:
+        for attrib in updateargs[1:]:
             keydata[attrib] = None
         for res in session.update(targpath, keydata):
             if 'error' in res:
@@ -333,18 +413,27 @@ def updateattrib(session,args,nodetype, noderange, options ):
                 sys.stderr.write('Error: ' + res['error'] + '\n')
         sys.exit(exitcode)
     else:
-        if "=" in args[1]:
+        if "=" in updateargs[1]:
             try:
-                if len(args[1:]) > 1:
-                    for val in args[1:]:
+                if len(updateargs[1:]) > 1:
+                    for val in updateargs[1:]:
                         val = val.split('=')
-                        exitcode=session.simple_noderange_command(noderange, 'attributes/all'.format(noderange), val[1], val[0])
+                        if (nodetype == "nodegroups"):
+                            exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all'.format(noderange),
+                                                                         val[1],val[0])
+                        else:
+                            exitcode = session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),
+                                                                        val[1], val[0])
                 else:
-                    val=args[1].split('=')
-                    exitcode=session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),val[1],val[0])
+                    val = updateargs[1].split('=')
+                    if nodetype == "nodegroups" :
+                        exitcode = session.simple_nodegroups_command(noderange, 'attributes/all'.format(noderange),
+                                                                     val[1], val[0])
+                    else:
+                        exitcode = session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),
+                                                                    val[1], val[0])
             except:
-                sys.stderr.write('Error: {0} not a valid expression\n'.format(str (args[1:])))
+                sys.stderr.write('Error: {0} not a valid expression\n'.format(str(updateargs[1:])))
                 exitcode = 1
             sys.exit(exitcode)
     return exitcode
-
