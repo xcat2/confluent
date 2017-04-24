@@ -131,7 +131,10 @@ unknown_info = {}
 pending_nodes = {}
 
 
-def enumerate_by_serial(model=None, type=None):
+def enumerate_by_serial(model=None, type=None, id=None):
+    if id is not None:
+        yield msg.ChildCollection[repr(known_serials[id])]
+        return
     type = servicebyname.get(type, None)
     for info in known_info:
         info = known_info[info]
@@ -144,7 +147,11 @@ def enumerate_by_serial(model=None, type=None):
         yield msg.ChildCollection(info['serialnumber'])
 
 
-def enumerate_by_mac(model=None, type=None):
+def enumerate_by_mac(model=None, type=None, id=None):
+    if id is not None:
+        mac = id.replace('-', ':')
+        yield msg.ChildCollection(repr(known_info[mac]))
+        return
     type = servicebyname.get(type, None)
     for mac in known_info:
         info = known_info[mac]
@@ -197,7 +204,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         if pathcomponents[1] in group_info:
             return [ msg.ChildCollection(x + '/') for x in disco_info ]
         elif pathcomponents[1] in disco_info:
-            return disco_info[pathcomponents[1]]()
+            return disco_info[pathcomponents[1]](id=pathcomponents[2])
     elif len(pathcomponents) == 4:
         if pathcomponents[1] == 'by-model':
             return disco_info[pathcomponents[3]](model=pathcomponents[2])
