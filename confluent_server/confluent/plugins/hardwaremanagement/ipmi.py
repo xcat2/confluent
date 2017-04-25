@@ -290,6 +290,15 @@ def perform_requests(operator, nodes, element, cfg, inputdata):
         for t in list(livingthreads):
             if t.dead:
                 livingthreads.discard(t)
+    try:
+        # drain queue if a thread put something on the queue and died
+        while True:
+            datum = resultdata.get_nowait()
+            if datum != 'Done':
+                yield datum
+    except queue.Empty:
+        pass
+
 
 
 def perform_request(operator, node, element,
