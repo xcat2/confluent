@@ -273,17 +273,23 @@ def perform_requests(operator, nodes, element, cfg, inputdata):
     configdata = cfg.get_node_attributes(nodes, _configattributes)
     cfg.decrypt = cryptit
     resultdata = queue.LightQueue()
-    pendingnum = len(nodes)
+    livingthreads = set([])
     for node in nodes:
-        _ipmiworkers.spawn_n(
+        livingthreads.add(_ipmiworkers.spawn(
             perform_request, operator, node, element, configdata, inputdata,
-            cfg, resultdata)
-    while pendingnum:
-        datum = resultdata.get()
-        if datum == 'Done':
-            pendingnum -= 1
-        else:
-            yield datum
+            cfg, resultdata))
+    while livingthreads:
+        try:
+            datum = resultdata.get(timeout=10)
+            while datum:
+                if datum != 'Done':
+                    yield datum
+                datum = resultdata.get_nowait()
+        except queue.Empty:
+            pass
+        for t in list(livingthreads):
+            if t.dead:
+                livingthreads.discard(t)
 
 
 def perform_request(operator, node, element,
