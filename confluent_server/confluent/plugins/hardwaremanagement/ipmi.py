@@ -342,10 +342,8 @@ class IpmiHandler(object):
         self.ipmicmd = None
         self.inputdata = inputdata
         tenant = cfg.tenant
-        self._logevt = None
         if ((node, tenant) not in persistent_ipmicmds or
                 not persistent_ipmicmds[(node, tenant)].ipmi_session.logged):
-            self._logevt = threading.Event()
             try:
                 persistent_ipmicmds[(node, tenant)].close_confluent()
             except KeyError:  # was no previous session
@@ -356,6 +354,14 @@ class IpmiHandler(object):
                     userid=connparams['username'],
                     password=connparams['passphrase'], kg=connparams['kg'],
                     port=connparams['port'], onlogon=self.logged)
+                ipmisess = persistent_ipmicmds[(node, tenant)].ipmi_session
+                begin = util.monotonic_time()
+                while ((not (self.broken or self.loggedin)) and
+                               (util.monotonic_time() - begin) < 180):
+                    ipmisess.wait_for_rsp(180)
+                if not (self.broken or self.loggedin):
+                    raise exc.TargetEndpointUnreachable(
+                        "Login process to " + bmc + " died")
             except socket.gaierror as ge:
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
@@ -374,12 +380,8 @@ class IpmiHandler(object):
             self.ipmicmd = ipmicmd
             self.loggedin = True
             self.ipmicmd.setup_confluent_keyhandler()
-        self._logevt.set()
 
     def handle_request(self):
-        if self._logevt is not None:
-            self._logevt.wait()
-        self._logevt = None
         if self.broken:
             if (self.error == 'timeout' or
                     'Insufficient resources' in self.error):
