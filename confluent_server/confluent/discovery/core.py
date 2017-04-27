@@ -131,42 +131,63 @@ unknown_info = {}
 pending_nodes = {}
 
 
-def enumerate_by_serial(model=None, type=None, id=None):
-    if id is not None:
-        yield msg.ChildCollection[repr(known_serials[id])]
+def send_discovery_datum(info):
+    addresses = info.get('addresses', [])
+    yield msg.Attributes(kv={'nodename': info.get('nodename', '')})
+    yield msg.ListAttributes(kv={'ipaddrs': [x[0] for x in addresses]})
+    yield msg.Attributes(kv={'serialnumber': info.get('serialnumber', '')})
+    yield msg.Attributes(kv={'modelnumber': info.get('modelnumber', '')})
+    yield msg.Attributes(kv={'macs': [info.get('hwaddr', '')]})
+    types = []
+    for infotype in info.get('services', []):
+        if infotype in servicenames:
+            types.append(servicenames[infotype])
+    yield msg.ListAttributes(kv={'types': types})
+
+
+def enumerate_by_serial(model=None, infotype=None, ident=None):
+    if ident is not None:
+        if ident not in known_serials:
+            raise exc.NotFoundException('Have not detected serial number ' +
+                                        ident)
+        for i in send_discovery_datum(known_serials[ident]):
+            yield i
         return
-    type = servicebyname.get(type, None)
+    infotype = servicebyname.get(infotype, None)
     for info in known_info:
         info = known_info[info]
         if 'serialnumber' not in info:
             continue
         if model and info.get('modelnumber', None) != model:
             continue
-        if type and type not in info['services']:
+        if infotype and infotype not in info['services']:
             continue
         yield msg.ChildCollection(info['serialnumber'])
 
 
-def enumerate_by_mac(model=None, type=None, id=None):
-    if id is not None:
-        mac = id.replace('-', ':')
-        yield msg.ChildCollection(repr(known_info[mac]))
+def enumerate_by_mac(model=None, infotype=None, ident=None):
+    if ident is not None:
+        mac = ident.replace('-', ':')
+        if mac not in known_info:
+            raise exc.NotFoundException(mac + ' not a known mac address')
+        for i in send_discovery_datum(known_info[mac]):
+            yield i
         return
-    type = servicebyname.get(type, None)
+    infotype = servicebyname.get(infotype, None)
     for mac in known_info:
         info = known_info[mac]
         if 'hwaddr' not in info:
             continue
         if model and info.get('modelnumber', None) != model:
             continue
-        if type and type not in info['services']:
+        if infotype and infotype not in info['services']:
             continue
         yield msg.ChildCollection(mac.replace(':', '-'))
 
 
 def enumerate_types():
-    for model in detected_services():
-        yield msg.ChildCollection(model + '/')
+    for infotype in detected_services():
+        yield msg.ChildCollection(infotype + '/')
 
 
 def enumerate_models():
@@ -204,12 +225,12 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         if pathcomponents[1] in group_info:
             return [ msg.ChildCollection(x + '/') for x in disco_info ]
         elif pathcomponents[1] in disco_info:
-            return disco_info[pathcomponents[1]](id=pathcomponents[2])
+            return disco_info[pathcomponents[1]](ident=pathcomponents[2])
     elif len(pathcomponents) == 4:
         if pathcomponents[1] == 'by-model':
             return disco_info[pathcomponents[3]](model=pathcomponents[2])
         elif pathcomponents[1] == 'by-type':
-            return disco_info[pathcomponents[3]](type=pathcomponents[2])
+            return disco_info[pathcomponents[3]](infotype=pathcomponents[2])
     raise exc.NotFoundException()
 
 
