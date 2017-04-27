@@ -29,8 +29,10 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage='''\n       %prog [options] noderange [list of attributes]  \
-             \n       %prog [options] noderange attribute1=value1,attribute2=value,...
+    usage='''\n       %prog [options]   \
+             \n       %prog [options] nodegroup [list of attributes]  \
+             \n       %prog [options] nodegroup group=value1,value2   \
+             \n       %prog [options] nodegroup group=value1,value2
              \n ''')
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
@@ -42,32 +44,30 @@ argparser.add_option('-c', '--clear', action='store_true',
 #setting minimal output to only output current information
 showtype = 'current'
 requestargs=None
+nodetype="nodegroups"
+
 try:
-    noderange = args[0]
-    nodelist = '/noderange/{0}/nodes/'.format(noderange)
+    nodegroups = args[0]
+    nodelist = '/{0}/{1}/'.format(nodetype,nodegroups)
 except IndexError:
-    nodelist = '/nodes/'
+    nodelist = '/nodegroups/'
 session = client.Command()
 exitcode = 0
 
 #Sets attributes
-nodetype="noderange"
 
 if len(args) > 1:
-    if "=" in args[1]:
-        exitcode=client.updateattrib(session,args,nodetype, noderange, options)
+    exitcode=client.updateattrib(session,args,nodetype, nodegroups, options)
     try:
         # setting user output to what the user inputs
         if args[1] == 'all':
             showtype = 'all'
-            requestargs=args[2:]
         elif args[1] == 'current':
             showtype = 'current'
-            requestargs=args[2:]
-        else:
-            requestargs=args[1:]
-    except:
-        pass
+
+        requestargs=args[1:]
+    except Exception as e:
+        print str(e)
 
 if exitcode != 0:
     sys.exit(exitcode)
@@ -86,7 +86,7 @@ if len(args) > 0:
             requestargs.remove('current')
         except ValueError:
             pass
-    exitcode = client.printattributes(session, requestargs, showtype,nodetype, noderange, options)
+    exitcode = client.printgroupattributes(session, requestargs, showtype,nodetype, nodegroups, options)
 else:
     for res in session.read(nodelist):
         if 'error' in res:
