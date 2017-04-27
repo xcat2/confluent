@@ -238,7 +238,7 @@ def parse_command(command):
     try:
         args = shlex.split(command, posix=True)
     except ValueError as ve:
-        print('Error: ' + ve.message)
+        print('Error: ' + str(ve))
         return []
     return args
 
