@@ -231,6 +231,13 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             return disco_info[pathcomponents[3]](model=pathcomponents[2])
         elif pathcomponents[1] == 'by-type':
             return disco_info[pathcomponents[3]](infotype=pathcomponents[2])
+    elif len(pathcomponents) == 5:
+        ident = pathcomponents[-1]
+        identtype = pathcomponents[-2]
+        if identtype not in disco_info:
+            raise exc.NotFoundException(
+                identtype + ' not a valid selector')
+        return disco_info[identtype](ident=ident)
     raise exc.NotFoundException()
 
 
