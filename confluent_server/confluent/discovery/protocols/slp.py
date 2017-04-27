@@ -437,7 +437,7 @@ def snoop(handler):
                 known_peers.add(peer)
                 mac = neighutil.neightable[ip]
                 if mac in peerbymacaddress:
-                    peerbymacaddress[mac]['peers'].append(peer)
+                    peerbymacaddress[mac]['addresses'].append(peer)
                 else:
                     q = query_srvtypes(peer)
                     if not q or not q[0]:
@@ -447,17 +447,15 @@ def snoop(handler):
                         continue
                     peerbymacaddress[mac] = {
                         'services': q,
-                        'peers': [peer],
+                        'addresses': [peer],
                     }
                 newmacs.add(mac)
             r, _, _ = select.select((net, net4), (), (), 0.2)
         for mac in newmacs:
-            peerinfo = {
-                'hwaddr': mac,
-                'addresses': peerbymacaddress[mac]['peers'],
-                'services': peerbymacaddress[mac]['services'],
-            }
-            handler(peerinfo)
+            peerbymacaddress[mac]['xid'] = 1
+            _add_attributes(peerbymacaddress[mac])
+            peerbymacaddress[mac]['hwaddr'] = mac
+            handler(peerbymacaddress[mac])
 
 
 def scan(srvtypes=_slp_services, addresses=None):
