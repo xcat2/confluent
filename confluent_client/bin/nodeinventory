@@ -77,7 +77,7 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
-if args[1] == 'firm':
+if len(args) > 1 and args[1] == 'firm':
     os.execlp('nodefirmware', 'nodefirmware', noderange)
 try:
     session = client.Command()
