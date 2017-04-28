@@ -33,6 +33,7 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
+import confluent
 import confluent.alerts as alerts
 import confluent.config.attributes as attrscheme
 import confluent.discovery.core as disco
@@ -101,8 +102,8 @@ def load_plugins():
         sys.path.pop(1)
 
 
-rootcollections = ['discovery/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'events/']
+rootcollections = ['discovery/', 'events/',
+                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'version']
 
 
 class PluginRoute(object):
@@ -639,6 +640,8 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     elif pathcomponents[0] == 'discovery':
         return disco.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
+    elif pathcomponents[0] == 'version':
+        return (msg.Attributes(kv={'version': confluent.__version__}),)
     elif pathcomponents[0] == 'users':
         # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
