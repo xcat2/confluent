@@ -84,6 +84,32 @@ netserver = None
 laststate = {}
 
 
+def print_help():
+    print("confetty provides a filesystem like interface to confluent.  "
+          "Navigation is done using the same commands as would be used in a "
+          "filesystem.  Tab completion is supported to aid in navigation,"
+          "as is up arrow to recall previous commands and control-r to search"
+          "previous command history, similar to using bash\n\n"
+          "The supported commands are:\n"
+          "cd [location] - Set the current command context, similar to a "
+          "working directory.\n"
+          "show [resource] - Present the information about the specified "
+          "resource, or current context if omitted.\n"
+          "create [resource] attributename=value attributename=value - Create "
+          "a new instance of a resource.\n"
+          "remove [resource] - Remove a resource from a list\n"
+          "set [resource] attributename=value attributename=value - Change "
+          "the specified attributes value for the given resource name\n"
+          "unset [resource] attributename - Clear any value for the given "
+          "attribute names on a resource.\n"
+          "start [resource] - When used on a text session resource, it "
+          "enters remote terminal mode.  In this mode, use 'ctrl-e, c, ?' for "
+          "help"
+          )
+    #TODO(jjohnson2): lookup context help for 'target' variable, perhaps
+    #common with the api document
+
+
 def updatestatus(stateinfo={}):
     status = consolename
     info = []
@@ -106,7 +132,7 @@ def updatestatus(stateinfo={}):
     if 'showtime' in laststate:
         showtime = laststate['showtime']
         age = time.time() - laststate['showtime']
-        if age > 86400: # older than one day
+        if age > 86400:  # older than one day
             # disambiguate by putting date in and time
             info.append(time.strftime('%m-%dT%H:%M', time.localtime(showtime)))
         else:
@@ -169,6 +195,7 @@ valid_commands = [
     'remove',
     'rm',
     'delete',
+    'help',
 ]
 
 candidates = None
@@ -309,6 +336,8 @@ def do_command(command, server):
         if os.environ['TERM'] not in ('linux'):
             sys.stdout.write('\x1b]0;\x07')
         sys.exit(0)
+    elif argv[0] in ('help', '?'):
+        return print_help()
     elif argv[0] == 'cd':
         otarget = target
         if len(argv) > 1:
@@ -674,7 +703,7 @@ def conserver_command(filehandle, localcommand):
 
     elif localcommand[0] == '?':
         print("help]\r")
-        print(".       disconnect\r")
+        print(".       exit console\r")
         print("b       break\r")
         print("o       reopen\r")
         print("po      power off\r")
