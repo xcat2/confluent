@@ -1,5 +1,8 @@
 #!/bin/sh
 cd `dirname $0`
+if [ -x ./makeman ]; then
+    ./makeman
+fi
 ./makesetup
 VERSION=`cat VERSION`
 PKGNAME=$(basename $(pwd))
