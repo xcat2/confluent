@@ -350,6 +350,21 @@ def do_command(command, server):
     elif argv[0] in ('cat', 'show', 'ls', 'dir'):
         if len(argv) > 1:
             targpath = fullpath_target(argv[1])
+            if argv[0] in ('ls', 'dir'):
+                if targpath[-1] != '/':
+                    # could still be a directory, fetch the parent..
+                    childname = targpath[targpath.rindex('/') + 1:]
+                    parentpath = targpath[:targpath.rindex('/') + 1]
+                    if parentpath != '/noderange/':
+                        # if it were /noderange/, then it's a directory
+                        # even though parent won't tell us that
+                        for res in session.read(parentpath, server):
+                            try:
+                                if res['item']['href'] == childname:
+                                    print(childname)
+                                    return
+                            except KeyError:
+                                pass
         else:
             targpath = target
         for res in session.read(targpath):
