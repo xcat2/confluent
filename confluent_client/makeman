@@ -1,6 +1,6 @@
 #!/bin/sh
 cd `dirname $0`/doc/man
 mkdir -p ../../man/man1
-ronn -m *.ronn
+ronn -r *.ronn
 mv *.1 ../../man/man1/
 
