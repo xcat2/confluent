@@ -77,6 +77,8 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
+if args[1] == 'firm':
+    exec(['nodefirmware', noderange])
 try:
     session = client.Command()
     for res in session.read('/noderange/{0}/inventory/hardware/all/all'.format(
