@@ -579,17 +579,36 @@ def discover_node(cfg, handler, info, nodename):
 
 
 attribwatcher = None
+nodeaddhandler = None
+needaddhandled = False
+
+
+def _handle_nodelist_change(configmanager):
+    global needaddhandled
+    global nodeaddhandler
+    _recheck_nodes((), configmanager)
+    if needaddhandled:
+        needaddhandled = False
+        nodeaddhandler = eventlet.spawn(_handle_nodelist_change, configmanager)
+    else:
+        nodeaddhandler = None
 
 
 def newnodes(added, deleting, configmanager):
     global attribwatcher
+    global needaddhandled
+    global nodeaddhandler
     configmanager.remove_watcher(attribwatcher)
     allnodes = configmanager.list_nodes()
     attribwatcher = configmanager.watch_attributes(
         allnodes, ('discovery.policy', 'net.switch',
                    'hardwaremanagement.manager', 'net.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
-    _recheck_nodes((), configmanager)
+    if nodeaddhandler:
+        needaddhandled = True
+    else:
+        nodeaddhandler = eventlet.spawn(_handle_nodelist_change, configmanager)
+
 
 
 rechecker = None
