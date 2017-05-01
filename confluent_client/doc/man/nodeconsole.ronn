@@ -8,7 +8,7 @@ nodeconsole(1) -- Open a console to a confluent node
 
 **nodeconsole** opens an interactive console session to a given node.  This is the
 text or serial console of a system.  Exiting is done by hitting `Ctrl-e`, then `c`,
- then `.`.  Note that console output by default is additionally logged to 
+ then `.`.  Note that console output by default is additionally logged to
 `/var/log/confluent/consoles/`**NODENAME**.
 
 ## ESCAPE SEQUENCE COMMANDS
@@ -20,11 +20,29 @@ keystroke will be interpreted as a command.  The following commands are availabl
 * `.`:
   Exit the session and return to the command prompt
 * `b`:
+  [send Break]
   Send a break to the remote console when possible (some console plugins may not support this)
 * `o`:
+  [reOpen]
   Request confluent to disconnect and reconnect to console.  For example if there is suspicion
   that the console has gone inoperable, but would work if reconnected.
+* `po`:
+  [Power Off]
+  Power off server immediately, without waiting for OS to shutdown
+* `ps`:
+  [Power Shutdown]
+  Request OS shut down gracefully, and then power off
+* `pb<ent>`:
+  [Power Boot]
+  Cause system to immediately boot, resetting or turning on as appropriate.
+  Htting enter is required to execute the reboot rather than another pb sequence
+* `pbs`:
+  [Power Boot Setup]
+  Request immediate boot ultimately landing in interactive firmware setup makeconfluentcfg
+* `pbn`:
+  [Power Boot Network]
+  Request immediate boot to network
 * `?`:
   Get a list of supported commands
-* `<enter>`:
-  Abandon entering an escape sequence command
+* `<ent>`:
+  Hit enter to skip entering a command at the escape prompt.
