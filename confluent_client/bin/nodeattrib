@@ -35,7 +35,7 @@ argparser = optparse.OptionParser(
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
 argparser.add_option('-c', '--clear', action='store_true',
-                     help='Clear variables')
+                     help='Clear attributes')
 (options, args) = argparser.parse_args()
 
 
@@ -46,7 +46,8 @@ try:
     noderange = args[0]
     nodelist = '/noderange/{0}/nodes/'.format(noderange)
 except IndexError:
-    nodelist = '/nodes/'
+    argparser.print_help()
+    sys.exit(1)
 session = client.Command()
 exitcode = 0
 
