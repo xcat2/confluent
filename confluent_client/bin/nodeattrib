@@ -66,6 +66,7 @@ if len(args) > 1:
             showtype = 'current'
             requestargs=args[2:]
         else:
+            showtype = 'current'
             requestargs=args[1:]
     except:
         pass
