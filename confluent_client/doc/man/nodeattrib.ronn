@@ -31,10 +31,10 @@ This is different from setting the value to an empty string.
 ## EXAMPLES
 * Listing matching nodes of a simple noderange:
     `# nodeattrib n1-n2`  
-    `n1`: console.method: ipmi  
-    `n1`: hardwaremanagement.manager: 172.30.3.1  
-    `n2`: console.method: ipmi  
-    `n2`: hardwaremanagement.manager: 172.30.3.2  
+    `n1: console.method: ipmi`  
+    `n1: hardwaremanagement.manager: 172.30.3.1`  
+    `n2: console.method: ipmi`  
+    `n2: hardwaremanagement.manager: 172.30.3.2`  
 
 * Getting an attribute of nodes matching a noderange:
     `# nodeattrib n1,n2 hardwaremanagement.manager`  
@@ -52,22 +52,23 @@ This is different from setting the value to an empty string.
     `n2: hardwaremanagement.switch: r8e1`  
     `n2: hardwaremanagement.switchport: 2`  
 
-  * Listing matching nodes of a simple noderange that are set:
+* Listing matching nodes of a simple noderange that are set:
     `# nodeattrib n1-n2 current`  
-    `n1`: console.method: ipmi  
-    `n1`: hardwaremanagement.manager: 172.30.3.1  
-    `n2`: console.method: ipmi  
-    `n2`: hardwaremanagement.manager: 172.30.3.2  
+    `n1: console.method: ipmi`  
+    `n1: hardwaremanagement.manager: 172.30.3.1`  
+    `n2: console.method: ipmi`  
+    `n2: hardwaremanagement.manager: 172.30.3.2`  
 
-  * Change attribute on nodes of a simple noderange:  
+* Change attribute on nodes of a simple noderange:
     `# nodeattrib n1-n2 console.method=serial`  
-    `n1`: console.method: serial  
-    `n1`: hardwaremanagement.manager: 172.30.3.1  
-    `n2`: console.method: serial  
-    `n2`: hardwaremanagement.manager: 172.30.3.2  
+    `n1: console.method: serial`  
+    `n1: hardwaremanagement.manager: 172.30.3.1`  
+    `n2: console.method: serial`  
+    `n2: hardwaremanagement.manager: 172.30.3.2`  
 
-  * Clear attribute on nodes of a simple noderange, if you want to retain the variable set the attribute to "":  
+* Clear attribute on nodes of a simple noderange, if you want to retain the variable set the attribute to "":
     `# nodeattrib n1-n2 -c console.method`  
     `# nodeattrib n1-n2 console.method`  
-    Error: console.logging not a valid attribute  
+    `n1: console.method: `  
+    `n2: console.method: `  
 
