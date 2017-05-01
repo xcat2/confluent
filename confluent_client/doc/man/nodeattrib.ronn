@@ -3,10 +3,10 @@ nodeattrib(1) -- List or change confluent nodes attributes
 
 ## SYNOPSIS
 
-`nodeattrib` `noderange` [ current | all ]
-`nodeattrib` `noderange` [-b] [<nodeattribute>...]
-`nodeattrib` `noderange` [<nodeattribute1=value1> <nodeattribute2=value2> ...]
-`nodeattrib` `noderange` [-c] [<nodeattribute1> <nodeattribute2=value2> ...]
+`nodeattrib` `noderange` [ current | all ]  
+`nodeattrib` `noderange` [-b] [<nodeattribute>...]  
+`nodeattrib` `noderange` [<nodeattribute1=value1> <nodeattribute2=value2> ...]  
+`nodeattrib` `noderange` [-c] [<nodeattribute1> <nodeattribute2=value2> ...]  
 
 ## DESCRIPTION
 
@@ -30,46 +30,44 @@ This is different from setting the value to an empty string.
 
 ## EXAMPLES
 * Listing matching nodes of a simple noderange:
-    `# nodeattrib n1-n2`
-    `n1`: console.method: ipmi
-    `n1`: hardwaremanagement.manager: 172.30.3.1
-    `n2`: console.method: ipmi
-    `n2`: hardwaremanagement.manager: 172.30.3.2
+    `# nodeattrib n1-n2`  
+    `n1`: console.method: ipmi  
+    `n1`: hardwaremanagement.manager: 172.30.3.1  
+    `n2`: console.method: ipmi  
+    `n2`: hardwaremanagement.manager: 172.30.3.2  
 
 * Getting an attribute of nodes matching a noderange:
-    `# nodeattrib n1,n2 hardwaremanagement.manager`
-    `n1: hardwaremanagement.manager: 172.30.3.1`
-    `n2: hardwaremanagement.manager: 172.30.3.2`
+    `# nodeattrib n1,n2 hardwaremanagement.manager`  
+    `n1: hardwaremanagement.manager: 172.30.3.1`  
+    `n2: hardwaremanagement.manager: 172.30.3.2`  
 
 * Getting a group of attributes while determining what group defines them:
-    `# nodeattrib n1,n2 hardwaremanagement --blame`
-    `n1: hardwaremanagement.manager: 172.30.3.1`
-    `n1: hardwaremanagement.method: ipmi (inherited from group everything)`
-    `n1: hardwaremanagement.switch: r8e1`
-    `n1: hardwaremanagement.switchport: 14`
-    `n2: hardwaremanagement.manager: 172.30.3.2`
-    `n2: hardwaremanagement.method: ipmi (inherited from group everything)`
-    `n2: hardwaremanagement.switch: r8e1`
-    `n2: hardwaremanagement.switchport: 2`
+    `# nodeattrib n1,n2 hardwaremanagement --blame`  
+    `n1: hardwaremanagement.manager: 172.30.3.1`  
+    `n1: hardwaremanagement.method: ipmi (inherited from group everything)`  
+    `n1: hardwaremanagement.switch: r8e1`  
+    `n1: hardwaremanagement.switchport: 14`  
+    `n2: hardwaremanagement.manager: 172.30.3.2`  
+    `n2: hardwaremanagement.method: ipmi (inherited from group everything)`  
+    `n2: hardwaremanagement.switch: r8e1`  
+    `n2: hardwaremanagement.switchport: 2`  
 
   * Listing matching nodes of a simple noderange that are set:
-    `# nodeattrib n1-n2 current`
-    `n1`: console.method: ipmi
-    `n1`: hardwaremanagement.manager: 172.30.3.1
-    `n2`: console.method: ipmi
-    `n2`: hardwaremanagement.manager: 172.30.3.2
+    `# nodeattrib n1-n2 current`  
+    `n1`: console.method: ipmi  
+    `n1`: hardwaremanagement.manager: 172.30.3.1  
+    `n2`: console.method: ipmi  
+    `n2`: hardwaremanagement.manager: 172.30.3.2  
 
-  * Change attribute on nodes of a simple noderange:
-    `# nodeattrib n1-n2 console.method=serial`
-    `n1`: console.method: serial
-    `n1`: hardwaremanagement.manager: 172.30.3.1
-    `n2`: console.method: serial
-    `n2`: hardwaremanagement.manager: 172.30.3.2
+  * Change attribute on nodes of a simple noderange:  
+    `# nodeattrib n1-n2 console.method=serial`  
+    `n1`: console.method: serial  
+    `n1`: hardwaremanagement.manager: 172.30.3.1  
+    `n2`: console.method: serial  
+    `n2`: hardwaremanagement.manager: 172.30.3.2  
 
-  * Clear attribute on nodes of a simple noderange, if you want to retain the variable set the attribute to "":
-    `# nodeattrib n1-n2 -c console.method`
-    `# nodeattrib n1-n2 console.method`
-    Error: console.logging not a valid attribute
-
-
+  * Clear attribute on nodes of a simple noderange, if you want to retain the variable set the attribute to "":  
+    `# nodeattrib n1-n2 -c console.method`  
+    `# nodeattrib n1-n2 console.method`  
+    Error: console.logging not a valid attribute  
 
