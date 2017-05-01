@@ -1,0 +1,31 @@
+nodeidentify(1) -- Control the identify LED of confluent nodes
+=========================================================
+
+## SYNOPSIS
+
+`nodidentify` `noderange` [on|off]  
+
+## DESCRIPTION
+
+`nodeidentify` allows you to turn on or off the location LED of conflueunt nodes,
+making it easier to determine the physical location of the nodes.  The following
+options are supported:
+
+* `on`: Turn on the identify LED
+* `off`: Turn off the identify LED
+
+## EXAMPLES:
+
+* Turn on the identify LED on nodes n1 through n4:
+  `# nodeidentify n1-n4 on`  
+  `n1: on`  
+  `n2: on`  
+  `n3: on`  
+  `n4: on`  
+
+* Turn off the identify LED on nodes n1 thorugh n4:
+  `# nodeidentify n1-n4 off`  
+  `n1: off`  
+  `n2: off`  
+  `n4: off`  
+  `n3: off`  
