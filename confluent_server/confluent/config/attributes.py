@@ -144,6 +144,13 @@ node = {
                         '"open" allows discovery even if a known public key '
                         'is already stored',
     },
+    'info.note': {
+        'description':  'A field used for administrators to make arbitrary '
+                        'notations about nodes. This is meant entirely for '
+                        'human use and not programmatic use, so it can be '
+                        'freeform text data without concern for issues in how '
+                        'the server will process it.',
+    },
     'location.room': {
         'description': 'Room description for the node',
     },
