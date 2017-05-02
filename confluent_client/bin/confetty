@@ -626,7 +626,7 @@ def conserver_command(filehandle, localcommand):
         tlvdata.send(session.connection, {'operation': 'break',
                                           'path': currconsole})
         print("break sent]\r")
-    elif localcommand[0] == 'p':  # print
+    elif localcommand[0] == 'p':  # power
         cmdlen += 1
         localcommand = get_command_bytes(filehandle, localcommand, cmdlen)
 
@@ -700,6 +700,8 @@ def conserver_command(filehandle, localcommand):
 
         else:
             print("Unknown power state.]\r")
+
+        check_power_state()
 
     elif localcommand[0] == '?':
         print("help]\r")
@@ -809,6 +811,27 @@ elif shellargs:
     do_command(command, netserver)
     quitconfetty(fullexit=True, fixterm=False)
 
+powerstate = None
+powertime = None
+
+
+def check_power_state():
+    global powerstate, powertime
+    for rsp in session.read('/nodes/' + consolename + '/power/state'):
+        if type(rsp) == dict and 'state' in rsp:
+            powerstate = rsp['state']['value']
+            powertime = time.time()
+            if powerstate == 'off':
+                sys.stdout.write("\r\n[powered off]\r\n")
+        elif type(rsp) == dict and '_requestdone' in rsp:
+            break
+        elif type(rsp) == dict:
+            updatestatus(rsp)
+        else:
+            sys.stdout.write(rsp)
+            sys.stdout.flush()
+
+
 while inconsole or not doexit:
     if inconsole:
         rdylist, _, _ = select.select(
@@ -870,6 +893,8 @@ while inconsole or not doexit:
                         tlvdata.send(session.connection, myinput)
                 except IOError:
                     pass
+        if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
+            check_power_state()
     else:
         currcommand = prompt()
         try:
