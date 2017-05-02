@@ -325,9 +325,16 @@ class ChildCollection(LinkRelation):
                                                                   extension)
 
 
+# TODO(jjohnson2): enhance the following to support expressions:
+# InputNetworkConfiguration
+# InputMCI
+# InputDomainName
+# InputNTPServer
 def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
+    elif path == ['attributes', 'expression']:
+        return InputExpression(path, inputdata, nodes)
     elif path[0] in ('attributes', 'users') and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
@@ -387,7 +394,47 @@ class InputAlertData(ConfluentMessage):
         return self.alertparams
 
 
+class InputExpression(ConfluentMessage):
+    # This is specifically designed to suppress the expansion of an expression
+    # so that it can make it intact to the pertinent configmanager function
+    def __init__(self, path, inputdata, nodes=None):
+        self.nodeattribs = {}
+        nestedmode = False
+        if not inputdata:
+            raise exc.InvalidArgumentException('no request data provided')
+        if nodes is None:
+            self.attribs = inputdata
+            return
+        for node in nodes:
+            if node in inputdata:
+                nestedmode = True
+                self.nodeattribs[node] = inputdata[node]
+        if nestedmode:
+            for key in inputdata:
+                if key not in nodes:
+                    raise exc.InvalidArgumentException
+        else:
+            for node in nodes:
+                self.nodeattribs[node] = inputdata
+
+    def get_attributes(self, node):
+        if node not in self.nodeattribs:
+            return {}
+        nodeattr = deepcopy(self.nodeattribs[node])
+        return nodeattr
+
+
 class InputAttributes(ConfluentMessage):
+    # This is particularly designed for attributes, where a simple string
+    # should become either a string value or a dict with {'expression':} to
+    # preserve the client provided expression for posterity, rather than
+    # immediate consumption.
+    # for things like node configuration or similar, a different class is
+    # appropriate since it nedes to immediately expand an expression.
+    # with that class, the 'InputExpression' and calling code in attributes.py
+    # might be deprecated in favor of the generic expression expander
+    # and a small function in attributes.py to reflect the expansion back
+    # to the client
     def __init__(self, path, inputdata, nodes=None):
         self.nodeattribs = {}
         nestedmode = False
