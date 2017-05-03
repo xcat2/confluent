@@ -29,6 +29,14 @@ the attributes are set on the node versus a group to which a node belongs.
 
 ## EXAMPLES
 
+* Show attributes of a group called `demogrp`:
+  `# nodegroupattrib demogrp`  
+  `demogrp: hardwaremanagement.manager:  (will derive from expression 10.30.{n0/255}.{n0%255})`  
+  `demogrp: nodes: n12,n13,n10,n11,n9,n1,n2,n3,n4`  
+
+* Set location.u to be the remainder of first number in node name when divided by 42:  
+  `# nodegroupattrib demogrp location.u={n1%42}`  
+
 ## SEE ALSO
 
 nodeattrib(8), nodeattribexpressions(5)
