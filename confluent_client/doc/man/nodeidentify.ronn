@@ -1,9 +1,9 @@
-nodeidentify(1) -- Control the identify LED of confluent nodes
+nodeidentify(8) -- Control the identify LED of confluent nodes
 =========================================================
 
 ## SYNOPSIS
 
-`nodidentify` `noderange` [on|off]  
+`nodidentify <noderange> [on|off]`  
 
 ## DESCRIPTION
 

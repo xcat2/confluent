@@ -1,9 +1,9 @@
-nodesensors(1) --- Retrieve telemetry for sensors of confluent nodes
+nodesensors(8) --- Retrieve telemetry for sensors of confluent nodes
 ====================================================================
 
 ## SYNOPSIS
 
-`nodesensors` `noderange` [-c] [-i <interval>] [-n <samplecount>]  [<sensor name  or category>...]  
+`nodesensors <noderange> [-c] [-i <interval>] [-n <samplecount>]  [<sensor name  or category>...]`  
 
 
 ## DESCRIPTION

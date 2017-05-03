@@ -1,0 +1,53 @@
+noderun(8) -- Run arbitrary commands per node in a noderange
+=============================================================
+
+## SYNOPSIS
+
+`noderun <noderange> <command string>`
+
+## DESCRIPTION
+
+`noderun` will take a given command and execute it in parallel once per node
+in the specified noderange.  Attribute expressions as documented in
+nodeattribexpressions(5) are expanded prior to execution of the command.  For
+noderun, the commands are locally executed.  To execute commands on the nodes
+themselves, see nodeshell(8).
+
+## EXAMPLES
+
+* Run ping against nodes n1 through n4:
+  `# noderun n1-n4 ping -c 1 {nodename}`  
+  `n3: PING n3 (172.30.2.3) 56(84) bytes of data.`  
+  `n3: 64 bytes from n3 (172.30.2.3): icmp_seq=1 ttl=64 time=0.387 ms`  
+  `n3: `  
+  `n3: --- n3 ping statistics ---`  
+  `n3: 1 packets transmitted, 1 received, 0% packet loss, time 0ms`  
+  `n3: rtt min/avg/max/mdev = 0.387/0.387/0.387/0.000 ms`  
+  `n4: PING n4 (172.30.2.4) 56(84) bytes of data.`  
+  `n4: 64 bytes from n4 (172.30.2.4): icmp_seq=1 ttl=64 time=0.325 ms`  
+  `n4: `  
+  `n4: --- n4 ping statistics ---`  
+  `n4: 1 packets transmitted, 1 received, 0% packet loss, time 0ms`  
+  `n4: rtt min/avg/max/mdev = 0.325/0.325/0.325/0.000 ms`  
+  `n2: PING n2 (172.30.2.2) 56(84) bytes of data.`  
+  `n2: From odin (172.30.0.6) icmp_seq=1 Destination Host Unreachable`  
+  `n2: `  
+  `n2: --- n2 ping statistics ---`  
+  `n2: 1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 3000ms`  
+  `n2: `  
+  `n1: PING n1 (172.30.2.1) 56(84) bytes of data.`  
+  `n1: `  
+  `n1: --- n1 ping statistics ---`  
+  `n1: 1 packets transmitted, 0 received, 100% packet loss, time 10000ms`  
+  `n1: `  
+
+* Run an ipmitool raw command against the management controllers of n1 through n4:
+  `# noderun n1-n4 ipmitool -I lanplus -U USERID -E -H {hardwaremanagement.manager} raw 0 1`  
+  `n3:  01 10 00`  
+  `n1:  01 10 00`  
+  `n4:  01 10 00`  
+  `n2:  01 10 00`  
+
+## SEE ALSO
+
+nodeshell(8)

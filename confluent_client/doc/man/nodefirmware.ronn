@@ -1,0 +1,30 @@
+nodefirmware(8) -- Report firmware information on confluent nodes
+=================================================================
+
+## SYNOPSIS
+
+`nodefirmware <noderange>`  
+
+## DESCRIPTION
+
+`nodefirmware` reports various pieces of firmware on confluent nodes.
+
+## EXAMPLES
+
+* Pull firmware from a node:
+`# nodefirmware r1`  
+`r1: IMM: 3.70 (TCOO26H 2016-11-29T05:09:51)`  
+`r1: IMM Backup: 1.71 (TCOO10D 2015-04-17T00:00:00)`  
+`r1: IMM Trusted Image: TCOO26H`  
+`r1: UEFI: 2.31 (TCE128I 2016-12-13T00:00:00)`  
+`r1: UEFI Backup: 2.20 (TCE126O)`  
+`r1: FPGA: 3.2.0`  
+`r1: Broadcom NetXtreme Gigabit Ethernet Controller Bootcode: 1.38`  
+`r1: Broadcom NetXtreme Gigabit Ethernet Controller MBA: 16.8.0`  
+`r1: Broadcom NetXtreme Gigabit Ethernet Controller Firmware Package: 0.0.0a`  
+`r1: ServeRAID M1215 MegaRAID Controller Firmware: 24.12.0-0038 (2016-10-20T00:00:00)`  
+`r1: ServeRAID M1215 Disk 28 MBF2600RC: SB2C`  
+`r1: ServeRAID M1215 Disk 29 MBF2600RC: SB2C`  
+`r1: ServeRAID M5210 Disk 0 MBF2600RC: SB2C`  
+`r1: ServeRAID M5210 Disk 1 MBF2600RC: SB2C`  
+`r1: ServeRAID M5210 Disk 2 MBF2600RC: SB2C`  

@@ -1,0 +1,106 @@
+nodeinventory(8) -- Get hardware inventory of confluent node
+===============================================================
+
+## SYNOPSIS
+
+`nodeinventory <noderange>`  
+
+## DESCRIPTION
+
+`nodeinventory` pulls information about hardware of a node.  This includes 
+information such as adapters, serial numbers, processors, and memory modules,
+as supported by the platforms hardware management implementation.
+
+## EXAMPLES
+
+* Pulling inventory of a node named r1:
+  `# nodeinventory r1`   
+  `r1: System MAC Address 1: 40:f2:e9:af:45:a0`   
+  `r1: System MAC Address 2: 40:f2:e9:af:45:a1`   
+  `r1: System MAC Address 3: 40:f2:e9:af:45:a2`   
+  `r1: System MAC Address 4: 40:f2:e9:af:45:a3`   
+  `r1: System Board manufacturer: IBM`   
+  `r1: System Product name: System x3650 M5`   
+  `r1: System Device ID: 32`   
+  `r1: System Revision: 9`   
+  `r1: System Product ID: 323`   
+  `r1: System Board model: 00KG915`   
+  `r1: System Device Revision: 0`   
+  `r1: System Serial Number: E2K4831`   
+  `r1: System Board manufacture date: 2014-10-20T12:00`   
+  `r1: System Board serial number: Y010UF4AL0B5`   
+  `r1: System Manufacturer: IBM`   
+  `r1: System FRU Number: 00FK639`   
+  `r1: System Board product name: System Board`   
+  `r1: System Model: 5462AC1`   
+  `r1: System UUID: 1B29CE46-765E-31A3-A3B9-B5FB934F15AB`   
+  `r1: System Hardware Version: 0x0000`   
+  `r1: System Manufacturer ID: 20301`   
+  `r1: System Chassis serial number: E2K4831`   
+  `r1: System Asset Number: `   
+  `r1: System Chassis type: Other`   
+  `r1: Power Supply 1 Board model: 94Y8136`   
+  `r1: Power Supply 1 Board manufacturer: EMER`   
+  `r1: Power Supply 1 FRU Number: 94Y8137`   
+  `r1: Power Supply 1 Board product name: IBM Designed Device`   
+  `r1: Power Supply 1 Board manufacture date: 2014-11-08T00:00`   
+  `r1: Power Supply 1 Board serial number:  K13814B88ED`   
+  `r1: Power Supply 1 Revision: 49`   
+  `r1: Power Supply 2: Not Present`   
+  `r1: DASD Backplane 1 Board model: 00JY139`   
+  `r1: DASD Backplane 1 Board manufacturer: WIST`   
+  `r1: DASD Backplane 1 FRU Number: 00FJ756`   
+  `r1: DASD Backplane 1 Board product name: IBM Designed Device`   
+  `r1: DASD Backplane 1 Board manufacture date: 2014-08-28T00:00`   
+  `r1: DASD Backplane 1 Board serial number: Y011UF48W02U`   
+  `r1: DASD Backplane 1 Revision: 0`   
+  `r1: DASD Backplane 2: Not Present`   
+  `r1: DASD Backplane 3: Not Present`   
+  `r1: DASD Backplane 4: Not Present`   
+  `r1: DASD Backplane 5 Board model: 00YJ530`   
+  `r1: DASD Backplane 5 Board manufacturer: WIST`   
+  `r1: DASD Backplane 5 FRU Number: 00AL953`   
+  `r1: DASD Backplane 5 Board product name: IBM Designed Device`   
+  `r1: DASD Backplane 5 Board manufacture date: 2016-02-04T00:00`   
+  `r1: DASD Backplane 5 Board serial number: Y010UF624024`   
+  `r1: DASD Backplane 5 Revision: 0`   
+  `r1: DASD Backplane 6: Not Present`   
+  `r1: CPU 1 Hardware Version: Intel(R) Xeon(R) CPU E5-2640 v3 @ 2.60GHz`   
+  `r1: CPU 1 Asset Number: Unknown`   
+  `r1: CPU 1 Manufacturer: Intel(R) Corporation`   
+  `r1: CPU 2: Not Present`   
+  `r1: ML2 Card: Not Present`   
+  `r1: DIMM 1: Not Present`   
+  `r1: DIMM 2: Not Present`   
+  `r1: DIMM 3: Not Present`   
+  `r1: DIMM 4: Not Present`   
+  `r1: DIMM 5: Not Present`   
+  `r1: DIMM 6: Not Present`   
+  `r1: DIMM 7: Not Present`   
+  `r1: DIMM 8: Not Present`   
+  `r1: DIMM 9: Not Present`   
+  `r1: DIMM 10: Not Present`   
+  `r1: DIMM 11: Not Present`   
+  `r1: DIMM 12: Not Present`   
+  `r1: DIMM 13: Not Present`   
+  `r1: DIMM 14: Not Present`   
+  `r1: DIMM 15: Not Present`   
+  `r1: DIMM 16: Not Present`   
+  `r1: DIMM 17: Not Present`   
+  `r1: DIMM 18: Not Present`   
+  `r1: DIMM 19: Not Present`   
+  `r1: DIMM 20: Not Present`   
+  `r1: DIMM 21: Not Present`   
+  `r1: DIMM 22: Not Present`   
+  `r1: DIMM 23: Not Present`   
+  `r1: DIMM 24: Not Present`   
+  `r1: X8 PCI 1: Not Present`   
+  `r1: X8 PCI 2: Not Present`   
+  `r1: X8 PCI 6: Not Present`   
+  `r1: X8 PCI 7: Not Present`   
+  `r1: Broadcom NetXtreme Gigabit Ethernet Controller MAC Address 1: 40:f2:e9:af:45:a0`   
+  `r1: Broadcom NetXtreme Gigabit Ethernet Controller MAC Address 2: 40:f2:e9:af:45:a1`   
+  `r1: Broadcom NetXtreme Gigabit Ethernet Controller MAC Address 3: 40:f2:e9:af:45:a2`   
+  `r1: Broadcom NetXtreme Gigabit Ethernet Controller MAC Address 4: 40:f2:e9:af:45:a3`   
+  `r1: Broadcom NetXtreme Gigabit Ethernet Controller PCI slot: 1b:00`   
+  `r1: Broadcom NetXtreme Gigabit Ethernet Controller location: Onboard`   

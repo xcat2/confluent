@@ -1,8 +1,8 @@
-nodeconsole(1) -- Open a console to a confluent node
+nodeconsole(8) -- Open a console to a confluent node
 =====================================================
 
 ## SYNOPSIS
-`nodeconsole` `node`
+`nodeconsole <node>`
 
 ## DESCRIPTION
 

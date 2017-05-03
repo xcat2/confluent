@@ -1,0 +1,28 @@
+nodeshell(8) -- Execute command on many nodes in a noderange through ssh
+=========================================================================
+
+## SYNOPSIS
+
+`nodeshell <noderange> <command to execute on each node>`
+
+## DESCRIPTION
+
+Allows execution of a command on many nodes in parallel.  Like noderun(8), it
+accepts and interpolates confluent attribute expressions as documented in 
+nodeattribexpressions(5).
+
+## EXAMPLES
+
+* Running `echo hi` on for nodes:
+  `# nodeshell n1-n4 echo hi`  
+  `n1: hi`  
+  `n2: hi`  
+  `n3: hi`  
+  `n4: hi`  
+
+* Setting a new static ip address temporarily on secondary interface of four nodes:
+  `# nodeshell n1-n4 ifconfig eth1 172.30.93.{n1}`  
+  
+## SEE ALSO
+
+noderun(8)

@@ -1,0 +1,22 @@
+nodehealth(8) -- Show health summary of confluent nodes
+========================================================
+
+## SYNOPSIS
+
+`nodehealth <noderange>`  
+
+## DESCRIPTION
+
+`nodehealth` reports the current health assessment of a confluent node.  It
+will report either `ok`, `warning`, `critical`, or `failed`, along with
+a string explaining the reason for any result other than `ok`.
+
+## EXAMPLES
+
+* Pull health summary of 5 nodes:
+  `# nodehealth n1-n4,r1`  
+  `n1: critical (Mezz Exp 2 Fault:Critical)`  
+  `n3: ok`  
+  `n2: ok`  
+  `r1: ok`  
+  `n4: ok`

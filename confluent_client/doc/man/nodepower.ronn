@@ -1,10 +1,10 @@
-nodepower(1) -- Check or change power state of confluent nodes
+nodepower(8) -- Check or change power state of confluent nodes
 =========================================================
 
 ## SYNOPSIS
 
-`nodepower` `noderange`  
-`nodepower` `noderange` [on|off|boot|shutdown|reset]  
+`nodepower <noderange>`  
+`nodepower <noderange> [on|off|boot|shutdown|reset]`  
 
 ## DESCRIPTION
 

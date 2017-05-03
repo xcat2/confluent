@@ -1,0 +1,33 @@
+nodeeventlog(8) -- Pull eventlog from confluent nodes
+============================================================
+
+## SYNOPSIS
+
+`nodeeventlog <noderange>`  
+`nodeeventlog <noderange> [clear]`
+
+## DESCRIPTION
+
+`nodeeventlog` pulls and optionally clears the event log from the requested
+noderange.
+
+## EXAMPLES
+* Pull the event log from n2 and n3:
+  `# nodeeventlog n2,n3`  
+  `n2: 05/03/2017 11:44:25 Event Log Disabled - SEL Fullness - Log clear`  
+  `n2: 05/03/2017 11:44:56 System Firmware - Progress - Unspecified`  
+  `n3: 05/03/2017 11:44:39 Event Log Disabled - SEL Fullness - Log clear`  
+  `n3: 05/03/2017 11:45:00 System Firmware - Progress - Unspecified`  
+  `n3: 05/03/2017 11:47:22 System Firmware - Progress - Starting OS boot`  
+
+* Pull and clear the event log from n2 and n3:
+`# nodeeventlog n2,n3 clear`  
+`n2: 05/03/2017 11:44:25 Event Log Disabled - SEL Fullness - Log clear`  
+`n2: 05/03/2017 11:44:56 System Firmware - Progress - Unspecified`  
+`n2: 05/03/2017 11:48:29 System Firmware - Progress - Starting OS boot`  
+`n3: 05/03/2017 11:44:39 Event Log Disabled - SEL Fullness - Log clear`  
+`n3: 05/03/2017 11:45:00 System Firmware - Progress - Unspecified`  
+`n3: 05/03/2017 11:47:22 System Firmware - Progress - Starting OS boot`  
+`# nodeeventlog n2,n3`  
+`n2: 05/03/2017 11:48:48 Event Log Disabled - SEL Fullness - Log clear`  
+`n3: 05/03/2017 11:48:52 Event Log Disabled - SEL Fullness - Log clear`  
