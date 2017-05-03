@@ -6,7 +6,7 @@ nodeattribexpressions(5) -- Confluent attribute expression syntax
 In confluent, any attribute may either be a straightforward value, or an
 expression to generate the value.
 
-An expression will contain some directives wrapped in `{} characters. Within
+An expression will contain some directives wrapped in `{}` characters. Within
 `{}` are a number of potential substitute values and operations.
 
 The most common operation is to extract a number from the nodename. These 
