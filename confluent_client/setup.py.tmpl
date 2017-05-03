@@ -4,7 +4,8 @@ import os
 data_files = [('/etc/profile.d', ['confluent_env.sh', 'confluent_env.csh'])]
 try:
     scriptlist = ['bin/{0}'.format(d) for d in os.listdir('bin/')]
-    data_files.append(('/opt/confluent/share/man/man5', ['man/man5/' + x for x in os.listdir('man/man5')] + ['man/man8/' + x for x in os.listdir('man/man8')]))
+    data_files.append(('/opt/confluent/share/man/man5', ['man/man5/' + x for x in os.listdir('man/man5')]))
+    data_files.append(('/opt/confluent/share/man/man8', ['man/man8/' + x for x in os.listdir('man/man8')]))
 except OSError:
     pass
 
