@@ -55,7 +55,7 @@ exitcode = 0
 nodetype="noderange"
 
 if len(args) > 1:
-    if "=" in args[1]:
+    if "=" in args[1] or options.clear:
         exitcode=client.updateattrib(session,args,nodetype, noderange, options)
     try:
         # setting user output to what the user inputs
@@ -66,7 +66,7 @@ if len(args) > 1:
             showtype = 'current'
             requestargs=args[2:]
         else:
-            showtype = 'current'
+            showtype = 'all'
             requestargs=args[1:]
     except:
         pass

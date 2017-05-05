@@ -57,6 +57,7 @@ exitcode = 0
 #Sets attributes
 
 if len(args) > 1:
+    showtype = 'all'
     exitcode=client.updateattrib(session,args,nodetype, nodegroups, options)
     try:
         # setting user output to what the user inputs
