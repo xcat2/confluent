@@ -819,10 +819,11 @@ def check_power_state():
     global powerstate, powertime
     for rsp in session.read('/nodes/' + consolename + '/power/state'):
         if type(rsp) == dict and 'state' in rsp:
-            powerstate = rsp['state']['value']
+            newpowerstate = rsp['state']['value']
             powertime = time.time()
-            if powerstate == 'off':
-                sys.stdout.write("\r\n[powered off]\r\n")
+            if newpowerstate != powerstate and newpowerstate == 'off':
+                sys.stdout.write("\x1b[2J\x1b[;H[powered off]\r\n")
+            powerstate = newpowerstate
         elif type(rsp) == dict and '_requestdone' in rsp:
             break
         elif type(rsp) == dict:
