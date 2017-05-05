@@ -228,9 +228,14 @@ class ConfluentTargetInvalidCredentials(ConfluentNodeError):
 
 
 class DeletedResource(ConfluentMessage):
+    notnode = True
     def __init__(self, resource):
-        self.kvpairs = {}
+        self.kvpairs = {'deleted': resource}
 
+class CreatedResource(ConfluentMessage):
+    notnode = True
+    def __init__(self, resource):
+        self.kvpairs = {'created': resource}
 
 class ConfluentChoiceMessage(ConfluentMessage):
     valid_values = set()

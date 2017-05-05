@@ -464,6 +464,10 @@ def createresource(args):
 def makecall(callout, args):
     global exitcode
     for response in callout(*args):
+        if 'deleted' in response:
+            print("Deleted: " + response['deleted'])
+        if 'created' in response:
+            print("Created: " + response['created'])
         if 'error' in response:
             if 'errorcode' in response:
                 exitcode = response['errorcode']

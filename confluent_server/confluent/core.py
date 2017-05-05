@@ -347,11 +347,14 @@ def delete_nodegroup_collection(collectionpath, configmanager):
         raise Exception("Not implemented")
 
 
-def delete_node_collection(collectionpath, configmanager):
+def delete_node_collection(collectionpath, configmanager, isnoderange):
     if len(collectionpath) == 2:  # just node
-        node = collectionpath[-1]
-        configmanager.del_nodes([node])
-        yield msg.DeletedResource(node)
+        nodes = [collectionpath[-1]]
+        if isnoderange:
+            nodes = noderange.NodeRange(nodes[0], configmanager).nodes
+        configmanager.del_nodes(nodes)
+        for node in nodes:
+            yield msg.DeletedResource(node)
     else:
         raise Exception("Not implemented")
 
@@ -395,6 +398,7 @@ def create_group(inputdata, configmanager):
         configmanager.add_group_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
+    yield msg.CreatedResource(groupname)
 
 
 def create_node(inputdata, configmanager):
@@ -408,6 +412,25 @@ def create_node(inputdata, configmanager):
         configmanager.add_node_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
+    yield msg.CreatedResource(nodename)
+
+
+def create_noderange(inputdata, configmanager):
+    try:
+        noder = inputdata['name']
+        del inputdata['name']
+        attribmap = {}
+        for node in noderange.NodeRange(noder).nodes:
+            attribmap[node] = inputdata
+    except KeyError:
+        raise exc.InvalidArgumentException('name not specified')
+    try:
+        configmanager.add_node_attributes(attribmap)
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
+    for node in attribmap:
+        yield msg.CreatedResource(node)
+
 
 
 def enumerate_collections(collections):
@@ -422,7 +445,7 @@ def handle_nodegroup_request(configmanager, inputdata,
     if len(pathcomponents) < 2:
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
-            create_group(inputdata.attribs, configmanager)
+            return create_group(inputdata.attribs, configmanager)
         allgroups = list(configmanager.get_groups())
         try:
             allgroups.sort(key=noderange.humanify_nodename)
@@ -502,11 +525,14 @@ def handle_node_request(configmanager, inputdata, operation,
         # this is enumerating a list of nodes or just empty noderange
         if isnoderange and operation == "retrieve":
             return iterate_collections([])
+        elif isnoderange and operation == "create":
+            inputdata = msg.InputAttributes(pathcomponents, inputdata)
+            return create_noderange(inputdata.attribs, configmanager)
         elif isnoderange or operation == "delete":
             raise exc.InvalidArgumentException()
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
-            create_node(inputdata.attribs, configmanager)
+            return create_node(inputdata.attribs, configmanager)
         allnodes = list(configmanager.list_nodes())
         try:
             allnodes.sort(key=noderange.humanify_nodename)
@@ -537,7 +563,8 @@ def handle_node_request(configmanager, inputdata, operation,
             raise exc.InvalidArgumentException('Custom interface required for resource')
     if iscollection:
         if operation == "delete":
-            return delete_node_collection(pathcomponents, configmanager)
+            return delete_node_collection(pathcomponents, configmanager,
+                                          isnoderange)
         elif operation == "retrieve":
             return enumerate_node_collection(pathcomponents, configmanager)
         else:
