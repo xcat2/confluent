@@ -28,13 +28,15 @@ def retrieve(nodes, element, configmanager, inputdata):
 def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
     grpcfg = configmanager.get_nodegroup_attributes(nodegroup)
     if element == 'all':
-        nodes = []
-        if 'nodes' in grpcfg:
-            nodes = list(grpcfg['nodes'])
-        yield msg.ListAttributes(kv={'nodes': nodes},
-                                 desc="The nodes belonging to this group")
-        for attribute in sorted(allattributes.node.iterkeys()):
+        theattrs = set(allattributes.node).union(set(grpcfg))
+        theattrs.add('nodes')
+        for attribute in sorted(theattrs):
             if attribute == 'groups':
+                continue
+            if attribute == 'nodes':
+                yield msg.ListAttributes(
+                    kv={'nodes': list(grpcfg.get('nodes', []))},
+                    desc="The nodes belonging to this group")
                 continue
             if attribute in grpcfg:
                 val = grpcfg[attribute]
@@ -45,13 +47,17 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                     kv={attribute: val},
                     desc=allattributes.node[attribute]['description'])
             elif isinstance(val, list):
-                raise Exception("TODO")
+                yield msg.ListAttributes(
+                    kv={attribute: val},
+                    desc=allattributes.node.get(
+                        attribute, {}).get('description', ''))
             else:
                 yield msg.Attributes(
                     kv={attribute: val},
-                    desc=allattributes.node[attribute]['description'])
+                    desc=allattributes.node.get(attribute, {}).get(
+                        'description', ''))
     if element == 'current':
-        for attribute in sorted(grpcfg.iterkeys()):
+        for attribute in sorted(list(grpcfg)):
             currattr = grpcfg[attribute]
             if attribute == 'nodes':
                 desc = 'The nodes belonging to this group'
@@ -61,7 +67,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                 try:
                     desc = allattributes.node[attribute]['description']
                 except KeyError:
-                    desc = 'Unknown'
+                    desc = ''
             if 'value' in currattr or 'expression' in currattr:
                 yield msg.Attributes(kv={attribute: currattr}, desc=desc)
             elif 'cryptvalue' in currattr:
@@ -86,7 +92,8 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
     attributes = configmanager.get_node_attributes(nodes)
     if element[-1] == 'all':
         for node in nodes:
-            for attribute in sorted(allattributes.node.iterkeys()):
+            theattrs = set(allattributes.node).union(set(attributes[node]))
+            for attribute in sorted(theattrs):
                 if attribute in attributes[node]:  # have a setting for it
                     val = attributes[node][attribute]
                 elif attribute == 'groups':  # no setting, provide a blank
@@ -96,23 +103,26 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                 if attribute.startswith('secret.'):
                     yield msg.CryptedAttributes(
                         node, {attribute: val},
-                        allattributes.node[attribute]['description'])
+                        allattributes.node.get(
+                            attribute, {}).get('description', ''))
                 elif isinstance(val, list):
                     yield msg.ListAttributes(
                         node, {attribute: val},
-                        allattributes.node[attribute]['description'])
+                        allattributes.node.get(
+                            attribute, {}).get('description', ''))
                 else:
                     yield msg.Attributes(
                         node, {attribute: val},
-                        allattributes.node[attribute]['description'])
+                        allattributes.node.get(
+                            attribute, {}).get('description', ''))
     elif element[-1] == 'current':
-        for node in attributes.iterkeys():
+        for node in sorted(list(attributes)):
             for attribute in sorted(attributes[node].iterkeys()):
                 currattr = attributes[node][attribute]
                 try:
                     desc = allattributes.node[attribute]['description']
                 except KeyError:
-                    desc = 'Unknown'
+                    desc = ''
                 if 'value' in currattr or 'expression' in currattr:
                     yield msg.Attributes(node, {attribute: currattr}, desc)
                 elif 'cryptvalue' in currattr:

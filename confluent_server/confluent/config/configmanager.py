@@ -222,6 +222,24 @@ def decrypt_value(cryptvalue,
     return value[0:-padsize]
 
 
+def attribute_is_invalid(attrname, attrval):
+    if attrname.startswith('custom.'):
+        # No type checking or name checking is provided for custom,
+        # it's not possible
+        return False
+    if attrname not in allattributes.node:
+        # Otherwise, it must be in the allattributes key list
+        return True
+    if 'type' in allattributes.node[attrname]:
+        if not isinstance(attrval, allattributes.node[attrname]['type']):
+            # provide type checking for attributes with a specific type
+            return True
+    else:
+        # if not specified, it must be str or unicode
+        if not (isinstance(attrval, str) or isinstance(attrval, unicode)):
+            return True
+    return False
+
 def crypt_value(value,
                 key=None,
                 integritykey=None):
@@ -940,11 +958,8 @@ class ConfigManager(object):
                 raise ValueError("{0} group does not exist".format(group))
             for attr in attribmap[group].iterkeys():
                 if (attr not in ('nodes', 'noderange') and
-                        (attr not in allattributes.node or
-                         ('type' in allattributes.node[attr] and
-                          not isinstance(attribmap[group][attr],
-                                         allattributes.node[attr]['type'])))):
-                    raise ValueError("nodes attribute is invalid")
+                        attribute_is_invalid(attr, attribmap[group][attr])):
+                    raise ValueError("{0} attribute is invalid".format(attr))
                 if attr == 'nodes':
                     if not isinstance(attribmap[group][attr], list):
                         if type(attribmap[group][attr]) is unicode or type(attribmap[group][attr]) is str:
@@ -1172,11 +1187,7 @@ class ConfigManager(object):
                     if ('everything' in self._cfgstore['nodegroups'] and
                             'everything' not in attribmap[node]['groups']):
                         attribmap[node]['groups'].append('everything')
-                elif (attrname not in allattributes.node or
-                        ('type' in allattributes.node[attrname] and
-                         not isinstance(
-                             attrval,
-                             allattributes.node[attrname]['type']))):
+                elif attribute_is_invalid(attrname, attrval):
                     errstr = "{0} attribute on node {1} is invalid".format(
                         attrname, node)
                     raise ValueError(errstr)
