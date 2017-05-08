@@ -841,9 +841,11 @@ class ConfigManager(object):
         if decrypt is None:
             decrypt = self.decrypt
         retdict = {}
-        relattribs = attributes
         if isinstance(nodelist, str) or isinstance(nodelist, unicode):
             nodelist = [nodelist]
+        if isinstance(attributes, str) or isinstance(attributes, unicode):
+            attributes = [attributes]
+        relattribs = attributes
         for node in nodelist:
             if node not in self._cfgstore['nodes']:
                 continue
@@ -855,6 +857,10 @@ class ConfigManager(object):
                 if attribute.startswith('_'):
                     # skip private things
                     continue
+                if '*' in attribute:
+                    for attr in fnmatch.filter(list(cfgnodeobj), attribute):
+                        nodeobj[attr] = _decode_attribute(attr, cfgnodeobj,
+                                                          decrypt=decrypt)
                 if attribute not in cfgnodeobj:
                     continue
                 # since the formatter is not passed in, the calculator is

@@ -274,7 +274,7 @@ def attrrequested(attr, attrlist, seenattributes):
         if candidate == attr:
             seenattributes.add(truename)
             return True
-        elif '.' not in candidate and attr.startswith(candidate + '.'):
+        elif attr.startswith(candidate + '.'):
             seenattributes.add(truename)
             return True
     return False
