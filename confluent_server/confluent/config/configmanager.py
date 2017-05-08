@@ -241,10 +241,6 @@ def attribute_is_invalid(attrname, attrval):
         if not isinstance(attrval, allattributes.node[attrname]['type']):
             # provide type checking for attributes with a specific type
             return True
-    else:
-        # if not specified, it must be str or unicode
-        if not (isinstance(attrval, str) or isinstance(attrval, unicode)):
-            return True
     return False
 
 def crypt_value(value,
