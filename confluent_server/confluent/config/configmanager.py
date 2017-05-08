@@ -228,6 +228,12 @@ def attribute_is_invalid(attrname, attrval):
         # No type checking or name checking is provided for custom,
         # it's not possible
         return False
+    if attrname.startswith('net.'):
+        # For net.* attribtues, split on the dots and put back together
+        # longer term we might want a generic approach, but
+        # right now it's just net. attributes
+        netattrparts = attrname.split('.')
+        attrname = netattrparts[0] + '.' + netattrparts[-1]
     if attrname not in allattributes.node:
         # Otherwise, it must be in the allattributes key list
         return True

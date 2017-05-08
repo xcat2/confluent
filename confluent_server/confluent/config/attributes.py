@@ -301,10 +301,17 @@ node = {
     },
     # TODO: extend to support 'net.0.switch' for multi-nic support
     'net.switch': {
-        'description': 'An ethernet switch the node is connected to.'
+        'description': 'An ethernet switch the node is connected to.  Note '
+                       'that net.* attributes may be indexed by interface. '
+                       'For example instead of using net.switch, it is '
+                       'possible to use net.eth0.switch and net.eth1.switch '
+                       'or net.0.switch and net.1.switch to define multiple '
+                       'sets of net connectivity associated with each other.'
     },
     'net.switchport': {
-        'description': 'The port on the switch that corresponds to this node.'
+        'description': 'The port on the switch that corresponds to this node. '
+                       'See information on net.switch for more on the '
+                       'flexibility of net.* attributes.'
     },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
