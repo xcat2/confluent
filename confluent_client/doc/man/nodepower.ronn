@@ -4,7 +4,7 @@ nodepower(8) -- Check or change power state of confluent nodes
 ## SYNOPSIS
 
 `nodepower <noderange>`  
-`nodepower <noderange> [on|off|boot|shutdown|reset]`  
+`nodepower <noderange> [on|off|boot|shutdown|reset|status]`
 
 ## DESCRIPTION
 
@@ -24,6 +24,7 @@ nodes that are off, and nodes will not shutdown if the OS fails to gracefully
 respond.
 * `reset`:  Request immediate reset of nodes of the noderange.  Nodes that are
 off will not react to this request.
+* `status`:  Behave identically to having no argument passed at all.
 
 ## EXAMPLES
 * Get power state of nodes n1 through n4:
