@@ -228,8 +228,12 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             return disco_info[pathcomponents[1]](ident=pathcomponents[2])
     elif len(pathcomponents) == 4:
         if pathcomponents[1] == 'by-model':
+            if pathcomponents[3] not in disco_info:
+                raise exc.NotFoundException()
             return disco_info[pathcomponents[3]](model=pathcomponents[2])
         elif pathcomponents[1] == 'by-type':
+            if pathcomponents[3] not in disco_info:
+                raise exc.NotFoundException()
             return disco_info[pathcomponents[3]](infotype=pathcomponents[2])
     elif len(pathcomponents) == 5:
         ident = pathcomponents[-1]
