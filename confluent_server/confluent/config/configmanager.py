@@ -73,6 +73,7 @@ import copy
 import cPickle
 import errno
 import eventlet
+import fnmatch
 import json
 import operator
 import os
@@ -593,7 +594,9 @@ class ConfigManager(object):
 
     def watch_attributes(self, nodes, attributes, callback):
         """
-        Watch a list of attributes for changes on a list of nodes
+        Watch a list of attributes for changes on a list of nodes.  The
+        attributes may be literal, or a filename style wildcard like 
+        'net*.switch'
 
         :param nodes: An iterable of node names to be watching
         :param attributes: An iterable of attribute names to be notified about
@@ -621,6 +624,10 @@ class ConfigManager(object):
                     }
                 else:
                     attribwatchers[node][attribute][notifierid] = callback
+                if '*' in attribute:
+                    currglobs = attribwatchers[node].get('_attrglobs', set([]))
+                    currglobs.add(attribute)
+                    attribwatchers[node]['_attrglobs'] = currglobs
         return notifierid
 
     def watch_nodecollection(self, callback):
@@ -1058,7 +1065,7 @@ class ConfigManager(object):
             return
         notifdata = {}
         attribwatchers = self._attribwatchers[self.tenant]
-        for node in nodeattrs.iterkeys():
+        for node in nodeattrs:
             if node not in attribwatchers:
                 continue
             attribwatcher = attribwatchers[node]
@@ -1071,10 +1078,19 @@ class ConfigManager(object):
                 # to deletion, to make all watchers aware of the removed
                 # node and take appropriate action
                 checkattrs = attribwatcher
+            globattrs = {}
+            for attrglob in attribwatcher.get('_attrglobs', []):
+                for matched in fnmatch.filter(list(checkattrs), attrglob):
+                    globattrs[matched] = attrglob
             for attrname in checkattrs:
+                watchkey = attrname
+                # the attrib watcher could still have a glob
                 if attrname not in attribwatcher:
-                    continue
-                for notifierid in attribwatcher[attrname].iterkeys():
+                    if attrname in globattrs:
+                        watchkey = globattrs[attrname]
+                    else:
+                        continue
+                for notifierid in attribwatcher[watchkey]:
                     if notifierid in notifdata:
                         if node in notifdata[notifierid]['nodeattrs']:
                             notifdata[notifierid]['nodeattrs'][node].append(
@@ -1085,7 +1101,7 @@ class ConfigManager(object):
                     else:
                         notifdata[notifierid] = {
                             'nodeattrs': {node: [attrname]},
-                            'callback': attribwatcher[attrname][notifierid]
+                            'callback': attribwatcher[watchkey][notifierid]
                         }
         for watcher in notifdata.itervalues():
             callback = watcher['callback']
