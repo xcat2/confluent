@@ -259,15 +259,18 @@ def update_macmap(configmanager, impatient=False):
             raise exc.ForbiddenRequest(
                 'Network topology not available to tenants')
         nodelocations = configmanager.get_node_attributes(
-            configmanager.list_nodes(), ('net.switch', 'net.switchport'))
+            configmanager.list_nodes(), ('net*.switch', 'net*.switchport'))
         switches = set([])
         for node in nodelocations:
             cfg = nodelocations[node]
-            if 'net.switch' in cfg and 'value' in cfg['net.switch']:
-                curswitch = cfg['net.switch']['value']
+            for attr in cfg:
+                if not attr.endswith('.switch') or 'value' not in cfg[attr]:
+                    continue
+                curswitch = cfg[attr]['value']
                 switches.add(curswitch)
-                if 'net.switchport' in cfg:
-                    portname = cfg['net.switchport']['value']
+                switchportattr = attr + 'port'
+                if switchportattr in cfg:
+                    portname = cfg[switchportattr]['value']
                     if curswitch not in _switchportmap:
                         _switchportmap[curswitch] = {}
                     if portname in _switchportmap[curswitch]:
