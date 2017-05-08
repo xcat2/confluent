@@ -19,52 +19,66 @@
 #This defines the attributes of various classes of things
 
 # 'nic', meant to be a nested structure under node
-nic = {
-    'name': {
-        'description': 'Name in ip/ifconfig as desired by administrator',
-    },
-    'biosdevname': {
-        'description': '"biosdevname" scheme to identify the adapter. If not'
-                       'mac address match is preferred, then biosdevname, then'
-                       'name.',
-    },
-    'port': {
-        'description': 'Port that this nic connects to',
-    },
-    'switch': {
-        'description': 'Switch that this nic connects to',
-    },
+# changing mind on design, flattening to a single attribute, a *touch* less
+# flexible at the top end, but much easier on the low end
+# now net.<name>.attribute scheme
+# similarly, leaning toward comma delimited ip addresses, since 99.99% of the
+# time each nic will have one ip address
+# vlan specification will need to be thought about a tad, each ip could be on
+# a distinct vlan, but could have a vlan without an ip for sake of putting
+# to a bridge.  Current thought is
+# vlans attribute would be comma delimited referring to the same index
+# as addresses, with either 'native' or a number for vlan id
+# the 'joinbridge' attribute would have some syntax like @<vlanid> to indicate
+# joining only a vlan of the nic to the bridge
+# 'joinbond' attribute would not support vlans.
+
+#nic = {
+#    'name': {
+#        'description': 'Name in ip/ifconfig as desired by administrator',
+#    },
+#    'biosdevname': {
+#        'description': '"biosdevname" scheme to identify the adapter. If not'
+#                       'mac address match is preferred, then biosdevname, then'
+#                       'name.',
+#    },
+#    'port': {
+#        'description': 'Port that this nic connects to',
+#    },
+#    'switch': {
+#        'description': 'Switch that this nic connects to',
+#    },
 #    'customhardwareaddress': {
 #        'description': 'Mac address to push to nic',
 #    },
-    'dnssuffix': {
-        'description': ('String to place after nodename, but before'
-                        'Network.Domain to derive FQDN for this NIC'),
-    },
-    'hardwareaddress': {
-        'description': 'Active mac address on this nic (factory or custom)'
-    },
-    'ipaddresses': {
-        'description': 'Set of IPv4 and IPv6 addresses in CIDR format'
-    },
-    'pvid': {
-        'description': 'PVID of port on switch this nic connects to',
-    },
-    'mtu': {
-        'description': 'Requested MTU to configure on this interface',
-    },
-    'vlans': {
-        'description': 'Tagged VLANs to apply to nic/switch',
-    },
-    'dhcpv4enabled': {
-        'description':  ('Whether DHCP should be attempted to acquire IPv4'
-                         'address on this interface'),
-    },
-    'dhcpv6enabled': {
-        'description':  ('Whether DHCP should be attempted to acquire IPv6'
-                         'address on this interface'),
-    },
-}
+#    'dnssuffix': {
+#        'description': ('String to place after nodename, but before'
+#                        'Network.Domain to derive FQDN for this NIC'),
+#    },
+#    'hardwareaddress': {
+#        'description': 'Active mac address on this nic (factory or custom)'
+#    },
+#    'ipaddresses': {
+#        'description': 'Set of IPv4 and IPv6 addresses in CIDR format'
+#    },
+#    'pvid': {
+#        'description': 'PVID of port on switch this nic connects to',
+#    },
+#    'mtu': {
+#        'description': 'Requested MTU to configure on this interface',
+#    },
+#    'vlans': {
+#        'description': 'Tagged VLANs to apply to nic/switch',
+#    },
+#    'dhcpv4enabled': {
+#        'description':  ('Whether DHCP should be attempted to acquire IPv4'
+#                         'address on this interface'),
+#    },
+#    'dhcpv6enabled': {
+#        'description':  ('Whether DHCP should be attempted to acquire IPv6'
+#                         'address on this interface'),
+#    },
+#}
 
 user = {
     'password': {
