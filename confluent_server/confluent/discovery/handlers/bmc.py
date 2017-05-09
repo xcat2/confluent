@@ -46,12 +46,35 @@ class NodeHandler(generic.NodeHandler):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
-
-        ic = self._get_ipmicmd()
+        try:
+            ic = self._get_ipmicmd()
+            passwd = DEFAULT_PASS
+        except pygexc.IpmiException as pi:
+            creds = self.configmanager.get_node_attributes(
+                nodename,
+                ['secret.hardwaremanagementuser',
+                 'secret.hardwaremanagementpassword'], decrypt=True)
+            user = creds.get(nodename, {}).get(
+                'secret.hardwaremanagementuser', {}).get('value', None)
+            havecustomcreds = False
+            if user is not None and user != DEFAULT_USER:
+                havecustomcreds = True
+            else:
+                user = DEFAULT_USER
+            passwd = creds.get(nodename, {}).get(
+                'secret.hardwaremanagementpassword', {}).get('value', None)
+            if passwd is not None and passwd != DEFAULT_PASS:
+                havecustomcreds = True
+            else:
+                passwd = DEFAULT_PASS
+            if havecustomcreds:
+                ic = self._get_ipmicmd(user, passwd)
+            else:
+                raise
         currusers = ic.get_users()
         lanchan = ic.get_network_channel()
         userdata = ic.xraw_command(netfn=6, command=0x44, data=(lanchan,
-                                                                      1))
+                                                                1))
         userdata = bytearray(userdata['data'])
         maxusers = userdata[0] & 0b111111
         enabledusers = userdata[1] & 0b111111
@@ -98,7 +121,7 @@ class NodeHandler(generic.NodeHandler):
             ic.set_user_name(newuserslot, newuser)
             ic.set_user_access(newuserslot, lanchan,
                                privilege_level='administrator')
-        if newpass != DEFAULT_PASS:  # don't mess with default if user wants
+        if newpass != passwd:  # don't mess with existing if no change
             ic.set_user_password(newuserslot, password=newpass)
         # Now to zap others
         for uid in currusers:
