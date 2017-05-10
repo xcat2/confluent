@@ -36,6 +36,7 @@ if __name__ == '__main__':
     import confluent.config.configmanager as cfm
 import confluent.exceptions as exc
 import confluent.log as log
+import confluent.messages as msg
 import confluent.snmputil as snmp
 import confluent.util as util
 from eventlet.greenpool import GreenPool
@@ -302,6 +303,77 @@ def update_macmap(configmanager, impatient=False):
         pool = GreenPool()
         for ans in pool.imap(_map_switch, switchauth):
             yield ans
+
+
+def _dump_locations(info, nodename=None):
+    yield msg.Attributes(kv={'possiblenode': nodename})
+    for location in info:
+        yield msg.Attributes(kv={'switch': location[0], 'port': location[1],
+                                 'macsonport': location[2]})
+
+def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+    #/networking/macs/node-by-mac
+    #                /ports-by-mac
+    #                /switches/
+    #                          <switch>/ports-by-mac
+    #                          <switch>/macs-by-port/<port>
+    if len(pathcomponents) == 1:
+        return [msg.ChildCollection('macs/')]
+    elif len(pathcomponents) == 2:
+        return [msg.ChildCollection(x) for x in ('node-by-mac/',
+                                                 'ports-by-mac/', 'switches/')]
+    if pathcomponents[2] == 'node-by-mac':
+        if len(pathcomponents) == 3:
+            return [msg.ChildCollection(x.replace(':', '-'))
+                    for x in sorted(list(_nodesbymac))]
+        elif len(pathcomponents) == 4:
+            macaddr = pathcomponents[-1].replace('-', ':')
+            return dump_macinfo(macaddr)
+    elif pathcomponents[2] == 'ports-by-mac':
+        if len(pathcomponents) == 3:
+            return [msg.ChildCollection(x.replace(':', '-'))
+                    for x in sorted(list(_macmap))]
+        elif len(pathcomponents) == 4:
+            return dump_macinfo(pathcomponents[-1])
+    elif pathcomponents[2] == 'switches':
+        if len(pathcomponents) == 3:
+            return [msg.ChildCollection(x + '/')
+                    for x in sorted(list(_macsbyswitch))]
+
+        if len(pathcomponents) == 4:
+            return [msg.ChildCollection('by-port/')]
+        if len(pathcomponents) == 5:
+            switchname = pathcomponents[-2]
+            if switchname not in _macsbyswitch:
+                raise exc.NotFoundException(
+                    'No known macs for switch {0}'.format(switchname))
+            return [msg.ChildCollection(x + '/')
+                    for x in sorted(list(_macsbyswitch[switchname]))]
+        if len(pathcomponents) == 6:
+            switchname = pathcomponents[-3]
+            portname = pathcomponents[-1]
+            try:
+                maclist = _macsbyswitch[switchname][portname]
+            except KeyError:
+                raise exc.NotFoundException('No known macs for switch {0} '
+                                            'port {1}'.format(switchname,
+                                                              portname))
+            return [msg.ChildCollection(x.replace(':', '-'))
+                    for x in sorted(maclist)]
+        if len(pathcomponents) == 7:
+            return dump_macinfo(pathcomponents[-1])
+    raise exc.NotFoundException('Unrecognized path {0}'.format(
+        '/'.join(pathcomponents)))
+
+
+def dump_macinfo(macaddr):
+    macaddr = macaddr.replace('-', ':')
+    info = _macmap.get(macaddr, None)
+    if info is None:
+        raise exc.NotFoundException(
+            '{0} not found in mac table of '
+            'any known switches'.format(macaddr))
+    return _dump_locations(info, _nodesbymac.get(macaddr, None))
 
 
 if __name__ == '__main__':

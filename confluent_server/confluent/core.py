@@ -40,6 +40,7 @@ import confluent.discovery.core as disco
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 try:
     import confluent.shellmodule as shellmodule
@@ -102,7 +103,7 @@ def load_plugins():
         sys.path.pop(1)
 
 
-rootcollections = ['discovery/', 'events/',
+rootcollections = ['discovery/', 'events/', 'networking/',
                    'noderange/', 'nodes/', 'nodegroups/', 'users/', 'version']
 
 
@@ -666,6 +667,9 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
                                    operation, pathcomponents, autostrip)
     elif pathcomponents[0] == 'discovery':
         return disco.handle_api_request(
+            configmanager, inputdata, operation, pathcomponents)
+    elif pathcomponents[0] == 'networking':
+        return macmap.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'version':
         return (msg.Attributes(kv={'version': confluent.__version__}),)

@@ -215,7 +215,7 @@ group_info = {
 
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if len(pathcomponents) == 1:
-        return [ msg.ChildCollection(x + '/') for x in category_info]
+        return [msg.ChildCollection(x + '/') for x in category_info]
     elif len(pathcomponents) == 2:
         category = pathcomponents[1]
         if category not in category_info:
