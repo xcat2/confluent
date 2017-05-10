@@ -305,18 +305,16 @@ def update_macmap(configmanager, impatient=False):
             yield ans
 
 
-def _dump_locations(info, nodename=None):
-    yield msg.Attributes(kv={'possiblenode': nodename})
+def _dump_locations(info, macaddr, nodename=None):
+    yield msg.KeyValueData({'possiblenode': nodename, 'mac': macaddr})
+    retdata = {'ports': []}
+    portinfo = retdata['ports']
     for location in info:
-        yield msg.Attributes(kv={'switch': location[0], 'port': location[1],
-                                 'macsonport': location[2]})
+        portinfo.append({'switch': location[0],
+                              'port': location[1], 'macsonport': location[2]})
+    yield msg.KeyValueData(retdata)
 
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
-    #/networking/macs/node-by-mac
-    #                /ports-by-mac
-    #                /switches/
-    #                          <switch>/ports-by-mac
-    #                          <switch>/macs-by-port/<port>
     if len(pathcomponents) == 1:
         return [msg.ChildCollection('macs/')]
     elif len(pathcomponents) == 2:
@@ -373,7 +371,7 @@ def dump_macinfo(macaddr):
         raise exc.NotFoundException(
             '{0} not found in mac table of '
             'any known switches'.format(macaddr))
-    return _dump_locations(info, _nodesbymac.get(macaddr, None))
+    return _dump_locations(info, macaddr, _nodesbymac.get(macaddr, None))
 
 
 if __name__ == '__main__':

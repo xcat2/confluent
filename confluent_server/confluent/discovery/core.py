@@ -133,16 +133,16 @@ pending_nodes = {}
 
 def send_discovery_datum(info):
     addresses = info.get('addresses', [])
-    yield msg.Attributes(kv={'nodename': info.get('nodename', '')})
-    yield msg.ListAttributes(kv={'ipaddrs': [x[0] for x in addresses]})
-    yield msg.Attributes(kv={'serialnumber': info.get('serialnumber', '')})
-    yield msg.Attributes(kv={'modelnumber': info.get('modelnumber', '')})
-    yield msg.Attributes(kv={'macs': [info.get('hwaddr', '')]})
+    yield msg.KeyValueData({'nodename': info.get('nodename', '')})
+    yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
+    yield msg.KeyValueData({'serialnumber': info.get('serialnumber', '')})
+    yield msg.KeyValueData({'modelnumber': info.get('modelnumber', '')})
+    yield msg.KeyValueData({'macs': [info.get('hwaddr', '')]})
     types = []
     for infotype in info.get('services', []):
         if infotype in servicenames:
             types.append(servicenames[infotype])
-    yield msg.ListAttributes(kv={'types': types})
+    yield msg.KeyValueData({'types': types})
 
 
 def enumerate_by_serial(model=None, infotype=None, ident=None):
