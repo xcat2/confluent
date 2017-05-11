@@ -345,12 +345,14 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             if switchname not in _macsbyswitch:
                 raise exc.NotFoundException(
                     'No known macs for switch {0}'.format(switchname))
-            return [msg.ChildCollection(x + '/')
+            return [msg.ChildCollection(x.replace('/', '-') + '/')
                     for x in sorted(list(_macsbyswitch[switchname]))]
         if len(pathcomponents) == 6:
             switchname = pathcomponents[-3]
             portname = pathcomponents[-1]
             try:
+                if portname not in _macsbyswitch[switchname]:
+                    portname = portname.replace('-', '/')
                 maclist = _macsbyswitch[switchname][portname]
             except KeyError:
                 raise exc.NotFoundException('No known macs for switch {0} '
