@@ -299,7 +299,11 @@ node = {
     'id.uuid': {
         'description': 'The UUID of the node as presented in DMI.',
     },
-    # TODO: extend to support 'net.0.switch' for multi-nic support
+    'net.ipv4_gateway': {
+        'description':  'The IPv4 gateway to use if applicable.  As is the '
+                        'case for other net attributes, net.eth0.ipv4_gateway '
+                        'and similar is accepted.'
+    },
     'net.switch': {
         'description': 'An ethernet switch the node is connected to.  Note '
                        'that net.* attributes may be indexed by interface. '

@@ -16,10 +16,66 @@
 # this will implement noderange grammar
 
 
-import socket
+import codecs
 import struct
+import eventlet.green.socket as socket
 import eventlet.support.greendns
 getaddrinfo = eventlet.support.greendns.getaddrinfo
+
+
+def ip_on_same_subnet(first, second, prefix):
+    addrinf = socket.getaddrinfo(first, None, 0, socket.SOCK_STREAM)[0]
+    fam = addrinf[0]
+    ip = socket.inet_pton(fam, addrinf[-1][0])
+    ip = int(codecs.encode(bytes(ip), 'hex'), 16)
+    addrinf = socket.getaddrinfo(second, None, 0, socket.SOCK_STREAM)[0]
+    if fam != addrinf[0]:
+        return False
+    oip = socket.inet_pton(fam, addrinf[-1][0])
+    oip = int(codecs.encode(bytes(oip), 'hex'), 16)
+    if fam == socket.AF_INET:
+        addrlen = 32
+    elif fam == socket.AF_INET6:
+        addrlen = 128
+    else:
+        raise Exception("Unknown address family {0}".format(fam))
+    mask = 2 ** prefix - 1 << (addrlen - prefix)
+    return ip & mask == oip & mask
+
+
+def get_nic_config(configmanager, node, ip=None, mac=None):
+    """Fetch network configuration parameters for a nic
+    
+    For a given node and interface, find and retrieve the pertinent network
+    configuration data.  The desired configuration can be searched
+    either by ip or by mac.
+    
+    :param configmanager: The relevant confluent.config.ConfigManager 
+        instance.
+    :param node:  The name of the node
+    :param ip:  The ip address that the interface should have
+    :param mac: The mac address of the interface
+    
+    :returns: A dict of parameters, 'ipv4_gateway', ....
+    """
+    #TODO(jjohnson2): ip address, prefix length, mac address,
+    # join a bond/bridge, vlan configs, etc.
+    # also other nic criteria, physical location, driver and index...
+    nodenetattribs = configmanager.get_node_attributes(
+        node, 'net*.ipv4_gateway').get(node, {})
+    cfgdata = {
+        'ipv4_gateway': None
+    }
+    if ip is not None:
+        prefixlen = get_prefix_len_for_ip(ip)
+        for setting in nodenetattribs:
+            gw = nodenetattribs[setting].get('value', None)
+            if gw is None:
+                continue
+            if ip_on_same_subnet(ip, gw, prefixlen):
+                cfgdata['ipv4_gateway'] = gw
+                break
+    return cfgdata
 
 
 def get_prefix_len_for_ip(ip):
@@ -52,3 +108,4 @@ def get_prefix_len_for_ip(ip):
                 nbits += 1
                 maskn = maskn >> 1
             return nbits
+    raise exc.NotImplementedException("Non local addresses not supported")
