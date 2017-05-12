@@ -94,13 +94,18 @@ class NodeHandler(generic.NodeHandler):
                 not cd['hardwaremanagement.manager']['value'].startswith(
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
-            newip = getaddrinfo(newip, 0)[0][-1][0]
+            newipinfo = getaddrinfo(newip, 0)[0]
+            # This getaddrinfo is repeated in get_nic_config, could be
+            # optimized, albeit with a more convoluted api..
+            newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            plen = netutil.get_prefix_len_for_ip(newip)
+            netconfig = netutil.get_nic_config(cfg, nodename, ip=newip)
+            plen = netconfig['prefix']
             newip = '{0}/{1}'.format(newip, plen)
             ic.set_net_configuration(ipv4_address=newip,
-                                     ipv4_configuration='static')
+                                     ipv4_configuration='static',
+                                     ipv4_gateway=netconfig['ipv4_gateway'])
         elif self.ipaddr.startswith('fe80::'):
             cfg.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})

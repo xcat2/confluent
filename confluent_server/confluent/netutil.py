@@ -75,10 +75,12 @@ def get_nic_config(configmanager, node, ip=None, mac=None):
     nodenetattribs = configmanager.get_node_attributes(
         node, 'net*.ipv4_gateway').get(node, {})
     cfgdata = {
-        'ipv4_gateway': None
+        'ipv4_gateway': None,
+        'prefix': None,
     }
     if ip is not None:
         prefixlen = get_prefix_len_for_ip(ip)
+        cfgdata['prefix'] = prefixlen
         for setting in nodenetattribs:
             gw = nodenetattribs[setting].get('value', None)
             if gw is None:
