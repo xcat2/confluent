@@ -62,10 +62,11 @@
 #     - Apply defined configuration to endpoint
 
 import confluent.config.configmanager as cfm
-#import confluent.discovery.protocols.pxe as pxe
+import confluent.discovery.protocols.pxe as pxe
 #import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
+import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
 import confluent.exceptions as exc
@@ -82,15 +83,18 @@ nodehandlers = {
     'service:lenovo-smm': smm,
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
     'service:management-hardware.IBM:integrated-management-module2': imm,
+    'pxe-client': pxeh,
 }
 
 servicenames = {
+    'pxe-client': 'pxe-client',
     'service:lenovo-smm': 'lenovo-smm',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
 }
 
 servicebyname = {
+    'pxe-client': 'pxe-client',
     'lenovo-smm': 'service:lenovo-smm',
     'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
@@ -312,11 +316,11 @@ def _recheck_single_unknown(configmanager, mac):
     info = unknown_info.get(mac, None)
     if not info:
         return
-    if not info.get('addresses', None):
+    if info['handler'] != pxeh and not info.get('addresses', None):
         log.log({'info': 'Missing address information in ' + repr(info)})
         return
     handler = info['handler'].NodeHandler(info, configmanager)
-    if not handler.https_cert:
+    if handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
             log.log(
                 {
@@ -383,7 +387,7 @@ def detected(info):
         info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
     except (KeyError, IndexError):
         pass
-    if info['hwaddr'] in known_info:
+    if info['hwaddr'] in known_info and 'addresses' in info:
         # we should tee these up for parsing when an enclosure comes up
         # also when switch config parameters change, should discard
         # and there's also if wiring is fixed...
@@ -394,7 +398,7 @@ def detected(info):
         # bz 93219, fix submitted, but not in builds yet
         # strictly speaking, going ipv4 only legitimately is mistreated here,
         # but that should be an edge case
-        oldaddr = known_info[info['hwaddr']]['addresses']
+        oldaddr = known_info[info['hwaddr']].get('addresses', [])
         for addr in info['addresses']:
             if addr[0].startswith('fe80::'):
                 break
@@ -402,7 +406,8 @@ def detected(info):
             for addr in oldaddr:
                 if addr[0].startswith('fe80::'):
                     info['addresses'].append(addr)
-        if known_info[info['hwaddr']]['addresses'] == info['addresses']:
+        if known_info[info['hwaddr']].get(
+                'addresses', []) == info['addresses']:
             # if the ip addresses match, then assume no changes
             # now something resetting to defaults could, in theory
             # have the same address, but need to be reset
@@ -411,7 +416,7 @@ def detected(info):
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
-    if not handler.https_cert:
+    if handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
             log.log(
                 {
@@ -459,6 +464,12 @@ def detected(info):
 
 
 def get_nodename(cfg, handler, info):
+    if not handler.https_supported:
+        curruuid = info['uuid']
+        nodename = nodes_by_uuid.get(curruuid, None)
+        if nodename is None:
+            nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
+        return nodename
     currcert = handler.https_cert
     if not currcert:
         info['discofailure'] = 'nohttps'
@@ -476,6 +487,8 @@ def eval_node(cfg, handler, info, nodename):
         handler.probe()  # unicast interrogation as possible to get more data
         # for now, we search switch only, ideally we search cmm, smm, and
         # switch concurrently
+        # do some preconfig, for example, to bring a SMM online if applicable
+        handler.preconfig()
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         log.log({'error': 'An error occured during discovery, check the '
@@ -485,8 +498,6 @@ def eval_node(cfg, handler, info, nodename):
                                     nodename)})
         traceback.print_exc()
         return
-    # do some preconfig, for example, to bring a SMM online if applicable
-    handler.preconfig()
     # first, if had a bay, it was in an enclosure.  If it was discovered by
     # switch, it is probably the enclosure manager and not
     # the node directly.  switch is ambiguous and we should leave it alone
@@ -550,7 +561,7 @@ def discover_node(cfg, handler, info, nodename):
     # the pubkeys, which is deferred for a little bit
     # Also, 'secure', when we have the needed infrastructure done
     # in some product or another.
-    if policy == 'permissive' and lastfp:
+    if policy == 'permissive' and handler.https_supported and lastfp:
         info['discofailure'] = 'fingerprint'
         log.log({'info': 'Detected replacement of {0} with existing '
                          'fingerprint and permissive discovery policy, not '
@@ -559,7 +570,23 @@ def discover_node(cfg, handler, info, nodename):
                          'first'.format(nodename)})
         return False  # With a permissive policy, do not discover new
     elif policy in ('open', 'permissive'):
-        if not util.cert_matches(lastfp, handler.https_cert):
+        info['nodename'] = nodename
+        if not handler.https_supported:
+            # use uuid based scheme in lieu of tls cert, ideally only
+            # for stateless 'discovery' targets like pxe, where data does not
+            # change
+            if info['uuid'] in known_pxe_uuids:
+                return True
+            uuidinfo = cfg.get_node_attributes(nodename, 'id.uuid')
+            olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
+            known_pxe_uuids.add(info['uuid'])
+            if 'uuid' in info and info['uuid'] != olduuid:
+                cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
+            log.log({'info': 'Discovered {0} ({1})'.format(nodename,
+                                                           handler.devname)})
+            return True
+        elif not util.cert_matches(lastfp, handler.https_cert):
+            # only 'discover' if it is not the same as last time
             if info['hwaddr'] in unknown_info:
                 del unknown_info[info['hwaddr']]
             handler.config(nodename)
@@ -571,8 +598,8 @@ def discover_node(cfg, handler, info, nodename):
                     util.get_fingerprint(handler.https_cert)
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
-            log.log({'info': 'Discovered {0}'.format(nodename)})
-        info['nodename'] = nodename
+            log.log({'info': 'Discovered {0} ({1}'.format(nodename,
+                                                          handler.devname)})
         known_nodes[nodename] = info
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
@@ -649,14 +676,17 @@ def start_detection():
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
     eventlet.spawn_n(slp.snoop, safe_detected)
+    eventlet.spawn_n(pxe.snoop, safe_detected)
     if rechecker is None:
         rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
+
     # eventlet.spawn_n(ssdp.snoop, safe_detected)
-    # eventlet.spawn_n(pxe.snoop, safe_detected)
+
 
 
 nodes_by_fprint = {}
 nodes_by_uuid = {}
+known_pxe_uuids = set([])
 
 def _map_unique_ids(nodes=None):
     # Map current known ids based on uuid and fingperprints for fast lookup

@@ -17,6 +17,7 @@ import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 class NodeHandler(object):
+    https_supported = True
     is_enclosure = False
 
     def __init__(self, info, configmanager):

@@ -46,7 +46,7 @@ def find_info_in_options(rq, optidx):
     try:
         while uuid is None or arch is None:
             if rq[optidx] == 53:  # DHCP message type
-                # we want only length 1 and only discover (type 2)
+                # we want only length 1 and only discover (type 1)
                 if rq[optidx + 1] != 1 or rq[optidx + 2] != 1:
                     return uuid, arch
                 optidx += 3
@@ -65,6 +65,7 @@ def find_info_in_options(rq, optidx):
                 archraw = bytes(rq[optidx + 2:optidx + 4])
                 if archraw in pxearchs:
                     arch = pxearchs[archraw]
+                optidx += 4
             else:
                 optidx += rq[optidx + 1] + 2
     except IndexError:
