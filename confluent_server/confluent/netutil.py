@@ -43,6 +43,15 @@ def ip_on_same_subnet(first, second, prefix):
     return ip & mask == oip & mask
 
 
+# TODO(jjohnson2): have a method to arbitrate setting methods, to aid
+# in correct matching of net.* based on parameters, mainly for pxe
+# The scheme for pxe:
+# For one: the candidate net.* should have pxe set to true, to help
+# disambiguate from interfaces meant for bmc access
+# bmc relies upon hardwaremanagement.manager, plus we don't collect
+# that mac address
+# the ip as reported by recvmsg to match the subnet of that net.* interface
+# if switch and port available, that should match.
 def get_nic_config(configmanager, node, ip=None, mac=None):
     """Fetch network configuration parameters for a nic
     
@@ -53,11 +62,13 @@ def get_nic_config(configmanager, node, ip=None, mac=None):
     :param configmanager: The relevant confluent.config.ConfigManager 
         instance.
     :param node:  The name of the node
-    :param ip:  The ip address that the interface should have
+    :param ip:  An IP address on the intended subnet
     :param mac: The mac address of the interface
     
     :returns: A dict of parameters, 'ipv4_gateway', ....
     """
+    # ip parameter *could* be the result of recvmsg with cmsg to tell
+    # pxe *our* ip address, or it could be the desired ip address
     #TODO(jjohnson2): ip address, prefix length, mac address,
     # join a bond/bridge, vlan configs, etc.
     # also other nic criteria, physical location, driver and index...
