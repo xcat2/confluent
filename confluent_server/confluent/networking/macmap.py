@@ -314,12 +314,25 @@ def _dump_locations(info, macaddr, nodename=None):
                               'port': location[1], 'macsonport': location[2]})
     yield msg.KeyValueData(retdata)
 
+
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+    if operation == 'retrieve':
+        return handle_read_api_request(pathcomponents)
+    if operation in ('update', 'create') and pathcomponents[-1] == 'rescan':
+        eventlet.spawn_n(rescan, configmanager)
+        return [msg.KeyValueData({'rescan': 'started'})]
+    raise exc.NotImplementedException(
+        'Operation {0} on {1} not implemented'.format(
+            operation, '/'.join(pathcomponents)))
+
+
+def handle_read_api_request(pathcomponents):
     if len(pathcomponents) == 1:
         return [msg.ChildCollection('macs/')]
     elif len(pathcomponents) == 2:
         return [msg.ChildCollection(x) for x in ('node-by-mac/',
-                                                 'ports-by-mac/', 'switches/')]
+                                                 'ports-by-mac/', 'switches/',
+                                                 'rescan')]
     if pathcomponents[2] == 'node-by-mac':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x.replace(':', '-'))
@@ -374,6 +387,11 @@ def dump_macinfo(macaddr):
             '{0} not found in mac table of '
             'any known switches'.format(macaddr))
     return _dump_locations(info, macaddr, _nodesbymac.get(macaddr, None))
+
+
+def rescan(cfg):
+    for _ in update_macmap(cfg):
+        pass
 
 
 if __name__ == '__main__':
