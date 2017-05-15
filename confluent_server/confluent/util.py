@@ -35,7 +35,7 @@ def list_interface_indexes():
             intidx = int(ifile.read())
             ifile.close()
             yield intidx
-    except (IOError, WindowsError):
+    except (IOError, OSError):
         # Probably situation is non-Linux, just do limited support for
         # such platforms until other people come alonge
         return
