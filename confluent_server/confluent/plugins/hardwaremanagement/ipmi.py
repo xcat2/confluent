@@ -36,7 +36,8 @@ console.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
 def exithandler():
-    console.session.iothread.join()
+    if console.session.iothread is not None:
+        console.session.iothread.join()
 
 atexit.register(exithandler)
 
