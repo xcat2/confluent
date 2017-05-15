@@ -318,7 +318,8 @@ def _dump_locations(info, macaddr, nodename=None):
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if operation == 'retrieve':
         return handle_read_api_request(pathcomponents)
-    if operation in ('update', 'create') and pathcomponents[-1] == 'rescan':
+    if (operation in ('update', 'create') and
+            pathcomponents == ['networking', 'macs', 'rescan']):
         eventlet.spawn_n(rescan, configmanager)
         return [msg.KeyValueData({'rescan': 'started'})]
     raise exc.NotImplementedException(

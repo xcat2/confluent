@@ -220,7 +220,8 @@ group_info = {
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if operation == 'retrieve':
         return handle_read_api_request(pathcomponents)
-    elif operation in ('update', 'create') and pathcomponents[-1] == 'rescan':
+    elif (operation in ('update', 'create') and
+            pathcomponents == ['discovery', 'rescan']):
         rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
     raise exc.NotImplementedException(
