@@ -320,6 +320,8 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         return handle_read_api_request(pathcomponents)
     if (operation in ('update', 'create') and
             pathcomponents == ['networking', 'macs', 'rescan']):
+        if inputdata != {'rescan': 'start'}:
+            raise exc.InvalidArgumentException()
         eventlet.spawn_n(rescan, configmanager)
         return [msg.KeyValueData({'rescan': 'started'})]
     raise exc.NotImplementedException(
