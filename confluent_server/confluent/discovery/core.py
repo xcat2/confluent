@@ -218,12 +218,24 @@ group_info = {
 
 
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+    if operation == 'retrieve':
+        return handle_read_api_request(pathcomponents)
+    elif operation in ('update', 'create') and pathcomponents[-1] == 'rescan':
+        rescan()
+        return (msg.KeyValueData({'rescan': 'started'}),)
+    raise exc.NotImplementedException(
+        'Unable to {0} to {1}'.format(operation, '/'.join(pathcomponents)))
+
+def handle_read_api_request(pathcomponents):
     if len(pathcomponents) == 1:
-        return [msg.ChildCollection(x + '/') for x in category_info]
+        dirlist = [msg.ChildCollection(x + '/') for x in category_info]
+        dirlist.append(msg.ChildCollection('rescan'))
+        return dirlist
     elif len(pathcomponents) == 2:
         category = pathcomponents[1]
         if category not in category_info:
-            raise exc.NotFoundException(category + ' not a valid discovery category')
+            raise exc.NotFoundException(
+                category + ' not a valid discovery category')
         return category_info[category]()
     elif len(pathcomponents) == 3:
         if pathcomponents[1] in group_info:
@@ -662,6 +674,10 @@ def _periodic_recheck(configmanager):
     if rechecker is None:
         rechecker = eventlet.spawn_after(900, _periodic_recheck,
                                          configmanager)
+
+
+def rescan():
+    eventlet.spawn_n(slp.active_scan, safe_detected)
 
 
 def start_detection():

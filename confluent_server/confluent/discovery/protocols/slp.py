@@ -376,17 +376,7 @@ def snoop(handler):
     :param handler:
     :return:
     """
-    known_peers = set([])
-    for scanned in scan():
-        for addr in scanned['addresses']:
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            if ip not in neighutil.neightable:
-                continue
-            if addr in known_peers:
-                break
-            known_peers.add(addr)
-        else:
-            handler(scanned)
+    active_scan(handler)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
@@ -456,6 +446,20 @@ def snoop(handler):
             _add_attributes(peerbymacaddress[mac])
             peerbymacaddress[mac]['hwaddr'] = mac
             handler(peerbymacaddress[mac])
+
+
+def active_scan(handler):
+    known_peers = set([])
+    for scanned in scan():
+        for addr in scanned['addresses']:
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            if ip not in neighutil.neightable:
+                continue
+            if addr in known_peers:
+                break
+            known_peers.add(addr)
+        else:
+            handler(scanned)
 
 
 def scan(srvtypes=_slp_services, addresses=None):
