@@ -79,6 +79,12 @@ import traceback
 import eventlet
 import eventlet.semaphore
 
+class nesteddict(dict):
+
+    def __missing__(self, key):
+        v = self[key] = nesteddict()
+        return v
+
 nodehandlers = {
     'service:lenovo-smm': smm,
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
@@ -130,7 +136,7 @@ servicebyname = {
 known_info = {}
 known_services = set([])
 known_serials = {}
-known_nodes = {}
+known_nodes = nesteddict()
 unknown_info = {}
 pending_nodes = {}
 
@@ -149,72 +155,112 @@ def send_discovery_datum(info):
     yield msg.KeyValueData({'types': types})
 
 
-def enumerate_by_serial(model=None, infotype=None, ident=None):
-    if ident is not None:
-        if ident not in known_serials:
-            raise exc.NotFoundException('Have not detected serial number ' +
-                                        ident)
-        for i in send_discovery_datum(known_serials[ident]):
-            yield i
-        return
-    infotype = servicebyname.get(infotype, None)
-    for info in known_info:
-        info = known_info[info]
-        if 'serialnumber' not in info:
-            continue
-        if model and info.get('modelnumber', None) != model:
-            continue
-        if infotype and infotype not in info['services']:
-            continue
-        yield msg.ChildCollection(info['serialnumber'])
+def _info_matches(info, criteria):
+    model = criteria.get('by-model', None)
+    devtype = criteria.get('by-type', None)
+    node = criteria.get('by-node', None)
+    serial = criteria.get('by-serial', None)
+    if model and info.get('modelnumber', None) != model:
+        return False
+    if devtype and devtype not in info.get('services', []):
+            return False
+    if node and info.get('nodename', None) != node:
+        return False
+    if serial and info.get('serialnumber', None) != serial:
+        return False
+    return True
 
 
-def enumerate_by_mac(model=None, infotype=None, ident=None):
-    if ident is not None:
-        mac = ident.replace('-', ':')
-        if mac not in known_info:
-            raise exc.NotFoundException(mac + ' not a known mac address')
-        for i in send_discovery_datum(known_info[mac]):
-            yield i
-        return
-    infotype = servicebyname.get(infotype, None)
+def list_matching_nodes(criteria):
+    for node in known_nodes:
+        for mac in known_nodes[node]:
+            info = known_info[mac]
+            if _info_matches(info, criteria):
+                yield msg.ChildCollection(node + '/')
+                break
+
+
+def list_matching_serials(criteria):
+    for serial in known_serials:
+        info = known_serials[serial]
+        if _info_matches(info, criteria):
+            yield msg.ChildCollection(serial + '/')
+
+
+def list_matching_macs(criteria):
     for mac in known_info:
         info = known_info[mac]
-        if 'hwaddr' not in info:
-            continue
-        if model and info.get('modelnumber', None) != model:
-            continue
-        if infotype and infotype not in info['services']:
-            continue
-        yield msg.ChildCollection(mac.replace(':', '-'))
+        if _info_matches(info, criteria):
+            yield msg.ChildCollection(mac.replace(':', '-'))
 
 
-def enumerate_types():
+def list_matching_types(criteria):
     for infotype in detected_services():
         yield msg.ChildCollection(infotype + '/')
 
 
-def enumerate_models():
+def list_matching_models(criteria):
     for model in detected_models():
         yield msg.ChildCollection(model + '/')
 
 
-disco_info = {
-    'by-serial': enumerate_by_serial,
-    'by-mac': enumerate_by_mac,
+def show_info(mac):
+    mac = mac.replace('-', ':')
+    if mac not in known_info:
+        raise exc.NotFoundException(mac + ' not a known mac address')
+    for i in send_discovery_datum(known_info[mac]):
+        yield i
+
+
+list_info = {
+    'by-node': list_matching_nodes,
+    'by-serial': list_matching_serials,
+    'by-type': list_matching_types,
+    'by-model': list_matching_models,
+    'by-mac': list_matching_macs,
 }
 
-category_info = {
-    'by-serial': enumerate_by_serial,
-    'by-mac': enumerate_by_mac,
-    'by-type': enumerate_types,
-    'by-model': enumerate_models,
-}
+multi_selectors = set([
+    'by-type',
+    'by-model',
+])
 
-group_info = {
-    'by-type': disco_info,
-    'by-model': disco_info,
-}
+
+node_selectors = set([
+    'by-node',
+    #'by-uuid',
+    'by-serial',
+])
+
+
+single_selectors = set([
+    'by-mac',
+])
+
+
+def _parameterize_path(pathcomponents):
+    listrequested = False
+    childcoll = True
+    if len(pathcomponents) % 2 == 1:
+        listrequested = pathcomponents[-1]
+        pathcomponents = pathcomponents[:-1]
+    pathit = iter(pathcomponents)
+    keyparams = {}
+    validselectors = multi_selectors | node_selectors | single_selectors
+    for key, val in zip(pathit, pathit):
+        if key not in validselectors:
+            raise exc.NotFoundException('{0} is not valid here'.format(key))
+        if key == 'by-type':
+            keyparams[key] = servicebyname.get(val, None)
+        else:
+            keyparams[key] = val
+        validselectors.discard(key)
+        if key in single_selectors:
+            childcoll = False
+            validselectors = set([])
+        elif key in node_selectors:
+            validselectors = single_selectors | set([])
+    return validselectors, keyparams, listrequested, childcoll
 
 
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
@@ -229,62 +275,28 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     raise exc.NotImplementedException(
         'Unable to {0} to {1}'.format(operation, '/'.join(pathcomponents)))
 
+
 def handle_read_api_request(pathcomponents):
+    # TODO(jjohnson2): This should be more generalized...
+    #  odd indexes into components are 'by-'*, even indexes
+    # starting at 2 are parameters to previous index
+    subcats, queryparms, indexof, coll = _parameterize_path(pathcomponents[1:])
     if len(pathcomponents) == 1:
-        dirlist = [msg.ChildCollection(x + '/') for x in category_info]
+        dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
         dirlist.append(msg.ChildCollection('rescan'))
         return dirlist
-    elif len(pathcomponents) == 2:
-        category = pathcomponents[1]
-        if category not in category_info:
-            raise exc.NotFoundException(
-                category + ' not a valid discovery category')
-        return category_info[category]()
-    elif len(pathcomponents) == 3:
-        if pathcomponents[1] in group_info:
-            return [ msg.ChildCollection(x + '/') for x in disco_info ]
-        elif pathcomponents[1] in disco_info:
-            return disco_info[pathcomponents[1]](ident=pathcomponents[2])
-    elif len(pathcomponents) == 4:
-        if pathcomponents[1] == 'by-model':
-            if pathcomponents[3] not in disco_info:
-                raise exc.NotFoundException()
-            return disco_info[pathcomponents[3]](model=pathcomponents[2])
-        elif pathcomponents[1] == 'by-type':
-            if pathcomponents[3] not in disco_info:
-                raise exc.NotFoundException()
-            return disco_info[pathcomponents[3]](infotype=pathcomponents[2])
-    elif len(pathcomponents) == 5:
-        ident = pathcomponents[-1]
-        identtype = pathcomponents[-2]
-        if identtype not in disco_info:
-            raise exc.NotFoundException(
-                identtype + ' not a valid selector')
-        return disco_info[identtype](ident=ident)
-    raise exc.NotFoundException()
+    if not coll:
+        return show_info(queryparms['by-mac'])
+    if not indexof:
+        return [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
+    if indexof not in list_info:
+        raise exc.NotFoundException('{0} is not found'.format(indexof))
+    return list_info[indexof](queryparms)
 
 
 def detected_services():
     for srv in known_services:
         yield servicenames[srv]
-
-
-def info_by_service(service):
-    service = servicebyname[service]
-    for mac in known_info:
-        info = known_info[mac]
-        if srv in info['services']:
-            if srv == service:
-                yield info
-                break
-
-
-def detected_serials():
-    return iter(known_serials)
-
-
-def info_by_serial(serial):
-    return known_serials.get(serial, None)
 
 
 def detected_models():
@@ -296,13 +308,6 @@ def detected_models():
             yield info['modelnumber']
 
 
-def info_by_model(model):
-    for info in known_info:
-        info = known_info[info]
-        if 'modelnumber' in info and info['modelnumber'] == model:
-            yield info
-
-
 def _recheck_nodes(nodeattribs, configmanager):
     global rechecker
     _map_unique_ids(nodeattribs)
@@ -310,7 +315,8 @@ def _recheck_nodes(nodeattribs, configmanager):
     # strangers
     for node in nodeattribs:
         if node in known_nodes:
-            unknown_info[known_nodes[node]['hwaddr']] = known_nodes[node]
+            for somemac in known_nodes[node]:
+                unknown_info[somemac] = known_nodes[node]
     # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
         try:
@@ -455,14 +461,14 @@ def detected(info):
         # influence periodic recheck to shorten delay?
         return
     nodename = get_nodename(cfg, handler, info)
-    if nodename:
+    if nodename and handler.https_supported:
         dp = cfg.get_node_attributes([nodename],
                                      ('pubkeys.tls_hardwaremanager',))
         lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                           {}).get('value', None)
         if util.cert_matches(lastfp, handler.https_cert):
             info['nodename'] = nodename
-            known_nodes[nodename] = info
+            known_nodes[nodename][info['hwaddr']] = info
             return  # already known, no need for more
     #TODO(jjohnson2): We might have to get UUID for certain searches...
     #for now defer probe until inside eval_node.  We might not have
@@ -593,12 +599,16 @@ def discover_node(cfg, handler, info, nodename):
             if info['uuid'] in known_pxe_uuids:
                 return True
             uuidinfo = cfg.get_node_attributes(nodename, 'id.uuid')
-            olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
-            known_pxe_uuids.add(info['uuid'])
-            if 'uuid' in info and info['uuid'] != olduuid:
-                cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
-            log.log({'info': 'Discovered {0} ({1})'.format(nodename,
-                                                           handler.devname)})
+            known_pxe_uuids[info['uuid']] = nodename
+            # TODO(jjohnson2):  This is messing with the attrib database
+            # so it should only be possible if policy is 'open'
+            #
+            # olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
+            #if 'uuid' in info and info['uuid'] != olduuid:
+            #    cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
+            log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
+                nodename, handler.devname, info['hwaddr'])})
+            known_nodes[nodename][info['hwaddr']] = info
             return True
         elif not util.cert_matches(lastfp, handler.https_cert):
             # only 'discover' if it is not the same as last time
@@ -615,7 +625,7 @@ def discover_node(cfg, handler, info, nodename):
                 cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1}'.format(nodename,
                                                           handler.devname)})
-        known_nodes[nodename] = info
+        known_nodes[nodename][info['hwaddr']] = info
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                      'value allowing discovery (open or permissive)'.format(
@@ -680,6 +690,7 @@ def _periodic_recheck(configmanager):
 
 
 def rescan():
+    _map_unique_ids()
     eventlet.spawn_n(slp.active_scan, safe_detected)
 
 
@@ -705,9 +716,13 @@ def start_detection():
 
 nodes_by_fprint = {}
 nodes_by_uuid = {}
-known_pxe_uuids = set([])
+known_pxe_uuids = {}
 
 def _map_unique_ids(nodes=None):
+    global nodes_by_uuid
+    global nodes_by_fprint
+    nodes_by_uuid = {}
+    nodes_by_fprint = {}
     # Map current known ids based on uuid and fingperprints for fast lookup
     cfg = cfm.ConfigManager(None)
     if nodes is None:
@@ -737,6 +752,9 @@ def _map_unique_ids(nodes=None):
             'pubkeys.tls_hardwaremanager', {}).get('value', None)
         if fprint:
             nodes_by_fprint[fprint] = node
+    for uuid in known_pxe_uuids:
+        if uuid not in nodes_by_uuid:
+            nodes_by_uuid[uuid] = known_pxe_uuids[uuid]
 
 
 if __name__ == '__main__':
