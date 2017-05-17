@@ -134,7 +134,7 @@ servicebyname = {
 
 #TODO: by serial, by uuid, by node
 known_info = {}
-known_services = set([])
+known_services = {}
 known_serials = {}
 known_nodes = nesteddict()
 unknown_info = {}
@@ -195,13 +195,19 @@ def list_matching_macs(criteria):
 
 
 def list_matching_types(criteria):
-    for infotype in detected_services():
-        yield msg.ChildCollection(infotype + '/')
+    for infotype in known_services:
+        typename = servicenames[infotype]
+        fakeinfo = {'modelnumber': known_services[infotype]}
+        if ('by-model' not in criteria or
+                criteria['by-model'] in known_services[infotype]):
+            yield msg.ChildCollection(typename + '/')
 
 
 def list_matching_models(criteria):
     for model in detected_models():
-        yield msg.ChildCollection(model + '/')
+        if ('by-type' not in criteria or
+                model in known_services[criteria['by-type']]):
+            yield msg.ChildCollection(model + '/')
 
 
 def show_info(mac):
@@ -391,7 +397,8 @@ def detected(info):
     # later, manual and CMM discovery may act on SN and/or UUID
     for service in info['services']:
         if nodehandlers.get(service, None):
-            known_services.add(service)
+            if service not in known_services:
+                known_services[service] = set([])
             handler = nodehandlers[service]
             info['handler'] = handler
             break
@@ -406,6 +413,7 @@ def detected(info):
         pass
     try:
         info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
+        known_services[service].add(info['modelnumber'])
     except (KeyError, IndexError):
         pass
     if info['hwaddr'] in known_info and 'addresses' in info:
