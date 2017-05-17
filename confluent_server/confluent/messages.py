@@ -194,6 +194,17 @@ class ConfluentNodeError(object):
         raise Exception(self.error)
 
 
+class ConfluentResourceUnavailable(ConfluentNodeError):
+    apicode = 503
+
+    def __init__(self, node, errstr='Unavailable'):
+        self.node = node
+        self.error = errstr
+
+    def strip_node(self, node):
+        raise exc.TargetResourceUnavailable()
+
+
 class ConfluentTargetTimeout(ConfluentNodeError):
     apicode = 504
 

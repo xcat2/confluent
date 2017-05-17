@@ -53,6 +53,15 @@ sensor_categories = {
 }
 
 
+class EmptySensor(object):
+    def __init__(self, name):
+        self.name = name
+        self.value = None
+        self.states = ['Unavailable']
+        self.units = None
+        self.health = 'ok'
+
+
 def hex2bin(hexstring):
     hexvals = hexstring.split(':')
     if len(hexvals) < 2:
@@ -599,29 +608,31 @@ class IpmiHandler(object):
             self.sensormap[simplify_name(resourcename)] = resourcename
 
     def read_sensors(self, sensorname):
-        try:
-            if sensorname == 'all':
-                sensors = self.ipmicmd.get_sensor_descriptions()
-                readings = []
-                for sensor in filter(self.match_sensor, sensors):
-                    try:
-                        reading = self.ipmicmd.get_sensor_reading(
-                            sensor['name'])
-                    except pygexc.IpmiException as ie:
-                        if ie.ipmicode == 203:
-                            continue
-                        raise
-                    if hasattr(reading, 'health'):
-                        reading.health = _str_health(reading.health)
-                    readings.append(reading)
-                self.output.put(msg.SensorReadings(readings, name=self.node))
-            else:
-                self.make_sensor_map()
-                if sensorname not in self.sensormap:
-                    self.output.put(
-                        msg.ConfluentTargetNotFound(self.node,
-                                                    'Sensor not found'))
-                    return
+        if sensorname == 'all':
+            sensors = self.ipmicmd.get_sensor_descriptions()
+            readings = []
+            for sensor in filter(self.match_sensor, sensors):
+                try:
+                    reading = self.ipmicmd.get_sensor_reading(
+                        sensor['name'])
+                except pygexc.IpmiException as ie:
+                    if ie.ipmicode == 203:
+                        self.output.put(msg.SensorReadings([EmptySensor(
+                            sensor['name'])], name=self.node))
+                        continue
+                    raise
+                if hasattr(reading, 'health'):
+                    reading.health = _str_health(reading.health)
+                readings.append(reading)
+            self.output.put(msg.SensorReadings(readings, name=self.node))
+        else:
+            self.make_sensor_map()
+            if sensorname not in self.sensormap:
+                self.output.put(
+                    msg.ConfluentTargetNotFound(self.node,
+                                                'Sensor not found'))
+                return
+            try:
                 reading = self.ipmicmd.get_sensor_reading(
                     self.sensormap[sensorname])
                 if hasattr(reading, 'health'):
@@ -629,8 +640,13 @@ class IpmiHandler(object):
                 self.output.put(
                     msg.SensorReadings([reading],
                                        name=self.node))
-        except pygexc.IpmiException:
-            self.output.put(msg.ConfluentTargetTimeout(self.node))
+            except pygexc.IpmiException as ie:
+                if ie.ipmicode == 203:
+                    self.output.put(msg.ConfluentResourceUnavailable(
+                        self.node, 'Unavailable'
+                    ))
+                else:
+                    self.output.put(msg.ConfluentTargetTimeout(self.node))
 
     def list_inventory(self):
         try:

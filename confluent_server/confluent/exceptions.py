@@ -81,6 +81,12 @@ class GlobalConfigError(ConfluentException):
     apierrorstr = 'Global configuration contains an error'
 
 
+class TargetResourceUnavailable(ConfluentException):
+    # This is meant for scenarios like asking to read a sensor that is
+    # currently unavailable.  This may be a persistent or transient state
+    apierrocode = 503
+    apierrorstr = 'Target Resource Unavailable'
+
 class PubkeyInvalid(ConfluentException):
     apierrorcode = 502
     apierrorstr = '502 - Invalid certificate or key on target'
