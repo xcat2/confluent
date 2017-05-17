@@ -4,7 +4,7 @@ nodelist(8) -- List confluent nodes and their attributes
 ## SYNOPSIS
 
 `nodelist <noderange>`  
-`nodelist <noderange> [-b] [<nodeattribute>...]`  
+`nodelist <noderange> [-b] <nodeattribute>...`  
 
 ## DESCRIPTION
 
