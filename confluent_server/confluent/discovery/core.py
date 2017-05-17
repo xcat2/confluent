@@ -278,6 +278,20 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             raise exc.InvalidArgumentException()
         rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
+    elif (operation in ('update', 'create')):
+        if 'node' not in inputdata:
+            raise exc.InvalidArgumentException('Missing node name in input')
+        _, queryparms, _, _ = _parameterize_path(pathcomponents[1:])
+        if 'by-mac' not in queryparms:
+            raise exc.InvalidArgumentException('Must target using "by-mac"')
+        mac = queryparms['by-mac'].replace('-', ':')
+        if mac not in known_info:
+            raise exc.NotFoundException('{0} not found'.format(mac))
+        info = known_info[mac]
+        handler = info['handler'].NodeHandler(info, configmanager)
+        eval_node(configmanager, handler, info, inputdata['node'],
+                  manual=True)
+        return [msg.AssignedResource(inputdata['node'])]
     raise exc.NotImplementedException(
         'Unable to {0} to {1}'.format(operation, '/'.join(pathcomponents)))
 
@@ -511,7 +525,7 @@ def get_nodename(cfg, handler, info):
     return nodename
 
 
-def eval_node(cfg, handler, info, nodename):
+def eval_node(cfg, handler, info, nodename, manual=False):
     try:
         handler.probe()  # unicast interrogation as possible to get more data
         # for now, we search switch only, ideally we search cmm, smm, and
@@ -520,12 +534,14 @@ def eval_node(cfg, handler, info, nodename):
         handler.preconfig()
     except Exception as e:
         unknown_info[info['hwaddr']] = info
-        log.log({'error': 'An error occured during discovery, check the '
-                          'trace and stderr logs, mac was {0} and ip was {1}'
-                          ', the node or the containing enclosure was {2}'
-                          ''.format(info['hwaddr'], handler.ipaddr,
-                                    nodename)})
+        errorstr = 'An error occured during discovery, check the ' \
+                   'trace and stderr logs, mac was {0} and ip was {1}' \
+                   ', the node or the containing enclosure was {2}' \
+                   ''.format(info['hwaddr'], handler.ipaddr, nodename)
         traceback.print_exc()
+        if manual:
+            raise exc.InvalidArgumentException(errorstr)
+        log.log({'error': errorstr})
         return
     # first, if had a bay, it was in an enclosure.  If it was discovered by
     # switch, it is probably the enclosure manager and not
@@ -534,6 +550,8 @@ def eval_node(cfg, handler, info, nodename):
         unknown_info[info['hwaddr']] = info
         log.log({'error': 'Something that is an enclosure reported a bay, '
                           'not possible'})
+        if manual:
+            raise exc.InvalidArgumentException()
         return
     nl = list(cfg.filter_node_attributes('enclosure.manager=' + nodename))
     if not handler.is_enclosure and nl:
@@ -541,10 +559,13 @@ def eval_node(cfg, handler, info, nodename):
         # what we are talking to is *not* an enclosure
         if 'enclosure.bay' not in info:
             unknown_info[info['hwaddr']] = info
-            log.log({'error': '{2} with mac {0} is in {1}, but unable to '
-                              'determine bay number'.format(info['hwaddr'],
-                                                            nodename,
-                                                            handler.ipaddr)})
+            errorstr = '{2} with mac {0} is in {1}, but unable to ' \
+                       'determine bay number'.format(info['hwaddr'],
+                                                     nodename,
+                                                     handler.ipaddr)
+            if manual:
+                raise exc.InvalidArgumentException(errorstr)
+            log.log({'error': errorstr})
             return
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
@@ -554,29 +575,33 @@ def eval_node(cfg, handler, info, nodename):
         if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
             if len(nl):
-                log.log({'error': 'The following nodes have duplicate '
-                                  'enclosure attributes: ' + ','.join(nl)})
+                errorstr = 'The following nodes have duplicate ' \
+                           'enclosure attributes: ' + ','.join(nl)
+
             else:
-                log.log({'error': 'The {0} in enclosure {1} bay {2} does not '
-                                  'seem to be a defined node ({3})'.format(
+                errorstr = 'The {0} in enclosure {1} bay {2} does not ' \
+                           'seem to be a defined node ({3})'.format(
                                         handler.devname, nodename,
                                         info['enclosure.bay'],
                                         handler.ipaddr,
-                                    )})
+                                    )
+            if manual:
+                raise exc.InvalidArgumentException(errorstr)
+            log.log({'error': errorstr})
             unknown_info[info['hwaddr']] = info
             return
         nodename = nl[0]
-        if not discover_node(cfg, handler, info, nodename):
+        if not discover_node(cfg, handler, info, nodename, manual):
             # store it as pending, assuming blocked on enclosure
             # assurance...
             pending_nodes[nodename] = info
     else:
         # we can and did accurately discover by switch or in enclosure
-        if not discover_node(cfg, handler, info, nodename):
+        if not discover_node(cfg, handler, info, nodename, manual):
             pending_nodes[nodename] = info
 
 
-def discover_node(cfg, handler, info, nodename):
+def discover_node(cfg, handler, info, nodename, manual):
     if info['hwaddr'] in unknown_info:
         del unknown_info[info['hwaddr']]
     dp = cfg.get_node_attributes(
@@ -590,7 +615,8 @@ def discover_node(cfg, handler, info, nodename):
     # the pubkeys, which is deferred for a little bit
     # Also, 'secure', when we have the needed infrastructure done
     # in some product or another.
-    if policy == 'permissive' and handler.https_supported and lastfp:
+    if (policy == 'permissive' and handler.https_supported and lastfp and
+            not manual):
         info['discofailure'] = 'fingerprint'
         log.log({'info': 'Detected replacement of {0} with existing '
                          'fingerprint and permissive discovery policy, not '
@@ -598,7 +624,7 @@ def discover_node(cfg, handler, info, nodename):
                          'pubkeys.tls_hardwaremanager attribute is cleared '
                          'first'.format(nodename)})
         return False  # With a permissive policy, do not discover new
-    elif policy in ('open', 'permissive'):
+    elif policy in ('open', 'permissive') or manual:
         info['nodename'] = nodename
         if not handler.https_supported:
             # use uuid based scheme in lieu of tls cert, ideally only
@@ -611,9 +637,11 @@ def discover_node(cfg, handler, info, nodename):
             # TODO(jjohnson2):  This is messing with the attrib database
             # so it should only be possible if policy is 'open'
             #
-            # olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
-            #if 'uuid' in info and info['uuid'] != olduuid:
-            #    cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
+            if manual or policy == 'open':
+                olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
+                if 'uuid' in info and info['uuid'] != olduuid:
+                    cfg.set_node_attributes(
+                        {nodename: {'id.uuid': info['uuid']}})
             log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
                 nodename, handler.devname, info['hwaddr'])})
             known_nodes[nodename][info['hwaddr']] = info

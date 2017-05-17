@@ -248,6 +248,11 @@ class CreatedResource(ConfluentMessage):
     def __init__(self, resource):
         self.kvpairs = {'created': resource}
 
+class AssignedResource(ConfluentMessage):
+    notnode = True
+    def __init__(self, resource):
+        self.kvpairs = {'assigned': resource}
+
 class ConfluentChoiceMessage(ConfluentMessage):
     valid_values = set()
     valid_paramset = {}
