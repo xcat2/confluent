@@ -248,9 +248,9 @@ def find_node_by_mac(mac, configmanager):
     now = util.monotonic_time()
     if vintage and now - vintage < 90 and mac in _nodesbymac:
         return _nodesbymac[mac]
-    # do not actually sweep switches more than once every 10 seconds
+    # do not actually sweep switches more than once every 30 seconds
     # however, if there is an update in progress, wait on it
-    for _ in update_macmap(configmanager, vintage and now - vintage < 10):
+    for _ in update_macmap(configmanager, vintage and now - vintage < 30):
         if mac in _nodesbymac:
             return _nodesbymac[mac]
     # If update_mac bailed out, still check one last time
@@ -271,7 +271,6 @@ def update_macmap(configmanager, impatient=False):
     global _macmap
     global _nodesbymac
     global _switchportmap
-    global vintage
     if mapupdating.locked():
         while mapupdating.locked():
             eventlet.sleep(1)
@@ -279,6 +278,22 @@ def update_macmap(configmanager, impatient=False):
         return
     if impatient:
         return
+    completions = _full_updatemacmap(configmanager)
+    for completion in completions:
+        try:
+            yield completion
+        except GeneratorExit:
+            # the calling function has stopped caring, but we want to finish
+            # the sweep, background it
+            eventlet.spawn_n(_finish_update, completions)
+            raise
+
+def _finish_update(completions):
+    for _ in completions:
+        pass
+
+def _full_updatemacmap(configmanager):
+    global vintage
     with mapupdating:
         vintage = util.monotonic_time()
         # Clear all existing entries
