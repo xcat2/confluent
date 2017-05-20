@@ -351,11 +351,13 @@ def _full_updatemacmap(configmanager):
 
 def _dump_locations(info, macaddr, nodename=None):
     yield msg.KeyValueData({'possiblenode': nodename, 'mac': macaddr})
-    retdata = {'ports': []}
-    portinfo = retdata['ports']
+    retdata = {}
+    portinfo = []
     for location in info:
         portinfo.append({'switch': location[0],
                               'port': location[1], 'macsonport': location[2]})
+    retdata['ports'] = sorted(portinfo, key=lambda x: x['macsonport'],
+                              reverse=True)
     yield msg.KeyValueData(retdata)
 
 
