@@ -377,23 +377,24 @@ def handle_read_api_request(pathcomponents):
     if len(pathcomponents) == 1:
         return [msg.ChildCollection('macs/')]
     elif len(pathcomponents) == 2:
-        return [msg.ChildCollection(x) for x in ('node-by-mac/',
-                                                 'ports-by-mac/', 'switches/',
+        return [msg.ChildCollection(x) for x in (# 'by-node/',
+                                                 'by-mac/', 'by-switch/',
                                                  'rescan')]
-    if pathcomponents[2] == 'node-by-mac':
+    if False and pathcomponents[2] == 'by-node':
+        # TODO: should be list of node names, and then under that 'by-mac'
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x.replace(':', '-'))
                     for x in sorted(list(_nodesbymac))]
         elif len(pathcomponents) == 4:
             macaddr = pathcomponents[-1].replace('-', ':')
             return dump_macinfo(macaddr)
-    elif pathcomponents[2] == 'ports-by-mac':
+    elif pathcomponents[2] == 'by-mac':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x.replace(':', '-'))
                     for x in sorted(list(_macmap))]
         elif len(pathcomponents) == 4:
             return dump_macinfo(pathcomponents[-1])
-    elif pathcomponents[2] == 'switches':
+    elif pathcomponents[2] == 'by-switch':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x + '/')
                     for x in sorted(list(_macsbyswitch))]
