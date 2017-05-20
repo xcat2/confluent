@@ -161,7 +161,15 @@ def _map_switch_backend(args):
         )
         mactobridge[macaddr] = int(bridgeport)
     if not haveqbridge:
-        raise exc.NotImplementedException('TODO: Bridge-MIB without QBRIDGE')
+        for vb in conn.walk('1.3.6.1.2.1.17.4.3.1.2'):
+            oid, bridgeport = vb
+            if not bridgeport:
+                continue
+            oid = str(oid).rsplit('.', 6)
+            macaddr = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'.format(
+                *([int(x) for x in oid[-6:]])
+            )
+            mactobridge[macaddr] = int(bridgeport)
     bridgetoifmap = {}
     for vb in conn.walk('1.3.6.1.2.1.17.1.4.1.2'):
         bridgeport, ifidx = vb
@@ -182,12 +190,33 @@ def _map_switch_backend(args):
             ifidx = int(str(ifidx).rsplit('.', 1)[1])
             ifnamemap[ifidx] = str(ifname)
     maccounts = {}
+    bridgetoifvalid = False
     for mac in mactobridge:
-        ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+        try:
+            ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+            bridgetoifvalid = True
+        except KeyError:
+            continue
         if ifname not in maccounts:
             maccounts[ifname] = 1
         else:
             maccounts[ifname] += 1
+    if not bridgetoifvalid:
+        bridgetoifmap = {}
+    # Not a single mac address resolved to an interface index, chances are
+    # that the switch is broken, and the mactobridge is reporting ifidx
+    # instead of bridge port index
+    # try again, skipping the bridgetoifmap lookup
+        for mac in mactobridge:
+            try:
+                ifname = ifnamemap[mactobridge[mac]]
+                bridgetoifmap[mactobridge[mac]] = mactobridge[mac]
+            except KeyError:
+                continue
+            if ifname not in maccounts:
+                maccounts[ifname] = 1
+            else:
+                maccounts[ifname] += 1
     _macsbyswitch[switch] = {}
     for mac in mactobridge:
         # We want to merge it so that when a mac appears in multiple
