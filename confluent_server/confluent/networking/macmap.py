@@ -268,9 +268,6 @@ def update_macmap(configmanager, impatient=False):
     recheck the cache as results become possible, rather
     than having to wait for the process to complete to interrogate.
     """
-    global _macmap
-    global _nodesbymac
-    global _switchportmap
     if mapupdating.locked():
         while mapupdating.locked():
             eventlet.sleep(1)
@@ -294,6 +291,9 @@ def _finish_update(completions):
 
 def _full_updatemacmap(configmanager):
     global vintage
+    global _macmap
+    global _nodesbymac
+    global _switchportmap
     with mapupdating:
         vintage = util.monotonic_time()
         # Clear all existing entries
