@@ -374,6 +374,8 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
 
 
 def handle_read_api_request(pathcomponents):
+    # TODO(jjohnson2): discovery core.py api handler design, apply it here
+    # to make this a less tangled mess as it gets extended
     if len(pathcomponents) == 1:
         return [msg.ChildCollection('macs/')]
     elif len(pathcomponents) == 2:
@@ -409,8 +411,10 @@ def handle_read_api_request(pathcomponents):
             return [msg.ChildCollection(x.replace('/', '-') + '/')
                     for x in sorted(list(_macsbyswitch[switchname]))]
         if len(pathcomponents) == 6:
-            switchname = pathcomponents[-3]
-            portname = pathcomponents[-1]
+            return [msg.ChildCollection('by-mac/')]
+        if len(pathcomponents) == 7:
+            switchname = pathcomponents[-4]
+            portname = pathcomponents[-2]
             try:
                 if portname not in _macsbyswitch[switchname]:
                     portname = portname.replace('-', '/')
@@ -421,7 +425,7 @@ def handle_read_api_request(pathcomponents):
                                                               portname))
             return [msg.ChildCollection(x.replace(':', '-'))
                     for x in sorted(maclist)]
-        if len(pathcomponents) == 7:
+        if len(pathcomponents) == 8:
             return dump_macinfo(pathcomponents[-1])
     raise exc.NotFoundException('Unrecognized path {0}'.format(
         '/'.join(pathcomponents)))
