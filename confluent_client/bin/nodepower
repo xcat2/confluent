@@ -43,6 +43,9 @@ if len(sys.argv) > 2:
     elif not sys.argv[2] in ('stat', 'state', 'status'):
         setstate = sys.argv[2]
 
+if setstate not in (None, 'on', 'off', 'shutdown', 'boot', 'reset'):
+    argparser.print_help()
+    sys.exit(1)
 session = client.Command()
 exitcode = 0
 session.add_precede_key('oldstate')
