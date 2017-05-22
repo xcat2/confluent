@@ -370,7 +370,7 @@ class IpmiHandler(object):
                     ipmisess.wait_for_rsp(180)
                 if not (self.broken or self.loggedin):
                     raise exc.TargetEndpointUnreachable(
-                        "Login process to " + bmc + " died")
+                        "Login process to " + connparams['bmc'] + " died")
             except socket.gaierror as ge:
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])
