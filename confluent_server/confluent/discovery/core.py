@@ -336,7 +336,7 @@ def _recheck_nodes(nodeattribs, configmanager):
     for node in nodeattribs:
         if node in known_nodes:
             for somemac in known_nodes[node]:
-                unknown_info[somemac] = known_nodes[node]
+                unknown_info[somemac] = known_nodes[node][somemac]
     # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
         try:
