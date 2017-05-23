@@ -648,9 +648,16 @@ def discover_node(cfg, handler, info, nodename, manual):
             return True
         elif not util.cert_matches(lastfp, handler.https_cert):
             # only 'discover' if it is not the same as last time
-            if info['hwaddr'] in unknown_info:
-                del unknown_info[info['hwaddr']]
-            handler.config(nodename)
+            try:
+                handler.config(nodename)
+            except Exception as e:
+                info['discofailure'] = 'bug'
+                log.log(
+                    {'error':
+                         'Error encountered trying to set up {0}, {1}'.format(
+                             nodename, str(e))})
+                traceback.print_exc()
+                return False
             newnodeattribs = {}
             if 'uuid' in info:
                 newnodeattribs['id.uuid'] = info['uuid']
