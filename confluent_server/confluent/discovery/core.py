@@ -602,6 +602,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
 
 
 def discover_node(cfg, handler, info, nodename, manual):
+    known_nodes[nodename][info['hwaddr']] = info
     if info['hwaddr'] in unknown_info:
         del unknown_info[info['hwaddr']]
     dp = cfg.get_node_attributes(
@@ -644,7 +645,6 @@ def discover_node(cfg, handler, info, nodename, manual):
                         {nodename: {'id.uuid': info['uuid']}})
             log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
                 nodename, handler.devname, info['hwaddr'])})
-            known_nodes[nodename][info['hwaddr']] = info
             return True
         elif not util.cert_matches(lastfp, handler.https_cert):
             # only 'discover' if it is not the same as last time
@@ -661,7 +661,6 @@ def discover_node(cfg, handler, info, nodename, manual):
                 cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1}'.format(nodename,
                                                           handler.devname)})
-        known_nodes[nodename][info['hwaddr']] = info
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                      'value allowing discovery (open or permissive)'.format(
