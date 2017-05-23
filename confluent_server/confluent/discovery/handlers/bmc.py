@@ -132,9 +132,22 @@ class NodeHandler(generic.NodeHandler):
         for uid in currusers:
             if uid != newuserslot:
                 if uid <= lockedusers:  # we cannot delete, settle for disable
-                    ic.disable_user(uid)
+                    ic.disable_user(uid, 'disable')
                 else:
-                    ic.user_delete(uid)
+                    # lead with the most critical thing, removing user access
+                    ic.set_user_access(uid, channel=None, callback=False,
+                                       link_auth=False, ipmi_msg=False,
+                                       privilege_level='no_access')
+                    # next, try to disable the password
+                    ic.set_user_password(uid, mode='disable', password=None)
+                    # ok, now we can be less paranoid
+                    try:
+                        ic.user_delete(uid)
+                    except pygexc.IpmiException as ie:
+                        if ie.ipmicode != 0xd5:  # some response to the 0xff
+                            # name...
+                            # the user will remain, but that is life
+                            raise
         if reset:
             ic.reset_bmc()
         return
