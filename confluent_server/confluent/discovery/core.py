@@ -666,7 +666,7 @@ def discover_node(cfg, handler, info, nodename, manual):
                     util.get_fingerprint(handler.https_cert)
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
-            log.log({'info': 'Discovered {0} ({1}'.format(nodename,
+            log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
