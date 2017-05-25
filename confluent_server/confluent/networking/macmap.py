@@ -337,14 +337,14 @@ def _full_updatemacmap(configmanager):
             if not switch:
                 continue
             switchparms = switchcfg.get(switch, {})
-            snmpc = switchparms.get(
-                'secret.snmpcommunity', {}).get('value', 'public')
             password = switchparms.get(
-                'secret.hardwaremanagementpassword', {}).get('value', None)
+                'secret.snmpcommunity', {}).get('value', None)
             if not password:
-                password = snmpc
-            user = switchparms.get(
-                'secret.hardwaremanagementuser', {}).get('value', None)
+                password = switchparms.get(
+                    'secret.hardwaremanagementpassword', {}).get('value',
+                                                                 'public')
+                user = switchparms.get(
+                    'secret.hardwaremanagementuser', {}).get('value', None)
             switchauth.append((switch, password, user))
         pool = GreenPool()
         for ans in pool.imap(_map_switch, switchauth):
