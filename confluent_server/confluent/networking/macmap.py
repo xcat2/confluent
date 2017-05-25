@@ -294,12 +294,14 @@ def _full_updatemacmap(configmanager):
     global _macmap
     global _nodesbymac
     global _switchportmap
+    global _macsbyswitch
     with mapupdating:
         vintage = util.monotonic_time()
         # Clear all existing entries
         _macmap = {}
         _nodesbymac = {}
         _switchportmap = {}
+        _macsbyswitch = {}
         if configmanager.tenant is not None:
             raise exc.ForbiddenRequest(
                 'Network topology not available to tenants')
@@ -328,21 +330,21 @@ def _full_updatemacmap(configmanager):
                     else:
                         _switchportmap[curswitch][portname] = node
         switchcfg = configmanager.get_node_attributes(
-            switches, ('secret.hardwaremanagementuser',
+            switches, ('secret.hardwaremanagementuser', 'secret.snmpcommunity',
                        'secret.hardwaremanagementpassword'), decrypt=True)
         switchauth = []
         for switch in switches:
             if not switch:
                 continue
-            password = 'public'
-            user = None
-            if (switch in switchcfg and
-                    'secret.hardwaremanagementpassword' in switchcfg[switch]):
-                password = switchcfg[
-                    switch]['secret.hardwaremanagementpassword']['value']
-                if 'secret.hardwaremanagementuser' in switchcfg[switch]:
-                    user = switchcfg[switch]['secret.hardwaremanagementuser'][
-                        'value']
+            switchparms = switchcfg.get(switch, {})
+            snmpc = switchparms.get(
+                'secret.snmpcommunity', {}).get('value', 'public')
+            password = switchparms.get(
+                'secret.hardwaremanagementpassword', {}).get('value', None)
+            if not password:
+                password = snmpc
+            user = switchparms.get(
+                'secret.hardwaremanagementuser', {}).get('value', None)
             switchauth.append((switch, password, user))
         pool = GreenPool()
         for ans in pool.imap(_map_switch, switchauth):
