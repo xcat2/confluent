@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -170,6 +170,17 @@ class NodeRange(object):
         
     def _expandstring(self, element, filternodes=None):
         prefix = ''
+        if element[0][0] in ('/', '~'):
+            element = ''.join(element)
+            nameexpression = element[1:]
+            if self.cfm is None:
+                raise Exception('Verification configmanager required')
+            return set(self.cfm.filter_nodenames(nameexpression, filternodes))
+        elif '=' in element[0] or '!~' in element[0]:
+            element = ''.join(element)
+            if self.cfm is None:
+                raise Exception('Verification configmanager required')
+            return set(self.cfm.filter_node_attributes(element, filternodes))
         for idx in xrange(len(element)):
             if element[idx][0] == '[':
                 nodes = set([])
@@ -191,17 +202,7 @@ class NodeRange(object):
                     nodes |= NodeRange(
                         grpcfg['noderange']['value'], self.cfm).nodes
                 return nodes
-
-        if element[0] in ('/', '~'):
-            nameexpression = element[1:]
-            if self.cfm is None:
-                raise Exception('Verification configmanager required')
-            return set(self.cfm.filter_nodenames(nameexpression, filternodes))
-        elif '=' in element or '!~' in element:
-            if self.cfm is None:
-                raise Exception('Verification configmanager required')
-            return set(self.cfm.filter_node_attributes(element, filternodes))
-        elif ':' in element:  # : range for less ambiguity
+        if ':' in element:  # : range for less ambiguity
             return self.expandrange(element, ':')
         elif '-' in element:
             return self.expandrange(element, '-')
