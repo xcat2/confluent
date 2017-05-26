@@ -35,10 +35,10 @@ keystroke will be interpreted as a command.  The following commands are availabl
 * `pb<ent>`:
   [Power Boot]
   Cause system to immediately boot, resetting or turning on as appropriate.
-  Htting enter is required to execute the reboot rather than another pb sequence
+  Hitting enter is required to execute the reboot rather than another pb sequence
 * `pbs`:
   [Power Boot Setup]
-  Request immediate boot ultimately landing in interactive firmware setup makeconfluentcfg
+  Request immediate boot ultimately landing in interactive firmware setup
 * `pbn`:
   [Power Boot Network]
   Request immediate boot to network
