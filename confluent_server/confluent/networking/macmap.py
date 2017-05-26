@@ -246,11 +246,11 @@ def _map_switch_backend(args):
 
 def find_node_by_mac(mac, configmanager):
     now = util.monotonic_time()
-    if vintage and now - vintage < 90 and mac in _nodesbymac:
+    if vintage and (now - vintage) < 90 and mac in _nodesbymac:
         return _nodesbymac[mac]
     # do not actually sweep switches more than once every 30 seconds
     # however, if there is an update in progress, wait on it
-    for _ in update_macmap(configmanager, vintage and now - vintage < 30):
+    for _ in update_macmap(configmanager, vintage and (now - vintage) < 30):
         if mac in _nodesbymac:
             return _nodesbymac[mac]
     # If update_mac bailed out, still check one last time
@@ -337,6 +337,7 @@ def _full_updatemacmap(configmanager):
             if not switch:
                 continue
             switchparms = switchcfg.get(switch, {})
+            user = None
             password = switchparms.get(
                 'secret.snmpcommunity', {}).get('value', None)
             if not password:
@@ -348,6 +349,7 @@ def _full_updatemacmap(configmanager):
             switchauth.append((switch, password, user))
         pool = GreenPool()
         for ans in pool.imap(_map_switch, switchauth):
+            vintage = util.monotonic_time()
             yield ans
 
 
