@@ -313,11 +313,15 @@ def _full_updatemacmap(configmanager):
             for attr in cfg:
                 if not attr.endswith('.switch') or 'value' not in cfg[attr]:
                     continue
-                curswitch = cfg[attr]['value']
+                curswitch = cfg[attr].get('value', None)
+                if not curswitch:
+                    continue
                 switches.add(curswitch)
                 switchportattr = attr + 'port'
                 if switchportattr in cfg:
-                    portname = cfg[switchportattr]['value']
+                    portname = cfg[switchportattr].get('value', '')
+                    if not portname:
+                        continue
                     if curswitch not in _switchportmap:
                         _switchportmap[curswitch] = {}
                     if portname in _switchportmap[curswitch]:
