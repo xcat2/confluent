@@ -191,19 +191,20 @@ class NodeRange(object):
                     nodes |= NodeRange(
                         grpcfg['noderange']['value'], self.cfm).nodes
                 return nodes
-        if '-' in element and ':' not in element:
-            return self.expandrange(element, '-')
-        elif ':' in element:  # : range for less ambiguity
-            return self.expandrange(element, ':')
-        elif '=' in element or '!~' in element:
-            if self.cfm is None:
-                raise Exception('Verification configmanager required')
-            return set(self.cfm.filter_node_attributes(element, filternodes))
-        elif element[0] in ('/', '~'):
+
+        if element[0] in ('/', '~'):
             nameexpression = element[1:]
             if self.cfm is None:
                 raise Exception('Verification configmanager required')
             return set(self.cfm.filter_nodenames(nameexpression, filternodes))
+        elif '=' in element or '!~' in element:
+            if self.cfm is None:
+                raise Exception('Verification configmanager required')
+            return set(self.cfm.filter_node_attributes(element, filternodes))
+        elif ':' in element:  # : range for less ambiguity
+            return self.expandrange(element, ':')
+        elif '-' in element:
+            return self.expandrange(element, '-')
         elif '+' in element:
             element, increment = element.split('+')
             try:
