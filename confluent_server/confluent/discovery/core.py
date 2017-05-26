@@ -646,7 +646,7 @@ def discover_node(cfg, handler, info, nodename, manual):
             log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
                 nodename, handler.devname, info['hwaddr'])})
             return True
-        elif not util.cert_matches(lastfp, handler.https_cert):
+        elif manual or not util.cert_matches(lastfp, handler.https_cert):
             # only 'discover' if it is not the same as last time
             try:
                 handler.config(nodename)
