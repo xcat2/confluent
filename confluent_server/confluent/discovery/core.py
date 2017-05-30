@@ -160,6 +160,7 @@ def _info_matches(info, criteria):
     devtype = criteria.get('by-type', None)
     node = criteria.get('by-node', None)
     serial = criteria.get('by-serial', None)
+    status = criteria.get('by-state', None)
     if model and info.get('modelnumber', None) != model:
         return False
     if devtype and devtype not in info.get('services', []):
@@ -167,6 +168,8 @@ def _info_matches(info, criteria):
     if node and info.get('nodename', None) != node:
         return False
     if serial and info.get('serialnumber', None) != serial:
+        return False
+    if status and info.get('discostatus', None) != status:
         return False
     return True
 
@@ -187,11 +190,18 @@ def list_matching_serials(criteria):
             yield msg.ChildCollection(serial + '/')
 
 
+def list_matching_states(criteria):
+    return [msg.ChildCollection(x) for x in ('discovered/', 'identified/',
+                                             'unidentified/')]
+
 def list_matching_macs(criteria):
+    retmacs = []
     for mac in known_info:
         info = known_info[mac]
         if _info_matches(info, criteria):
-            yield msg.ChildCollection(mac.replace(':', '-'))
+            retmacs.append(mac)
+    for mac in sorted(retmacs):
+        yield msg.ChildCollection(mac.replace(':', '-'))
 
 
 def list_matching_types(criteria):
@@ -224,11 +234,13 @@ list_info = {
     'by-type': list_matching_types,
     'by-model': list_matching_models,
     'by-mac': list_matching_macs,
+    'by-state': list_matching_states,
 }
 
 multi_selectors = set([
     'by-type',
     'by-model',
+    'by-state',
 ])
 
 
@@ -337,6 +349,7 @@ def _recheck_nodes(nodeattribs, configmanager):
         if node in known_nodes:
             for somemac in known_nodes[node]:
                 unknown_info[somemac] = known_nodes[node][somemac]
+                unknown_info[somemac]['discostatus'] = 'unidentified'
     # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
         try:
@@ -479,6 +492,7 @@ def detected(info):
         if rechecker is None or rechecker.dead:
             rechecker = eventlet.spawn_after(60, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
+        info['discostatus'] = 'unidentfied'
         #TODO, eventlet spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
         return
@@ -491,6 +505,7 @@ def detected(info):
         if util.cert_matches(lastfp, handler.https_cert):
             info['nodename'] = nodename
             known_nodes[nodename][info['hwaddr']] = info
+            info['discostatus'] = 'discovered'
             return  # already known, no need for more
     #TODO(jjohnson2): We might have to get UUID for certain searches...
     #for now defer probe until inside eval_node.  We might not have
@@ -503,6 +518,7 @@ def detected(info):
                      'address {2}'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                       )})
+        info['discostatus'] = 'unidentified'
         unknown_info[info['hwaddr']] = info
 
 
@@ -511,6 +527,9 @@ def get_nodename(cfg, handler, info):
         curruuid = info['uuid']
         nodename = nodes_by_uuid.get(curruuid, None)
         if nodename is None:
+            # TODO: if there are too many matches on port for a
+            # given type, error!  Can't just arbitarily limit,
+            # shared nic with vms is possible and valid
             nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
         return nodename
     currcert = handler.https_cert
@@ -519,7 +538,6 @@ def get_nodename(cfg, handler, info):
         return None
     currprint = util.get_fingerprint(currcert)
     nodename = nodes_by_fprint.get(currprint, None)
-    # TODO, opportunistically check uuid if not nodename
     if not nodename:
         nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     return nodename
@@ -534,6 +552,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         handler.preconfig()
     except Exception as e:
         unknown_info[info['hwaddr']] = info
+        info['discostatus'] = 'unidentified'
         errorstr = 'An error occured during discovery, check the ' \
                    'trace and stderr logs, mac was {0} and ip was {1}' \
                    ', the node or the containing enclosure was {2}' \
@@ -548,6 +567,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
     # the node directly.  switch is ambiguous and we should leave it alone
     if 'enclosure.bay' in info and handler.is_enclosure:
         unknown_info[info['hwaddr']] = info
+        info['discostatus'] = 'unidentified'
         log.log({'error': 'Something that is an enclosure reported a bay, '
                           'not possible'})
         if manual:
@@ -559,6 +579,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # what we are talking to is *not* an enclosure
         if 'enclosure.bay' not in info:
             unknown_info[info['hwaddr']] = info
+            info['discostatus'] = 'unidentified'
             errorstr = '{2} with mac {0} is in {1}, but unable to ' \
                        'determine bay number'.format(info['hwaddr'],
                                                      nodename,
@@ -589,6 +610,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 raise exc.InvalidArgumentException(errorstr)
             log.log({'error': errorstr})
             unknown_info[info['hwaddr']] = info
+            info['discostatus'] = 'unidentified'
             return
         nodename = nl[0]
         if not discover_node(cfg, handler, info, nodename, manual):
@@ -605,6 +627,7 @@ def discover_node(cfg, handler, info, nodename, manual):
     known_nodes[nodename][info['hwaddr']] = info
     if info['hwaddr'] in unknown_info:
         del unknown_info[info['hwaddr']]
+    info['discostatus'] = 'identified'
     dp = cfg.get_node_attributes(
         [nodename], ('discovery.policy',
                      'pubkeys.tls_hardwaremanager'))
@@ -668,6 +691,7 @@ def discover_node(cfg, handler, info, nodename, manual):
                 cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
+        info['discostatus'] = 'discovered'
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                      'value allowing discovery (open or permissive)'.format(
