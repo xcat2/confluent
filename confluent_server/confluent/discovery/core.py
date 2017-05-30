@@ -175,16 +175,18 @@ def _info_matches(info, criteria):
 
 
 def list_matching_nodes(criteria):
+    retnodes = []
     for node in known_nodes:
         for mac in known_nodes[node]:
             info = known_info[mac]
             if _info_matches(info, criteria):
-                yield msg.ChildCollection(node + '/')
+                retnodes.append(node)
                 break
+    return [msg.ChildCollection(node + '/') for node in sorted(retnodes)]
 
 
 def list_matching_serials(criteria):
-    for serial in known_serials:
+    for serial in sorted(list(known_serials)):
         info = known_serials[serial]
         if _info_matches(info, criteria):
             yield msg.ChildCollection(serial + '/')
@@ -195,26 +197,25 @@ def list_matching_states(criteria):
                                              'unidentified/')]
 
 def list_matching_macs(criteria):
-    retmacs = []
-    for mac in known_info:
+    for mac in sorted(list(known_info)):
         info = known_info[mac]
         if _info_matches(info, criteria):
-            retmacs.append(mac)
-    for mac in sorted(retmacs):
-        yield msg.ChildCollection(mac.replace(':', '-'))
+            yield msg.ChildCollection(mac.replace(':', '-'))
 
 
 def list_matching_types(criteria):
+    rettypes = []
     for infotype in known_services:
         typename = servicenames[infotype]
-        fakeinfo = {'modelnumber': known_services[infotype]}
         if ('by-model' not in criteria or
                 criteria['by-model'] in known_services[infotype]):
-            yield msg.ChildCollection(typename + '/')
+            rettypes.append(typename)
+    return [msg.ChildCollection(typename + '/')
+            for typename in sorted(rettypes)]
 
 
 def list_matching_models(criteria):
-    for model in detected_models():
+    for model in sorted(list(detected_models())):
         if ('by-type' not in criteria or
                 model in known_services[criteria['by-type']]):
             yield msg.ChildCollection(model + '/')
