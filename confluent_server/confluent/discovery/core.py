@@ -406,6 +406,16 @@ def _recheck_single_unknown(configmanager, mac):
         return
     nodename = get_nodename(configmanager, handler, info)
     if nodename:
+        if handler.https_supported:
+            dp = configmanager.get_node_attributes([nodename],
+                                         ('pubkeys.tls_hardwaremanager',))
+            lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
+                                              {}).get('value', None)
+            if util.cert_matches(lastfp, handler.https_cert):
+                info['nodename'] = nodename
+                known_nodes[nodename][info['hwaddr']] = info
+                info['discostatus'] = 'discovered'
+                return  # already known, no need for more
         eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
 
 
