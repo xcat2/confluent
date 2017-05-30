@@ -73,6 +73,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
 import confluent.networking.macmap as macmap
+import confluent.noderange as noderange
 import confluent.util as util
 import traceback
 
@@ -182,7 +183,8 @@ def list_matching_nodes(criteria):
             if _info_matches(info, criteria):
                 retnodes.append(node)
                 break
-    return [msg.ChildCollection(node + '/') for node in sorted(retnodes)]
+    retnodes.sort(key=noderange.humanify_nodename)
+    return [msg.ChildCollection(node + '/') for node in retnodes]
 
 
 def list_matching_serials(criteria):
