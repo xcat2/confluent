@@ -370,6 +370,7 @@ def _recheck_nodes(nodeattribs, configmanager):
 
 def _recheck_single_unknown(configmanager, mac):
     global rechecker
+    global rechecktime
     info = unknown_info.get(mac, None)
     if not info:
         return
@@ -397,10 +398,11 @@ def _recheck_single_unknown(configmanager, mac):
                         'https, will examine later'.format(
                     handler.devname, info['hwaddr'], handler.ipaddr
                 )})
-        if rechecker is not None:
+        if rechecker is not None and rechecktime > util.monotonic_time() + 60:
             rechecker.cancel()
         # if cancel did not result in dead, then we are in progress
         if rechecker is None or rechecker.dead:
+            rechecktime = util.monotonic_time() + 60
             rechecker = eventlet.spawn_after(60, _periodic_recheck,
                                              configmanager)
         return
@@ -432,6 +434,7 @@ def eval_detected(info):
 
 def detected(info):
     global rechecker
+    global rechecktime
     if 'hwaddr' not in info:
         return  # For now, require hwaddr field to proceed
     # later, manual and CMM discovery may act on SN and/or UUID
@@ -500,9 +503,10 @@ def detected(info):
                       'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
             )})
-        if rechecker is not None:
+        if rechecker is not None and rechecktime > util.monotonic_time() + 60:
             rechecker.cancel()
         if rechecker is None or rechecker.dead:
+            rechecktime = util.monotonic_time() + 60
             rechecker = eventlet.spawn_after(60, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentfied'
@@ -747,10 +751,12 @@ def newnodes(added, deleting, configmanager):
 
 
 rechecker = None
+rechecktime = None
 rechecklock = eventlet.semaphore.Semaphore()
 
 def _periodic_recheck(configmanager):
     global rechecker
+    global rechecktime
     rechecker = None
     # There shouldn't be anything causing this to double up, but just in case
     # use a semaphore to absolutely guarantee this doesn't multiply
@@ -761,11 +767,12 @@ def _periodic_recheck(configmanager):
             traceback.print_exc()
             log.log({'error': 'Unexpected error during discovery, check debug '
                               'logs'})
-    # if rechecker is set, it means that an accelerated schedule
-    # for rechecker was requested in the course of recheck_nodes
-    if rechecker is None:
-        rechecker = eventlet.spawn_after(900, _periodic_recheck,
-                                         configmanager)
+        # if rechecker is set, it means that an accelerated schedule
+        # for rechecker was requested in the course of recheck_nodes
+        if rechecker is None:
+            rechecktime = util.monotonic_time() + 900
+            rechecker = eventlet.spawn_after(900, _periodic_recheck,
+                                             configmanager)
 
 
 def rescan():
@@ -787,6 +794,7 @@ def start_detection():
     eventlet.spawn_n(slp.snoop, safe_detected)
     eventlet.spawn_n(pxe.snoop, safe_detected)
     if rechecker is None:
+        rechecktime = util.monotonic_time() + 900
         rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
 
     # eventlet.spawn_n(ssdp.snoop, safe_detected)
