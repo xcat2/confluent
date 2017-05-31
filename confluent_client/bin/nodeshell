@@ -65,7 +65,7 @@ for pop in popens:
     all.add(pop.stdout)
     all.add(pop.stderr)
 rdy, _, _ = select.select(all, [], [], 10)
-while all and rdy:
+while all:
     for r in rdy:
         data = r.readline()
         desc = pipedesc[r]
