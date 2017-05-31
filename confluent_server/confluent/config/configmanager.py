@@ -1091,6 +1091,8 @@ class ConfigManager(object):
                 for matched in fnmatch.filter(list(checkattrs), attrglob):
                     globattrs[matched] = attrglob
             for attrname in checkattrs:
+                if attrname == '_attrglobs':
+                    continue
                 watchkey = attrname
                 # the attrib watcher could still have a glob
                 if attrname not in attribwatcher:
