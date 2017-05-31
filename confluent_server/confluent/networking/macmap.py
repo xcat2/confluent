@@ -221,7 +221,10 @@ def _map_switch_backend(args):
     for mac in mactobridge:
         # We want to merge it so that when a mac appears in multiple
         # places, it is captured.
-        ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+        try:
+            ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+        except KeyError:
+            continue
         if mac in _macmap:
             _macmap[mac].append((switch, ifname, maccounts[ifname]))
         else:
