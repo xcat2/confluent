@@ -174,7 +174,11 @@ def _map_switch_backend(args):
     for vb in conn.walk('1.3.6.1.2.1.17.1.4.1.2'):
         bridgeport, ifidx = vb
         bridgeport = int(str(bridgeport).rsplit('.', 1)[1])
-        bridgetoifmap[bridgeport] = int(ifidx)
+        try:
+            bridgetoifmap[bridgeport] = int(ifidx)
+        except ValueError:
+            # ifidx might be '', skip in such a case
+            continue
     ifnamemap = {}
     havenames = False
     for vb in conn.walk('1.3.6.1.2.1.31.1.1.1.1'):
