@@ -38,6 +38,12 @@ srvreqfooter = b'\x00\x07DEFAULT\x00\x00\x00\x00'
 # which is defined in RFC 3059, used to indicate support for that capability
 attrlistext = b'\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00'
 
+try:
+    IPPROTO_IPV6 = socket.IPPROTO_IPV6
+except AttributeError:
+    IPPROTO_IPV6 = 41  # Assume Windows value if socket is missing it
+
+
 
 def _parse_slp_header(packet):
     packet = bytearray(packet)
@@ -197,7 +203,7 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
         v6addrs.append(('ff02::1:' + v6hash, 427, 0, 0))
         for idx in util.list_interface_indexes():
             # IPv6 multicast is by index, so lead with that
-            net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, idx)
+            net.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, idx)
             for sa in v6addrs:
                 try:
                     net.sendto(data, sa)
@@ -378,14 +384,14 @@ def snoop(handler):
     """
     active_scan(handler)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
     slpg2 = socket.inet_pton(socket.AF_INET6, 'ff02::123')
     for i6idx in util.list_interface_indexes():
         mreq = slpg + struct.pack('=I', i6idx)
-        net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
+        net.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
         mreq = slpg2 + struct.pack('=I', i6idx)
-        net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
+        net.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -483,7 +489,7 @@ def scan(srvtypes=_slp_services, addresses=None):
     # must make the best of it
     # Some platforms/config default to IPV6ONLY, we are doing IPv4
     # too, so force it
-    net.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+    #net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
     # we are going to do broadcast, so allow that...
     initxid = random.randint(0, 32768)
     xididx = 0
@@ -512,4 +518,6 @@ def scan(srvtypes=_slp_services, addresses=None):
 if __name__ == '__main__':
     def testsnoop(a):
         print(repr(a))
-    snoop(testsnoop)
+    #snoop(testsnoop)
+    for res in scan():
+        print(repr(res))

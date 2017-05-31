@@ -34,6 +34,11 @@ import eventlet.green.select as select
 import eventlet.green.socket as socket
 import struct
 
+try:
+    IPPROTO_IPV6 = socket.IPPROTO_IPV6
+except AttributeError:
+    IPPROTO_IPV6 = 41  # Assume Windows value if socket is missing it
+
 mcastv4addr = '239.255.255.250'
 mcastv6addr = 'ff02::c'
 
@@ -69,10 +74,10 @@ def snoop(handler, byehandler=None):
     # so we will have two distinct sockets
     known_peers = set([])
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    net6.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     for ifidx in util.list_interface_indexes():
         v6grp = ssdp6mcast + struct.pack('=I', ifidx)
-        net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
+        net6.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
     net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     for i4 in util.list_ips():
@@ -134,7 +139,7 @@ def snoop(handler, byehandler=None):
 def _find_service(service, target):
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    net6.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     if target:
         addrs = socket.getaddrinfo(target, 1900, 0, socket.SOCK_DGRAM)
         for addr in addrs:
@@ -147,7 +152,7 @@ def _find_service(service, target):
     else:
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         for idx in util.list_interface_indexes():
-            net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF,
+            net6.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_IF,
                             idx)
             try:
                 net6.sendto(smsg.format('[{0}]'.format(mcastv6addr), service
