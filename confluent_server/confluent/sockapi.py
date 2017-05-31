@@ -234,8 +234,16 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
                 consession.reopen()
                 continue
             else:
-                process_request(connection, data, cfm, authdata, authname,
-                                skipauth)
+                try:
+                    process_request(connection, data, cfm, authdata, authname,
+                                    skipauth)
+                except Exception:
+                    tracelog.log(traceback.format_exc(),
+                                 ltype=log.DataTypes.event,
+                                 event=log.Events.stacktrace)
+                    send_data(connection, {'errorcode': 500,
+                                           'error': 'Unexpected error'})
+                    send_data(connection, {'_requestdone': 1})
                 continue
         if not data:
             consession.destroy()
