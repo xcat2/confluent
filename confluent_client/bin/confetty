@@ -47,6 +47,7 @@ import optparse
 import os
 import select
 import shlex
+import signal
 import socket
 import sys
 import time
@@ -56,7 +57,10 @@ try:
     import tty
 except ImportError:
     pass
-
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 exitcode = 0
 consoleonly = False
 consolename = ""
