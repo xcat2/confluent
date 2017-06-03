@@ -204,7 +204,10 @@ def setlimits():
 
 def run():
     setlimits()
-    signal.signal(signal.SIGUSR1, dumptrace)
+    try:
+        signal.signal(signal.SIGUSR1, dumptrace)
+    except AttributeError:
+        pass   # silly windows
     if havefcntl:
         _checkpidfile()
     conf.init_config()
@@ -231,9 +234,12 @@ def run():
             os.remove('/var/run/confluent/dbg.sock')
         except OSError:
             pass  # We are not expecting the file to exist
-        dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
-                                   family=socket.AF_UNIX)
-        eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
+        try:
+            dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
+                                       family=socket.AF_UNIX)
+            eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
+        except AttributeError:
+            pass  # Windows...
         os.umask(oumask)
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
