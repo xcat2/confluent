@@ -100,9 +100,8 @@ def get_prefix_len_for_ip(ip):
         ipn = socket.inet_aton(ip)
     except socket.error:  # For now, assume 64 for ipv6
         return 64
-    # It comes out big endian, but as document /proc/net/route is little endian
-    # byte swap the result
-    ipn = struct.unpack('<I', ipn)[0]
+    # It comes out big endian, regardless of host arch
+    ipn = struct.unpack('>I', ipn)[0]
     rf = open('/proc/net/route')
     ri = rf.read()
     rf.close()
@@ -113,12 +112,13 @@ def get_prefix_len_for_ip(ip):
         rd = rl.split('\t')
         if rd[1] == '00000000':  # default gateway, not useful for this
             continue
-        maskn = int(rd[7], 16)
-        netn = int(rd[1], 16)
+        # don't have big endian to look at, assume that it is host endian
+        maskn = struct.unpack('I', struct.pack('>I', int(rd[7], 16)))[0]
+        netn = struct.unpack('I', struct.pack('>I', int(rd[1], 16)))[0]
         if ipn & maskn == netn:
             nbits = 0
             while maskn:
                 nbits += 1
-                maskn = maskn >> 1
+                maskn = maskn << 1 & 0xffffffff
             return nbits
     raise exc.NotImplementedException("Non local addresses not supported")
