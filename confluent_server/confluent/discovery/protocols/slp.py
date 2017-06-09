@@ -28,6 +28,8 @@ _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
     'service:lenovo-smm',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller',
+    'service:management-hardware.IBM:chassis-management-module',
+    'service:management-hardware.Lenovo:chassis-management-module',
 ])
 
 # SLP has a lot of ambition that was unfulfilled in practice.
@@ -468,7 +470,7 @@ def active_scan(handler):
             handler(scanned)
 
 
-def scan(srvtypes=_slp_services, addresses=None):
+def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     """Find targets providing matching requested srvtypes
 
     This is a generator that will iterate over respondants to the SrvType
@@ -508,6 +510,12 @@ def scan(srvtypes=_slp_services, addresses=None):
     _grab_rsps((net, net4), rsps, 1, xidmap)
     # now to analyze and flesh out the responses
     for id in rsps:
+        if localonly:
+            for addr in rsps[id]['addresses']:
+                if 'fe80' in addr[0]:
+                    break
+            else:
+                continue
         _add_attributes(rsps[id])
         del rsps[id]['payload']
         del rsps[id]['function']
