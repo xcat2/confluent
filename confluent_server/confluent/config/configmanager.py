@@ -261,7 +261,10 @@ def crypt_value(value,
     neededpad = 16 - (len(value) % 16)
     pad = chr(neededpad) * neededpad
     value += pad
-    cryptval = crypter.encrypt(value)
+    try:
+        cryptval = crypter.encrypt(value)
+    except TypeError:
+        cryptval = crypter.encrypt(value.encode('utf-8'))
     hmac = HMAC.new(integritykey, cryptval, SHA256).digest()
     return iv, cryptval, hmac
 
