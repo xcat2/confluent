@@ -208,11 +208,12 @@ class ConsoleHandler(object):
             self._isondemand = False
         elif 'console.logging' not in attrvalue[self.node]:
             self._isondemand = False
-        elif (attrvalue[self.node]['console.logging']['value'] not in (
-                'full', '')):
-            self._isondemand = True
-        elif (attrvalue[self.node]['console.logging']['value']) == 'none':
-            self._dologging = False
+        else:
+            if (attrvalue[self.node]['console.logging']['value'] not in (
+                'full', '', 'buffer')):
+                self._isondemand = True
+            if (attrvalue[self.node]['console.logging']['value']) in ('none', 'memory'):
+                self._dologging = False
 
     def get_buffer_age(self):
         """Return age of buffered data
@@ -247,7 +248,7 @@ class ConsoleHandler(object):
                     return
             else:
                 self._ondemand()
-                if logvalue == 'none':
+                if logvalue in ('none', 'memory'):
                     self._dologging = False
         if not self._isondemand or self.livesessions:
             eventlet.spawn(self._connect)
