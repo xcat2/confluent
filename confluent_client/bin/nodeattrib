@@ -35,8 +35,9 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage='''\n       %prog [options] noderange [list of attributes]  \
-             \n       %prog [options] noderange attribute1=value1,attribute2=value,...
+    usage='''\n       %prog [-b] noderange [list of attributes]  \
+             \n       %prog -c noderange <list of attributes>  \
+             \n       %prog noderange attribute1=value1 attribute2=value,...
              \n ''')
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
