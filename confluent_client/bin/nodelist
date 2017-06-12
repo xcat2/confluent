@@ -35,7 +35,8 @@ import confluent.client as client
 
 def main():
     argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [<nodeattribute>...]")
+    usage="Usage: %prog noderange\n"
+          "   or: %prog [options] noderange <nodeattribute>...")
     argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
     (options, args) = argparser.parse_args()
