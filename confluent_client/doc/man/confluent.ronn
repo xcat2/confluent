@@ -1,0 +1,14 @@
+confluent(8) -- Start the confluent server
+=========================================================
+
+## SYNOPSIS
+
+`confluent`
+
+## DESCRIPTION
+
+**confluent** is the name of the server daemon.  It is normally run
+through the init subsystem rather than executed directly.  All confluent
+commands connect to confluent daemon.  It provides the web interface, debug,
+and unix socket connectivity.
+
