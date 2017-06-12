@@ -4,9 +4,9 @@ nodeattrib(8) -- List or change confluent nodes attributes
 ## SYNOPSIS
 
 `nodeattrib <noderange> [ current | all ]`  
-`nodeattrib <noderange> [-b] [<nodeattribute>...]`  
+`nodeattrib <noderange> [-b] [<nodeattribute>...]`
 `nodeattrib <noderange> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`  
-`nodeattrib <noderange> [-c] [<nodeattribute1> <nodeattribute2=value2> ...]`  
+`nodeattrib <noderange> [-c] <nodeattribute1> <nodeattribute2> ...`
 
 ## DESCRIPTION
 
