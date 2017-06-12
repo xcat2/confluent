@@ -40,6 +40,10 @@ _handled_consoles = {}
 
 _tracelog = None
 
+try:
+    range = xrange
+except NameError:
+    pass
 
 pytecolors2ansi = {
     'black': 0,
@@ -96,7 +100,8 @@ def pytechars2line(chars, maxlen=None):
     lbg = 'default'   # last bg color
     hasdata = False
     len = 1
-    for char in chars:
+    for charidx in range(maxlen):
+        char = chars[charidx]
         csi = []
         if char.fg != lfg:
             csi.append(30 + pytecolors2ansi[char.fg])
@@ -502,8 +507,8 @@ class ConsoleHandler(object):
             line = line.rstrip()
             if len(line) > maxlen:
                 maxlen = len(line)
-        for line in self.buffer.buffer:
-            nline, notblank = pytechars2line(line, maxlen)
+        for line in range(self.buffer.lines):
+            nline, notblank = pytechars2line(self.buffer.buffer[line], maxlen)
             if notblank:
                 if pendingbl:
                     retdata += pendingbl
