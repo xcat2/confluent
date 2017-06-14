@@ -709,7 +709,7 @@ def conserver_command(filehandle, localcommand):
         else:
             print("Unknown power state.]\r")
 
-        check_power_state()
+        #check_power_state()
 
     elif localcommand[0] == '?':
         print("help]\r")
@@ -902,8 +902,8 @@ while inconsole or not doexit:
                         tlvdata.send(session.connection, myinput)
                 except IOError:
                     pass
-        if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
-            check_power_state()
+        #if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
+        #    check_power_state()
     else:
         currcommand = prompt()
         try:
