@@ -274,7 +274,7 @@ def attrrequested(attr, attrlist, seenattributes):
         if candidate == attr:
             seenattributes.add(truename)
             return True
-        elif '.' not in candidate and attr.startswith(candidate + '.'):
+        elif attr.startswith(candidate + '.'):
             seenattributes.add(truename)
             return True
     return False
@@ -309,12 +309,12 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
                                   '{2}'.format(node, attr,
                                                currattr['broken'])
                     elif isinstance(currattr, list) or isinstance(currattr, tuple):
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, currattr)))
+                        attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, currattr)))
                     elif isinstance(currattr, dict):
                         dictout = []
                         for k, v in currattr.items:
                             dictout.append("{0}={1}".format(k, v))
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, dictout)))
+                        attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, dictout)))
                     else:
                         print ("CODE ERROR" + repr(attr))
 
@@ -367,28 +367,17 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                     attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                               '{2}'.format(noderange, attr,
                                            currattr['broken'])
+                elif 'expression' in currattr:
+                    attrout = '{0}: {1}:  (will derive from expression {2})'.format(noderange, attr, currattr['expression'])
                 elif isinstance(currattr, list) or isinstance(currattr, tuple):
-                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ', '.join(map(str, currattr)))
+                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ','.join(map(str, currattr)))
                 elif isinstance(currattr, dict):
                     dictout = []
                     for k, v in currattr.items:
                         dictout.append("{0}={1}".format(k, v))
-                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ', '.join(map(str, dictout)))
+                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ','.join(map(str, dictout)))
                 else:
                     print ("CODE ERROR" + repr(attr))
-
-                if options.blame or 'broken' in currattr:
-                    blamedata = []
-                    if 'inheritedfrom' in currattr:
-                        blamedata.append('inherited from group {0}'.format(
-                            currattr['inheritedfrom']
-                        ))
-                    if 'expression' in currattr:
-                        blamedata.append(
-                            'derived from expression "{0}"'.format(
-                                currattr['expression']))
-                    if blamedata:
-                        attrout += ' (' + ', '.join(blamedata) + ')'
                 print attrout
     if not exitcode:
         if requestargs:

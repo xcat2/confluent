@@ -24,6 +24,7 @@
 import confluent.exceptions as exc
 import eventlet
 from eventlet.support.greendns import getaddrinfo
+import pysnmp.smi.error as snmperr
 import socket
 snmp = eventlet.import_patched('pysnmp.hlapi')
 
@@ -85,14 +86,22 @@ class Session(object):
 
         walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
                                lexicographicMode=False)
-        for rsp in walking:
-            errstr, errnum, erridx, answers = rsp
-            if errstr:
-                raise exc.TargetEndpointUnreachable(str(errstr))
-            elif errnum:
-                raise exc.ConfluentException(errnum.prettyPrint())
-            for ans in answers:
-                yield ans
+        try:
+            for rsp in walking:
+                errstr, errnum, erridx, answers = rsp
+                if errstr:
+                    errstr = str(errstr)
+                    if errstr in ('unknownUserName', 'wrongDigest'):
+                        raise exc.TargetEndpointBadCredentials(errstr)
+                    # need to do bad credential versus timeout
+                    raise exc.TargetEndpointUnreachable(errstr)
+                elif errnum:
+                    raise exc.ConfluentException(errnum.prettyPrint())
+                for ans in answers:
+                    yield ans
+        except snmperr.WrongValueError:
+            raise exc.TargetEndpointBadCredentials('Invalid SNMPv3 password')
+
 
 
 if __name__ == '__main__':

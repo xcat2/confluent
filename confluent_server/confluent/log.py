@@ -743,6 +743,7 @@ tracelog = None
 
 
 def log(logdata=None, ltype=None, event=0, eventdata=None):
+    global globaleventlog
     if globaleventlog is None:
         globaleventlog = Logger('events')
     globaleventlog.log(logdata, ltype, event, eventdata)

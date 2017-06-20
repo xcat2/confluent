@@ -72,6 +72,8 @@ import confluent.exceptions as exc
 import copy
 import cPickle
 import errno
+import eventlet
+import fnmatch
 import json
 import operator
 import os
@@ -151,6 +153,29 @@ def _format_key(key, password=None):
         return {"unencryptedvalue": key}
 
 
+def _do_notifier(cfg, watcher, callback):
+    try:
+        callback(nodeattribs=watcher['nodeattrs'], configmanager=cfg)
+    except Exception:
+        logException()
+
+
+def logException():
+    global tracelog
+    if tracelog is None:
+        tracelog = confluent.log.Logger('trace')
+    tracelog.log(traceback.format_exc(),
+                 ltype=confluent.log.DataTypes.event,
+                 event=confluent.log.Events.stacktrace)
+
+
+def _do_add_watcher(watcher, added, configmanager):
+    try:
+        watcher(added=added, deleting=[], configmanager=configmanager)
+    except Exception:
+        logException()
+
+
 def init_masterkey(password=None):
     global _masterkey
     global _masterintegritykey
@@ -197,6 +222,26 @@ def decrypt_value(cryptvalue,
             raise Exception("bad padding in encrypted value")
     return value[0:-padsize]
 
+
+def attribute_is_invalid(attrname, attrval):
+    if attrname.startswith('custom.'):
+        # No type checking or name checking is provided for custom,
+        # it's not possible
+        return False
+    if attrname.startswith('net.'):
+        # For net.* attribtues, split on the dots and put back together
+        # longer term we might want a generic approach, but
+        # right now it's just net. attributes
+        netattrparts = attrname.split('.')
+        attrname = netattrparts[0] + '.' + netattrparts[-1]
+    if attrname not in allattributes.node:
+        # Otherwise, it must be in the allattributes key list
+        return True
+    if 'type' in allattributes.node[attrname]:
+        if not isinstance(attrval, allattributes.node[attrname]['type']):
+            # provide type checking for attributes with a specific type
+            return True
+    return False
 
 def crypt_value(value,
                 key=None,
@@ -372,8 +417,8 @@ class _ExpressionFormat(string.Formatter):
             if optype not in self._supported_ops:
                 raise Exception("Unsupported operation")
             op = self._supported_ops[optype]
-            return op(self._handle_ast_node(node.left),
-                      self._handle_ast_node(node.right))
+            return op(int(self._handle_ast_node(node.left)),
+                      int(self._handle_ast_node(node.right)))
 
 
 def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
@@ -551,7 +596,9 @@ class ConfigManager(object):
 
     def watch_attributes(self, nodes, attributes, callback):
         """
-        Watch a list of attributes for changes on a list of nodes
+        Watch a list of attributes for changes on a list of nodes.  The
+        attributes may be literal, or a filename style wildcard like 
+        'net*.switch'
 
         :param nodes: An iterable of node names to be watching
         :param attributes: An iterable of attribute names to be notified about
@@ -579,6 +626,10 @@ class ConfigManager(object):
                     }
                 else:
                     attribwatchers[node][attribute][notifierid] = callback
+                if '*' in attribute:
+                    currglobs = attribwatchers[node].get('_attrglobs', set([]))
+                    currglobs.add(attribute)
+                    attribwatchers[node]['_attrglobs'] = currglobs
         return notifierid
 
     def watch_nodecollection(self, callback):
@@ -786,9 +837,11 @@ class ConfigManager(object):
         if decrypt is None:
             decrypt = self.decrypt
         retdict = {}
-        relattribs = attributes
         if isinstance(nodelist, str) or isinstance(nodelist, unicode):
             nodelist = [nodelist]
+        if isinstance(attributes, str) or isinstance(attributes, unicode):
+            attributes = [attributes]
+        relattribs = attributes
         for node in nodelist:
             if node not in self._cfgstore['nodes']:
                 continue
@@ -800,6 +853,10 @@ class ConfigManager(object):
                 if attribute.startswith('_'):
                     # skip private things
                     continue
+                if '*' in attribute:
+                    for attr in fnmatch.filter(list(cfgnodeobj), attribute):
+                        nodeobj[attr] = _decode_attribute(attr, cfgnodeobj,
+                                                          decrypt=decrypt)
                 if attribute not in cfgnodeobj:
                     continue
                 # since the formatter is not passed in, the calculator is
@@ -916,11 +973,8 @@ class ConfigManager(object):
                 raise ValueError("{0} group does not exist".format(group))
             for attr in attribmap[group].iterkeys():
                 if (attr not in ('nodes', 'noderange') and
-                        (attr not in allattributes.node or
-                         ('type' in allattributes.node[attr] and
-                          not isinstance(attribmap[group][attr],
-                                         allattributes.node[attr]['type'])))):
-                    raise ValueError("nodes attribute is invalid")
+                        attribute_is_invalid(attr, attribmap[group][attr])):
+                    raise ValueError("{0} attribute is invalid".format(attr))
                 if attr == 'nodes':
                     if not isinstance(attribmap[group][attr], list):
                         if type(attribmap[group][attr]) is unicode or type(attribmap[group][attr]) is str:
@@ -1019,7 +1073,7 @@ class ConfigManager(object):
             return
         notifdata = {}
         attribwatchers = self._attribwatchers[self.tenant]
-        for node in nodeattrs.iterkeys():
+        for node in nodeattrs:
             if node not in attribwatchers:
                 continue
             attribwatcher = attribwatchers[node]
@@ -1032,10 +1086,21 @@ class ConfigManager(object):
                 # to deletion, to make all watchers aware of the removed
                 # node and take appropriate action
                 checkattrs = attribwatcher
+            globattrs = {}
+            for attrglob in attribwatcher.get('_attrglobs', []):
+                for matched in fnmatch.filter(list(checkattrs), attrglob):
+                    globattrs[matched] = attrglob
             for attrname in checkattrs:
-                if attrname not in attribwatcher:
+                if attrname == '_attrglobs':
                     continue
-                for notifierid in attribwatcher[attrname].iterkeys():
+                watchkey = attrname
+                # the attrib watcher could still have a glob
+                if attrname not in attribwatcher:
+                    if attrname in globattrs:
+                        watchkey = globattrs[attrname]
+                    else:
+                        continue
+                for notifierid in attribwatcher[watchkey]:
                     if notifierid in notifdata:
                         if node in notifdata[notifierid]['nodeattrs']:
                             notifdata[notifierid]['nodeattrs'][node].append(
@@ -1046,18 +1111,12 @@ class ConfigManager(object):
                     else:
                         notifdata[notifierid] = {
                             'nodeattrs': {node: [attrname]},
-                            'callback': attribwatcher[attrname][notifierid]
+                            'callback': attribwatcher[watchkey][notifierid]
                         }
         for watcher in notifdata.itervalues():
             callback = watcher['callback']
-            try:
-                callback(nodeattribs=watcher['nodeattrs'], configmanager=self)
-            except Exception:
-                global tracelog
-                if tracelog is None:
-                    tracelog = confluent.log.Logger('trace')
-                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                             event=log.Events.stacktrace)
+            eventlet.spawn_n(_do_notifier, self, watcher, callback)
+
 
     def del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
@@ -1154,11 +1213,7 @@ class ConfigManager(object):
                     if ('everything' in self._cfgstore['nodegroups'] and
                             'everything' not in attribmap[node]['groups']):
                         attribmap[node]['groups'].append('everything')
-                elif (attrname not in allattributes.node or
-                        ('type' in allattributes.node[attrname] and
-                         not isinstance(
-                             attrval,
-                             allattributes.node[attrname]['type']))):
+                elif attribute_is_invalid(attrname, attrval):
                     errstr = "{0} attribute on node {1} is invalid".format(
                         attrname, node)
                     raise ValueError(errstr)
@@ -1206,7 +1261,7 @@ class ConfigManager(object):
             if self.tenant in self._nodecollwatchers:
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
                 for watcher in nodecollwatchers.itervalues():
-                    watcher(added=newnodes, deleting=[], configmanager=self)
+                    eventlet.spawn_n(_do_add_watcher, watcher, newnodes, self)
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 

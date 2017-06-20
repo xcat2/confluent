@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,9 +20,35 @@ import base64
 import confluent.exceptions as cexc
 import confluent.log as log
 import hashlib
+import netifaces
 import os
 import struct
 
+
+def list_interface_indexes():
+    # Getting the interface indexes in a portable manner
+    # would be better, but there's difficulty from a python perspective.
+    # For now be linux specific
+    try:
+        for iface in os.listdir('/sys/class/net/'):
+            ifile = open('/sys/class/net/{0}/ifindex'.format(iface), 'r')
+            intidx = int(ifile.read())
+            ifile.close()
+            yield intidx
+    except (IOError, OSError):
+        # Probably situation is non-Linux, just do limited support for
+        # such platforms until other people come alonge
+        return
+
+
+def list_ips():
+    # Used for getting addresses to indicate the multicast address
+    # as well as getting all the broadcast addresses
+    for iface in netifaces.interfaces():
+        addrs = netifaces.ifaddresses(iface)
+        if netifaces.AF_INET in addrs:
+            for addr in addrs[netifaces.AF_INET]:
+                yield addr
 
 def randomstring(length=20):
     """Generate a random string of requested length
@@ -61,6 +87,23 @@ def monotonic_time():
     # for now, just support POSIX systems
     return os.times()[4]
 
+
+def get_fingerprint(certificate, algo='sha512'):
+    if algo != 'sha512':
+        raise Exception("TODO: Non-sha512")
+    return 'sha512$' + hashlib.sha512(certificate).hexdigest()
+
+
+def cert_matches(fingerprint, certificate):
+    if not fingerprint or not certificate:
+        return False
+    algo, _, fp = fingerprint.partition('$')
+    newfp = None
+    if algo == 'sha512':
+        newfp = get_fingerprint(certificate)
+    return newfp and fingerprint == newfp
+
+
 class TLSCertVerifier(object):
     def __init__(self, configmanager, node, fieldname):
         self.cfm = configmanager
@@ -68,7 +111,7 @@ class TLSCertVerifier(object):
         self.fieldname = fieldname
 
     def verify_cert(self, certificate):
-        fingerprint = 'sha512$' + hashlib.sha512(certificate).hexdigest()
+        fingerprint = get_fingerprint(certificate)
         storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
                                                    )
         if self.fieldname not in storedprint[self.node]:  # no stored value, check

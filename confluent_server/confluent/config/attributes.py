@@ -16,50 +16,69 @@
 # limitations under the License.
 
 
-#This defines the attributes of variou classes of things
+#This defines the attributes of various classes of things
 
 # 'nic', meant to be a nested structure under node
-nic = {
-    'name': {
-        'description': 'Name in ip/ifconfig as desired by administrator',
-    },
-    'port': {
-        'description': 'Port that this nic connects to',
-    },
-    'switch': {
-        'description': 'Switch that this nic connects to',
-    },
-    'customhardwareaddress': {
-        'description': 'Mac address to push to nic',
-    },
-    'dnssuffix': {
-        'description': ('String to place after nodename, but before'
-                        'Network.Domain to derive FQDN for this NIC'),
-    },
-    'hardwareaddress': {
-        'description': 'Active mac address on this nic (factory or custom)'
-    },
-    'ipaddresses': {
-        'description': 'Set of IPv4 and IPv6 addresses in CIDR format'
-    },
-    'pvid': {
-        'description': 'PVID of port on switch this nic connects to',
-    },
-    'mtu': {
-        'description': 'Requested MTU to configure on this interface',
-    },
-    'vlans': {
-        'description': 'Tagged VLANs to apply to nic/switch',
-    },
-    'dhcpv4enabled': {
-        'description':  ('Whether DHCP should be attempted to acquire IPv4'
-                         'address on this interface'),
-    },
-    'dhcpv6enabled': {
-        'description':  ('Whether DHCP should be attempted to acquire IPv6'
-                         'address on this interface'),
-    },
-}
+# changing mind on design, flattening to a single attribute, a *touch* less
+# flexible at the top end, but much easier on the low end
+# now net.<name>.attribute scheme
+# similarly, leaning toward comma delimited ip addresses, since 99.99% of the
+# time each nic will have one ip address
+# vlan specification will need to be thought about a tad, each ip could be on
+# a distinct vlan, but could have a vlan without an ip for sake of putting
+# to a bridge.  Current thought is
+# vlans attribute would be comma delimited referring to the same index
+# as addresses, with either 'native' or a number for vlan id
+# the 'joinbridge' attribute would have some syntax like @<vlanid> to indicate
+# joining only a vlan of the nic to the bridge
+# 'joinbond' attribute would not support vlans.
+
+#nic = {
+#    'name': {
+#        'description': 'Name in ip/ifconfig as desired by administrator',
+#    },
+#    'biosdevname': {
+#        'description': '"biosdevname" scheme to identify the adapter. If not'
+#                       'mac address match is preferred, then biosdevname, then'
+#                       'name.',
+#    },
+#    'port': {
+#        'description': 'Port that this nic connects to',
+#    },
+#    'switch': {
+#        'description': 'Switch that this nic connects to',
+#    },
+#    'customhardwareaddress': {
+#        'description': 'Mac address to push to nic',
+#    },
+#    'dnssuffix': {
+#        'description': ('String to place after nodename, but before'
+#                        'Network.Domain to derive FQDN for this NIC'),
+#    },
+#    'hardwareaddress': {
+#        'description': 'Active mac address on this nic (factory or custom)'
+#    },
+#    'ipaddresses': {
+#        'description': 'Set of IPv4 and IPv6 addresses in CIDR format'
+#    },
+#    'pvid': {
+#        'description': 'PVID of port on switch this nic connects to',
+#    },
+#    'mtu': {
+#        'description': 'Requested MTU to configure on this interface',
+#    },
+#    'vlans': {
+#        'description': 'Tagged VLANs to apply to nic/switch',
+#    },
+#    'dhcpv4enabled': {
+#        'description':  ('Whether DHCP should be attempted to acquire IPv4'
+#                         'address on this interface'),
+#    },
+#    'dhcpv6enabled': {
+#        'description':  ('Whether DHCP should be attempted to acquire IPv6'
+#                         'address on this interface'),
+#    },
+#}
 
 user = {
     'password': {
@@ -71,7 +90,6 @@ user = {
 node = {
     'groups': {
         'type': list,
-        'default': 'all',
         'description': ('List of static groups for which this node is '
                         'considered a member'),
     },
@@ -81,6 +99,72 @@ node = {
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},
+    # autonode is the feature of generating nodes based on connectivity to
+    # current node.  In recursive autonode, for now we just allow endpoint to
+    # either be a server directly *or* a server enclosure.  This precludes
+    # for the moment a concept of nested arbitrarily deep, but for now do this.
+    # hypothetically, one could imagine supporting an array and 'popping'
+    # names until reaching end.  Not worth implementing at this point.  If
+    # a traditional switch is added, it needs some care and feeding anyway.
+    # If a more exciting scheme presents itself, well we won't have to
+#   # own discovering switches anyway.
+#   'autonode.servername': {
+#       'description': ('Template for creating nodenames for automatic '
+#                       'creation of nodes detected as children of '
+#                       'this node.  For example, a node in a server '
+#                       'enclosure bay or a server connected to a switch or '
+#                       'an enclosure manager connected to a switch.  Certain '
+#                       'special template parameters are available and can '
+#                       'be used alongside usual config template directives. '
+#                       '"discovered.nodenumber" will be replaced with the '
+#                       'bay or port number where the child node is connected.'
+#                       ),
+#   },
+#   'autonode.servergroups': {
+#       'type': list,
+#       'description': ('A list of groups to which discovered nodes will '
+#                       'belong to.  As in autonode.servername, "discovered." '
+#                       'variable names will be substituted in special context')
+#   },
+#   'autonode.enclosurename': {
+#       'description': ('Template for creating nodenames when the discovered '
+#                       'node is an enclosure that will in turn generate nodes.'
+#                       )
+#   },
+#   'autonode.enclosuregroups': {
+#       'type': list,
+#       'description': ('A list of groups to which a discovered node will be'
+#                       'placed, presuming that node is an enclosure.')
+#   },
+#For now, we consider this eventuality if needed.  For now emphasize paradigm
+# of group membership and see how far that goes.
+#    'autonode.copyattribs': {
+#        'type': list,
+#        'description': ('A list of attributes to copy from the node generator '
+#                        'to the generated node.  Expressions will be copied '
+#                        'over without evaluation, so will be evaluated '
+#                        'in the context of the generated node, rather than the'
+#                        'parent node.  By default, an enclosure will copy over'
+#                        'autonode.servername, so that would not need to be '
+#                        'copied ')
+#    },
+    'discovery.policy': {
+        'description':  'Policy to use for auto-configuration of discovered '
+                        'and identified nodes. Valid values are "manual", '
+                        '"permissive", or "open". "manual" means nodes are '
+                        'detected, but not autoconfigured until a user '
+                        'approves. "permissive" indicates to allow discovery, '
+                        'so long as the node has no existing public key. '
+                        '"open" allows discovery even if a known public key '
+                        'is already stored',
+    },
+    'info.note': {
+        'description':  'A field used for administrators to make arbitrary '
+                        'notations about nodes. This is meant entirely for '
+                        'human use and not programmatic use, so it can be '
+                        'freeform text data without concern for issues in how '
+                        'the server will process it.',
+    },
     'location.room': {
         'description': 'Room description for the node',
     },
@@ -195,17 +279,6 @@ node = {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
     },
-    'hardwaremanagement.switch': {
-        'description': 'The switch to which the hardware manager is connected.'
-                       ' Only relevant if using switch based discovery via the'
-                       ' hardware manager (Lenovo IMMs and CMMs).  Not '
-                       'applicable to Lenovo Flex nodes.'
-    },
-    'hardwaremanagement.switchport': {
-        'description': 'The port of the switch that the hardware manager is '
-                       'connected.  See documentation of '
-                       'hardwaremanagement.switch for more detail.'
-    },
     'enclosure.manager': {
         'description': "The management device for this node's chassis",
 #        'appliesto': ['system'],
@@ -223,9 +296,32 @@ node = {
 #    'id.serial': {
 #        'description': 'The manufacturer serial number of node',
 #    },
-#    'id.uuid': {
-#        'description': 'The UUID of the node as presented in DMI',
-#    },
+    'id.uuid': {
+        'description': 'The UUID of the node as presented in DMI.',
+    },
+    'net.ipv4_gateway': {
+        'description':  'The IPv4 gateway to use if applicable.  As is the '
+                        'case for other net attributes, net.eth0.ipv4_gateway '
+                        'and similar is accepted.'
+    },
+    # 'net.pxe': { 'description': 'Whether pxe will be used on this interface'
+    # TODO(jjohnson2):  Above being 'true' will control whether mac addresses
+    # are stored in this nics attribute on pxe-client discovery, since
+    # pxe discovery is ambiguous for BMC and system on same subnet,
+    # or even both on the same port and same subnet
+    'net.switch': {
+        'description': 'An ethernet switch the node is connected to.  Note '
+                       'that net.* attributes may be indexed by interface. '
+                       'For example instead of using net.switch, it is '
+                       'possible to use net.eth0.switch and net.eth1.switch '
+                       'or net.0.switch and net.1.switch to define multiple '
+                       'sets of net connectivity associated with each other.'
+    },
+    'net.switchport': {
+        'description': 'The port on the switch that corresponds to this node. '
+                       'See information on net.switch for more on the '
+                       'flexibility of net.* attributes.'
+    },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
 #    },

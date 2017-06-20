@@ -19,7 +19,13 @@ __author__ = 'alin37'
 
 import optparse
 import os
+import signal
 import sys
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -29,13 +35,14 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage='''\n       %prog [options] noderange [list of attributes]  \
-             \n       %prog [options] noderange attribute1=value1,attribute2=value,...
+    usage='''\n       %prog [-b] noderange [list of attributes]  \
+             \n       %prog -c noderange <list of attributes>  \
+             \n       %prog noderange attribute1=value1 attribute2=value,...
              \n ''')
 argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
 argparser.add_option('-c', '--clear', action='store_true',
-                     help='Clear variables')
+                     help='Clear attributes')
 (options, args) = argparser.parse_args()
 
 
@@ -46,7 +53,8 @@ try:
     noderange = args[0]
     nodelist = '/noderange/{0}/nodes/'.format(noderange)
 except IndexError:
-    nodelist = '/nodes/'
+    argparser.print_help()
+    sys.exit(1)
 session = client.Command()
 exitcode = 0
 
@@ -54,7 +62,7 @@ exitcode = 0
 nodetype="noderange"
 
 if len(args) > 1:
-    if "=" in args[1]:
+    if "=" in args[1] or options.clear:
         exitcode=client.updateattrib(session,args,nodetype, noderange, options)
     try:
         # setting user output to what the user inputs
@@ -65,6 +73,7 @@ if len(args) > 1:
             showtype = 'current'
             requestargs=args[2:]
         else:
+            showtype = 'all'
             requestargs=args[1:]
     except:
         pass

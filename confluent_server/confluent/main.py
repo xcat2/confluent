@@ -39,6 +39,7 @@ except ImportError:
     #On platforms without pwd, give up on the sockapi in general and be http
     #only for now
     pass
+import confluent.discovery.core as disco
 import eventlet
 dbgif = False
 if  map(int, (eventlet.__version__.split('.'))) > [0, 18]:
@@ -238,6 +239,7 @@ def run():
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
+    disco.start_detection()
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
         sockservice.start()

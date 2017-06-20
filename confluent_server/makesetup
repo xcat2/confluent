@@ -6,3 +6,4 @@ if [ "$NUMCOMMITS" != "$VERSION"  ]; then
 fi
 echo $VERSION > VERSION
 sed -e "s/#VERSION#/$VERSION/" setup.py.tmpl > setup.py
+echo '__version__ = "'$VERSION'"' > confluent/__init__.py

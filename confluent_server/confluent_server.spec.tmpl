@@ -12,7 +12,7 @@ Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
-Requires: python-pyghmi, python-eventlet, python-greenlet, python-crypto >= 2.6.1, confluent_client, pyparsing, python-paramiko, python-dns
+Requires: python-pyghmi, python-eventlet, python-greenlet, python-crypto >= 2.6.1, confluent_client, pyparsing, python-paramiko, python-dns, python-netifaces, python2-pyasn1, python-pysnmp, python-pyte
 Vendor: Jarrod Johnson <jjohnson2@lenovo.com>
 Url: http://xcat.sf.net/
 
@@ -34,7 +34,8 @@ grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
 cat INSTALLED_FILES
 
 %post
-if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent; fi
+if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
+true
 
 %clean
 rm -rf $RPM_BUILD_ROOT

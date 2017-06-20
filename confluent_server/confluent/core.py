@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,11 +33,14 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
+import confluent
 import confluent.alerts as alerts
 import confluent.config.attributes as attrscheme
+import confluent.discovery.core as disco
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 try:
     import confluent.shellmodule as shellmodule
@@ -100,7 +103,8 @@ def load_plugins():
         sys.path.pop(1)
 
 
-rootcollections = ['noderange/', 'nodes/', 'nodegroups/', 'users/', 'events/']
+rootcollections = ['discovery/', 'events/', 'networking/',
+                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'version']
 
 
 class PluginRoute(object):
@@ -344,11 +348,14 @@ def delete_nodegroup_collection(collectionpath, configmanager):
         raise Exception("Not implemented")
 
 
-def delete_node_collection(collectionpath, configmanager):
+def delete_node_collection(collectionpath, configmanager, isnoderange):
     if len(collectionpath) == 2:  # just node
-        node = collectionpath[-1]
-        configmanager.del_nodes([node])
-        yield msg.DeletedResource(node)
+        nodes = [collectionpath[-1]]
+        if isnoderange:
+            nodes = noderange.NodeRange(nodes[0], configmanager).nodes
+        configmanager.del_nodes(nodes)
+        for node in nodes:
+            yield msg.DeletedResource(node)
     else:
         raise Exception("Not implemented")
 
@@ -392,6 +399,7 @@ def create_group(inputdata, configmanager):
         configmanager.add_group_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
+    yield msg.CreatedResource(groupname)
 
 
 def create_node(inputdata, configmanager):
@@ -405,6 +413,25 @@ def create_node(inputdata, configmanager):
         configmanager.add_node_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
+    yield msg.CreatedResource(nodename)
+
+
+def create_noderange(inputdata, configmanager):
+    try:
+        noder = inputdata['name']
+        del inputdata['name']
+        attribmap = {}
+        for node in noderange.NodeRange(noder).nodes:
+            attribmap[node] = inputdata
+    except KeyError:
+        raise exc.InvalidArgumentException('name not specified')
+    try:
+        configmanager.add_node_attributes(attribmap)
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
+    for node in attribmap:
+        yield msg.CreatedResource(node)
+
 
 
 def enumerate_collections(collections):
@@ -419,7 +446,7 @@ def handle_nodegroup_request(configmanager, inputdata,
     if len(pathcomponents) < 2:
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
-            create_group(inputdata.attribs, configmanager)
+            return create_group(inputdata.attribs, configmanager)
         allgroups = list(configmanager.get_groups())
         try:
             allgroups.sort(key=noderange.humanify_nodename)
@@ -458,6 +485,16 @@ def handle_nodegroup_request(configmanager, inputdata,
     raise Exception("unknown case encountered")
 
 
+class BadPlugin(object):
+    def __init__(self, node, plugin):
+        self.node = node
+        self.plugin = plugin
+
+    def error(self, *args, **kwargs):
+        yield msg.ConfluentNodeError(
+            self.node, self.plugin + ' is not a supported plugin')
+
+
 def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
     iscollection = False
@@ -489,11 +526,14 @@ def handle_node_request(configmanager, inputdata, operation,
         # this is enumerating a list of nodes or just empty noderange
         if isnoderange and operation == "retrieve":
             return iterate_collections([])
+        elif isnoderange and operation == "create":
+            inputdata = msg.InputAttributes(pathcomponents, inputdata)
+            return create_noderange(inputdata.attribs, configmanager)
         elif isnoderange or operation == "delete":
             raise exc.InvalidArgumentException()
         if operation == "create":
             inputdata = msg.InputAttributes(pathcomponents, inputdata)
-            create_node(inputdata.attribs, configmanager)
+            return create_node(inputdata.attribs, configmanager)
         allnodes = list(configmanager.list_nodes())
         try:
             allnodes.sort(key=noderange.humanify_nodename)
@@ -524,7 +564,8 @@ def handle_node_request(configmanager, inputdata, operation,
             raise exc.InvalidArgumentException('Custom interface required for resource')
     if iscollection:
         if operation == "delete":
-            return delete_node_collection(pathcomponents, configmanager)
+            return delete_node_collection(pathcomponents, configmanager,
+                                          isnoderange)
         elif operation == "retrieve":
             return enumerate_node_collection(pathcomponents, configmanager)
         else:
@@ -561,7 +602,11 @@ def handle_node_request(configmanager, inputdata, operation,
                 if attrname in nodeattr[node]:
                     plugpath = nodeattr[node][attrname]['value']
             if plugpath is not None:
-                hfunc = getattr(pluginmap[plugpath], operation)
+                try:
+                    hfunc = getattr(pluginmap[plugpath], operation)
+                except KeyError:
+                    nodesbyhandler[BadPlugin(node, plugpath).error] = [node]
+                    continue
                 if hfunc in nodesbyhandler:
                     nodesbyhandler[hfunc].append(node)
                 else:
@@ -588,6 +633,14 @@ def handle_node_request(configmanager, inputdata, operation,
         #     return stripnode(passvalues[0], nodes[0])
 
 
+def handle_discovery(pathcomponents, operation, configmanager, inputdata):
+    if pathcomponents[0] == 'detected':
+        pass
+
+def handle_discovery(pathcomponents, operation, configmanager, inputdata):
+    if pathcomponents[0] == 'detected':
+        pass
+
 def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
 
@@ -612,6 +665,14 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
         # single node request of some sort
         return handle_node_request(configmanager, inputdata,
                                    operation, pathcomponents, autostrip)
+    elif pathcomponents[0] == 'discovery':
+        return disco.handle_api_request(
+            configmanager, inputdata, operation, pathcomponents)
+    elif pathcomponents[0] == 'networking':
+        return macmap.handle_api_request(
+            configmanager, inputdata, operation, pathcomponents)
+    elif pathcomponents[0] == 'version':
+        return (msg.Attributes(kv={'version': confluent.__version__}),)
     elif pathcomponents[0] == 'users':
         # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
@@ -646,5 +707,8 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
             raise exc.NotFoundException()
         if operation == 'update':
             return alerts.decode_alert(inputdata, configmanager)
+    elif pathcomponents[0] == 'discovery':
+        return handle_discovery(pathcomponents[1:], operation, configmanager,
+                                inputdata)
     else:
         raise exc.NotFoundException()

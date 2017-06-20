@@ -1,10 +1,10 @@
-nodelist(1) -- List confluent nodes and their attributes
+nodelist(8) -- List confluent nodes and their attributes
 =========================================================
 
 ## SYNOPSIS
 
-`nodelist` `noderange`  
-`nodelist` `noderange` [-b] [<nodeattribute>...]  
+`nodelist <noderange>`  
+`nodelist <noderange> [-b] <nodeattribute>...`  
 
 ## DESCRIPTION
 
@@ -45,4 +45,3 @@ information on node attributes in nodeattributes(5) man page.
   `n2: hardwaremanagement.method: ipmi (inherited from group everything)`  
   `n2: hardwaremanagement.switch: r8e1`  
   `n2: hardwaremanagement.switchport: 2`  
-

@@ -47,6 +47,7 @@ import optparse
 import os
 import select
 import shlex
+import signal
 import socket
 import sys
 import time
@@ -56,7 +57,10 @@ try:
     import tty
 except ImportError:
     pass
-
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 exitcode = 0
 consoleonly = False
 consolename = ""
@@ -84,6 +88,32 @@ netserver = None
 laststate = {}
 
 
+def print_help():
+    print("confetty provides a filesystem like interface to confluent.  "
+          "Navigation is done using the same commands as would be used in a "
+          "filesystem.  Tab completion is supported to aid in navigation,"
+          "as is up arrow to recall previous commands and control-r to search"
+          "previous command history, similar to using bash\n\n"
+          "The supported commands are:\n"
+          "cd [location] - Set the current command context, similar to a "
+          "working directory.\n"
+          "show [resource] - Present the information about the specified "
+          "resource, or current context if omitted.\n"
+          "create [resource] attributename=value attributename=value - Create "
+          "a new instance of a resource.\n"
+          "remove [resource] - Remove a resource from a list\n"
+          "set [resource] attributename=value attributename=value - Change "
+          "the specified attributes value for the given resource name\n"
+          "unset [resource] attributename - Clear any value for the given "
+          "attribute names on a resource.\n"
+          "start [resource] - When used on a text session resource, it "
+          "enters remote terminal mode.  In this mode, use 'ctrl-e, c, ?' for "
+          "help"
+          )
+    #TODO(jjohnson2): lookup context help for 'target' variable, perhaps
+    #common with the api document
+
+
 def updatestatus(stateinfo={}):
     status = consolename
     info = []
@@ -106,7 +136,7 @@ def updatestatus(stateinfo={}):
     if 'showtime' in laststate:
         showtime = laststate['showtime']
         age = time.time() - laststate['showtime']
-        if age > 86400: # older than one day
+        if age > 86400:  # older than one day
             # disambiguate by putting date in and time
             info.append(time.strftime('%m-%dT%H:%M', time.localtime(showtime)))
         else:
@@ -169,6 +199,7 @@ valid_commands = [
     'remove',
     'rm',
     'delete',
+    'help',
 ]
 
 candidates = None
@@ -238,7 +269,7 @@ def parse_command(command):
     try:
         args = shlex.split(command, posix=True)
     except ValueError as ve:
-        print('Error: ' + ve.message)
+        print('Error: ' + str(ve))
         return []
     return args
 
@@ -306,7 +337,11 @@ def do_command(command, server):
         return
     argv[0] = argv[0].lower()
     if argv[0] == 'exit':
+        if os.environ['TERM'] not in ('linux'):
+            sys.stdout.write('\x1b]0;\x07')
         sys.exit(0)
+    elif argv[0] in ('help', '?'):
+        return print_help()
     elif argv[0] == 'cd':
         otarget = target
         if len(argv) > 1:
@@ -348,6 +383,21 @@ def do_command(command, server):
     elif argv[0] in ('cat', 'show', 'ls', 'dir'):
         if len(argv) > 1:
             targpath = fullpath_target(argv[1])
+            if argv[0] in ('ls', 'dir'):
+                if targpath[-1] != '/':
+                    # could still be a directory, fetch the parent..
+                    childname = targpath[targpath.rindex('/') + 1:]
+                    parentpath = targpath[:targpath.rindex('/') + 1]
+                    if parentpath != '/noderange/':
+                        # if it were /noderange/, then it's a directory
+                        # even though parent won't tell us that
+                        for res in session.read(parentpath, server):
+                            try:
+                                if res['item']['href'] == childname:
+                                    print(childname)
+                                    return
+                            except KeyError:
+                                pass
         else:
             targpath = target
         for res in session.read(targpath):
@@ -418,6 +468,10 @@ def createresource(args):
 def makecall(callout, args):
     global exitcode
     for response in callout(*args):
+        if 'deleted' in response:
+            print("Deleted: " + response['deleted'])
+        if 'created' in response:
+            print("Created: " + response['created'])
         if 'error' in response:
             if 'errorcode' in response:
                 exitcode = response['errorcode']
@@ -526,7 +580,11 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
         if oldtcattr is not None:
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+    # Request default color scheme, to undo potential weirdness of terminal
+    sys.stdout.write('\x1b[m')
     if fullexit:
+        if os.environ['TERM'] not in ('linux'):
+            sys.stdout.write('\x1b]0;\x07')
         sys.exit(code)
     else:
         tlvdata.send(session.connection, {'operation': 'stop',
@@ -651,11 +709,11 @@ def conserver_command(filehandle, localcommand):
         else:
             print("Unknown power state.]\r")
 
-        check_power_state()
+        #check_power_state()
 
     elif localcommand[0] == '?':
         print("help]\r")
-        print(".       disconnect\r")
+        print(".       exit console\r")
         print("b       break\r")
         print("o       reopen\r")
         print("po      power off\r")
@@ -744,6 +802,8 @@ if sys.stdout.isatty():
 
     readline.parse_and_bind("tab: complete")
     readline.parse_and_bind("set bell-style none")
+    dl = readline.get_completer_delims().replace('-', '')
+    readline.set_completer_delims(dl)
     readline.set_completer(completer)
 
 doexit = False
@@ -767,10 +827,11 @@ def check_power_state():
     global powerstate, powertime
     for rsp in session.read('/nodes/' + consolename + '/power/state'):
         if type(rsp) == dict and 'state' in rsp:
-            powerstate = rsp['state']['value']
+            newpowerstate = rsp['state']['value']
             powertime = time.time()
-            if powerstate == 'off':
-                sys.stdout.write("\r\n[powered off]\r\n")
+            if newpowerstate != powerstate and newpowerstate == 'off':
+                sys.stdout.write("\x1b[2J\x1b[;H[powered off]\r\n")
+            powerstate = newpowerstate
         elif type(rsp) == dict and '_requestdone' in rsp:
             break
         elif type(rsp) == dict:
@@ -799,7 +860,12 @@ while inconsole or not doexit:
                     updatestatus(data)
                     continue
                 if data is not None:
-                    sys.stdout.write(data)
+                    try:
+                        sys.stdout.write(data)
+                    except IOError:  # Some times circumstances are bad
+                        # resort to byte at a time...
+                        for d in data:
+                            sys.stdout.write(d)
                     now = time.time()
                     if ('showtime' not in laststate or
                             (now // 60) != laststate['showtime'] // 60):
@@ -829,13 +895,15 @@ while inconsole or not doexit:
                         sys.stdout.write("\r\n[remote disconnected]\r\n")
                     break
             else:
-                myinput = fh.read()
-                myinput = check_escape_seq(myinput, fh)
-                if myinput:
-                    tlvdata.send(session.connection, myinput)
-        if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
-            check_power_state()
-
+                try:
+                    myinput = fh.read()
+                    myinput = check_escape_seq(myinput, fh)
+                    if myinput:
+                        tlvdata.send(session.connection, myinput)
+                except IOError:
+                    pass
+        #if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
+        #    check_power_state()
     else:
         currcommand = prompt()
         try:

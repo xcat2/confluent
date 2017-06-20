@@ -1,6 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
+# Copyright 2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@
 
 # we track nodes that are actively being logged, watched, or have attached
 # there should be no more than one handler per node
+import codecs
 import collections
 import confluent.config.configmanager as configmodule
 import confluent.exceptions as exc
@@ -29,6 +31,7 @@ import confluent.core as plugin
 import confluent.util as util
 import eventlet
 import eventlet.event
+import pyte
 import random
 import time
 import traceback
@@ -37,6 +40,100 @@ _handled_consoles = {}
 
 _tracelog = None
 
+try:
+    range = xrange
+except NameError:
+    pass
+
+pytecolors2ansi = {
+    'black': 0,
+    'red': 1,
+    'green': 2,
+    'brown': 3,
+    'blue': 4,
+    'magenta': 5,
+    'cyan': 6,
+    'white': 7,
+    'default': 9,
+}
+# might be able to use IBMPC map from pyte charsets,
+# in that case, would have to mask out certain things (like ESC)
+# in the same way that Screen's draw method would do
+# for now at least get some of the arrows in there (note ESC is one
+# of those arrows... so skip it...
+ansichars = dict(zip((0x18, 0x19), u'\u2191\u2193'))
+
+
+def _utf8_normalize(data, shiftin, decoder):
+    # first we give the stateful decoder a crack at the byte stream,
+    # we may come up empty in the event of a partial multibyte
+    try:
+        data = decoder.decode(data)
+    except UnicodeDecodeError:
+        # first order of business is to reset the state of
+        # the decoder to a clean one, so we can switch back to utf-8
+        # when things change, for example going from an F1 setup menu stuck
+        # in the old days to a modern platform using utf-8
+        decoder.setstate(codecs.getincrementaldecoder('utf-8')().getstate())
+        # Ok, so we have something that is not valid UTF-8,
+        # our next stop is to try CP437.  We don't try incremental
+        # decode, since cp437 is single byte
+        # replace is silly here, since there does not exist invalid c437,
+        # but just in case
+        data = data.decode('cp437', 'replace')
+    # Finally, the low part of ascii is valid utf-8, but we are going to be
+    # more interested in the cp437 versions (since this is console *output*
+    # not input
+    if shiftin is None:
+        data = data.translate(ansichars)
+    return data.encode('utf-8')
+
+
+def pytechars2line(chars, maxlen=None):
+    line = '\x1b[m'  # start at default params
+    lb = False  # last bold
+    li = False  # last italic
+    lu = False  # last underline
+    ls = False  # last strikethrough
+    lr = False  # last reverse
+    lfg = 'default'  # last fg color
+    lbg = 'default'   # last bg color
+    hasdata = False
+    len = 1
+    for charidx in range(maxlen):
+        char = chars[charidx]
+        csi = []
+        if char.fg != lfg:
+            csi.append(30 + pytecolors2ansi[char.fg])
+            lfg = char.fg
+        if char.bg != lbg:
+            csi.append(40 + pytecolors2ansi[char.bg])
+            lbg = char.bg
+        if char.bold != lb:
+            lb = char.bold
+            csi.append(1 if lb else 22)
+        if char.italics != li:
+            li = char.italics
+            csi.append(3 if li else 23)
+        if char.underscore != lu:
+            lu = char.underscore
+            csi.append(4 if lu else 24)
+        if char.strikethrough != ls:
+            ls = char.strikethrough
+            csi.append(9 if ls else 29)
+        if char.reverse != lr:
+            lr = char.reverse
+            csi.append(7 if lr else 27)
+        if csi:
+            line += b'\x1b[' + b';'.join(['{0}'.format(x) for x in csi]) + b'm'
+        if not hasdata and char.data.encode('utf-8').rstrip():
+            hasdata = True
+        line += char.data.encode('utf-8')
+        if maxlen and len >= maxlen:
+            break
+        len += 1
+    return line, hasdata
+
 
 class ConsoleHandler(object):
     _plugin_path = '/nodes/{0}/_console/session'
@@ -44,6 +141,7 @@ class ConsoleHandler(object):
     _genwatchattribs = frozenset(('console.method', 'console.logging'))
 
     def __init__(self, node, configmanager):
+        self.clearpending = False
         self._dologging = True
         self._isondemand = False
         self.error = None
@@ -51,14 +149,15 @@ class ConsoleHandler(object):
         self.node = node
         self.connectstate = 'unconnected'
         self._isalive = True
-        self.buffer = bytearray()
+        self.buffer = pyte.Screen(100, 31)
+        self.termstream = pyte.ByteStream()
+        self.termstream.attach(self.buffer)
         self.livesessions = set([])
+        self.utf8decoder = codecs.getincrementaldecoder('utf-8')()
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
                                      tenant=configmanager.tenant)
-            (text, termstate, timestamp) = self.logger.read_recent_text(8192)
-        else:
-            (text, termstate, timestamp) = ('', 0, False)
+        (text, termstate, timestamp) = (b'', 0, False)
         # when reading from log file, we will use wall clock
         # it should usually match walltime.
         self.lasttime = 0
@@ -70,7 +169,7 @@ class ConsoleHandler(object):
                 # wall clock has gone backwards, use current time as best
                 # guess
                 self.lasttime = util.monotonic_time()
-        self.buffer += text
+        self.clearbuffer()
         self.appmodedetected = False
         self.shiftin = None
         self.reconnect = None
@@ -90,6 +189,16 @@ class ConsoleHandler(object):
         if not self._isondemand:
             self.connectstate = 'connecting'
             eventlet.spawn(self._connect)
+
+    def feedbuffer(self, data):
+        try:
+            self.termstream.feed(data)
+        except StopIteration:  # corrupt parser state, start over
+            self.termstream = pyte.ByteStream()
+            self.termstream.attach(self.buffer)
+        except Exception:
+            _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                          event=log.Events.stacktrace)
 
     def check_isondemand(self):
         self._dologging = True
@@ -157,10 +266,18 @@ class ConsoleHandler(object):
         else:
             self._console.ping()
 
+    def clearbuffer(self):
+        self.feedbuffer(
+            '\x1bc[no replay buffer due to console.logging attribute set to '
+            'none or interactive,\r\nconnection loss, or service restart]')
+        self.clearpending = True
+
     def _disconnect(self):
         if self.connectionthread:
             self.connectionthread.kill()
             self.connectionthread = None
+        # clear the terminal buffer when disconnected
+        self.clearbuffer()
         if self._console:
             self.log(
                 logdata='console disconnected', ltype=log.DataTypes.event,
@@ -200,6 +317,7 @@ class ConsoleHandler(object):
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
         if not isinstance(self._console, conapi.Console):
+            self.clearbuffer()
             self.connectstate = 'unconnected'
             self.error = 'misconfigured'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -219,6 +337,7 @@ class ConsoleHandler(object):
         try:
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointBadCredentials:
+            self.clearbuffer()
             self.error = 'badcredentials'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -228,6 +347,7 @@ class ConsoleHandler(object):
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
         except exc.TargetEndpointUnreachable:
+            self.clearbuffer()
             self.error = 'unreachable'
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
@@ -237,6 +357,7 @@ class ConsoleHandler(object):
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
         except Exception:
+            self.clearbuffer()
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
             self.error = 'unknown'
@@ -257,6 +378,7 @@ class ConsoleHandler(object):
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
+        self.clearbuffer()
         if self.connectstate != 'unconnected':
             self.connectstate = 'unconnected'
             self.log(
@@ -277,12 +399,6 @@ class ConsoleHandler(object):
         if self.connectionthread:
             self.connectionthread.kill()
             self.connectionthread = None
-
-    def flushbuffer(self):
-        # Logging is handled in a different stream
-        # this buffer is now just for having screen redraw on
-        # connect
-        self.buffer = bytearray(self.buffer[-8192:])
 
     def get_console_output(self, data):
         # Spawn as a greenthread, return control as soon as possible
@@ -354,19 +470,18 @@ class ConsoleHandler(object):
             eventdata |= 2
         self.log(data, eventdata=eventdata)
         self.lasttime = util.monotonic_time()
-        if isinstance(data, bytearray) or isinstance(data, bytes):
-            self.buffer += data
-        else:
-            self.buffer += data.encode('utf-8')
+        self.feedbuffer(data)
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        if len(self.buffer) > 16384:
-            self.flushbuffer()
-        self._send_rcpts(data)
+        if self.clearpending:
+            self.clearpending = False
+            self.feedbuffer(b'\x1bc')
+            self._send_rcpts(b'\x1bc')
+        self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
 
     def _send_rcpts(self, data):
-        for rcpt in self.livesessions:
+        for rcpt in list(self.livesessions):
             try:
                 rcpt.data_handler(data)
             except:  # No matter the reason, advance to next recipient
@@ -385,7 +500,26 @@ class ConsoleHandler(object):
             'connectstate': self.connectstate,
             'clientcount': len(self.livesessions),
         }
-        retdata = ''
+        retdata = b'\x1b[H\x1b[J'  # clear screen
+        pendingbl = b''  # pending blank lines
+        maxlen = 0
+        for line in self.buffer.display:
+            line = line.rstrip()
+            if len(line) > maxlen:
+                maxlen = len(line)
+        for line in range(self.buffer.lines):
+            nline, notblank = pytechars2line(self.buffer.buffer[line], maxlen)
+            if notblank:
+                if pendingbl:
+                    retdata += pendingbl
+                    pendingbl = b''
+                retdata += nline + '\r\n'
+            else:
+                pendingbl += nline + '\r\n'
+        if len(retdata) >  6:
+            retdata = retdata[:-2]  # remove the last \r\n
+        retdata += b'\x1b[{0};{1}H'.format(self.buffer.cursor.y + 1,
+                                           self.buffer.cursor.x + 1)
         if self.shiftin is not None:  # detected that terminal requested a
             # shiftin character set, relay that to the terminal that cannected
             retdata += '\x1b)' + self.shiftin
@@ -393,27 +527,16 @@ class ConsoleHandler(object):
             retdata += '\x1b[?1h'
         else:
             retdata += '\x1b[?1l'
-        # an alternative would be to emulate a VT100 to know what the
-        # whole screen would look like
-        # this is one scheme to clear screen, move cursor then clear
-        bufidx = self.buffer.rfind('\x1b[H\x1b[J')
-        if bufidx >= 0:
-            return retdata + str(self.buffer[bufidx:]), connstate
-        # another scheme is the 2J scheme
-        bufidx = self.buffer.rfind('\x1b[2J')
-        if bufidx >= 0:
-            # there was some sort of clear screen event
-            # somewhere in the buffer, replay from that point
-            # in hopes that it reproduces the screen
-            return retdata + str(self.buffer[bufidx:]), connstate
-        else:
-            # we have no indication of last erase, play back last kibibyte
-            #  to give some sense of context anyway
-            return retdata + str(self.buffer[-1024:]), connstate
+        return retdata, connstate
 
     def write(self, data):
         if self.connectstate == 'connected':
-            self._console.write(data)
+            try:
+                self._console.write(data)
+            except Exception:
+                _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                              event=log.Events.stacktrace)
+                self._got_disconnected()
 
 
 def disconnect_node(node, configmanager):
