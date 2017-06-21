@@ -1,0 +1,42 @@
+nodegroupattrib(8) -- List or change confluent nodegroup attributes
+===================================================================
+
+## SYNOPSIS
+
+`nodegroupattrib <group> [ current | all ]`  
+`nodegroupattrib <group> [<nodeattribute>...]`  
+`nodegroupattrib <group> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`  
+`nodegroupattrib <group> [-c] [<nodeattribute1> <nodeattribute2=value2> ...]`  
+
+## DESCRIPTION
+
+`nodegroupattrip` queries the confluent server to get information about nodes.
+In the simplest form, it simply takes the given group and lists the attributes of that group.
+
+Contrasted with nodeattrib(8), settings managed by nodegroupattrib will be added
+and removed from a node as it is added or removed from a group.  If an attribute
+is set using nodeattrib(8) against a noderange(5) that happens to be a group name,
+nodeattrib(8) individually sets attributes directly on each individual node that is
+currently a member of that group.  Removing group membership or adding a new
+node after using the nodeattrib(8) command will not have attributes change automatically.
+It's easiest to see by using the `nodeattrib <noderange> -b` to understand how
+the attributes are set on the node versus a group to which a node belongs.
+
+## OPTIONS
+
+* `-c`, `--clear`:
+  Clear specified nodeattributes.
+
+## EXAMPLES
+
+* Show attributes of a group called `demogrp`:
+  `# nodegroupattrib demogrp`  
+  `demogrp: hardwaremanagement.manager:  (will derive from expression 10.30.{n0/255}.{n0%255})`  
+  `demogrp: nodes: n12,n13,n10,n11,n9,n1,n2,n3,n4`  
+
+* Set location.u to be the remainder of first number in node name when divided by 42:  
+  `# nodegroupattrib demogrp location.u={n1%42}`  
+
+## SEE ALSO
+
+nodeattrib(8), nodeattribexpressions(5)

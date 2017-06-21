@@ -1,0 +1,34 @@
+nodeboot(8) -- Reboot a confluent node to a specific device
+=========================================================
+
+## SYNOPSIS
+
+`nodeboot <noderange>`  
+`nodeboot <noderange>` [net|setup]  
+
+## DESCRIPTION
+
+**nodeboot** reboots nodes in a noderange.  If an additional argument is given,
+it sets the node to specifically boot to that as the next boot.
+
+## EXAMPLES
+* Booting n3 and n4 to the default boot behavior:
+  `# nodeboot n3-n4`  
+  `n3: default`  
+  `n4: default`  
+  `n3: on->reset`  
+  `n4: on->reset`  
+
+* Booting n1 and n2 to setup menu:
+  `# nodeboot n1-n2 setup`
+  `n2: setup`  
+  `n1: setup`  
+  `n2: on->reset`  
+  `n1: on->reset`  
+
+* Booting n3 and n4 to network:
+  `# nodeboot n3-n4 net`  
+  `n3: network`  
+  `n4: network`  
+  `n4: on->reset`  
+  `n3: off->on`  

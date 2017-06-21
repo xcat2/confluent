@@ -1,0 +1,43 @@
+nodepower(8) -- Check or change power state of confluent nodes
+=========================================================
+
+## SYNOPSIS
+
+`nodepower <noderange>`  
+`nodepower <noderange> [on|off|boot|shutdown|reset|status]`
+
+## DESCRIPTION
+
+**nodepower** with only a noderange will retrieve current power state of nodes
+through confluent.  When given an additional argument, it will request a change
+to the power state of the nodes.  The following arguments are recognized:
+
+* `on`: Turn on the specified noderange.  Nothing will happen to nodes of
+the noderange that are already on.
+* `off`:  Immediately turn off the specified noderange, without waiting for OS
+to shutdown.  Nothing will happen to nodes of the noderange that are already on.
+* `boot`:  Immediately boot a system.  This will power on nodes of the noderange
+that are off, and reset nodes of the noderange that are on.  The previous state
+will be reflected in the output.
+* `shutdown`:  Request the OS gracefully shut down.  Nothing will happen for
+nodes that are off, and nodes will not shutdown if the OS fails to gracefully
+respond.
+* `reset`:  Request immediate reset of nodes of the noderange.  Nodes that are
+off will not react to this request.
+* `status`:  Behave identically to having no argument passed at all.
+
+## EXAMPLES
+* Get power state of nodes n1 through n4:
+  `# nodepower n1-n4`  
+  `n1: on`  
+  `n2: on`  
+  `n3: on`  
+  `n4: off`  
+
+
+* Forcing a reboot of nodes n1-n4:
+    `# nodepower n1-n4 boot`  
+    `n3: on->reset`  
+    `n1: on->reset`  
+    `n2: on->reset`  
+    `n4: off->on`  

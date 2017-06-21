@@ -1,0 +1,69 @@
+nodesetboot(8) -- Check or set next boot device for noderange
+====================================================
+
+## SYNOPSIS
+
+`nodesetboot <noderange>`  
+`nodesetboot [options] <noderang> [default|cd|network|setup|hd]`
+
+## DESCRIPTION
+
+Requests that the next boot occur from the specified device.  Unless otherwise
+specified, this is a one time boot option, and does not change the normal boot
+behavior of the system.  This is useful for taking a system that normally boots
+to the hard drive and startking a network install, or to go into the firmware
+setup menu without having to hit a keystroke at the correct time on the console.
+
+Generally, it's a bit more convenient and direct to use the nodeboot(8) command,
+which will follow up the boot device with an immediate power directive to take
+effect.  The `nodesetboot` command is still useful, particularly if you want
+to use `nodesetboot <noderange> setup` and then initiate a reboot from within
+the operating system with ssh or similar rather than using the remote hardware
+control.
+
+## OPTIONS
+
+* `-b`, `--bios`:
+  For a system that supports both BIOS and UEFI style boot, request BIOS style
+  boot if supported (some platforms will UEFI boot with this flag anyway).
+
+* `-p`, `--persist`:
+  For a system that supports it, mark the boot override to persist rather than
+  be a one time change.  Many systems do not support this functionality.
+  
+* `default`:
+  Request a normal default boot with no particular device override
+
+* `cd`:
+  Request boot from media.  Note that this can include physical CD,
+  remote media mounted as CD/DVD, and detachable hard disks drives such as usb
+  key devices.
+  
+* `network`:
+  Request boot to network
+  
+* `setup`:
+  Request to enter the firmware configuration menu (e.g. F1 setup) on next boot.
+
+* `hd`:
+  Boot straight to hard disk drive
+
+## EXAMPLES
+
+* Set next boot to setup for four nodes:
+  `# nodesetboot n1-n4 setup`  
+  `n1: setup`  
+  `n3: setup`  
+  `n2: setup`  
+  `n4: setup`  
+
+* Check boot override settings on four nodes:
+  `# nodesetboot n1-n4`  
+  `n1: setup`  
+  `n2: setup`  
+  `n3: setup`  
+  `n4: setup`  
+  
+## SEE ALSO
+
+nodeboot(8)
