@@ -449,11 +449,11 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
         odtfn = dtfn
         append=1
         while os.path.exists(dbfn):
-            dbfn = odbfn + '.{}'.format(append)
+            dbfn = odbfn + '.{0}'.format(append)
             append += 1
         append=1
         while os.path.exists(dtfn):
-            dtfn = odtfn + '.{}'.format(append)
+            dtfn = odtfn + '.{0}'.format(append)
             append += 1
         if os.path.exists(self.binpath):
             os.rename(self.binpath, dbfn)
