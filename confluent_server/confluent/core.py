@@ -363,7 +363,8 @@ def delete_node_collection(collectionpath, configmanager, isnoderange):
 def enumerate_nodegroup_collection(collectionpath, configmanager):
     nodegroup = collectionpath[1]
     if not configmanager.is_nodegroup(nodegroup):
-        raise exc.NotFoundException("Invalid element requested")
+        raise exc.NotFoundException(
+            'Invalid nodegroup: {0} not found'.format(nodegroup))
     del collectionpath[0:2]
     collection = nested_lookup(nodegroupresources, collectionpath)
     return iterate_resources(collection)

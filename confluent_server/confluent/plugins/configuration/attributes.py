@@ -1,4 +1,5 @@
 # Copyright 2014 IBM Corporation
+# Copyright 2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +27,13 @@ def retrieve(nodes, element, configmanager, inputdata):
 
 
 def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
-    grpcfg = configmanager.get_nodegroup_attributes(nodegroup)
+    try:
+        grpcfg = configmanager.get_nodegroup_attributes(nodegroup)
+    except KeyError:
+        if not configmanager.is_nodegroup(nodegroup):
+            raise exc.NotFoundException(
+                'Invalid nodegroup: {0} not found'.format(nodegroup))
+        raise
     if element == 'all':
         theattrs = set(allattributes.node).union(set(grpcfg))
         theattrs.add('nodes')
