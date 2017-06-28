@@ -443,8 +443,15 @@ def snoop(handler):
                         # ignore for now
                         known_peers.discard(peer)
                         continue
+                    # we want to prioritize the very well known services
+                    svcs = []
+                    for svc in q:
+                        if svc in _slp_services:
+                            svcs.insert(0, svc)
+                        else:
+                            svcs.append(svc)
                     peerbymacaddress[mac] = {
-                        'services': q,
+                        'services': svcs,
                         'addresses': [peer],
                     }
                 newmacs.add(mac)
