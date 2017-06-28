@@ -15,6 +15,8 @@
 import confluent.discovery.handlers.bmc as bmchandler
 import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.private.util as pygutil
+import string
+import struct
 
 
 class NodeHandler(bmchandler.NodeHandler):
@@ -22,6 +24,31 @@ class NodeHandler(bmchandler.NodeHandler):
 
     def probe(self):
         try:
+            slpattrs = self.info.get('attributes', {})
+            try:
+                ff = slpattrs.get('enclosure-form-factor', [''])[0]
+            except IndexError:
+                return
+            if ff != 'dense-computing':
+                # do not probe unless it's a dense platform
+                return
+            wronguuid = slpattrs.get('node-uuid', [''])[0]
+            if wronguuid:
+                # we need to fix the first three portions of the uuid
+                uuidprefix = wronguuid.split('-')[:3]
+                uuidprefix = struct.pack(
+                    '<IHH', *[int(x, 16) for x in uuidprefix]).encode('hex')
+                uuidprefix = uuidprefix[:8] + '-' + uuidprefix[8:12] + '-' + \
+                             uuidprefix[12:16]
+                self.info['uuid'] = uuidprefix + '-' + '-'.join(
+                    wronguuid.split('-')[3:])
+                self.info['uuid'] = string.lower(self.info['uuid'])
+            slot = int(slpattrs.get('slot', ['0'])[0])
+            if slot != 0:
+                self.info['enclosure.bay'] = slot
+                return
+            # we are a dense platform, but the SLP data did not give us slot
+            # attempt to probe using IPMI
             ipmicmd = self._get_ipmicmd()
             guiddata = ipmicmd.xraw_command(netfn=6, command=8)
             self.info['uuid'] = pygutil.decode_wireformat_uuid(
