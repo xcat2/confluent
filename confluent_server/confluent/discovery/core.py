@@ -448,7 +448,7 @@ def detected(info):
     else:  # no nodehandler, ignore for now
         return
     try:
-        snum = info['attributes']['enclosure-serial-number'][0].rstrip()
+        snum = info['attributes']['enclosure-serial-number'][0].strip()
         if snum:
             info['serialnumber'] = snum
             known_serials[info['serialnumber']] = info
