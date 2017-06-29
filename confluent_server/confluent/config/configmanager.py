@@ -90,6 +90,8 @@ _masterintegritykey = None
 _dirtylock = threading.RLock()
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 tracelog = None
+statelessmode = False
+_cfgstore = None
 
 def _mkpath(pathname):
     try:
@@ -495,6 +497,8 @@ class ConfigManager(object):
 
     def __init__(self, tenant, decrypt=False, username=None):
         global _cfgstore
+        if _cfgstore is None:
+            init()
         self.decrypt = decrypt
         self.current_user = username
         if tenant is None:
@@ -1408,6 +1412,8 @@ class ConfigManager(object):
 
     @classmethod
     def _bg_sync_to_file(cls):
+        if statelessmode:
+            return
         with cls._syncstate:
             if cls._syncrunning:
                 cls._writepending = True
@@ -1421,6 +1427,8 @@ class ConfigManager(object):
 
     @classmethod
     def _sync_to_file(cls):
+        if statelessmode:
+            return
         if 'dirtyglobals' in _cfgstore:
             with _dirtylock:
                 dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
@@ -1566,11 +1574,15 @@ def dump_db_to_directory(location, password, redact=None):
     except OSError:
         pass
 
-
-try:
-    ConfigManager._read_from_path()
-except IOError:
-    _cfgstore = {}
+def init(stateless=False):
+    global _cfgstore
+    if stateless:
+        _cfgstore = {}
+        return
+    try:
+        ConfigManager._read_from_path()
+    except IOError:
+        _cfgstore = {}
 
 
 # some unit tests worth implementing:
