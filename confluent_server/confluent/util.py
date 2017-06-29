@@ -37,7 +37,14 @@ def list_interface_indexes():
             yield intidx
     except (IOError, OSError):
         # Probably situation is non-Linux, just do limited support for
-        # such platforms until other people come alonge
+        # such platforms until other people come along
+        for iface in netifaces.interfaces():
+            addrinfo = netifaces.ifaddresses(iface).get(socket.AF_INET6, [])
+            for addr in addrinfo:
+                v6addr = addr.get('addr', '').partition('%')[2]
+                if v6addr:
+                    yield(int(v6addr))
+                    break
         return
 
 
