@@ -302,6 +302,8 @@ def get_global(globalname):
 
     :param globalname: The global parameter name to read
     """
+    if _cfgstore is None:
+        init()
     try:
         return _cfgstore['globals'][globalname]
     except KeyError:
@@ -318,6 +320,8 @@ def set_global(globalname, value):
     :param globalname:  The global parameter name to store
     :param value: The value to set the global parameter to.
     """
+    if _cfgstore is None:
+        init()
     with _dirtylock:
         if 'dirtyglobals' not in _cfgstore:
             _cfgstore['dirtyglobals'] = set()
