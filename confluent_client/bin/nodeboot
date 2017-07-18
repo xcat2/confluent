@@ -66,6 +66,7 @@ rc = session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
                                      bootmode=bootmode,
                                      persistent=options.persist,
                                      errnodes=errnodes)
-noderange = noderange + ',-(' + ','.join(errnodes) + ')'
+if errnodes:
+    noderange = noderange + ',-(' + ','.join(errnodes) + ')'
 rc |= session.simple_noderange_command(noderange, '/power/state', 'boot')
 sys.exit(rc)
