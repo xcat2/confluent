@@ -121,8 +121,9 @@ class TLSCertVerifier(object):
         fingerprint = get_fingerprint(certificate)
         storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
                                                    )
-        if self.fieldname not in storedprint[self.node]:  # no stored value, check
-                                                   # policy for next action
+        if (self.fieldname not in storedprint[self.node] or
+                storedprint[self.node][self.fieldname]['value'] == ''):
+            # no stored value, check policy for next action
             newpolicy = self.cfm.get_node_attributes(self.node,
                                                      ('pubkeys.addpolicy',))
             if ('pubkeys.addpolicy' in newpolicy[self.node] and
