@@ -540,6 +540,12 @@ class Logger(object):
             tstamp = entry[1]
             data = entry[2]
             evtdata = entry[3]
+            if len(data) > 65535:
+                # our max log entry is 65k, take only the first 65k and put
+                # rest back on as a continuation
+                entry[2] = data[65535:]
+                self.logentries.appendleft(entry)
+                data = data[:65535]
             textdate = ''
             if self.isconsole and ltype != 2:
                 textdate = time.strftime(
