@@ -608,7 +608,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
         nl = cfg.filter_node_attributes(
-            'enclosure.bay=' + info['enclosure.bay'], nl)
+            'enclosure.bay={0}'.format(info['enclosure.bay']), nl)
         nl = list(nl)
         if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
