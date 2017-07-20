@@ -61,11 +61,12 @@ if options.biosmode:
 else:
     bootmode = 'uefi'
 
+errnodes = set([])
 rc = session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
                                      bootmode=bootmode,
-                                     persistent=options.persist)
-
-if rc:
-    sys.exit(rc)
-else:
-    sys.exit(session.simple_noderange_command(noderange, '/power/state', 'boot'))
+                                     persistent=options.persist,
+                                     errnodes=errnodes)
+if errnodes:
+    noderange = noderange + ',-(' + ','.join(errnodes) + ')'
+rc |= session.simple_noderange_command(noderange, '/power/state', 'boot')
+sys.exit(rc)

@@ -77,7 +77,7 @@ class Command(object):
     def add_precede_key(self, keyname):
         self._prevkeyname = keyname
 
-    def handle_results(self, ikey, rc, res):
+    def handle_results(self, ikey, rc, res, errnodes=None):
         if 'error' in res:
             sys.stderr.write('Error: {0}\n'.format(res['error']))
             if 'errorcode' in res:
@@ -89,6 +89,8 @@ class Command(object):
         res = res['databynode']
         for node in res:
             if 'error' in res[node]:
+                if errnodes is not None:
+                    errnodes.add(node)
                 sys.stderr.write('{0}: Error: {1}\n'.format(
                     node, res[node]['error']))
                 if 'errorcode' in res[node]:
@@ -110,7 +112,7 @@ class Command(object):
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
-                                 key=None, **kwargs):
+                                 key=None, errnodes=None, **kwargs):
         try:
             rc = 0
             if resource[0] == '/':
@@ -123,12 +125,12 @@ class Command(object):
             if input is None:
                 for res in self.read('/noderange/{0}/{1}'.format(
                         noderange, resource)):
-                    rc = self.handle_results(ikey, rc, res)
+                    rc = self.handle_results(ikey, rc, res, errnodes)
             else:
                 kwargs[ikey] = input
                 for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
-                    rc = self.handle_results(ikey, rc, res)
+                    rc = self.handle_results(ikey, rc, res, errnodes)
             return rc
         except KeyboardInterrupt:
             print('')

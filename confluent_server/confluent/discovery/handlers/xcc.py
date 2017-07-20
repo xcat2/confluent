@@ -58,7 +58,7 @@ class NodeHandler(bmchandler.NodeHandler):
                 '/v2/cmm/sp/7')
             if not bayid:
                 return
-            self.info['enclosure.bay'] = bayid
+            self.info['enclosure.bay'] = int(bayid)
             smmid = ipmicmd._oem.immhandler.get_property(
                 '/v2/ibmc/smm/chassis/uuid')
             if not smmid:
