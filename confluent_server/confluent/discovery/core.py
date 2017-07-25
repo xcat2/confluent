@@ -148,6 +148,8 @@ def send_discovery_datum(info):
     yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
     yield msg.KeyValueData({'serialnumber': info.get('serialnumber', '')})
     yield msg.KeyValueData({'modelnumber': info.get('modelnumber', '')})
+    if 'enclosure.bay' in info:
+        yield msg.KeyValueData({'bay': int(info['enclosure.bay'])})
     yield msg.KeyValueData({'macs': [info.get('hwaddr', '')]})
     types = []
     for infotype in info.get('services', []):
@@ -488,6 +490,7 @@ def detected(info):
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
+    handler.scan()
     if handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
             log.log(

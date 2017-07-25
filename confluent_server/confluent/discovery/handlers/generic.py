@@ -36,6 +36,12 @@ class NodeHandler(object):
         self.ipaddr = targsa[0]
         return
 
+    def scan(self):
+        # Do completely passive things to enhance data.
+        # Probe is permitted to for example attempt a login
+        # scan *only* does what it can without a login attempt
+        return
+
     def probe(self):
         # Use appropriate direct strategy to gather data such as
         # serial number and uuid to flesh out data as needed

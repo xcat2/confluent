@@ -12,68 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import confluent.discovery.handlers.bmc as bmchandler
+import confluent.discovery.handlers.imm as immhandler
 import pyghmi.exceptions as pygexc
-import pyghmi.ipmi.private.util as pygutil
-import string
-import struct
 
 
-class NodeHandler(bmchandler.NodeHandler):
+
+class NodeHandler(immhandler.NodeHandler):
     devname = 'XCC'
 
-    def probe(self):
-        try:
-            slpattrs = self.info.get('attributes', {})
-            try:
-                ff = slpattrs.get('enclosure-form-factor', [''])[0]
-            except IndexError:
-                return
-            if ff != 'dense-computing':
-                # do not probe unless it's a dense platform
-                return
-            wronguuid = slpattrs.get('node-uuid', [''])[0]
-            if wronguuid:
-                # we need to fix the first three portions of the uuid
-                uuidprefix = wronguuid.split('-')[:3]
-                uuidprefix = struct.pack(
-                    '<IHH', *[int(x, 16) for x in uuidprefix]).encode('hex')
-                uuidprefix = uuidprefix[:8] + '-' + uuidprefix[8:12] + '-' + \
-                             uuidprefix[12:16]
-                self.info['uuid'] = uuidprefix + '-' + '-'.join(
-                    wronguuid.split('-')[3:])
-                self.info['uuid'] = string.lower(self.info['uuid'])
-            slot = int(slpattrs.get('slot', ['0'])[0])
-            if slot != 0:
-                self.info['enclosure.bay'] = slot
-                return
-            # we are a dense platform, but the SLP data did not give us slot
-            # attempt to probe using IPMI
-            ipmicmd = self._get_ipmicmd()
-            guiddata = ipmicmd.xraw_command(netfn=6, command=8)
-            self.info['uuid'] = pygutil.decode_wireformat_uuid(
-                guiddata['data'])
-            ipmicmd.oem_init()
-            bayid = ipmicmd._oem.immhandler.get_property(
-                '/v2/cmm/sp/7')
-            if not bayid:
-                return
-            self.info['enclosure.bay'] = int(bayid)
-            smmid = ipmicmd._oem.immhandler.get_property(
-                '/v2/ibmc/smm/chassis/uuid')
-            if not smmid:
-                return
-            smmid = smmid.lower().replace(' ', '')
-            smmid = '{0}-{1}-{2}-{3}-{4}'.format(smmid[:8], smmid[8:12],
-                                                 smmid[12:16], smmid[16:20],
-                                                 smmid[20:])
-            self.info['enclosure.uuid'] = smmid
-            self.info['enclosure.type'] = 'smm'
-        except pygexc.IpmiException as ie:
-            print(repr(ie))
-            raise
-
     def preconfig(self):
+        ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
+        if ff != 'dense-computing':
+            return
         # attempt to enable SMM
         #it's normal to get a 'not supported' (193) for systems without an SMM
         ipmicmd = None
