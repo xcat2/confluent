@@ -19,8 +19,13 @@ __author__ = 'jjohnson2,alin37'
 
 import optparse
 import os
+import signal
 import sys
 
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -30,7 +35,8 @@ import confluent.client as client
 
 def main():
     argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [list of attributes]")
+    usage="Usage: %prog noderange\n"
+          "   or: %prog [options] noderange <nodeattribute>...")
     argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
     (options, args) = argparser.parse_args()

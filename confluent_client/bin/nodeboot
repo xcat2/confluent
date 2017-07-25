@@ -17,8 +17,13 @@
 
 import optparse
 import os
+import signal
 import sys
 
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -56,11 +61,12 @@ if options.biosmode:
 else:
     bootmode = 'uefi'
 
+errnodes = set([])
 rc = session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
                                      bootmode=bootmode,
-                                     persistent=options.persist)
-
-if rc:
-    sys.exit(rc)
-else:
-    sys.exit(session.simple_noderange_command(noderange, '/power/state', 'boot'))
+                                     persistent=options.persist,
+                                     errnodes=errnodes)
+if errnodes:
+    noderange = noderange + ',-(' + ','.join(errnodes) + ')'
+rc |= session.simple_noderange_command(noderange, '/power/state', 'boot')
+sys.exit(rc)

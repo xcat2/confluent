@@ -1,1 +1,2 @@
 include confluent_env.sh
+include confluent_env.csh

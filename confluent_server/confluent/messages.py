@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -194,6 +194,17 @@ class ConfluentNodeError(object):
         raise Exception(self.error)
 
 
+class ConfluentResourceUnavailable(ConfluentNodeError):
+    apicode = 503
+
+    def __init__(self, node, errstr='Unavailable'):
+        self.node = node
+        self.error = errstr
+
+    def strip_node(self, node):
+        raise exc.TargetResourceUnavailable()
+
+
 class ConfluentTargetTimeout(ConfluentNodeError):
     apicode = 504
 
@@ -228,9 +239,19 @@ class ConfluentTargetInvalidCredentials(ConfluentNodeError):
 
 
 class DeletedResource(ConfluentMessage):
+    notnode = True
     def __init__(self, resource):
-        self.kvpairs = {}
+        self.kvpairs = {'deleted': resource}
 
+class CreatedResource(ConfluentMessage):
+    notnode = True
+    def __init__(self, resource):
+        self.kvpairs = {'created': resource}
+
+class AssignedResource(ConfluentMessage):
+    notnode = True
+    def __init__(self, resource):
+        self.kvpairs = {'assigned': resource}
 
 class ConfluentChoiceMessage(ConfluentMessage):
     valid_values = set()
@@ -325,9 +346,16 @@ class ChildCollection(LinkRelation):
                                                                   extension)
 
 
+# TODO(jjohnson2): enhance the following to support expressions:
+# InputNetworkConfiguration
+# InputMCI
+# InputDomainName
+# InputNTPServer
 def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
+    elif path == ['attributes', 'expression']:
+        return InputExpression(path, inputdata, nodes)
     elif path[0] in ('attributes', 'users') and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
@@ -387,7 +415,47 @@ class InputAlertData(ConfluentMessage):
         return self.alertparams
 
 
+class InputExpression(ConfluentMessage):
+    # This is specifically designed to suppress the expansion of an expression
+    # so that it can make it intact to the pertinent configmanager function
+    def __init__(self, path, inputdata, nodes=None):
+        self.nodeattribs = {}
+        nestedmode = False
+        if not inputdata:
+            raise exc.InvalidArgumentException('no request data provided')
+        if nodes is None:
+            self.attribs = inputdata
+            return
+        for node in nodes:
+            if node in inputdata:
+                nestedmode = True
+                self.nodeattribs[node] = inputdata[node]
+        if nestedmode:
+            for key in inputdata:
+                if key not in nodes:
+                    raise exc.InvalidArgumentException
+        else:
+            for node in nodes:
+                self.nodeattribs[node] = inputdata
+
+    def get_attributes(self, node):
+        if node not in self.nodeattribs:
+            return {}
+        nodeattr = deepcopy(self.nodeattribs[node])
+        return nodeattr
+
+
 class InputAttributes(ConfluentMessage):
+    # This is particularly designed for attributes, where a simple string
+    # should become either a string value or a dict with {'expression':} to
+    # preserve the client provided expression for posterity, rather than
+    # immediate consumption.
+    # for things like node configuration or similar, a different class is
+    # appropriate since it nedes to immediately expand an expression.
+    # with that class, the 'InputExpression' and calling code in attributes.py
+    # might be deprecated in favor of the generic expression expander
+    # and a small function in attributes.py to reflect the expansion back
+    # to the client
     def __init__(self, path, inputdata, nodes=None):
         self.nodeattribs = {}
         nestedmode = False
@@ -468,12 +536,13 @@ class InputCredential(ConfluentMessage):
         if len(path) == 4:
             inputdata['uid'] = path[-1]
         # if the operation is 'create' check if all fields are present
-        elif ('uid' not in inputdata or 'privilege_level' not in inputdata or
-                'username' not in inputdata or 'password' not in inputdata):
-            raise exc.InvalidArgumentException('all fields are required')
-
-        if 'uid' not in inputdata:
-            raise exc.InvalidArgumentException('uid is missing')
+        missingattrs = []
+        for attrname in ('uid', 'privilege_level', 'username', 'password'):
+            if attrname not in inputdata:
+                missingattrs.append(attrname)
+        if missingattrs:
+            raise exc.InvalidArgumentException(
+                'Required fields missing: {0}'.format(','.join(missingattrs)))
         if (isinstance(inputdata['uid'], str) and
                 not inputdata['uid'].isdigit()):
             raise exc.InvalidArgumentException('uid must be a number')

@@ -1,9 +1,10 @@
-confetty(1) --- Interactive confluent client
+confetty(8) --- Interactive confluent client
 =================================================
 
 ## SYNOPSIS
 
-`confetty`
+`confetty`  
+`confetty <confetty command line>`
 
 ## DESCRIPTION
 
@@ -33,5 +34,3 @@ commands.
   Start a console session indicated by **ELEMENT** (e.g. /nodes/n1/console/session)
 * `rm` **ELEMENT**
   Request removal of an element.  (e.g. rm events/hardware/log clears log from a node)
-
-

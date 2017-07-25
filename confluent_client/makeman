@@ -1,0 +1,8 @@
+#!/bin/sh
+cd `dirname $0`/doc/man
+mkdir -p ../../man/man5
+mkdir -p ../../man/man8
+ronn -r *.ronn
+mv *.5 ../../man/man5/
+mv *.8 ../../man/man8/
+

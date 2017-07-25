@@ -77,7 +77,7 @@ class Command(object):
     def add_precede_key(self, keyname):
         self._prevkeyname = keyname
 
-    def handle_results(self, ikey, rc, res):
+    def handle_results(self, ikey, rc, res, errnodes=None):
         if 'error' in res:
             sys.stderr.write('Error: {0}\n'.format(res['error']))
             if 'errorcode' in res:
@@ -89,6 +89,8 @@ class Command(object):
         res = res['databynode']
         for node in res:
             if 'error' in res[node]:
+                if errnodes is not None:
+                    errnodes.add(node)
                 sys.stderr.write('{0}: Error: {1}\n'.format(
                     node, res[node]['error']))
                 if 'errorcode' in res[node]:
@@ -110,7 +112,7 @@ class Command(object):
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
-                                 key=None, **kwargs):
+                                 key=None, errnodes=None, **kwargs):
         try:
             rc = 0
             if resource[0] == '/':
@@ -123,12 +125,12 @@ class Command(object):
             if input is None:
                 for res in self.read('/noderange/{0}/{1}'.format(
                         noderange, resource)):
-                    rc = self.handle_results(ikey, rc, res)
+                    rc = self.handle_results(ikey, rc, res, errnodes)
             else:
                 kwargs[ikey] = input
                 for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
-                    rc = self.handle_results(ikey, rc, res)
+                    rc = self.handle_results(ikey, rc, res, errnodes)
             return rc
         except KeyboardInterrupt:
             print('')
@@ -274,7 +276,7 @@ def attrrequested(attr, attrlist, seenattributes):
         if candidate == attr:
             seenattributes.add(truename)
             return True
-        elif '.' not in candidate and attr.startswith(candidate + '.'):
+        elif attr.startswith(candidate + '.'):
             seenattributes.add(truename)
             return True
     return False
@@ -309,12 +311,12 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
                                   '{2}'.format(node, attr,
                                                currattr['broken'])
                     elif isinstance(currattr, list) or isinstance(currattr, tuple):
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, currattr)))
+                        attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, currattr)))
                     elif isinstance(currattr, dict):
                         dictout = []
                         for k, v in currattr.items:
                             dictout.append("{0}={1}".format(k, v))
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ', '.join(map(str, dictout)))
+                        attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, dictout)))
                     else:
                         print ("CODE ERROR" + repr(attr))
 
@@ -367,28 +369,17 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                     attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                               '{2}'.format(noderange, attr,
                                            currattr['broken'])
+                elif 'expression' in currattr:
+                    attrout = '{0}: {1}:  (will derive from expression {2})'.format(noderange, attr, currattr['expression'])
                 elif isinstance(currattr, list) or isinstance(currattr, tuple):
-                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ', '.join(map(str, currattr)))
+                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ','.join(map(str, currattr)))
                 elif isinstance(currattr, dict):
                     dictout = []
                     for k, v in currattr.items:
                         dictout.append("{0}={1}".format(k, v))
-                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ', '.join(map(str, dictout)))
+                    attrout = '{0}: {1}: {2}'.format(noderange, attr, ','.join(map(str, dictout)))
                 else:
                     print ("CODE ERROR" + repr(attr))
-
-                if options.blame or 'broken' in currattr:
-                    blamedata = []
-                    if 'inheritedfrom' in currattr:
-                        blamedata.append('inherited from group {0}'.format(
-                            currattr['inheritedfrom']
-                        ))
-                    if 'expression' in currattr:
-                        blamedata.append(
-                            'derived from expression "{0}"'.format(
-                                currattr['expression']))
-                    if blamedata:
-                        attrout += ' (' + ', '.join(blamedata) + ')'
                 print attrout
     if not exitcode:
         if requestargs:

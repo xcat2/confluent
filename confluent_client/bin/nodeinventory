@@ -17,7 +17,13 @@
 
 import optparse
 import os
+import signal
 import sys
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -77,6 +83,8 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
+if len(args) > 1 and args[1] == 'firm':
+    os.execlp('nodefirmware', 'nodefirmware', noderange)
 try:
     session = client.Command()
     for res in session.read('/noderange/{0}/inventory/hardware/all/all'.format(

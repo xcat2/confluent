@@ -449,11 +449,11 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
         odtfn = dtfn
         append=1
         while os.path.exists(dbfn):
-            dbfn = odbfn + '.{}'.format(append)
+            dbfn = odbfn + '.{0}'.format(append)
             append += 1
         append=1
         while os.path.exists(dtfn):
-            dtfn = odtfn + '.{}'.format(append)
+            dtfn = odtfn + '.{0}'.format(append)
             append += 1
         if os.path.exists(self.binpath):
             os.rename(self.binpath, dbfn)
@@ -540,6 +540,12 @@ class Logger(object):
             tstamp = entry[1]
             data = entry[2]
             evtdata = entry[3]
+            if len(data) > 65535:
+                # our max log entry is 65k, take only the first 65k and put
+                # rest back on as a continuation
+                entry[2] = data[65535:]
+                self.logentries.appendleft(entry)
+                data = data[:65535]
             textdate = ''
             if self.isconsole and ltype != 2:
                 textdate = time.strftime(
@@ -743,6 +749,7 @@ tracelog = None
 
 
 def log(logdata=None, ltype=None, event=0, eventdata=None):
+    global globaleventlog
     if globaleventlog is None:
         globaleventlog = Logger('events')
     globaleventlog.log(logdata, ltype, event, eventdata)

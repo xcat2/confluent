@@ -19,8 +19,13 @@ __author__ = 'alin37'
 
 import optparse
 import os
+import signal
 import sys
 
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -57,6 +62,7 @@ exitcode = 0
 #Sets attributes
 
 if len(args) > 1:
+    showtype = 'all'
     exitcode=client.updateattrib(session,args,nodetype, nodegroups, options)
     try:
         # setting user output to what the user inputs
