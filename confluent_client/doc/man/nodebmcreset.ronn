@@ -1,0 +1,19 @@
+nodebmcreset(8) -- Reset management controller
+=========================================================
+
+## SYNOPSIS
+
+`nodebmcreset <noderange>`  
+
+## DESCRIPTION
+
+`nodebmcreset` allows you to reset the management controller of the specified noderange
+
+## EXAMPLES:
+
+* Reset the management controller for nodes n1 through n4:
+  `# nodebmcreset n1-n4`
+  `n1: BMC Reset Successful`
+  `n2: BMC Reset Successful`
+  `n3: BMC Reset Successful`
+  `n4: BMC Reset Successful`
