@@ -15,6 +15,7 @@
 
 import atexit
 import confluent.exceptions as exc
+import confluent.firmwaremanager as firmwaremanager
 import confluent.interface.console as conapi
 import confluent.messages as msg
 import confluent.util as util
@@ -350,6 +351,7 @@ class IpmiHandler(object):
         connparams = get_conn_params(node, self.cfg)
         self.ipmicmd = None
         self.inputdata = inputdata
+        self.tenant = cfg.tenant
         tenant = cfg.tenant
         if ((node, tenant) not in persistent_ipmicmds or
                 not persistent_ipmicmds[(node, tenant)].ipmi_session.logged):
@@ -417,6 +419,8 @@ class IpmiHandler(object):
             self.handle_sensors()
         elif self.element[0] == 'configuration':
             self.handle_configuration()
+        elif self.element[:3] == ['inventory', 'firmware', 'updates']:
+            self.handle_update()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
         elif self.element == ['events', 'hardware', 'log']:
@@ -427,6 +431,11 @@ class IpmiHandler(object):
             self.handle_license()
         else:
             raise Exception('Not Implemented')
+
+    def handle_update(self):
+        firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
+                                self.inputdata.filename, self.tenant)
+
 
     def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
@@ -961,9 +970,16 @@ def update(nodes, element, configmanager, inputdata):
     return create(nodes, element, configmanager, inputdata)
 
 
+def list_active_updates(nodes, configmanager):
+    raise Exception('Not Implemented')
+
+
 def retrieve(nodes, element, configmanager, inputdata):
     initthread()
-    return perform_requests('read', nodes, element, configmanager, inputdata)
+    if '/'.join(element).startswith('inventory/firmware/updates/active'):
+        return firmwaremanager.list_updates(nodes, configmanager.tenant)
+    else:
+        return perform_requests('read', nodes, element, configmanager, inputdata)
 
 def delete(nodes, element, configmanager, inputdata):
     initthread()

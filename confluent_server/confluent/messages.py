@@ -389,8 +389,17 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     elif (path[:4] == ['configuration', 'management_controller', 'ntp',
             'servers'] and operation != 'retrieve' and len(path) == 5):
         return InputNTPServer(path, nodes, inputdata)
+    elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
+        return InputFirmwareUpdate(path, nodes, inputdata)
     elif inputdata:
-        raise exc.InvalidArgumentException()
+        raise exc.InvalidArgumentException(
+            'No known input handler for request')
+
+class InputFirmwareUpdate(ConfluentMessage):
+
+    def __init__(self, path, nodes, inputdata):
+        self.filename = inputdata['filename']
+        self.nodes = nodes
 
 
 class InputAlertData(ConfluentMessage):
