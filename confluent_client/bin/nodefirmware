@@ -19,6 +19,7 @@ import optparse
 import os
 import signal
 import sys
+import time
 
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -30,7 +31,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
-
+import confluent.screensqueeze as sq
 
 exitcode = 0
 
@@ -64,15 +65,62 @@ def printfirm(node, prefix, data):
     print('{0}: {1}: {2}'.format(node, prefix, version))
 
 
-argparser = optparse.OptionParser(usage="Usage: %prog <noderange>")
+argparser = optparse.OptionParser(
+    usage="Usage: %prog <noderange> [update <file>]")
 (options, args) = argparser.parse_args()
+upfile = None
 try:
     noderange = args[0]
+    if len(args) > 1:
+        if args[1] != 'update':
+            argparser.print_help()
+            sys.exit(1)
+        upfile = args[2]
 except IndexError:
     argparser.print_help()
     sys.exit(1)
-try:
-    session = client.Command()
+
+def get_update_progress(session, url):
+    for res in session.read(url):
+        status = res['phase']
+        percent = res['progress']
+        detail = res['detail']
+        if status == 'error':
+            text = 'error!'
+        else:
+            text = '{0}: {1:3.0f}%'.format(status, percent)
+    return text, status, detail
+
+def update_firmware(session, filename):
+    global exitcode
+    output = sq.ScreenPrinter(noderange, session)
+    nodeurls = {}
+    filename = os.path.abspath(filename)
+    resource = '/noderange/{0}/inventory/firmware/updates/active'.format(
+        noderange)
+    for res in session.create(resource, {'filename': filename}):
+        watchurl = res['created']
+        currnode = watchurl.split('/')[1]
+        nodeurls[currnode] = '/' + watchurl
+    noderrs = {}
+    while nodeurls:
+        for node in list(nodeurls):
+            progress, status, err = get_update_progress(
+                session, nodeurls[node])
+            if status == 'error':
+                exitcode = 1
+                noderrs[node] = err
+            if status in ('error', 'complete'):
+                list(session.delete(nodeurls[node]))
+                del nodeurls[node]
+            output.set_output(node, progress)
+        time.sleep(2)
+    allerrnodes = ','.join(noderrs)
+    sys.stderr.write('Nodes had errors updating ({0})!\n'.format(allerrnodes))
+    for node in noderrs:
+        sys.stderr.write('{0}: {1}\n'.format(node, noderrs[node]))
+
+def show_firmware(session):
     for res in session.read('/noderange/{0}/inventory/firmware/all/all'.format(
             noderange)):
         printerror(res)
@@ -85,6 +133,14 @@ try:
             for inv in res['databynode'][node]['firmware']:
                 for prefix in inv:
                     printfirm(node, prefix, inv[prefix])
+
+
+try:
+    session = client.Command()
+    if upfile is None:
+        show_firmware(session)
+    else:
+        update_firmware(session, upfile)
 except KeyboardInterrupt:
     print('')
 sys.exit(exitcode)
