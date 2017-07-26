@@ -116,7 +116,9 @@ def update_firmware(session, filename):
             output.set_output(node, progress)
         time.sleep(2)
     allerrnodes = ','.join(noderrs)
-    sys.stderr.write('Nodes had errors updating ({0})!\n'.format(allerrnodes))
+    if noderrs:
+        sys.stderr.write(
+            'Nodes had errors updating ({0})!\n'.format(allerrnodes))
     for node in noderrs:
         sys.stderr.write('{0}: {1}\n'.format(node, noderrs[node]))
 
