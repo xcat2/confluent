@@ -1,5 +1,5 @@
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -433,8 +433,12 @@ class IpmiHandler(object):
             raise Exception('Not Implemented')
 
     def handle_update(self):
-        firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
-                                self.inputdata.filename, self.tenant)
+        u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
+                                    self.inputdata.filename, self.tenant)
+        self.output.put(
+            msg.CreatedResource(
+                'nodes/{0}/inventory/firmware/updates/active/{1}'.format(
+                    self.node, u.name)))
 
 
     def handle_configuration(self):
@@ -970,14 +974,11 @@ def update(nodes, element, configmanager, inputdata):
     return create(nodes, element, configmanager, inputdata)
 
 
-def list_active_updates(nodes, configmanager):
-    raise Exception('Not Implemented')
-
-
 def retrieve(nodes, element, configmanager, inputdata):
     initthread()
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
-        return firmwaremanager.list_updates(nodes, configmanager.tenant)
+        return firmwaremanager.list_updates(nodes, configmanager.tenant,
+                                            element)
     else:
         return perform_requests('read', nodes, element, configmanager, inputdata)
 

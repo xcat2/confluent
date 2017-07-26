@@ -18,6 +18,7 @@
 # provide managing firmware update process and firmware repository if/when
 # the time comes
 
+import confluent.exceptions as exc
 import confluent.messages as msg
 import eventlet
 
@@ -35,15 +36,17 @@ class Updater(object):
     def __init__(self, node, handler, filename, tenant=None, name=None):
         self.node = node
         self.phase = 'initializing'
+        self.detail = ''
         self.percent = 0.0
         self.updateproc = eventlet.spawn(execupdate, handler, filename, self)
         if (node, tenant) not in updatesbytarget:
             updatesbytarget[(node, tenant)] = {}
         if name is None:
             name = 1
-            while name in updatesbytarget[(node, tenant)]:
+            while '{0}'.format(name) in updatesbytarget[(node, tenant)]:
                 name += 1
-        updatesbytarget[(node, tenant)][name] = self
+        self.name = '{0}'.format(name)
+        updatesbytarget[(node, tenant)][self.name] = self
 
     def handle_progress(self, progress):
         self.phase = progress['phase']
@@ -56,7 +59,18 @@ class Updater(object):
                 'detail': self.detail}
 
 
-def list_updates(nodes, tenant=None):
+def list_updates(nodes, tenant, element):
+    showmode = False
+    if len(element) > 4:
+        showmode = True
+        upid = element[-1]
     for node in nodes:
-        for updateid in updatesbytarget.get((node, None), {}):
-            yield msg.ChildCollection(updateid)
+        if showmode:
+            try:
+                updater = updatesbytarget[(node, tenant)][upid]
+            except KeyError:
+                raise exc.NotFoundException('No matching update process found')
+            yield msg.KeyValueData(updater.progress, name=node)
+        else:
+            for updateid in updatesbytarget.get((node, tenant), {}):
+                yield msg.ChildCollection(updateid)
