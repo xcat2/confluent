@@ -234,12 +234,10 @@ def _init_core():
                     'default': 'ipmi',
                 }),
                 'updates': {
-                    'active': {
-                        PluginCollection({
+                    'active': PluginCollection({
                             'pluginattrs': ['hardwaremanagement.method'],
                             'default': 'ipmi',
-                        }),
-                    },
+                    }),
                 },
             },
         },
