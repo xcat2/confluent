@@ -53,10 +53,29 @@ class Updater(object):
         self.percent = float(progress['progress'])
         self.detail = progress.get('detail', '')
 
+    def cancel(self):
+        self.updateproc.kill()
+
     @property
     def progress(self):
         return {'phase': self.phase, 'progress': self.percent,
                 'detail': self.detail}
+
+
+def remove_updates(nodes, tenant, element):
+    if len(element) < 5:
+        raise exc.InvalidArgumentException()
+    upid = element[-1]
+    for node in nodes:
+        try:
+            upd = updatesbytarget[(node, tenant)][upid]
+        except KeyError:
+            raise exc.NotFoundException('No active update matches request')
+        upd.cancel()
+        del updatesbytarget[(node, tenant)][upid]
+        yield msg.DeletedResource(
+            'nodes/{0}/inventory/firmware/updates/active/{1}'.format(
+                node, upid))
 
 
 def list_updates(nodes, tenant, element):

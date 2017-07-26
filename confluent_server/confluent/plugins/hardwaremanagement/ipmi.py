@@ -984,5 +984,8 @@ def retrieve(nodes, element, configmanager, inputdata):
 
 def delete(nodes, element, configmanager, inputdata):
     initthread()
+    if '/'.join(element).startswith('inventory/firmware/updates/active'):
+        return firmwaremanager.remove_updates(nodes, configmanager.tenant,
+                                              element)
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata)
