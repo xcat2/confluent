@@ -59,4 +59,4 @@ for node in goodNodes:
     print node + ": BMC Reset Successful"
 
 
-sys.exit()
+sys.exit(success)
