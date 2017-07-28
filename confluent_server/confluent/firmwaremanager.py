@@ -30,7 +30,7 @@ def execupdate(handler, filename, updateobj):
         updateobj.handle_progress({'phase': 'complete', 'progress': 100.0})
     except Exception as e:
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
-                                   'detail': repr(e)})
+                                   'detail': str(e)})
 
 class Updater(object):
     def __init__(self, node, handler, filename, tenant=None, name=None):
