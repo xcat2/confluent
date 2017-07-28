@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015-2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import optparse
+import os
+import signal
+import sys
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+argparser = optparse.OptionParser(usage="Usage: %prog <noderange>")
+(options, args) = argparser.parse_args()
+try:
+    noderange = args[0]
+except IndexError:
+    argparser.print_help()
+    sys.exit(1)
+
+session = client.Command()
+exitcode = 0
+
+errorNodes = set([])
+
+success = session.simple_noderange_command(noderange, 'configuration/management_controller/reset', 'reset', key='state', errnodes=errorNodes)   # = 0 if successful
+
+# Determine which nodes were successful and print them
+
+allNodes = set([])
+
+for node in session.read('/noderange/{0}/nodes/'.format(noderange)):
+    allNodes.add(node['item']['href'].replace("/", ""))
+
+goodNodes = allNodes - errorNodes
+
+for node in goodNodes:
+    print node + ": BMC Reset Successful"
+
+
+sys.exit(success)
