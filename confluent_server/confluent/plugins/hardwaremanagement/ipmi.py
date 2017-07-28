@@ -40,11 +40,14 @@ import socket
 # are not actually dangerously multiplexed...  so we can replace with
 # a null context manager for now
 class NullLock(object):
-    def __enter__(self, *args, **kwargs):
+
+    def donothing(self, *args, **kwargs):
         return 1
 
-    def __exit__(self, *args, **kwargs):
-        return 1
+    __enter__ = donothing
+    __exit__ = donothing
+    acquire = donothing
+    release = donothing
 
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
