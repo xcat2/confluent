@@ -31,8 +31,25 @@ console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
 
+
+# There is something not right with the RLocks used in pyghmi when
+# eventlet comes into play.  It seems like sometimes on acquire,
+# it calls _get_ident and it isn't the id(greenlet) and so
+# a thread deadlocks itself due to identity crisis?
+# However, since we are not really threaded, the operations being protected
+# are not actually dangerously multiplexed...  so we can replace with
+# a null context manager for now
+class NullLock(object):
+    def __enter__(self, *args, **kwargs):
+        return 1
+
+    def __exit__(self, *args, **kwargs):
+        return 1
+
 console.session.select = eventlet.green.select
 console.session.threading = eventlet.green.threading
+console.session.WAITING_SESSIONS = NullLock()
+console.session.KEEPALIVE_SESSIONS = NullLock()
 console.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
