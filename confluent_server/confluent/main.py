@@ -163,7 +163,7 @@ def dumptrace(signalname, frame):
             continue
         if not o:
             continue
-        ht.write('Thread trace:\n')
+        ht.write('Thread trace: ({0})\n'.format(id(o)))
         ht.write(''.join(traceback.format_stack(o.gr_frame)))
     ht.close()
 
