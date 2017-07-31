@@ -266,6 +266,7 @@ class IpmiConsole(conapi.Console):
                                                  password=self.password,
                                                  kg=self.kg, force=True,
                                                  iohandler=self.handle_data)
+            self.solconnection.outputlock = NullLock()
             while not self.solconnection.connected and not self.broken:
                 w = eventlet.event.Event()
                 _ipmiwaiters.append(w)
