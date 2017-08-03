@@ -19,7 +19,6 @@ from collections import deque
 import optparse
 import os
 import select
-import shlex
 import signal
 import subprocess
 import sys
@@ -62,7 +61,7 @@ def run():
         ex = exp['databynode']
         for node in ex:
             cmd = ex[node]['value'].encode('utf-8')
-            cmdv = ['ssh', node] + shlex.split(cmd)
+            cmdv = ['ssh', node, cmd]
             if currprocs < concurrentprocs:
                 currprocs += 1
                 run_cmdv(node, cmdv, all, pipedesc)
