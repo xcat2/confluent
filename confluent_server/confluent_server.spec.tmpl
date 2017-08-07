@@ -33,6 +33,10 @@ done
 grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
 cat INSTALLED_FILES
 
+%triggerin -- python-pyghmi
+if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
+true
+
 %post
 if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
 true
