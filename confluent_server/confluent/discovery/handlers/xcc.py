@@ -22,7 +22,7 @@ class NodeHandler(immhandler.NodeHandler):
 
     def preconfig(self):
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
-        if ff != 'dense-computing':
+        if ff not in ('dense-computing', [u'dense-computing']):
             return
         # attempt to enable SMM
         #it's normal to get a 'not supported' (193) for systems without an SMM
