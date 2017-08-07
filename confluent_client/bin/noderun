@@ -71,9 +71,9 @@ def run():
                 run_cmdv(node, cmdv, all, pipedesc)
             else:
                 pendingexecs.append((node, cmdv))
+    exitcode = 0
     if not all or exitcode:
         sys.exit(exitcode)
-    exitcode = 0
     rdy, _, _ = select.select(all, [], [], 10)
     while all:
         for r in rdy:
