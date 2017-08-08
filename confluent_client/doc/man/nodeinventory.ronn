@@ -3,13 +3,15 @@ nodeinventory(8) -- Get hardware inventory of confluent node
 
 ## SYNOPSIS
 
-`nodeinventory <noderange>`  
+`nodeinventory <noderange> [serial|model|uuid|mac]`
 
 ## DESCRIPTION
 
 `nodeinventory` pulls information about hardware of a node.  This includes 
 information such as adapters, serial numbers, processors, and memory modules,
-as supported by the platforms hardware management implementation.
+as supported by the platforms hardware management implementation.  It accepts
+arguments such as serial or model or others as listed above to filter
+output to specific data.
 
 ## EXAMPLES
 
@@ -104,3 +106,16 @@ as supported by the platforms hardware management implementation.
   `r1: Broadcom NetXtreme Gigabit Ethernet Controller MAC Address 4: 40:f2:e9:af:45:a3`   
   `r1: Broadcom NetXtreme Gigabit Ethernet Controller PCI slot: 1b:00`   
   `r1: Broadcom NetXtreme Gigabit Ethernet Controller location: Onboard`   
+
+* Reporting just the mac addresses of a node named r2:
+  `# nodeinventory r2 mac`
+  `r2: System MAC Address 1: 40:f2:e9:b9:10:18`
+  `r2: System MAC Address 2: 40:f2:e9:b9:10:19`
+  `r2: System MAC Address 3: 40:f2:e9:b9:10:1a`
+  `r2: System MAC Address 4: 40:f2:e9:b9:10:1b`
+
+* Getting the model number and serial number of a node named s2:
+  `# nodeinventory stark2 serial model`
+  `s2: System Product name: LENOVO THINKSYSTEM SD530 SERVER`
+  `s2: System Serial Number: DEV0000002`
+  `s2: System Model: 7X2104Z028`
