@@ -12,8 +12,8 @@ nodebmcreset(8) -- Reset management controller
 ## EXAMPLES:
 
 * Reset the management controller for nodes n1 through n4:
-  `# nodebmcreset n1-n4`
-  `n1: BMC Reset Successful`
-  `n2: BMC Reset Successful`
-  `n3: BMC Reset Successful`
-  `n4: BMC Reset Successful`
+  `# nodebmcreset n1-n4`  
+  `n1: BMC Reset Successful`  
+  `n2: BMC Reset Successful`  
+  `n3: BMC Reset Successful`  
+  `n4: BMC Reset Successful`  
