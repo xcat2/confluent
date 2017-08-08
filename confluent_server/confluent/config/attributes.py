@@ -293,9 +293,15 @@ node = {
 #IBM Flex)''',
 #        'appliesto': ['system'],
 #    },
-#    'id.serial': {
-#        'description': 'The manufacturer serial number of node',
-#    },
+    'id.model': {
+        'description': 'The model number of a node.  In scenarios where there '
+                       'is both a name and a model number, it is generally '
+                       'expected that this would be the generally more '
+                       'specific model number.'
+    },
+    'id.serial': {
+        'description': 'The manufacturer serial number of node',
+    },
     'id.uuid': {
         'description': 'The UUID of the node as presented in DMI.',
     },
