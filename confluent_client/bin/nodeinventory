@@ -81,7 +81,7 @@ def printerror(res, node=None):
 
 url = '/noderange/{0}/inventory/hardware/all/all'
 
-argparser = optparse.OptionParser(usage="Usage: %prog <noderange>")
+argparser = optparse.OptionParser(usage="Usage: %prog <noderange> [serial|model|uuid|mac")
 (options, args) = argparser.parse_args()
 try:
     noderange = sys.argv[1]
