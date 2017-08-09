@@ -706,8 +706,8 @@ def discover_node(cfg, handler, info, nodename, manual):
                 newnodeattribs['id.uuid'] = info['uuid']
             if 'serialnumber' in info:
                 newnodeattribs['id.serial'] = info['serialnumber']
-            if 'model' in info:
-                newnodeattribs['id.model'] = info['model']
+            if 'modelnumber' in info:
+                newnodeattribs['id.model'] = info['modelnumber']
             if handler.https_cert:
                 newnodeattribs['pubkeys.tls_hardwaremanager'] = \
                     util.get_fingerprint(handler.https_cert)
