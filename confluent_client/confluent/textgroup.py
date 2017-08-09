@@ -73,10 +73,41 @@ class GroupedData(object):
         else:
             self.bynode[node].append(line)
 
-    def print_deviants(self, output=sys.stdout, skipmodal=True):
+    def print_all(self, output=sys.stdout, skipmodal=False, reverse=False,
+                  count=False):
         self.generate_byoutput()
         modaloutput = None
         ismodal = True
+        outdatalist = sorted(
+            self.byoutput, key=lambda x: len(self.byoutput[x]))
+        if not reverse:
+             outdatalist = reversed(outdatalist)
+        if reverse and skipmodal:
+            # if reversed, the last is biggest and should be skipped if modal
+            outdatalist = outdatalist[:-1]
+        for outdata in outdatalist:
+            if not reverse and skipmodal:
+                # If big first, this makes skipmodal skip first
+                skipmodal = False
+                continue
+            currout = '====================================\n'
+            currout += ','.join(sorted(self.byoutput[outdata]))
+            currout += '\n====================================\n'
+            if count:
+                currout += 'Count: {0}'.format(len(list(
+                    self.byoutput[outdata])))
+                currout += '\n====================================\n'
+            currout += outdata
+            currout += '\n\n'
+            output.write(currout)
+        output.flush()
+
+    def print_deviants(self, output=sys.stdout, skipmodal=False, reverse=False,
+                       count=False):
+        self.generate_byoutput()
+        modaloutput = None
+        ismodal = True
+        revoutput = []
         for outdata in reversed(
                 sorted(self.byoutput, key=lambda x: len(self.byoutput[x]))):
             if modaloutput is None:
@@ -85,16 +116,26 @@ class GroupedData(object):
                 skipmodal = False
                 ismodal = False
                 continue
-            output.write('====================================\n')
-            output.write(','.join(sorted(self.byoutput[outdata])))
-            output.write('\n====================================\n')
+            currout = '====================================\n'
+            currout += ','.join(sorted(self.byoutput[outdata]))
+            currout += '\n====================================\n'
+            if count:
+                currout += 'Count: {0}'.format(len(list(
+                    self.byoutput[outdata])))
+                currout += '\n====================================\n'
             if ismodal:
                 ismodal = False
-                output.write(outdata)
+                currout += outdata
             else:
-                output.write('\n'.join(colordiff(modaloutput.split('\n'),
-                                                 outdata.split('\n'))))
-            output.write('\n\n')
+                currout += '\n'.join(colordiff(modaloutput.split('\n'),
+                                                 outdata.split('\n')))
+            currout += '\n\n'
+            if reverse:
+                revoutput.append(currout)
+            else:
+                output.write(currout)
+        for currout in reversed(revoutput):
+            output.write(currout)
         output.flush()
 
 if __name__ == '__main__':

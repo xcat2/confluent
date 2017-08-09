@@ -27,6 +27,10 @@ import confluent.tlvdata as tlvdata
 SO_PASSCRED = 16
 
 
+def cprint(txt):
+    print(txt)
+    sys.stdout.flush()
+
 def _parseserver(string):
     if ']:' in string:
         server, port = string[1:].split(']:')
@@ -105,10 +109,10 @@ class Command(object):
                 else:
                     val = repr(res[node][ikey])
                 if self._prevkeyname and self._prevkeyname in res[node]:
-                    print('{0}: {2}->{1}'.format(
+                    cprint('{0}: {2}->{1}'.format(
                         node, val, res[node][self._prevkeyname]['value']))
                 else:
-                    print('{0}: {1}'.format(node, val))
+                    cprint('{0}: {1}'.format(node, val))
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
@@ -133,7 +137,7 @@ class Command(object):
                     rc = self.handle_results(ikey, rc, res, errnodes)
             return rc
         except KeyboardInterrupt:
-            print('')
+            cprint('')
             return 0
 
     def simple_nodegroups_command(self, noderange, resource, input=None, key=None, **kwargs):
@@ -157,7 +161,7 @@ class Command(object):
                     rc = self.handle_results(ikey, rc, res)
             return rc
         except KeyboardInterrupt:
-            print('')
+            cprint('')
             return 0
 
     def read(self, path, parameters=None):
@@ -239,7 +243,7 @@ class Command(object):
                         "MISMATCHED CERTIFICATE DATA, ACCEPT NEW? (y/n):")
                     if replace not in ('y', 'Y'):
                         raise Exception("BAD CERTIFICATE")
-            print 'Adding new key for %s:%s' % (server, port)
+            cprint('Adding new key for %s:%s' % (server, port))
             khf[hostid] = fingerprint
 
 
@@ -318,7 +322,7 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
                             dictout.append("{0}={1}".format(k, v))
                         attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, dictout)))
                     else:
-                        print ("CODE ERROR" + repr(attr))
+                        cprint("CODE ERROR" + repr(attr))
 
                     if options.blame or 'broken' in currattr:
                         blamedata = []
@@ -332,7 +336,7 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
                                     currattr['expression']))
                         if blamedata:
                             attrout += ' (' + ', '.join(blamedata) + ')'
-                    print attrout
+                    cprint(attrout)
     if not exitcode:
         if requestargs:
             for attr in requestargs:
@@ -379,8 +383,8 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                         dictout.append("{0}={1}".format(k, v))
                     attrout = '{0}: {1}: {2}'.format(noderange, attr, ','.join(map(str, dictout)))
                 else:
-                    print ("CODE ERROR" + repr(attr))
-                print attrout
+                    cprint("CODE ERROR" + repr(attr))
+                cprint(attrout)
     if not exitcode:
         if requestargs:
             for attr in requestargs:

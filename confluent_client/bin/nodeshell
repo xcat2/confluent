@@ -83,8 +83,10 @@ def run():
                 node = desc['node']
                 if desc['type'] == 'stdout':
                     sys.stdout.write('{0}: {1}'.format(node,data))
+                    sys.stdout.flush()
                 else:
                     sys.stderr.write('{0}: {1}'.format(node, data))
+                    sys.stderr.flush()
             else:
                 pop = desc['popen']
                 ret = pop.poll()
