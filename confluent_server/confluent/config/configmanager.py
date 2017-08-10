@@ -813,12 +813,16 @@ class ConfigManager(object):
     def is_nodegroup(self, nodegroup):
         return nodegroup in self._cfgstore['nodegroups']
 
-    def get_groups(self):
-        return self._cfgstore['nodegroups'].iterkeys()
+    def get_groups(self, sizesort=False):
+        if sizesort:
+            return reversed(
+                sorted(self._cfgstore['nodegroups'], key=lambda x: len(
+                    self._cfgstore['nodegroups'][x]['nodes'])))
+        return iter(self._cfgstore['nodegroups'])
 
     def list_nodes(self):
         try:
-            return self._cfgstore['nodes'].iterkeys()
+            return iter(self._cfgstore['nodes'])
         except KeyError:
             return []
 

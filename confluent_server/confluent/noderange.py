@@ -48,6 +48,35 @@ def humanify_nodename(nodename):
             for text in re.split(numregex, nodename)]
 
 
+class ReverseNodeRange(object):
+    """Abbreviate a set of nodes to a shorter noderange representation
+
+    :param nodes: List of nodes as a list, tuple, etc.
+    :param config: Config manager
+    """
+
+    def __init__(self, nodes, config):
+        self.cfm = config
+        self.nodes = set(nodes)
+
+
+    @property
+    def noderange(self):
+        subsetgroups = []
+        for group in self.cfm.get_groups(sizesort=True):
+            nl = set(
+                self.cfm.get_nodegroup_attributes(group).get('nodes', []))
+            if len(nl) > len(self.nodes) or not nl:
+                continue
+            if not nl - self.nodes:
+                subsetgroups.append(group)
+                self.nodes -= nl
+                if not self.nodes:
+                    break
+        return ','.join(sorted(subsetgroups) + sorted(self.nodes))
+
+
+
 # TODO: pagination operators <pp.nums and >pp.nums for begin and end respective
 class NodeRange(object):
     """Iterate over a noderange
