@@ -38,6 +38,7 @@ if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /
 true
 
 %post
+sysctl -p /usr/lib/sysctl.d/confluent.conf
 if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
 true
 
