@@ -28,10 +28,6 @@ class NodeHandler(bmchandler.NodeHandler):
             ff = slpattrs.get('enclosure-form-factor', [''])[0]
         except IndexError:
             return
-        if ff not in ('dense-computing', 'BC2'):
-            # do not probe unless it's a dense platform
-            return
-        self.isdense = True
         wronguuid = slpattrs.get('node-uuid', [''])[0]
         if wronguuid:
             # we need to fix the first three portions of the uuid
@@ -43,6 +39,10 @@ class NodeHandler(bmchandler.NodeHandler):
             self.info['uuid'] = uuidprefix + '-' + '-'.join(
                 wronguuid.split('-')[3:])
             self.info['uuid'] = string.lower(self.info['uuid'])
+        if ff not in ('dense-computing', 'BC2'):
+            # do not probe unless it's a dense platform
+            return
+        self.isdense = True
         slot = int(slpattrs.get('slot', ['0'])[0])
         if slot != 0:
             self.info['enclosure.bay'] = slot
