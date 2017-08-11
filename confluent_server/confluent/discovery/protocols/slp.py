@@ -492,8 +492,10 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     """
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # TODO: increase RCVBUF to max, mitigate chance of
+    # increase RCVBUF to max, mitigate chance of
     # failure due to full buffer.
+    net.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16777216)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16777216)
     # SLP is very poor at scanning large counts and managing it, so we
     # must make the best of it
     # Some platforms/config default to IPV6ONLY, we are doing IPv4
