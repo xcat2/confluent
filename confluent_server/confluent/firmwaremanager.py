@@ -26,8 +26,10 @@ updatesbytarget = {}
 
 def execupdate(handler, filename, updateobj):
     try:
-        handler(filename, progress=updateobj.handle_progress)
-        updateobj.handle_progress({'phase': 'complete', 'progress': 100.0})
+        completion = handler(filename, progress=updateobj.handle_progress)
+        if completion is None:
+            completion = 'complete'
+        updateobj.handle_progress({'phase': completion, 'progress': 100.0})
     except Exception as e:
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': str(e)})
