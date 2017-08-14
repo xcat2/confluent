@@ -110,7 +110,7 @@ def update_firmware(session, filename):
             if status == 'error':
                 exitcode = 1
                 noderrs[node] = err
-            if status in ('error', 'complete'):
+            if status in ('error', 'complete', 'pending'):
                 list(session.delete(nodeurls[node]))
                 del nodeurls[node]
             output.set_output(node, progress)
