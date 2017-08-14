@@ -13,12 +13,25 @@
 # limitations under the License.
 
 import difflib
+import re
 import sys
 
 try:
     range = xrange
 except NameError:
     pass
+
+
+
+numregex = re.compile('([0-9]+)')
+def humanify_nodename(nodename):
+    """Analyzes nodename in a human way to enable natural sort
+
+    :param nodename: The node name to analyze
+    :returns: A structure that can be consumed by 'sorted'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(numregex, nodename)]
 
 
 def _colorize_line(orig, mask):
@@ -53,10 +66,15 @@ def colordiff(first, second):
 
 
 class GroupedData(object):
+    '''A post processor to sort and compare per-node data
 
-    def __init__(self):
+    :param confluentconnection: If given, will attempt to use the connection to abbreviate noderanges
+    '''
+
+    def __init__(self, confluentconnection=None):
         self.bynode = {}
         self.byoutput = {}
+        self.client = confluentconnection
 
     def generate_byoutput(self):
         self.byoutput = {}
@@ -72,6 +90,15 @@ class GroupedData(object):
             self.bynode[node] = [line]
         else:
             self.bynode[node].append(line)
+
+    def get_group_text(self, nodes):
+        if self.client:
+            noderange = ''
+            for reply in self.client.create('/noderange//abbreviate', {'nodes': sorted(nodes)}):
+                noderange = reply['noderange']
+            return noderange
+        else:
+            return ','.join(sorted(nodes, key=humanify_nodename))
 
     def print_all(self, output=sys.stdout, skipmodal=False, reverse=False,
                   count=False):
@@ -91,7 +118,7 @@ class GroupedData(object):
                 skipmodal = False
                 continue
             currout = '====================================\n'
-            currout += ','.join(sorted(self.byoutput[outdata]))
+            currout += self.get_group_text(self.byoutput[outdata])
             currout += '\n====================================\n'
             if count:
                 currout += 'Count: {0}'.format(len(list(
@@ -117,7 +144,7 @@ class GroupedData(object):
                 ismodal = False
                 continue
             currout = '====================================\n'
-            currout += ','.join(sorted(self.byoutput[outdata]))
+            currout += self.get_group_text(self.byoutput[outdata])
             currout += '\n====================================\n'
             if count:
                 currout += 'Count: {0}'.format(len(list(

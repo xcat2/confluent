@@ -29,8 +29,11 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.textgroup as tg
+import confluent.client
 
 argparser = optparse.OptionParser(usage="Usage: <other command> | %prog [options]")
+argparser.add_option('-a', '--abbreviate', action='store_true',
+                     help='Attempt to use confluent server to shorten noderanges')
 argparser.add_option('-d', '--diff', action='store_true',
                      help='Show what differs between most common '
                           'output group and others')
@@ -50,6 +53,11 @@ if sys.stdin.isatty():
     sys.exit(1)
 
 grouped = tg.GroupedData()
+
+if options.abbreviate:
+    grouped = tg.GroupedData(confluent.client.Command())
+else:
+    grouped = tg.GroupedData()
 
 def print_current():
     if options.diff:
