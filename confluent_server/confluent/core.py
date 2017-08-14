@@ -332,10 +332,12 @@ def iterate_collections(iterable, forcecollection=True):
 
 
 def iterate_resources(fancydict):
-    for resource in fancydict.iterkeys():
+    for resource in fancydict:
         if resource.startswith("_"):
             continue
-        if not isinstance(fancydict[resource], PluginRoute):  # a resource
+        if resource == 'abbreviate':
+            pass
+        elif not isinstance(fancydict[resource], PluginRoute):  # a resource
             resource += '/'
         yield msg.ChildCollection(resource)
 
@@ -390,6 +392,7 @@ def enumerate_node_collection(collectionpath, configmanager):
     collection = nested_lookup(noderesources, collectionpath[2:])
     if len(collectionpath) == 2 and collectionpath[0] == 'noderange':
         collection['nodes'] = {}
+        collection['abbreviate'] = {}
     if not isinstance(collection, dict):
         raise exc.NotFoundException("Invalid element requested")
     return iterate_resources(collection)
@@ -502,6 +505,16 @@ class BadPlugin(object):
             self.node, self.plugin + ' is not a supported plugin')
 
 
+def abbreviate_noderange(configmanager, inputdata, operation):
+    if operation != 'create':
+        raise exc.InvalidArgumentException('Must be a create with nodes in list')
+    if 'nodes' not in inputdata:
+        raise exc.InvalidArgumentException('Must be given list of nodes under key named nodes')
+    if isinstance(inputdata['nodes'], str) or isinstance(inputdata['nodes'], unicode):
+        inputdata['nodes'] = inputdata['nodes'].split(',')
+    return (msg.KeyValueData({'noderange': noderange.ReverseNodeRange(inputdata['nodes'], configmanager).noderange}),)
+
+
 def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
     iscollection = False
@@ -514,6 +527,8 @@ def handle_node_request(configmanager, inputdata, operation,
             # facility anyway
             isnoderange = False
             pathcomponents = pathcomponents[2:]
+        elif len(pathcomponents) == 3 and pathcomponents[2] == 'abbreviate':
+            return abbreviate_noderange(configmanager, inputdata, operation)
         else:
             isnoderange = True
     else:
@@ -522,7 +537,8 @@ def handle_node_request(configmanager, inputdata, operation,
         nodeorrange = pathcomponents[1]
         if not isnoderange and not configmanager.is_node(nodeorrange):
             raise exc.NotFoundException("Invalid Node")
-        if isnoderange:
+        if isnoderange and not (len(pathcomponents) == 3 and
+                                        pathcomponents[2] == 'abbreviate'):
             try:
                 nodes = noderange.NodeRange(nodeorrange, configmanager).nodes
             except Exception as e:

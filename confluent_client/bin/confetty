@@ -460,8 +460,11 @@ def createresource(args):
     if keydata is None:
         return
     targpath = fullpath_target(resname)
-    collection, _, resname = targpath.rpartition('/')
-    keydata['name'] = resname
+    if targpath.startswitch('/noderange//'):
+        collection = targpath
+    else:
+        collection, _, resname = targpath.rpartition('/')
+        keydata['name'] = resname
     makecall(session.create, (collection, keydata))
 
 
