@@ -54,15 +54,37 @@ def _colorize_line(orig, mask):
     return newline
 
 
+def near_diff(idx, diffdata):
+    maxidx = idx + 3
+    if maxidx > len(diffdata) -1:
+        maxidx = len(diffdata) - 1
+    idx = idx - 3
+    if idx < 0:
+        idx = 0
+    while idx <= maxidx:
+        if len(diffdata[idx]) > 0 and diffdata[idx][0] in ('+', '-'):
+            return True
+        idx += 1
+    return False
+
+
 def colordiff(first, second):
     diffdata = list(difflib.ndiff(first, second))
+    quiet = True
     for i in range(len(diffdata)):
         if i < len(diffdata) - 1 and diffdata[i + 1].startswith('?'):
+            if quiet:
+                quiet = False
+                yield '@@'
             yield _colorize_line(diffdata[i], diffdata[i + 1])
-        elif diffdata[i].startswith('?'):
-            continue
-        else:
+        elif not diffdata[i].startswith('?') and near_diff(i, diffdata):
+            if quiet:
+                quiet = False
+                yield '@@'
             yield diffdata[i]
+        elif not diffdata[i].startswith('?'):
+            quiet = True
+
 
 
 class GroupedData(object):
