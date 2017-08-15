@@ -4,10 +4,16 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 ## SYNOPSIS
 
 `nodefirmware <noderange>`  
+`nodefirmware <noderange> update <filename>`  
 
 ## DESCRIPTION
 
-`nodefirmware` reports various pieces of firmware on confluent nodes.
+`nodefirmware` reports and updates various firmware on nodes.  In the update form, it accepts a single
+file and attempts to update it using the out of band facilities.  Firmware updates can end in one of three states:
+
+* `error`: The attempted update encountered an error that prevented successful install.  Nodes experiencing this state will be reported at the end and more detail on the error will be given
+* `pending`:  The firmware update process has completed, but the firmware will not be active until the relevant component next resets.  Generally speaking, for UEFI update the system will need a reboot, and for BMC updates, the `nodebmcreset` command will begin the process to activate the firmware.
+* `complete`:  The firmware update process has completed and activation has proceeded.  Note that while the activation process has commenced, the component may still be in the process of rebooting when nodefirmware exits.
 
 ## EXAMPLES
 

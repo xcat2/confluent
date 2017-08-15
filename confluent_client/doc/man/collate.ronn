@@ -1,0 +1,79 @@
+collate(1) -- Organize text input by node
+==============================
+
+## SYNOPSIS
+
+`<other command> | collate [-d] [-w] [-s] [-c] [-r]`  
+
+## DESCRIPTION
+
+**collate** takes input in the form of <nodename>: <data> and groups
+the output for each <nodename> together, and checks for identical data to further group nodes together.  It also will sort the output groups so that
+the most frequently seen output is printed first, and then other groups in descending order of frequency.
+
+## OPTIONS
+
+* `-d`, `--diff`:
+   Express all but the most common result group in terms of diff from
+   the most common result group
+
+* `-w`, `--watch`:
+   Update results dynamically as data becomes available, rather than
+   waiting    for the command to fully complete.
+
+* `-s`, `--skipcommon`:
+   Suppress printing of the most common result text group.  This is used to
+   focus on stray output against a well known and expected result.
+   
+* `-c`, `--count`:
+   Print a count of the number of nodes in an output group under the 
+  noderange.
+  
+ * `-r`, `--reverse`:
+    Rather than starting with most common to least common, start with
+    the least common and print the most common last.
+   
+## EXAMPLES
+ * Organizing power state of multiple nodes:
+  `# nodepower n1-n12 | collate`  
+  `====================================`  
+  `n1,n2,n3,n4,n7,n8,n9,n10,n11,n12`  
+  `====================================`  
+  `on`  
+  
+  `====================================`  
+  `n5,n6`  
+  `====================================`  
+  `off`  
+
+* Using diff to detect distinct UEFI configuration
+
+  `# pasu n1-n4 show Processors|collate -d -s`  
+  `====================================`  
+  `n3`  
+  `====================================`  
+  `@@`  
+  `  Processors.ProcessorPerformanceStates=Enable`  
+  `  Processors.C-States=Enable`  
+  `  Processors.PackageACPIC-StateLimit=ACPI C3`  
+  `- Processors.C1EnhancedMode=Enable`  
+  `+ Processors.C1EnhancedMode=Disable`  
+  `- Processors.Hyper-Threading=Enable`  
+  `+ Processors.Hyper-Threading=Disable`  
+  `  Processors.ExecuteDisableBit=Enable`  
+  `  Processors.IntelVirtualizationTechnology=Enable`  
+    
+  `====================================`  
+  `n1`  
+  `====================================`  
+  `@@`  
+  `  Processors.ProcessorPerformanceStates=Enable`
+  `  Processors.C-States=Enable`  
+  `  Processors.PackageACPIC-StateLimit=ACPI C3`  
+  `- Processors.C1EnhancedMode=Enable`  
+  `+ Processors.C1EnhancedMode=Disable`  
+  `  Processors.Hyper-Threading=Enable`  
+  `  Processors.ExecuteDisableBit=Enable`  
+
+   
+   
