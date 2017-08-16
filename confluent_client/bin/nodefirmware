@@ -66,7 +66,9 @@ def printfirm(node, prefix, data):
 
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog <noderange> [update <file>]")
+    usage="Usage: %prog <noderange> [update [--backup <file>]")
+argparser.add_option('-b', '--backup', action='store_true',
+                     help='Target a backup bank rather than primary')
 (options, args) = argparser.parse_args()
 upfile = None
 try:
@@ -98,7 +100,10 @@ def update_firmware(session, filename):
     filename = os.path.abspath(filename)
     resource = '/noderange/{0}/inventory/firmware/updates/active'.format(
         noderange)
-    for res in session.create(resource, {'filename': filename}):
+    upargs = {'filename': filename}
+    if options.backup:
+        upargs['bank'] = 'bank'
+    for res in session.create(resource, upargs):
         watchurl = res['created']
         currnode = watchurl.split('/')[1]
         nodeurls[currnode] = '/' + watchurl
