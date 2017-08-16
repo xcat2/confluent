@@ -455,7 +455,8 @@ class IpmiHandler(object):
 
     def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
-                                    self.inputdata.filename, self.tenant)
+                                    self.inputdata.filename, self.tenant,
+                                    bank=self.inputdata.bank)
         self.output.put(
             msg.CreatedResource(
                 'nodes/{0}/inventory/firmware/updates/active/{1}'.format(

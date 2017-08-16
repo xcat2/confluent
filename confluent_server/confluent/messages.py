@@ -399,6 +399,7 @@ class InputFirmwareUpdate(ConfluentMessage):
 
     def __init__(self, path, nodes, inputdata):
         self.filename = inputdata['filename']
+        self.bank = inputdata.get('bank', None)
         self.nodes = nodes
 
 
