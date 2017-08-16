@@ -460,7 +460,7 @@ def createresource(args):
     if keydata is None:
         return
     targpath = fullpath_target(resname)
-    if targpath.startswitch('/noderange//'):
+    if targpath.startswith('/noderange//'):
         collection = targpath
     else:
         collection, _, resname = targpath.rpartition('/')
