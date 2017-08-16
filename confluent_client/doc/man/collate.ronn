@@ -3,7 +3,7 @@ collate(1) -- Organize text input by node
 
 ## SYNOPSIS
 
-`<other command> | collate [-d] [-w] [-s] [-c] [-r]`  
+`<other command> | collate [-a] [-d] [-w] [-s] [-c] [-r]`
 
 ## DESCRIPTION
 
@@ -12,6 +12,12 @@ the output for each <nodename> together, and checks for identical data to furthe
 the most frequently seen output is printed first, and then other groups in descending order of frequency.
 
 ## OPTIONS
+
+* `-a`, `--abbreviate`:
+   Use confluent to attempt to shorten the noderange.  This can help identify
+   when output differs along a telling group boundary.  For example, if
+   output suggests a large number of nodes are unreachable, abbreviate
+   showing 'rack1' as being unreachable may make more obvious a possible cause.
 
 * `-d`, `--diff`:
    Express all but the most common result group in terms of diff from
