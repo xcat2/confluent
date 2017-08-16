@@ -74,6 +74,8 @@ while fullline:
     for line in fullline.split('\n'):
         if not line:
             continue
+        if ': ' not in line:
+            line = 'UNKNOWN: ' + line
         grouped.add_line(*line.split(': ', 1))
         if options.watch:
             sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
