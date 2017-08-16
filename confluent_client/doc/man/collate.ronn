@@ -40,7 +40,7 @@ the most frequently seen output is printed first, and then other groups in desce
   `n1,n2,n3,n4,n7,n8,n9,n10,n11,n12`  
   `====================================`  
   `on`  
-  
+  ``  
   `====================================`  
   `n5,n6`  
   `====================================`  
@@ -62,12 +62,12 @@ the most frequently seen output is printed first, and then other groups in desce
   `+ Processors.Hyper-Threading=Disable`  
   `  Processors.ExecuteDisableBit=Enable`  
   `  Processors.IntelVirtualizationTechnology=Enable`  
-    
+    ``  
   `====================================`  
   `n1`  
   `====================================`  
   `@@`  
-  `  Processors.ProcessorPerformanceStates=Enable`
+  `  Processors.ProcessorPerformanceStates=Enable`  
   `  Processors.C-States=Enable`  
   `  Processors.PackageACPIC-StateLimit=ACPI C3`  
   `- Processors.C1EnhancedMode=Enable`  
