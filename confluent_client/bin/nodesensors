@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import codecs
 import csv
 import datetime
 import optparse
@@ -34,8 +33,6 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
-
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
 sensorcollections = {
     'all': 'sensors/hardware/all/all',
