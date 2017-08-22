@@ -366,8 +366,13 @@ def _recheck_nodes(nodeattribs, configmanager):
     # policy or hadn't been able to verify key
     for nodename in pending_nodes:
         info = pending_nodes[nodename]
-        handler = info['handler'].NodeHandler(info, configmanager)
-        eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
+        try:
+            handler = info['handler'].NodeHandler(info, configmanager)
+            eventlet.spawn_n(eval_node, configmanager, handler, info, nodename)
+        except Exception:
+            traceback.print_exc()
+            log.log({'error': 'Unexpected error during discovery of {0}, check debug '
+                              'logs'.format(nodename)})
 
 
 def _recheck_single_unknown(configmanager, mac):
