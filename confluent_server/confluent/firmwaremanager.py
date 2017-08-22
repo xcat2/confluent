@@ -26,7 +26,8 @@ updatesbytarget = {}
 
 def execupdate(handler, filename, updateobj):
     try:
-        completion = handler(filename, progress=updateobj.handle_progress)
+        completion = handler(filename, progress=updateobj.handle_progress,
+                             bank=updateobj.bank)
         if completion is None:
             completion = 'complete'
         updateobj.handle_progress({'phase': completion, 'progress': 100.0})
@@ -35,7 +36,9 @@ def execupdate(handler, filename, updateobj):
                                    'detail': str(e)})
 
 class Updater(object):
-    def __init__(self, node, handler, filename, tenant=None, name=None):
+    def __init__(self, node, handler, filename, tenant=None, name=None,
+                 bank=None):
+        self.bank = bank
         self.node = node
         self.phase = 'initializing'
         self.detail = ''
