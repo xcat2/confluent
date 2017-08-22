@@ -388,9 +388,8 @@ def _recheck_single_unknown(configmanager, mac):
                             ''.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
-            # addresses data is bad, clear it, to force repair next
-            # opportunity
-            info['addresses'] = []
+            # addresses data is bad, delete the offending ip
+            info['addresses'] = [x for x in info['addresses'] if x != handler.ipaddr]
             # TODO(jjohnson2):  rescan due to bad peer addr data?
             # not just wait around for the next announce
             return
@@ -499,7 +498,7 @@ def detected(info):
                             ''.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
-            info['addresses'] = []
+            info['addresses'] = [x for x in info['addresses'] if x != handler.ipaddr]
             return
         log.log(
             {'info':  '{0} with hwaddr {1} at address {2} is not yet running '
