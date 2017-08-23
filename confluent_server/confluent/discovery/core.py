@@ -382,7 +382,7 @@ def _recheck_single_unknown(configmanager, mac):
     if not info:
         return
     if info['handler'] != pxeh and not info.get('addresses', None):
-        log.log({'info': 'Missing address information in ' + repr(info)})
+        #log.log({'info': 'Missing address information in ' + repr(info)})
         return
     handler = info['handler'].NodeHandler(info, configmanager)
     if handler.https_supported and not handler.https_cert:
