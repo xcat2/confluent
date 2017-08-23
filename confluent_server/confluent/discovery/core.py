@@ -256,6 +256,7 @@ list_info = {
     'by-model': list_matching_models,
     'by-mac': list_matching_macs,
     'by-state': list_matching_states,
+    'by-uuid': list_matching_uuids,
 }
 
 multi_selectors = set([
