@@ -148,6 +148,7 @@ def send_discovery_datum(info):
     yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
     yield msg.KeyValueData({'serialnumber': info.get('serialnumber', '')})
     yield msg.KeyValueData({'modelnumber': info.get('modelnumber', '')})
+    yield msg.KeyValueData({'uuid': info.get('uuid, ''')})
     if 'enclosure.bay' in info:
         yield msg.KeyValueData({'bay': int(info['enclosure.bay'])})
     yield msg.KeyValueData({'macs': [info.get('hwaddr', '')]})
