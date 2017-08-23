@@ -62,7 +62,7 @@ class NodeHandler(bmchandler.NodeHandler):
             ipmicmd = self._get_ipmicmd()
             guiddata = ipmicmd.xraw_command(netfn=6, command=8)
             self.info['uuid'] = pygutil.decode_wireformat_uuid(
-                guiddata['data'])
+                guiddata['data']).lower()
             ipmicmd.oem_init()
             bayid = ipmicmd._oem.immhandler.get_property(
                 '/v2/cmm/sp/7')

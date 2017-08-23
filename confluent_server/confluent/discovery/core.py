@@ -165,6 +165,7 @@ def _info_matches(info, criteria):
     node = criteria.get('by-node', None)
     serial = criteria.get('by-serial', None)
     status = criteria.get('by-state', None)
+    uuid = criteria.get('by-uuid', None)
     if model and info.get('modelnumber', None) != model:
         return False
     if devtype and devtype not in info.get('services', []):
@@ -174,6 +175,8 @@ def _info_matches(info, criteria):
     if serial and info.get('serialnumber', None) != serial:
         return False
     if status and info.get('discostatus', None) != status:
+        return False
+    if uuid and info.get('uuid') != uuid:
         return False
     return True
 
@@ -195,6 +198,18 @@ def list_matching_serials(criteria):
         info = known_serials[serial]
         if _info_matches(info, criteria):
             yield msg.ChildCollection(serial + '/')
+
+def list_matching_uuids(criteria):
+    uuids = []
+    for mac in known_info:
+        info = known_info[mac]
+        uuid = info.get('uuid', None)
+        if not uuid:
+            continue
+        if _info_matches(info, criteria):
+            uuids.append(uuid)
+    for uuid in uuids:
+        yield msg.ChildCollection(uuid + '/')
 
 
 def list_matching_states(criteria):
@@ -247,12 +262,12 @@ multi_selectors = set([
     'by-type',
     'by-model',
     'by-state',
+    'by-uuid',
 ])
 
 
 node_selectors = set([
     'by-node',
-    #'by-uuid',
     'by-serial',
 ])
 

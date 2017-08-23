@@ -272,7 +272,7 @@ def _parse_attrlist(attrstr):
                                   '{4:04X}{5:08X}'.format(
                                 lebytes[0], lebytes[1], lebytes[2], bebytes[0],
                                 bebytes[1], bebytes[2]
-                            )
+                            ).lower()
                     attribs[attrname].append(val)
             attrstr = attrstr[attrstr.index(')'):]
         elif attrstr[0] == ',':
