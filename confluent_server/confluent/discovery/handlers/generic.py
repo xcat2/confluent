@@ -25,16 +25,16 @@ class NodeHandler(object):
         self._fp = None
         self.info = info
         self.configmanager = configmanager
-        targsa = None
+        targsa = [None]
         # first let us prefer LLA if possible, since that's most stable
         for sa in info['addresses']:
             if sa[0].startswith('fe80'):
                 targsa = sa
                 break
         else:
-            targsa = info['addresses'][0]
+            if info['addresses']:
+                targsa = info['addresses'][0]
         self.ipaddr = targsa[0]
-        return
 
     def scan(self):
         # Do completely passive things to enhance data.
