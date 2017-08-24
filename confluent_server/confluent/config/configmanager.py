@@ -227,6 +227,8 @@ def decrypt_value(cryptvalue,
 
 def fixup_attribute(attrname, attrval):
     # Normalize some data, for example strings and numbers to bool
+    if attrname.startswith('custom.'):
+        return attrval
     if attrname.startswith('net.'):
         # For net.* attribtues, split on the dots and put back together
         # longer term we might want a generic approach, but
