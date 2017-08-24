@@ -227,6 +227,12 @@ def decrypt_value(cryptvalue,
 
 def fixup_attribute(attrname, attrval):
     # Normalize some data, for example strings and numbers to bool
+    if attrname.startswith('net.'):
+        # For net.* attribtues, split on the dots and put back together
+        # longer term we might want a generic approach, but
+        # right now it's just net. attributes
+        netattrparts = attrname.split('.')
+        attrname = netattrparts[0] + '.' + netattrparts[-1]
     if not isinstance(attrval, allattributes.node[attrname]['type']):
         if (allattributes.node[attrname]['type'] == bool and
                 (isinstance(attrval, str) or isinstance(attrval, unicode))):
