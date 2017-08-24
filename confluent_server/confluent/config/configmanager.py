@@ -225,6 +225,15 @@ def decrypt_value(cryptvalue,
     return value[0:-padsize]
 
 
+def fixup_attribute(attrname, attrval):
+    # Normalize some data, for example strings and numbers to bool
+    if not isinstance(attrval, allattributes.node[attrname]['type']):
+        if (allattributes.node[attrname]['type'] == bool and
+                (isinstance(attrval, str) or isinstance(attrval, unicode))):
+            return attrval.lower() in ('true', '1', 'y', 'yes', 'enable', 'enabled')
+    return attrval
+
+
 def attribute_is_invalid(attrname, attrval):
     if attrname.startswith('custom.'):
         # No type checking or name checking is provided for custom,
@@ -1228,10 +1237,13 @@ class ConfigManager(object):
                     if ('everything' in self._cfgstore['nodegroups'] and
                             'everything' not in attribmap[node]['groups']):
                         attribmap[node]['groups'].append('everything')
-                elif attribute_is_invalid(attrname, attrval):
-                    errstr = "{0} attribute on node {1} is invalid".format(
-                        attrname, node)
-                    raise ValueError(errstr)
+                else:
+                    attrval = fixup_attribute(attrname, attrval)
+                    if attribute_is_invalid(attrname, attrval):
+                        errstr = "{0} attribute on node {1} is invalid".format(
+                            attrname, node)
+                        raise ValueError(errstr)
+                    attribmap[node][attrname] = attrval
         for node in attribmap.iterkeys():
             node = node.encode('utf-8')
             exprmgr = None
@@ -1242,7 +1254,8 @@ class ConfigManager(object):
             recalcexpressions = False
             for attrname in attribmap[node].iterkeys():
                 if (isinstance(attribmap[node][attrname], str) or
-                        isinstance(attribmap[node][attrname], unicode)):
+                        isinstance(attribmap[node][attrname], unicode) or
+                        isinstance(attribmap[node][attrname], bool)):
                     newdict = {'value': attribmap[node][attrname]}
                 else:
                     newdict = attribmap[node][attrname]
