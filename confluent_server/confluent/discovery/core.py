@@ -137,6 +137,7 @@ servicebyname = {
 known_info = {}
 known_services = {}
 known_serials = {}
+known_uuids = nesteddict()
 known_nodes = nesteddict()
 unknown_info = {}
 pending_nodes = {}
@@ -146,9 +147,23 @@ def send_discovery_datum(info):
     addresses = info.get('addresses', [])
     yield msg.KeyValueData({'nodename': info.get('nodename', '')})
     yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
-    yield msg.KeyValueData({'serialnumber': info.get('serialnumber', '')})
-    yield msg.KeyValueData({'modelnumber': info.get('modelnumber', '')})
-    yield msg.KeyValueData({'uuid': info.get('uuid', '')})
+    sn = info.get('serialnumber', '')
+    mn = info.get('modelnumber', '')
+    uuid = info.get('uuid', '')
+    if uuid:
+        relatedmacs = []
+        for mac in known_uuids.get(uuid, {}):
+            if mac and mac != info.get('hwaddr', ''):
+                relatedmacs.append(mac)
+            if not sn and 'serialnumber' in known_uuids[uuid][mac]:
+                sn = known_uuids[uuid][mac]['serialnumber']
+            if not mn and 'modelnumber' in known_uuids[uuid][mac]:
+                mn = known_uuids[uuid][mac]['modelnumber']
+        if relatedmacs:
+            yield msg.KeyValueData({'relatedmacs': relatedmacs})
+    yield msg.KeyValueData({'serialnumber': sn})
+    yield msg.KeyValueData({'modelnumber': mn})
+    yield msg.KeyValueData({'uuid': uuid})
     if 'enclosure.bay' in info:
         yield msg.KeyValueData({'bay': int(info['enclosure.bay'])})
     yield msg.KeyValueData({'macs': [info.get('hwaddr', '')]})
@@ -200,16 +215,12 @@ def list_matching_serials(criteria):
             yield msg.ChildCollection(serial + '/')
 
 def list_matching_uuids(criteria):
-    uuids = []
-    for mac in known_info:
-        info = known_info[mac]
-        uuid = info.get('uuid', None)
-        if not uuid:
-            continue
-        if _info_matches(info, criteria):
-            uuids.append(uuid)
-    for uuid in uuids:
-        yield msg.ChildCollection(uuid + '/')
+    for uuid in sorted(list(known_uuids)):
+        for mac in known_uuids[uuid]:
+            info = known_uuids[uuid][mac]
+            if _info_matches(info, criteria):
+                yield msg.ChildCollection(uuid + '/')
+                break
 
 
 def list_matching_states(criteria):
@@ -512,6 +523,9 @@ def detected(info):
     cfg = cfm.ConfigManager(None)
     handler = handler.NodeHandler(info, cfg)
     handler.scan()
+    uuid = info.get('uuid', None)
+    if uuid:
+        known_uuids[uuid][info['hwaddr']] = info
     if handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
             log.log(
