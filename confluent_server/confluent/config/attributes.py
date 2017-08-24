@@ -305,6 +305,18 @@ node = {
     'id.uuid': {
         'description': 'The UUID of the node as presented in DMI.',
     },
+    # For single interface mac collection, net.bootable suffices
+    # For multiple interface mac collection, we perhaps add an address field and use subnet affinity as a clue
+    # to disambiguate multiple addresses for external provisioning
+    # For internal provisioning, the UUID matters rather than the MAC, though subnet affinity may
+    # still be a factor to select the appropriate static config to send down.  In such a case bonding
+    # is hopefully more likely as that's a bit easier.
+    # Start with the first case and only document that, the other thoughts can be future items if they turn up
+    'net.bootable': {
+        'type': bool,
+        'description': 'Whether or not the indicated network interface is to be used for booting.  This is used by '
+                       'the discovery process to decide where to place the mac address of a detected PXE nic.',
+    },
     'net.ipv4_gateway': {
         'description':  'The IPv4 gateway to use if applicable.  As is the '
                         'case for other net attributes, net.eth0.ipv4_gateway '
