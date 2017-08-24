@@ -1347,7 +1347,9 @@ class ConfigManager(object):
                     pass
         # Now we have to iterate through each fixed up element, using the
         # set attribute to flesh out inheritence and expressions
+        _cfgstore['main']['idmap'] = {}
         for confarea in _config_areas:
+            self._cfgstore[confarea] = {}
             if confarea not in tmpconfig:
                 continue
             if confarea == 'nodes':
