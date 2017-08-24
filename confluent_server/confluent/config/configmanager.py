@@ -233,7 +233,7 @@ def fixup_attribute(attrname, attrval):
         # right now it's just net. attributes
         netattrparts = attrname.split('.')
         attrname = netattrparts[0] + '.' + netattrparts[-1]
-    if not isinstance(attrval, allattributes.node[attrname]['type']):
+    if 'type' in allattributes.node[attrname] and not isinstance(attrval, allattributes.node[attrname]['type']):
         if (allattributes.node[attrname]['type'] == bool and
                 (isinstance(attrval, str) or isinstance(attrval, unicode))):
             return attrval.lower() in ('true', '1', 'y', 'yes', 'enable', 'enabled')
