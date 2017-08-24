@@ -719,7 +719,7 @@ def discover_node(cfg, handler, info, nodename, manual):
     if 'pxe' in policies and info['handler'] == pxeh:
         return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
     elif ('permissive' in policies and handler.https_supported and lastfp and
-            not manual):
+            not util.cert_matches(lastfp, handler.https_cert) and not manual):
         info['discofailure'] = 'fingerprint'
         log.log({'info': 'Detected replacement of {0} with existing '
                          'fingerprint and permissive discovery policy, not '
