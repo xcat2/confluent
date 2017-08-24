@@ -141,12 +141,29 @@ known_uuids = nesteddict()
 known_nodes = nesteddict()
 unknown_info = {}
 pending_nodes = {}
+blockrecheck = False
+
+
+def enrich_pxe_info(info):
+    sn = None
+    mn = None
+    uuid = info.get('uuid', '')
+    if not uuid:
+        return info
+    for mac in known_uuids.get(uuid, {}):
+        for mac in known_uuids.get(uuid, {}):
+            if not sn and 'serialnumber' in known_uuids[uuid][mac]:
+                info['serialnumber'] = known_uuids[uuid][mac]['serialnumber']
+            if not mn and 'modelnumber' in known_uuids[uuid][mac]:
+                info['modelnumber'] = known_uuids[uuid][mac]['modelnumber']
 
 
 def send_discovery_datum(info):
     addresses = info.get('addresses', [])
     yield msg.KeyValueData({'nodename': info.get('nodename', '')})
     yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
+    if info['handler'] == pxeh:
+        enrich_pxe_info(info)
     sn = info.get('serialnumber', '')
     mn = info.get('modelnumber', '')
     uuid = info.get('uuid', '')
@@ -155,10 +172,6 @@ def send_discovery_datum(info):
         for mac in known_uuids.get(uuid, {}):
             if mac and mac != info.get('hwaddr', ''):
                 relatedmacs.append(mac)
-            if not sn and 'serialnumber' in known_uuids[uuid][mac]:
-                sn = known_uuids[uuid][mac]['serialnumber']
-            if not mn and 'modelnumber' in known_uuids[uuid][mac]:
-                mn = known_uuids[uuid][mac]['modelnumber']
         if relatedmacs:
             yield msg.KeyValueData({'relatedmacs': relatedmacs})
     yield msg.KeyValueData({'serialnumber': sn})
@@ -374,6 +387,8 @@ def detected_models():
 
 
 def _recheck_nodes(nodeattribs, configmanager):
+    if blockrecheck:
+        return
     global rechecker
     _map_unique_ids(nodeattribs)
     # for the nodes whose attributes have changed, consider them as potential
@@ -582,6 +597,9 @@ def get_nodename(cfg, handler, info):
         curruuid = info['uuid']
         nodename = nodes_by_uuid.get(curruuid, None)
         if nodename is None:
+            _map_unique_ids()
+            nodename = nodes_by_uuid.get(curruuid, None)
+        if nodename is None:
             # TODO: if there are too many matches on port for a
             # given type, error!  Can't just arbitarily limit,
             # shared nic with vms is possible and valid
@@ -679,6 +697,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
 
 
 def discover_node(cfg, handler, info, nodename, manual):
+    global blockrecheck
     known_nodes[nodename][info['hwaddr']] = info
     if info['hwaddr'] in unknown_info:
         del unknown_info[info['hwaddr']]
@@ -688,13 +707,16 @@ def discover_node(cfg, handler, info, nodename, manual):
                      'pubkeys.tls_hardwaremanager'))
     policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
         'value', None)
+    policies = set(policy.split(','))
     lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                       {}).get('value', None)
     # TODO(jjohnson2): permissive requires we guarantee storage of
     # the pubkeys, which is deferred for a little bit
     # Also, 'secure', when we have the needed infrastructure done
     # in some product or another.
-    if (policy == 'permissive' and handler.https_supported and lastfp and
+    if 'pxe' in policies and info['handler'] == pxeh:
+        return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
+    elif ('permissive' in policies and handler.https_supported and lastfp and
             not manual):
         info['discofailure'] = 'fingerprint'
         log.log({'info': 'Detected replacement of {0} with existing '
@@ -703,27 +725,10 @@ def discover_node(cfg, handler, info, nodename, manual):
                          'pubkeys.tls_hardwaremanager attribute is cleared '
                          'first'.format(nodename)})
         return False  # With a permissive policy, do not discover new
-    elif policy in ('open', 'permissive') or manual:
+    elif policies & set(('open', 'permissive')) or manual:
         info['nodename'] = nodename
-        if not handler.https_supported:
-            # use uuid based scheme in lieu of tls cert, ideally only
-            # for stateless 'discovery' targets like pxe, where data does not
-            # change
-            if info['uuid'] in known_pxe_uuids:
-                return True
-            uuidinfo = cfg.get_node_attributes(nodename, 'id.uuid')
-            known_pxe_uuids[info['uuid']] = nodename
-            # TODO(jjohnson2):  This is messing with the attrib database
-            # so it should only be possible if policy is 'open'
-            #
-            if manual or policy == 'open':
-                olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
-                if 'uuid' in info and info['uuid'] != olduuid:
-                    cfg.set_node_attributes(
-                        {nodename: {'id.uuid': info['uuid']}})
-            log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
-                nodename, handler.devname, info['hwaddr'])})
-            return True
+        if info['handler'] == pxeh:
+            return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
         elif manual or not util.cert_matches(lastfp, handler.https_cert):
             # only 'discover' if it is not the same as last time
             try:
@@ -747,7 +752,9 @@ def discover_node(cfg, handler, info, nodename, manual):
                 newnodeattribs['pubkeys.tls_hardwaremanager'] = \
                     util.get_fingerprint(handler.https_cert)
             if newnodeattribs:
+                blockrecheck = True
                 cfg.set_node_attributes({nodename: newnodeattribs})
+                blockrecheck = False
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
         info['discostatus'] = 'discovered'
@@ -757,6 +764,41 @@ def discover_node(cfg, handler, info, nodename, manual):
                         nodename)})
     info['discofailure'] = 'policy'
     return False
+
+
+def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
+    # use uuid based scheme in lieu of tls cert, ideally only
+    # for stateless 'discovery' targets like pxe, where data does not
+    # change
+    global blockrecheck
+    uuidinfo = cfg.get_node_attributes(nodename, ['id.uuid', 'id.serial', 'id.model', 'net*.bootable'])
+    if manual or policies & set(('open', 'pxe')):
+        enrich_pxe_info(info)
+        attribs = {}
+        olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
+        uuid = info.get('uuid', None)
+        if uuid and uuid != olduuid:
+            attribs['id.uuid'] = info['uuid']
+        sn = info.get('serialnumber', None)
+        mn = info.get('modelnumber', None)
+        if sn and sn != uuidinfo.get(nodename, {}).get('id.serial', None):
+            attribs['id.serial'] = info['serialnumber']
+        if mn and mn != uuidinfo.get(nodename, {}).get('id.model', None):
+            attribs['id.model'] = info['modelnumber']
+        for attrname in uuidinfo.get(nodename, {}):
+            if attrname.endswith('.bootable') and uuidinfo[nodename][attrname].get('value', None):
+                newattrname = attrname[:-8] + 'hwaddr'
+                attribs[newattrname] = info['hwaddr']
+        if attribs:
+            blockrecheck = True
+            cfg.set_node_attributes({nodename: attribs})
+            blockrecheck = False
+    if info['uuid'] in known_pxe_uuids:
+        return True
+    known_pxe_uuids[info['uuid']] = nodename
+    log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
+        nodename, handler.devname, info['hwaddr'])})
+    return True
 
 
 attribwatcher = None
@@ -784,7 +826,7 @@ def newnodes(added, deleting, configmanager):
     attribwatcher = configmanager.watch_attributes(
         allnodes, ('discovery.policy', 'net*.switch',
                    'hardwaremanagement.manager', 'net*.switchport', 'id.uuid',
-                   'pubkeys.tls_hardwaremanager'), _recheck_nodes)
+                   'pubkeys.tls_hardwaremanager', 'net*.bootable'), _recheck_nodes)
     if nodeaddhandler:
         needaddhandled = True
     else:

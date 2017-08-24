@@ -322,6 +322,10 @@ node = {
                         'case for other net attributes, net.eth0.ipv4_gateway '
                         'and similar is accepted.'
     },
+    'net.hwaddr': {
+        'description': 'The hardware address, aka MAC address of the interface indicated, generally populated by the '
+                       'PXE discovery mechanism'
+    },
     # 'net.pxe': { 'description': 'Whether pxe will be used on this interface'
     # TODO(jjohnson2):  Above being 'true' will control whether mac addresses
     # are stored in this nics attribute on pxe-client discovery, since
