@@ -707,6 +707,8 @@ def discover_node(cfg, handler, info, nodename, manual):
                      'pubkeys.tls_hardwaremanager'))
     policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
         'value', None)
+    if policy is None:
+        policy = ''
     policies = set(policy.split(','))
     lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                       {}).get('value', None)
