@@ -151,11 +151,10 @@ def enrich_pxe_info(info):
     if not uuid:
         return info
     for mac in known_uuids.get(uuid, {}):
-        for mac in known_uuids.get(uuid, {}):
-            if not sn and 'serialnumber' in known_uuids[uuid][mac]:
-                info['serialnumber'] = known_uuids[uuid][mac]['serialnumber']
-            if not mn and 'modelnumber' in known_uuids[uuid][mac]:
-                info['modelnumber'] = known_uuids[uuid][mac]['modelnumber']
+        if not sn and 'serialnumber' in known_uuids[uuid][mac]:
+            info['serialnumber'] = known_uuids[uuid][mac]['serialnumber']
+        if not mn and 'modelnumber' in known_uuids[uuid][mac]:
+            info['modelnumber'] = known_uuids[uuid][mac]['modelnumber']
 
 
 def send_discovery_datum(info):
@@ -204,7 +203,7 @@ def _info_matches(info, criteria):
         return False
     if status and info.get('discostatus', None) != status:
         return False
-    if uuid and info.get('uuid') != uuid:
+    if uuid and info.get('uuid', None) != uuid:
         return False
     return True
 
@@ -437,7 +436,7 @@ def _recheck_single_unknown(configmanager, mac):
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
             # addresses data is bad, delete the offending ip
-            info['addresses'] = [x for x in info['addresses'] if x != handler.ipaddr]
+            info['addresses'] = [x for x in info.get('addresses', []) if x != handler.ipaddr]
             # TODO(jjohnson2):  rescan due to bad peer addr data?
             # not just wait around for the next announce
             return
@@ -549,18 +548,18 @@ def detected(info):
                             ''.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
-            info['addresses'] = [x for x in info['addresses'] if x != handler.ipaddr]
+            info['addresses'] = [x for x in info.get('addresses', []) if x != handler.ipaddr]
             return
         log.log(
             {'info':  '{0} with hwaddr {1} at address {2} is not yet running '
                       'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
             )})
-        if rechecker is not None and rechecktime > util.monotonic_time() + 240:
+        if rechecker is not None and rechecktime > util.monotonic_time() + 300:
             rechecker.cancel()
         if rechecker is None or rechecker.dead:
-            rechecktime = util.monotonic_time() + 240
-            rechecker = eventlet.spawn_after(240, _periodic_recheck, cfg)
+            rechecktime = util.monotonic_time() + 300
+            rechecker = eventlet.spawn_after(300, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentfied'
         #TODO, eventlet spawn after to recheck sooner, or somehow else
@@ -784,9 +783,9 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
         sn = info.get('serialnumber', None)
         mn = info.get('modelnumber', None)
         if sn and sn != uuidinfo.get(nodename, {}).get('id.serial', None):
-            attribs['id.serial'] = info['serialnumber']
+            attribs['id.serial'] = sn
         if mn and mn != uuidinfo.get(nodename, {}).get('id.model', None):
-            attribs['id.model'] = info['modelnumber']
+            attribs['id.model'] = mn
         for attrname in uuidinfo.get(nodename, {}):
             if attrname.endswith('.bootable') and uuidinfo[nodename][attrname].get('value', None):
                 newattrname = attrname[:-8] + 'hwaddr'

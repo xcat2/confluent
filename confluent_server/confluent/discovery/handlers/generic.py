@@ -32,7 +32,7 @@ class NodeHandler(object):
                 targsa = sa
                 break
         else:
-            if info['addresses']:
+            if info.get('addresses', False):
                 targsa = info['addresses'][0]
         self.ipaddr = targsa[0]
 
