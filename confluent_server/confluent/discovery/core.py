@@ -447,12 +447,12 @@ def _recheck_single_unknown(configmanager, mac):
                         'https, will examine later'.format(
                     handler.devname, info['hwaddr'], handler.ipaddr
                 )})
-        if rechecker is not None and rechecktime > util.monotonic_time() + 60:
+        if rechecker is not None and rechecktime > util.monotonic_time() + 300:
             rechecker.cancel()
         # if cancel did not result in dead, then we are in progress
         if rechecker is None or rechecker.dead:
-            rechecktime = util.monotonic_time() + 60
-            rechecker = eventlet.spawn_after(60, _periodic_recheck,
+            rechecktime = util.monotonic_time() + 300
+            rechecker = eventlet.spawn_after(300, _periodic_recheck,
                                              configmanager)
         return
     nodename = get_nodename(configmanager, handler, info)
@@ -556,11 +556,11 @@ def detected(info):
                       'https, will examine later'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
             )})
-        if rechecker is not None and rechecktime > util.monotonic_time() + 60:
+        if rechecker is not None and rechecktime > util.monotonic_time() + 240:
             rechecker.cancel()
         if rechecker is None or rechecker.dead:
-            rechecktime = util.monotonic_time() + 60
-            rechecker = eventlet.spawn_after(60, _periodic_recheck, cfg)
+            rechecktime = util.monotonic_time() + 240
+            rechecker = eventlet.spawn_after(240, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentfied'
         #TODO, eventlet spawn after to recheck sooner, or somehow else
