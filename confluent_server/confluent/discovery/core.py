@@ -151,13 +151,19 @@ def enrich_pxe_info(info):
     sn = None
     mn = None
     uuid = info.get('uuid', '')
-    if not uuid:
+    if not uuid_is_valid(uuid):
         return info
     for mac in known_uuids.get(uuid, {}):
         if not sn and 'serialnumber' in known_uuids[uuid][mac]:
             info['serialnumber'] = known_uuids[uuid][mac]['serialnumber']
         if not mn and 'modelnumber' in known_uuids[uuid][mac]:
             info['modelnumber'] = known_uuids[uuid][mac]['modelnumber']
+
+
+def uuid_is_valid(uuid):
+    if not uuid:
+        return False
+    return uuid.lower() not in ('00000000-0000-0000-0000-000000000000', 'ffffffff-ffff-ffff-ffff-ffffffffffff')
 
 
 def send_discovery_datum(info):
@@ -551,7 +557,7 @@ def detected(info):
     handler = handler.NodeHandler(info, cfg)
     handler.scan()
     uuid = info.get('uuid', None)
-    if uuid:
+    if uuid_is_valid(uuid):
         known_uuids[uuid][info['hwaddr']] = info
     if handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
@@ -803,7 +809,8 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
             cfg.set_node_attributes({nodename: attribs})
     if info['uuid'] in known_pxe_uuids:
         return True
-    known_pxe_uuids[info['uuid']] = nodename
+    if uuid_is_valid(info['uuid']):
+        known_pxe_uuids[info['uuid']] = nodename
     log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
         nodename, handler.devname, info['hwaddr'])})
     return True
@@ -909,6 +916,8 @@ def _map_unique_ids(nodes=None):
     uuid_by_nodes = {}
     fprint_by_nodes = {}
     for uuid in nodes_by_uuid:
+        if not uuid_is_valid():
+            continue
         node = nodes_by_uuid[uuid]
         if node in bigmap:
             uuid_by_nodes[node] = uuid
@@ -922,14 +931,14 @@ def _map_unique_ids(nodes=None):
         if node in fprint_by_nodes:
             del nodes_by_fprint[fprint_by_nodes[node]]
         uuid = bigmap[node].get('id.uuid', {}).get('value', None)
-        if uuid:
+        if uuid_is_valid(uuid):
             nodes_by_uuid[uuid] = node
         fprint = bigmap[node].get(
             'pubkeys.tls_hardwaremanager', {}).get('value', None)
         if fprint:
             nodes_by_fprint[fprint] = node
     for uuid in known_pxe_uuids:
-        if uuid not in nodes_by_uuid:
+        if uuid_is_valid(uuid) and uuid not in nodes_by_uuid:
             nodes_by_uuid[uuid] = known_pxe_uuids[uuid]
 
 
