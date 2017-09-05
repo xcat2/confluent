@@ -22,6 +22,7 @@ import confluent.log as log
 import hashlib
 import netifaces
 import os
+import socket
 import struct
 
 
