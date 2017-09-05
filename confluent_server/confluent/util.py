@@ -31,6 +31,8 @@ def list_interface_indexes():
     # For now be linux specific
     try:
         for iface in os.listdir('/sys/class/net/'):
+            if not os.path.exists('/sys/class/net/{0}/ifindex'.format(iface)):
+                continue
             ifile = open('/sys/class/net/{0}/ifindex'.format(iface), 'r')
             intidx = int(ifile.read())
             ifile.close()
