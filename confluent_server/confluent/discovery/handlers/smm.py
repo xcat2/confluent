@@ -32,7 +32,7 @@ class NodeHandler(bmchandler.NodeHandler):
         # ipmi return and property value
         uuid = self.info.get('attributes', {}).get('uuid', None)
         if uuid:
-            uuid = fixuuid(uuid)
+            uuid = fixuuid(uuid[0])
             self.info['uuid'] = uuid
 
     def config(self, nodename):
