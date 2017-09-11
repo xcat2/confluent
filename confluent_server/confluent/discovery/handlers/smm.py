@@ -13,10 +13,27 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.bmc as bmchandler
+import struct
+
+def fixuuid(baduuid):
+    # SMM dumps it out in hex
+    uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
+    a = struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]).encode(
+        'hex')
+    uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
+    return '-'.join(uuid).lower()
 
 class NodeHandler(bmchandler.NodeHandler):
     is_enclosure = True
     devname = 'SMM'
+
+    def scan(self):
+        # the UUID is in a weird order, fix it up to match
+        # ipmi return and property value
+        uuid = self.info.get('attributes', {}).get('uuid', None)
+        if uuid:
+            uuid = fixuuid(uuid)
+            self.info['uuid'] = uuid
 
     def config(self, nodename):
         # SMM for now has to reset to assure configuration applies
