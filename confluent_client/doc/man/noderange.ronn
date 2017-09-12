@@ -1,4 +1,4 @@
-noderange(5) -- Indicate a target set of nodes
+noderange(5) -- Indicate a target set of nodes in confluent
 =========================================================
 
 ## SYNOPSIS
