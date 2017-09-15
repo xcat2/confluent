@@ -39,6 +39,27 @@ class NodeHandler(immhandler.NodeHandler):
         #if ipmicmd:
         #    ipmicmd.ipmi_session.logout()
 
+    def config(self, nodename, reset=False):
+        # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
+        # In general, try to use https automation, to make it consistent
+        # between hypothetical secure path and today.
+        ic = self._bmcconfig(nodename)
+        ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
+        if ff not in ('dense-computing', [u'dense-computing']):
+            return
+        # Ok, we can get the enclosure uuid now..
+        ic.oem_init()
+        enclosureuuid = ic._oem.xcchandler.get_property(
+            '/v2/ibmc/smm/chassis/uuid')
+        enclosureuuid = ic._oem.get_property('/v2/ibmc/smm/chassis/uuid')
+        if enclosureuuid:
+            em = self.configmanager.get_node_attributes(nodename,
+                                                        'enclosure.manager')
+            em = em.get(nodename, {}).get('enclosure.manager', {}).get(
+                'value', None)
+            # ok, set the uuid of the manager...
+            if em:
+                self.configmanager.set_node_attributes(em, {'id.uuid': em})
 
 # TODO(jjohnson2): web based init config for future prevalidated cert scheme
 #    def config(self, nodename):

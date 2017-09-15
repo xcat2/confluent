@@ -43,6 +43,9 @@ class NodeHandler(generic.NodeHandler):
         # TODO(jjohnson2): probe serial number and uuid
 
     def config(self, nodename, reset=False):
+        self._bmcconfig(nodename, reset)
+
+    def _bmcconfig(self, nodename, reset=False):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
@@ -150,4 +153,4 @@ class NodeHandler(generic.NodeHandler):
                             raise
         if reset:
             ic.reset_bmc()
-        return
+        return ic
