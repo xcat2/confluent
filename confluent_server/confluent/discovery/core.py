@@ -613,25 +613,22 @@ def detected(info):
 
 
 def get_nodename(cfg, handler, info):
-    if not handler.https_supported:
-        curruuid = info['uuid']
-        nodename = nodes_by_uuid.get(curruuid, None)
-        if nodename is None:
-            _map_unique_ids()
-            nodename = nodes_by_uuid.get(curruuid, None)
-        if nodename is None:
-            # TODO: if there are too many matches on port for a
-            # given type, error!  Can't just arbitarily limit,
-            # shared nic with vms is possible and valid
-            nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
-        return nodename
-    currcert = handler.https_cert
-    if not currcert:
-        info['discofailure'] = 'nohttps'
-        return None
-    currprint = util.get_fingerprint(currcert)
-    nodename = nodes_by_fprint.get(currprint, None)
+    nodename = None
+    if handler.https_supported:
+        currcert = handler.https_cert
+        if not currcert:
+            info['discofailure'] = 'nohttps'
+            return None
+        currprint = util.get_fingerprint(currcert)
+        nodename = nodes_by_fprint.get(currprint, None)
     if not nodename:
+        curruuid = info.get('uuid', None)
+        if uuid_is_valid(curruuid):
+            nodename = nodes_by_uuid.get(curruuid, None)
+            if nodename is None:
+                _map_unique_ids()
+                nodename = nodes_by_uuid.get(curruuid, None)
+    if not nodename:  # as a last resort, search switch for info
         nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
     return nodename
 
