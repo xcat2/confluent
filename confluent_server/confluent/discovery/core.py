@@ -163,7 +163,9 @@ def enrich_pxe_info(info):
 def uuid_is_valid(uuid):
     if not uuid:
         return False
-    return uuid.lower() not in ('00000000-0000-0000-0000-000000000000', 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+    return uuid.lower() not in ('00000000-0000-0000-0000-000000000000',
+                                'ffffffff-ffff-ffff-ffff-ffffffffffff',
+                                '20202020-2020-2020-2020-202020202020')
 
 
 def send_discovery_datum(info):
