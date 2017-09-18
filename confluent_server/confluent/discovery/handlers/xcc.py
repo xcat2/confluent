@@ -14,6 +14,7 @@
 
 import confluent.discovery.handlers.imm as immhandler
 import pyghmi.exceptions as pygexc
+import pyghmi.ipmi.oem.lenovo.imm as imm
 
 
 
@@ -49,17 +50,20 @@ class NodeHandler(immhandler.NodeHandler):
             return
         # Ok, we can get the enclosure uuid now..
         ic.oem_init()
-        enclosureuuid = ic._oem.xcchandler.get_property(
+        enclosureuuid = ic._oem.immhandler.get_property(
             '/v2/ibmc/smm/chassis/uuid')
-        enclosureuuid = ic._oem.get_property('/v2/ibmc/smm/chassis/uuid')
+        enclosureuuid = ic._oem.immhandler.get_property(
+            '/v2/ibmc/smm/chassis/uuid')
         if enclosureuuid:
+            enclosureuuid = imm.fixup_uuid(enclosureuuid).lower()
             em = self.configmanager.get_node_attributes(nodename,
                                                         'enclosure.manager')
             em = em.get(nodename, {}).get('enclosure.manager', {}).get(
                 'value', None)
             # ok, set the uuid of the manager...
             if em:
-                self.configmanager.set_node_attributes(em, {'id.uuid': em})
+                self.configmanager.set_node_attributes(
+                    {em: {'id.uuid': enclosureuuid}})
 
 # TODO(jjohnson2): web based init config for future prevalidated cert scheme
 #    def config(self, nodename):
