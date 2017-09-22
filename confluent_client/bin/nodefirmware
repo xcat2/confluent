@@ -103,11 +103,17 @@ def update_firmware(session, filename):
     upargs = {'filename': filename}
     if options.backup:
         upargs['bank'] = 'backup'
+    noderrs = {}
     for res in session.create(resource, upargs):
+        if 'created' not in res:
+            for nodename in res.get('databynode', ()):
+                output.set_output(nodename, 'error!')
+                noderrs[nodename] = res['databynode'][nodename].get(
+                    'error', 'Unknown Error')
+            continue
         watchurl = res['created']
         currnode = watchurl.split('/')[1]
         nodeurls[currnode] = '/' + watchurl
-    noderrs = {}
     while nodeurls:
         for node in list(nodeurls):
             progress, status, err = get_update_progress(
