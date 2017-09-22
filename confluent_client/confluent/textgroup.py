@@ -96,6 +96,7 @@ class GroupedData(object):
     def __init__(self, confluentconnection=None):
         self.bynode = {}
         self.byoutput = {}
+        self.header = {}
         self.client = confluentconnection
 
     def generate_byoutput(self):
@@ -115,9 +116,14 @@ class GroupedData(object):
 
     def get_group_text(self, nodes):
         if self.client:
+            headerkey = ','.join(sorted(nodes))
+            if headerkey in self.header:
+                return self.header[headerkey]
             noderange = ''
-            for reply in self.client.create('/noderange//abbreviate', {'nodes': sorted(nodes)}):
+            for reply in self.client.create('/noderange//abbreviate',
+                                            {'nodes': sorted(nodes)}):
                 noderange = reply['noderange']
+            self.header[headerkey] = noderange
             return noderange
         else:
             return ','.join(sorted(nodes, key=humanify_nodename))
