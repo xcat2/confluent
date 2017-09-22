@@ -211,6 +211,10 @@ def _init_core():
                 }),
             },
         },
+        #'forward': {
+        #    # Another dummy value, currently only for the gui
+        #    'web': None,
+        #},
         'health': {
             'hardware': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],

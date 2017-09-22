@@ -50,7 +50,7 @@ def forward_port(sock, target):
 
 
 def forward_video():
-    sock = eventlet.listen(('localhost', 3900, 0, 0), family=socket.AF_INET6)
+    sock = eventlet.listen(('::', 3900, 0, 0), family=socket.AF_INET6)
     while True:
         conn, _ = sock.accept()
         if vidtarget is None:
@@ -67,7 +67,7 @@ def get_port(addr):
     global vidtarget
     global vidforwarder
     if addr not in forwarders:
-        newsock = eventlet.listen(('localhost', 0, 0, 0),
+        newsock = eventlet.listen(('::', 0, 0, 0),
                   family=socket.AF_INET6)
         forwarders[addr] = newsock
         sockhandler[newsock] = eventlet.spawn(forward_port, newsock, addr)

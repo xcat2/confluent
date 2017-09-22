@@ -21,6 +21,7 @@ import Cookie
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
+import confluent.forwarder as forwarder
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages
@@ -446,6 +447,23 @@ def resourcehandler_backend(env, start_response):
             start_response('{0} {1}'.format(e.apierrorcode, e.apierrorstr),
                            headers)
             yield e.get_error_body()
+    elif (env['PATH_INFO'].endswith('/forward/web') and
+              env['PATH_INFO'].startswith('/nodes/')):
+        prefix, _, _ = env['PATH_INFO'].partition('/forward/web')
+        _, _, nodename = prefix.rpartition('/')
+        hm = cfgmgr.get_node_attributes(nodename, 'hardwaremanagement.manager')
+        targip = hm.get(nodename, {}).get(
+            'hardwaremanagement.manager', {}).get('value', None)
+        if not targip:
+            start_response('404 Not Found', headers)
+            yield 'No hardwaremanagemnet.manager defined for node'
+            return
+        funport = forwarder.get_port(targip)
+        host = env['HTTP_X_FORWARDED_HOST']
+        url = 'https://{0}:{1}/'.format(host, funport)
+        start_response('302', [('Location', url)])
+        yield 'Our princess is in another castle!'
+        return
     elif (operation == 'create' and ('/console/session' in env['PATH_INFO'] or
             '/shell/sessions/' in env['PATH_INFO'])):
         #hard bake JSON into this path, do not support other incarnations
