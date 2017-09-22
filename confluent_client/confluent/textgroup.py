@@ -127,10 +127,21 @@ class GroupedData(object):
         self.generate_byoutput()
         modaloutput = None
         ismodal = True
-        outdatalist = sorted(
-            self.byoutput, key=lambda x: len(self.byoutput[x]))
-        if not reverse:
-             outdatalist = reversed(outdatalist)
+
+        if reverse:
+            outdatalist = sorted(
+                self.byoutput, key=lambda x: [len(self.byoutput[x]),
+                                              humanify_nodename(
+                                                  self.get_group_text(
+                                                      self.byoutput[x]
+                                                  ))])
+        else:
+            outdatalist = sorted(
+                self.byoutput, key=lambda x: [0 - len(self.byoutput[x]),
+                                              humanify_nodename(
+                                                  self.get_group_text(
+                                                      self.byoutput[x]
+                                                  ))])
         if reverse and skipmodal:
             # if reversed, the last is biggest and should be skipped if modal
             outdatalist = outdatalist[:-1]
@@ -157,8 +168,12 @@ class GroupedData(object):
         modaloutput = None
         ismodal = True
         revoutput = []
-        for outdata in reversed(
-                sorted(self.byoutput, key=lambda x: len(self.byoutput[x]))):
+        for outdata in sorted(
+                self.byoutput, key=lambda x: [0 - len(self.byoutput[x]),
+                                              humanify_nodename(
+                                                  self.get_group_text(
+                                                      self.byoutput[x]
+                                                  ))]):
             if modaloutput is None:
                 modaloutput = outdata
             if skipmodal:
