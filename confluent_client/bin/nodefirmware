@@ -102,7 +102,7 @@ def update_firmware(session, filename):
         noderange)
     upargs = {'filename': filename}
     if options.backup:
-        upargs['bank'] = 'bank'
+        upargs['bank'] = 'backup'
     for res in session.create(resource, upargs):
         watchurl = res['created']
         currnode = watchurl.split('/')[1]
