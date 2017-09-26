@@ -22,6 +22,7 @@ import confluent.log as log
 import hashlib
 import netifaces
 import os
+import re
 import socket
 import struct
 
@@ -150,3 +151,26 @@ class TLSCertVerifier(object):
         raise cexc.PubkeyInvalid(
             'Mismatched certificate detected', certificate, fingerprint,
             self.fieldname, 'mismatch')
+
+numregex = re.compile('([0-9]+)')
+
+def naturalize_string(key):
+    """Analyzes string in a human way to enable natural sort
+
+    :param nodename: The node name to analyze
+    :returns: A structure that can be consumed by 'sorted'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(numregex, key)]
+
+def natural_sort(iterable):
+    """Return a sort using natural sort if possible
+
+    :param iterable:
+    :return:
+    """
+    try:
+        return sorted(iterable, key=naturalize_string)
+    except TypeError:
+        # The natural sort attempt failed, fallback to ascii sort
+        return sorted(iterable)
