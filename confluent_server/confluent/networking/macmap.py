@@ -416,8 +416,7 @@ def handle_read_api_request(pathcomponents):
     elif pathcomponents[2] == 'by-switch':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x + '/')
-                    for x in sorted(list(_macsbyswitch))]
-
+                    for x in sorted(list(_switchportmap))]
         if len(pathcomponents) == 4:
             return [msg.ChildCollection('by-port/')]
         if len(pathcomponents) == 5:
