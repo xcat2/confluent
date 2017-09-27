@@ -1,0 +1,72 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import confluent.util as util
+
+
+def get_switchcreds(configmanager, switches):
+    switchcfg = configmanager.get_node_attributes(
+        switches, ('secret.hardwaremanagementuser', 'secret.snmpcommunity',
+                   'secret.hardwaremanagementpassword'), decrypt=True)
+    switchauth = []
+    for switch in switches:
+        if not switch:
+            continue
+        switchparms = switchcfg.get(switch, {})
+        user = None
+        password = switchparms.get(
+            'secret.snmpcommunity', {}).get('value', None)
+        if not password:
+            password = switchparms.get(
+                'secret.hardwaremanagementpassword', {}).get('value',
+                                                             'public')
+            user = switchparms.get(
+                'secret.hardwaremanagementuser', {}).get('value', None)
+        switchauth.append((switch, password, user))
+    return switchauth
+
+
+def list_switches(configmanager):
+    nodelocations = configmanager.get_node_attributes(
+        configmanager.list_nodes(), ('net*.switch', 'net*.switchport'))
+    switches = set([])
+    for node in nodelocations:
+        cfg = nodelocations[node]
+        for attr in cfg:
+            if not attr.endswith('.switch') or 'value' not in cfg[attr]:
+                continue
+            curswitch = cfg[attr].get('value', None)
+            if not curswitch:
+                continue
+            switches.add(curswitch)
+    return util.natural_sort(switches)
+
+
+def get_portnamemap(conn):
+    ifnamemap = {}
+    havenames = False
+    for vb in conn.walk('1.3.6.1.2.1.31.1.1.1.1'):
+        ifidx, ifname = vb
+        if not ifname:
+            continue
+        havenames = True
+        ifidx = int(str(ifidx).rsplit('.', 1)[1])
+        ifnamemap[ifidx] = str(ifname)
+    if not havenames:
+        for vb in conn.walk('1.3.6.1.2.1.2.2.1.2'):
+            ifidx, ifname = vb
+            ifidx = int(str(ifidx).rsplit('.', 1)[1])
+            ifnamemap[ifidx] = str(ifname)
+    return ifnamemap

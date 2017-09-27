@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016, 2017 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,10 +30,18 @@
 
 # Provides support for viewing and processing lldp data for switches
 
+if __name__ == '__main__':
+    import sys
+    import confluent.config.configmanager as cfm
 import confluent.exceptions as exc
 import confluent.log as log
+import confluent.messages as msg
 import confluent.snmputil as snmp
+import confluent.networking.netutil as netutil
+import confluent.util as util
+import eventlet
 from eventlet.greenpool import GreenPool
+import eventlet.semaphore
 import re
 
 # The interesting OIDs are:
@@ -70,6 +78,10 @@ import re
 # # 1.0.8802.1.1.2.1.4.1.1.10 - SysDesc - good stuff
 
 
+_neighdata = {}
+_updatelocks = {}
+
+
 def lenovoname(idx, desc):
     if desc.isdigit():
         return 'Ethernet' + str(idx)
@@ -104,23 +116,52 @@ def _extract_neighbor_data_b(args):
         idxtoifname[idx] = _lldpdesc_to_ifname(sid, idx, str(oidindex[1]))
     for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
         iname = idxtoifname[remotedesc[0][-2]]
-        lldpdata[iname] = {'description': str(remotedesc[1])}
+        lldpdata[iname] = {'peerdescription': str(remotedesc[1])}
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
         iname = idxtoifname[remotename[0][-2]]
         if iname not in lldpdata:
             lldpdata[iname] = {}
-        lldpdata[iname]['name'] = str(remotename[1])
+        lldpdata[iname]['peername'] = str(remotename[1])
+    for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.7'):
+        iname = idxtoifname[remotename[0][-2]]
+        if iname not in lldpdata:
+            lldpdata[iname] = {}
+        lldpdata[iname]['peerport'] = str(remotename[1])
     for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
         iname = idxtoifname[remoteid[0][-2]]
         if iname not in lldpdata:
             lldpdata[iname] = {}
-        lldpdata[iname]['chassisid'] = str(remoteid[1])
-    print(repr(lldpdata))
+        lldpdata[iname]['peerchassisid'] = str(remoteid[1])
+    _neighdata[switch] = lldpdata
+
+
+def update_switch_data(switch, configmanager):
+    switchcreds = netutil.get_switchcreds(configmanager, (switch,))[0]
+    _extract_neighbor_data(switchcreds)
+    return _neighdata.get(switch, {})
+
+def _update_neighbors_backend(configmanager):
+    global _neighdata
+    _neighdata = {}
+    switches = list_switches(configmanager)
+    switchcreds = netutil.get_switchcreds(configmanager, switches)
+    pool = GreenPool(64)
+    for ans in pool.imap(_extract_neighbor_data, switchcreds):
+        yield ans
 
 
 def _extract_neighbor_data(args):
+    # single switch neighbor data update
+    switch = args[0]
+    if switch not in _updatelocks:
+        _updatelocks[switch] = eventlet.semaphore.Semaphore()
+    if _updatelocks[switch].locked():
+        while _updatelocks[switch].locked():
+            eventlet.sleep(1)
+        return
     try:
-        _extract_neighbor_data_b(args)
+        with _updatelocks[switch]:
+            _extract_neighbor_data_b(args)
     except Exception:
         log.logtrace()
 
@@ -128,4 +169,26 @@ if __name__ == '__main__':
     # a quick one-shot test, args are switch and snmpv1 string for now
     # (should do three argument form for snmpv3 test
     import sys
-    _extract_neighbor_data((sys.argv[1], sys.argv[2]))
+    _extract_neighbor_data((sys.argv[1], sys.argv[2], None))
+    print(repr(_neighdata))
+
+
+def _handle_neighbor_query(pathcomponents, configmanager):
+    switchname = pathcomponents[0]
+    if len(pathcomponents) == 1:
+        return [msg.ChildCollection('by-port/')]
+    if len(pathcomponents) == 2:
+        # need to list ports for the switchname
+        update_switch_data(switchname, configmanager)
+        return [msg.ChildCollection(x) for x in util.natural_sort(
+            _neighdata[switchname])]
+    portname = pathcomponents[2]
+    return [msg.ChildCollection(repr(_neighdata[switchname][portname]))]
+
+
+def _list_interfaces(switchname, configmanager):
+    switchcreds = get_switchcreds(configmanager, (switchname,))
+    switchcreds = switchcreds[0]
+    conn = snmp.Session(*switchcreds)
+    ifnames = netutil.get_portnamemap(conn)
+    return util.natural_sort(ifnames.values())

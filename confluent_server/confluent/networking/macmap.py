@@ -30,11 +30,12 @@
 
 # this module will provide mac to switch and full 'ifName' label
 # This functionality is restricted to the null tenant
+from confluent.networking.lldp import _handle_neighbor_query
+from confluent.networking.netutil import get_switchcreds, list_switches
 
 if __name__ == '__main__':
     import sys
     import confluent.config.configmanager as cfm
-import confluent.networking.lldp as lldp
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -181,7 +182,7 @@ def _map_switch_backend(args):
         except ValueError:
             # ifidx might be '', skip in such a case
             continue
-    ifnamemap = _get_portnamemap(conn)
+    ifnamemap = netutil.get_portnamemap(conn)
     maccounts = {}
     bridgetoifvalid = False
     for mac in mactobridge:
@@ -240,24 +241,6 @@ def _map_switch_backend(args):
                 _nodesbymac[mac] = nodename
 
 
-def _get_portnamemap(conn):
-    ifnamemap = {}
-    havenames = False
-    for vb in conn.walk('1.3.6.1.2.1.31.1.1.1.1'):
-        ifidx, ifname = vb
-        if not ifname:
-            continue
-        havenames = True
-        ifidx = int(str(ifidx).rsplit('.', 1)[1])
-        ifnamemap[ifidx] = str(ifname)
-    if not havenames:
-        for vb in conn.walk('1.3.6.1.2.1.2.2.1.2'):
-            ifidx, ifname = vb
-            ifidx = int(str(ifidx).rsplit('.', 1)[1])
-            ifnamemap[ifidx] = str(ifname)
-    return ifnamemap
-
-
 def find_node_by_mac(mac, configmanager):
     now = util.monotonic_time()
     if vintage and (now - vintage) < 90 and mac in _nodesbymac:
@@ -299,25 +282,10 @@ def update_macmap(configmanager, impatient=False):
             eventlet.spawn_n(_finish_update, completions)
             raise
 
+
 def _finish_update(completions):
     for _ in completions:
         pass
-
-
-def _list_switches(configmanager):
-    nodelocations = configmanager.get_node_attributes(
-        configmanager.list_nodes(), ('net*.switch', 'net*.switchport'))
-    switches = set([])
-    for node in nodelocations:
-        cfg = nodelocations[node]
-        for attr in cfg:
-            if not attr.endswith('.switch') or 'value' not in cfg[attr]:
-                continue
-            curswitch = cfg[attr].get('value', None)
-            if not curswitch:
-                continue
-            switches.add(curswitch)
-    return util.natural_sort(switches)
 
 
 def _full_updatemacmap(configmanager):
@@ -365,33 +333,11 @@ def _full_updatemacmap(configmanager):
                         _switchportmap[curswitch][portname] = None
                     else:
                         _switchportmap[curswitch][portname] = node
-        switchauth = _get_switchcreds(configmanager, switches)
-        pool = GreenPool()
+        switchauth = get_switchcreds(configmanager, switches)
+        pool = GreenPool(64)
         for ans in pool.imap(_map_switch, switchauth):
             vintage = util.monotonic_time()
             yield ans
-
-
-def _get_switchcreds(configmanager, switches):
-    switchcfg = configmanager.get_node_attributes(
-        switches, ('secret.hardwaremanagementuser', 'secret.snmpcommunity',
-                   'secret.hardwaremanagementpassword'), decrypt=True)
-    switchauth = []
-    for switch in switches:
-        if not switch:
-            continue
-        switchparms = switchcfg.get(switch, {})
-        user = None
-        password = switchparms.get(
-            'secret.snmpcommunity', {}).get('value', None)
-        if not password:
-            password = switchparms.get(
-                'secret.hardwaremanagementpassword', {}).get('value',
-                                                             'public')
-            user = switchparms.get(
-                'secret.hardwaremanagementuser', {}).get('value', None)
-        switchauth.append((switch, password, user))
-    return switchauth
 
 
 def _dump_locations(info, macaddr, nodename=None):
@@ -420,26 +366,6 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             operation, '/'.join(pathcomponents)))
 
 
-def _list_interfaces(switchname, configmanager):
-    switchcreds = _get_switchcreds(configmanager, (switchname,))
-    switchcreds = switchcreds[0]
-    conn = snmp.Session(*switchcreds)
-    ifnames = _get_portnamemap(conn)
-    return util.natural_sort(ifnames.values())
-
-
-def _handle_neighbor_query(pathcomponents, configmanager):
-    switchname = pathcomponents[0]
-    if len(pathcomponents) == 1:
-        return [msg.ChildCollection('by-port/')]
-    if len(pathcomponents) == 2:
-        # need to list ports for the switchname
-        return [msg.ChildCollection(x) for x in _list_interfaces(switchname,
-                                                                 configmanager)]
-    portname = pathcomponents[2]
-    return [msg.ChildCollection(portname)]
-
-
 def handle_read_api_request(pathcomponents, configmanager):
     # TODO(jjohnson2): discovery core.py api handler design, apply it here
     # to make this a less tangled mess as it gets extended
@@ -451,7 +377,7 @@ def handle_read_api_request(pathcomponents, configmanager):
             return [msg.ChildCollection('by-switch/')]
         elif len(pathcomponents) == 3:
             return [msg.ChildCollection(x + '/')
-                    for x in _list_switches(configmanager)]
+                    for x in list_switches(configmanager)]
         else:
             return _handle_neighbor_query(pathcomponents[3:], configmanager)
     elif len(pathcomponents) == 2:
@@ -481,7 +407,7 @@ def handle_read_api_request(pathcomponents, configmanager):
     elif pathcomponents[2] == 'by-switch':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x + '/')
-                    for x in _list_switches(configmanager)]
+                    for x in list_switches(configmanager)]
         if len(pathcomponents) == 4:
             return [msg.ChildCollection('by-port/')]
         if len(pathcomponents) == 5:
