@@ -59,8 +59,9 @@ class Session(object):
             # SNMP v2c
             self.authdata = snmp.CommunityData(secret, mpModel=1)
         else:
-            self.authdata = snmp.UsmUserData(username, authKey=secret,
-                                             privKey=secret)
+            self.authdata = snmp.UsmUserData(
+                username, authKey=secret, privKey=secret,
+                authProtocol=snmp.usmHMACSHAAuthProtocol)
         self.eng = snmp.SnmpEngine()
 
     def walk(self, oid):

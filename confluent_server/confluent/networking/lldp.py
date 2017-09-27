@@ -99,6 +99,23 @@ def _lldpdesc_to_ifname(switchid, idx, desc):
     return desc
 
 
+def _dump_neighbordatum(info, switch, port):
+    datum = {'switch': switch, 'port': port}
+    datum.update(info)
+    return [msg.KeyValueData(datum)]
+
+
+def _extract_extended_desc(info, source, integritychecked):
+    source = str(source)
+    info['authenticated']  = bool(integritychecked)
+    if source.startswith('Lenovo SMM;'):
+        info['peerdescription'] = 'Lenovo SMM'
+        if ';S2=' in source:
+            info['peersha256fingerprint'] = source.replace('Lenovo SMM;S2=',
+                                                           '')
+    else:
+        info['peerdescription'] = source
+
 def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
 
@@ -116,7 +133,8 @@ def _extract_neighbor_data_b(args):
         idxtoifname[idx] = _lldpdesc_to_ifname(sid, idx, str(oidindex[1]))
     for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
         iname = idxtoifname[remotedesc[0][-2]]
-        lldpdata[iname] = {'peerdescription': str(remotedesc[1])}
+        lldpdata[iname] = {}
+        _extract_extended_desc(lldpdata[iname], remotedesc[1], user)
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
         iname = idxtoifname[remotename[0][-2]]
         if iname not in lldpdata:
@@ -183,7 +201,15 @@ def _handle_neighbor_query(pathcomponents, configmanager):
         return [msg.ChildCollection(x) for x in util.natural_sort(
             _neighdata[switchname])]
     portname = pathcomponents[2]
-    return [msg.ChildCollection(repr(_neighdata[switchname][portname]))]
+    try:
+        if switchname not in _neighdata:
+            update_switch_data(switchname, configmanager)
+        return _dump_neighbordatum(
+            _neighdata[switchname][portname], switchname, portname)
+    except IndexError:
+        raise exc.NotFoundException(
+            'No neighbor info for switch {0}, port {1}'.format(switchname, portname))
+
 
 
 def _list_interfaces(switchname, configmanager):

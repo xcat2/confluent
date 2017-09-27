@@ -31,7 +31,7 @@
 # this module will provide mac to switch and full 'ifName' label
 # This functionality is restricted to the null tenant
 from confluent.networking.lldp import _handle_neighbor_query
-from confluent.networking.netutil import get_switchcreds, list_switches
+from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
 
 if __name__ == '__main__':
     import sys
@@ -182,7 +182,7 @@ def _map_switch_backend(args):
         except ValueError:
             # ifidx might be '', skip in such a case
             continue
-    ifnamemap = netutil.get_portnamemap(conn)
+    ifnamemap = get_portnamemap(conn)
     maccounts = {}
     bridgetoifvalid = False
     for mac in mactobridge:
