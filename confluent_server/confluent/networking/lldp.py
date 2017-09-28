@@ -116,6 +116,15 @@ def _extract_extended_desc(info, source, integritychecked):
     else:
         info['peerdescription'] = source
 
+def sanitize(val):
+    val = str(val)
+    for x in val.strip('\x00'):
+        if ord(x) < 32 or ord(x) > 128:
+            val = ':'.join(['{0:02x}'.format(ord(x)) for x in str(val)])
+            break
+    return val
+
+
 def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
 
@@ -144,12 +153,12 @@ def _extract_neighbor_data_b(args):
         iname = idxtoifname[remotename[0][-2]]
         if iname not in lldpdata:
             lldpdata[iname] = {}
-        lldpdata[iname]['peerport'] = str(remotename[1])
+        lldpdata[iname]['peerport'] = sanitize(remotename[1])
     for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
         iname = idxtoifname[remoteid[0][-2]]
         if iname not in lldpdata:
             lldpdata[iname] = {}
-        lldpdata[iname]['peerchassisid'] = str(remoteid[1])
+        lldpdata[iname]['peerchassisid'] = sanitize(remoteid[1])
     _neighdata[switch] = lldpdata
 
 
