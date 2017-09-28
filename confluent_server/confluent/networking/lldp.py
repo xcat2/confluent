@@ -79,6 +79,7 @@ import re
 
 
 _neighdata = {}
+_neighbypeerid = {}
 _updatelocks = {}
 
 
@@ -99,10 +100,8 @@ def _lldpdesc_to_ifname(switchid, idx, desc):
     return desc.strip().strip('\x00')
 
 
-def _dump_neighbordatum(info, switch, port):
-    datum = {'switch': switch, 'port': port}
-    datum.update(info)
-    return [msg.KeyValueData(datum)]
+def _dump_neighbordatum(info):
+    return [msg.KeyValueData(info)]
 
 
 def _extract_extended_desc(info, source, integritychecked):
@@ -142,23 +141,31 @@ def _extract_neighbor_data_b(args):
         idxtoifname[idx] = _lldpdesc_to_ifname(sid, idx, str(oidindex[1]))
     for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
         iname = idxtoifname[remotedesc[0][-2]]
-        lldpdata[iname] = {}
+        lldpdata[iname] = {'port': iname}
         _extract_extended_desc(lldpdata[iname], remotedesc[1], user)
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
         iname = idxtoifname[remotename[0][-2]]
         if iname not in lldpdata:
-            lldpdata[iname] = {}
+            lldpdata[iname] = {'port': iname}
         lldpdata[iname]['peername'] = str(remotename[1])
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.7'):
         iname = idxtoifname[remotename[0][-2]]
         if iname not in lldpdata:
-            lldpdata[iname] = {}
+            lldpdata[iname] = {'port': iname}
         lldpdata[iname]['peerport'] = sanitize(remotename[1])
     for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
         iname = idxtoifname[remoteid[0][-2]]
         if iname not in lldpdata:
-            lldpdata[iname] = {}
+            lldpdata[iname] = {'port': iname}
         lldpdata[iname]['peerchassisid'] = sanitize(remoteid[1])
+    for entry in lldpdata:
+        entry = lldpdata[entry]
+        entry['switch'] = switch
+        peerid = '{0}-{1}-{2}'.format(
+            entry.get('peername', ''),
+            entry.get('peerchassisid', '').replace(':', '-'),
+            entry.get('peerport', '').replace(':', '-'))
+        _neighbypeerid[peerid] = entry
     _neighdata[switch] = lldpdata
 
 
@@ -169,7 +176,9 @@ def update_switch_data(switch, configmanager):
 
 def _update_neighbors_backend(configmanager):
     global _neighdata
+    global _neighbypeerid
     _neighdata = {}
+    _neighbypeerid = {}
     switches = list_switches(configmanager)
     switchcreds = netutil.get_switchcreds(configmanager, switches)
     pool = GreenPool(64)
@@ -200,7 +209,40 @@ if __name__ == '__main__':
     print(repr(_neighdata))
 
 
-def _handle_neighbor_query(pathcomponents, configmanager):
+multi_selectors = set(['by-switch', 'by-peername', 'by-peerport',
+                        'by-peerchassisid'])
+single_selectors = set(['by-peerid'])
+
+def _parameterize_path(pathcomponents):
+    listrequested = False
+    childcoll = True
+    if len(pathcomponents) % 2 == 1:
+        listrequested = pathcomponents[-1]
+        pathcomponents = pathcomponents[:-1]
+    pathit = iter(pathcomponents)
+    keyparams = {}
+    validselectors = multi_selectors | single_selectors
+    for key, val in zip(pathit, pathit):
+        if key not in validselectors:
+            print(repr(key))
+            print(repr(validselectors))
+            raise exc.NotFoundException('{0} is not valid here'.format(key))
+        keyparams[key] = val
+        validselectors.discard(key)
+        if key == 'by-switch':
+            validselectors.add('by-port')
+        if key in single_selectors:
+            childcoll = False
+            validselectors = set([])
+    return validselectors, keyparams, listrequested, childcoll
+
+
+def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
+    choices, parms, listrequested, childcoll = _parameterize_path(
+        pathcomponents)
+    if not childcoll:
+        return _dump_neighbordatum(_neighbypeerid[parms['by-peerid']])
+
     switchname = pathcomponents[0]
     if len(pathcomponents) == 1:
         return [msg.ChildCollection('by-port/')]
@@ -216,8 +258,7 @@ def _handle_neighbor_query(pathcomponents, configmanager):
             update_switch_data(switchname, configmanager)
         if switchname in _neighdata and not portname in _neighdata[switchname]:
             portname = portname.replace('-', '/')
-        return _dump_neighbordatum(
-            _neighdata[switchname][portname], switchname, portname)
+        return _dump_neighbordatum(_neighdata[switchname][portname])
     except KeyError:
         raise exc.NotFoundException(
             'No neighbor info for switch {0}, port {1}'.format(switchname, portname))

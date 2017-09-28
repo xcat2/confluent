@@ -379,7 +379,8 @@ def handle_read_api_request(pathcomponents, configmanager):
             return [msg.ChildCollection(x + '/')
                     for x in list_switches(configmanager)]
         else:
-            return _handle_neighbor_query(pathcomponents[3:], configmanager)
+            return _handle_neighbor_query(pathcomponents[2:], configmanager,
+                                          list_switches)
     elif len(pathcomponents) == 2:
         if pathcomponents[-1] == 'macs':
             return [msg.ChildCollection(x) for x in (# 'by-node/',
