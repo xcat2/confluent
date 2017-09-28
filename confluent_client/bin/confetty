@@ -291,7 +291,10 @@ def print_result(res):
         elif type(res[key]) == list:
             attrstr = '%s=%s' % (key, recurse_format(res[key]))
         elif not isinstance(res[key], dict):
-            print '{0}: {1}'.format(key, res[key])
+            try:
+                print '{0}: {1}'.format(key, res[key])
+            except UnicodeEncodeError:
+                print '{0}: {1}'.format(key, repr(res[key]))
             continue
         elif 'value' in res[key] and res[key]['value'] is not None:
             attrstr = '%s="%s"' % (key, res[key]['value'])
