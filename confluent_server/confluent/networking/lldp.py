@@ -96,7 +96,7 @@ def _lldpdesc_to_ifname(switchid, idx, desc):
     for tform in nameoverrides:
         if tform[0].match(switchid):
             desc = tform[1](idx, desc)
-    return desc
+    return desc.strip().strip('\x00')
 
 
 def _dump_neighbordatum(info, switch, port):
@@ -107,7 +107,7 @@ def _dump_neighbordatum(info, switch, port):
 
 def _extract_extended_desc(info, source, integritychecked):
     source = str(source)
-    info['authenticated']  = bool(integritychecked)
+    info['verified']  = bool(integritychecked)
     if source.startswith('Lenovo SMM;'):
         info['peerdescription'] = 'Lenovo SMM'
         if ';S2=' in source:
@@ -198,15 +198,18 @@ def _handle_neighbor_query(pathcomponents, configmanager):
     if len(pathcomponents) == 2:
         # need to list ports for the switchname
         update_switch_data(switchname, configmanager)
-        return [msg.ChildCollection(x) for x in util.natural_sort(
-            _neighdata[switchname])]
+        return [msg.ChildCollection(
+            x.replace('/', '-')) for x in util.natural_sort(
+            _neighdata.get(switchname, {}))]
     portname = pathcomponents[2]
     try:
         if switchname not in _neighdata:
             update_switch_data(switchname, configmanager)
+        if switchname in _neighdata and not portname in _neighdata[switchname]:
+            portname = portname.replace('-', '/')
         return _dump_neighbordatum(
             _neighdata[switchname][portname], switchname, portname)
-    except IndexError:
+    except KeyError:
         raise exc.NotFoundException(
             'No neighbor info for switch {0}, port {1}'.format(switchname, portname))
 
