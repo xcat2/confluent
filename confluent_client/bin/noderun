@@ -56,6 +56,7 @@ def run():
     all = set([])
     pipedesc = {}
     pendingexecs = deque()
+    exitcode = 0
 
     for exp in c.create('/noderange/{0}/attributes/expression'.format(args[0]),
                         {'expression': cmdstr}):
@@ -71,7 +72,6 @@ def run():
                 run_cmdv(node, cmdv, all, pipedesc)
             else:
                 pendingexecs.append((node, cmdv))
-    exitcode = 0
     if not all or exitcode:
         sys.exit(exitcode)
     rdy, _, _ = select.select(all, [], [], 10)
