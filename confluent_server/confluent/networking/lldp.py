@@ -246,8 +246,10 @@ def list_info(parms, requestedparameter):
             mk = mk.replace('by-', '')
             if mk not in info:
                 continue
-            if parms['by-' + mk] == info[mk] and requestedparameter in info:
-                results.add(info[requestedparameter])
+            if parms['by-' + mk] != info[mk] or requestedparameter not in info:
+                break
+        else:
+            results.add(info[requestedparameter])
     return [msg.ChildCollection(x + suffix) for x in util.natural_sort(results)]
 
 def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
