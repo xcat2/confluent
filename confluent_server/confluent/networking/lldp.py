@@ -209,7 +209,7 @@ if __name__ == '__main__':
 
 
 multi_selectors = set(['by-switch', 'by-peername', 'by-peerport',
-                        'by-peerchassisid'])
+                        'by-peerchassisid', 'by-port'])
 single_selectors = set(['by-peerid'])
 
 def _parameterize_path(pathcomponents):
@@ -223,8 +223,6 @@ def _parameterize_path(pathcomponents):
     validselectors = multi_selectors | single_selectors
     for key, val in zip(pathit, pathit):
         if key not in validselectors:
-            print(repr(key))
-            print(repr(validselectors))
             raise exc.NotFoundException('{0} is not valid here'.format(key))
         keyparams[key] = val
         validselectors.discard(key)
@@ -235,12 +233,34 @@ def _parameterize_path(pathcomponents):
             validselectors = set([])
     return validselectors, keyparams, listrequested, childcoll
 
+def list_info(parms, requestedparameter):
+    #{u'by-switch': u'r8e1', u'by-port': u'e'}
+    #by-peerport
+    results = set([])
+    requestedparameter = requestedparameter.replace('by-', '')
+    for info in _neighbypeerid:
+        info = _neighbypeerid[info]
+        for mk in parms:
+            mk = mk.replace('by-', '')
+            if mk not in info:
+                continue
+            if parms['by-' + mk] == info[mk] and requestedparameter in info:
+                results.add(info[requestedparameter])
+    return [msg.ChildCollection(x) for x in util.natural_sort(results)]
 
 def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
     choices, parms, listrequested, childcoll = _parameterize_path(
         pathcomponents)
-    if not childcoll:
+    if not childcoll:  # this means it's a single entry with by-peerid
+        # guaranteed
         return _dump_neighbordatum(_neighbypeerid[parms['by-peerid']])
+    if not listrequested:  # the query is for currently valid choices
+        return [msg.ChildCollection(x + '/') for x in sorted(list(choices))]
+    if listrequested not in multi_selectors | single_selectors:
+        raise exc.NotFoundException('{0} is not found'.format(listrequested))
+    if 'by-switch' in parms:
+        update_switch_data(parms['by-switch'], configmanager)
+    return list_info(parms, listrequested)
 
     switchname = pathcomponents[0]
     if len(pathcomponents) == 1:
