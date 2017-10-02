@@ -247,7 +247,7 @@ def list_info(parms, requestedparameter):
                 continue
             if parms['by-' + mk] == info[mk] and requestedparameter in info:
                 results.add(info[requestedparameter])
-    return [msg.ChildCollection(x) for x in util.natural_sort(results)]
+    return [msg.ChildCollection(x + '/') for x in util.natural_sort(results)]
 
 def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
     choices, parms, listrequested, childcoll = _parameterize_path(
