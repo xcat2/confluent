@@ -161,8 +161,7 @@ def _extract_neighbor_data_b(args):
     for entry in lldpdata:
         entry = lldpdata[entry]
         entry['switch'] = switch
-        peerid = '{0}-{1}-{2}'.format(
-            entry.get('peername', ''),
+        peerid = '{0}-{1}'.format(
             entry.get('peerchassisid', '').replace(':', '-'),
             entry.get('peerport', '').replace(':', '-'))
         _neighbypeerid[peerid] = entry
