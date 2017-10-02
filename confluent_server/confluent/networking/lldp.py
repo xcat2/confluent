@@ -237,6 +237,7 @@ def _parameterize_path(pathcomponents):
 def list_info(parms, requestedparameter):
     #{u'by-switch': u'r8e1', u'by-port': u'e'}
     #by-peerport
+    suffix = '/' if requestedparameter in multi_selectors else ''
     results = set([])
     requestedparameter = requestedparameter.replace('by-', '')
     for info in _neighbypeerid:
@@ -247,7 +248,7 @@ def list_info(parms, requestedparameter):
                 continue
             if parms['by-' + mk] == info[mk] and requestedparameter in info:
                 results.add(info[requestedparameter])
-    return [msg.ChildCollection(x + '/') for x in util.natural_sort(results)]
+    return [msg.ChildCollection(x + suffix) for x in util.natural_sort(results)]
 
 def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
     choices, parms, listrequested, childcoll = _parameterize_path(
