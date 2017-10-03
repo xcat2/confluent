@@ -45,6 +45,8 @@ import eventlet.semaphore
 import re
 
 # The interesting OIDs are:
+# lldpLocChassisId - to cross reference (1.0.8802.1.1.2.1.3.2.0)
+# lldpLocPortId - for cross referencing.. (1.0.8802.1.1.2.1.3.7.1.3)
 # 1.0.8802.1.1.2.1.3.7.1.4 - Lookup of LLDP index id to description
 #                            Yet another fun fact, the LLDP port index frequent
 #                            does *not* map to ifName, like a sane
@@ -81,7 +83,7 @@ import re
 _neighdata = {}
 _neighbypeerid = {}
 _updatelocks = {}
-
+_chassisidbyswitch = {}
 
 def lenovoname(idx, desc):
     if desc.isdigit():
@@ -135,6 +137,10 @@ def sanitize(val):
             break
     return val
 
+def _init_lldp(data, iname, idx, idxtoportid, switch):
+    if iname not in data:
+        data[iname] = {'port': iname, 'portid': str(idxtoportid[idx]),
+                       'chassisid': str(_chassisidbyswitch[switch])}
 
 def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
@@ -152,27 +158,29 @@ def _extract_neighbor_data_b(args):
     for sysid in conn.walk('1.3.6.1.2.1.1.2'):
         sid = str(sysid[1][6:])
     idxtoifname = {}
+    idxtoportid = {}
+    _chassisidbyswitch[switch] = list(conn.walk('1.0.8802.1.1.2.1.3.2'))[0][1]
+    for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.3'):
+        idx = oidindex[0][-1]
+        idxtoportid[idx] = sanitize(oidindex[1])
     for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.4'):
         idx = oidindex[0][-1]
         idxtoifname[idx] = _lldpdesc_to_ifname(sid, idx, str(oidindex[1]))
     for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
         iname = idxtoifname[remotedesc[0][-2]]
-        lldpdata[iname] = {'port': iname}
+        _init_lldp(lldpdata, iname, remotedesc[0][-2], idxtoportid, switch)
         _extract_extended_desc(lldpdata[iname], remotedesc[1], user)
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
         iname = idxtoifname[remotename[0][-2]]
-        if iname not in lldpdata:
-            lldpdata[iname] = {'port': iname}
+        _init_lldp(lldpdata, iname, remotename[0][-2], idxtoportid, switch)
         lldpdata[iname]['peername'] = str(remotename[1])
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.7'):
         iname = idxtoifname[remotename[0][-2]]
-        if iname not in lldpdata:
-            lldpdata[iname] = {'port': iname}
-        lldpdata[iname]['peerport'] = sanitize(remotename[1])
+        _init_lldp(lldpdata, iname, remotename[0][-2], idxtoportid, switch)
+        lldpdata[iname]['peerportid'] = sanitize(remotename[1])
     for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
         iname = idxtoifname[remoteid[0][-2]]
-        if iname not in lldpdata:
-            lldpdata[iname] = {'port': iname}
+        _init_lldp(lldpdata, iname, remoteid[0][-2], idxtoportid, switch)
         lldpdata[iname]['peerchassisid'] = sanitize(remoteid[1])
     for entry in lldpdata:
         if entry == '!!vintage':
@@ -181,7 +189,7 @@ def _extract_neighbor_data_b(args):
         entry['switch'] = switch
         peerid = '{0}.{1}'.format(
             entry.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
-            entry.get('peerport', '').replace(':', '-').replace('/', '-'))
+            entry.get('peerportid', '').replace(':', '-').replace('/', '-'))
         entry['peerid'] = peerid
         _neighbypeerid[peerid] = entry
     _neighdata[switch] = lldpdata
@@ -237,8 +245,9 @@ if __name__ == '__main__':
     print(repr(_neighdata))
 
 
-multi_selectors = set(['by-switch', 'by-peername', 'by-peerport',
-                        'by-peerchassisid', 'by-port'])
+multi_selectors = set(['by-switch', 'by-peername', 'by-peerportid',
+                        'by-peerchassisid', 'by-chassisid', 'by-port',
+                        'by-portid'])
 single_selectors = set(['by-peerid'])
 
 def _parameterize_path(pathcomponents):
