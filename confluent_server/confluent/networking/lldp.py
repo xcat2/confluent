@@ -129,10 +129,14 @@ def _extract_neighbor_data_b(args):
 
     args are carried as a tuple, because of eventlet convenience
     """
-    switch, password, user = args
+    switch, password, user, force = args
+    vintage = _neighdata.get(switch, {}).get('!!vintage', 0)
+    now = util.monotonic_time()
+    if vintage > (now - 60) and not force:
+        return
     conn = snmp.Session(switch, password, user)
     sid = None
-    lldpdata = {}
+    lldpdata = {'!!vintage': now}
     for sysid in conn.walk('1.3.6.1.2.1.1.2'):
         sid = str(sysid[1][6:])
     idxtoifname = {}
@@ -159,6 +163,8 @@ def _extract_neighbor_data_b(args):
             lldpdata[iname] = {'port': iname}
         lldpdata[iname]['peerchassisid'] = sanitize(remoteid[1])
     for entry in lldpdata:
+        if entry == '!!vintage':
+            continue
         entry = lldpdata[entry]
         entry['switch'] = switch
         peerid = '{0}--{1}'.format(
@@ -169,18 +175,27 @@ def _extract_neighbor_data_b(args):
     _neighdata[switch] = lldpdata
 
 
-def update_switch_data(switch, configmanager):
+def update_switch_data(switch, configmanager, force=False):
     switchcreds = netutil.get_switchcreds(configmanager, (switch,))[0]
-    _extract_neighbor_data(switchcreds)
+    _extract_neighbor_data(switchcreds + (force,))
     return _neighdata.get(switch, {})
 
-def _update_neighbors_backend(configmanager):
+
+def update_neighbors(configmanager, force=False):
+    return _update_neighbors_backend(configmanager, force)
+
+
+def _update_neighbors_backend(configmanager, force):
     global _neighdata
     global _neighbypeerid
-    _neighdata = {}
-    _neighbypeerid = {}
+    vintage = _neighdata.get('!!vintage', 0)
+    now = util.monotonic_time()
+    if vintage > (now - 60) and not force:
+        return
+    _neighdata = {'!!vintage': now}
+    _neighbypeerid = {'!!vintage': now}
     switches = list_switches(configmanager)
-    switchcreds = netutil.get_switchcreds(configmanager, switches)
+    switchcreds = netutil.get_switchcreds(configmanager, switches) + (force,)
     pool = GreenPool(64)
     for ans in pool.imap(_extract_neighbor_data, switchcreds):
         yield ans
@@ -205,7 +220,7 @@ if __name__ == '__main__':
     # a quick one-shot test, args are switch and snmpv1 string for now
     # (should do three argument form for snmpv3 test
     import sys
-    _extract_neighbor_data((sys.argv[1], sys.argv[2], None))
+    _extract_neighbor_data((sys.argv[1], sys.argv[2], None, True))
     print(repr(_neighdata))
 
 
@@ -264,28 +279,9 @@ def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
         raise exc.NotFoundException('{0} is not found'.format(listrequested))
     if 'by-switch' in parms:
         update_switch_data(parms['by-switch'], configmanager)
+    else:
+        update_neighbors(configmanager)
     return list_info(parms, listrequested)
-
-    switchname = pathcomponents[0]
-    if len(pathcomponents) == 1:
-        return [msg.ChildCollection('by-port/')]
-    if len(pathcomponents) == 2:
-        # need to list ports for the switchname
-        update_switch_data(switchname, configmanager)
-        return [msg.ChildCollection(
-            x.replace('/', '-')) for x in util.natural_sort(
-            _neighdata.get(switchname, {}))]
-    portname = pathcomponents[2]
-    try:
-        if switchname not in _neighdata:
-            update_switch_data(switchname, configmanager)
-        if switchname in _neighdata and not portname in _neighdata[switchname]:
-            portname = portname.replace('-', '/')
-        return _dump_neighbordatum(_neighdata[switchname][portname])
-    except KeyError:
-        raise exc.NotFoundException(
-            'No neighbor info for switch {0}, port {1}'.format(switchname, portname))
-
 
 
 def _list_interfaces(switchname, configmanager):
