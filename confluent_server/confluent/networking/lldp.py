@@ -291,6 +291,11 @@ def _handle_neighbor_query(pathcomponents, configmanager):
         pathcomponents)
     if not childcoll:  # this means it's a single entry with by-peerid
         # guaranteed
+        if (parms['by-peerid'] not in _neighbypeerid and
+                _neighbypeerid.get('!!vintage', 0) < util.monotonic_time() - 60):
+            list(update_neighbors(configmanager))
+        if parms['by-peerid'] not in _neighbypeerid:
+            raise exc.NotFoundException('No matching peer known')
         return _dump_neighbordatum(_neighbypeerid[parms['by-peerid']])
     if not listrequested:  # the query is for currently valid choices
         return [msg.ChildCollection(x + '/') for x in sorted(list(choices))]
