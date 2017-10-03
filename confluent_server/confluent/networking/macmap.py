@@ -373,14 +373,11 @@ def handle_read_api_request(pathcomponents, configmanager):
         return [msg.ChildCollection('macs/'),
                 msg.ChildCollection('neighbors/')]
     elif pathcomponents[1] == 'neighbors':
-        if len(pathcomponents) == 2:
-            return [msg.ChildCollection('by-switch/')]
-        elif len(pathcomponents) == 3:
+        if len(pathcomponents) == 3 and pathcomponents[-1] == 'by-switch':
             return [msg.ChildCollection(x + '/')
                     for x in list_switches(configmanager)]
         else:
-            return _handle_neighbor_query(pathcomponents[2:], configmanager,
-                                          list_switches)
+            return _handle_neighbor_query(pathcomponents[2:], configmanager)
     elif len(pathcomponents) == 2:
         if pathcomponents[-1] == 'macs':
             return [msg.ChildCollection(x) for x in (# 'by-node/',

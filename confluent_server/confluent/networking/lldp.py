@@ -168,8 +168,8 @@ def _extract_neighbor_data_b(args):
         entry = lldpdata[entry]
         entry['switch'] = switch
         peerid = '{0}--{1}'.format(
-            entry.get('peerchassisid', '').replace(':', '-'),
-            entry.get('peerport', '').replace(':', '-'))
+            entry.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
+            entry.get('peerport', '').replace(':', '-').replace('/', '-'))
         entry['peerid'] = peerid
         _neighbypeerid[peerid] = entry
     _neighdata[switch] = lldpdata
@@ -194,8 +194,9 @@ def _update_neighbors_backend(configmanager, force):
         return
     _neighdata = {'!!vintage': now}
     _neighbypeerid = {'!!vintage': now}
-    switches = list_switches(configmanager)
-    switchcreds = netutil.get_switchcreds(configmanager, switches) + (force,)
+    switches = netutil.list_switches(configmanager)
+    switchcreds = netutil.get_switchcreds(configmanager, switches)
+    switchcreds = [ x + (force,) for x in switchcreds]
     pool = GreenPool(64)
     for ans in pool.imap(_extract_neighbor_data, switchcreds):
         yield ans
@@ -256,6 +257,8 @@ def list_info(parms, requestedparameter):
     results = set([])
     requestedparameter = requestedparameter.replace('by-', '')
     for info in _neighbypeerid:
+        if info == '!!vintage':
+            continue
         info = _neighbypeerid[info]
         for mk in parms:
             mk = mk.replace('by-', '')
@@ -267,7 +270,7 @@ def list_info(parms, requestedparameter):
             results.add(info[requestedparameter])
     return [msg.ChildCollection(x + suffix) for x in util.natural_sort(results)]
 
-def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
+def _handle_neighbor_query(pathcomponents, configmanager):
     choices, parms, listrequested, childcoll = _parameterize_path(
         pathcomponents)
     if not childcoll:  # this means it's a single entry with by-peerid
@@ -280,7 +283,7 @@ def _handle_neighbor_query(pathcomponents, configmanager, list_switches):
     if 'by-switch' in parms:
         update_switch_data(parms['by-switch'], configmanager)
     else:
-        update_neighbors(configmanager)
+        list(update_neighbors(configmanager))
     return list_info(parms, listrequested)
 
 
