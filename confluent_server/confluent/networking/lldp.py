@@ -93,6 +93,18 @@ nameoverrides = [
 ]
 
 
+def _api_sanitize_string(source):
+    source = source.strip()
+    return source.replace(':', '-').replace('/', '-')
+
+def close_enough(fuzz, literal):
+    if fuzz == literal:
+        return True
+    fuzz = '^' + fuzz.replace('-', '[/: -]') + '$'
+    matcher = re.compile(fuzz)
+    return bool(matcher.match(literal))
+
+
 def _lldpdesc_to_ifname(switchid, idx, desc):
     for tform in nameoverrides:
         if tform[0].match(switchid):
@@ -167,7 +179,7 @@ def _extract_neighbor_data_b(args):
             continue
         entry = lldpdata[entry]
         entry['switch'] = switch
-        peerid = '{0}--{1}'.format(
+        peerid = '{0}.{1}'.format(
             entry.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
             entry.get('peerport', '').replace(':', '-').replace('/', '-'))
         entry['peerid'] = peerid
@@ -264,10 +276,14 @@ def list_info(parms, requestedparameter):
             mk = mk.replace('by-', '')
             if mk not in info:
                 continue
-            if parms['by-' + mk] != info[mk] or requestedparameter not in info:
+            if (not close_enough(parms['by-' + mk], info[mk]) or
+                    requestedparameter not in info):
                 break
         else:
-            results.add(info[requestedparameter])
+            candidate = info[requestedparameter]
+            candidate = candidate.strip()
+            if candidate != '':
+                results.add(_api_sanitize_string(candidate))
     return [msg.ChildCollection(x + suffix) for x in util.natural_sort(results)]
 
 def _handle_neighbor_query(pathcomponents, configmanager):
