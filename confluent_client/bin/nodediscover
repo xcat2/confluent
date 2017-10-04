@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import csv
+import optparse
+import os
+import sys
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+tabformat = '{0:>15}|{1:>15}|{2:>15}|{3:>36}|{4:>17}|{5:>12}|{6:>48}'
+columns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
+           'Current IP Addresses']
+delimit = ['-' * 15, '-' * 15, '-' * 15, '-' * 36, '-' * 17, '-' * 12,
+           '-' * 48]
+
+
+def dumpmacs(procinfo):
+    return ','.join(procinfo['macs']) # + procinfo.get('relatedmacs', []))
+
+
+def print_disco(options, session, currmac):
+    procinfo = {}
+    for tmpinfo in session.read('/discovery/by-mac/{0}'.format(currmac)):
+
+        procinfo.update(tmpinfo)
+    record = [procinfo['nodename'], procinfo['modelnumber'],
+              procinfo['serialnumber'], procinfo['uuid'], dumpmacs(procinfo),
+              ','.join(procinfo['types']),
+              ','.join(sorted(procinfo['ipaddrs']))]
+    if options.csv:
+        csv.writer(sys.stdout).writerow(record)
+    else:
+        print(tabformat.format(*record))
+
+
+def list_discovery(options, session):
+    if options.csv:
+        csv.writer(sys.stdout).writerow(columns)
+    else:
+        print(tabformat.format(*columns))
+        print(tabformat.format(*delimit))
+    path = '/discovery/'
+    if options.model:
+        path += 'by-model/{0}/'.format(options.model)
+    if options.serial:
+        path += 'by-serial/{0}/'.format(options.serial)
+    if options.uuid:
+        path += 'by-uuid/{0}/'.format(options.uuid)
+    if options.type:
+        path += 'by-type/{0}/'.format(options.type)
+    if options.mac:
+        #path += 'by-mac/{0}'.format(options.mac)
+        print_disco(options, session, options.mac)
+    else:
+        path += 'by-mac/'
+        macs = [x['item']['href'] for x in session.read(path)]
+        for currmac in macs:
+            print_disco(options, session, currmac)
+
+def main():
+    parser = optparse.OptionParser(
+        usage='Usage: %prog [list|assign] [options])')
+    parser.add_option('-m', '--model', dest='model',
+                      help='Operate with nodes matching the specified model '
+                       'number', metavar='MODEL')
+    parser.add_option('-s', '--serial', dest='serial',
+                      help='Operate against the system matching the specified '
+                           'serial number', metavar='SERIAL')
+    parser.add_option('-u', '--uuid', dest='uuid',
+                      help='Operate against the system matching the specified '
+                           'UUID', metavar='UUID')
+    parser.add_option('-n', '--netaddr', dest='mac',
+                      help='Operate against the system with the specified MAC '
+                           'address', metavar='MAC')
+    parser.add_option('-t', '--type', dest='type',
+                      help='Operate against the system of the specified type',
+                      metavar='TYPE')
+    parser.add_option('-c', '--csv', dest='csv',
+                      help='Use CSV formatted output', action='store_true')
+    parser.add_option('-i', '--import',
+                      help='Import bulk assignment data from given CSV file',
+                      metavar='IMPORT.CSV')
+    (options, args) = parser.parse_args()
+    if len(args) == 0 or args[0] not in ('list', 'assign'):
+        parser.print_help()
+        sys.exit(1)
+    session = client.Command()
+    if args[0] == 'list':
+        list_discovery(options, session)
+    if args[0] == 'assign':
+        assign_discovery(options)
+
+
+if __name__ == '__main__':
+    main()
