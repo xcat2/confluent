@@ -284,7 +284,7 @@ def print_result(res):
     if 'databynode' in res:
         print_result(res['databynode'])
         return
-    for key in res.iterkeys():
+    for key in sorted(res):
         notes = []
         if res[key] is None:
             attrstr = '%s=""' % key
