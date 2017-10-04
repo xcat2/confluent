@@ -94,6 +94,7 @@ nameoverrides = [
     (re.compile('20301\..*'), lenovoname),
 ]
 
+# Lenovo chassis id rule is match only first 5 bytes for a match.....
 
 def _api_sanitize_string(source):
     source = source.strip()
