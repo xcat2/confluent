@@ -59,6 +59,11 @@ def list_discovery(options, session):
     else:
         print(tabformat.format(*columns))
         print(tabformat.format(*delimit))
+    for mac in list_matching_macs(options, session):
+        print_disco(options, session, mac)
+
+
+def list_matching_macs(options, session):
     path = '/discovery/'
     if options.model:
         path += 'by-model/{0}/'.format(options.model)
@@ -69,17 +74,41 @@ def list_discovery(options, session):
     if options.type:
         path += 'by-type/{0}/'.format(options.type)
     if options.mac:
-        #path += 'by-mac/{0}'.format(options.mac)
-        print_disco(options, session, options.mac)
+        # path += 'by-mac/{0}'.format(options.mac)
+        return [options.mac.replace(':', '-')]
     else:
         path += 'by-mac/'
-        macs = [x['item']['href'] for x in session.read(path)]
-        for currmac in macs:
-            print_disco(options, session, currmac)
+        return [x['item']['href'] for x in session.read(path)]
+
+def assign_discovery(options, session):
+    abort = False
+    if not (options.serial or options.uuid or options.mac):
+        sys.stderr.write(
+            "UUID (-u), serial (-s), or ether address (-e) required for "
+            "assignment\n")
+        abort = True
+    if not options.node:
+        sys.stderr.write("Node (-n) must be specified for assignment\n")
+        abort = True
+    if abort:
+        sys.exit(1)
+    matches = list_matching_macs(options, session)
+    if not matches:
+        sys.stderr.write("No matching discovery candidates found\n")
+        sys.exit(1)
+    for res in session.update('/discovery/by-mac/{0}'.format(matches[0]),
+                   {'node': options.node}):
+        if 'assigned' in res:
+            print('Assigned: {0}'.format(res['assigned']))
+        else:
+            print(repr(res))
+
+
 
 def main():
     parser = optparse.OptionParser(
         usage='Usage: %prog [list|assign|rescan] [options]')
+    # -a for 'address' maybe?
     parser.add_option('-m', '--model', dest='model',
                       help='Operate with nodes matching the specified model '
                        'number', metavar='MODEL')
@@ -89,7 +118,8 @@ def main():
     parser.add_option('-u', '--uuid', dest='uuid',
                       help='Operate against the system matching the specified '
                            'UUID', metavar='UUID')
-    parser.add_option('-n', '--netaddr', dest='mac',
+    parser.add_option('-n', '--node', help='Operate with the given nodename')
+    parser.add_option('-e', '--ethaddr', dest='mac',
                       help='Operate against the system with the specified MAC '
                            'address', metavar='MAC')
     parser.add_option('-t', '--type', dest='type',
