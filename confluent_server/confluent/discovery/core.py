@@ -150,6 +150,7 @@ pending_nodes = {}
 def enrich_pxe_info(info):
     sn = None
     mn = None
+    nodename = info.get('nodename', None)
     uuid = info.get('uuid', '')
     if not uuid_is_valid(uuid):
         return info
@@ -158,6 +159,9 @@ def enrich_pxe_info(info):
             info['serialnumber'] = known_uuids[uuid][mac]['serialnumber']
         if not mn and 'modelnumber' in known_uuids[uuid][mac]:
             info['modelnumber'] = known_uuids[uuid][mac]['modelnumber']
+        if nodename is None and 'nodename' in known_uuids[uuid][mac]:
+            info['nodename'] = known_uuids[uuid][mac]['nodename']
+
 
 
 def uuid_is_valid(uuid):
@@ -170,10 +174,10 @@ def uuid_is_valid(uuid):
 
 def send_discovery_datum(info):
     addresses = info.get('addresses', [])
-    yield msg.KeyValueData({'nodename': info.get('nodename', '')})
-    yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
     if info['handler'] == pxeh:
         enrich_pxe_info(info)
+    yield msg.KeyValueData({'nodename': info.get('nodename', '')})
+    yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
     sn = info.get('serialnumber', '')
     mn = info.get('modelnumber', '')
     uuid = info.get('uuid', '')
