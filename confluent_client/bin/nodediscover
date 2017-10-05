@@ -53,6 +53,90 @@ def print_disco(options, session, currmac):
         print(tabformat.format(*record))
 
 
+def process_header(header):
+    # normalize likely header titles
+    fields = []
+    broken = False
+    for datum in header:
+        datum = datum.lower()
+        if datum.startswith('node') or datum.startswith('name'):
+            fields.append('node')
+        elif datum in ('nodegroup', 'nodegroups', 'group', 'groups'):
+            fields.append('groups')
+        elif datum.startswith('mac') or datum.startswith('ether'):
+            fields.append('mac')
+        elif datum.startswith('serial') or datum in ('sn', 's/n'):
+            fields.append('serial')
+        elif datum == 'uuid':
+            fields.append('uuid')
+        elif datum in ('bmc', 'imm', 'xcc'):
+            fields.append('hardwaremanagement.manager')
+        elif datum in ('bmc gateway', 'xcc gateway', 'imm gateway'):
+            fields.append('net.bmc.gateway')
+        elif datum in ('bmcuser', 'username', 'user'):
+            fields.append('secret.hardwaremanagementuser')
+        elif datum in ('bmcpass', 'password', 'pass'):
+            fields.append('secret.hardwaremanagementpassword')
+        else:
+            print("Unrecognized column name {0}".format(datum))
+            broken = True
+    if broken:
+        sys.exit(1)
+    return tuple(fields)
+
+
+def datum_complete(datum):
+    if 'node' not in datum or not datum['node']:
+        sys.stderr.write('Nodename is a required field')
+        return False
+    provided = set(datum)
+    required = set(['serial', 'uuid', 'mac'])
+    for field in provided & required:
+        if datum[field]:
+            break
+    else:
+        sys.stderr.write('One of the fields "Serial Number", "UUID", or '
+                   '"MAC Address" must be provided')
+        return False
+    return True
+
+
+searchkeys = set(['mac', 'serial', 'uuid'])
+
+
+def search_record(datum, options, session):
+    for searchkey in searchkeys:
+        options.__dict__[searchkey] = None
+    for searchkey in searchkeys & set(datum):
+        options.__dict__[searchkey] = datum[searchkey]
+    return list(list_matching_macs(options, session))
+
+
+
+def import_csv(options, session):
+    with open(options.importfile, 'r') as datasrc:
+        records = csv.reader(datasrc)
+        fields = process_header(next(records))
+        nodedata = []
+        for record in records:
+            currfields = list(fields)
+            nodedatum = {}
+            for datum in record:
+                nodedatum[currfields.pop(0)] = datum
+            if not datum_complete(nodedatum):
+                sys.exit(1)
+            if not search_record(nodedatum, options, session):
+                sys.stderr.write(
+                    "Could not match the following data: " +
+                    repr(nodedatum) + '\n')
+                sys.exit(1)
+            nodedata.append(nodedata)
+    # ok, we have vetted the csv and we can proceed, next we will do a create
+    # to make node definitions to hold if there isn't one already, fixing up
+    # fields like groups and bmc
+    # then will iterate through matches on each doing an assign once per
+
+
 def list_discovery(options, session):
     if options.csv:
         csv.writer(sys.stdout).writerow(columns)
@@ -74,7 +158,10 @@ def list_matching_macs(options, session):
     if options.type:
         path += 'by-type/{0}/'.format(options.type)
     if options.mac:
-        # path += 'by-mac/{0}'.format(options.mac)
+        path += 'by-mac/{0}'.format(options.mac)
+        result = list(session.read(path))[0]
+        if 'error' in result:
+            return []
         return [options.mac.replace(':', '-')]
     else:
         path += 'by-mac/'
@@ -82,6 +169,8 @@ def list_matching_macs(options, session):
 
 def assign_discovery(options, session):
     abort = False
+    if options.importfile:
+        return import_csv(options, session)
     if not (options.serial or options.uuid or options.mac):
         sys.stderr.write(
             "UUID (-u), serial (-s), or ether address (-e) required for "
@@ -127,7 +216,7 @@ def main():
                       metavar='TYPE')
     parser.add_option('-c', '--csv', dest='csv',
                       help='Use CSV formatted output', action='store_true')
-    parser.add_option('-i', '--import',
+    parser.add_option('-i', '--import', dest='importfile',
                       help='Import bulk assignment data from given CSV file',
                       metavar='IMPORT.CSV')
     (options, args) = parser.parse_args()
