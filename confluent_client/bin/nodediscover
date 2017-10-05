@@ -79,7 +79,7 @@ def list_discovery(options, session):
 
 def main():
     parser = optparse.OptionParser(
-        usage='Usage: %prog [list|assign] [options])')
+        usage='Usage: %prog [list|assign|rescan] [options]')
     parser.add_option('-m', '--model', dest='model',
                       help='Operate with nodes matching the specified model '
                        'number', metavar='MODEL')
@@ -101,14 +101,17 @@ def main():
                       help='Import bulk assignment data from given CSV file',
                       metavar='IMPORT.CSV')
     (options, args) = parser.parse_args()
-    if len(args) == 0 or args[0] not in ('list', 'assign'):
+    if len(args) == 0 or args[0] not in ('list', 'assign', 'rescan'):
         parser.print_help()
         sys.exit(1)
     session = client.Command()
     if args[0] == 'list':
         list_discovery(options, session)
     if args[0] == 'assign':
-        assign_discovery(options)
+        assign_discovery(options, session)
+    if args[0] == 'rescan':
+        session.update('/discovery/rescan', {'rescan': 'start'})
+        print("Rescan initiated")
 
 
 if __name__ == '__main__':
