@@ -329,7 +329,7 @@ def _parameterize_path(pathcomponents):
         if key not in validselectors:
             raise exc.NotFoundException('{0} is not valid here'.format(key))
         if key == 'by-type':
-            keyparams[key] = servicebyname.get(val, None)
+            keyparams[key] = servicebyname.get(val, '!!!!invalid-type')
         else:
             keyparams[key] = val
         validselectors.discard(key)
