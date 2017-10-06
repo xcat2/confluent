@@ -112,12 +112,21 @@ def search_record(datum, options, session):
     return list(list_matching_macs(options, session))
 
 
+def datum_to_attrib(datum):
+    for key in ('serial', 'uuid', 'mac'):
+        try:
+            del datum[key]
+        except KeyError:
+            pass
+    datum['name'] = datum['node']
+    del datum['node']
+    return datum
 
 def import_csv(options, session):
+    nodedata = []
     with open(options.importfile, 'r') as datasrc:
         records = csv.reader(datasrc)
         fields = process_header(next(records))
-        nodedata = []
         for record in records:
             currfields = list(fields)
             nodedatum = {}
@@ -130,11 +139,29 @@ def import_csv(options, session):
                     "Could not match the following data: " +
                     repr(nodedatum) + '\n')
                 sys.exit(1)
-            nodedata.append(nodedata)
-    # ok, we have vetted the csv and we can proceed, next we will do a create
-    # to make node definitions to hold if there isn't one already, fixing up
-    # fields like groups and bmc
-    # then will iterate through matches on each doing an assign once per
+            nodedata.append(nodedatum)
+    for datum in nodedata:
+        maclist = search_record(datum, options, session)
+        datum = datum_to_attrib(datum)
+        nodename = datum['name']
+        for res in session.create('/nodes/', datum):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
+                continue
+            elif 'created' in res:
+                print('Defined ' + res['created'])
+            else:
+                print(repr(res))
+        for mac in maclist:
+            for res in session.update('/discovery/by-mac/{0}'.format(mac),
+                                      {'node': nodename}):
+                if 'error' in res:
+                    sys.stderr.write(res['error'] + '\n')
+                    continue
+                elif 'assigned' in res:
+                    print('Discovered ' + res['assigned'])
+                else:
+                    print(repr(res))
 
 
 def list_discovery(options, session):
@@ -198,6 +225,12 @@ def main():
     parser = optparse.OptionParser(
         usage='Usage: %prog [list|assign|rescan] [options]')
     # -a for 'address' maybe?
+    # order by
+    # show state (discovered or..
+    # nodediscover approve?
+    # flush to clear old data out?  (e.g. no good way to age pxe data)
+    # also delete discovery datum... more targeted
+    # defect: -t lenovo-imm returns all
     parser.add_option('-m', '--model', dest='model',
                       help='Operate with nodes matching the specified model '
                        'number', metavar='MODEL')
