@@ -757,6 +757,8 @@ def discover_node(cfg, handler, info, nodename, manual):
                 handler.config(nodename)
             except Exception as e:
                 info['discofailure'] = 'bug'
+                if manual:
+                    raise
                 log.log(
                     {'error':
                          'Error encountered trying to set up {0}, {1}'.format(
