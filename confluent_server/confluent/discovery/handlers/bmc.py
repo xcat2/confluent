@@ -91,7 +91,8 @@ class NodeHandler(generic.NodeHandler):
         if ('secret.hardwaremanagementuser' not in cd or
                 'secret.hardwaremanagementpassword' not in cd):
             raise exc.TargetEndpointBadCredentials(
-                'Missing user and/or password')
+                'secret.hardwaremanagementuser and/or '
+                'secret.hardwaremanagementpassword was not configured')
         if ('hardwaremanagement.manager' in cd and
                 cd['hardwaremanagement.manager']['value'] and
                 not cd['hardwaremanagement.manager']['value'].startswith(
