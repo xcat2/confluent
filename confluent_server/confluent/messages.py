@@ -245,11 +245,15 @@ class DeletedResource(ConfluentMessage):
 
 class CreatedResource(ConfluentMessage):
     notnode = True
+    readonly = True
+
     def __init__(self, resource):
         self.kvpairs = {'created': resource}
 
 class AssignedResource(ConfluentMessage):
     notnode = True
+    readonly = True
+
     def __init__(self, resource):
         self.kvpairs = {'assigned': resource}
 
