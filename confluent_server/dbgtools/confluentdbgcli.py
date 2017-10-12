@@ -19,12 +19,28 @@
 # Note that this script has a high chance of breaking confluent, so
 # do not be surprised if confluent crashes as you exit...
 
+import atexit
+import os
 import select
 import socket
 import readline
 import sys
 import threading
 
+historypath = os.path.expanduser("~/.confluentdbghistory")
+
+def save_history():
+    import readline
+    try:
+        readline.write_history_file(historypath)
+    except:
+        pass
+
+if os.path.exists(historypath):
+    readline.set_history_length(1000)
+    readline.read_history_file(historypath)
+
+atexit.register(save_history)
 readline.parse_and_bind('tab: complete')
 conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 conn.connect('/var/run/confluent/dbg.sock')
