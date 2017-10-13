@@ -49,6 +49,7 @@ class Command(object):
     def __init__(self, server=None):
         self._prevkeyname = None
         self.connection = None
+        self._currnoderange = None
         if server is None:
             if 'CONFLUENT_HOST' in os.environ:
                 self.serverloc = os.environ['CONFLUENT_HOST']
@@ -83,6 +84,8 @@ class Command(object):
 
     def handle_results(self, ikey, rc, res, errnodes=None):
         if 'error' in res:
+            if errnodes is not None:
+                errnodes.add(self._currnoderange)
             sys.stderr.write('Error: {0}\n'.format(res['error']))
             if 'errorcode' in res:
                 return res['errorcode']
@@ -118,6 +121,7 @@ class Command(object):
     def simple_noderange_command(self, noderange, resource, input=None,
                                  key=None, errnodes=None, **kwargs):
         try:
+            self._currnoderange = noderange
             rc = 0
             if resource[0] == '/':
                 resource = resource[1:]
@@ -135,6 +139,7 @@ class Command(object):
                 for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res, errnodes)
+            self._currnoderange = None
             return rc
         except KeyboardInterrupt:
             cprint('')
