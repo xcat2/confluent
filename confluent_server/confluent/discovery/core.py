@@ -929,7 +929,7 @@ def _map_unique_ids(nodes=None):
     for fprint in nodes_by_fprint:
         node = nodes_by_fprint[fprint]
         if node in bigmap:
-            fprint_by_nodes[node] =fprint
+            fprint_by_nodes[node] = fprint
     for node in bigmap:
         if node in uuid_by_nodes:
             del nodes_by_uuid[uuid_by_nodes[node]]
