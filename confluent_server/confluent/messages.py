@@ -138,7 +138,9 @@ class ConfluentMessage(object):
                         '<input type="checkbox" name="restexplorerhonorkey" '
                         'value="{1}">\r').format(valtype, key, self.desc)
                 return snippet
-            if val is not None and 'value' in val:
+            if isinstance(val, bool):
+                value = str(val)
+            elif val is not None and 'value' in val:
                 value = val['value']
                 if 'inheritedfrom' in val:
                     notes.append('Inherited from %s' % val['inheritedfrom'])
@@ -162,7 +164,7 @@ class ConfluentMessage(object):
                     notes.append('Inherited from %s' % val['inheritedfrom'])
                 value = '********'
             if self.readonly:
-                snippet += "{0}: {1}".format(key, value)
+                snippet += "{0}: {1}<br>".format(key, value)
             else:
                 snippet += (key + ":" +
                             '<input type="{0}" name="{1}" value="{2}" '
