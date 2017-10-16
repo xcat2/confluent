@@ -226,7 +226,7 @@ def _csrf_exempt(path):
 def _csrf_valid(env, session):
     # This could be simplified into a statement, but this is more readable
     # to have it broken out
-    if (env['REQUEST_METHOD'] == 'GET' and _csrf_exmept(env['PATH_INFO'])):
+    if env['REQUEST_METHOD'] == 'GET' and _csrf_exempt(env['PATH_INFO']):
         # Provide a web client a safe hook to request the CSRF token
         # This means that we consider GET of /sessions/current/info to be
         # a safe thing to inflict via CSRF, since CORS should prevent
