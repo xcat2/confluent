@@ -138,7 +138,8 @@ class ConfluentMessage(object):
                         '<input type="checkbox" name="restexplorerhonorkey" '
                         'value="{1}">\r').format(valtype, key, self.desc)
                 return snippet
-            if isinstance(val, bool):
+            if (isinstance(val, bool) or isinstance(val, str) or
+                    isinstance(val, unicode)):
                 value = str(val)
             elif val is not None and 'value' in val:
                 value = val['value']
