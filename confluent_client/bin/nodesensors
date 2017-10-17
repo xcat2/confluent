@@ -126,6 +126,8 @@ def sensorpass(showout=True, appendtime=False):
                     if showout:
                         if sensedata['value'] is None:
                             showval = ''
+                        elif isinstance(sensedata['value'], float):
+                            showval = u' {0:.5f} '.format(sensedata['value'])
                         else:
                             showval = u' {0} '.format(sensedata['value'])
                         if sensedata['units'] not in (None, u''):
