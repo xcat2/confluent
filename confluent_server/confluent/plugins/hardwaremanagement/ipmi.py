@@ -701,9 +701,16 @@ class IpmiHandler(object):
 
     def read_firmware(self, component):
         items = []
-        for id, data in self.ipmicmd.get_firmware():
-            if component == 'all' or component == simplify_name(id):
-                items.append({id: data})
+        try:
+            for id, data in self.ipmicmd.get_firmware():
+                if component == 'all' or component == simplify_name(id):
+                    items.append({id: data})
+        except exc.PubkeyInvalid:
+            self.output.put(msg.ConfluentNodeError(
+                self.node,
+                'Extended information unavailable, mismatch detected between '
+                'target certificate fingerprint and '
+                'pubkeys.tls_hardwaremanager attribute'))
         self.output.put(msg.Firmware(items, self.node))
 
     def handle_inventory(self):
