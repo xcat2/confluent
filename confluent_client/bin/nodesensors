@@ -36,6 +36,7 @@ import confluent.client as client
 
 sensorcollections = {
     'all': 'sensors/hardware/all/all',
+    'energy': 'sensors/hardware/energy/all',
     'temperature': 'sensors/hardware/temperature/all',
     'temp': 'sensors/hardware/temperature/all',
     'power': 'sensors/hardware/power/all',

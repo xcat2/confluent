@@ -69,7 +69,8 @@ _ipmiwaiters = []
 
 sensor_categories = {
     'temperature': frozenset(['Temperature']),
-    'power': frozenset(['Power', 'Current', 'Battery']),
+    'energy': frozenset(['Energy']),
+    'power': frozenset(['Power', 'Current']),
     'fans': frozenset(['Fan', 'Cooling Device']),
 }
 
