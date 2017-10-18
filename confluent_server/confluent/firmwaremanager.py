@@ -31,6 +31,11 @@ def execupdate(handler, filename, updateobj):
         if completion is None:
             completion = 'complete'
         updateobj.handle_progress({'phase': completion, 'progress': 100.0})
+    except exc.PubkeyInvalid as pi:
+        errstr = 'Certificate mismatch detected, does not match value in ' \
+                 'attribute {0}'.format(pi.attrname)
+        updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
+                                   'detail': errstr})
     except Exception as e:
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': str(e)})

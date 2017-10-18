@@ -100,6 +100,7 @@ class PubkeyInvalid(ConfluentException):
     def __init__(self, text, certificate, fingerprint, attribname, event):
         super(PubkeyInvalid, self).__init__(self, text)
         self.fingerprint = fingerprint
+        self.attrname = attribname
         bodydata = {'message': text,
                     'event': event,
                     'fingerprint': fingerprint,
