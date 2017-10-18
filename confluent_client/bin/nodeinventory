@@ -46,14 +46,17 @@ def pretty(text):
     return text
 
 def print_mem_info(node, prefix, meminfo):
-    capacity = meminfo['capacity_mb'] / 1024
     memdescfmt = '{0}GB PC'
     if meminfo['memory_type'] == 'DDR3 SDRAM':
         memdescfmt += '3-{1} '
     elif meminfo['memory_type'] == 'DDR4 SDRAM':
         memdescfmt += '4-{1} '
+    elif meminfo['memory_type'] == 'Unknown':
+        print('{0}: Unrecognized Memory'.format(node))
+        return
     if meminfo['ecc']:
         memdescfmt += 'ECC '
+    capacity = meminfo['capacity_mb'] / 1024
     memdescfmt += meminfo['module_type']
     memdesc = memdescfmt.format(capacity, meminfo['speed'])
     print('{0}: {1} description: {2}'.format(node, prefix, memdesc))
