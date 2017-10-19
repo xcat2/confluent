@@ -63,6 +63,10 @@ nodetype="noderange"
 
 if len(args) > 1:
     if "=" in args[1] or options.clear:
+        if "=" in args[1] and options.clear:
+            print("Can not clear and set at the same time!")
+            argparser.print_help()
+            sys.exit(1)
         exitcode=client.updateattrib(session,args,nodetype, noderange, options)
     try:
         # setting user output to what the user inputs
