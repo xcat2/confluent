@@ -262,7 +262,7 @@ def main():
     if args[0] == 'assign':
         assign_discovery(options, session)
     if args[0] == 'rescan':
-        session.update('/discovery/rescan', {'rescan': 'start'})
+        list(session.update('/discovery/rescan', {'rescan': 'start'}))
         print("Rescan initiated")
 
 
