@@ -392,7 +392,7 @@ def handle_read_api_request(pathcomponents, configmanager):
         # TODO: should be list of node names, and then under that 'by-mac'
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x.replace(':', '-'))
-                    for x in sorted(list(_nodesbymac))]
+                    for x in util.natural_sort(list(_nodesbymac))]
         elif len(pathcomponents) == 4:
             macaddr = pathcomponents[-1].replace('-', ':')
             return dump_macinfo(macaddr)
@@ -414,7 +414,7 @@ def handle_read_api_request(pathcomponents, configmanager):
                 raise exc.NotFoundException(
                     'No known macs for switch {0}'.format(switchname))
             return [msg.ChildCollection(x.replace('/', '-') + '/')
-                    for x in sorted(list(_macsbyswitch[switchname]))]
+                    for x in util.natural_sort(list(_macsbyswitch[switchname]))]
         if len(pathcomponents) == 6:
             return [msg.ChildCollection('by-mac/')]
         if len(pathcomponents) == 7:
