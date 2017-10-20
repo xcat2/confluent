@@ -135,6 +135,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
                       'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
+        self.setup_confluent_keyhandler()
 
     def setup_confluent_keyhandler(self):
         self.register_key_handler(util.TLSCertVerifier(
@@ -387,6 +388,7 @@ class IpmiHandler(object):
                     userid=connparams['username'],
                     password=connparams['passphrase'], kg=connparams['kg'],
                     port=connparams['port'], onlogon=self.logged)
+
                 ipmisess = persistent_ipmicmds[(node, tenant)].ipmi_session
                 begin = util.monotonic_time()
                 while ((not (self.broken or self.loggedin)) and
@@ -412,7 +414,6 @@ class IpmiHandler(object):
         else:
             self.ipmicmd = ipmicmd
             self.loggedin = True
-            self.ipmicmd.setup_confluent_keyhandler()
 
     def handle_request(self):
         if self.broken:
