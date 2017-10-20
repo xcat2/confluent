@@ -23,6 +23,8 @@ import confluent.messages as msg
 import eventlet
 
 updatesbytarget = {}
+updatepool = eventlet.greenpool.GreenPool(256)
+
 
 def execupdate(handler, filename, updateobj):
     try:
@@ -48,7 +50,8 @@ class Updater(object):
         self.phase = 'initializing'
         self.detail = ''
         self.percent = 0.0
-        self.updateproc = eventlet.spawn(execupdate, handler, filename, self)
+        #Change the below to a pool???
+        self.updateproc = updatepool.spawn(execupdate, handler, filename, self)
         if (node, tenant) not in updatesbytarget:
             updatesbytarget[(node, tenant)] = {}
         if name is None:
