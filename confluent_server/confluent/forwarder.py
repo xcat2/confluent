@@ -22,6 +22,7 @@ import eventlet.green.select as select
 import eventlet.green.socket as socket
 forwarders = {}
 sockhandler = {}
+allowedclients = set([])
 vidtarget = None
 vidforwarder = None
 
@@ -40,7 +41,10 @@ def handle_connection(incoming, outgoing):
 
 def forward_port(sock, target):
     while True:
-        conn, _ = sock.accept()
+        conn, cli = sock.accept()
+        if cli[0] not in allowedclients:
+            conn.close()
+            continue
         try:
             client = socket.create_connection((target, 443))
         except Exception:
@@ -52,7 +56,10 @@ def forward_port(sock, target):
 def forward_video():
     sock = eventlet.listen(('::', 3900, 0, 0), family=socket.AF_INET6)
     while True:
-        conn, _ = sock.accept()
+        conn, cli = sock.accept()
+        if cli[0] not in allowedclients:
+            conn.close()
+            continue
         if vidtarget is None:
             conn.close()
             continue
@@ -63,9 +70,13 @@ def forward_video():
             continue
         eventlet.spawn_n(handle_connection, conn, vidclient)
 
-def get_port(addr):
+def get_port(addr, clientip):
     global vidtarget
     global vidforwarder
+    if socket.getaddrinfo(clientip, 0)[0][0] == socket.AF_INET:
+        allowedclients.add('::ffff:' + clientip)
+    else:
+        allowedclients.add(clientip)
     if addr not in forwarders:
         newsock = eventlet.listen(('::', 0, 0, 0),
                   family=socket.AF_INET6)
