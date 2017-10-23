@@ -23,7 +23,7 @@ import eventlet.green.socket as socket
 forwarders = {}
 sockhandler = {}
 allowedclients = set([])
-vidtarget = None
+vidtargetbypeer = {}
 vidforwarder = None
 
 def handle_connection(incoming, outgoing):
@@ -57,26 +57,22 @@ def forward_video():
     sock = eventlet.listen(('::', 3900, 0, 0), family=socket.AF_INET6)
     while True:
         conn, cli = sock.accept()
-        if cli[0] not in allowedclients:
-            conn.close()
-            continue
-        if vidtarget is None:
+        if cli[0] not in vidtargetbypeer:
             conn.close()
             continue
         try:
-            vidclient = socket.create_connection((vidtarget, 3900))
+            vidclient = socket.create_connection((vidtargetbypeer[cli[0]],
+                                                  3900))
         except Exception:
             conn.close()
             continue
         eventlet.spawn_n(handle_connection, conn, vidclient)
 
 def get_port(addr, clientip):
-    global vidtarget
     global vidforwarder
     if socket.getaddrinfo(clientip, 0)[0][0] == socket.AF_INET:
-        allowedclients.add('::ffff:' + clientip)
-    else:
-        allowedclients.add(clientip)
+        clientip = '::ffff:' + clientip
+    allowedclients.add(clientip)
     if addr not in forwarders:
         newsock = eventlet.listen(('::', 0, 0, 0),
                   family=socket.AF_INET6)
@@ -84,6 +80,6 @@ def get_port(addr, clientip):
         sockhandler[newsock] = eventlet.spawn(forward_port, newsock, addr)
         if not vidforwarder:
             vidforwarder = eventlet.spawn(forward_video)
-    vidtarget = addr
+    vidtargetbypeer[clientip] = addr
     return forwarders[addr].getsockname()[1]
 
