@@ -20,9 +20,8 @@
 import eventlet
 import eventlet.green.select as select
 import eventlet.green.socket as socket
-forwarders = {}
+forwardersbyclient = {}
 sockhandler = {}
-allowedclients = set([])
 vidtargetbypeer = {}
 vidforwarder = None
 
@@ -39,10 +38,10 @@ def handle_connection(incoming, outgoing):
                 incoming.sendall(data)
 
 
-def forward_port(sock, target):
+def forward_port(sock, target, clientip):
     while True:
         conn, cli = sock.accept()
-        if cli[0] not in allowedclients:
+        if cli[0] != clientip:
             conn.close()
             continue
         try:
@@ -72,14 +71,16 @@ def get_port(addr, clientip):
     global vidforwarder
     if socket.getaddrinfo(clientip, 0)[0][0] == socket.AF_INET:
         clientip = '::ffff:' + clientip
-    allowedclients.add(clientip)
-    if addr not in forwarders:
+    if clientip not in forwardersbyclient:
+        forwardersbyclient[clientip] = {}
+    if addr not in forwardersbyclient[clientip]:
         newsock = eventlet.listen(('::', 0, 0, 0),
                   family=socket.AF_INET6)
-        forwarders[addr] = newsock
-        sockhandler[newsock] = eventlet.spawn(forward_port, newsock, addr)
+        forwardersbyclient[clientip][addr] = newsock
+        sockhandler[newsock] = eventlet.spawn(forward_port, newsock, addr,
+                                              clientip)
         if not vidforwarder:
             vidforwarder = eventlet.spawn(forward_video)
     vidtargetbypeer[clientip] = addr
-    return forwarders[addr].getsockname()[1]
+    return forwardersbyclient[clientip][addr].getsockname()[1]
 
