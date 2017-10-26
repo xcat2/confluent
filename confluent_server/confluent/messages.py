@@ -364,6 +364,9 @@ class ChildCollection(LinkRelation):
 def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
+    elif (path in (['power', 'reseat'], ['_enclosure', 'reseat_bay']) and
+            operation != 'retrieve'):
+        return InputReseatMessage(path, nodes, inputdata)
     elif path == ['attributes', 'expression']:
         return InputExpression(path, inputdata, nodes)
     elif path[0] in ('attributes', 'users') and operation != 'retrieve':
@@ -624,7 +627,7 @@ class ConfluentInputMessage(ConfluentMessage):
                 if self.keyname not in datum:
                     raise exc.InvalidArgumentException(
                         'missing {0} argument'.format(self.keyname))
-                elif datum[self.keyname] not in self.valid_values:
+                elif not self.is_valid_key(datum[self.keyname]):
                     raise exc.InvalidArgumentException(
                         datum[self.keyname] + ' is not one of ' +
                         ','.join(self.valid_values))
@@ -634,13 +637,15 @@ class ConfluentInputMessage(ConfluentMessage):
             if self.keyname not in datum:
                 raise exc.InvalidArgumentException(
                     'missing {0} argument'.format(self.keyname))
-            elif datum[self.keyname] not in self.valid_values:
+            elif not self.is_valid_key(datum[self.keyname]):
                 raise exc.InvalidArgumentException(datum[self.keyname] +
                                                    ' is not one of ' +
                                                    ','.join(self.valid_values))
             for node in nodes:
                 self.inputbynode[node] = datum[self.keyname]
 
+    def is_valid_key(self, key):
+        return key in self.valid_values
 
 class InputIdentifyMessage(ConfluentInputMessage):
     valid_values = set([
@@ -663,6 +668,16 @@ class InputPowerMessage(ConfluentInputMessage):
 
     def powerstate(self, node):
         return self.inputbynode[node]
+
+class InputReseatMessage(ConfluentInputMessage):
+    valid_values = set([
+        'reseat',
+    ])
+
+    keyname = 'reseat'
+
+    def is_valid_key(self, key):
+        return key in self.valid_values or isinstance(key, int)
 
 
 class InputBMCReset(ConfluentInputMessage):
@@ -873,6 +888,13 @@ class IdentifyState(ConfluentChoiceMessage):
         'off',
     ])
     keyname = 'identify'
+
+
+class ReseatResult(ConfluentChoiceMessage):
+    valid_values = set([
+        'success',
+    ])
+    keyname = 'reseat'
 
 
 class PowerState(ConfluentChoiceMessage):

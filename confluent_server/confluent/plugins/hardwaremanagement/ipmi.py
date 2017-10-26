@@ -432,6 +432,8 @@ class IpmiHandler(object):
                 raise Exception(self.error)
         if self.element == ['power', 'state']:
             self.power()
+        elif self.element == ['_enclosure', 'reseat_bay']:
+            self.reseat_bay()
         elif self.element == ['boot', 'nextdevice']:
             self.bootdevice()
         elif self.element == ['health', 'hardware']:
@@ -819,6 +821,11 @@ class IpmiHandler(object):
                 self.output.put(msg.SensorReadings(badsensors, name=self.node))
         else:
             raise exc.InvalidArgumentException('health is read-only')
+
+    def reseat_bay(self):
+        bay = self.inputdata.inputbynode[self.node]
+        self.ipmicmd.reseat_bay(bay)
+        self.output.put(msg.ReseatResult(self.node, 'success'))
 
     def bootdevice(self):
         if 'read' == self.op:
