@@ -185,6 +185,11 @@ def _init_core():
                 'handler': 'ssh',
             }),
         },
+        '_enclosure': {
+            'reseat_bay': PluginRoute(
+                {'pluginattrs': ['hardwaremanagement.method'],
+                 'default': 'ipmi'}),
+        },
         'shell': {
             # another special case similar to console
             'sessions': PluginCollection({
@@ -250,6 +255,7 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'reseat':  PluginRoute({'handler': 'enclosure'}),
         },
         'sensors': {
             'hardware': {
