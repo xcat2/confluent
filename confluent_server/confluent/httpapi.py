@@ -152,6 +152,7 @@ def _sessioncleaner():
             if httpsessions[session]['expiry'] < currtime:
                 targsessions.append(session)
         for session in targsessions:
+            forwarder.close_session(session)
             del httpsessions[session]
         targsessions = []
         for session in consolesessions:
@@ -283,6 +284,7 @@ def _authorize_request(env, operation):
                             targets.append(mythread)
                         for mythread in targets:
                             eventlet.greenthread.kill(mythread)
+                        forwarder.close_session(sessionid)
                         del httpsessions[sessionid]
                         return ('logout',)
                     httpsessions[sessionid]['expiry'] = time.time() + 90
@@ -464,7 +466,8 @@ def resourcehandler_backend(env, start_response):
             start_response('404 Not Found', headers)
             yield 'No hardwaremanagemnet.manager defined for node'
             return
-        funport = forwarder.get_port(targip, env['HTTP_X_FORWARDED_FOR'])
+        funport = forwarder.get_port(targip, env['HTTP_X_FORWARDED_FOR'],
+                                     authorized['sessionid'])
         host = env['HTTP_X_FORWARDED_HOST']
         url = 'https://{0}:{1}/'.format(host, funport)
         start_response('302', [('Location', url)])
