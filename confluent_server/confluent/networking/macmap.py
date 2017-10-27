@@ -241,13 +241,17 @@ def _map_switch_backend(args):
                 _nodesbymac[mac] = nodename
 
 
+switchbackoff = 30
+
+
 def find_node_by_mac(mac, configmanager):
     now = util.monotonic_time()
     if vintage and (now - vintage) < 90 and mac in _nodesbymac:
         return _nodesbymac[mac]
     # do not actually sweep switches more than once every 30 seconds
     # however, if there is an update in progress, wait on it
-    for _ in update_macmap(configmanager, vintage and (now - vintage) < 30):
+    for _ in update_macmap(configmanager,
+                           vintage and (now - vintage) < switchbackoff):
         if mac in _nodesbymac:
             return _nodesbymac[mac]
     # If update_mac bailed out, still check one last time
@@ -294,6 +298,8 @@ def _full_updatemacmap(configmanager):
     global _nodesbymac
     global _switchportmap
     global _macsbyswitch
+    global switchbackoff
+    start = util.monotonic_time()
     with mapupdating:
         vintage = util.monotonic_time()
         # Clear all existing entries
@@ -338,6 +344,13 @@ def _full_updatemacmap(configmanager):
         for ans in pool.imap(_map_switch, switchauth):
             vintage = util.monotonic_time()
             yield ans
+    endtime = util.monotonic_time()
+    duration = endtime - start
+    duration = duration * 15  # wait 15 times as long as it takes to walk
+    # avoid spending a large portion of the time hitting switches with snmp
+    # requests
+    if duration > switchbackoff:
+        switchbackoff = duration
 
 
 def _dump_locations(info, macaddr, nodename=None):
