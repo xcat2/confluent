@@ -93,6 +93,12 @@ tracelog = None
 statelessmode = False
 _cfgstore = None
 
+_attraliases = {
+    'bmc': 'hardwaremanagement.manager',
+    'bmcuser': 'secret.hardwaremanagementuser',
+    'bmcpass': 'secret.hardwaremanagementpassword',
+}
+
 def _mkpath(pathname):
     try:
         os.makedirs(pathname)
@@ -295,7 +301,7 @@ def _load_dict_from_dbm(dpath, tdb):
                 currdict[elem] = {}
             currdict = currdict[elem]
         try:
-            for tk in dbe.iterkeys():
+            for tk in dbe:
                 currdict[tk] = cPickle.loads(dbe[tk])
         except AttributeError:
             tk = dbe.firstkey()
@@ -412,17 +418,15 @@ class _ExpressionFormat(string.Formatter):
             left = node.value.id
             right = node.attr
             key = left + '.' + right
-            if '_expressionkeys' not in self._nodeobj:
-                self._nodeobj['_expressionkeys'] = set([key])
-            else:
-                self._nodeobj['_expressionkeys'].add(key)
-            val = _decode_attribute(key, self._nodeobj,
-                                    formatter=self)
+            val = self._expand_attribute(key)
             return val['value'] if 'value' in val else ""
         elif isinstance(node, ast.Name):
             var = node.id
             if var == 'nodename':
                 return self._nodename
+            if var in _attraliases:
+                val = self._expand_attribute(_attraliases[var])
+                return val['value'] if 'value' in val else ""
             mg = re.match(self.posmatch, var)
             if mg:
                 idx = int(mg.group(1))
@@ -431,12 +435,7 @@ class _ExpressionFormat(string.Formatter):
                 return int(self._numbers[idx - 1])
             else:
                 if var in self._nodeobj:
-                    if '_expressionkeys' not in self._nodeobj:
-                        self._nodeobj['_expressionkeys'] = set([var])
-                    else:
-                        self._nodeobj['_expressionkeys'].add(var)
-                    val = _decode_attribute(var, self._nodeobj,
-                                            formatter=self)
+                    val = self._expand_attribute(var)
                     return val['value'] if 'value' in val else ""
         elif isinstance(node, ast.BinOp):
             optype = type(node.op)
@@ -445,6 +444,15 @@ class _ExpressionFormat(string.Formatter):
             op = self._supported_ops[optype]
             return op(int(self._handle_ast_node(node.left)),
                       int(self._handle_ast_node(node.right)))
+
+    def _expand_attribute(self, key):
+        if '_expressionkeys' not in self._nodeobj:
+            self._nodeobj['_expressionkeys'] = set([key])
+        else:
+            self._nodeobj['_expressionkeys'].add(key)
+        val = _decode_attribute(key, self._nodeobj,
+                                formatter=self)
+        return val
 
 
 def _decode_attribute(attribute, nodeobj, formatter=None, decrypt=False):
@@ -499,7 +507,7 @@ def hook_new_configmanagers(callback):
     #TODO(jbjohnso): actually live up to the promise of ongoing callbacks
     callback(ConfigManager(None))
     try:
-        for tenant in _cfgstore['tenant'].iterkeys():
+        for tenant in _cfgstore['tenant']:
             callback(ConfigManager(tenant))
     except KeyError:
         pass
@@ -705,7 +713,7 @@ class ConfigManager(object):
 
     def list_users(self):
         try:
-            return self._cfgstore['users'].iterkeys()
+            return list(self._cfgstore['users'])
         except KeyError:
             return []
 
@@ -747,7 +755,7 @@ class ConfigManager(object):
         :param attributemap: The mapping of keys to values to set
         """
 
-        for attribute in attributemap.iterkeys():
+        for attribute in attributemap:
             self._cfgstore['usergroups'][attribute] = attributemap[attribute]
         _mark_dirtykey('usergroups', groupname, self.tenant)
 
@@ -846,7 +854,7 @@ class ConfigManager(object):
     def get_nodegroup_attributes(self, nodegroup, attributes=()):
         cfgnodeobj = self._cfgstore['nodegroups'][nodegroup]
         if not attributes:
-            attributes = cfgnodeobj.iterkeys()
+            attributes = cfgnodeobj
         nodeobj = {}
         for attribute in attributes:
             if attribute.startswith('_'):
@@ -905,7 +913,7 @@ class ConfigManager(object):
             groupcfg = self._cfgstore['nodegroups'][group]
         except KeyError:  # something did not exist, nothing to do
             return
-        for attrib in groupcfg.iterkeys():
+        for attrib in groupcfg:
             self._do_inheritance(nodecfg, attrib, node, changeset)
             _addchange(changeset, node, attrib)
 
@@ -959,7 +967,7 @@ class ConfigManager(object):
                 return
 
     def _sync_groups_to_node(self, groups, node, changeset):
-        for group in self._cfgstore['nodegroups'].iterkeys():
+        for group in self._cfgstore['nodegroups']:
             if group not in groups:
                 if node in self._cfgstore['nodegroups'][group]['nodes']:
                     self._cfgstore['nodegroups'][group]['nodes'].discard(node)
@@ -976,7 +984,7 @@ class ConfigManager(object):
             self._node_added_to_group(node, group, changeset)
 
     def _sync_nodes_to_group(self, nodes, group, changeset):
-        for node in self._cfgstore['nodes'].iterkeys():
+        for node in self._cfgstore['nodes']:
             if node not in nodes and 'groups' in self._cfgstore['nodes'][node]:
                 if group in self._cfgstore['nodes'][node]['groups']:
                     self._cfgstore['nodes'][node]['groups'].remove(group)
@@ -997,13 +1005,23 @@ class ConfigManager(object):
 
     def set_group_attributes(self, attribmap, autocreate=False):
         changeset = {}
-        for group in attribmap.iterkeys():
+        for group in attribmap:
             if group == '':
                 raise ValueError('"{0}" is not a valid group name'.format(
                     group))
             if not autocreate and group not in self._cfgstore['nodegroups']:
                 raise ValueError("{0} group does not exist".format(group))
-            for attr in attribmap[group].iterkeys():
+            for attr in attribmap[group]:
+                # first do a pass to normalize out any aliased attribute names
+                if attr in _attraliases:
+                    newattr = _attraliases[attr]
+                    attribmap[group][newattr] = attribmap[group][attr]
+                    del attribmap[group][attr]
+            for attr in attribmap[group]:
+                if attr in _attraliases:
+                    newattr = _attraliases[attr]
+                    attribmap[group][newattr] = attribmap[group][attr]
+                    del attribmap[group][attr]
                 if (attr not in ('nodes', 'noderange') and
                         attribute_is_invalid(attr, attribmap[group][attr])):
                     raise ValueError("{0} attribute is invalid".format(attr))
@@ -1018,12 +1036,12 @@ class ConfigManager(object):
                             raise ValueError(
                                 "{0} node does not exist to add to {1}".format(
                                     node, group))
-        for group in attribmap.iterkeys():
+        for group in attribmap:
             group = group.encode('utf-8')
             if group not in self._cfgstore['nodegroups']:
                 self._cfgstore['nodegroups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['nodegroups'][group]
-            for attr in attribmap[group].iterkeys():
+            for attr in attribmap[group]:
                 if attr == 'nodes':
                     newdict = set(attribmap[group][attr])
                 elif (isinstance(attribmap[group][attr], str) or
@@ -1208,7 +1226,7 @@ class ConfigManager(object):
         self._bg_sync_to_file()
 
     def add_node_attributes(self, attribmap):
-        for node in attribmap.iterkeys():
+        for node in attribmap:
             if 'groups' not in attribmap[node]:
                 attribmap[node]['groups'] = []
         self.set_node_attributes(attribmap, autocreate=True)
@@ -1221,17 +1239,22 @@ class ConfigManager(object):
         changeset = {}
         # first do a sanity check of the input upfront
         # this mitigates risk of arguments being partially applied
-        for node in attribmap.iterkeys():
+        for node in attribmap:
             node = node.encode('utf-8')
             if node == '':
                 raise ValueError('"{0}" is not a valid node name'.format(node))
             if autocreate is False and node not in self._cfgstore['nodes']:
                 raise ValueError("node {0} does not exist".format(node))
-            for attrname in attribmap[node].iterkeys():
+            for attrname in list(attribmap[node]):
+                if attrname in _attraliases:
+                    truename = _attraliases[attrname]
+                    attribmap[node][truename] = attribmap[node][attrname]
+                    del attribmap[node][attrname]
+            for attrname in attribmap[node]:
                 attrval = attribmap[node][attrname]
                 try:
                     if (allattributes.node[attrname]['type'] == 'list' and
-                        type(attrval) in (str, unicode)):
+                            type(attrval) in (str, unicode)):
                         attrval = attrval.split(",")
                 except KeyError:
                     pass
@@ -1252,7 +1275,7 @@ class ConfigManager(object):
                             attrname, node)
                         raise ValueError(errstr)
                     attribmap[node][attrname] = attrval
-        for node in attribmap.iterkeys():
+        for node in attribmap:
             node = node.encode('utf-8')
             exprmgr = None
             if node not in self._cfgstore['nodes']:
@@ -1260,7 +1283,7 @@ class ConfigManager(object):
                 self._cfgstore['nodes'][node] = {}
             cfgobj = self._cfgstore['nodes'][node]
             recalcexpressions = False
-            for attrname in attribmap[node].iterkeys():
+            for attrname in attribmap[node]:
                 if (isinstance(attribmap[node][attrname], str) or
                         isinstance(attribmap[node][attrname], unicode) or
                         isinstance(attribmap[node][attrname], bool)):
@@ -1385,10 +1408,10 @@ class ConfigManager(object):
             if confarea not in self._cfgstore:
                 continue
             dumpdata[confarea] = {}
-            for element in self._cfgstore[confarea].iterkeys():
+            for element in self._cfgstore[confarea]:
                 dumpdata[confarea][element] = \
                     copy.deepcopy(self._cfgstore[confarea][element])
-                for attribute in self._cfgstore[confarea][element].iterkeys():
+                for attribute in self._cfgstore[confarea][element]:
                     if 'inheritedfrom' in dumpdata[confarea][element][attribute]:
                         del dumpdata[confarea][element][attribute]
                     elif (attribute == 'cryptpass' or
@@ -1483,7 +1506,7 @@ class ConfigManager(object):
             with _dirtylock:
                 currdirt = copy.deepcopy(_cfgstore['dirtykeys'])
                 del _cfgstore['dirtykeys']
-            for tenant in currdirt.iterkeys():
+            for tenant in currdirt:
                 dkdict = currdirt[tenant]
                 if tenant is None:
                     pathname = cls._cfgdir
@@ -1491,7 +1514,7 @@ class ConfigManager(object):
                 else:
                     pathname = os.path.join(cls._cfgdir, 'tenants', tenant)
                     currdict = _cfgstore['tenant'][tenant]
-                for category in dkdict.iterkeys():
+                for category in dkdict:
                     _mkpath(pathname)
                     dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
                     try:
@@ -1514,7 +1537,7 @@ class ConfigManager(object):
             return cls._sync_to_file()
 
     def _recalculate_expressions(self, cfgobj, formatter, node, changeset):
-        for key in cfgobj.iterkeys():
+        for key in cfgobj:
             if not isinstance(cfgobj[key], dict):
                 continue
             if 'expression' in cfgobj[key]:
