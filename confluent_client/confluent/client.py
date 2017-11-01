@@ -299,9 +299,14 @@ def attrrequested(attr, attrlist, seenattributes):
 
 
 def printattributes(session, requestargs, showtype, nodetype, noderange, options):
+    path = '/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)
+    return print_attrib_path(path, session, requestargs, options)
+
+
+def print_attrib_path(path, session, requestargs, options):
     exitcode = 0
     seenattributes = set([])
-    for res in session.read('/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)):
+    for res in session.read(path):
         if 'error' in res:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
@@ -310,7 +315,8 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
             for attr in res['databynode'][node]:
                 seenattributes.add(attr)
                 currattr = res['databynode'][node][attr]
-                if (requestargs is None or requestargs == [] or attrrequested(attr, requestargs, seenattributes)):
+                if (requestargs is None or requestargs == [] or attrrequested(
+                        attr, requestargs, seenattributes)):
                     if 'value' in currattr:
                         if currattr['value'] is not None:
                             attrout = '{0}: {1}: {2}'.format(

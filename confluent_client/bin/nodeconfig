@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+import os
+import signal
+import optparse
+import sys
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+class NullOpt(object):
+    blame = None
+    clear = None
+
+
+def bailout(msg, code=1):
+    sys.stderr.write(msg + '\n')
+    sys.exit(code)
+
+
+argparser = optparse.OptionParser()
+(options, args) = argparser.parse_args()
+
+cfgpaths = {
+    'bmc.ipv4': (
+        'configuration/management_controller/net_interfaces/management',
+        'ipv4_address'),
+    'bmc.ipv4_method': (
+        'configuration/management_controller/net_interfaces/management',
+        'ipv4_configuration'),
+    'bmc.ipv4_gateway': (
+        'configuration/management_controller/net_interfaces/management',
+        'ipv4_gateway'),
+}
+
+try:
+    noderange = args[0]
+except IndexError:
+    argparser.print_help()
+    sys.exit(1)
+setmode = None
+assignment = {}
+queryparms = {}
+for param in args[1:]:
+    if '=' in param:
+        if setmode is None:
+            setmode = True
+        if setmode != True:
+            bailout('Cannot do set and query in same command')
+        key, _, value = param.partition('=')
+        if key not in cfgpaths:
+            bailout('Unrecognized setting: {0}'.format(key))
+        assignment[key] = value
+    else:
+        if setmode is None:
+            setmode = False
+        if setmode != False:
+            bailout('Cannot do set and query in same command')
+        if '.' not in param:
+            matchedparms = False
+            for candidate in cfgpaths:
+                if candidate.startswith('{0}.'.format(param)):
+                    matchedparms = True
+                    path, attrib = cfgpaths[candidate]
+                    path = '/noderange/{0}/{1}'.format(noderange, path)
+                    if path not in queryparms:
+                        queryparms[path] = set([])
+                    queryparms[path].add(attrib)
+            if not matchedparms:
+                bailout('Unrecognized settings category: {0}'.format(param))
+        elif param not in cfgpaths:
+            bailout('Unrecognized parameter: {0}'.format(param))
+        else:
+            queryparms.append(candidate)
+session = client.Command()
+if setmode:
+    raise Exception('TODO')
+else:
+    for path in queryparms:
+        client.print_attrib_path(path, session, queryparms[path], NullOpt())
+
