@@ -26,6 +26,11 @@ import confluent.tlvdata as tlvdata
 
 SO_PASSCRED = 16
 
+_attraliases = {
+    'bmc': 'hardwaremanagement.manager',
+    'bmcuser': 'secret.hardwaremanagementuser',
+    'bmcpass': 'secret.hardwaremanagementpassword',
+}
 
 def cprint(txt):
     print(txt)
@@ -282,6 +287,8 @@ def attrrequested(attr, attrlist, seenattributes):
         truename = candidate
         if candidate.startswith('hm'):
             candidate = candidate.replace('hm', 'hardwaremanagement', 1)
+        if candidate in _attraliases:
+            candidate = _attraliases[candidate]
         if candidate == attr:
             seenattributes.add(truename)
             return True
