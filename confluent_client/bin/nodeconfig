@@ -65,6 +65,8 @@ except IndexError:
 setmode = None
 assignment = {}
 queryparms = {}
+
+
 for param in args[1:]:
     if '=' in param:
         if setmode is None:
@@ -88,18 +90,44 @@ for param in args[1:]:
                     path, attrib = cfgpaths[candidate]
                     path = '/noderange/{0}/{1}'.format(noderange, path)
                     if path not in queryparms:
-                        queryparms[path] = set([])
-                    queryparms[path].add(attrib)
+                        queryparms[path] = {}
+                    queryparms[path][attrib] = candidate
             if not matchedparms:
                 bailout('Unrecognized settings category: {0}'.format(param))
         elif param not in cfgpaths:
             bailout('Unrecognized parameter: {0}'.format(param))
         else:
-            queryparms.append(candidate)
+            path, attrib = cfgpaths[param]
+            path = '/noderange/{0}/{1}'.format(noderange, path)
+            if path not in queryparms:
+                queryparms[path] = {}
+            queryparms[path][attrib] = param
 session = client.Command()
 if setmode:
-    raise Exception('TODO')
+    updatebypath = {}
+    attrnamebypath = {}
+    for key in assignment:
+        if key not in cfgpaths:
+            bailout('Unknown settings key: {0}'.format(key))
+        path, attrib = cfgpaths[key]
+        if path not in updatebypath:
+            updatebypath[path] = {}
+            attrnamebypath[path] = {}
+        updatebypath[path][attrib] = assignment[key]
+        attrnamebypath[path][attrib] = key
+    # well, we want to expand things..
+    # check ipv4, if requested change method to static
+    for path in updatebypath:
+        for r in session.update('/noderange/{0}/{1}'.format(noderange, path),
+                                updatebypath[path]):
+            for node in r:
+                keyval = r[node]['value']
+                key, val = keyval.split('=')
+                if key in attrnamebypath[path]:
+                    key = attrnamebypath[path][key]
+                print('{0}: {1}: {2}'.format(node, key, val))
 else:
     for path in queryparms:
-        client.print_attrib_path(path, session, queryparms[path], NullOpt())
+        client.print_attrib_path(path, session, list(queryparms[path]),
+                                 NullOpt(), queryparms[path])
 

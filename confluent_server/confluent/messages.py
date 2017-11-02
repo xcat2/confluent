@@ -19,6 +19,7 @@
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
 import confluent.exceptions as exc
+import confluent.config.configmanager as cfm
 from copy import deepcopy
 from datetime import datetime
 import json
@@ -361,7 +362,8 @@ class ChildCollection(LinkRelation):
 # InputMCI
 # InputDomainName
 # InputNTPServer
-def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
+def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
+                      configmanager=None):
     if path[0] == 'power' and path[1] == 'state' and operation != 'retrieve':
         return InputPowerMessage(path, nodes, inputdata)
     elif (path in (['power', 'reseat'], ['_enclosure', 'reseat_bay']) and
@@ -392,7 +394,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False):
         return InputMCI(path, nodes, inputdata)
     elif (path[:4] == ['configuration', 'management_controller',
             'net_interfaces', 'management'] and operation != 'retrieve'):
-        return InputNetworkConfiguration(path, nodes, inputdata)
+        return InputNetworkConfiguration(path, nodes, inputdata,
+                                         configmanager)
     elif (path[:3] == ['configuration', 'management_controller', 'domain_name']
             and operation != 'retrieve'):
         return InputDomainName(path, nodes, inputdata)
@@ -710,7 +713,7 @@ class InputMCI(ConfluentInputMessage):
 
 
 class InputNetworkConfiguration(ConfluentInputMessage):
-    def __init__(self, path, nodes, inputdata):
+    def __init__(self, path, nodes, inputdata, configmanager=None):
         self.inputbynode = {}
         self.stripped = False
         if not inputdata:
@@ -734,8 +737,26 @@ class InputNetworkConfiguration(ConfluentInputMessage):
         if nodes is None:
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
+        nodeattrmap = {}
+        for attr in inputdata:
+            try:
+                inputdata[attr].format()
+            except (KeyError, IndexError):
+                nodeattrmap[attr] = {}
+                for expanded in cfm.expand_attrib_expression(nodes,
+                                                             inputdata[attr]):
+                    node, value = expanded
+                    nodeattrmap[attr][node] = value
+        if not nodeattrmap:
+            for node in nodes:
+                self.inputbynode[node] = inputdata
+            return
+        # an expression was encountered
         for node in nodes:
-            self.inputbynode[node] = inputdata
+            self.inputbynode[node] = deepcopy(inputdata)
+            for attr in self.inputbynode[node]:
+                if attr in nodeattrmap:
+                    self.inputbynode[node][attr] = nodeattrmap[attr][node][attr]
 
     def netconfig(self, node):
         return self.inputbynode[node]

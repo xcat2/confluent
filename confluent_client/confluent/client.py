@@ -303,7 +303,7 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
     return print_attrib_path(path, session, requestargs, options)
 
 
-def print_attrib_path(path, session, requestargs, options):
+def print_attrib_path(path, session, requestargs, options, rename=None):
     exitcode = 0
     seenattributes = set([])
     for res in session.read(path):
@@ -314,23 +314,28 @@ def print_attrib_path(path, session, requestargs, options):
         for node in res['databynode']:
             for attr in res['databynode'][node]:
                 seenattributes.add(attr)
+                if rename and attr in rename:
+                    printattr = rename[attr]
+                else:
+                    printattr = attr
                 currattr = res['databynode'][node][attr]
                 if (requestargs is None or requestargs == [] or attrrequested(
                         attr, requestargs, seenattributes)):
                     if 'value' in currattr:
                         if currattr['value'] is not None:
                             attrout = '{0}: {1}: {2}'.format(
-                                node, attr, currattr['value'])
+                                node, printattr, currattr['value'])
                         else:
-                            attrout = '{0}: {1}:'.format(node, attr)
+                            attrout = '{0}: {1}:'.format(node, printattr)
                     elif 'isset' in currattr:
                         if currattr['isset']:
-                            attrout = '{0}: {1}: ********'.format(node, attr)
+                            attrout = '{0}: {1}: ********'.format(node,
+                                                                  printattr)
                         else:
-                            attrout = '{0}: {1}:'.format(node, attr)
+                            attrout = '{0}: {1}:'.format(node, printattr)
                     elif 'broken' in currattr:
                         attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
-                                  '{2}'.format(node, attr,
+                                  '{2}'.format(node, printattr,
                                                currattr['broken'])
                     elif isinstance(currattr, list) or isinstance(currattr, tuple):
                         attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, currattr)))
@@ -338,7 +343,7 @@ def print_attrib_path(path, session, requestargs, options):
                         dictout = []
                         for k, v in currattr.items:
                             dictout.append("{0}={1}".format(k, v))
-                        attrout = '{0}: {1}: {2}'.format(node, attr, ','.join(map(str, dictout)))
+                        attrout = '{0}: {1}: {2}'.format(node, printattr, ','.join(map(str, dictout)))
                     else:
                         cprint("CODE ERROR" + repr(attr))
 
@@ -432,18 +437,18 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
                     for val in updateargs[1:]:
                         val = val.split('=')
                         if (nodetype == "nodegroups"):
-                            exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all'.format(noderange),
+                            exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all',
                                                                          val[1],val[0])
                         else:
-                            exitcode = session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),
+                            exitcode = session.simple_noderange_command(noderange, 'attributes/all',
                                                                         val[1], val[0])
                 else:
                     val = updateargs[1].split('=')
                     if nodetype == "nodegroups" :
-                        exitcode = session.simple_nodegroups_command(noderange, 'attributes/all'.format(noderange),
+                        exitcode = session.simple_nodegroups_command(noderange, 'attributes/all',
                                                                      val[1], val[0])
                     else:
-                        exitcode = session.simple_noderange_command(noderange, 'attributes/all'.format(noderange),
+                        exitcode = session.simple_noderange_command(noderange, 'attributes/all',
                                                                     val[1], val[0])
             except:
                 sys.stderr.write('Error: {0} not a valid expression\n'.format(str(updateargs[1:])))
