@@ -740,11 +740,12 @@ class InputNetworkConfiguration(ConfluentInputMessage):
         nodeattrmap = {}
         for attr in inputdata:
             try:
-                inputdata[attr].format()
+                if inputdata[attr] is not None:
+                    inputdata[attr].format()
             except (KeyError, IndexError):
                 nodeattrmap[attr] = {}
-                for expanded in cfm.expand_attrib_expression(nodes,
-                                                             inputdata[attr]):
+                for expanded in configmanager.expand_attrib_expression(
+                        nodes, inputdata[attr]):
                     node, value = expanded
                     nodeattrmap[attr][node] = value
         if not nodeattrmap:
@@ -756,7 +757,7 @@ class InputNetworkConfiguration(ConfluentInputMessage):
             self.inputbynode[node] = deepcopy(inputdata)
             for attr in self.inputbynode[node]:
                 if attr in nodeattrmap:
-                    self.inputbynode[node][attr] = nodeattrmap[attr][node][attr]
+                    self.inputbynode[node][attr] = nodeattrmap[attr][node]
 
     def netconfig(self, node):
         return self.inputbynode[node]
