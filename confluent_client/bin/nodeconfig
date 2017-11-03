@@ -57,6 +57,10 @@ cfgpaths = {
         'ipv4_gateway'),
 }
 
+autodeps = {
+    'bmc.ipv4': (('bmc.ipv4_method', 'static'),)
+}
+
 try:
     noderange = args[0]
 except IndexError:
@@ -76,6 +80,8 @@ for param in args[1:]:
         key, _, value = param.partition('=')
         if key not in cfgpaths:
             bailout('Unrecognized setting: {0}'.format(key))
+        for depkey, depval in autodeps.get(key, []):
+            assignment[depkey] = depval
         assignment[key] = value
     else:
         if setmode is None:
