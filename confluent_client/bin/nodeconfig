@@ -46,7 +46,7 @@ argparser = optparse.OptionParser()
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
-    'bmc.ipv4': (
+    'bmc.ipv4_address': (
         'configuration/management_controller/net_interfaces/management',
         'ipv4_address'),
     'bmc.ipv4_method': (
@@ -58,7 +58,7 @@ cfgpaths = {
 }
 
 autodeps = {
-    'bmc.ipv4': (('bmc.ipv4_method', 'static'),)
+    'bmc.ipv4_address': (('bmc.ipv4_method', 'static'),)
 }
 
 try:
@@ -71,6 +71,13 @@ assignment = {}
 queryparms = {}
 
 
+if len(args) == 1:
+    for candidate in cfgpaths:
+        path, attrib = cfgpaths[candidate]
+        path = '/noderange/{0}/{1}'.format(noderange, path)
+        if path not in queryparms:
+            queryparms[path] = {}
+        queryparms[path][attrib] = candidate
 for param in args[1:]:
     if '=' in param:
         if setmode is None:
