@@ -16,6 +16,7 @@
 import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.config.attributes as allattributes
+import confluent.util as util
 
 
 def retrieve(nodes, element, configmanager, inputdata):
@@ -175,8 +176,11 @@ def _expand_expression(nodes, configmanager, inputdata):
         expression = expression['expression']
     if type(expression) is dict:
         expression = expression['expression']
+    pernodeexpressions = {}
     for expanded in configmanager.expand_attrib_expression(nodes, expression):
-        yield msg.KeyValueData({'value': expanded[1]}, expanded[0])
+        pernodeexpressions[expanded[0]] = expanded[1]
+    for node in util.natural_sort(pernodeexpressions):
+        yield msg.KeyValueData({'value': pernodeexpressions[node]}, node)
 
 
 def create(nodes, element, configmanager, inputdata):
