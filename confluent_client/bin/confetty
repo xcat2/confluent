@@ -115,6 +115,7 @@ def print_help():
 
 
 def updatestatus(stateinfo={}):
+    global powerstate, powertime
     status = consolename
     info = []
     for statekey in stateinfo:
@@ -129,6 +130,11 @@ def updatestatus(stateinfo={}):
         # error will be repeated if relevant
         # avoid keeping it around as stale
         del laststate['error']
+    if 'state' in stateinfo:  # currently only read power means anything
+        newpowerstate = stateinfo['state']['value']
+        if newpowerstate != powerstate and newpowerstate == 'off':
+            sys.stdout.write("\x1b[2J\x1b[;H[powered off]\r\n")
+        powerstate = newpowerstate
     if 'clientcount' in laststate and laststate['clientcount'] != 1:
         info.append('clients: %d' % laststate['clientcount'])
     if 'bufferage' in stateinfo and stateinfo['bufferage'] is not None:
@@ -715,7 +721,7 @@ def conserver_command(filehandle, localcommand):
         else:
             print("Unknown power state.]\r")
 
-        #check_power_state()
+        check_power_state()
 
     elif localcommand[0] == '?':
         print("help]\r")
@@ -830,21 +836,11 @@ powertime = None
 
 
 def check_power_state():
-    global powerstate, powertime
-    for rsp in session.read('/nodes/' + consolename + '/power/state'):
-        if type(rsp) == dict and 'state' in rsp:
-            newpowerstate = rsp['state']['value']
-            powertime = time.time()
-            if newpowerstate != powerstate and newpowerstate == 'off':
-                sys.stdout.write("\x1b[2J\x1b[;H[powered off]\r\n")
-            powerstate = newpowerstate
-        elif type(rsp) == dict and '_requestdone' in rsp:
-            break
-        elif type(rsp) == dict:
-            updatestatus(rsp)
-        else:
-            sys.stdout.write(rsp)
-            sys.stdout.flush()
+    tlvdata.send(
+        session.connection,
+        {'operation': 'retrieve',
+         'path': '/nodes/' + consolename + '/power/state'})
+    return
 
 
 while inconsole or not doexit:
@@ -908,8 +904,10 @@ while inconsole or not doexit:
                         tlvdata.send(session.connection, myinput)
                 except IOError:
                     pass
-        #if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
-        #    check_power_state()
+        if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
+            powertime = time.time()
+            powerstate = True
+            check_power_state()
     else:
         currcommand = prompt()
         try:
