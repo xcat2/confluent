@@ -722,7 +722,22 @@ def conserver_command(filehandle, localcommand):
             print("Unknown power state.]\r")
 
         check_power_state()
-
+    elif localcommand[0] == 'r':
+        sys.stdout.write('\x1b7\x1b[999;999H\x1b[6n')
+        sys.stdout.flush()
+        reply = ''
+        while 'R' not in reply:
+            try:
+                reply += sys.stdin.read(1)
+            except IOError:
+                pass
+        reply = reply.replace('\x1b[', '')
+        reply = reply.replace('R', '')
+        height, width = reply.split(';')
+        sys.stdout.write('\x1b8')
+        sys.stdout.flush()
+        print('sending stty commands]')
+        return 'stty columns {0}\rstty rows {1}\r'.format(width, height)
     elif localcommand[0] == '?':
         print("help]\r")
         print(".       exit console\r")
@@ -733,6 +748,7 @@ def conserver_command(filehandle, localcommand):
         print("pbs     boot to setup\r")
         print("pbn     boot to network\r")
         print("pb<ent> boot to default\r")
+        print("r       send stty command to resize terminal\r")
         print("<cr> abort command\r")
     elif localcommand[0] == '\x0d':
         print("ignored]\r")
