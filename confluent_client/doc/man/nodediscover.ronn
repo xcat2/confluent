@@ -1,0 +1,106 @@
+nodediscover(8)  -- List or manage confluent node discovery
+=========================================================
+
+## SYNOPSIS
+
+`nodediscover rescan`
+`nodediscover [options] list`
+`nodeattrib [options] assign`
+
+## DESCRIPTION
+
+**nodediscover** provides streamlined access to the confluent discovery data
+and assignment.  Nodes are detected through either an active scan (as occurs
+at service startup and on request by nodediscover rescan) or through passive
+detection (as a target comes online, it may attempt to register with the
+network).
+
+**nodediscover list** provides the currently known data in tabular format.  The
+data may be filtered by various parameters, as denoted in the options below.
+
+**nodediscover assign** performs manual discovery, assigning an entry to a node
+identity or, using `-i`, using a csv file to assign nodes all at once.  For
+example, a spreadsheet of serial numbers to desired node names could be used.
+
+## CSV FORMAT
+
+The CSV format used by nodediscover consists of one header describing the
+columns followed by the data.  The available columns are:
+
+* node: The name desired for the node in confluent
+* groups: A comma delimited list of groups to put the node into (using normal CSV escape rules for the commas)
+* mac: The mac address of the node
+* serial: The serial number of the node
+* uuid: The uuid of the node
+* bmc: The name or ip address that should be assigned to the BMC, regardless of current address
+* bmc_gateway: IP address of gateway, if desired
+* bmcuser: The desired username for the BMC to have as administrator
+* bmcpass: The desired password for the BMC to require
+
+Note that node is the only mandatory field.  To identify the systems, one of
+mac, serial, or uuid should be specified, it is pointless to provide more than
+one of these columns.  Other attributes if not provided may be defined through
+nodeattrib or group inherited.  It is possible to define nodes without ever
+providing a BMC ip, in which case IPv6 will be used automatically if possible.
+
+One example of a valid CSV file would be:
+node,serial,bmc,bmcuser,bmcpass
+n1,06DPMDF,172.30.204.1,admin,Passw0rd12
+n2,J30002HG,172.30.204.2,admin,Passw0rd12
+
+Which would use the serial number to assign the name and other three values to
+the nodes.
+
+## OPTIONS
+
+* `-m MODEL`, `--model=MODEL`:
+  Operate with nodes matching the specified model number
+* `-s SERIAL`, `--serial=SERIAL`:
+  Operate against the system matching the specified
+  serial number
+* `-u UUID`, `--uuid=UUID`:
+  Operate against the system matching the specified UUID
+* `-n NODE`, `--node=NODE`:
+  Operate with the given nodename
+* `-e MAC`, `--ethaddr=MAC`:
+  Operate against the system with the specified MAC
+  address
+* `-t TYPE, --type=TYPE`:
+  Operate against the system of the specified type
+* `-c, --csv`:
+  Use CSV formatted output
+* `-i IMPORT.CSV`, `--import=IMPORT.CSV`:
+  Import bulk assignment data from given CSV file
+
+## EXAMPLES
+
+* Listing all detected Lenovo IMMv2 systems on a local network:
+  `# nodediscover list -t lenovo-imm2`  
+  `           Node|          Model|         Serial|                                UUID|      Mac Address|        Type|                            Current IP Addresses`  
+  `---------------|---------------|---------------|------------------------------------|-----------------|------------|------------------------------------------------`  
+  `             r2|        5463AC1|        06DPMDF|5f7133b8-c8cb-11e4-99a9-40f2e9b91018|40:f2:e9:b9:10:1d| lenovo-imm2|     172.30.204.1,fe80::42f2:e9ff:feb9:101d%eth1`  
+  `               |        7906AC1|        06PBX15|e98d483d-2759-11e1-8ffd-5cf3fc11249c|5c:f3:fc:11:24:9f| lenovo-imm2|      172.30.3.12,fe80::5ef3:fcff:fe11:249f%eth1`  
+  `             n1|        8737AC1|        23XXH41|14dd3ba6-5c38-11e1-931a-5cf3fc6e4680|5c:f3:fc:6e:13:e1| lenovo-imm2|       172.30.3.1,fe80::5ef3:fcff:fe6e:13e1%eth1`  
+  `             n7|        8737AC1|        23XXH32|79d2ce28-5cd5-11e1-8c86-5cf3fc6e46b0|5c:f3:fc:6e:13:f9| lenovo-imm2|       172.30.3.7,fe80::5ef3:fcff:fe6e:13f9%eth1`  
+  `             n8|        8737AC1|        23XXH49|551a8438-5cd5-11e1-8d6c-5cf3fc6e4708|5c:f3:fc:6e:14:25| lenovo-imm2|       172.30.3.8,fe80::5ef3:fcff:fe6e:1425%eth1`  
+  `             n3|        8737AC1|        23XXH30|1dd7f7b3-5da5-11e1-baf0-5cf3fc6e4738|5c:f3:fc:6e:14:3d| lenovo-imm2|       172.30.3.3,fe80::5ef3:fcff:fe6e:143d%eth1`  
+  `             n4|        8737AC1|        23XXH35|45b81dae-5d9b-11e1-8337-5cf3fc6e4858|5c:f3:fc:6e:14:cd| lenovo-imm2|       172.30.3.4,fe80::5ef3:fcff:fe6e:14cd%eth1`  
+  `            n11|        8737AC1|        23XXH12|31d90128-5c37-11e1-bdb7-5cf3fc6e4920|5c:f3:fc:6e:15:31| lenovo-imm2|      172.30.3.11,fe80::5ef3:fcff:fe6e:1531%eth1`  
+  `            n13|        8737AC1|        23XXH44|e23a138a-5cd3-11e1-8f3d-5cf3fc6e4950|5c:f3:fc:6e:15:49| lenovo-imm2|      172.30.3.13,fe80::5ef3:fcff:fe6e:1549%eth1`  
+  `               |        8737AC1|        23XXH29|5cd1216b-5c37-11e1-ba0c-5cf3fc6e49c8|5c:f3:fc:6e:15:85| lenovo-imm2|       172.30.3.9,fe80::5ef3:fcff:fe6e:1585%eth1`  
+  `               |        8737AC1|        23ZYT44|f4bf48ca-71f0-11e1-b274-5cf3fc6e4f10|5c:f3:fc:6e:18:29| lenovo-imm2|      172.30.3.10,fe80::5ef3:fcff:fe6e:1829%eth1`  
+  `         hpcedr|        7915AC1|        06DRHL5|a64e3014-d7e3-11e1-8d21-6cae8b1dff32|6c:ae:8b:1d:ff:36| lenovo-imm2|   172.30.254.250,fe80::6eae:8bff:fe1d:ff36%eth1`  
+  `               |        8737AC1|        06YRWC3|3af85a51-7efd-11e3-8599-000af7482e00|6c:ae:8b:32:cb:c5| lenovo-imm2|       172.30.3.6,fe80::6eae:8bff:fe32:cbc5%eth1`  
+  `               |        8737AC1|        06YRWB7|b230f62e-7efd-11e3-9773-000af7482980|6c:ae:8b:32:cd:01| lenovo-imm2|       172.30.3.5,fe80::6eae:8bff:fe32:cd01%eth1`  
+  `               |        8737AC1|        06YRWC7|09586005-7efe-11e3-9f03-000af7482df0|6c:ae:8b:32:cd:a5| lenovo-imm2|       172.30.3.2,fe80::6eae:8bff:fe32:cda5%eth1`  
+
+* Manually assign a single node according to serial number:
+  `[root@odin ~]# nodediscover assign -s 06PBX15 -n n12`  
+  `Assigned: n12`  
+
+* Bulk execute discovery based on spreadsheet:
+  `[root@odin ~]# nodediscover assign -i import.csv`  
+  `Defined r2`  
+  `Discovered r2`  
+  `Defined c1`  
+  `Discovered c1`  
