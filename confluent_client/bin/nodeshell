@@ -33,21 +33,25 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
+import confluent.sortutil as sortutil
 
 
 def run():
-    concurrentprocs = 168
-    # among other things, FD_SETSIZE limits.  Besides, spawning too many
-    # processes can be unkind for the unaware on memory pressure and such...
+
     argparser = optparse.OptionParser(
-        usage="Usage: %prog node commandexpression",
+        usage="Usage: %prog noderange commandexpression",
         epilog="Expressions are the same as in attributes, e.g. "
                "'ipmitool -H {hardwaremanagement.manager}' will be expanded.")
+    argparser.add_option('-c', '--count', type='int', default=168,
+                         help='Number of commands to run at a time')
+    # among other things, FD_SETSIZE limits.  Besides, spawning too many
+    # processes can be unkind for the unaware on memory pressure and such...
     argparser.disable_interspersed_args()
     (options, args) = argparser.parse_args()
     if len(args) < 2:
         argparser.print_help()
         sys.exit(1)
+    concurrentprocs = options.count
     c = client.Command()
     cmdstr = " ".join(args[1:])
 
@@ -76,26 +80,34 @@ def run():
         sys.exit(exitcode)
     rdy, _, _ = select.select(all, [], [], 10)
     while all:
+        pernodeout = {}
         for r in rdy:
-            data = r.readline()
             desc = pipedesc[r]
-            if data:
-                node = desc['node']
-                if desc['type'] == 'stdout':
-                    sys.stdout.write('{0}: {1}'.format(node,data))
-                    sys.stdout.flush()
+            node = desc['node']
+            data = True
+            while data and select.select([r], [], [], 0):
+                data = r.readline()
+                if data:
+                    if desc['type'] == 'stdout':
+                        if node not in pernodeout:
+                            pernodeout[node] = []
+                        pernodeout[node].append(data)
+                    else:
+                        sys.stderr.write('{0}: {1}'.format(node, data))
+                        sys.stderr.flush()
                 else:
-                    sys.stderr.write('{0}: {1}'.format(node, data))
-                    sys.stderr.flush()
-            else:
-                pop = desc['popen']
-                ret = pop.poll()
-                if ret is not None:
-                    exitcode = exitcode | ret
-                    all.discard(r)
-                    if desc['type'] == 'stdout' and pendingexecs:
-                        node, cmdv = pendingexecs.popleft()
-                        run_cmdv(node, cmdv, all, pipedesc)
+                    pop = desc['popen']
+                    ret = pop.poll()
+                    if ret is not None:
+                        exitcode = exitcode | ret
+                        all.discard(r)
+                        if desc['type'] == 'stdout' and pendingexecs:
+                            node, cmdv = pendingexecs.popleft()
+                            run_cmdv(node, cmdv, all, pipedesc)
+        for node in sortutil.natural_sort(pernodeout):
+            for line in pernodeout[node]:
+                sys.stdout.ouwrite('{0}: {1}'.format(node, line))
+        sys.stdout.flush()
         if all:
             rdy, _, _ = select.select(all, [], [], 10)
     sys.exit(exitcode)

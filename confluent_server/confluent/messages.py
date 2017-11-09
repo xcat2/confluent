@@ -446,23 +446,13 @@ class InputExpression(ConfluentMessage):
     # so that it can make it intact to the pertinent configmanager function
     def __init__(self, path, inputdata, nodes=None):
         self.nodeattribs = {}
-        nestedmode = False
         if not inputdata:
             raise exc.InvalidArgumentException('no request data provided')
         if nodes is None:
             self.attribs = inputdata
             return
         for node in nodes:
-            if node in inputdata:
-                nestedmode = True
-                self.nodeattribs[node] = inputdata[node]
-        if nestedmode:
-            for key in inputdata:
-                if key not in nodes:
-                    raise exc.InvalidArgumentException
-        else:
-            for node in nodes:
-                self.nodeattribs[node] = inputdata
+            self.nodeattribs[node] = inputdata
 
     def get_attributes(self, node):
         if node not in self.nodeattribs:
@@ -484,7 +474,6 @@ class InputAttributes(ConfluentMessage):
     # to the client
     def __init__(self, path, inputdata, nodes=None):
         self.nodeattribs = {}
-        nestedmode = False
         if not inputdata:
             raise exc.InvalidArgumentException('no request data provided')
         if nodes is None:
@@ -509,16 +498,7 @@ class InputAttributes(ConfluentMessage):
                             'expression': self.attribs[attrib]}
             return
         for node in nodes:
-            if node in inputdata:
-                nestedmode = True
-                self.nodeattribs[node] = inputdata[node]
-        if nestedmode:
-            for key in inputdata:
-                if key not in nodes:
-                    raise exc.InvalidArgumentException
-        else:
-            for node in nodes:
-                self.nodeattribs[node] = inputdata
+            self.nodeattribs[node] = inputdata
 
     def get_attributes(self, node):
         if node not in self.nodeattribs:
@@ -555,7 +535,6 @@ class InputCredential(ConfluentMessage):
 
     def __init__(self, path, inputdata, nodes=None):
         self.credentials = {}
-        nestedmode = False
         if not inputdata:
             raise exc.InvalidArgumentException('no request data provided')
 
