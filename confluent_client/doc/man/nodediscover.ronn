@@ -3,9 +3,9 @@ nodediscover(8)  -- List or manage confluent node discovery
 
 ## SYNOPSIS
 
-`nodediscover rescan`
-`nodediscover [options] list`
-`nodeattrib [options] assign`
+`nodediscover rescan`  
+`nodediscover [options] list`  
+`nodeattrib [options] assign`  
 
 ## DESCRIPTION
 
