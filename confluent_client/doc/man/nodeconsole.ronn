@@ -11,6 +11,11 @@ text or serial console of a system.  Exiting is done by hitting `Ctrl-e`, then `
  then `.`.  Note that console output by default is additionally logged to
 `/var/log/confluent/consoles/`**NODENAME**.
 
+When the console connection to the target is broken, then confluent on backend
+will initiate an automatic retry interval that is randomized between 2 and 4 minutes.
+The reopen escape sequence below requests an immediate retry, as does connecting
+a new session.
+
 ## ESCAPE SEQUENCE COMMANDS
 
 While connected to a console, a number of commands may be performed through escape
@@ -42,6 +47,10 @@ keystroke will be interpreted as a command.  The following commands are availabl
 * `pbn`:
   [Power Boot Network]
   Request immediate boot to network
+* `r`:
+  [send Resize]
+  This queries the current terminal and sends stty commands to advertise the user termineal
+  size to the remote console
 * `?`:
   Get a list of supported commands
 * `<ent>`:
