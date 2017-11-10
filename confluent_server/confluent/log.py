@@ -379,7 +379,7 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
 
     def _sizeRoll(self):
         self.close()
-        for i in range(self.sizeRollingCount, 0, -1):
+        for i in range(self.backupCount - 1, 0, -1):
             sbfn = "%s.%d" % (self.binpath, i)
             dbfn = "%s.%d" % (self.binpath, i + 1)
             stfn = "%s.%d" % (self.textpath, i)
@@ -392,8 +392,6 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
                 if os.path.exists(dtfn):
                     os.remove(dtfn)
                 os.rename(stfn, dtfn)
-        # size rolling happens, add statistics count
-        self.sizeRollingCount += 1
         dbfn = self.binpath + ".1"
         dtfn = self.textpath + ".1"
         if os.path.exists(dbfn):
@@ -404,7 +402,17 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
             os.rename(self.binpath, dbfn)
         if os.path.exists(self.textpath):
             os.rename(self.textpath, dtfn)
+        self._deleteFilesForSizeRolling()
         return dbfn, dtfn
+
+    def _deleteFilesForSizeRolling(self):
+        for i in range(self.sizeRollingCount, self.backupCount -1, -1):
+            dbfn = "%s.%d" % (self.binpath, i)
+            dtfn = "%s.%d" % (self.textpath, i)
+            if os.path.exists(dbfn):
+                os.remove(dbfn)
+            if os.path.exists(dtfn):
+                os.remove(dtfn)
 
     def _timeRoll(self):
         self.close()
@@ -424,8 +432,7 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
                     addend = -3600
                 timeTuple = time.localtime(t + addend)
 
-        # if size rolling files exist
-        for i in range(self.sizeRollingCount, 0, -1):
+        for i in range(self.backupCount - 1, 0, -1):
             sbfn = "%s.%d" % ( self.binpath, i)
             dbfn = "%s.%s.%d" % (
             self.binpath, time.strftime(self.suffix, timeTuple),i)
@@ -441,8 +448,6 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
                     os.remove(dtfn)
                 os.rename(stfn, dtfn)
 
-        # As time rolling happens, reset statistics count
-        self.sizeRollingCount = 0
         dbfn = self.binpath + "." + time.strftime(self.suffix, timeTuple)
         odbfn = dbfn
         dtfn = self.textpath + "." + time.strftime(self.suffix, timeTuple)
