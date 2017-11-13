@@ -76,6 +76,7 @@ import confluent.tlvdata as tlvdata
 import confluent.client as client
 
 conserversequence = '\x05c'  # ctrl-e, c
+clearpowermessage = False
 
 oldtcattr = None
 fd = sys.stdin
@@ -115,7 +116,7 @@ def print_help():
 
 
 def updatestatus(stateinfo={}):
-    global powerstate, powertime
+    global powerstate, powertime, clearpowermessage
     status = consolename
     info = []
     for statekey in stateinfo:
@@ -134,6 +135,10 @@ def updatestatus(stateinfo={}):
         newpowerstate = stateinfo['state']['value']
         if newpowerstate != powerstate and newpowerstate == 'off':
             sys.stdout.write("\x1b[2J\x1b[;H[powered off]\r\n")
+            clearpowermessage = True
+        if newpowerstate == 'on' and clearpowermessage:
+            sys.stdout.write("\x1b[2J\x1b[;H")
+            clearpowermessage = False
         powerstate = newpowerstate
     if 'clientcount' in laststate and laststate['clientcount'] != 1:
         info.append('clients: %d' % laststate['clientcount'])
@@ -878,6 +883,9 @@ while inconsole or not doexit:
                     updatestatus(data)
                     continue
                 if data is not None:
+                    if clearpowermessage:
+                        sys.stdout.write("\x1b[2J\x1b[;H")
+                        clearpowermessage = False
                     try:
                         sys.stdout.write(data)
                     except IOError:  # Some times circumstances are bad
