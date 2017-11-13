@@ -56,6 +56,7 @@ try:
     nodelist = '/{0}/{1}/'.format(nodetype,nodegroups)
 except IndexError:
     nodelist = '/nodegroups/'
+client.check_globbing(nodegroups)
 session = client.Command()
 exitcode = 0
 

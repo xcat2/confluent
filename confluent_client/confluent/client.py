@@ -19,6 +19,7 @@ import anydbm as dbm
 import errno
 import hashlib
 import os
+import shlex
 import socket
 import ssl
 import sys
@@ -455,3 +456,28 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
                 exitcode = 1
             sys.exit(exitcode)
     return exitcode
+
+
+# So we try to prevent bad things from happening when globbing
+# We tried to head this off at the shell, but the various solutions would end
+# up breaking the shell in various ways (breaking pipe capability if using
+# DEBUG, breaking globbing if in pipe, etc)
+# Then we tried to parse the original commandline instead, however shlex isn't
+# going to parse full bourne language (e.g. knowing that '|' and '>' and
+# a world of other things would not be in our command line
+# so finally, just make sure the noderange appears verbatim in the command line
+# if we glob to something, then bash will change noderange and this should
+# detect it and save the user from tragedy
+def check_globbing(noderange):
+    rawargs = os.environ.get('CURRENT_CMDLINE', None)
+    if rawargs:
+        rawargs = shlex.split(rawargs)
+        for arg in rawargs:
+            if arg.startswith(noderange):
+                break
+        else:
+            sys.stderr.write(
+                'Shell glob conflict detected, specified target {0} '
+                'not in command line (if bash, try set -f)'
+                '\n'.format(noderange))
+            sys.exit(1)

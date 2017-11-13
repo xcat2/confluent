@@ -81,6 +81,7 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
+client.check_globbing(noderange)
 
 def get_update_progress(session, url):
     for res in session.read(url):

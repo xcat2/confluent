@@ -51,6 +51,7 @@ def run():
     if len(args) < 2:
         argparser.print_help()
         sys.exit(1)
+    client.check_globbing(args[0])
     concurrentprocs = options.count
     c = client.Command()
     cmdstr = " ".join(args[1:])

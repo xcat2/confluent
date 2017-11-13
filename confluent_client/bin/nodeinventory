@@ -95,6 +95,7 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
+client.check_globbing(noderange)
 if len(args) > 1:
     if args[1] == 'firm':
         os.execlp('nodefirmware', 'nodefirmware', noderange)

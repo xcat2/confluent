@@ -40,6 +40,7 @@ if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
 noderange = args[0]
+client.check_globbing(noderange)
 session = client.Command()
 exitcode = 0
 for r in session.delete('/noderange/{0}'.format(noderange)):

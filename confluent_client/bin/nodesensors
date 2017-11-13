@@ -65,6 +65,7 @@ if options.numreadings:
         options.interval = 1
 try:
     noderange = args[0]
+    client.check_globbing(noderange)
 except IndexError:
     argparser.print_help()
     sys.exit(1)
@@ -79,7 +80,6 @@ for sensorgroup in args[1:]:
                 sensors.append('sensors/hardware/all/' + sensor)
 if not sensors:
     sensors = ['sensors/hardware/all/all']
-
 session = client.Command()
 exitcode = 0
 sensorheaders = {}

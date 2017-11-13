@@ -38,13 +38,13 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
-
+client.check_globbing(noderange)
 identifystate = None
 if len(sys.argv) > 2:
     identifystate = sys.argv[2]
 else:
-	argparser.print_help()
-	sys.exit(1)
+    argparser.print_help()
+    sys.exit(1)
 session = client.Command()
 exitcode = 0
 sys.exit(

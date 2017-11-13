@@ -41,6 +41,7 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
+client.check_globbing(noderange)
 
 
 def main():

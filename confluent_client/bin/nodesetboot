@@ -48,6 +48,7 @@ argparser.add_option('-u', '--uefi', dest='uefi', action='store_true',
 
 try:
     noderange = args[0]
+    client.check_globbing(noderange)
 except IndexError:
     argparser.print_help()
     sys.exit(1)

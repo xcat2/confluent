@@ -47,6 +47,7 @@ def main():
         nodelist = '/noderange/{0}/nodes/'.format(noderange)
     except IndexError:
         nodelist = '/nodes/'
+    client.check_globbing(noderange)
     session = client.Command()
     exitcode = 0
     showtype='all'

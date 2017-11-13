@@ -6,21 +6,28 @@ export MANPATH
 # this avoids a problem if a user does a noderange like 'n[21-33] and there is a file
 # in the directory like 'n3' that causes the parameter to change and target a totally
 # different node
-alias confetty='set -f;confetty';confetty(){ command confetty "$@"; set +f;}
-alias nodeattrib='set -f;nodeattrib';nodeattrib(){ command nodeattrib "$@"; set +f;}
-alias nodeboot='set -f;nodeboot';nodeboot(){ command nodeboot "$@"; set +f;}
-alias nodeconsole='set -f;nodeconsole';nodeconsole(){ command nodeconsole "$@"; set +f;}
-alias nodedefine='set -f;nodedefine';nodedefine(){ command nodedefine "$@"; set +f;}
-alias nodeeventlog='set -f;nodeeventlog';nodeeventlog(){ command nodeeventlog "$@"; set +f;}
-alias nodefirmware='set -f;nodefirmware';nodefirmware(){ command nodefirmware "$@"; set +f;}
-alias nodegroupattrib='set -f;nodegroupattrib';nodegroupattrib(){ command nodegroupattrib "$@"; set +f;}
-alias nodehealth='set -f;nodehealth';nodehealth(){ command nodehealth "$@"; set +f;}
-alias nodeidentify='set -f;nodeidentify';nodeidentify(){ command nodeidentify "$@"; set +f;}
-alias nodeinventory='set -f;nodeinventory';nodeinventory(){ command nodeinventory "$@"; set +f;}
-alias nodelist='set -f;nodelist';nodelist(){ command nodelist "$@"; set +f;}
-alias nodepower='set -f;nodepower';nodepower(){ command nodepower "$@"; set +f;}
-alias nodereseat='set -f;nodereseat';nodereseat(){ command nodereseat "$@"; set +f;}
-alias noderun='set -f;noderun';noderun(){ command noderun "$@"; set +f;}
-alias nodesensors='set -f;nodesensors';nodesensors(){ command nodesensors "$@"; set +f;}
-alias nodesetboot='set -f;nodesetboot';nodesetboot(){ command nodesetboot "$@"; set +f;}
-alias nodeshell='set -f;nodeshell';nodeshell(){ command nodeshell "$@"; set +f;}
+# Unfortunately in bourne shell, we cannot reliably ensure a prepended set-f
+# and an appended set +f are both run.  alias seems to be the only mechanism
+# that can intervene before glob expansion, but it lacks power.
+# putting it into a function to append is all well and good, *except*  that
+# if doing something like 'nodepower compute|grep' causes set -f to execute
+# in current shell, and the function to be in a subshell and leaves globbing
+# disabled in the parent shell.  Instead, store the current command in a
+# variable and use that to check for misglobbed noderanges, which was the goal
+alias nodeattrib='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeattrib'
+alias nodeboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeboot'
+alias nodeconsole='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeconsole'
+alias nodedefine='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodedefine'
+alias nodeeventlog='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeeventlog'
+alias nodefirmware='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodefirmware'
+alias nodegroupattrib='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodegroupattrib'
+alias nodehealth='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodehealth'
+alias nodeidentify='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeidentify'
+alias nodeinventory='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeinventory'
+alias nodelist='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodelist'
+alias nodepower='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodepower'
+alias nodereseat='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodereseat'
+alias noderun='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; noderun'
+alias nodesensors='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesensors'
+alias nodesetboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesetboot'
+alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeshell'

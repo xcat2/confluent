@@ -49,6 +49,7 @@ except IndexError:
         'Usage: {0} <noderange> [default|cd|network|setup|hd]\n'.format(
             sys.argv[0]))
     sys.exit(1)
+client.check_globbing(noderange)
 bootdev = None
 if len(sys.argv) > 2:
     bootdev = sys.argv[2]

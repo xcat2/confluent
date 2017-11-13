@@ -52,6 +52,7 @@ def run():
         argparser.print_help()
         sys.exit(1)
     concurrentprocs = options.count
+    client.check_globbing(args[0])
     c = client.Command()
     cmdstr = " ".join(args[1:])
 

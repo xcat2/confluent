@@ -40,7 +40,7 @@ try:
 except IndexError:
     argparser.print_help()
     sys.exit(1)
-
+client.check_globbing(noderange)
 setstate = None
 if len(sys.argv) > 2:
     if setstate == 'softoff':
