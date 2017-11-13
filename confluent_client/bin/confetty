@@ -867,7 +867,7 @@ def check_power_state():
 while inconsole or not doexit:
     if inconsole:
         rdylist, _, _ = select.select(
-            (sys.stdin, session.connection), (), (), 60)
+            (sys.stdin, session.connection), (), (), 10)
         for fh in rdylist:
             if fh == session.connection:
                 # this only should get called in the
@@ -928,7 +928,7 @@ while inconsole or not doexit:
                         tlvdata.send(session.connection, myinput)
                 except IOError:
                     pass
-        if powerstate is None or powertime < time.time() - 60:  # Check powerstate every 60 seconds
+        if powerstate is None or powertime < time.time() - 10:  # Check powerstate every 10 seconds
             powertime = time.time()
             powerstate = True
             check_power_state()
