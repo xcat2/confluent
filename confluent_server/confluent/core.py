@@ -499,7 +499,7 @@ def handle_nodegroup_request(configmanager, inputdata,
             raise Exception("TODO")
     plugroute = routespec.routeinfo
     inputdata = msg.get_input_message(
-        pathcomponents[2:], operation, inputdata, configmanager)
+        pathcomponents[2:], operation, inputdata)
     if 'handler' in plugroute:  # fixed handler definition
         hfunc = getattr(pluginmap[plugroute['handler']], operation)
         return hfunc(
