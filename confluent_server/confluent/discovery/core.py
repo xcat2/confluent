@@ -634,7 +634,17 @@ def get_nodename(cfg, handler, info):
                 _map_unique_ids()
                 nodename = nodes_by_uuid.get(curruuid, None)
     if not nodename:  # as a last resort, search switch for info
-        nodename = macmap.find_node_by_mac(info['hwaddr'], cfg)
+        nodename, macinfo = macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
+        if (nodename and
+                not handler.discoverable_by_switch(macinfo['maccount'])):
+            if handler.devname == 'SMM':
+                errorstr = 'Attempt to discover SMM by switch, but chained ' \
+                           'topology or incorrect net attributes detected, ' \
+                           'which is not compatible with switch discovery ' \
+                           'of SMM, nodename would have been ' \
+                           '{0}'.format(nodename)
+                log.log({'error': errorstr})
+            return None
     return nodename
 
 

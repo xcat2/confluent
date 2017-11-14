@@ -19,6 +19,10 @@ webclient = eventlet.import_patched('pyghmi.util.webclient')
 class NodeHandler(object):
     https_supported = True
     is_enclosure = False
+    devname = ''
+    maxmacs = 2  # reasonable default, allowing for common scenario of
+                 # shared nic in theory, but blocking enclosure managers
+                 # and uplink ports
 
     def __init__(self, info, configmanager):
         self._certfailreason = None
@@ -50,9 +54,10 @@ class NodeHandler(object):
     def preconfig(self):
         return
 
-    @property
-    def discoverable_by_switch(self):
-        return True
+    def discoverable_by_switch(self, macs):
+        # Given the number of macs sharing the port, is this handler
+        # appropriate?
+        return macs <= self.maxmacs
 
     def _savecert(self, certificate):
         self._fp = certificate
