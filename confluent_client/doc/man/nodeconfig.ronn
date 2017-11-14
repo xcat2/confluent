@@ -1,0 +1,33 @@
+nodeconfig(8) -- Show or change node configuration
+==================================================
+
+## SYNOPSIS
+
+`nodecanfig <noderange> [<configuration>..]`
+`nodecanfig <noderange> [<configuration=value>..]`
+
+## DESCRIPTION
+
+**nodeconfig** manages the configuration of nodes managed by confluent.
+Rather than manipulating the confluent database, this actually modifies the
+running configuration on the node firmware.  Calling without '=' will show the
+current value, and '=' will change the value.  Network information can be
+given as a node expression, as documented in the man page for nodeattribexpressions(5).
+
+## EXAMPLES
+* Showing the current IP configuration of noderange BMC/IMM/XCC:
+    `# nodeconfig s3,s4 bmc`  
+    `s3: bmc.ipv4_address: 172.30.254.193/16`  
+    `s3: bmc.ipv4_method: DHCP`  
+    `s3: bmc.ipv4_gateway: 172.30.0.6`  
+    `s4: bmc.ipv4_address: 172.30.254.192/16`  
+    `s4: bmc.ipv4_method: DHCP`  
+    `s4: bmc.ipv4_gateway: 172.30.0.6`  
+
+* Changing nodes `s3` and `s4` to have the ip addressess 10.1.2.3 and 10.1.2.4 with a 16 bit subnet mask:
+    `# nodeconfig s3,s4 bmc.ipv4_address=10.1.2.{n1}/16`  
+
+## SEE ALSO
+
+nodeattribexpressions(5)
+
