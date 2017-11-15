@@ -107,7 +107,7 @@ def run():
                             run_cmdv(node, cmdv, all, pipedesc)
         for node in sortutil.natural_sort(pernodeout):
             for line in pernodeout[node]:
-                sys.stdout.ouwrite('{0}: {1}'.format(node, line))
+                sys.stdout.write('{0}: {1}'.format(node, line))
         sys.stdout.flush()
         if all:
             rdy, _, _ = select.select(all, [], [], 10)
