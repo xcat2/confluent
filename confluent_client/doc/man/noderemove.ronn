@@ -1,0 +1,25 @@
+noderemove(8) -- Remove nodes from the confluent management service
+===================================================================
+
+## SYNOPSIS
+
+`noderemove <noderange>`  
+
+## DESCRIPTION
+
+`noderemove` simply removes the given noderange from the confluent database.
+
+
+## EXAMPLES
+
+* Remove two racks each with 4 nodes:
+    `# noderemove r1u1-r2u4`  
+    `r1u4: deleted`  
+    `r1u1: deleted`  
+    `r1u2: deleted`  
+    `r1u3: deleted`  
+    `r2u4: deleted`  
+    `r2u3: deleted`  
+    `r2u2: deleted`  
+    `r2u1: deleted`  
+

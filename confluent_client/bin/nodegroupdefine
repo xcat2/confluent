@@ -49,7 +49,7 @@ attribs = {'name': noderange}
 for arg in args[1:]:
     key, val = arg.split('=')
     attribs[key] = val
-for r in session.create('/noderange/', attribs):
+for r in session.create('/nodegroups/', attribs):
     if 'error' in r:
         sys.stderr.write(r['error'] + '\n')
         exitcode |= 1

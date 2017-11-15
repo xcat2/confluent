@@ -1,0 +1,19 @@
+nodereseat(8) -- Request a reseat of a node
+============================================
+
+## SYNOPSIS
+
+`nodereseat <noderange>`  
+
+## DESCRIPTION
+
+`nodereseat` requests the enclosure manager of the current node to reseat that
+node's slot.  This should be equivalent to removing the system entirely from
+the chassis and putting it back in, but without actually having to do so.
+
+## EXAMPLES
+
+* Reseating the node `s1`:
+    `# nodereseat s1`  
+    `s1: Reseat successful`  
+

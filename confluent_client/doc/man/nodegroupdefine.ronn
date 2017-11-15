@@ -1,0 +1,23 @@
+nodegroupdefine(8) -- Define new confluent node group
+
+## SYNOPSIS
+
+`nodegroupdefine <groupname> [nodeattribute1=value1> <nodeattribute2=value2> ...]`  
+
+## DESCRIPTION
+
+`nodegroupdefine` allows the definition of a new node for the confluent management
+service.  It may only define a single group name at a time.
+It has the same syntax as `nodegroupattrib(8)`, and the commands differ in
+that `nodegroupattrib(8)` will error if a node group does not exist.
+
+## EXAMPLES
+
+* Create a group called `compute`:
+    `# nodegroupdefine compute`  
+    `compute: created`  
+
+
+## SEE ALSO
+
+nodeattribexpressions(8), nodegroupattrib(8), nodegroupremove(8)
