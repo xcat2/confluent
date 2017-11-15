@@ -1,0 +1,28 @@
+nodedefine(8) -- Define new confluent nodes
+
+## SYNOPSIS
+
+`nodedefine <noderange> [nodeattribute1=value1> <nodeattribute2=value2> ...]`  
+
+## DESCRIPTION
+
+`nodedefine` allows the definition of new nodes for the confluent management
+system.  It has the same syntax as `nodeattrib(8)`, and the commands differ in
+that `nodeattrib(8)` will error if a node does not exist.
+
+## EXAMPLES
+
+* Define two racks of nodes, named r{rack}u{u}:
+    `# nodedefine r1u1-r2u4`  
+    `r1u4: created`  
+    `r1u1: created`  
+    `r1u2: created`  
+    `r1u3: created`  
+    `r2u4: created`  
+    `r2u3: created`  
+    `r2u2: created`  
+    `r2u1: created`  
+
+## SEE ALSO
+
+noderange(5), nodeattribexpressions(8)

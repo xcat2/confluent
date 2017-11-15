@@ -229,33 +229,32 @@ def _map_switch_backend(args):
             _macsbyswitch[switch][ifname] = [mac]
         nodename = _nodelookup(switch, ifname)
         if nodename is not None:
-            if mac in _nodesbymac and _nodesbymac[mac] != nodename:
+            if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
                 # For example, listed on both a real edge port
                 # and by accident a trunk port
                 log.log({'error': '{0} and {1} described by ambiguous'
-                                    ' switch topology values'.format(nodename,
-                                                              _nodesbymac[mac]
-                                                              )})
-                _nodesbymac[mac] = None
+                                  ' switch topology values'.format(
+                                      nodename, _nodesbymac[mac][0])})
+                _nodesbymac[mac] = (None, None)
             else:
-                _nodesbymac[mac] = nodename
+                _nodesbymac[mac] = (nodename, maccounts[ifname])
 
 
 switchbackoff = 30
 
 
-def find_node_by_mac(mac, configmanager):
+def find_nodeinfo_by_mac(mac, configmanager):
     now = util.monotonic_time()
     if vintage and (now - vintage) < 90 and mac in _nodesbymac:
-        return _nodesbymac[mac]
+        return _nodesbymac[mac][0], {'maccount': _nodesbymac[mac][1]}
     # do not actually sweep switches more than once every 30 seconds
     # however, if there is an update in progress, wait on it
     for _ in update_macmap(configmanager,
                            vintage and (now - vintage) < switchbackoff):
         if mac in _nodesbymac:
-            return _nodesbymac[mac]
+            return _nodesbymac[mac][0], {'maccount': _nodesbymac[mac][1]}
     # If update_mac bailed out, still check one last time
-    return _nodesbymac.get(mac, None)
+    return _nodesbymac.get(mac, (None, {'maccount': 0}))
 
 
 mapupdating = eventlet.semaphore.Semaphore()
@@ -456,7 +455,7 @@ def dump_macinfo(macaddr):
         raise exc.NotFoundException(
             '{0} not found in mac table of '
             'any known switches'.format(macaddr))
-    return _dump_locations(info, macaddr, _nodesbymac.get(macaddr, None))
+    return _dump_locations(info, macaddr, _nodesbymac.get(macaddr, (None,))[0])
 
 
 def rescan(cfg):

@@ -1,0 +1,18 @@
+nodegroupremove(8) -- Remove a nodegroup from the confluent database
+====================================================================
+
+## SYNOPSIS
+
+`nodegroupremove <noderange>`  
+
+## DESCRIPTION
+
+`nodegroupremove` simply removes the given single nodegroup from the confluent database.
+
+
+## EXAMPLES
+
+* Remove group called testgroup
+    `# nodegroupremove testgroup`  
+    `testgroup: deleted`  
+
