@@ -476,7 +476,7 @@ def _recheck_single_unknown(configmanager, mac):
             rechecker = eventlet.spawn_after(300, _periodic_recheck,
                                              configmanager)
         return
-    nodename = get_nodename(configmanager, handler, info)
+    nodename, info['maccount'] = get_nodename(configmanager, handler, info)
     if nodename:
         if handler.https_supported:
             dp = configmanager.get_node_attributes([nodename],
@@ -591,7 +591,7 @@ def detected(info):
         #TODO, eventlet spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
         return
-    nodename = get_nodename(cfg, handler, info)
+    nodename, info['maccount'] = get_nodename(cfg, handler, info)
     if nodename and handler.https_supported:
         dp = cfg.get_node_attributes([nodename],
                                      ('pubkeys.tls_hardwaremanager',))
@@ -619,11 +619,12 @@ def detected(info):
 
 def get_nodename(cfg, handler, info):
     nodename = None
+    maccount = None
     if handler.https_supported:
         currcert = handler.https_cert
         if not currcert:
             info['discofailure'] = 'nohttps'
-            return None
+            return None, None
         currprint = util.get_fingerprint(currcert)
         nodename = nodes_by_fprint.get(currprint, None)
     if not nodename:
@@ -635,6 +636,7 @@ def get_nodename(cfg, handler, info):
                 nodename = nodes_by_uuid.get(curruuid, None)
     if not nodename:  # as a last resort, search switch for info
         nodename, macinfo = macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
+        maccount = macinfo['maccount']
         if (nodename and
                 not handler.discoverable_by_switch(macinfo['maccount'])):
             if handler.devname == 'SMM':
@@ -644,8 +646,8 @@ def get_nodename(cfg, handler, info):
                            'of SMM, nodename would have been ' \
                            '{0}'.format(nodename)
                 log.log({'error': errorstr})
-                return None
-    return nodename
+                return None, None
+    return nodename, maccount
 
 
 def eval_node(cfg, handler, info, nodename, manual=False):
@@ -698,6 +700,9 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         nl = cfg.filter_node_attributes(
             'enclosure.bay={0}'.format(info['enclosure.bay']), nl)
         nl = list(nl)
+        # sadly, we cannot detect when user has a daisy chain smm config
+        # without ability to disambiguate, however the SMM will be caught so
+        # at least one actionable error will be encountered.
         if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
             if len(nl):
@@ -724,6 +729,18 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             pending_nodes[nodename] = info
     else:
         # we can and did accurately discover by switch or in enclosure
+        # but... is this really ok?  could be on an upstream port or
+        # erroneously put in the enclosure with no nodes yet
+        if (info['maccount'] and
+                not handler.discoverable_by_switch(info['maccount'])):
+            errorstr = 'The detected node {0} was detected using switch, ' \
+                       'however the relevant port has too many macs learned ' \
+                       'for this type of device ({1}) to be discovered by ' \
+                       'switch.'.format(nodename, handler.devname)
+            if manual:
+                raise exc.InvalidArgumentException(errorstr)
+            log.log({'error': errorstr})
+            return
         if not discover_node(cfg, handler, info, nodename, manual):
             pending_nodes[nodename] = info
 
