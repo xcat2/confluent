@@ -469,15 +469,24 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
 # if we glob to something, then bash will change noderange and this should
 # detect it and save the user from tragedy
 def check_globbing(noderange):
+    if not os.path.exists(noderange):
+        return True
     rawargs = os.environ.get('CURRENT_CMDLINE', None)
     if rawargs:
         rawargs = shlex.split(rawargs)
         for arg in rawargs:
+            if arg.startswith('$'):
+                arg = arg[1:]
+                if arg.endswith(';'):
+                    arg = arg[:-1]
+                arg = os.environ.get(arg, '$' + arg)
             if arg.startswith(noderange):
                 break
         else:
             sys.stderr.write(
-                'Shell glob conflict detected, specified target {0} '
-                'not in command line (if bash, try set -f)'
+                'Shell glob conflict detected, specified target "{0}" '
+                'not in command line, but is a file.  You can use "set -f" in '
+                'bash or change directories such that there is no filename '
+                'that would conflict.'
                 '\n'.format(noderange))
             sys.exit(1)
