@@ -633,7 +633,7 @@ class ConfigManager(object):
     def watch_attributes(self, nodes, attributes, callback):
         """
         Watch a list of attributes for changes on a list of nodes.  The
-        attributes may be literal, or a filename style wildcard like 
+        attributes may be literal, or a filename style wildcard like
         'net*.switch'
 
         :param nodes: An iterable of node names to be watching
@@ -1022,9 +1022,12 @@ class ConfigManager(object):
                     newattr = _attraliases[attr]
                     attribmap[group][newattr] = attribmap[group][attr]
                     del attribmap[group][attr]
-                if (attr not in ('nodes', 'noderange') and
-                        attribute_is_invalid(attr, attribmap[group][attr])):
-                    raise ValueError("{0} attribute is invalid".format(attr))
+                if attr not in ('nodes', 'noderange'):
+                    attrval = fixup_attribute(attr, attribmap[group][attr])
+                    if attribute_is_invalid(attr, attrval):
+                        errstr = "{0} attribute is invalid".format(attrname)
+                        raise ValueError(errstr)
+                    attribmap[group][attr] = attrval
                 if attr == 'nodes':
                     if not isinstance(attribmap[group][attr], list):
                         if type(attribmap[group][attr]) is unicode or type(attribmap[group][attr]) is str:
@@ -1045,7 +1048,8 @@ class ConfigManager(object):
                 if attr == 'nodes':
                     newdict = set(attribmap[group][attr])
                 elif (isinstance(attribmap[group][attr], str) or
-                        isinstance(attribmap[group][attr], unicode)):
+                        isinstance(attribmap[group][attr], unicode) or
+                        isinstance(attribmap[group][attr], bool)):
                     newdict = {'value': attribmap[group][attr]}
                 else:
                     newdict = attribmap[group][attr]
@@ -1069,6 +1073,13 @@ class ConfigManager(object):
 
     def clear_group_attributes(self, groups, attributes):
         changeset = {}
+        realattributes = []
+        for attrname in list(attributes):
+            if attrname in _attraliases:
+                realattributes.append(_attraliases[attrname])
+            else:
+                realattributes.append(attrname)
+        attributes = realattributes
         if type(groups) in (str, unicode):
             groups = (groups,)
         for group in groups:
@@ -1200,6 +1211,13 @@ class ConfigManager(object):
     def clear_node_attributes(self, nodes, attributes):
         # accumulate all changes into a changeset and push in one go
         changeset = {}
+        realattributes = []
+        for attrname in list(attributes):
+            if attrname in _attraliases:
+                realattributes.append(_attraliases[attrname])
+            else:
+                realattributes.append(attrname)
+        attributes = realattributes
         for node in nodes:
             node = node.encode('utf-8')
             try:

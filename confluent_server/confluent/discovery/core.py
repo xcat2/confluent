@@ -644,7 +644,7 @@ def get_nodename(cfg, handler, info):
                            'of SMM, nodename would have been ' \
                            '{0}'.format(nodename)
                 log.log({'error': errorstr})
-            return None
+                return None
     return nodename
 
 
