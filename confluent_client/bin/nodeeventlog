@@ -45,9 +45,15 @@ except IndexError:
     sys.exit(1)
 client.check_globbing(noderange)
 deletemode = False
+if len(sys.argv) > 3:
+    argparser.print_help()
+    sys.exit(1)
 if len(sys.argv) == 3:
     if sys.argv[2] == 'clear':
         deletemode = True
+    else:
+        argparser.print_help()
+        sys.exit(1)
 
 session = client.Command()
 exitcode = 0
