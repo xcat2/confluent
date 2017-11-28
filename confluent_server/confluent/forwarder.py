@@ -82,11 +82,11 @@ def close_session(sessionid):
         killsock.close()
     if sessionid in forwardersbyclient:
         del forwardersbyclient[sessionid]
-    for clip in ipsbysession[sessionid]:
+    for clip in ipsbysession.get(sessionid, ()):
         sessionsbyip[clip].discard(sessionid)
     if sessionid in ipsbysession:
         del ipsbysession[sessionid]
-    for relay in list(relaysbysession[sessionid]):
+    for relay in list(relaysbysession.get(sessionid, ())):
         conn = relaysbysession[sessionid][relay]
         relay.kill()
         conn.close()
