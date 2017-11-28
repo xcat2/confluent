@@ -719,7 +719,8 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
         except IndexError:  # it's just users/
             if operation == 'create':
                 inputdata = msg.get_input_message(
-                    pathcomponents, operation, inputdata, configmanager)
+                    pathcomponents, operation, inputdata,
+                    configmanager=configmanager)
                 create_user(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.list_users(),
                                        forcecollection=False)
@@ -731,7 +732,8 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
             return delete_user(user, configmanager)
         elif operation == 'update':
             inputdata = msg.get_input_message(
-                pathcomponents, operation, inputdata, configmanager)
+                pathcomponents, operation, inputdata,
+                configmanager=configmanager)
             update_user(user, inputdata.attribs, configmanager)
             return show_user(user, configmanager)
     elif pathcomponents[0] == 'events':
