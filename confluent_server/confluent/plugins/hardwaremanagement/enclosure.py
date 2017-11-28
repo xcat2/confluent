@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import confluent.core as core
+import confluent.messages as msg
+import pyghmi.exceptions as pygexc
 
 def update(nodes, element, configmanager, inputdata):
     emebs = configmanager.get_node_attributes(
@@ -19,8 +21,11 @@ def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         em = emebs[node]['enclosure.manager']['value']
         eb = emebs[node]['enclosure.bay']['value']
-        for rsp in core.handle_path(
-                '/nodes/{0}/_enclosure/reseat_bay'.format(em),
-                'update', configmanager,
-                inputdata={'reseat': int(eb)}):
-            yield rsp
+        try:
+            for rsp in core.handle_path(
+                    '/nodes/{0}/_enclosure/reseat_bay'.format(em),
+                    'update', configmanager,
+                    inputdata={'reseat': int(eb)}):
+                yield rsp
+        except pygexc.UnsupportedFunctionality as uf:
+            yield msg.ConfluentNodeError(node, str(uf))

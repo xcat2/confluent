@@ -317,6 +317,8 @@ def perform_requests(operator, nodes, element, cfg, inputdata):
             datum = resultdata.get(timeout=10)
             while datum:
                 if datum != 'Done':
+                    if isinstance(datum, Exception):
+                        raise datum
                     yield datum
                 datum = resultdata.get_nowait()
         except queue.Empty:
@@ -824,8 +826,11 @@ class IpmiHandler(object):
 
     def reseat_bay(self):
         bay = self.inputdata.inputbynode[self.node]
-        self.ipmicmd.reseat_bay(bay)
-        self.output.put(msg.ReseatResult(self.node, 'success'))
+        try:
+            self.ipmicmd.reseat_bay(bay)
+            self.output.put(msg.ReseatResult(self.node, 'success'))
+        except pygexc.UnsupportedFunctionality as uf:
+            self.output.put(uf)
 
     def bootdevice(self):
         if 'read' == self.op:
