@@ -51,7 +51,7 @@ def print_mem_info(node, prefix, meminfo):
         memdescfmt += '3-{1} '
     elif meminfo['memory_type'] == 'DDR4 SDRAM':
         memdescfmt += '4-{1} '
-    elif meminfo['memory_type'] == 'Unknown':
+    else:
         print('{0}: Unrecognized Memory'.format(node))
         return
     if meminfo['ecc']:
