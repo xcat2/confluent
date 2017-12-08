@@ -1047,7 +1047,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element)
     elif '/'.join(element).startswith('media/uploads'):
-        return firmwaremanager.list_updates(nodes, configmanager.tenent,
+        return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'mediaupload')
     else:
         return perform_requests('read', nodes, element, configmanager, inputdata)
