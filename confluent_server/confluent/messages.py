@@ -250,12 +250,17 @@ class DeletedResource(ConfluentMessage):
     def strip_node(self, node):
         pass
 
+
 class CreatedResource(ConfluentMessage):
     notnode = True
     readonly = True
 
     def __init__(self, resource):
         self.kvpairs = {'created': resource}
+
+    def strip_node(self, node):
+        pass
+
 
 class AssignedResource(ConfluentMessage):
     notnode = True
