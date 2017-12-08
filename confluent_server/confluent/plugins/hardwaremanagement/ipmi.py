@@ -1057,5 +1057,8 @@ def delete(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
         return firmwaremanager.remove_updates(nodes, configmanager.tenant,
                                               element)
+    elif '/'.join(element).startswith('media/uploads'):
+        return firmwaremanager.remove_updates(nodes, configmanager.tenant,
+                                              element, type='mediaupload')
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata)
