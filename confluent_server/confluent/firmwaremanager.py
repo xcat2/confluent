@@ -23,13 +23,17 @@ import confluent.messages as msg
 import eventlet
 
 updatesbytarget = {}
+uploadsbytarget = {}
 updatepool = eventlet.greenpool.GreenPool(256)
 
 
-def execupdate(handler, filename, updateobj):
+def execupdate(handler, filename, updateobj, type):
     try:
-        completion = handler(filename, progress=updateobj.handle_progress,
-                             bank=updateobj.bank)
+        if type == 'firmware':
+            completion = handler(filename, progress=updateobj.handle_progress,
+                                 bank=updateobj.bank)
+        else:
+            completion = handler(filename, progress=updateobj.handle_progress)
         if completion is None:
             completion = 'complete'
         updateobj.handle_progress({'phase': completion, 'progress': 100.0})
@@ -44,26 +48,30 @@ def execupdate(handler, filename, updateobj):
 
 class Updater(object):
     def __init__(self, node, handler, filename, tenant=None, name=None,
-                 bank=None):
+                 bank=None, type='firmware'):
         self.bank = bank
         self.node = node
         self.phase = 'initializing'
         self.detail = ''
         self.percent = 0.0
-        #Change the below to a pool???
-        self.updateproc = updatepool.spawn(execupdate, handler, filename, self)
-        if (node, tenant) not in updatesbytarget:
-            updatesbytarget[(node, tenant)] = {}
+        self.updateproc = updatepool.spawn(execupdate, handler, filename,
+                                           self, type)
+        if type == 'firmware':
+            myparty = updatesbytarget
+        elif type == 'mediaupload':
+            myparty = uploadsbytarget
+        if (node, tenant) not in myparty:
+            myparty[(node, tenant)] = {}
         if name is None:
             name = 1
-            while '{0}'.format(name) in updatesbytarget[(node, tenant)]:
+            while '{0}'.format(name) in myparty[(node, tenant)]:
                 name += 1
         self.name = '{0}'.format(name)
-        updatesbytarget[(node, tenant)][self.name] = self
+        myparty[(node, tenant)][self.name] = self
 
     def handle_progress(self, progress):
-        self.phase = progress['phase']
-        self.percent = float(progress['progress'])
+        self.phase = progress.get('phase', 'unknown')
+        self.percent = float(progress.get('progress', 100.0))
         self.detail = progress.get('detail', '')
 
     def cancel(self):
@@ -91,18 +99,25 @@ def remove_updates(nodes, tenant, element):
                 node, upid))
 
 
-def list_updates(nodes, tenant, element):
+def list_updates(nodes, tenant, element, type='firmware'):
     showmode = False
+    if type == 'mediaupload':
+        myparty = uploadsbytarget
+        verb = 'upload'
+    else:
+        myparty = updatesbytarget
+        verb = 'update'
     if len(element) > 4:
         showmode = True
         upid = element[-1]
     for node in nodes:
         if showmode:
             try:
-                updater = updatesbytarget[(node, tenant)][upid]
+                updater = myparty[(node, tenant)][upid]
             except KeyError:
-                raise exc.NotFoundException('No matching update process found')
+                raise exc.NotFoundException(
+                    'No matching {0} process found'.format(verb))
             yield msg.KeyValueData(updater.progress, name=node)
         else:
-            for updateid in updatesbytarget.get((node, tenant), {}):
+            for updateid in myparty.get((node, tenant), {}):
                 yield msg.ChildCollection(updateid)

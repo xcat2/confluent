@@ -407,6 +407,10 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputNTPServer(path, nodes, inputdata)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
         return InputFirmwareUpdate(path, nodes, inputdata)
+    elif '/'.join(path).startswith('media/detach'):
+        return DetachMedia(path, nodes, inputdata)
+    elif '/'.join(path).startswith('media/'):
+        return InputMedia(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException(
             'No known input handler for request')
@@ -414,10 +418,22 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
 class InputFirmwareUpdate(ConfluentMessage):
 
     def __init__(self, path, nodes, inputdata):
-        self.filename = inputdata['filename']
+        self.filename = inputdata.get('filename', inputdata['url'])
         self.bank = inputdata.get('bank', None)
         self.nodes = nodes
 
+class InputMedia(InputFirmwareUpdate):
+    # Use InputFirmwareUpdate
+    pass
+
+class DetachMedia(ConfluentMessage):
+    def __init__(self, path, nodes, inputdata):
+        if inputdata['detach'] != 'all':
+            raise exc.InvalidArgumentException('Currently only supporting'
+                                               '{"detach": "all"}')
+class Media(ConfluentMessage):
+    def __init__(self, node, media):
+        self.kvpairs = {node: {'name': media.name, 'url': media.url}}
 
 class InputAlertData(ConfluentMessage):
 

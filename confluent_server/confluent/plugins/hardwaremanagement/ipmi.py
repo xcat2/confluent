@@ -450,6 +450,14 @@ class IpmiHandler(object):
             self.handle_update()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
+        elif self.element == ['media', 'attach']:
+            self.handle_attach_media()
+        elif self.element == ['media', 'detach']:
+            self.handle_detach_media()
+        elif self.element == ['media', 'uploads']:
+            self.handle_media_upload()
+        elif self.element == ['media', 'current']:
+            self.handle_list_media()
         elif self.element == ['events', 'hardware', 'log']:
             self.do_eventlog()
         elif self.element == ['events', 'hardware', 'decode']:
@@ -468,6 +476,22 @@ class IpmiHandler(object):
                 'nodes/{0}/inventory/firmware/updates/active/{1}'.format(
                     self.node, u.name)))
 
+    def handle_media_upload(self):
+        u = firmwaremanager.Updater(self.node, self.ipmicmd.upload_media,
+                                     self.inputdata.filename, self.tenant,
+                                     type='mediaupload')
+        self.output.put(msg.CreatedResource(
+            'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
+
+    def handle_attach_media(self):
+        self.ipmicmd.attach_remote_media(self.inputdata.filename)
+
+    def handle_detach_media(self):
+        self.ipmicmd.detach_remote_media()
+
+    def handle_list_media(self):
+        for media in self.ipmicmd.list_media():
+            self.output.put(msg.Media(self.node, media))
 
     def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
@@ -1022,6 +1046,9 @@ def retrieve(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element)
+    elif '/'.join(element).startswith('media/uploads'):
+        return firmwaremanager.list_updates(nodes, configmanager.tenent,
+                                            element, 'mediaupload')
     else:
         return perform_requests('read', nodes, element, configmanager, inputdata)
 

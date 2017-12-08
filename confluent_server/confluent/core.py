@@ -250,6 +250,25 @@ def _init_core():
                 },
             },
         },
+        'media': {
+            'uploads': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'attach': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'detach': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'current': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+
+        },
         'power': {
             'state': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
