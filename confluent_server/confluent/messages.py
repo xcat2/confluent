@@ -409,7 +409,7 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputFirmwareUpdate(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
         return DetachMedia(path, nodes, inputdata)
-    elif '/'.join(path).startswith('media/'):
+    elif '/'.join(path).startswith('media/') and inputdata:
         return InputMedia(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException(
@@ -418,7 +418,7 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
 class InputFirmwareUpdate(ConfluentMessage):
 
     def __init__(self, path, nodes, inputdata):
-        self.filename = inputdata.get('filename', inputdata['url'])
+        self.filename = inputdata.get('filename', inputdata.get('url', None))
         self.bank = inputdata.get('bank', None)
         self.nodes = nodes
 
