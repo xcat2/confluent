@@ -1,0 +1,19 @@
+#!/bin/sh
+# This will take a given directory and make a 'big floppy image'
+# out of it, suitable for nodemedia upload.
+
+if [ -z "$1" -o -z "$2" ]; then
+        echo "Usage: $0 <directory> <imagefile>"
+        exit 1
+fi
+# Get the needed payload side
+SIZE=$(du -sB 512 $1|awk '{print $1}')
+ENTRIES=$(find $1 |wc -l)
+# Also, each file and directory has overhead, pad size by 32kb per file,
+# which should be overkill but other values proved to be inadequate
+# A deeper understanding of VFAT would probably allow for more precise value
+SIZE=$((SIZE + ENTRIES * 64))
+dd if=/dev/zero of=$2 bs=512 count=$SIZE
+# Make a big single sided floppy with many many tracks, saves on complex math
+mformat -i $2 -d 1 -t $SIZE -s 1 -h 1 ::
+mcopy -i $2 -s $1/* ::
