@@ -111,7 +111,11 @@ def list_updates(nodes, tenant, element, type='firmware'):
     else:
         myparty = updatesbytarget
         verb = 'update'
-    if len(element) > 4:
+    if type == 'firmware':
+        specificlen = 4
+    else:
+        specificlen = 2
+    if len(element) > specificlen:
         showmode = True
         upid = element[-1]
     for node in nodes:

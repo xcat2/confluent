@@ -35,6 +35,19 @@ import confluent.screensqueeze as sq
 
 exitcode = 0
 
+
+def get_update_progress(session, url):
+    for res in session.read(url):
+        status = res['phase']
+        percent = res['progress']
+        detail = res['detail']
+        if status == 'error':
+            text = 'error!'
+        else:
+            text = '{0}: {1:3.0f}%'.format(status, percent)
+    return text, status, detail
+
+
 def printerror(res, node=None):
     global exitcode
     if 'errorcode' in res:
@@ -133,7 +146,7 @@ def main():
     try:
         noderange = args[0]
         operation = args[1]
-        if operation == 'attach':
+        if operation in ('attach', 'upload'):
             media = args[2]
     except IndexError:
         argparser.print_help()
