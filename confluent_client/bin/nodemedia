@@ -62,14 +62,14 @@ def list_media(noderange, media):
         for node in res.get('databynode', []):
             url = res['databynode'][node]['url']
             name =  res['databynode'][node]['name']
-            print('{0}: {1}'.format(node, url if url else name))
+            print('{0}: {1}'.format(node, url + '/' + name if url else name))
 
 
 def detach_media(noderange, media):
     global exitcode
     session = client.Command()
     resource = '/noderange/{0}/media/detach'.format(noderange)
-    for res in session.update(resource, {'detach': media}):
+    for res in session.update(resource, {'detachall': 1}):
         printerror(res)
 
 
@@ -125,7 +125,7 @@ def main():
               "<filename>|all|<url>",
         epilog='upload will take the specified file and upload it to the BMC, '
                'attach will instruct the BMC to connect a remote media to the '
-               'specified url, and detach all will remove all uploaded and'
+               'specified url, and detach will remove all uploaded and'
                'attached urls from the BMC, list shows currently mounted '
                'media.')
     (options, args) = argparser.parse_args()
@@ -133,7 +133,7 @@ def main():
     try:
         noderange = args[0]
         operation = args[1]
-        if operation != 'list':
+        if operation == 'attach':
             media = args[2]
     except IndexError:
         argparser.print_help()

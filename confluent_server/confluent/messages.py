@@ -431,11 +431,14 @@ class InputMedia(InputFirmwareUpdate):
     # Use InputFirmwareUpdate
     pass
 
+
 class DetachMedia(ConfluentMessage):
     def __init__(self, path, nodes, inputdata):
-        if inputdata['detach'] != 'all':
+        if 'detachall' not in inputdata:
             raise exc.InvalidArgumentException('Currently only supporting'
-                                               '{"detach": "all"}')
+                                               '{"detachall": 1}')
+
+
 class Media(ConfluentMessage):
     def __init__(self, node, media):
         self.kvpairs = {node: {'name': media.name, 'url': media.url}}
