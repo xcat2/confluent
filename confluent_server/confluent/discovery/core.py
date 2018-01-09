@@ -92,6 +92,7 @@ nodehandlers = {
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
+    'service:io-device.Lenovo:management-module': None,
 }
 
 servicenames = {
@@ -99,6 +100,7 @@ servicenames = {
     'service:lenovo-smm': 'lenovo-smm',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
+    'service:io-device.Lenovo:management-module': 'lenovo-switch',
 }
 
 servicebyname = {
@@ -106,6 +108,7 @@ servicebyname = {
     'lenovo-smm': 'service:lenovo-smm',
     'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
+    'lenovo-switch': 'service:io-device.Lenovo:management-module',
 }
 
 discopool = eventlet.greenpool.GreenPool(500)
@@ -361,6 +364,10 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         if mac not in known_info:
             raise exc.NotFoundException('{0} not found'.format(mac))
         info = known_info[mac]
+        if info['handler'] is None:
+            raise exc.NotImplementedException(
+                'Unable to {0} to {1}'.format(operation,
+                                              '/'.join(pathcomponents)))
         handler = info['handler'].NodeHandler(info, configmanager)
         eval_node(configmanager, handler, info, inputdata['node'],
                   manual=True)
@@ -431,6 +438,8 @@ def _recheck_nodes_backend(nodeattribs, configmanager):
     for nodename in pending_nodes:
         info = pending_nodes[nodename]
         try:
+            if info['handler'] is None:
+                next
             handler = info['handler'].NodeHandler(info, configmanager)
             discopool.spawn_n(eval_node, configmanager, handler, info, nodename)
         except Exception:
@@ -443,7 +452,7 @@ def _recheck_single_unknown(configmanager, mac):
     global rechecker
     global rechecktime
     info = unknown_info.get(mac, None)
-    if not info:
+    if not info or info['handler'] is None:
         return
     if info['handler'] != pxeh and not info.get('addresses', None):
         #log.log({'info': 'Missing address information in ' + repr(info)})
@@ -513,7 +522,7 @@ def detected(info):
     global rechecktime
     # later, manual and CMM discovery may act on SN and/or UUID
     for service in info['services']:
-        if nodehandlers.get(service, None):
+        if service in nodehandlers:
             if service not in known_services:
                 known_services[service] = set([])
             handler = nodehandlers[service]

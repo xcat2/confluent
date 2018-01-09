@@ -30,6 +30,7 @@ _slp_services = set([
     'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'service:management-hardware.IBM:chassis-management-module',
     'service:management-hardware.Lenovo:chassis-management-module',
+    'service:io-device.Lenovo:management-module',
 ])
 
 # SLP has a lot of ambition that was unfulfilled in practice.
