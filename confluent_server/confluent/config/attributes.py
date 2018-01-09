@@ -279,12 +279,17 @@ node = {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
     },
-    'enclosure.manager': {
-        'description': "The management device for this node's chassis",
-#        'appliesto': ['system'],
-    },
     'enclosure.bay': {
          'description': 'The bay in the enclosure, if any',
+#        'appliesto': ['system'],
+    },
+    'enclosure.extends': {
+        'description': 'When using an extendable enclosure, this is the node '
+                       'representing the manager that is one closer to the '
+                       'uplink.',
+    },
+    'enclosure.manager': {
+        'description': "The management device for this node's chassis",
 #        'appliesto': ['system'],
     },
 

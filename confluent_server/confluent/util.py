@@ -100,9 +100,11 @@ def monotonic_time():
 
 
 def get_fingerprint(certificate, algo='sha512'):
-    if algo != 'sha512':
-        raise Exception("TODO: Non-sha512")
-    return 'sha512$' + hashlib.sha512(certificate).hexdigest()
+    if algo == 'sha256':
+        return 'sha256$' + hashlib.sha256(certificate).hexdigest()
+    elif algo == 'sha512':
+        return 'sha512$' + hashlib.sha512(certificate).hexdigest()
+    raise Exception('Unsupported fingerprint algorithm ' + algo)
 
 
 def cert_matches(fingerprint, certificate):
@@ -110,8 +112,8 @@ def cert_matches(fingerprint, certificate):
         return False
     algo, _, fp = fingerprint.partition('$')
     newfp = None
-    if algo == 'sha512':
-        newfp = get_fingerprint(certificate)
+    if algo in ('sha512', 'sha256'):
+        newfp = get_fingerprint(certificate, algo)
     return newfp and fingerprint == newfp
 
 

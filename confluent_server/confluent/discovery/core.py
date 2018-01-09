@@ -75,7 +75,10 @@ import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.util as util
+import eventlet
 import traceback
+webclient = eventlet.import_patched('pyghmi.util.webclient')
+
 
 import eventlet
 import eventlet.greenpool
@@ -579,8 +582,8 @@ def detected(info):
         if handler.cert_fail_reason == 'unreachable':
             log.log(
                 {
-                    'info': '{0} with hwaddr {1} is not reachable at {2}'
-                            ''.format(
+                    'info': '{0} with hwaddr {1} is not reachable by https '
+                            'at address {2}'.format(
                         handler.devname, info['hwaddr'], handler.ipaddr
                     )})
             info['addresses'] = [x for x in info.get('addresses', []) if x != handler.ipaddr]
@@ -626,6 +629,44 @@ def detected(info):
         unknown_info[info['hwaddr']] = info
 
 
+
+def b64tohex(b64str):
+    bd = base64.b64decode(b64str)
+    return ''.join(['{0:02x}'.format(ord(x)) for x in bd])
+
+
+def get_chained_smm_name(nodename, cfg, handler, nl):
+    # first we check to see if directly connected
+    mycert = handler.https_cert
+    fprints = macmap.get_node_fingerprints(nodename, cfg)
+    for fprint in fprints:
+        if util.cert_matches(fprint, mycert):
+            # ok we have a direct match, it is this node
+            return nodename
+    # ok, unable to get it, need to traverse the chain from the beginning
+    while nl:
+        if len(nl) != 1:
+            raise exc.InvalidArgumentException('Multiple enclosures trying to '
+                                               'extend a single enclosure')
+        cd = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
+        smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
+        cv = util.TLSCertVerifier(
+            cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
+        wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
+        neighs = wc.grab_json_response('/scripts/neighdata.json')
+        for idx in (4, 5):
+            if 'sha256' not in neighs[idx]:
+                continue
+            fprint = 'sha256$' + b64tohex(neighs[idx]['sha256'])
+            if util.cert_matches(fprint, mycert):
+                return nl[0]
+        # advance down the chain by one and try again
+        nodename = nl[0]
+        nl = list(cfg.filter_node_attributes(
+            'enclosure.extends=' + nodename))
+    return None
+
+
 def get_nodename(cfg, handler, info):
     nodename = None
     maccount = None
@@ -646,6 +687,21 @@ def get_nodename(cfg, handler, info):
     if not nodename:  # as a last resort, search switch for info
         nodename, macinfo = macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
         maccount = macinfo['maccount']
+        if nodename:
+            if handler.devname == 'SMM':
+                nl = list(cfg.filter_node_attributes(
+                            'enclosure.extends=' + nodename))
+                if not nl:
+                    # we reached the end of the chain without success
+                    return None, None
+                # We found an SMM, and it's in a chain per configuration
+                # we need to ask the switch for the fingerprint to see
+                # if we have a match or not
+                newnodename = get_chained_smm_name(nodename, cfg, handler,
+                                                   nl)
+                if newnodename:
+                    return newnodename, None
+
         if (nodename and
                 not handler.discoverable_by_switch(macinfo['maccount'])):
             if handler.devname == 'SMM':
@@ -693,6 +749,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
     if not handler.is_enclosure and nl:
         # The specified node is an enclosure (has nodes mapped to it), but
         # what we are talking to is *not* an enclosure
+        # might be ambiguous, need to match chassis-uuid as well..
         if 'enclosure.bay' not in info:
             unknown_info[info['hwaddr']] = info
             info['discostatus'] = 'unidentified'
@@ -740,6 +797,17 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # we can and did accurately discover by switch or in enclosure
         # but... is this really ok?  could be on an upstream port or
         # erroneously put in the enclosure with no nodes yet
+        # so first, see if the candidate node is a chain host
+        if info['maccount']:
+            # discovery happened through switch
+            nl = list(cfg.filter_node_attributes(
+                'enclosure.extends=' + nodename))
+            if nl:
+                # The candidate nodename is the head of a chain, we must
+                # validate the smm certificate by the switch
+                macmap.get_node_fingerprint(nodename, cfg)
+                util.handler.cert_matches(fprint, handler.https_cert)
+                return
         if (info['maccount'] and
                 not handler.discoverable_by_switch(info['maccount'])):
             errorstr = 'The detected node {0} was detected using switch, ' \

@@ -30,7 +30,7 @@
 
 # this module will provide mac to switch and full 'ifName' label
 # This functionality is restricted to the null tenant
-from confluent.networking.lldp import _handle_neighbor_query
+from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
 from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
 
 if __name__ == '__main__':
@@ -376,6 +376,17 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     raise exc.NotImplementedException(
         'Operation {0} on {1} not implemented'.format(
             operation, '/'.join(pathcomponents)))
+
+
+def get_node_fingerprints(nodename, configmanager):
+    cfg = configmanager.get_node_attributes(nodename, ['net*.switch',
+                                                       'net*.switchport'])
+    for attrkey in cfg[nodename]:
+        if attrkey.endswith('switch'):
+            switch = cfg[nodename][attrkey]['value']
+            port = cfg[nodename][attrkey + 'port']['value']
+            yield get_fingerprint(switch, port, configmanager,
+                                       _namesmatch)
 
 
 def handle_read_api_request(pathcomponents, configmanager):

@@ -33,6 +33,7 @@
 if __name__ == '__main__':
     import sys
     import confluent.config.configmanager as cfm
+import base64
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -117,6 +118,24 @@ def _lldpdesc_to_ifname(switchid, idx, desc):
 
 def _dump_neighbordatum(info):
     return [msg.KeyValueData(info)]
+
+def b64tohex(b64str):
+    bd = base64.b64decode(b64str)
+    return ''.join(['{0:02x}'.format(ord(x)) for x in bd])
+
+def get_fingerprint(switch, port, configmanager, portmatch):
+    update_switch_data(switch, configmanager)
+    for neigh in _neighbypeerid:
+        info = _neighbypeerid[neigh]
+        if neigh == '!!vintage' or info.get('switch', None) != switch:
+            continue
+        if 'peersha256fingerprint' not in info:
+            continue
+        if info.get('switch', None) != switch:
+            continue
+        if portmatch(info.get('port'), port):
+            return 'sha256$' + b64tohex(info['peersha256fingerprint'])
+    return None
 
 
 def _extract_extended_desc(info, source, integritychecked):
