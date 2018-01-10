@@ -636,13 +636,14 @@ def b64tohex(b64str):
 
 
 def get_chained_smm_name(nodename, cfg, handler, nl):
+    # returns the new name and whether it has been securely validated or not
     # first we check to see if directly connected
     mycert = handler.https_cert
     fprints = macmap.get_node_fingerprints(nodename, cfg)
     for fprint in fprints:
-        if util.cert_matches(fprint, mycert):
+        if util.cert_matches(fprint[0], mycert):
             # ok we have a direct match, it is this node
-            return nodename
+            return nodename, fprint[1]
     # ok, unable to get it, need to traverse the chain from the beginning
     while nl:
         if len(nl) != 1:
@@ -659,17 +660,20 @@ def get_chained_smm_name(nodename, cfg, handler, nl):
                 continue
             fprint = 'sha256$' + b64tohex(neighs[idx]['sha256'])
             if util.cert_matches(fprint, mycert):
-                return nl[0]
+                # a trusted chain member vouched for the cert
+                # so it's validated
+                return nl[0], True
         # advance down the chain by one and try again
         nodename = nl[0]
         nl = list(cfg.filter_node_attributes(
             'enclosure.extends=' + nodename))
-    return None
+    return None, False
 
 
 def get_nodename(cfg, handler, info):
     nodename = None
     maccount = None
+    info['verified'] = False
     if handler.https_supported:
         currcert = handler.https_cert
         if not currcert:
@@ -691,17 +695,16 @@ def get_nodename(cfg, handler, info):
             if handler.devname == 'SMM':
                 nl = list(cfg.filter_node_attributes(
                             'enclosure.extends=' + nodename))
-                if not nl:
-                    # we reached the end of the chain without success
-                    return None, None
-                # We found an SMM, and it's in a chain per configuration
-                # we need to ask the switch for the fingerprint to see
-                # if we have a match or not
-                newnodename = get_chained_smm_name(nodename, cfg, handler,
-                                                   nl)
-                if newnodename:
-                    return newnodename, None
-
+                if nl:
+                    # We found an SMM, and it's in a chain per configuration
+                    # we need to ask the switch for the fingerprint to see
+                    # if we have a match or not
+                    newnodename, v = get_chained_smm_name(nodename, cfg,
+                                                          handler, nl)
+                    if newnodename:
+                        # while this started by switch, it was disambiguated
+                        info['verified'] = v
+                        return newnodename, None
         if (nodename and
                 not handler.discoverable_by_switch(macinfo['maccount'])):
             if handler.devname == 'SMM':
@@ -761,14 +764,28 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 raise exc.InvalidArgumentException(errorstr)
             log.log({'error': errorstr})
             return
+        enl = list(cfg.filter_node_attributes('enclosure.extends=' + nodename))
+        if enl:
+            # ambiguous SMM situation according to the configuration, we need
+            # to match uuid
+            encuuid = info['attributes'].get('chasis-uuid', None)
+            enl = list(cfg.filter_node_attributes('id.uuid=' + encuuid))
+            if len(enl) != 1:
+                # errorstr = 'Node in chain with head {0} discovery deferred '
+                #            'until related enclosure manager completes ' \
+                #            'discovery'
+                # if manual:
+                #     raise exc.InvalidArgumentException(errorstr)
+                # log.log({'error': errorstr})
+                return
+            # We found the real smm, replace the list with the actual smm to
+            # continue
+            nl = list(cfg.filter_node_attributes(
+                'enclosure.manager=' + enl[0]))
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
-        nl = cfg.filter_node_attributes(
-            'enclosure.bay={0}'.format(info['enclosure.bay']), nl)
-        nl = list(nl)
-        # sadly, we cannot detect when user has a daisy chain smm config
-        # without ability to disambiguate, however the SMM will be caught so
-        # at least one actionable error will be encountered.
+        nl = list(cfg.filter_node_attributes(
+            'enclosure.bay={0}'.format(info['enclosure.bay']), nl))
         if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
             if len(nl):

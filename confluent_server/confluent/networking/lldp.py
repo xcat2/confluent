@@ -134,8 +134,9 @@ def get_fingerprint(switch, port, configmanager, portmatch):
         if info.get('switch', None) != switch:
             continue
         if portmatch(info.get('port'), port):
-            return 'sha256$' + b64tohex(info['peersha256fingerprint'])
-    return None
+            return ('sha256$' + b64tohex(info['peersha256fingerprint']),
+                    info.get('verified', False))
+    return None, False
 
 
 def _extract_extended_desc(info, source, integritychecked):
