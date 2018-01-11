@@ -61,6 +61,7 @@
 #       retry until uppercase, lowercase, digit, and symbol all present)
 #     - Apply defined configuration to endpoint
 
+import base64
 import confluent.config.configmanager as cfm
 import confluent.discovery.protocols.pxe as pxe
 #import confluent.discovery.protocols.ssdp as ssdp
@@ -578,12 +579,13 @@ def detected(info):
             return
     known_info[info['hwaddr']] = info
     cfg = cfm.ConfigManager(None)
-    handler = handler.NodeHandler(info, cfg)
-    handler.scan()
+    if handler:
+        handler = handler.NodeHandler(info, cfg)
+        handler.scan()
     uuid = info.get('uuid', None)
     if uuid_is_valid(uuid):
         known_uuids[uuid][info['hwaddr']] = info
-    if handler.https_supported and not handler.https_cert:
+    if handler and handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
             log.log(
                 {
@@ -609,7 +611,7 @@ def detected(info):
         # influence periodic recheck to shorten delay?
         return
     nodename, info['maccount'] = get_nodename(cfg, handler, info)
-    if nodename and handler.https_supported:
+    if nodename and handler and handler.https_supported:
         dp = cfg.get_node_attributes([nodename],
                                      ('pubkeys.tls_hardwaremanager',))
         lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
@@ -622,9 +624,9 @@ def detected(info):
     #TODO(jjohnson2): We might have to get UUID for certain searches...
     #for now defer probe until inside eval_node.  We might not have
     #a nodename without probe in the future.
-    if nodename:
+    if nodename and handler:
         eval_node(cfg, handler, info, nodename)
-    else:
+    elif handler:
         log.log(
             {'info': 'Detected unknown {0} with hwaddr {1} at '
                      'address {2}'.format(
@@ -696,6 +698,8 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
 
 
 def get_smm_neighbor_fingerprints(smmaddr, cv):
+    if ':' in smmaddr:
+        smmaddr = '[{0}]'.format(smmaddr)
     wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
     neighs = wc.grab_json_response('/scripts/neighdata.json')
     for idx in (4, 5):
@@ -708,6 +712,8 @@ def get_nodename(cfg, handler, info):
     nodename = None
     maccount = None
     info['verified'] = False
+    if not handler:
+        return None, None
     if handler.https_supported:
         currcert = handler.https_cert
         if not currcert:
@@ -782,6 +788,7 @@ def get_nodename_from_chained_smms(cfg, handler, info):
 
 
 def get_nodename_from_enclosures(cfg, info):
+    nodename = None
     cuuid = info.get('attributes', {}).get('chassis-uuid', [None])[0]
     if cuuid and cuuid in nodes_by_uuid:
         encl = nodes_by_uuid[cuuid]
