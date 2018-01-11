@@ -102,6 +102,7 @@ def run():
                     if ret is not None:
                         exitcode = exitcode | ret
                         all.discard(r)
+                        r.close()
                         if desc['type'] == 'stdout' and pendingexecs:
                             node, cmdv = pendingexecs.popleft()
                             run_cmdv(node, cmdv, all, pipedesc)
