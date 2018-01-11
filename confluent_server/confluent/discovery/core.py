@@ -151,6 +151,7 @@ known_uuids = nesteddict()
 known_nodes = nesteddict()
 unknown_info = {}
 pending_nodes = {}
+pending_by_uuid = {}
 
 
 def enrich_pxe_info(info):
@@ -452,9 +453,13 @@ def _recheck_nodes_backend(nodeattribs, configmanager):
 
 
 def _recheck_single_unknown(configmanager, mac):
+    info = unknown_info.get(mac, None)
+    _recheck_single_unknown_info(configmanager, info)
+
+
+def _recheck_single_unknown_info(configmanager, info):
     global rechecker
     global rechecktime
-    info = unknown_info.get(mac, None)
     if not info or info['handler'] is None:
         return
     if info['handler'] != pxeh and not info.get('addresses', None):
@@ -679,8 +684,12 @@ def get_nodename(cfg, handler, info):
         if not currcert:
             info['discofailure'] = 'nohttps'
             return None, None
-        currprint = util.get_fingerprint(currcert)
+        currprint = util.get_fingerprint(currcert, 'sha256')
         nodename = nodes_by_fprint.get(currprint, None)
+        if not nodename:
+            # Try SHA512 as well
+            currprint = util.get_fingerprint(currcert)
+            nodename = nodes_by_fprint.get(currprint, None)
     if not nodename:
         curruuid = info.get('uuid', None)
         if uuid_is_valid(curruuid):
@@ -777,6 +786,10 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 # if manual:
                 #     raise exc.InvalidArgumentException(errorstr)
                 # log.log({'error': errorstr})
+                if encuuid in pending_by_uuid:
+                    pending_by_uuid[encuuid].add(info)
+                else:
+                    pending_by_uuid[encuuid] = set([info])
                 return
             # We found the real smm, replace the list with the actual smm to
             # continue
@@ -888,20 +901,24 @@ def discover_node(cfg, handler, info, nodename, manual):
                 traceback.print_exc()
                 return False
             newnodeattribs = {}
+            curruuid = False
             if 'uuid' in info:
                 newnodeattribs['id.uuid'] = info['uuid']
+                curruuid = info['uuid']
             if 'serialnumber' in info:
                 newnodeattribs['id.serial'] = info['serialnumber']
             if 'modelnumber' in info:
                 newnodeattribs['id.model'] = info['modelnumber']
             if handler.https_cert:
                 newnodeattribs['pubkeys.tls_hardwaremanager'] = \
-                    util.get_fingerprint(handler.https_cert)
+                    util.get_fingerprint(handler.https_cert, 'sha256')
             if newnodeattribs:
                 cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
         info['discostatus'] = 'discovered'
+        for i in pending_by_uuid.get(curruuid, []):
+            eventlet.spawn_n(_recheck_single_unknown_info, cfg, i)
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                      'value allowing discovery (open or permissive)'.format(
