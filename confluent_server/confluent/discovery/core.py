@@ -640,16 +640,41 @@ def b64tohex(b64str):
     return ''.join(['{0:02x}'.format(ord(x)) for x in bd])
 
 
-def get_chained_smm_name(nodename, cfg, handler, nl):
+def get_enclosure_chain_head(nodename, cfg):
+    ne = True
+    members = [nodename]
+    while ne:
+        ne = cfg.get_node_attributes(
+            nodename, 'enclosure.extends').get(nodename, {}).get(
+            'enclosure.extends', {}).get('value', None)
+        if not ne:
+            return nodename
+        if ne in members:
+            raise exc.InvalidArgumentException(
+                'Circular chain that includes ' + nodename)
+        nodename = ne
+        members.append(nodename)
+    return nodename
+
+
+def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
+    # nodename is the head of the chain, cfg is a configmanager, handler
+    # is the handler of the current candidate, nl is optional indication
+    # of the next link in the chain, checkswitch can disable the switch
+    # search if not indicated by current situation
     # returns the new name and whether it has been securely validated or not
     # first we check to see if directly connected
     mycert = handler.https_cert
-    fprints = macmap.get_node_fingerprints(nodename, cfg)
-    for fprint in fprints:
-        if util.cert_matches(fprint[0], mycert):
-            # ok we have a direct match, it is this node
-            return nodename, fprint[1]
+    if checkswitch:
+        fprints = macmap.get_node_fingerprints(nodename, cfg)
+        for fprint in fprints:
+            if util.cert_matches(fprint[0], mycert):
+                # ok we have a direct match, it is this node
+                return nodename, fprint[1]
     # ok, unable to get it, need to traverse the chain from the beginning
+    if not nl:
+        nl = list(cfg.filter_node_attributes(
+            'enclosure.extends=' + nodename))
     while nl:
         if len(nl) != 1:
             raise exc.InvalidArgumentException('Multiple enclosures trying to '
@@ -658,12 +683,7 @@ def get_chained_smm_name(nodename, cfg, handler, nl):
         smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
         cv = util.TLSCertVerifier(
             cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
-        wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
-        neighs = wc.grab_json_response('/scripts/neighdata.json')
-        for idx in (4, 5):
-            if 'sha256' not in neighs[idx]:
-                continue
-            fprint = 'sha256$' + b64tohex(neighs[idx]['sha256'])
+        for fprint in get_smm_neighbor_fingerprints(smmaddr, cv):
             if util.cert_matches(fprint, mycert):
                 # a trusted chain member vouched for the cert
                 # so it's validated
@@ -673,6 +693,15 @@ def get_chained_smm_name(nodename, cfg, handler, nl):
         nl = list(cfg.filter_node_attributes(
             'enclosure.extends=' + nodename))
     return None, False
+
+
+def get_smm_neighbor_fingerprints(smmaddr, cv):
+    wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
+    neighs = wc.grab_json_response('/scripts/neighdata.json')
+    for idx in (4, 5):
+        if 'sha256' not in neighs[idx]:
+            continue
+        yield 'sha256$' + b64tohex(neighs[idx]['sha256'])
 
 
 def get_nodename(cfg, handler, info):
@@ -697,7 +726,15 @@ def get_nodename(cfg, handler, info):
             if nodename is None:
                 _map_unique_ids()
                 nodename = nodes_by_uuid.get(curruuid, None)
-    if not nodename:  # as a last resort, search switch for info
+    if not nodename:
+        # Ok, see if it is something with a chassis-uuid and discover by
+        # chassis
+        nodename = get_nodename_from_enclosures(cfg, info)
+    if not nodename and handler.devname == 'SMM':
+        nodename = get_nodename_from_chained_smms(cfg, handler, info)
+    if not nodename:  # as a last resort, search switches for info
+        # This is the slowest potential operation, so we hope for the
+        # best to occur prior to this
         nodename, macinfo = macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
         maccount = macinfo['maccount']
         if nodename:
@@ -725,6 +762,38 @@ def get_nodename(cfg, handler, info):
                 log.log({'error': errorstr})
                 return None, None
     return nodename, maccount
+
+
+def get_nodename_from_chained_smms(cfg, handler, info):
+    nodename = None
+    for fprint in get_smm_neighbor_fingerprints(
+            handler.ipaddr, lambda x: True):
+        if fprint in nodes_by_fprint:
+            # need to chase the whole chain
+            # to support either direction
+            chead = get_enclosure_chain_head(nodes_by_fprint[fprint],
+                                             cfg)
+            newnodename, v = get_chained_smm_name(
+                chead, cfg, handler, checkswitch=False)
+            if newnodename:
+                info['verified'] = v
+                nodename = newnodename
+    return nodename
+
+
+def get_nodename_from_enclosures(cfg, info):
+    cuuid = info.get('attributes', {}).get('chassis-uuid', [None])[0]
+    if cuuid and cuuid in nodes_by_uuid:
+        encl = nodes_by_uuid[cuuid]
+        bay = info.get('enclosure.bay', None)
+        if bay:
+            tnl = cfg.filter_node_attributes('enclosure.manager=' + encl)
+            tnl = cfg.filter_node_attributes('enclosure.bay=' + bay)
+            if len(tnl) == 1:
+                # This is not a secure assurance, because it's by
+                # uuid instead of a key
+                nodename = tnl[0]
+    return nodename
 
 
 def eval_node(cfg, handler, info, nodename, manual=False):
