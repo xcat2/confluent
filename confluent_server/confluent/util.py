@@ -124,7 +124,6 @@ class TLSCertVerifier(object):
         self.fieldname = fieldname
 
     def verify_cert(self, certificate):
-        fingerprint = get_fingerprint(certificate)
         storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
                                                    )
         if (self.fieldname not in storedprint[self.node] or
@@ -142,13 +141,15 @@ class TLSCertVerifier(object):
                                          self.fieldname, 'newkey')
             # since the policy is not manual, go ahead and add new key
             # after logging to audit log
+            fingerprint = get_fingerprint(certificate, 'sha256')
             auditlog = log.Logger('audit')
             auditlog.log({'node': self.node, 'event': 'certautoadd',
                           'fingerprint': fingerprint})
             self.cfm.set_node_attributes(
                 {self.node: {self.fieldname: fingerprint}})
             return True
-        elif storedprint[self.node][self.fieldname]['value'] == fingerprint:
+        elif cert_matches(storedprint[self.node][self.fieldname]['value'],
+                          certificate):
             return True
         raise cexc.PubkeyInvalid(
             'Mismatched certificate detected', certificate, fingerprint,
