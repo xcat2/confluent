@@ -854,23 +854,22 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             # ambiguous SMM situation according to the configuration, we need
             # to match uuid
             encuuid = info['attributes'].get('chasis-uuid', None)
-            enl = list(cfg.filter_node_attributes('id.uuid=' + encuuid))
-            if len(enl) != 1:
-                # errorstr = 'Node in chain with head {0} discovery deferred '
-                #            'until related enclosure manager completes ' \
-                #            'discovery'
-                # if manual:
-                #     raise exc.InvalidArgumentException(errorstr)
-                # log.log({'error': errorstr})
-                if encuuid in pending_by_uuid:
-                    pending_by_uuid[encuuid].add(info)
-                else:
-                    pending_by_uuid[encuuid] = set([info])
-                return
-            # We found the real smm, replace the list with the actual smm to
-            # continue
-            nl = list(cfg.filter_node_attributes(
-                'enclosure.manager=' + enl[0]))
+            if encuuid:
+                enl = list(cfg.filter_node_attributes('id.uuid=' + encuuid))
+                if len(enl) != 1:
+                    # errorstr = 'No SMM by given UUID known, *yet*'
+                    # if manual:
+                    #     raise exc.InvalidArgumentException(errorstr)
+                    # log.log({'error': errorstr})
+                    if encuuid in pending_by_uuid:
+                        pending_by_uuid[encuuid].add(info)
+                    else:
+                        pending_by_uuid[encuuid] = set([info])
+                    return
+                # We found the real smm, replace the list with the actual smm
+                # to continue
+                nl = list(cfg.filter_node_attributes(
+                    'enclosure.manager=' + enl[0]))
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
         nl = list(cfg.filter_node_attributes(
