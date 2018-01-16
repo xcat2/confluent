@@ -870,6 +870,13 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 # to continue
                 nl = list(cfg.filter_node_attributes(
                     'enclosure.manager=' + enl[0]))
+            else:
+                errorstr = 'Chained SMM configuration with older XCC, ' \
+                           'unable to perform zero power discovery'
+                if manual:
+                    raise exc.InvalidArgumentException(errorstr)
+                log.log({'error': errorstr})
+                return
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
         nl = list(cfg.filter_node_attributes(
