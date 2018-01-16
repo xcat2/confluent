@@ -795,7 +795,7 @@ def get_nodename_from_enclosures(cfg, info):
         bay = info.get('enclosure.bay', None)
         if bay:
             tnl = cfg.filter_node_attributes('enclosure.manager=' + encl)
-            tnl = cfg.filter_node_attributes('enclosure.bay=' + bay)
+            tnl = cfg.filter_node_attributes('enclosure.bay={0}'.format(bay))
             if len(tnl) == 1:
                 # This is not a secure assurance, because it's by
                 # uuid instead of a key
