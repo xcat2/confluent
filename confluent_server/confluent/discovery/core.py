@@ -684,7 +684,7 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
         cd = cfg.get_node_attributes(nodename, ['hardwaremanagement.manager',
                                                 'pubkeys.tls_hardwaremanager'])
         smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
-        pkey = cd.get[nodename].get('pubkeys.tls_hardwaremanager', {}).get(
+        pkey = cd[nodename].get('pubkeys.tls_hardwaremanager', {}).get(
             'value', None)
         if pkey:
             cv = util.TLSCertVerifier(

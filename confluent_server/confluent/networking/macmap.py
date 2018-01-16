@@ -254,7 +254,9 @@ def find_nodeinfo_by_mac(mac, configmanager):
         if mac in _nodesbymac:
             return _nodesbymac[mac][0], {'maccount': _nodesbymac[mac][1]}
     # If update_mac bailed out, still check one last time
-    return _nodesbymac.get(mac, (None, {'maccount': 0}))
+    if mac in _nodesbymac:
+        return _nodesbymac[mac][0], {'maccount': _nodesbymac[mac][1]}
+    return None, {'maccount': 0}
 
 
 mapupdating = eventlet.semaphore.Semaphore()
