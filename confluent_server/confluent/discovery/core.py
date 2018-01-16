@@ -681,16 +681,20 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
         if len(nl) != 1:
             raise exc.InvalidArgumentException('Multiple enclosures trying to '
                                                'extend a single enclosure')
-        cd = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
+        cd = cfg.get_node_attributes(nodename, ['hardwaremanagement.manager',
+                                                'pubkeys.tls_hardwaremanager'])
         smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
-        cv = util.TLSCertVerifier(
-            cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
-        for fprint in get_smm_neighbor_fingerprints(smmaddr, cv):
-            if util.cert_matches(fprint, mycert):
-                # a trusted chain member vouched for the cert
-                # so it's validated
-                return nl[0], True
-        # advance down the chain by one and try again
+        pkey = cd.get[nodename].get('pubkeys.tls_hardwaremanager', {}).get(
+            'value', None)
+        if pkey:
+            cv = util.TLSCertVerifier(
+                cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
+            for fprint in get_smm_neighbor_fingerprints(smmaddr, cv):
+                if util.cert_matches(fprint, mycert):
+                    # a trusted chain member vouched for the cert
+                    # so it's validated
+                    return nl[0], True
+            # advance down the chain by one and try again
         nodename = nl[0]
         nl = list(cfg.filter_node_attributes(
             'enclosure.extends=' + nodename))
