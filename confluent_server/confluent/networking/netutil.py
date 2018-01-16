@@ -34,6 +34,8 @@ def get_switchcreds(configmanager, switches):
                                                              'public')
             user = switchparms.get(
                 'secret.hardwaremanagementuser', {}).get('value', None)
+            if not user:
+                user = None
         switchauth.append((switch, password, user))
     return switchauth
 
