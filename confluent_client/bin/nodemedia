@@ -125,6 +125,7 @@ def upload_media(noderange, media):
             'Nodes had errors receiving media ({0})!\n'.format(allerrnodes))
     for node in noderrs:
         sys.stderr.write('{0}: {1}\n'.format(node, noderrs[node]))
+    list_media(noderange, media)
 
 funmap = {
     'upload': upload_media,
