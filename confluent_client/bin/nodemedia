@@ -64,7 +64,9 @@ def attach_media(noderange, media):
     global exitcode
     session = client.Command()
     resource = '/noderange/{0}/media/attach'.format(noderange)
-    print(repr(list(session.update(resource, {'url': media}))))
+    for rsp in session.update(resource, {'url': media}):
+        printerror(res)
+    list_media(noderange, media)
 
 
 def list_media(noderange, media):
