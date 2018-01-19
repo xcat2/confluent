@@ -510,7 +510,7 @@ def _recheck_single_unknown_info(configmanager, info):
 
 
 def safe_detected(info):
-    if 'hwaddr' not in info:
+    if 'hwaddr' not in info or not info['hwaddr']:
         return
     if info['hwaddr'] in runningevals:
         # Do not evaluate the same mac multiple times at once

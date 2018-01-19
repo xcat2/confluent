@@ -92,7 +92,7 @@ def snoop(handler):
         rq = bytearray(rq)
         if rq[0] == 1:  # Boot request
             addrlen = rq[2]
-            if addrlen > 16:  # max address size in bootp is 16 bytes
+            if addrlen > 16 or addrlen == 0:
                 continue
             netaddr = rq[28:28+addrlen]
             netaddr = ':'.join(['{0:02x}'.format(x) for x in netaddr])
