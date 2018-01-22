@@ -222,7 +222,13 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
             bcast = i4['broadcast']
             net4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
                            socket.inet_aton(addr))
-            net4.sendto(data, ('239.255.255.253', 427))
+            try:
+                net4.sendto(data, ('239.255.255.253', 427))
+            except socket.error as se:
+                # On occasion, multicasting may be disabled
+                # tolerate this scenario and move on
+                if se.errno != 101:
+                    raise
             net4.sendto(data, (bcast, 427))
 
 
