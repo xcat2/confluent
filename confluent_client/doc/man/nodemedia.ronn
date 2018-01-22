@@ -1,0 +1,46 @@
+nodemedia(8) -- Manage server remote media
+=========================================================
+
+## SYNOPSIS
+
+`nodemedia <noderange> [attach|detach|list|upload] <media>`
+
+## DESCRIPTION
+
+**nodemedia** manages the remote media functionality of supported BMCs.
+
+`list` shows all the current remote media the BMCs of the noderange are
+providing to the host platform.
+
+`detach` removes all the currently provided media to the host.  This unlinks
+remote media from urls and deletes uploaded media from the BMC.
+
+`upload` takes the given media image and uploads it to the BMC.  This causes
+the remote media to reside internally to the system without having to go
+to the network after the upload.  This is more constrained, for example the
+Lenovo xClarity Controller has a limit of 50 megabytes, but it has zero ongoing
+load on the media source.
+
+`attach` takes a URL to a remote media as an argument, and has the given
+BMCs map a virtual USB device to that url.  Content is loaded on demand, and
+as such that URL is referenced potentially once for every IO operation that
+the host platform attempts.
+
+## EXAMPLES
+* Listing currently mounted media:
+  `# nodemedia s1-s4 list`
+  `s1: boot.img`
+  `s2: boot.img`
+  `s4: boot.img`
+
+* Uploading a small boot image to the BMC:
+  `# nodemedia s1-s4 upload boot.img`
+  `s1:complete: 100%     s2:complete: 100%     s3:complete: 100%     s4:complete: 100%`
+  `s1: boot.img`
+  `s4: boot.img`
+  `s2: boot.img`
+
+* Attaching a larger ISO for on-demand access:
+  `# nodemedia s1,s4 attach http://172.30.0.6/install/rhel74.iso`
+  `s4: http://172.30.0.6/install/rhel74.iso`
+  `s1: http://172.30.0.6/install/rhel74.iso`
