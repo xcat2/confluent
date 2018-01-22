@@ -135,15 +135,21 @@ funmap = {
 }
 
 
+class OptParser(optparse.OptionParser):
+
+    def format_epilog(self, formatter):
+        return self.expand_prog_name(self.epilog)
+
 def main():
-    argparser = optparse.OptionParser(
+    argparser = OptParser(
         usage="Usage: %prog <noderange> [list|upload|attach|detachall] "
               "<filename>|all|<url>",
-        epilog='upload will take the specified file and upload it to the BMC, '
+        epilog='\nupload will take the specified file and upload it to the '
+               'BMC.\n\n'
                'attach will instruct the BMC to connect a remote media to the '
-               'specified url, and detachall will remove all uploaded and'
-               'attached urls from the BMC, list shows currently mounted '
-               'media.')
+               'specified url.\n\ndetachall will remove *ALL* uploaded and '
+               'attached urls from the BMC\n\nlist shows currently mounted '
+               'media.\n')
     (options, args) = argparser.parse_args()
     media = None
     try:
