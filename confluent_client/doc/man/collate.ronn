@@ -8,8 +8,11 @@ collate(1) -- Organize text input by node
 ## DESCRIPTION
 
 **collate** takes input in the form of <nodename>: <data> and groups
-the output for each <nodename> together, and checks for identical data to further group nodes together.  It also will sort the output groups so that
-the most frequently seen output is printed first, and then other groups in descending order of frequency.
+the output for each <nodename> together, and checks for identical data to further group nodes together.
+Output groups are sorted in descending size such that the topmost group is the largest, and the
+last output group is the smallest.  In the event of equally sized output groups,
+the groups are sorted alphanumerically by their header, and each header has
+node and group names sorted alphanumerically.
 
 ## OPTIONS
 
