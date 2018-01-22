@@ -3,7 +3,7 @@ nodemedia(8) -- Manage server remote media
 
 ## SYNOPSIS
 
-`nodemedia <noderange> [attach|detach|list|upload] <media>`
+`nodemedia <noderange> [attach|detachall|list|upload] <media>`
 
 ## DESCRIPTION
 
@@ -12,7 +12,7 @@ nodemedia(8) -- Manage server remote media
 `list` shows all the current remote media the BMCs of the noderange are
 providing to the host platform.
 
-`detach` removes all the currently provided media to the host.  This unlinks
+`detachall` removes all the currently provided media to the host.  This unlinks
 remote media from urls and deletes uploaded media from the BMC.
 
 `upload` takes the given media image and uploads it to the BMC.  This causes

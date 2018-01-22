@@ -130,18 +130,18 @@ def upload_media(noderange, media):
 funmap = {
     'upload': upload_media,
     'attach': attach_media,
-    'detach': detach_media,
+    'detachall': detach_media,
     'list': list_media,
 }
 
 
 def main():
     argparser = optparse.OptionParser(
-        usage="Usage: %prog <noderange> [list|upload|attach|detach] "
+        usage="Usage: %prog <noderange> [list|upload|attach|detachall] "
               "<filename>|all|<url>",
         epilog='upload will take the specified file and upload it to the BMC, '
                'attach will instruct the BMC to connect a remote media to the '
-               'specified url, and detach will remove all uploaded and'
+               'specified url, and detachall will remove all uploaded and'
                'attached urls from the BMC, list shows currently mounted '
                'media.')
     (options, args) = argparser.parse_args()
@@ -149,8 +149,13 @@ def main():
     try:
         noderange = args[0]
         operation = args[1]
+        arglength = 2
         if operation in ('attach', 'upload'):
             media = args[2]
+            arglength = 3
+        if len(args) > arglength:
+            argparser.print_help()
+            sys.exit(1)
     except IndexError:
         argparser.print_help()
         sys.exit(1)
