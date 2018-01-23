@@ -173,6 +173,13 @@ def list_discovery(options, session):
     for mac in list_matching_macs(options, session):
         print_disco(options, session, mac)
 
+def clear_discovery(options, session):
+    for mac in list_matching_macs(options, session):
+        for res in session.delete('/discovery/by-mac/{0}'.format(mac)):
+            if 'deleted' in res:
+                print('Cleared info for {0}'.format(res['deleted']))
+            else:
+                print(repr(res))
 
 def list_matching_macs(options, session):
     path = '/discovery/'
@@ -223,7 +230,7 @@ def assign_discovery(options, session):
 
 def main():
     parser = optparse.OptionParser(
-        usage='Usage: %prog [list|assign|rescan] [options]')
+        usage='Usage: %prog [list|assign|rescan|clear] [options]')
     # -a for 'address' maybe?
     # order by
     # show state (discovered or..
@@ -253,12 +260,14 @@ def main():
                       help='Import bulk assignment data from given CSV file',
                       metavar='IMPORT.CSV')
     (options, args) = parser.parse_args()
-    if len(args) == 0 or args[0] not in ('list', 'assign', 'rescan'):
+    if len(args) == 0 or args[0] not in ('list', 'assign', 'rescan', 'clear'):
         parser.print_help()
         sys.exit(1)
     session = client.Command()
     if args[0] == 'list':
         list_discovery(options, session)
+    if args[0] == 'clear':
+        clear_discovery(options, session)
     if args[0] == 'assign':
         assign_discovery(options, session)
     if args[0] == 'rescan':
