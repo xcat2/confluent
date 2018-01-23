@@ -5,7 +5,9 @@ nodediscover(8)  -- List or manage confluent node discovery
 
 `nodediscover rescan`  
 `nodediscover [options] list`  
-`nodeattrib [options] assign`  
+`nodediscover [options] assign`
+`nodediscover [options] rescan`
+`nodediscover [options] clear`
 
 ## DESCRIPTION
 
@@ -21,6 +23,14 @@ data may be filtered by various parameters, as denoted in the options below.
 **nodediscover assign** performs manual discovery, assigning an entry to a node
 identity or, using `-i`, using a csv file to assign nodes all at once.  For
 example, a spreadsheet of serial numbers to desired node names could be used.
+
+**nodediscover rescan** requests the server to do an active sweep for new
+devices.  Generally every effort is made to passively detect devices as they
+become available (as they boot or are plugged in), however sometimes an active
+scan is the best approach to catch something that appears to be missing.
+
+**nodedsicover clear** requests the server forget about a selection of
+detected device.  It takes the same arguments as **nodediscover list**.
 
 ## CSV FORMAT
 
@@ -67,8 +77,22 @@ the nodes.
   address
 * `-t TYPE, --type=TYPE`:
   Operate against the system of the specified type
-* `-c, --csv`:
+* `-c`, ``--csv`:
   Use CSV formatted output
+* `-d`, `--discoverystate`:
+  Indicate devices with a particular state.  The states are:
+     * discovered - The device has been identified and has also had discovery
+                    activities performed, including any relevant certificate
+                    exchanges and deploying user and network configuration.
+     * identified - The device has been identified as to what node it is
+                    supposed to be, however no active changes to the attributes
+                    or device configuration has been performed.  This is
+                    generally discovery awaiting approval due to
+                    discovery.policy specifying a strict security model.
+     * unidentified - A device has been sensed, but no node identity has been
+                     established at all.  It provides data that can be used
+                     for nodediscover assign, as well as current IP addresses
+                     that can be used for manual efforts as possible.
 * `-i IMPORT.CSV`, `--import=IMPORT.CSV`:
   Import bulk assignment data from given CSV file
 

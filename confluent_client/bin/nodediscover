@@ -191,6 +191,10 @@ def list_matching_macs(options, session):
         path += 'by-uuid/{0}/'.format(options.uuid)
     if options.type:
         path += 'by-type/{0}/'.format(options.type)
+    if options.state:
+        if options.state == 'unknown':
+            options.state = 'unidentified'
+        path += 'by-state/{0}/'.format(options.state).lower()
     if options.mac:
         path += 'by-mac/{0}'.format(options.mac)
         result = list(session.read(path))[0]
@@ -241,6 +245,9 @@ def main():
     parser.add_option('-m', '--model', dest='model',
                       help='Operate with nodes matching the specified model '
                        'number', metavar='MODEL')
+    parser.add_option('-d', '--discoverystate', dest='state',
+                      help='The discovery state of the entries (discovered, '
+                           'identified, and unidentified)')
     parser.add_option('-s', '--serial', dest='serial',
                       help='Operate against the system matching the specified '
                            'serial number', metavar='SERIAL')
