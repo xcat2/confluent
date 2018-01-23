@@ -815,7 +815,12 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # for now, we search switch only, ideally we search cmm, smm, and
         # switch concurrently
         # do some preconfig, for example, to bring a SMM online if applicable
-        handler.preconfig()
+        errorstr = handler.preconfig()
+        if errorstr:
+            if manual:
+                raise exc.InvalidArgumentException(errorstr)
+            log.log({'error': errorstr})
+            return
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
