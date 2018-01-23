@@ -136,6 +136,7 @@ class TLSCertVerifier(object):
                     newpolicy[self.node]['pubkeys.addpolicy']['value'] == 'manual'):
                 # manual policy means always raise unless a match is set
                 # manually
+                fingerprint = get_fingerprint(certificate, 'sha256')
                 raise cexc.PubkeyInvalid('New certificate detected',
                                          certificate, fingerprint,
                                          self.fieldname, 'newkey')
@@ -151,6 +152,7 @@ class TLSCertVerifier(object):
         elif cert_matches(storedprint[self.node][self.fieldname]['value'],
                           certificate):
             return True
+        fingerprint = get_fingerprint(certificate, 'sha256')
         raise cexc.PubkeyInvalid(
             'Mismatched certificate detected', certificate, fingerprint,
             self.fieldname, 'mismatch')
