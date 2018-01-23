@@ -38,8 +38,8 @@ class NodeHandler(immhandler.NodeHandler):
                 if (e.ipmicode != 193 and
                         'Unauthorized name' not in str(e) and
                         'Incorrect password' not in str(e)):
-                # raise an issue if anything other than to be expected
-                raise
+                    # raise an issue if anything other than to be expected
+                    raise
         if ff not in ('dense-computing', [u'dense-computing']):
             return
         # attempt to enable SMM
