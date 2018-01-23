@@ -79,22 +79,22 @@ the nodes.
   Operate against the system of the specified type
 * `-c`, `--csv`:
   Use CSV formatted output
-* `-d`, `--discoverystate`:
-  Indicate devices with a particular state.  The states are:
-     * discovered - The device has been identified and has also had discovery
-                    activities performed, including any relevant certificate
-                    exchanges and deploying user and network configuration.
-     * identified - The device has been identified as to what node it is
-                    supposed to be, however no active changes to the attributes
-                    or device configuration has been performed.  This is
-                    generally discovery awaiting approval due to
-                    discovery.policy specifying a strict security model.
-     * unidentified - A device has been sensed, but no node identity has been
-                     established at all.  It provides data that can be used
-                     for nodediscover assign, as well as current IP addresses
-                     that can be used for manual efforts as possible.
 * `-i IMPORT.CSV`, `--import=IMPORT.CSV`:
   Import bulk assignment data from given CSV file
+* `-d STATE`, `--discoverystate=STATE`:
+  Indicate devices with a particular state.  The states are listed below
+* discovered: The device has been identified and has also had discovery
+              activities performed, including any relevant certificate
+              exchanges and deploying user and network configuration.
+* identified:  The device has been identified as to what node it is
+               supposed to be, however no active changes to the attributes
+               or device configuration has been performed.  This is
+               generally discovery awaiting approval due to
+               discovery.policy specifying a strict security model.
+* unidentified:  A device has been sensed, but no node identity has been
+                 established at all.  It provides data that can be used
+                 for nodediscover assign, as well as current IP addresses
+                 that can be used for manual efforts as possible.
 
 ## EXAMPLES
 
