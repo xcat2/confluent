@@ -75,9 +75,9 @@ the nodes.
 * `-e MAC`, `--ethaddr=MAC`:
   Operate against the system with the specified MAC
   address
-* `-t TYPE, --type=TYPE`:
+* `-t TYPE`, `--type=TYPE`:
   Operate against the system of the specified type
-* `-c`, ``--csv`:
+* `-c`, `--csv`:
   Use CSV formatted output
 * `-d`, `--discoverystate`:
   Indicate devices with a particular state.  The states are:
