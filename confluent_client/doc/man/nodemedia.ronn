@@ -10,7 +10,12 @@ nodemedia(8) -- Manage server remote media
 **nodemedia** manages the remote media functionality of supported BMCs.
 
 `list` shows all the current remote media the BMCs of the noderange are
-providing to the host platform.
+providing to the host platform.  The string (insecure) is appended to URLs that
+are mounted in an insecure fashion.  http is insecure, and https is also
+insecure when no meaningful certificate validation is performed.  Currently
+there is no action that can change this, and this is purely informational.  A
+future version of software may provide a means to increase security of attached
+remote media.
 
 `detachall` removes all the currently provided media to the host.  This unlinks
 remote media from urls and deletes uploaded media from the BMC.

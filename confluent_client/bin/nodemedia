@@ -76,6 +76,8 @@ def list_media(noderange, media):
         printerror(res)
         for node in res.get('databynode', []):
             url = res['databynode'][node]['url']
+            if url and not res['databynode'][node].get('secure', False):
+                url += ' (insecure)'
             name =  res['databynode'][node]['name']
             print('{0}: {1}'.format(node, url + '/' + name if url else name))
 
@@ -149,7 +151,7 @@ def main():
                'attach will instruct the BMC to connect a remote media to the '
                'specified url.\n\ndetachall will remove *ALL* uploaded and '
                'attached urls from the BMC\n\nlist shows currently mounted '
-               'media.\n')
+               'media.\n\nSee `man %prog` for more info.\n')
     (options, args) = argparser.parse_args()
     media = None
     try:
