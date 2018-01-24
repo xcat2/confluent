@@ -64,7 +64,7 @@ def attach_media(noderange, media):
     global exitcode
     session = client.Command()
     if ':' not in media:
-        sys.stderr.write('Full URL required for attach')
+        sys.stderr.write('Full URL required for attach\n')
         sys.exit(1)
     resource = '/noderange/{0}/media/attach'.format(noderange)
     for res in session.update(resource, {'url': media}):
