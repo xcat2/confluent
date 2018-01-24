@@ -359,15 +359,10 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             raise exc.InvalidArgumentException()
         rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
-    elif (operation in ('update', 'create')):
+    elif operation in ('update', 'create'):
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
-        _, queryparms, _, _ = _parameterize_path(pathcomponents[1:])
-        if 'by-mac' not in queryparms:
-            raise exc.InvalidArgumentException('Must target using "by-mac"')
-        mac = queryparms['by-mac'].replace('-', ':')
-        if mac not in known_info:
-            raise exc.NotFoundException('{0} not found'.format(mac))
+        mac = _get_mac_from_query(pathcomponents)
         info = known_info[mac]
         if info['handler'] is None:
             raise exc.NotImplementedException(
@@ -377,8 +372,22 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         eval_node(configmanager, handler, info, inputdata['node'],
                   manual=True)
         return [msg.AssignedResource(inputdata['node'])]
+    elif operation == 'delete':
+        mac = _get_mac_from_query(pathcomponents)
+        del known_info[mac]
+        return [msg.DeletedResource(mac)]
     raise exc.NotImplementedException(
         'Unable to {0} to {1}'.format(operation, '/'.join(pathcomponents)))
+
+
+def _get_mac_from_query(pathcomponents):
+    _, queryparms, _, _ = _parameterize_path(pathcomponents[1:])
+    if 'by-mac' not in queryparms:
+        raise exc.InvalidArgumentException('Must target using "by-mac"')
+    mac = queryparms['by-mac'].replace('-', ':')
+    if mac not in known_info:
+        raise exc.NotFoundException('{0} not found'.format(mac))
+    return mac
 
 
 def handle_read_api_request(pathcomponents):
@@ -812,10 +821,14 @@ def get_nodename_from_enclosures(cfg, info):
 def eval_node(cfg, handler, info, nodename, manual=False):
     try:
         handler.probe()  # unicast interrogation as possible to get more data
-        # for now, we search switch only, ideally we search cmm, smm, and
         # switch concurrently
         # do some preconfig, for example, to bring a SMM online if applicable
-        handler.preconfig()
+        errorstr = handler.preconfig()
+        if errorstr:
+            if manual:
+                raise exc.InvalidArgumentException(errorstr)
+            log.log({'error': errorstr})
+            return
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
