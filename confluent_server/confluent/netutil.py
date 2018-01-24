@@ -83,7 +83,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None):
         cfgdata['prefix'] = prefixlen
         for setting in nodenetattribs:
             gw = nodenetattribs[setting].get('value', None)
-            if gw is None:
+            if gw is None or not gw:
                 continue
             if ip_on_same_subnet(ip, gw, prefixlen):
                 cfgdata['ipv4_gateway'] = gw
