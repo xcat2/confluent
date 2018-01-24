@@ -42,7 +42,7 @@ def run():
         usage="Usage: %prog noderange commandexpression",
         epilog="Expressions are the same as in attributes, e.g. "
                "'ipmitool -H {hardwaremanagement.manager}' will be expanded.")
-    argparser.add_option('-c', '--count', type='int', default=168,
+    argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of commands to run at a time')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
     # processes can be unkind for the unaware on memory pressure and such...
