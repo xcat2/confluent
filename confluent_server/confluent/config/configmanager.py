@@ -424,6 +424,10 @@ class _ExpressionFormat(string.Formatter):
                 key = '.' + left.attr + key
                 left = left.value
             key = left.id + key
+            if (not key.startswith('custom.') and
+                        _get_valid_attrname(key) not in allattributes.node):
+                raise ValueError(
+                    '{0} is not a valid attribute name'.format(key))
             val = self._expand_attribute(key)
             return val['value'] if val and 'value' in val else ""
         elif isinstance(node, ast.Name):
