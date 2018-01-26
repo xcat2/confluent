@@ -416,9 +416,14 @@ class _ExpressionFormat(string.Formatter):
             return node.n
         elif isinstance(node, ast.Attribute):
             #ok, we have something with a dot
-            left = node.value.id
-            right = node.attr
-            key = left + '.' + right
+            left = node
+            key = ''
+            while isinstance(left, ast.Attribute):
+                # Loop through, to handle multi dot expressions
+                # such as 'net.pxe.hwaddr'
+                key = '.' + left.attr + key
+                left = left.value
+            key = left.id + key
             val = self._expand_attribute(key)
             return val['value'] if val and 'value' in val else ""
         elif isinstance(node, ast.Name):
