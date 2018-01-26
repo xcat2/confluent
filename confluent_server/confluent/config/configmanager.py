@@ -233,14 +233,9 @@ def decrypt_value(cryptvalue,
 
 def fixup_attribute(attrname, attrval):
     # Normalize some data, for example strings and numbers to bool
-    if attrname.startswith('custom.'):
+    attrname = _get_valid_attrname(attrname)
+    if attrname not in allattributes.node:  # no fixup possible
         return attrval
-    if attrname.startswith('net.'):
-        # For net.* attribtues, split on the dots and put back together
-        # longer term we might want a generic approach, but
-        # right now it's just net. attributes
-        netattrparts = attrname.split('.')
-        attrname = netattrparts[0] + '.' + netattrparts[-1]
     if 'type' in allattributes.node[attrname] and not isinstance(attrval, allattributes.node[attrname]['type']):
         if (allattributes.node[attrname]['type'] == bool and
                 (isinstance(attrval, str) or isinstance(attrval, unicode))):
@@ -253,12 +248,7 @@ def attribute_is_invalid(attrname, attrval):
         # No type checking or name checking is provided for custom,
         # it's not possible
         return False
-    if attrname.startswith('net.'):
-        # For net.* attribtues, split on the dots and put back together
-        # longer term we might want a generic approach, but
-        # right now it's just net. attributes
-        netattrparts = attrname.split('.')
-        attrname = netattrparts[0] + '.' + netattrparts[-1]
+    attrname = _get_valid_attrname(attrname)
     if attrname not in allattributes.node:
         # Otherwise, it must be in the allattributes key list
         return True
@@ -267,6 +257,17 @@ def attribute_is_invalid(attrname, attrval):
             # provide type checking for attributes with a specific type
             return True
     return False
+
+
+def _get_valid_attrname(attrname):
+    if attrname.startswith('net.'):
+        # For net.* attribtues, split on the dots and put back together
+        # longer term we might want a generic approach, but
+        # right now it's just net. attributes
+        netattrparts = attrname.split('.')
+        attrname = netattrparts[0] + '.' + netattrparts[-1]
+    return attrname
+
 
 def crypt_value(value,
                 key=None,
@@ -419,10 +420,10 @@ class _ExpressionFormat(string.Formatter):
             right = node.attr
             key = left + '.' + right
             val = self._expand_attribute(key)
-            return val['value'] if 'value' in val else ""
+            return val['value'] if val and 'value' in val else ""
         elif isinstance(node, ast.Name):
             var = node.id
-            if var == 'nodename':
+            if var in ('node', 'nodename'):
                 return self._nodename
             if var in _attraliases:
                 val = self._expand_attribute(_attraliases[var])
@@ -436,7 +437,11 @@ class _ExpressionFormat(string.Formatter):
             else:
                 if var in self._nodeobj:
                     val = self._expand_attribute(var)
-                    return val['value'] if 'value' in val else ""
+                    return val['value'] if val and 'value' in val else ""
+                elif (not var.startswith('custom.') and
+                        _get_valid_attrname(var) not in allattributes.node):
+                    raise ValueError(
+                        '{0} is not a valid attribute name'.format(var))
         elif isinstance(node, ast.BinOp):
             optype = type(node.op)
             if optype not in self._supported_ops:

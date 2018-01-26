@@ -177,10 +177,15 @@ def _expand_expression(nodes, configmanager, inputdata):
     if type(expression) is dict:
         expression = expression['expression']
     pernodeexpressions = {}
-    for expanded in configmanager.expand_attrib_expression(nodes, expression):
-        pernodeexpressions[expanded[0]] = expanded[1]
-    for node in util.natural_sort(pernodeexpressions):
-        yield msg.KeyValueData({'value': pernodeexpressions[node]}, node)
+    try:
+        for expanded in configmanager.expand_attrib_expression(nodes,
+                                                               expression):
+            pernodeexpressions[expanded[0]] = expanded[1]
+        for node in util.natural_sort(pernodeexpressions):
+            yield msg.KeyValueData({'value': pernodeexpressions[node]}, node)
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
+
 
 
 def create(nodes, element, configmanager, inputdata):
