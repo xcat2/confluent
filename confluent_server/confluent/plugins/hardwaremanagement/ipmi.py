@@ -350,6 +350,11 @@ def perform_request(operator, node, element,
                 raise
         except exc.TargetEndpointUnreachable as tu:
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        except exc.PubkeyInvalid:
+            results.put(msg.ConfluentNodeError(
+                node,
+                'Mismatch detected between target certificate fingerprint '
+                'and pubkeys.tls_hardwaremanager attribute'))
         except Exception as e:
             results.put(e)
         finally:
