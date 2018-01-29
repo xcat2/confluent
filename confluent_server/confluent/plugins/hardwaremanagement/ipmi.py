@@ -728,17 +728,20 @@ class IpmiHandler(object):
 
     def read_firmware(self, component):
         items = []
+        errorneeded = False
         try:
             for id, data in self.ipmicmd.get_firmware():
                 if component == 'all' or component == simplify_name(id):
                     items.append({id: data})
         except exc.PubkeyInvalid:
-            self.output.put(msg.ConfluentNodeError(
+            errorneeded = msg.ConfluentNodeError(
                 self.node,
                 'Extended information unavailable, mismatch detected between '
                 'target certificate fingerprint and '
-                'pubkeys.tls_hardwaremanager attribute'))
+                'pubkeys.tls_hardwaremanager attribute')
         self.output.put(msg.Firmware(items, self.node))
+        if errorneeded:
+            self.output.put(errorneeded)
 
     def handle_inventory(self):
         if self.element[1] == 'firmware':
@@ -766,32 +769,42 @@ class IpmiHandler(object):
         self.output.put(msg.LEDStatus(led_categories, self.node))
 
     def read_inventory(self, component):
-        invitems = []
-        if component == 'all':
-            for invdata in self.ipmicmd.get_inventory():
-                if invdata[1] is None:
+        errorneeded = False
+        try:
+            invitems = []
+            if component == 'all':
+                for invdata in self.ipmicmd.get_inventory():
+                    if invdata[1] is None:
+                        newinf = {'present': False, 'information': None}
+                    else:
+                        sanitize_invdata(invdata[1])
+                        newinf = {'present': True, 'information': invdata[1]}
+                    newinf['name'] = invdata[0]
+                    invitems.append(newinf)
+            else:
+                self.make_inventory_map()
+                compname = self.invmap.get(component, None)
+                if compname is None:
+                    self.output.put(msg.ConfluentTargetNotFound())
+                    return
+                invdata = self.ipmicmd.get_inventory_of_component(compname)
+                if invdata is None:
                     newinf = {'present': False, 'information': None}
                 else:
-                    sanitize_invdata(invdata[1])
-                    newinf = {'present': True, 'information': invdata[1]}
-                newinf['name'] = invdata[0]
+                    sanitize_invdata(invdata)
+                    newinf = {'present': True, 'information': invdata}
+                newinf['name'] = compname
                 invitems.append(newinf)
-        else:
-            self.make_inventory_map()
-            compname = self.invmap.get(component, None)
-            if compname is None:
-                self.output.put(msg.ConfluentTargetNotFound())
-                return
-            invdata = self.ipmicmd.get_inventory_of_component(compname)
-            if invdata is None:
-                newinf = {'present': False, 'information': None}
-            else:
-                sanitize_invdata(invdata)
-                newinf = {'present': True, 'information': invdata}
-            newinf['name'] = compname
-            invitems.append(newinf)
+        except exc.PubkeyInvalid:
+            errorneeded = msg.ConfluentNodeError(
+                self.node,
+                'Extended information unavailable, mismatch detected between '
+                'target certificate fingerprint and '
+                'pubkeys.tls_hardwaremanager attribute')
         newinvdata = {'inventory': invitems}
         self.output.put(msg.KeyValueData(newinvdata, self.node))
+        if errorneeded:
+            self.output.put(errorneeded)
 
     def handle_sensors(self):
         if self.element[-1] == '':
