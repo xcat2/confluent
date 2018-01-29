@@ -72,7 +72,8 @@ def attach_media(noderange, media):
     resource = '/noderange/{0}/media/attach'.format(noderange)
     for res in session.update(resource, {'url': media}):
         printerror(res)
-    list_media(noderange, media)
+    if not exitcode:
+        list_media(noderange, media)
 
 
 def list_media(noderange, media):
@@ -135,7 +136,8 @@ def upload_media(noderange, media):
             'Nodes had errors receiving media ({0})!\n'.format(allerrnodes))
     for node in noderrs:
         sys.stderr.write('{0}: {1}\n'.format(node, noderrs[node]))
-    list_media(noderange, media)
+    if not exitcode:
+        list_media(noderange, media)
 
 funmap = {
     'upload': upload_media,
