@@ -59,6 +59,9 @@ def printerror(res, node=None):
             sys.stderr.write('{0}\n'.format(res['error']))
         if 'errorcode' not in res:
             exitcode = 1
+    for node in res.get('databynode', ()):
+        printerror(res['databynode'][node], node)
+
 
 def attach_media(noderange, media):
     global exitcode
