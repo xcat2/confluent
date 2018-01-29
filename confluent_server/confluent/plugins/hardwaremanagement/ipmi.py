@@ -351,9 +351,7 @@ def perform_request(operator, node, element,
         except exc.TargetEndpointUnreachable as tu:
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except Exception as e:
-            results.put(msg.ConfluentNodeError(
-                node, 'IPMI PluginException (see stderr log): ' + str(e)))
-            raise
+            results.put(e)
         finally:
             results.put('Done')
 
