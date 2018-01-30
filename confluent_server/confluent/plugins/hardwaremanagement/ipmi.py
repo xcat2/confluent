@@ -355,6 +355,8 @@ def perform_request(operator, node, element,
                 node,
                 'Mismatch detected between target certificate fingerprint '
                 'and pubkeys.tls_hardwaremanager attribute'))
+        except pygexc.InvalidParameterValue as e:
+            results.put(msg.ConfluentNodeError(node, str(e)))
         except Exception as e:
             results.put(e)
         finally:
