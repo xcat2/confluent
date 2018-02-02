@@ -410,6 +410,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:4] == ['configuration', 'management_controller', 'ntp',
             'servers'] and operation != 'retrieve' and len(path) == 5):
         return InputNTPServer(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'system', 'all'] and
+            operation != 'retrieve'):
+        return InputConfigChangeSet(path, inputdata, nodes, configmanager)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
         return InputFirmwareUpdate(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
@@ -484,6 +487,27 @@ class InputExpression(ConfluentMessage):
         nodeattr = deepcopy(self.nodeattribs[node])
         return nodeattr
 
+class InputConfigChangeSet(InputExpression):
+    # For now, this is identical to InputExpression, later it may
+    # internalize formula expansion, but not now..
+    def __init__(self, path, inputdata, nodes=None, configmanager=None):
+        self.cfm = configmanager
+        super(InputConfigChangeSet, self).__init__(path, inputdata, nodes)
+
+    def get_attributes(self, node):
+        attrs = super(InputConfigChangeSet, self).get_attributes(node)
+        endattrs = {}
+        for attr in attrs:
+            origval = attrs[attr]
+            if isinstance(origval, str) or isinstance(origval, unicode):
+                origval = {'expression': origval}
+            if 'expression' not in origval:
+                endattrs[attr] = attrs[attr]
+            else:
+                endattrs[attr] = list(self.cfm.expand_attrib_expression(
+                    [node], attrs[attr]))[0][1]
+        return endattrs
+
 
 class InputAttributes(ConfluentMessage):
     # This is particularly designed for attributes, where a simple string
@@ -491,7 +515,7 @@ class InputAttributes(ConfluentMessage):
     # preserve the client provided expression for posterity, rather than
     # immediate consumption.
     # for things like node configuration or similar, a different class is
-    # appropriate since it nedes to immediately expand an expression.
+    # appropriate since it needs to immediately expand an expression.
     # with that class, the 'InputExpression' and calling code in attributes.py
     # might be deprecated in favor of the generic expression expander
     # and a small function in attributes.py to reflect the expansion back
@@ -1249,6 +1273,8 @@ class Attributes(ConfluentMessage):
                 name: nkv
             }
 
+class ConfigSet(Attributes):
+    pass
 
 class ListAttributes(ConfluentMessage):
     def __init__(self, name=None, kv=None, desc=''):

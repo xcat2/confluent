@@ -359,6 +359,7 @@ def perform_request(operator, node, element,
             results.put(msg.ConfluentNodeError(node, str(e)))
         except Exception as e:
             results.put(e)
+            raise
         finally:
             results.put('Done')
 
@@ -513,6 +514,8 @@ class IpmiHandler(object):
             return self.handle_domain_name()
         elif self.element[1:3] == ['management_controller', 'ntp']:
             return self.handle_ntp()
+        elif self.element[1:3] == ['system', 'all']:
+            return self.handle_sysconfig()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -972,6 +975,14 @@ class IpmiHandler(object):
             dn = self.inputdata.domain_name(self.node)
             self.ipmicmd.set_domain_name(dn)
             return
+
+    def handle_sysconfig(self):
+        if 'read' == self.op:
+            self.output.put(msg.ConfigSet(
+                self.node, self.ipmicmd.get_system_configuration()))
+        elif 'update' == self.op:
+            self.ipmicmd.set_system_configuration(
+                self.inputdata.get_attributes(self.node))
 
     def handle_ntp(self):
         if self.element[3] == 'enabled':

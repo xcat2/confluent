@@ -172,7 +172,13 @@ def _init_core():
                         'default': 'ipmi',
                     }),
                 },
-            }
+            },
+            'system': {
+                'all': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+            },
         },
         '_console': {
             'session': PluginRoute({
