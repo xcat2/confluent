@@ -70,9 +70,11 @@ client.check_globbing(noderange)
 setmode = None
 assignment = {}
 queryparms = {}
-
+printsys = []
+setsys = {}
 
 if len(args) == 1:
+    printsys = 'all'
     for candidate in cfgpaths:
         path, attrib = cfgpaths[candidate]
         path = '/noderange/{0}/{1}'.format(noderange, path)
@@ -87,7 +89,7 @@ for param in args[1:]:
             bailout('Cannot do set and query in same command')
         key, _, value = param.partition('=')
         if key not in cfgpaths:
-            bailout('Unrecognized setting: {0}'.format(key))
+            setsys[key] = value
         for depkey, depval in autodeps.get(key, []):
             assignment[depkey] = depval
         assignment[key] = value
@@ -107,9 +109,9 @@ for param in args[1:]:
                         queryparms[path] = {}
                     queryparms[path][attrib] = candidate
             if not matchedparms:
-                bailout('Unrecognized settings category: {0}'.format(param))
+                printsys.append(param)
         elif param not in cfgpaths:
-            bailout('Unrecognized parameter: {0}'.format(param))
+            printsys.append(param)
         else:
             path, attrib = cfgpaths[param]
             path = '/noderange/{0}/{1}'.format(noderange, path)
@@ -122,8 +124,10 @@ if setmode:
     attrnamebypath = {}
     for key in assignment:
         if key not in cfgpaths:
-            bailout('Unknown settings key: {0}'.format(key))
-        path, attrib = cfgpaths[key]
+            path = 'configuration/system/all'
+            attrib = key
+        else:
+            path, attrib = cfgpaths[key]
         if path not in updatebypath:
             updatebypath[path] = {}
             attrnamebypath[path] = {}
@@ -144,4 +148,9 @@ else:
     for path in queryparms:
         client.print_attrib_path(path, session, list(queryparms[path]),
                                  NullOpt(), queryparms[path])
-
+    if printsys:
+        if printsys == 'all':
+            printsys = []
+        path = '/noderange/{0}/configuration/system/all'.format(noderange)
+        client.print_attrib_path(path, session, printsys,
+                                 NullOpt())

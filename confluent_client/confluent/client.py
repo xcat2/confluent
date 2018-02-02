@@ -290,10 +290,10 @@ def attrrequested(attr, attrlist, seenattributes):
             candidate = candidate.replace('hm', 'hardwaremanagement', 1)
         if candidate in _attraliases:
             candidate = _attraliases[candidate]
-        if candidate == attr:
+        if candidate.lower() == attr.lower():
             seenattributes.add(truename)
             return True
-        elif attr.startswith(candidate + '.'):
+        elif attr.lower().startswith(candidate.lower() + '.'):
             seenattributes.add(truename)
             return True
     return False
