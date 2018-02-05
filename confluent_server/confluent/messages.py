@@ -35,7 +35,7 @@ valid_health_values = set([
 def _htmlify_structure(indict):
     ret = "<ul>"
     if isinstance(indict, dict):
-        for key in indict.iterkeys():
+        for key in sorted(indict):
             ret += "<li>{0}: ".format(key)
             if type(indict[key]) in (str, unicode, float, int):
                 ret += str(indict[key])
@@ -77,7 +77,7 @@ class ConfluentMessage(object):
             datasource = self.kvpairs
         else:
             datasource = {'databynode': self.kvpairs}
-        jsonsnippet = json.dumps(datasource, separators=(',', ':'))[1:-1]
+        jsonsnippet = json.dumps(datasource, sort_keys=True, separators=(',', ':'))[1:-1]
         return jsonsnippet
 
     def raw(self):
@@ -1261,7 +1261,7 @@ class Attributes(ConfluentMessage):
         self.desc = desc
         nkv = {}
         self.notnode = name is None
-        for key in kv.iterkeys():
+        for key in kv:
             if type(kv[key]) in (str, unicode):
                 nkv[key] = {'value': kv[key]}
             else:

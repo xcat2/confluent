@@ -312,8 +312,8 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
             continue
-        for node in res['databynode']:
-            for attr in res['databynode'][node]:
+        for node in sorted(res['databynode']):
+            for attr in sorted(res['databynode'][node]):
                 seenattributes.add(attr)
                 if rename and attr in rename:
                     printattr = rename[attr]
