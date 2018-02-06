@@ -383,7 +383,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                             details = False
                         if details:
                             if currattr.get('help', None):
-                                attrtout += ' (Help: {0})'.format(
+                                attrout += ' (Help: {0})'.format(
                                     currattr['help'].encode('utf-8'))
                             if currattr.get('possible', None):
                                 attrout += ' (Choices: {0})'.format(
