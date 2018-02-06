@@ -376,6 +376,18 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                                 node, printattr, currattr['value'],
                                 currattr['default']))
                     else:
+
+                        try:
+                            details = options.detail
+                        except AttributeError:
+                            details = False
+                        if details:
+                            if currattr.get('help', None):
+                                attrtout += ' (Help: {0})'.format(
+                                    currattr['help'].encode('utf-8'))
+                            if currattr.get('possible', None):
+                                attrout += ' (Choices: {0})'.format(
+                                    ','.join(currattr['possible']))
                         cprint(attrout)
     if not exitcode:
         if requestargs:

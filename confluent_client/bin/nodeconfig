@@ -47,6 +47,10 @@ argparser.add_option('-c', '--comparedefault', dest='comparedefault',
                      action='store_true', default=False,
                      help='Compare given settings to default or list settings '
                           'that are non default')
+argparser.add_option('-d', '--detail', dest='detail',
+                     action='store_true', default=False,
+                     help='Provide verbose information as available, such as '
+                          'help text and possible valid values')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
