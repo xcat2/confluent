@@ -315,8 +315,8 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
         for node in sorted(res['databynode']):
             for attr in sorted(res['databynode'][node]):
                 seenattributes.add(attr)
-                if rename and attr in rename:
-                    printattr = rename[attr]
+                if rename:
+                    printattr = rename.get(attr, attr)
                 else:
                     printattr = attr
                 currattr = res['databynode'][node][attr]
@@ -347,8 +347,11 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                         attrout = '{0}: {1}: {2}'.format(node, printattr, ','.join(map(str, dictout)))
                     else:
                         cprint("CODE ERROR" + repr(attr))
-
-                    if options.blame or 'broken' in currattr:
+                    try:
+                        blame = options.blame
+                    except AttributeError:
+                        blame = False
+                    if blame or 'broken' in currattr:
                         blamedata = []
                         if 'inheritedfrom' in currattr:
                             blamedata.append('inherited from group {0}'.format(
@@ -360,7 +363,20 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                                     currattr['expression']))
                         if blamedata:
                             attrout += ' (' + ', '.join(blamedata) + ')'
-                    cprint(attrout)
+                    try:
+                        comparedefault = options.comparedefault
+                    except AttributeError:
+                        comparedefault = False
+                    if comparedefault:
+                        if (requestargs or
+                                (currattr.get('default', None) is not None and
+                                currattr.get('value', None) is not None and
+                                currattr['value'] != currattr['default'])):
+                            cprint('{0}: {1}: {2} (Default: {3})'.format(
+                                node, printattr, currattr['value'],
+                                currattr['default']))
+                    else:
+                        cprint(attrout)
     if not exitcode:
         if requestargs:
             for attr in requestargs:

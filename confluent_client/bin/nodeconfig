@@ -43,6 +43,10 @@ def bailout(msg, code=1):
 
 
 argparser = optparse.OptionParser()
+argparser.add_option('-c', '--comparedefault', dest='comparedefault',
+                     action='store_true', default=False,
+                     help='Compare given settings to default or list settings '
+                          'that are non default')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -154,6 +158,8 @@ if setmode:
                 print('{0}: {1}: {2}'.format(node, key, val))
 else:
     for path in queryparms:
+        if options.comparedefault:
+            continue
         client.print_attrib_path(path, session, list(queryparms[path]),
                                  NullOpt(), queryparms[path])
     if printsys:
@@ -161,5 +167,5 @@ else:
             printsys = []
         path = '/noderange/{0}/configuration/system/all'.format(noderange)
         client.print_attrib_path(path, session, printsys,
-                                 NullOpt())
+                                 options)
 sys.exit(rcode)
