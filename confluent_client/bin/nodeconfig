@@ -51,6 +51,10 @@ argparser.add_option('-d', '--detail', dest='detail',
                      action='store_true', default=False,
                      help='Provide verbose information as available, such as '
                           'help text and possible valid values')
+argparser.add_option('-x', '--exclude', dest='exclude',
+                     action='store_true', default=False,
+                     help='Treat positional arguments as items to not '
+                          'examine, compare, or restore default')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -81,8 +85,9 @@ queryparms = {}
 printsys = []
 setsys = {}
 
-if len(args) == 1:
-    printsys = 'all'
+if len(args) == 1 or options.exclude:
+    if not options.exclude:
+        printsys = 'all'
     for candidate in cfgpaths:
         path, attrib = cfgpaths[candidate]
         path = '/noderange/{0}/{1}'.format(noderange, path)
@@ -111,11 +116,17 @@ for param in args[1:]:
             for candidate in cfgpaths:
                 if candidate.startswith('{0}.'.format(param)):
                     matchedparms = True
-                    path, attrib = cfgpaths[candidate]
-                    path = '/noderange/{0}/{1}'.format(noderange, path)
-                    if path not in queryparms:
-                        queryparms[path] = {}
-                    queryparms[path][attrib] = candidate
+                    if not options.exclude:
+                        path, attrib = cfgpaths[candidate]
+                        path = '/noderange/{0}/{1}'.format(noderange, path)
+                        if path not in queryparms:
+                            queryparms[path] = {}
+                        queryparms[path][attrib] = candidate
+                    else:
+                        try:
+                            del queryparms[path]
+                        except KeyError:
+                            pass
             if not matchedparms:
                 printsys.append(param)
         elif param not in cfgpaths:
@@ -129,6 +140,9 @@ for param in args[1:]:
 session = client.Command()
 rcode = 0
 if setmode:
+    if options.exclude:
+        sys.stderr.write('Cannot use exclude and assign at the same time\n')
+        sys.exit(1)
     updatebypath = {}
     attrnamebypath = {}
     for key in assignment:
@@ -166,7 +180,7 @@ else:
             continue
         client.print_attrib_path(path, session, list(queryparms[path]),
                                  NullOpt(), queryparms[path])
-    if printsys:
+    if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
         path = '/noderange/{0}/configuration/system/all'.format(noderange)

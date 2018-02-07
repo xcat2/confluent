@@ -313,19 +313,23 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
             exitcode = 1
             continue
         for node in sorted(res['databynode']):
-            for attr in sorted(res['databynode'][node]):
+            for attr, val in sorted(
+                    res['databynode'][node].items(),
+                    key=lambda (k, v): v.get('sortid', k) if v else k):
                 seenattributes.add(attr)
                 if rename:
                     printattr = rename.get(attr, attr)
                 else:
                     printattr = attr
                 currattr = res['databynode'][node][attr]
-                if (requestargs is None or requestargs == [] or attrrequested(
-                        attr, requestargs, seenattributes)):
+                if show_attr(attr, requestargs, seenattributes, options):
                     if 'value' in currattr:
                         if currattr['value'] is not None:
+                            val = currattr['value']
+                            if isinstance(val, list):
+                                val = ','.join(val)
                             attrout = '{0}: {1}: {2}'.format(
-                                node, printattr, currattr['value'])
+                                node, printattr, val)
                         else:
                             attrout = '{0}: {1}:'.format(node, printattr)
                     elif 'isset' in currattr:
@@ -368,7 +372,11 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                     except AttributeError:
                         comparedefault = False
                     if comparedefault:
-                        if (requestargs or
+                        try:
+                            exclude = options.exclude
+                        except AttributeError:
+                            exclude = False
+                        if ((requestargs and not exclude) or
                                 (currattr.get('default', None) is not None and
                                 currattr.get('value', None) is not None and
                                 currattr['value'] != currattr['default'])):
@@ -396,6 +404,19 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                     sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
                     exitcode = 1
     return exitcode
+
+
+def show_attr(attr, requestargs, seenattributes, options):
+    try:
+        reverse = options.exclude
+    except AttributeError:
+        reverse = False
+    if requestargs is None or requestargs == []:
+        return True
+    processattr = attrrequested(attr, requestargs, seenattributes)
+    if reverse:
+        processattr = not processattr
+    return processattr
 
 
 def printgroupattributes(session, requestargs, showtype, nodetype, noderange, options):
