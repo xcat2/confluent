@@ -39,7 +39,7 @@ number of operators at the end to indicate formatting changes.
 
 Another common element to pull into an expression is the node name in whole:
 
-`hardwaremanagement.manager={nodename}-imm`  
+`hardwaremanagement.manager={node}-imm`
 
 Additionally other attributes may be pulled in:
 
@@ -47,7 +47,7 @@ Additionally other attributes may be pulled in:
 
 Multiple expressions are permissible within a single attribute:
 
-`hardwaremanagement.manager={nodename}-{hardwaremanagement.method}`  
+`hardwaremanagement.manager={node}-{hardwaremanagement.method}`
 
 A note to developers: in general the API layer will automatically recognize a
 generic set attribute to string with expression syntax and import it as an
