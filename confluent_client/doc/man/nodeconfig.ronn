@@ -3,8 +3,8 @@ nodeconfig(8) -- Show or change node configuration
 
 ## SYNOPSIS
 
-`nodeconfig <noderange> [<configuration>..]`
-`nodeconfig <noderange> [<configuration=value>..]`
+`nodeconfig <noderange> [options] [<configuration>..]`
+`nodeconfig <noderange> [options] [<configuration=value>..]`
 
 ## DESCRIPTION
 
@@ -13,6 +13,23 @@ Rather than manipulating the confluent database, this actually modifies the
 running configuration on the node firmware.  Calling without '=' will show the
 current value, and '=' will change the value.  Network information can be
 given as a node expression, as documented in the man page for nodeattribexpressions(5).
+
+## OPTIONS
+
+* `-c`, `--comparedefault`:
+  Take the given settings and compare against default value, if available.  If
+  no configuration values are specified, it will show only those that differ.
+  If combined with `-x`, will show all differing values except those indicated
+  by `-x`
+
+* `-x`, `--exclude`:
+  Rather than listing only the specified configuration parameters, list all
+  attributes except for the specified ones
+
+* `-d`, `--detail`:
+  Provide detailed data as available.  This can include help text and valid
+  values for a setting.
+
 
 ## EXAMPLES
 * Showing the current IP configuration of noderange BMC/IMM/XCC:
