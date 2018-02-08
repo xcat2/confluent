@@ -315,7 +315,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
         for node in sorted(res['databynode']):
             for attr, val in sorted(
                     res['databynode'][node].items(),
-                    key=lambda (k, v): v.get('sortid', k) if v else k):
+                    key=lambda (k, v): v.get('sortid', k) if isinstance(v, dict) else k):
                 seenattributes.add(attr)
                 if rename:
                     printattr = rename.get(attr, attr)
