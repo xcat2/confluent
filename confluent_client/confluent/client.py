@@ -485,7 +485,7 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
             try:
                 for val in updateargs[1:]:
                     val = val.split('=')
-                    if val[0][-1] in (',', '-'):
+                    if val[0][-1] in (',', '-', '^'):
                         key = val[0][:-1]
                         if val[0][-1] == ',':
                             value = {'prepend': val[1]}
