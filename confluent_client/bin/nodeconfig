@@ -84,6 +84,8 @@ assignment = {}
 queryparms = {}
 printsys = []
 setsys = {}
+forceset = False
+needval = None
 
 if len(args) == 1 or options.exclude:
     if not options.exclude:
@@ -94,18 +96,40 @@ if len(args) == 1 or options.exclude:
         if path not in queryparms:
             queryparms[path] = {}
         queryparms[path][attrib] = candidate
+
+
+def _assign_value():
+    if key not in cfgpaths:
+        setsys[key] = value
+    for depkey, depval in autodeps.get(key, []):
+        assignment[depkey] = depval
+    assignment[key] = value
+
+
 for param in args[1:]:
-    if '=' in param:
+    if param == 'show':
+        continue  # forgive muscle memory of pasu users
+    if param == 'set':
+        setmode = True
+        forceset = True
+        continue
+    if needval:
+        key = needval
+        value = param
+        _assign_value()
+        continue
+    if '=' in param or param[-1] == ':' or forceset:
         if setmode is None:
             setmode = True
         if setmode != True:
             bailout('Cannot do set and query in same command')
-        key, _, value = param.partition('=')
-        if key not in cfgpaths:
-            setsys[key] = value
-        for depkey, depval in autodeps.get(key, []):
-            assignment[depkey] = depval
-        assignment[key] = value
+        if '=' in param:
+            key, _, value = param.partition('=')
+            _assign_value()
+        elif param[-1] == ':':
+            needval = param[:-1]
+        else:
+            needval = param
     else:
         if setmode is None:
             setmode = False
