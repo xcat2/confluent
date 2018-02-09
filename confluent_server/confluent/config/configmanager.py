@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1043,6 +1043,18 @@ class ConfigManager(object):
                         raise ValueError(errstr)
                     attribmap[group][attr] = attrval
                 if attr == 'nodes':
+                    if isinstance(attribmap[group][attr], dict):
+                        currnodes = list(self.get_nodegroup_attributes(
+                            group, ['nodes']).get('nodes', []))
+                        if attribmap[group][attr].get('prepend', False):
+                            newnodes = attribmap[group][attr][
+                                'prepend'].split(',')
+                            attribmap[group][attr] = newnodes + currnodes
+                        elif attribmap[group][attr].get('remove', False):
+                            delnodes = attribmap[group][attr][
+                                'remove'].split(',')
+                            attribmap[group][attr] = [
+                                x for x in currnodes if x not in delnodes]
                     if not isinstance(attribmap[group][attr], list):
                         if type(attribmap[group][attr]) is unicode or type(attribmap[group][attr]) is str:
                             attribmap[group][attr]=attribmap[group][attr].split(",")
@@ -1291,7 +1303,20 @@ class ConfigManager(object):
                 except KeyError:
                     pass
                 if attrname == 'groups':
-                    if type(attribmap[node]['groups']) != list:
+                    if isinstance(attribmap[node]['groups'], dict):
+                        currgroups = self.get_node_attributes(
+                            node, 'groups').get(node, {}).get('groups', [])
+                        if attribmap[node]['groups'].get('prepend', False):
+                            newgroups = attribmap[node]['groups'][
+                                'prepend'].split(',')
+                            attribmap[node]['groups'] = newgroups + currgroups
+                        elif attribmap[node]['groups'].get('remove', False):
+                            delgroups = attribmap[node]['groups'][
+                                'remove'].split(',')
+                            newgroups = [
+                                x for x in currgroups if x not in delgroups]
+                            attribmap[node]['groups'] = newgroups
+                    elif type(attribmap[node]['groups']) != list:
                         attribmap[node]['groups']=attribmap[node]['groups'].split(",")
                     for group in attribmap[node]['groups']:
                         if group not in self._cfgstore['nodegroups']:

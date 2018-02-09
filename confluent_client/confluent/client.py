@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -483,23 +483,23 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
     else:
         if "=" in updateargs[1]:
             try:
-                if len(updateargs[1:]) > 1:
-                    for val in updateargs[1:]:
-                        val = val.split('=')
-                        if (nodetype == "nodegroups"):
-                            exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all',
-                                                                         val[1],val[0])
-                        else:
-                            exitcode = session.simple_noderange_command(noderange, 'attributes/all',
-                                                                        val[1], val[0])
-                else:
-                    val = updateargs[1].split('=')
-                    if nodetype == "nodegroups" :
-                        exitcode = session.simple_nodegroups_command(noderange, 'attributes/all',
-                                                                     val[1], val[0])
+                for val in updateargs[1:]:
+                    val = val.split('=')
+                    if val[0][-1] in (',', '-'):
+                        key = val[0][:-1]
+                        if val[0][-1] == ',':
+                            value = {'prepend': val[1]}
+                        elif val[0][-1] in ('-', '^'):
+                            value = {'remove': val[1]}
+                    else:
+                        key = val[0]
+                        value = val[1]
+                    if (nodetype == "nodegroups"):
+                        exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all',
+                                                                     value, key)
                     else:
                         exitcode = session.simple_noderange_command(noderange, 'attributes/all',
-                                                                    val[1], val[0])
+                                                                    value, key)
             except:
                 sys.stderr.write('Error: {0} not a valid expression\n'.format(str(updateargs[1:])))
                 exitcode = 1
