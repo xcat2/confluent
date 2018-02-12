@@ -145,6 +145,7 @@ class ConsoleHandler(object):
         self._dologging = True
         self._isondemand = False
         self.error = None
+        self._retrytime = 0
         self.cfgmgr = configmanager
         self.node = node
         self.connectstate = 'unconnected'
@@ -189,6 +190,16 @@ class ConsoleHandler(object):
         if not self._isondemand:
             self.connectstate = 'connecting'
             eventlet.spawn(self._connect)
+
+    def _get_retry_time(self):
+        clustsize = len(self.cfgmgr._cfgstore['nodes'])
+        self._retrytime = self._retrytime * 2 + 1
+        if self._retrytime > 120:
+            self._retrytime = 120
+        retrytime = clustsize * 0.05 * self._retrytime
+        if retrytime > 120:
+            retrytime = 120
+        return retrytime + (retrytime * random.random())
 
     def feedbuffer(self, data):
         try:
@@ -343,7 +354,7 @@ class ConsoleHandler(object):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
-            retrytime = 120 + (120 * random.random())
+            retrytime = self._get_retry_time()
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
@@ -353,7 +364,7 @@ class ConsoleHandler(object):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
-            retrytime = 120 + (120 * random.random())
+            retrytime = self._get_retry_time()
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
@@ -365,7 +376,7 @@ class ConsoleHandler(object):
             self.connectstate = 'unconnected'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
-            retrytime = 120 + (120 * random.random())
+            retrytime = self._get_retry_time()
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
@@ -373,6 +384,7 @@ class ConsoleHandler(object):
 
     def _got_connected(self):
         self.connectstate = 'connected'
+        self._retrytime = 0
         self.log(
             logdata='console connected', ltype=log.DataTypes.event,
             event=log.Events.consoleconnect)
