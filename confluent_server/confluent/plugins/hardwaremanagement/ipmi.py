@@ -30,6 +30,7 @@ import pyghmi.exceptions as pygexc
 console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
+import ssl
 
 
 # There is something not right with the RLocks used in pyghmi when
@@ -350,6 +351,10 @@ def perform_request(operator, node, element,
                 raise
         except exc.TargetEndpointUnreachable as tu:
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        except ssl.SSLEOFError:
+            results.put(msg.ConfluentNodeError(
+                self.node, 'Unable to communicate with the https server on '
+                           'the target BMC'))
         except exc.PubkeyInvalid:
             results.put(msg.ConfluentNodeError(
                 node,
@@ -743,6 +748,11 @@ class IpmiHandler(object):
             for id, data in self.ipmicmd.get_firmware():
                 if component == 'all' or component == simplify_name(id):
                     items.append({id: data})
+        except ssl.SSLEOFError:
+            errorneeded = msg.ConfluentNodeError(
+                self.node, 'Unable to communicate with the https server on '
+                           'the target BMC while trying to read extended '
+                           'information')
         except exc.PubkeyInvalid:
             errorneeded = msg.ConfluentNodeError(
                 self.node,
@@ -805,6 +815,11 @@ class IpmiHandler(object):
                     newinf = {'present': True, 'information': invdata}
                 newinf['name'] = compname
                 invitems.append(newinf)
+        except ssl.SSLEOFError:
+            errorneeded = msg.ConfluentNodeError(
+                self.node, 'Unable to communicate with the https server on '
+                           'the target BMC while trying to read extended '
+                           'information')
         except exc.PubkeyInvalid:
             errorneeded = msg.ConfluentNodeError(
                 self.node,
