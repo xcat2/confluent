@@ -745,8 +745,10 @@ class IpmiHandler(object):
         items = []
         errorneeded = False
         try:
-            for id, data in self.ipmicmd.get_firmware():
-                if component == 'all' or component == simplify_name(id):
+            complist = () if component == 'all' else (component,)
+            for id, data in self.ipmicmd.get_firmware(complist):
+                if (component in ('core', 'all') or
+                        component == simplify_name(id)):
                     items.append({id: data})
         except ssl.SSLEOFError:
             errorneeded = msg.ConfluentNodeError(
