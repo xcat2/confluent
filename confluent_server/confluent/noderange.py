@@ -38,6 +38,9 @@ _parser = pp.nestedExpr(content=_grammar)
 _numextractor = pp.OneOrMore(pp.Word(pp.alphas + '-') | pp.Word(pp.nums))
 
 numregex = re.compile('([0-9]+)')
+
+lastnoderange = None
+
 def humanify_nodename(nodename):
     """Analyzes nodename in a human way to enable natural sort
 
@@ -64,6 +67,13 @@ class ReverseNodeRange(object):
     def noderange(self):
         subsetgroups = []
         for group in self.cfm.get_groups(sizesort=True):
+            if lastnoderange:
+                for nr in lastnoderange:
+                    if lastnoderange[nr] - self.nodes:
+                        continue
+                    if self.nodes - lastnoderange[nr]:
+                        continue
+                    return nr
             nl = set(
                 self.cfm.get_nodegroup_attributes(group).get('nodes', []))
             if len(nl) > len(self.nodes) or not nl:
@@ -86,6 +96,7 @@ class NodeRange(object):
     """
 
     def __init__(self, noderange, config=None):
+        global lastnoderange
         self.beginpage = None
         self.endpage = None
         self.cfm = config
@@ -99,6 +110,7 @@ class NodeRange(object):
             self._noderange = set(self.cfm.list_nodes())
         else:
             self._noderange = self._evaluate(elements)
+        lastnoderange = {noderange: set(self._noderange)}
 
     @property
     def nodes(self):
