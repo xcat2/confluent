@@ -75,7 +75,7 @@ upfile = None
 try:
     noderange = args[0]
     if len(args) > 1:
-        if args[1] == ['update']:
+        if args[1] == 'update':
             upfile = args[2]
         else:
             components = []
