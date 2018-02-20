@@ -139,6 +139,7 @@ def update_firmware(session, filename):
         sys.stderr.write('{0}: {1}\n'.format(node, noderrs[node]))
 
 def show_firmware(session):
+    firmware_shown = False
     for component in components:
         for res in session.read(
                 '/noderange/{0}/inventory/firmware/all/{1}'.format(
@@ -152,7 +153,10 @@ def show_firmware(session):
                     continue
                 for inv in res['databynode'][node]['firmware']:
                     for prefix in inv:
+                        firmware_shown = True
                         printfirm(node, prefix, inv[prefix])
+    if not firmware_shown:
+        argparser.print_help()
 
 
 try:
