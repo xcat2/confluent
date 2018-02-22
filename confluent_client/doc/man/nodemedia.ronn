@@ -33,19 +33,19 @@ the host platform attempts.
 
 ## EXAMPLES
 * Listing currently mounted media:
-  `# nodemedia s1-s4 list`
-  `s1: boot.img`
-  `s2: boot.img`
-  `s4: boot.img`
+  `# nodemedia s1-s4 list`  
+  `s1: boot.img`  
+  `s2: boot.img`  
+  `s4: boot.img`  
 
 * Uploading a small boot image to the BMC:
-  `# nodemedia s1-s4 upload boot.img`
-  `s1:complete: 100%     s2:complete: 100%     s3:complete: 100%     s4:complete: 100%`
-  `s1: boot.img`
-  `s4: boot.img`
-  `s2: boot.img`
+  `# nodemedia s1-s4 upload boot.img`  
+  `s1:complete: 100%     s2:complete: 100%     s3:complete: 100%     s4:complete: 100%`  
+  `s1: boot.img`  
+  `s4: boot.img`  
+  `s2: boot.img`  
 
 * Attaching a larger ISO for on-demand access:
-  `# nodemedia s1,s4 attach http://172.30.0.6/install/rhel74.iso`
-  `s4: http://172.30.0.6/install/rhel74.iso`
+  `# nodemedia s1,s4 attach http://172.30.0.6/install/rhel74.iso`  
+  `s4: http://172.30.0.6/install/rhel74.iso`  
   `s1: http://172.30.0.6/install/rhel74.iso`
