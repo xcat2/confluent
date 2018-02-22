@@ -47,5 +47,5 @@ the host platform attempts.
 
 * Attaching a larger ISO for on-demand access:
   `# nodemedia s1,s4 attach http://172.30.0.6/install/rhel74.iso`  
-  `s4: http://172.30.0.6/install/rhel74.iso`  
-  `s1: http://172.30.0.6/install/rhel74.iso`
+  `s4: http://172.30.0.6/install/rhel74.iso` (insecure)  
+  `s1: http://172.30.0.6/install/rhel74.iso` (insecure)
