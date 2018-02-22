@@ -480,6 +480,25 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
                     exitcode = res['errorcode']
                 sys.stderr.write('Error: ' + res['error'] + '\n')
         sys.exit(exitcode)
+    elif hasattr(options, 'environment') and options.environment:
+        for key in updateargs[1:]:
+            key = key.replace('.', '_')
+            value = os.environ.get(
+                key, os.environ[key.upper()])
+            # Let's do one pass to make sure that there's not a usage problem
+        for key in updateargs[1:]:
+            key = key.replace('.', '_')
+            value = os.environ.get(
+                key, os.environ[key.upper()])
+            if (nodetype == "nodegroups"):
+                exitcode = session.simple_nodegroups_command(noderange,
+                                                             'attributes/all',
+                                                             value, key)
+            else:
+                exitcode = session.simple_noderange_command(noderange,
+                                                            'attributes/all',
+                                                            value, key)
+        sys.exit(exitcode)
     else:
         if "=" in updateargs[1]:
             try:
