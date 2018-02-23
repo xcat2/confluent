@@ -3,7 +3,7 @@ nodeshell(8) -- Execute command on many nodes in a noderange through ssh
 
 ## SYNOPSIS
 
-`nodeshell <noderange> <command to execute on each node>`
+`nodeshell <noderange> [options] <command to execute on each node>`
 
 ## DESCRIPTION
 
@@ -11,6 +11,11 @@ Allows execution of a command on many nodes in parallel.  Like noderun(8), it
 accepts and interpolates confluent attribute expressions as documented in 
 nodeattribexpressions(5).  `nodeshell` provides stdout as stdout and stderr
 as stderr, unlike psh which combines all stdout and stderr into stdout.
+
+## OPTIONS
+
+* `-c`:
+  Specify the maximum number of instances to run concurrently.
 
 ## EXAMPLES
 
