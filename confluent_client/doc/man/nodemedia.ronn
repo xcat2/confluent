@@ -3,7 +3,7 @@ nodemedia(8) -- Manage server remote media
 
 ## SYNOPSIS
 
-`nodemedia <noderange> [attach|detachall|list|upload] <media>`
+`nodemedia <noderange> [attach|detachall|list|upload] [options] <media>`
 
 ## DESCRIPTION
 
@@ -30,6 +30,11 @@ load on the media source.
 BMCs map a virtual USB device to that url.  Content is loaded on demand, and
 as such that URL is referenced potentially once for every IO operation that
 the host platform attempts.
+
+## OPTIONS
+
+* `-c`:
+  Specify the maximum number of instances to run concurrently.
 
 ## EXAMPLES
 * Listing currently mounted media:
