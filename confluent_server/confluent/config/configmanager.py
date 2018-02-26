@@ -67,6 +67,7 @@ import base64
 import confluent.config.attributes as allattributes
 import confluent.config.conf as conf
 import confluent.log
+import confluent.noderange as noderange
 import confluent.util
 import confluent.exceptions as exc
 import copy
@@ -1023,6 +1024,13 @@ class ConfigManager(object):
             if group == '':
                 raise ValueError('"{0}" is not a valid group name'.format(
                     group))
+            if autocreate:
+                try:
+                    noderange._parser.parseString(
+                        '({0})'.format(group)).asList()
+                except noderange.pp.ParseException as pe:
+                    raise ValueError('"{0}" is not a valid group name'.format(
+                        group))
             if not autocreate and group not in self._cfgstore['nodegroups']:
                 raise ValueError("{0} group does not exist".format(group))
             for attr in attribmap[group]:
@@ -1287,6 +1295,13 @@ class ConfigManager(object):
             node = node.encode('utf-8')
             if node == '':
                 raise ValueError('"{0}" is not a valid node name'.format(node))
+            if autocreate:
+                try:
+                    noderange._parser.parseString(
+                        '({0})'.format(node)).asList()
+                except noderange.pp.ParseException as pe:
+                    raise ValueError(
+                        '"{0}" is not a valid node name'.format(node))
             if autocreate is False and node not in self._cfgstore['nodes']:
                 raise ValueError("node {0} does not exist".format(node))
             for attrname in list(attribmap[node]):
