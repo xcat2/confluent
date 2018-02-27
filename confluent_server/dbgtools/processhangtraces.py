@@ -27,7 +27,7 @@ with open(sys.argv[1]) as tracefile:
                 if currtrace not in threadtraces:
                     threadtraces[currtrace] = 0
                 threadtraces[currtrace] += 1
-            currtrace = line
+            currtrace = ''
         elif currtrace is not None:
             currtrace += line + '\n'
 for trace in sorted(threadtraces, key=lambda x: threadtraces[x]):
