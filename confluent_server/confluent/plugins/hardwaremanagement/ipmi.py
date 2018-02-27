@@ -495,7 +495,10 @@ class IpmiHandler(object):
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
     def handle_attach_media(self):
-        self.ipmicmd.attach_remote_media(self.inputdata.filename)
+        try:
+            self.ipmicmd.attach_remote_media(self.inputdata.filename)
+        except pygexc.UnsupportedFunctionality as uf:
+            self.output.put(msg.ConfluentNodeError(self.node, str(uf)))
 
     def handle_detach_media(self):
         self.ipmicmd.detach_remote_media()
