@@ -255,6 +255,11 @@ def attribute_is_invalid(attrname, attrval):
         return True
     if 'type' in allattributes.node[attrname]:
         if not isinstance(attrval, allattributes.node[attrname]['type']):
+            # it is valid if it is {'value': actualvalue}
+            if (isinstance(attrval, dict) and 'value' in attrval and
+                    isinstance(attrval['value'],
+                               allattributes.node[attrname]['type'])):
+                return False
             # provide type checking for attributes with a specific type
             return True
     return False
@@ -1047,7 +1052,7 @@ class ConfigManager(object):
                 if attr not in ('nodes', 'noderange'):
                     attrval = fixup_attribute(attr, attribmap[group][attr])
                     if attribute_is_invalid(attr, attrval):
-                        errstr = "{0} attribute is invalid".format(attrname)
+                        errstr = "{0} attribute is invalid".format(attr)
                         raise ValueError(errstr)
                     attribmap[group][attr] = attrval
                 if attr == 'nodes':
