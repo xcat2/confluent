@@ -972,6 +972,7 @@ def discover_node(cfg, handler, info, nodename, manual):
     # the pubkeys, which is deferred for a little bit
     # Also, 'secure', when we have the needed infrastructure done
     # in some product or another.
+    curruuid = info.get('uuid', False)
     if 'pxe' in policies and info['handler'] == pxeh:
         return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
     elif ('permissive' in policies and handler.https_supported and lastfp and
@@ -1002,10 +1003,8 @@ def discover_node(cfg, handler, info, nodename, manual):
                 traceback.print_exc()
                 return False
             newnodeattribs = {}
-            curruuid = False
             if 'uuid' in info:
                 newnodeattribs['id.uuid'] = info['uuid']
-                curruuid = info['uuid']
             if 'serialnumber' in info:
                 newnodeattribs['id.serial'] = info['serialnumber']
             if 'modelnumber' in info:
