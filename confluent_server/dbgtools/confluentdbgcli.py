@@ -61,7 +61,10 @@ class GetInput(threading.Thread):
 inputthread = GetInput()
 inputthread.start()
 while True:
-    r, _, _ = select.select((conn,), (), (), 0.1)
+    try:
+        r, _, _ = select.select((conn,), (), (), 0.1)
+    except select.error:
+        continue
     if conn in r:
         sys.stdout.write(conn.recv(1))
     if pendingoutput is not None:
