@@ -22,24 +22,7 @@ class NodeHandler(immhandler.NodeHandler):
     devname = 'XCC'
 
     def preconfig(self):
-        ff = None
-        try:
-            ff = self.info['attributes']['enclosure-form-factor']
-        except KeyError:
-            try:
-                # an XCC should always have that set, this is sign of
-                # a bug, try to reset the BMC as a workaround
-                ipmicmd = self._get_ipmicmd()
-                ipmicmd.reset_bmc()
-                return "XCC with address {0} did not have attributes " \
-                       "declared, attempting to correct with " \
-                       "XCC reset".format(self.ipaddr)
-            except pygexc.IpmiException as e:
-                if (e.ipmicode != 193 and
-                        'Unauthorized name' not in str(e) and
-                        'Incorrect password' not in str(e)):
-                # raise an issue if anything other than to be expected
-                raise
+        ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
         # attempt to enable SMM

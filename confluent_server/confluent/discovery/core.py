@@ -823,12 +823,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         handler.probe()  # unicast interrogation as possible to get more data
         # switch concurrently
         # do some preconfig, for example, to bring a SMM online if applicable
-        errorstr = handler.preconfig()
-        if errorstr:
-            if manual:
-                raise exc.InvalidArgumentException(errorstr)
-            log.log({'error': errorstr})
-            return
+        handler.preconfig()
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
