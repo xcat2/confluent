@@ -88,6 +88,9 @@ class Command(object):
     def add_precede_key(self, keyname):
         self._prevkeyname = keyname
 
+    def add_precede_dict(self, dict):
+        self._prevdict = dict
+
     def handle_results(self, ikey, rc, res, errnodes=None):
         if 'error' in res:
             if errnodes is not None:
@@ -120,6 +123,9 @@ class Command(object):
                 if self._prevkeyname and self._prevkeyname in res[node]:
                     cprint('{0}: {2}->{1}'.format(
                         node, val, res[node][self._prevkeyname]['value']))
+                elif self._prevdict and node in self._prevdict:
+                    cprint('{0}: {2}->{1}'.format(
+                        node, val, self._prevdict[node]))
                 else:
                     cprint('{0}: {1}'.format(node, val))
         return rc
