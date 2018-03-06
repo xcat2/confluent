@@ -16,6 +16,7 @@
 # this will implement noderange grammar
 
 
+import confluent.exceptions as exc
 import codecs
 import struct
 import eventlet.green.socket as socket
