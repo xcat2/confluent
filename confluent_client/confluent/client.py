@@ -53,6 +53,7 @@ def _parseserver(string):
 
 class Command(object):
     def __init__(self, server=None):
+        self._prevdict = None
         self._prevkeyname = None
         self.connection = None
         self._currnoderange = None
