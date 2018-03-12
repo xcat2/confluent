@@ -400,7 +400,7 @@ def resourcehandler_backend(env, start_response):
                ('Pragma', 'no-cache'),
                ('X-Content-Type-Options', 'nosniff'),
                ('Content-Security-Policy', "default-src 'self'"),
-               ('X-XSS-Protection', '1'), ('X-Frame-Options', 'deny'),
+               ('X-XSS-Protection', '1; mode=block'), ('X-Frame-Options', 'deny'),
                ('Strict-Transport-Security', 'max-age=86400'),
                ('X-Permitted-Cross-Domain-Policies', 'none')]
     reqbody = None
