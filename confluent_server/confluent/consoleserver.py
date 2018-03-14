@@ -391,7 +391,6 @@ class ConsoleHandler(object):
         self._send_rcpts({'connectstate': self.connectstate})
 
     def _got_disconnected(self):
-        self.clearbuffer()
         if self.connectstate != 'unconnected':
             self.connectstate = 'unconnected'
             self.log(
@@ -400,6 +399,8 @@ class ConsoleHandler(object):
             self._send_rcpts({'connectstate': self.connectstate})
         if self._isalive:
             self._connect()
+        else:
+            self.clearbuffer()
 
     def close(self):
         self._isalive = False
