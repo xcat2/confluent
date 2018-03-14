@@ -924,7 +924,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # but... is this really ok?  could be on an upstream port or
         # erroneously put in the enclosure with no nodes yet
         # so first, see if the candidate node is a chain host
-        if info['maccount']:
+        if info.get('maccount', False):
             # discovery happened through switch
             nl = list(cfg.filter_node_attributes(
                 'enclosure.extends=' + nodename))
@@ -934,7 +934,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 macmap.get_node_fingerprint(nodename, cfg)
                 util.handler.cert_matches(fprint, handler.https_cert)
                 return
-        if (info['maccount'] and
+        if (info.get('maccount', False) and
                 not handler.discoverable_by_switch(info['maccount'])):
             errorstr = 'The detected node {0} was detected using switch, ' \
                        'however the relevant port has too many macs learned ' \
