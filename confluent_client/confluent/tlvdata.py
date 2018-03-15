@@ -38,13 +38,19 @@ def unicode_dictvalues(dictdata):
         elif isinstance(dictdata[key], datetime):
             dictdata[key] = dictdata[key].strftime('%Y-%m-%dT%H:%M:%S')
         elif isinstance(dictdata[key], list):
-            for i in xrange(len(dictdata[key])):
-                if isinstance(dictdata[key][i], str):
-                    dictdata[key][i] = decodestr(dictdata[key][i])
-                elif isinstance(dictdata[key][i], dict):
-                    unicode_dictvalues(dictdata[key][i])
+            _unicode_list(dictdata[key])
         elif isinstance(dictdata[key], dict):
             unicode_dictvalues(dictdata[key])
+
+
+def _unicode_list(currlist):
+    for i in xrange(len(currlist)):
+        if isinstance(currlist[i], str):
+            currlist[i] = decodestr(currlist[i])
+        elif isinstance(currlist[i], dict):
+            unicode_dictvalues(currlist[i])
+        elif isinstance(currlist[i], list):
+            _unicode_list(currlist[i])
 
 
 def send(handle, data):
