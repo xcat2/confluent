@@ -741,7 +741,10 @@ def _assemble_json(responses, resource=None, url=None, extension=None):
             for dk in rsp.iterkeys():
                 if dk in rspdata:
                     if isinstance(rspdata[dk], list):
-                        rspdata[dk].append(rsp[dk])
+                        if isinstance(rsp[dk], list):
+                            rspdata[dk].extend(rsp[dk])
+                        else:
+                            rspdata[dk].append(rsp[dk])
                     else:
                         rspdata[dk] = [rspdata[dk], rsp[dk]]
                 else:
