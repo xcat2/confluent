@@ -24,6 +24,7 @@ import netifaces
 import os
 import re
 import socket
+import ssl
 import struct
 
 
@@ -97,6 +98,20 @@ def monotonic_time():
     """
     # for now, just support POSIX systems
     return os.times()[4]
+
+
+def get_certificate_from_file(certfile):
+    cert = open(certfile, 'rb').read()
+    inpemcert = False
+    prunedcert = ''
+    for line in cert.split('\n'):
+        if '-----BEGIN CERTIFICATE-----' in line:
+            inpemcert = True
+        if inpemcert:
+            prunedcert += line
+        if '-----END CERTIFICATE-----' in line:
+            break
+    return ssl.PEM_cert_to_DER_cert(prunedcert)
 
 
 def get_fingerprint(certificate, algo='sha512'):
