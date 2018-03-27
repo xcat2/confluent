@@ -394,10 +394,10 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'management_controller', 'reset']
             and operation != 'retrieve'):
         return InputBMCReset(path, nodes, inputdata)
-    elif (path[:2] == ['configuration', 'management_controller', 'identifier']
+    elif (path[:3] == ['configuration', 'management_controller', 'identifier']
             and operation != 'retrieve'):
         return InputMCI(path, nodes, inputdata)
-    elif (path[:2] == ['configuration', 'management_controller', 'hostname']
+    elif (path[:3] == ['configuration', 'management_controller', 'hostname']
             and operation != 'retrieve'):
         return InputHostname(path, nodes, inputdata, configmanager)
     elif (path[:4] == ['configuration', 'management_controller',
