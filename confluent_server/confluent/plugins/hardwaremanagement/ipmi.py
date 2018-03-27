@@ -344,7 +344,7 @@ def perform_request(operator, node, element,
                                cfg, results).handle_request()
         except pygexc.IpmiException as ipmiexc:
             excmsg = str(ipmiexc)
-            if excmsg == 'Session no longer connected':
+            if excmsg in ('Session no longer connected', 'timeout'):
                 results.put(msg.ConfluentTargetTimeout(node))
             else:
                 results.put(msg.ConfluentNodeError(node, excmsg))
