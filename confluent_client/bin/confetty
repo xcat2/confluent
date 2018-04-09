@@ -763,7 +763,10 @@ def conserver_command(filehandle, localcommand):
 
 def get_command_bytes(filehandle, localcommand, cmdlen):
     while len(localcommand) < cmdlen:
-        ready, _, _ = select.select((filehandle,), (), (), 1)
+        try:
+            ready, _, _ = select.select((filehandle,), (), (), 1)
+        except select.error:
+            ready = ()
         if ready:
             localcommand += filehandle.read()
     return localcommand
@@ -776,7 +779,10 @@ def check_escape_seq(currinput, filehandle):
             sys.stdout.flush()
             return conserver_command(
                 filehandle, currinput[len(conserversequence):])
-        ready, _, _ = select.select((filehandle,), (), (), 3)
+        try:
+            ready, _, _ = select.select((filehandle,), (), (), 3)
+        except select.error:
+            ready = ()
         if not ready:  # 3 seconds of no typing
             break
         currinput += filehandle.read()
@@ -866,8 +872,11 @@ def check_power_state():
 
 while inconsole or not doexit:
     if inconsole:
-        rdylist, _, _ = select.select(
-            (sys.stdin, session.connection), (), (), 10)
+        try:
+            rdylist, _, _ = select.select(
+                (sys.stdin, session.connection), (), (), 10)
+        except select.error:
+            rdylist = ()
         for fh in rdylist:
             if fh == session.connection:
                 # this only should get called in the
