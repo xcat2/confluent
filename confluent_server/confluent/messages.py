@@ -397,6 +397,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'management_controller', 'identifier']
             and operation != 'retrieve'):
         return InputMCI(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'management_controller', 'hostname']
+            and operation != 'retrieve'):
+        return InputHostname(path, nodes, inputdata, configmanager)
     elif (path[:4] == ['configuration', 'management_controller',
             'net_interfaces', 'management'] and operation != 'retrieve'):
         return InputNetworkConfiguration(path, nodes, inputdata,
@@ -716,6 +719,25 @@ class InputBMCReset(ConfluentInputMessage):
     ])
 
     def state(self, node):
+        return self.inputbynode[node]
+
+
+
+class InputHostname(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata, configmanager):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata or 'hostname' not in inputdata:
+            raise exc.InvalidArgumentException('missing hostname attribute')
+        if nodes is None:
+            raise exc.InvalidArgumentException(
+                'This only supports per-node input')
+        for expanded in configmanager.expand_attrib_expression(
+                nodes, inputdata['hostname']):
+            node, value = expanded
+            self.inputbynode[node] = value
+
+    def hostname(self, node):
         return self.inputbynode[node]
 
 
@@ -1297,6 +1319,17 @@ class MCI(ConfluentMessage):
         else:
             self.kvpairs = {name: kv}
 
+
+class Hostname(ConfluentMessage):
+    def __init__(self, name=None, hostname=None):
+        self.notnode = name is None
+        self.desc = 'BMC hostname'
+
+        kv = {'hostname': {'value': hostname}}
+        if self.notnode:
+            self.kvpairs = kv
+        else:
+            self.kvpairs = {name: kv}
 
 class DomainName(ConfluentMessage):
     def __init__(self, name=None, dn=None):

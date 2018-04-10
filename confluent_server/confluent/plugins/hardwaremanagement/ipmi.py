@@ -344,7 +344,7 @@ def perform_request(operator, node, element,
                                cfg, results).handle_request()
         except pygexc.IpmiException as ipmiexc:
             excmsg = str(ipmiexc)
-            if excmsg == 'Session no longer connected':
+            if excmsg in ('Session no longer connected', 'timeout'):
                 results.put(msg.ConfluentTargetTimeout(node))
             else:
                 results.put(msg.ConfluentNodeError(node, excmsg))
@@ -518,6 +518,8 @@ class IpmiHandler(object):
             return self.handle_reset()
         elif self.element[1:3] == ['management_controller', 'identifier']:
             return self.handle_identifier()
+        elif self.element[1:3] == ['management_controller', 'hostname']:
+            return self.handle_hostname()
         elif self.element[1:3] == ['management_controller', 'domain_name']:
             return self.handle_domain_name()
         elif self.element[1:3] == ['management_controller', 'ntp']:
@@ -984,6 +986,16 @@ class IpmiHandler(object):
         elif 'update' == self.op:
             mci = self.inputdata.mci(self.node)
             self.ipmicmd.set_mci(mci)
+            return
+
+    def handle_hostname(self):
+        if 'read' == self.op:
+            hostname = self.ipmicmd.get_hostname()
+            self.output.put(msg.Hostname(self.node, hostname))
+            return
+        elif 'update' == self.op:
+            hostname = self.inputdata.hostname(self.node)
+            self.ipmicmd.set_hostname(hostname)
             return
 
     def handle_domain_name(self):

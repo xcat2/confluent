@@ -191,7 +191,6 @@ def _parse_ssdp(peer, rsp, peerdata):
         _, code, _ = headlines[0].split(' ', 2)
     except ValueError:
         return
-    myurl = None
     if code == '200':
         if nid in peerdata:
             peerdatum = peerdata[nid]
@@ -208,7 +207,6 @@ def _parse_ssdp(peer, rsp, peerdata):
             header = header.strip()
             value = value.strip()
             if header == 'AL' or header == 'LOCATION':
-                myurl = value
                 if 'urls' not in peerdatum:
                     peerdatum['urls'] = [value]
                 elif value not in peerdatum['urls']:

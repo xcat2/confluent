@@ -67,6 +67,8 @@ cfgpaths = {
     'bmc.ipv4_gateway': (
         'configuration/management_controller/net_interfaces/management',
         'ipv4_gateway'),
+    'bmc.hostname': (
+        'configuration/management_controller/hostname', 'hostname'),
 }
 
 autodeps = {
