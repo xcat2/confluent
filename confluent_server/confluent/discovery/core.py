@@ -695,6 +695,9 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
         smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
         pkey = cd[nodename].get('pubkeys.tls_hardwaremanager', {}).get(
             'value', None)
+        if not pkey:
+            # We cannot continue through a break in the chain
+            return None, False
         if pkey:
             cv = util.TLSCertVerifier(
                 cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
