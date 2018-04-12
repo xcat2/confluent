@@ -1078,6 +1078,7 @@ def newnodes(added, deleting, configmanager):
     global attribwatcher
     global needaddhandled
     global nodeaddhandler
+    _map_unique_ids()
     configmanager.remove_watcher(attribwatcher)
     allnodes = configmanager.list_nodes()
     attribwatcher = configmanager.watch_attributes(
