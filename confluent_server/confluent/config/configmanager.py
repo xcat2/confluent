@@ -1684,19 +1684,33 @@ def restore_db_from_directory(location, password):
         if e.errno == 2:
             raise Exception("Cannot restore without keys, this may be a "
                             "redacted dump")
+    try:
+        moreglobals = json.load(open(os.path.join(location, 'globals.json')))
+        for globvar in moreglobals:
+            set_global(globvar, moreglobals[globvar])
+    except IOError as e:
+        if e.errno != 2:
+            raise
     with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
         cfgdata = cfgfile.read()
         ConfigManager(tenant=None)._load_from_json(cfgdata)
 
 
-def dump_db_to_directory(location, password, redact=None):
-    if not redact:
+def dump_db_to_directory(location, password, redact=None, skipkeys=False):
+    if not redact and not skipkeys:
         with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
             cfgfile.write(_dump_keys(password))
             cfgfile.write('\n')
     with open(os.path.join(location, 'main.json'), 'w') as cfgfile:
         cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
         cfgfile.write('\n')
+    bkupglobals = {}
+    for globvar in _cfgstore['globals']:
+        if globvar.endswith('_key'):
+            continue
+        bkupglobals[globvar] = _cfgstore['globals'][globvar]
+    if bkupglobals:
+        json.dump(bkupglobals, open(os.path.join(location, 'globals.json')))
     try:
         for tenant in os.listdir(
                 os.path.join(ConfigManager._cfgdir, '/tenants/')):
