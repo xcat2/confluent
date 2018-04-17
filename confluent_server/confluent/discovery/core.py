@@ -85,6 +85,7 @@ import eventlet
 import eventlet.greenpool
 import eventlet.semaphore
 
+autosensors = set()
 class nesteddict(dict):
 
     def __missing__(self, key):
@@ -350,7 +351,28 @@ def _parameterize_path(pathcomponents):
     return validselectors, keyparams, listrequested, childcoll
 
 
+def handle_autosense_config(operation, inputdata):
+    autosense = cfm.get_global('discovery.autosense')
+    autosense = autosense or autosense is None
+    if operation == 'retrieve':
+        yield msg.KeyValueData({'enabled': autosense})
+    elif operation == 'update':
+        enabled = inputdata['enabled']
+        if type(enabled) in (unicode, str):
+            enabled = enabled.lower() in ('true', '1', 'y', 'yes', 'enable',
+                                          'enabled')
+        if autosense == enabled:
+            return
+        cfm.set_global('discovery.autosense', enabled)
+        if enabled:
+            start_autosense()
+        else:
+            stop_autosense()
+
+
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+    if pathcomponents == ['discovery', 'autosense']:
+        return handle_autosense_config(operation, inputdata)
     if operation == 'retrieve':
         return handle_read_api_request(pathcomponents)
     elif (operation in ('update', 'create') and
@@ -398,6 +420,7 @@ def handle_read_api_request(pathcomponents):
     if len(pathcomponents) == 1:
         dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
         dirlist.append(msg.ChildCollection('rescan'))
+        dirlist.append(msg.ChildCollection('autosense'))
         return dirlist
     if not coll:
         return show_info(queryparms['by-mac'])
@@ -695,6 +718,9 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
         smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
         pkey = cd[nodename].get('pubkeys.tls_hardwaremanager', {}).get(
             'value', None)
+        if not pkey:
+            # We cannot continue through a break in the chain
+            return None, False
         if pkey:
             cv = util.TLSCertVerifier(
                 cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
@@ -1075,12 +1101,14 @@ def newnodes(added, deleting, configmanager):
     global attribwatcher
     global needaddhandled
     global nodeaddhandler
+    _map_unique_ids()
     configmanager.remove_watcher(attribwatcher)
     allnodes = configmanager.list_nodes()
     attribwatcher = configmanager.watch_attributes(
         allnodes, ('discovery.policy', 'net*.switch',
-                   'hardwaremanagement.manager', 'net*.switchport', 'id.uuid',
-                   'pubkeys.tls_hardwaremanager', 'net*.bootable'), _recheck_nodes)
+                   'hardwaremanagement.manager', 'net*.switchport',
+                   'id.uuid', 'pubkeys.tls_hardwaremanager',
+                   'net*.bootable'), _recheck_nodes)
     if nodeaddhandler:
         needaddhandled = True
     else:
@@ -1126,14 +1154,23 @@ def start_detection():
                    'hardwaremanagement.manager', 'net*.switchport', 'id.uuid',
                    'pubkeys.tls_hardwaremanager'), _recheck_nodes)
     cfg.watch_nodecollection(newnodes)
-    eventlet.spawn_n(slp.snoop, safe_detected)
-    eventlet.spawn_n(pxe.snoop, safe_detected)
+    autosense = cfm.get_global('discovery.autosense')
+    if autosense or autosense is None:
+        start_autosense()
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
         rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
 
     # eventlet.spawn_n(ssdp.snoop, safe_detected)
 
+def stop_autosense():
+    for watcher in list(autosensors):
+        watcher.kill()
+        autosensors.discard(watcher)
+
+def start_autosense():
+    autosensors.add(eventlet.spawn(slp.snoop, safe_detected))
+    autosensors.add(eventlet.spawn(pxe.snoop, safe_detected))
 
 
 nodes_by_fprint = {}
