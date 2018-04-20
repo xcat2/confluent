@@ -462,7 +462,7 @@ def handle_read_api_request(pathcomponents, configmanager):
 
 
 def dump_macinfo(macaddr):
-    macaddr = macaddr.replace('-', ':')
+    macaddr = macaddr.replace('-', ':').lower()
     info = _macmap.get(macaddr, None)
     if info is None:
         raise exc.NotFoundException(
