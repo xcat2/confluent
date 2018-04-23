@@ -278,10 +278,23 @@ def _tlshandler(bind_host, bind_port):
 
 def _tlsstartup(cnn):
     authname = None
-    cnn = ssl.wrap_socket(cnn, keyfile="/etc/confluent/privkey.pem",
-                          certfile="/etc/confluent/srvcert.pem",
-                          ssl_version=ssl.PROTOCOL_TLSv1,
-                          server_side=True)
+    try:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3
+        ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+        ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+        ctx.set_ciphers(
+            'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
+            'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384')
+        ctx.load_cert_chain('/etc/confluent/srvcert.pem',
+                            '/etc/confluent/privkey.pem')
+        cnn = ctx.wrap_socket(cnn, server_side=True)
+    except AttributeError:
+        # Older python, must fall back
+        cnn = ssl.wrap_socket(cnn, keyfile="/etc/confluent/privkey.pem",
+                              certfile="/etc/confluent/srvcert.pem",
+                              ssl_version=ssl.PROTOCOL_TLSv1,
+                              server_side=True)
     sessionhdl(cnn, authname)
 
 def removesocket():
