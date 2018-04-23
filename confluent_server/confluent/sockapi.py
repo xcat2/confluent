@@ -21,6 +21,8 @@
 #
 
 import atexit
+import ctypes
+import ctypes.util
 import errno
 import os
 import pwd
@@ -29,6 +31,7 @@ import struct
 import sys
 import traceback
 
+import eventlet.green.select as select
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 import eventlet
@@ -54,6 +57,7 @@ except AttributeError:
     else:
         SO_PEERCRED = 17
 
+plainsocket = None
 
 class ClientConsole(object):
     def __init__(self, client):
@@ -252,6 +256,7 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
 
 
 def _tlshandler(bind_host, bind_port):
+    global plainsocket
     plainsocket = socket.socket(socket.AF_INET6)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -336,6 +341,36 @@ class SockApi(object):
         global tracelog
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
+        self.tlsserver = None
+        if self.should_run_remoteapi():
+            self.start_remoteapi()
+        else:
+            eventlet.spawn_n(self.watch_for_cert)
+        self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
+
+    def watch_for_cert(self):
+        libc = ctypes.CDLL(ctypes.util.find_library('c'))
+        watcher = libc.inotify_init()
+        if libc.inotify_add_watch(watcher, '/etc/confluent/', 0x100) > -1:
+            while True:
+                select.select((watcher,), (), (), 86400)
+                if self.should_run_remoteapi():
+                    os.close(watcher)
+                    self.start_remoteapi()
+                    break
+
+    def should_run_remoteapi(self):
+        return os.path.exists("/etc/confluent/srvcert.pem")
+
+    def stop_remoteapi(self):
+        if self.tlsserver is None:
+            return
+        self.tlsserver.kill()
+        plainsocket.close()
+        self.tlsserver = None
+
+    def start_remoteapi(self):
+        if self.tlsserver is not None:
+            return
         self.tlsserver = eventlet.spawn(
             _tlshandler, self.bind_host, self.bind_port)
-        self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
