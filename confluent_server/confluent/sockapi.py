@@ -44,7 +44,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.core as pluginapi
 import confluent.shellserver as shellserver
-
+import confluent.swarm.manager as swarm
 
 tracelog = None
 auditlog = None
@@ -66,9 +66,9 @@ try:
     # so we need to ffi that in using a strategy compatible with PyOpenSSL
     import OpenSSL.SSL as libssln
     from OpenSSL._util import ffi
-    import OpenSSL.crypto as crypto
 except ImportError:
     libssl = None
+    ffi = None
 
 plainsocket = None
 
@@ -104,9 +104,6 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
     authenticated = False
     authdata = None
     cfm = None
-    if cert:
-        print(repr(crypto.dump_certificate(crypto.FILETYPE_ASN1,
-                                           cert)))
     if skipauth:
         authenticated = True
         cfm = configmanager.ConfigManager(tenant=None, username=authname)
@@ -119,6 +116,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
+        if 'swarm' in response:
+            return swarm.handle_connection(connection, cert, response['swarm'])
         authname = response['username']
         passphrase = response['password']
         # note(jbjohnso): here, we need to authenticate, but not
@@ -134,6 +133,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
+    if 'swarm' in request and skipauth:
+        swarm.handle_connection(connection, None, request['swarm'], local=True)
     while request is not None:
         try:
             process_request(
@@ -192,7 +193,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
         if operation == 'start':
             return start_term(authname, cfm, connection, params, path,
                               authdata, skipauth)
-        elif operation == 'shutdown':
+        elif operation == 'shutdown' and skipauth:
             configmanager.ConfigManager.shutdown()
         else:
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
