@@ -57,6 +57,19 @@ except AttributeError:
     else:
         SO_PEERCRED = 17
 
+try:
+    # Python core TLS despite improvements still has no support for custom
+    # verify functions.... try to use PyOpenSSL where available to support
+    # client certificates with custom verify
+    import eventlet.green.OpenSSL.SSL as libssl
+    # further, not even pyopenssl exposes SSL_CTX_set_cert_verify_callback
+    # so we need to ffi that in using a strategy compatible with PyOpenSSL
+    import OpenSSL.SSL as libssln
+    from OpenSSL._util import ffi
+    import OpenSSL.crypto as crypto
+except ImportError:
+    libssl = None
+
 plainsocket = None
 
 class ClientConsole(object):
@@ -86,11 +99,14 @@ def send_data(connection, data):
             raise
 
 
-def sessionhdl(connection, authname, skipauth=False):
+def sessionhdl(connection, authname, skipauth=False, cert=None):
     # For now, trying to test the console stuff, so let's just do n4.
     authenticated = False
     authdata = None
     cfm = None
+    if cert:
+        print(repr(crypto.dump_certificate(crypto.FILETYPE_ASN1,
+                                           cert)))
     if skipauth:
         authenticated = True
         cfm = configmanager.ConfigManager(tenant=None, username=authname)
@@ -275,14 +291,51 @@ def _tlshandler(bind_host, bind_port):
         cnn, addr = plainsocket.accept()
         eventlet.spawn_n(_tlsstartup, cnn)
 
+@ffi.callback("int(*)( X509_STORE_CTX *, void*)")
+def verify_stub(store, misc):
+    return 1
 
 def _tlsstartup(cnn):
     authname = None
-    cnn = ssl.wrap_socket(cnn, keyfile="/etc/confluent/privkey.pem",
-                          certfile="/etc/confluent/srvcert.pem",
-                          ssl_version=ssl.PROTOCOL_TLSv1,
-                          server_side=True)
-    sessionhdl(cnn, authname)
+    cert = None
+    if libssl:
+        # most fully featured SSL function
+        ctx = libssl.Context(libssl.SSLv23_METHOD)
+        ctx.set_options(libssl.OP_NO_SSLv2 | libssl.OP_NO_SSLv3 |
+                        libssl.OP_NO_TLSv1 | libssl.OP_NO_TLSv1_1 |
+                        libssl.OP_CIPHER_SERVER_PREFERENCE)
+        ctx.set_cipher_list(
+            'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
+            'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384')
+        ctx.use_certificate_file('/etc/confluent/srvcert.pem')
+        ctx.use_privatekey_file('/etc/confluent/privkey.pem')
+        ctx.set_verify(libssln.VERIFY_PEER, lambda *args: True)
+        libssln._lib.SSL_CTX_set_cert_verify_callback(ctx._context,
+                                                      verify_stub, ffi.NULL)
+        cnn = libssl.Connection(ctx, cnn)
+        cnn.set_accept_state()
+        cnn.do_handshake()
+        cert = cnn.get_peer_certificate()
+    else:
+        try:
+            # Try relatively newer python TLS function
+            ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            ctx.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3
+            ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+            ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+            ctx.set_ciphers(
+                'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
+                'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384')
+            ctx.load_cert_chain('/etc/confluent/srvcert.pem',
+                                '/etc/confluent/privkey.pem')
+            cnn = ctx.wrap_socket(cnn, server_side=True)
+        except AttributeError:
+            # Python 2.6 era, go with best effort
+            cnn = ssl.wrap_socket(cnn, keyfile="/etc/confluent/privkey.pem",
+                                  certfile="/etc/confluent/srvcert.pem",
+                                  ssl_version=ssl.PROTOCOL_TLSv1,
+                                  server_side=True)
+    sessionhdl(cnn, authname, cert=cert)
 
 def removesocket():
     try:
