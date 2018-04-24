@@ -25,7 +25,7 @@ pending_invites = {}
 def create_server_invitation(servername):
     invitation = os.urandom(66)
     pending_invites[servername] = invitation
-    return base64.b64encode(invitation)
+    return base64.b64encode(servername + '@' + invitation)
 
 def create_client_proof(invitation, mycert, peercert):
     return hmac.new(invitation, peercert + mycert, hashlib.sha256).digest()
