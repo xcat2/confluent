@@ -23,7 +23,7 @@ import eventlet.green.ssl as ssl
 try:
     import OpenSSL.crypto as crypto
 except ImportError:
-    # while not always required, we use pyopenssl required for at least swarm
+    # while not always required, we use pyopenssl required for at least collective
     crypto = None
 
 swarmcerts = {}
@@ -39,7 +39,7 @@ def handle_connection(connection, cert, swarmrequest, local=False):
         if 'invite' == operation:
             name = swarmrequest['invite']['name']
             invitation = invites.create_server_invitation(name)
-            tlvdata.send(connection, {'swarm': {'invitation': invitation}})
+            tlvdata.send(connection, {'collective': {'invitation': invitation}})
         if 'join' == operation:
             invitation = swarmrequest['invitation']
             invitation = base64.b64decode(invitation)
@@ -60,10 +60,10 @@ def handle_connection(connection, cert, swarmrequest, local=False):
                 invitation, mycert, cert))
             tlvdata.recv(remote)  # ignore banner
             tlvdata.recv(remote)  # ignore authpassed: 0
-            tlvdata.send(remote, {'swarm': {'operation': 'joinchallenge',
+            tlvdata.send(remote, {'collective': {'operation': 'joinchallenge',
                                             'name': name, 'hmac': proof}})
             rsp = tlvdata.recv(remote)
-            proof = rsp['swarm']['approval']
+            proof = rsp['collective']['approval']
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
                 return
@@ -77,6 +77,6 @@ def handle_connection(connection, cert, swarmrequest, local=False):
             return
         myrsp = base64.b64encode(myrsp)
         swarmcerts[swarmrequest['name']] = cert
-        tlvdata.send(connection, {'swarm': {'approval': myrsp}})
+        tlvdata.send(connection, {'collective': {'approval': myrsp}})
         clientready = tlvdata.recv(connection)
         print(repr(clientready))

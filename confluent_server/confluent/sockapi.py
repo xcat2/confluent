@@ -44,7 +44,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.core as pluginapi
 import confluent.shellserver as shellserver
-import confluent.swarm.manager as swarm
+import confluent.collective.manager as collective
 
 tracelog = None
 auditlog = None
@@ -116,8 +116,9 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
-        if 'swarm' in response:
-            return swarm.handle_connection(connection, cert, response['swarm'])
+        if 'collective' in response:
+            return collective.handle_connection(connection, cert,
+                                           response['collective'])
         authname = response['username']
         passphrase = response['password']
         # note(jbjohnso): here, we need to authenticate, but not
@@ -133,8 +134,9 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
-    if 'swarm' in request and skipauth:
-        swarm.handle_connection(connection, None, request['swarm'], local=True)
+    if 'collective' in request and skipauth:
+        collective.handle_connection(connection, None, request['collective'],
+                                     local=True)
     while request is not None:
         try:
             process_request(
