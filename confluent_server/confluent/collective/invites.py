@@ -23,9 +23,10 @@ import os
 pending_invites = {}
 
 def create_server_invitation(servername):
+    servername = servername.encode('utf-8')
     invitation = os.urandom(66)
     pending_invites[servername] = invitation
-    return base64.b64encode(servername + '@' + invitation)
+    return base64.b64encode(servername + b'@' + invitation)
 
 def create_client_proof(invitation, mycert, peercert):
     return hmac.new(invitation, peercert + mycert, hashlib.sha256).digest()
@@ -36,6 +37,7 @@ def check_server_proof(invitation, mycert, peercert, proof):
     return proof == validproof
 
 def check_client_proof(servername, mycert, peercert, proof):
+    servername = servername.encode('utf-8')
     invitation = pending_invites[servername]
     validproof = hmac.new(invitation, mycert + peercert, hashlib.sha256
                           ).digest()
