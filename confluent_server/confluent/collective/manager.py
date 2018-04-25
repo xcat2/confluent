@@ -43,7 +43,7 @@ def handle_connection(connection, cert, request, local=False):
         if 'join' == operation:
             invitation = request['invitation']
             invitation = base64.b64decode(invitation)
-            name, invitation = invitation.split('@')
+            name, invitation = invitation.split('@', 1)
             host = request['server']
             remote = socket.create_connection((host, 13001))
             # This isn't what it looks like.  We do CERT_NONE to disable
@@ -66,17 +66,22 @@ def handle_connection(connection, cert, request, local=False):
             proof = rsp['collective']['approval']
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
+                tlvdata.send(connection,
+                             {'errorcode': 500,
+                              'error': 'Response failed validation'})
                 return
+            tlvdata.send(remote, {'collective': 'success'})
     if 'joinchallenge' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
         myrsp = invites.check_client_proof(request['name'], mycert,
                                            cert, proof)
         if not myrsp:
+            tlvdata.send(connection, {'error': 'Invalid token'})
             connection.close()
             return
         myrsp = base64.b64encode(myrsp)
-        collcerts[request['name']] = cert
         tlvdata.send(connection, {'collective': {'approval': myrsp}})
         clientready = tlvdata.recv(connection)
         print(repr(clientready))
+        collcerts[request['name']] = cert
