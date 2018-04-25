@@ -135,7 +135,7 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
     if 'collective' in request and skipauth:
-        collective.handle_connection(connection, None, request['collective'],
+        return collective.handle_connection(connection, None, request['collective'],
                                      local=True)
     while request is not None:
         try:

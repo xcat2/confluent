@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import base64
-import confluent.swarm.invites as invites
+import confluent.collective.invites as invites
 import confluent.tlvdata as tlvdata
 import confluent.util as util
 import eventlet.green.socket as socket
@@ -26,25 +26,25 @@ except ImportError:
     # while not always required, we use pyopenssl required for at least collective
     crypto = None
 
-swarmcerts = {}
+collcerts = {}
 
 
-def handle_connection(connection, cert, swarmrequest, local=False):
-    operation = swarmrequest['operation']
+def handle_connection(connection, cert, request, local=False):
+    operation = request['operation']
     if cert:
         cert = crypto.dump_certificate(crypto.FILETYPE_ASN1, cert)
     else:
         if not local:
             return
         if 'invite' == operation:
-            name = swarmrequest['invite']['name']
+            name = request['name']
             invitation = invites.create_server_invitation(name)
             tlvdata.send(connection, {'collective': {'invitation': invitation}})
         if 'join' == operation:
-            invitation = swarmrequest['invitation']
+            invitation = request['invitation']
             invitation = base64.b64decode(invitation)
             name, invitation = invitation.split('@')
-            host = swarmrequest['server']
+            host = request['server']
             remote = socket.create_connection((host, 13001))
             # This isn't what it looks like.  We do CERT_NONE to disable
             # openssl verification, but then use the invitation as a
@@ -69,14 +69,14 @@ def handle_connection(connection, cert, swarmrequest, local=False):
                 return
     if 'joinchallenge' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
-        proof = base64.b64decode(swarmrequest['hmac'])
-        myrsp = invites.check_client_proof(swarmrequest['name'], mycert,
+        proof = base64.b64decode(request['hmac'])
+        myrsp = invites.check_client_proof(request['name'], mycert,
                                            cert, proof)
         if not myrsp:
             connection.close()
             return
         myrsp = base64.b64encode(myrsp)
-        swarmcerts[swarmrequest['name']] = cert
+        collcerts[request['name']] = cert
         tlvdata.send(connection, {'collective': {'approval': myrsp}})
         clientready = tlvdata.recv(connection)
         print(repr(clientready))
