@@ -38,6 +38,8 @@ def check_server_proof(invitation, mycert, peercert, proof):
 
 def check_client_proof(servername, mycert, peercert, proof):
     servername = servername.encode('utf-8')
+    if servername not in pending_invites:
+        return False
     invitation = pending_invites[servername]
     validproof = hmac.new(invitation, mycert + peercert, hashlib.sha256
                           ).digest()
