@@ -64,13 +64,16 @@ def handle_connection(connection, cert, request, local=False):
                                             'name': name, 'hmac': proof}})
             rsp = tlvdata.recv(remote)
             proof = rsp['collective']['approval']
+            proof = base64.b64decode(proof)
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
                 tlvdata.send(connection,
                              {'errorcode': 500,
                               'error': 'Response failed validation'})
                 return
-            tlvdata.send(remote, {'collective': 'success'})
+            tlvdata.send(remote, {'collective': {'success': True}})
+            tlvdata.send(connection, {'collective': {'status': 'Success'}})
+            #Ok, here start getting assimilated, connect to get the database and register for changes...
     if 'joinchallenge' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
@@ -83,5 +86,6 @@ def handle_connection(connection, cert, request, local=False):
         myrsp = base64.b64encode(myrsp)
         tlvdata.send(connection, {'collective': {'approval': myrsp}})
         clientready = tlvdata.recv(connection)
-        print(repr(clientready))
-        collcerts[request['name']] = cert
+        if clientready.get('collective', {}).get('success', False):
+            collcerts[request['name']] = cert
+            # store certificate signature for the collective trust
