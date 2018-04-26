@@ -24,7 +24,8 @@ pending_invites = {}
 
 def create_server_invitation(servername):
     servername = servername.encode('utf-8')
-    invitation = os.urandom(66)
+    randbytes = (3 - ((len(servername) + 2) % 3)) % 3 + 64
+    invitation = os.urandom(randbytes)
     pending_invites[servername] = invitation
     return base64.b64encode(servername + b'@' + invitation)
 
