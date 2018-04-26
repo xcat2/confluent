@@ -363,6 +363,24 @@ def set_global(globalname, value):
     ConfigManager._bg_sync_to_file()
 
 
+def add_collective_member(name, address, fingerprint):
+    try:
+        name = name.encode('utf-8')
+    except AttributeError:
+        pass
+    if _cfgstore is None:
+        init()
+    if 'collective' not in _cfgstore:
+        _cfgstore['collective'] = {}
+    _cfgstore['collective'][name] = {'address': address,
+                                     'fingerprint': fingerprint}
+    with _dirtylock:
+        if 'collectivedirty' not in _cfgstore:
+            _cfgstore['collectivedirty'] = set([])
+        _cfgstore['collectivedirty'].add(name)
+    ConfigManager._bg_sync_to_file()
+
+
 def _mark_dirtykey(category, key, tenant=None):
     if type(key) in (str, unicode):
         key = key.encode('utf-8')
@@ -1521,6 +1539,8 @@ class ConfigManager(object):
         global _cfgstore
         _cfgstore = {}
         rootpath = cls._cfgdir
+        _load_dict_from_dbm(['collective'], os.path.join(rootpath,
+                                                         "collective"))
         _load_dict_from_dbm(['globals'], os.path.join(rootpath, "globals"))
         for confarea in _config_areas:
             _load_dict_from_dbm(['main', confarea], os.path.join(rootpath, confarea))
@@ -1579,6 +1599,22 @@ class ConfigManager(object):
                             del globalf[globalkey]
             finally:
                 globalf.close()
+        if 'collectivedirty' in _cfgstore:
+            collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
+                                   'c', 384)
+            try:
+                with _dirtylock:
+                    colls = copy.deepcopy(_cfgstore['collectivedirty'])
+                    del _cfgstore['collectivedirty']
+                for coll in colls:
+                    if coll in _cfgstore['collective']:
+                        collectivef[coll] = cPickle.dumps(
+                            _cfgstore['collective'][coll])
+                    else:
+                        if coll in collectivef:
+                            del globalf[coll]
+            finally:
+                collectivef.close()
         if 'dirtykeys' in _cfgstore:
             with _dirtylock:
                 currdirt = copy.deepcopy(_cfgstore['dirtykeys'])

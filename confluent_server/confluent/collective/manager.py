@@ -16,6 +16,7 @@
 
 import base64
 import confluent.collective.invites as invites
+import confluent.config.configmanager as cfm
 import confluent.tlvdata as tlvdata
 import confluent.util as util
 import eventlet.green.socket as socket
@@ -26,8 +27,7 @@ except ImportError:
     # while not always required, we use pyopenssl required for at least collective
     crypto = None
 
-collcerts = {}
-
+currentleader = None
 
 def handle_connection(connection, cert, request, local=False):
     operation = request['operation']
@@ -67,13 +67,8 @@ def handle_connection(connection, cert, request, local=False):
             proof = base64.b64decode(proof)
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
-                tlvdata.send(connection,
-                             {'errorcode': 500,
-                              'error': 'Response failed validation'})
                 return
-            tlvdata.send(remote, {'collective': {'success': True}})
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
-            #Ok, here start getting assimilated, connect to get the database and register for changes...
     if 'joinchallenge' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
@@ -84,8 +79,16 @@ def handle_connection(connection, cert, request, local=False):
             connection.close()
             return
         myrsp = base64.b64encode(myrsp)
-        tlvdata.send(connection, {'collective': {'approval': myrsp}})
-        clientready = tlvdata.recv(connection)
-        if clientready.get('collective', {}).get('success', False):
-            collcerts[request['name']] = cert
-            # store certificate signature for the collective trust
+        fprint = util.get_fingerprint(cert)
+        cfm.add_collective_member(request['name'],
+                                  connection.getpeername()[0], fprint)
+        tlvdata.send(connection,
+                     {'collective': {'approval': myrsp,
+                                     'leader': get_leader(connection)}})
+
+
+def get_leader(connection):
+    global currentleader
+    if currentleader is None:
+        currentleader = connection.getsockname()[0]
+    return currentleader
