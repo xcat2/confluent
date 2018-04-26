@@ -1727,6 +1727,14 @@ def restore_db_from_directory(location, password):
     except IOError as e:
         if e.errno != 2:
             raise
+    try:
+        collective = json.load(open(os.path.join(location, 'collective.json')))
+        for coll in collective:
+            add_collective_member(coll, collective[coll]['address'],
+                                  collective[coll]['fingerprint'])
+    except IOError as e:
+        if e.errno != 2:
+            raise
     with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
         cfgdata = cfgfile.read()
         ConfigManager(tenant=None)._load_from_json(cfgdata)
@@ -1736,6 +1744,10 @@ def dump_db_to_directory(location, password, redact=None, skipkeys=False):
     if not redact and not skipkeys:
         with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
             cfgfile.write(_dump_keys(password))
+            cfgfile.write('\n')
+    if 'collective' in _cfgstore:
+        with open(os.path.join(location, 'collective.json'), 'w') as cfgfile:
+            cfgfile.write(json.dumps(_cfgstore['collective']))
             cfgfile.write('\n')
     with open(os.path.join(location, 'main.json'), 'w') as cfgfile:
         cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
