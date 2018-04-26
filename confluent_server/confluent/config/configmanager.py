@@ -380,6 +380,8 @@ def add_collective_member(name, address, fingerprint):
         _cfgstore['collectivedirty'].add(name)
     ConfigManager._bg_sync_to_file()
 
+def get_collective_member(name):
+    return _cfgstore['collective'][name]
 
 def _mark_dirtykey(category, key, tenant=None):
     if type(key) in (str, unicode):
