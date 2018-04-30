@@ -64,7 +64,7 @@ def handle_connection(connection, cert, request, local=False):
                 invitation, mycert, cert))
             tlvdata.recv(remote)  # ignore banner
             tlvdata.recv(remote)  # ignore authpassed: 0
-            tlvdata.send(remote, {'collective': {'operation': 'joinchallenge',
+            tlvdata.send(remote, {'collective': {'operation': 'enroll',
                                                  'name': name, 'hmac': proof}})
             rsp = tlvdata.recv(remote)
             proof = rsp['collective']['approval']
@@ -74,7 +74,7 @@ def handle_connection(connection, cert, request, local=False):
                 return
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
             currentleader = rsp['collective']['leader']
-    if 'joinchallenge' == operation:
+    if 'enroll' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
         myrsp = invites.check_client_proof(request['name'], mycert,
