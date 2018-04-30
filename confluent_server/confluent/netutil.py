@@ -123,3 +123,27 @@ def get_prefix_len_for_ip(ip):
                 maskn = maskn << 1 & 0xffffffff
             return nbits
     raise exc.NotImplementedException("Non local addresses not supported")
+
+def addresses_match(addr1, addr2):
+    """Check two network addresses for similarity
+
+    Is it zero padded in one place, not zero padded in another?  Is one place by name and another by IP??
+    Is one context getting a normal IPv4 address and another getting IPv4 in IPv6 notation?
+    This function examines the two given names, performing the required changes to compare them for equivalency
+
+    :param addr1:
+    :param addr2:
+    :return: True if the given addresses refer to the same thing
+    """
+    for addrinfo in socket.getaddrinfo(addr1, 0, 0, socket.SOCK_STREAM):
+        rootaddr1 = socket.inet_pton(addrinfo[0], addrinfo[4][0])
+        if addrinfo[0] == socket.AF_INET6 and rootaddr1[:12] == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff':
+            # normalize to standard IPv4
+            rootaddr1 = rootaddr1[-4:]
+        for otherinfo in socket.getaddrinfo(addr2, 0, 0, socket.SOCK_STREAM):
+            otheraddr = socket.inet_pton(otherinfo[0], otherinfo[4][0])
+            if otherinfo[0] == socket.AF_INET6 and otheraddr[:12] == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff':
+                otheraddr = otheraddr[-4:]
+            if otheraddr == rootaddr1:
+                return True
+    return False
