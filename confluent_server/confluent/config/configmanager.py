@@ -1770,7 +1770,8 @@ def dump_db_to_directory(location, password, redact=None, skipkeys=False):
         cfgfile.write('\n')
     bkupglobals = get_globals()
     if bkupglobals:
-        json.dump(bkupglobals, open(os.path.join(location, 'globals.json')))
+        json.dump(bkupglobals, open(os.path.join(location, 'globals.json'),
+                                    'w'))
     try:
         for tenant in os.listdir(
                 os.path.join(ConfigManager._cfgdir, '/tenants/')):
