@@ -19,6 +19,7 @@ import confluent.collective.invites as invites
 import confluent.config.configmanager as cfm
 import confluent.tlvdata as tlvdata
 import confluent.util as util
+import eventlet
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 try:
