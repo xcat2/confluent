@@ -353,6 +353,13 @@ def set_global(globalname, value):
     """
     if _cfgstore is None:
         init()
+    try:
+        globalname = globalname.encode('utf-8')
+    except AttributeError:
+        # We have to remove the unicode-ness of the string,
+        # but if it is already bytes in python 3, then we will
+        # get an attributeerror, so pass
+        pass
     with _dirtylock:
         if 'dirtyglobals' not in _cfgstore:
             _cfgstore['dirtyglobals'] = set()
@@ -1684,7 +1691,10 @@ def _restore_keys(jsond, password, newpassword=None):
     # the file, and newpassword to use, (also check the service.cfg file)
     global _masterkey
     global _masterintegritykey
-    keydata = json.loads(jsond)
+    if isinstance(jsond, dict):
+        keydata = jsond
+    else:
+        keydata = json.loads(jsond)
     cryptkey = _parse_key(keydata['cryptkey'], password)
     integritykey = _parse_key(keydata['integritykey'], password)
     conf.init_config()
@@ -1745,6 +1755,7 @@ def restore_db_from_directory(location, password):
             raise
     try:
         collective = json.load(open(os.path.join(location, 'collective.json')))
+        _cfgstore['collective'] = {}
         for coll in collective:
             add_collective_member(coll, collective[coll]['address'],
                                   collective[coll]['fingerprint'])
