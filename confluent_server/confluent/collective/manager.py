@@ -32,7 +32,7 @@ except ImportError:
 currentleader = None
 
 
-def connect_to_leader(cert=None):
+def connect_to_leader(cert=None, name=None):
     remote = socket.create_connection((currentleader, 13001))
     # TLS cert validation is custom and will not pass normal CA vetting
     # to override completely in the right place requires enormous effort, so just defer until after connect
@@ -46,7 +46,9 @@ def connect_to_leader(cert=None):
     if not util.cert_matches(fprint, remote.getpeercert(binary_form=True)):
         # probably Janeway up to something
         raise Exception("Certificate mismatch in the collective")
-    tlvdata.send(remote, {'collective': {'operation': 'connect'}})
+    tlvdata.recv(remote)  # the banner
+    tlvdata.recv(remote)  # authpassed... 0..
+    tlvdata.send(remote, {'collective': {'operation': 'connect', 'name': name}})
     keydata = tlvdata.recv(remote)
     colldata = tlvdata.recv(remote)
     globaldata = tlvdata.recv(remote)
@@ -102,7 +104,7 @@ def handle_connection(connection, cert, request, local=False):
                 return
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
             currentleader = rsp['collective']['leader']
-            eventlet.spawn_n(connect_to_leader, cert)
+            eventlet.spawn_n(connect_to_leader, cert, name)
     if 'enroll' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
@@ -135,13 +137,13 @@ def handle_connection(connection, cert, request, local=False):
                                    'redo invitation process'})
             return
         tlvdata.send(connection, cfm._dump_keys(None, False))
-        tlvdata.send(connection, cfm._cfgstore['collective]'])
+        tlvdata.send(connection, cfm._cfgstore['collective'])
         tlvdata.send(connection, cfm.get_globals())
         cfgdata = cfm.ConfigManager(None)._dump_to_json()
         tlvdata.send(connection, {'dbsize': len(cfgdata)})
-        connection.write(cfgdata)
+        connection.sendall(cfgdata)
         tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now, so far unused anyway
-        cfm.register_cfg_listener(drone, connection)
+        cfm.register_config_listener(drone, connection)
         # ok, we have a connecting member whose certificate checks out
         # He needs to bootstrap his configuration and subscribe it to updates
 
