@@ -116,6 +116,9 @@ def handle_connection(connection, cert, request, local=False):
             return
         myrsp = base64.b64encode(myrsp)
         fprint = util.get_fingerprint(cert)
+        myfprint = util.get_fingerprint(mycert)
+        cfm.add_collective_member(socket.gethostname(),
+                                  connection.getsockname()[0], myfprint)
         cfm.add_collective_member(request['name'],
                                   connection.getpeername()[0], fprint)
         tlvdata.send(connection,
