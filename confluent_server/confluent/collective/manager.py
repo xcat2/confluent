@@ -32,15 +32,20 @@ except ImportError:
 currentleader = None
 
 
-def connect_to_leader():
+def connect_to_leader(cert=None):
     remote = socket.create_connection((currentleader, 13001))
     # TLS cert validation is custom and will not pass normal CA vetting
     # to override completely in the right place requires enormous effort, so just defer until after connect
     remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE, keyfile='/etc/confluent/privkey.pem',
                              certfile='/etc/confluent/srvcert.pem')
-    collent = cfm.get_collective_member_by_address(currentleader)
-    if not util.cert_matches(remote.getpeercert(binary_form=True), collent['fingerprint']):
-        raise Exception("Certificate mismatch in the collective")  # probably Janeway up to something
+    if cert:
+        fprint = util.get_fingerprint(cert)
+    else:
+        collent = cfm.get_collective_member_by_address(currentleader)
+        fprint = collent['fingerprint']
+    if not util.cert_matches(fprint, remote.getpeercert(binary_form=True)):
+        # probably Janeway up to something
+        raise Exception("Certificate mismatch in the collective")
     tlvdata.send(remote, {'collective': {'operation': 'connect'}})
     keydata = tlvdata.recv(remote)
     colldata = tlvdata.recv(remote)
@@ -97,7 +102,7 @@ def handle_connection(connection, cert, request, local=False):
                 return
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
             currentleader = rsp['collective']['leader']
-            eventlet.spawn_n(connect_to_leader())
+            eventlet.spawn_n(connect_to_leader, cert)
     if 'enroll' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
