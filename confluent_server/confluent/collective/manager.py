@@ -59,6 +59,12 @@ def connect_to_leader(cert=None, name=None):
         if not ndata:
             raise Exception("Error doing initial DB transfer")
         dbjson += ndata
+    cfm._restore_keys(keydata, None)
+    cfm._cfgstore['collective'] = colldata
+    for globvar in globaldata:
+        cfm.set_global(globvar, globaldata[globvar])
+    cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
+    cfm.ConfigManager._bg_sync_to_file()
 
 
 def handle_connection(connection, cert, request, local=False):
