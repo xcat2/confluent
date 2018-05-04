@@ -374,6 +374,17 @@ cfgstreams = {}
 def register_config_listener(name, listener):
     cfgstreams[listener] = name
 
+def clear_configuration():
+    global _cfgstore
+    _cfgstore = {}
+    todelete = _config_areas + ('globals', 'collective')
+    for cfg in todelete:
+        try:
+            os.remove(os.path.join(ConfigManager._cfgdir, cfg))
+        except OSError as oe:
+            pass
+
+
 def add_collective_member(name, address, fingerprint):
     try:
         name = name.encode('utf-8')
