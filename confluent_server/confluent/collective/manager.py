@@ -69,6 +69,7 @@ def connect_to_leader(cert=None, name=None):
         cfm.set_global(globvar, globaldata[globvar])
     cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
     cfm.ConfigManager._bg_sync_to_file()
+    cfm.set_leader_channel(remote)
 
 
 def handle_connection(connection, cert, request, local=False):
