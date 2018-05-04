@@ -59,7 +59,11 @@ def connect_to_leader(cert=None, name=None):
         if not ndata:
             raise Exception("Error doing initial DB transfer")
         dbjson += ndata
+    cfm.clear_configuration()
     cfm._restore_keys(keydata, None)
+    for c in colldata:
+        cfm.add_collective_member(c, colldata[c]['address'],
+                                  colldata[c]['fingerprint'])
     cfm._cfgstore['collective'] = colldata
     for globvar in globaldata:
         cfm.set_global(globvar, globaldata[globvar])
