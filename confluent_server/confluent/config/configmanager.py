@@ -416,8 +416,7 @@ def follow_channel(channel):
             _txcount = rpc['txcount']
             if 'xid' in rpc:
                 _pendingchangesets[rpc['xid']].send()
-
-
+        msg = channel.recv(8)
 
 def add_collective_member(name, address, fingerprint):
     try:

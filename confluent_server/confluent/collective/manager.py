@@ -48,7 +48,8 @@ def connect_to_leader(cert=None, name=None):
         raise Exception("Certificate mismatch in the collective")
     tlvdata.recv(remote)  # the banner
     tlvdata.recv(remote)  # authpassed... 0..
-    tlvdata.send(remote, {'collective': {'operation': 'connect', 'name': name}})
+    tlvdata.send(remote, {'collective': {'operation': 'connect',
+                                         'name': name}})
     keydata = tlvdata.recv(remote)
     colldata = tlvdata.recv(remote)
     globaldata = tlvdata.recv(remote)
