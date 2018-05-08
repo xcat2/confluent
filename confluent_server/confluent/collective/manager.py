@@ -157,8 +157,9 @@ def handle_connection(connection, cert, request, local=False):
         cfgdata = cfm.ConfigManager(None)._dump_to_json()
         tlvdata.send(connection, {'dbsize': len(cfgdata)})
         connection.sendall(cfgdata)
-        #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now, so far unused anyway
-        cfm.register_config_listener(drone, connection)
+        #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
+        # so far unused anyway
+        cfm.relay_slaved_requests(drone, connection)
         # ok, we have a connecting member whose certificate checks out
         # He needs to bootstrap his configuration and subscribe it to updates
 
