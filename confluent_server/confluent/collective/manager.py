@@ -32,8 +32,10 @@ except ImportError:
 currentleader = None
 
 
-def connect_to_leader(cert=None, name=None):
-    remote = socket.create_connection((currentleader, 13001))
+def connect_to_leader(cert=None, name=None, leader=None):
+    if leader is None:
+        leader = currentleader
+    remote = socket.create_connection((leader, 13001))
     # TLS cert validation is custom and will not pass normal CA vetting
     # to override completely in the right place requires enormous effort, so just defer until after connect
     remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE, keyfile='/etc/confluent/privkey.pem',
@@ -41,7 +43,7 @@ def connect_to_leader(cert=None, name=None):
     if cert:
         fprint = util.get_fingerprint(cert)
     else:
-        collent = cfm.get_collective_member_by_address(currentleader)
+        collent = cfm.get_collective_member_by_address(leader)
         fprint = collent['fingerprint']
     if not util.cert_matches(fprint, remote.getpeercert(binary_form=True)):
         # probably Janeway up to something
@@ -51,6 +53,10 @@ def connect_to_leader(cert=None, name=None):
     tlvdata.send(remote, {'collective': {'operation': 'connect',
                                          'name': name}})
     keydata = tlvdata.recv(remote)
+    if 'error' in keydata:
+        if 'leader' in keydata:
+            return connect_to_leader(name=name, leader=keydata['leader'])
+        raise Exception(keydata['error'])
     colldata = tlvdata.recv(remote)
     globaldata = tlvdata.recv(remote)
     dbsize = tlvdata.recv(remote)['dbsize']
@@ -168,3 +174,19 @@ def get_leader(connection):
     if currentleader is None:
         currentleader = connection.getsockname()[0]
     return currentleader
+
+def startup():
+    members = list(cfm.list_collective())
+    if len(members) < 2:
+        # Not in collective mode, return
+        return
+    eventlet.spawn_n(start_collective)
+
+def start_collective():
+    myname = socket.gethostname()
+    for member in members:
+        if member == myname:
+            continue
+        ldrcandidate = cfm.get_collective_member(member)['address']
+        connect_to_leader(name=myname, leader=ldrcandidate)
+
