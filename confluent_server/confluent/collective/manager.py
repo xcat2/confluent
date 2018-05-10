@@ -84,7 +84,7 @@ def get_myname():
             return f.read()
     except IOError:
         myname = socket.gethostname()
-        with open('/etc/confluenut/cfg/myname', 'w') as f:
+        with open('/etc/confluent/cfg/myname', 'w') as f:
             f.write(myname)
         return myname
 
