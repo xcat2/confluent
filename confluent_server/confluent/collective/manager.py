@@ -78,6 +78,15 @@ def connect_to_leader(cert=None, name=None, leader=None):
     cfm.ConfigManager._bg_sync_to_file()
     cfm.follow_channel(remote)
 
+def get_myname():
+    try:
+        with open('/etc/confluent/cfg/myname', 'r') as f:
+            return f.read()
+    except IOError:
+        myname = socket.gethostname()
+        with open('/etc/confluenut/cfg/myname', 'w') as f:
+            f.write(myname)
+        return myname
 
 def handle_connection(connection, cert, request, local=False):
     global currentleader
@@ -122,6 +131,9 @@ def handle_connection(connection, cert, request, local=False):
                 return
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
             currentleader = rsp['collective']['leader']
+            f = open('/etc/confluent/cfg/myname', 'w')
+            f.write(name)
+            f.close()
             eventlet.spawn_n(connect_to_leader, cert, name)
     if 'enroll' == operation:
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
@@ -135,7 +147,7 @@ def handle_connection(connection, cert, request, local=False):
         myrsp = base64.b64encode(myrsp)
         fprint = util.get_fingerprint(cert)
         myfprint = util.get_fingerprint(mycert)
-        cfm.add_collective_member(socket.gethostname(),
+        cfm.add_collective_member(get_myname(),
                                   connection.getsockname()[0], myfprint)
         cfm.add_collective_member(request['name'],
                                   connection.getpeername()[0], fprint)
@@ -183,8 +195,8 @@ def startup():
     eventlet.spawn_n(start_collective)
 
 def start_collective():
-    myname = socket.gethostname()
-    for member in members:
+    myname = get_myname()
+    for member in cfm.list_collective():
         if member == myname:
             continue
         ldrcandidate = cfm.get_collective_member(member)['address']
