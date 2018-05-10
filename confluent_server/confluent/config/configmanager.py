@@ -27,21 +27,6 @@
 # encrypted fields do not support expressions, either as a source or
 # destination
 
-#TODO: clustered mode
-# In clustered case, only one instance is the 'master'.  If some 'def set'
-# is requested on a slave, it creates a transaction id and an event, firing it
-# to master.  It then waits on the event.  When the master reflects the data
-# back and that reflection data goes into memory, the wait will be satisfied
-# this means that set on a slave will be much longer.
-# the assumption is that only the calls to 'def set' need be pushed to/from
-# master and all the implicit activity that ensues will pan out since
-# the master is ensuring a strict ordering of transactions
-# for missed transactions, transaction log will be used to track transactions
-# transaction log can have a constrained size if we want, in which case full
-# replication will trigger.
-# uuid.uuid4() will be used for transaction ids
-
-
 # Note on the cryptography.  Default behavior is mostly just to pave the
 # way to meaningful security.  Root all potentially sensitive data in
 # one key.  That key is in plain sight, so not meaningfully protected
@@ -459,6 +444,9 @@ def add_collective_member(name, address, fingerprint):
             _cfgstore['collectivedirty'] = set([])
         _cfgstore['collectivedirty'].add(name)
     ConfigManager._bg_sync_to_file()
+
+def list_collective():
+    return iter(_cfgstore['collective'])
 
 def get_collective_member(name):
     return _cfgstore['collective'][name]

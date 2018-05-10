@@ -33,6 +33,7 @@ import confluent.consoleserver as consoleserver
 import confluent.core as confluentcore
 import confluent.httpapi as httpapi
 import confluent.log as log
+import confluent.collective.manager as collective
 try:
     import confluent.sockapi as sockapi
 except ImportError:
@@ -228,6 +229,7 @@ def run():
         _updatepidfile()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
+    collective.startup()
     if dbgif:
         oumask = os.umask(0077)
         try:
