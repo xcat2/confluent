@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import codecs
+import json
 import optparse
 import os
 import re
@@ -89,9 +90,10 @@ url = '/noderange/{0}/inventory/hardware/all/all'
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog <noderange> [serial|model|uuid|mac]")
+argparser.add_option('-j', '--json', action='store_true', help='Output JSON')
 (options, args) = argparser.parse_args()
 try:
-    noderange = sys.argv[1]
+    noderange = args[0]
 except IndexError:
     argparser.print_help()
     sys.exit(1)
@@ -114,6 +116,8 @@ if len(args) > 1:
                     filters.append(re.compile('mac address'))
                     url = '/noderange/{0}/inventory/hardware/all/all'
 try:
+    if options.json:
+        databynode = {}
     session = client.Command()
     for res in session.read(url.format(noderange)):
         printerror(res)
@@ -121,6 +125,10 @@ try:
             continue
         for node in res['databynode']:
             printerror(res['databynode'][node], node)
+            if options.json:
+                databynode[node] = dict(databynode.get(node, {}),
+                                        **res['databynode'][node])
+                continue
             if 'inventory' not in res['databynode'][node]:
                 continue
             for inv in res['databynode'][node]['inventory']:
@@ -150,6 +158,9 @@ try:
                     print(u'{0}: {1} {2}: {3}'.format(node, prefix,
                                                      pretty(datum),
                                                      info[datum]))
+    if options.json:
+        print(json.dumps(databynode, sort_keys=True, indent=4,
+                         separators=(',', ': ')))
 except KeyboardInterrupt:
     print('')
 sys.exit(exitcode)
