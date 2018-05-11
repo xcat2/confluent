@@ -125,16 +125,12 @@ try:
             continue
         for node in res['databynode']:
             printerror(res['databynode'][node], node)
-            if options.json:
-                databynode[node] = dict(databynode.get(node, {}),
-                                        **res['databynode'][node])
-                continue
             if 'inventory' not in res['databynode'][node]:
                 continue
             for inv in res['databynode'][node]['inventory']:
                 prefix = inv['name']
                 if not inv['present']:
-                    if not filters:
+                    if not filters and not options.json:
                         print '{0}: {1}: Not Present'.format(node, prefix)
                     continue
                 info = inv['information']
@@ -144,6 +140,11 @@ try:
                 info.pop('product_extra', None)
                 if 'memory_type' in info:
                     if not filters:
+                        if options.json:
+                            if node not in databynode:
+                                databynode[node] = {}
+                            databynode[node][prefix] = inv
+                            continue
                         print_mem_info(node, prefix, info)
                     continue
                 for datum in info:
@@ -155,6 +156,11 @@ try:
                             continue
                     if info[datum] is None:
                         continue
+                    if options.json:
+                        if node not in databynode:
+                            databynode[node] = {}
+                        databynode[node][prefix] = inv
+                        break
                     print(u'{0}: {1} {2}: {3}'.format(node, prefix,
                                                      pretty(datum),
                                                      info[datum]))
