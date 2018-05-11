@@ -446,7 +446,7 @@ def add_collective_member(name, address, fingerprint):
     ConfigManager._bg_sync_to_file()
 
 def list_collective():
-    return iter(_cfgstore['collective'])
+    return iter(_cfgstore.get('collective', ()))
 
 def get_collective_member(name):
     return _cfgstore['collective'][name]
@@ -1651,8 +1651,14 @@ class ConfigManager(object):
     @classmethod
     def _read_from_path(cls):
         global _cfgstore
+        global _txcount
         _cfgstore = {}
         rootpath = cls._cfgdir
+        try:
+            with open(os.path.join(rootpath, 'transactioncount', 'r')) as f:
+                _txcount = struct.unpack('!Q', f.read())[0]
+        except IOError:
+            pass
         _load_dict_from_dbm(['collective'], os.path.join(rootpath,
                                                          "collective"))
         _load_dict_from_dbm(['globals'], os.path.join(rootpath, "globals"))
@@ -1697,6 +1703,8 @@ class ConfigManager(object):
     def _sync_to_file(cls):
         if statelessmode:
             return
+        with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
+            f.write(struct.pack('!Q', _txcount))
         if 'dirtyglobals' in _cfgstore:
             with _dirtylock:
                 dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
