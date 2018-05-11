@@ -33,6 +33,7 @@ currentleader = None
 
 
 def connect_to_leader(cert=None, name=None, leader=None):
+    global currentleader
     if leader is None:
         leader = currentleader
     remote = socket.create_connection((leader, 13001))
