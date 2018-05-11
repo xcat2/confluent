@@ -79,6 +79,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
         cfm.set_global(globvar, globaldata[globvar])
     cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
     cfm.ConfigManager._bg_sync_to_file()
+    currentleader = leader
     cfm.follow_channel(remote)
 
 def get_myname():
