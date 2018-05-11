@@ -130,8 +130,13 @@ try:
             for inv in res['databynode'][node]['inventory']:
                 prefix = inv['name']
                 if not inv['present']:
-                    if not filters and not options.json:
-                        print '{0}: {1}: Not Present'.format(node, prefix)
+                    if not filters:
+                        if options.json:
+                            if node not in databynode:
+                                databynode[node] = {}
+                            databynode[node][prefix] = inv
+                        else:
+                            print '{0}: {1}: Not Present'.format(node, prefix)
                     continue
                 info = inv['information']
                 info.pop('board_extra', None)
