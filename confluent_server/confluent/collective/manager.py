@@ -55,6 +55,9 @@ def connect_to_leader(cert=None, name=None, leader=None):
     keydata = tlvdata.recv(remote)
     if 'error' in keydata:
         if 'leader' in keydata:
+            ldrc = cfm.get_collective_member_by_address(keydata['leader'])
+            if ldrc and ldrc['name'] == name:
+                raise Exception("Redirected to self")
             return connect_to_leader(name=name, leader=keydata['leader'])
         raise Exception(keydata['error'])
     colldata = tlvdata.recv(remote)

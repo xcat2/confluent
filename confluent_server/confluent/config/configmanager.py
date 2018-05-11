@@ -446,13 +446,19 @@ def add_collective_member(name, address, fingerprint):
     ConfigManager._bg_sync_to_file()
 
 def list_collective():
+    if _cfgstore is None:
+        init()
     return iter(_cfgstore.get('collective', ()))
 
 def get_collective_member(name):
-    return _cfgstore['collective'][name]
+    if _cfgstore is None:
+        init()
+    return _cfgstore.get('collective', {}).get(name, None)
 
 
 def get_collective_member_by_address(address):
+    if _cfgstore is None:
+        init()
     for name in _cfgstore.get('collective', {}):
         currdrone = _cfgstore['collective'][name]
         if netutil.addresses_match(address, currdrone['address']):
