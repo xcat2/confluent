@@ -408,6 +408,7 @@ def clear_configuration():
 cfgleader = None
 def follow_channel(channel):
     global cfgleader
+    global _txcount
     cfgleader = channel
     msg = channel.recv(8)
     while msg:
@@ -420,10 +421,10 @@ def follow_channel(channel):
                     raise Exception('Truncated message error')
                 rpc += nrpc
             rpc = cPickle.loads(rpc)
-            if 'function' in rpc:
-                globals()[rpc['function']](*rpc['args'])
             if 'txcount' in rpc:
                 _txcount = rpc['txcount']
+            if 'function' in rpc:
+                globals()[rpc['function']](*rpc['args'])
             if 'xid' in rpc and rpc['xid']:
                 _pendingchangesets[rpc['xid']].send()
         msg = channel.recv(8)
