@@ -51,8 +51,11 @@ def connect_to_leader(cert=None, name=None, leader=None):
         raise Exception("Certificate mismatch in the collective")
     tlvdata.recv(remote)  # the banner
     tlvdata.recv(remote)  # authpassed... 0..
+    if name is None:
+        name = get_myname()
     tlvdata.send(remote, {'collective': {'operation': 'connect',
-                                         'name': name}})
+                                         'name': name,
+                                         'txcount': cfm._txcount}})
     keydata = tlvdata.recv(remote)
     if 'error' in keydata:
         if 'leader' in keydata:
@@ -159,6 +162,23 @@ def handle_connection(connection, cert, request, local=False):
         tlvdata.send(connection,
                      {'collective': {'approval': myrsp,
                                      'leader': get_leader(connection)}})
+    if 'assimilate' == operation:
+        drone = request['name']
+        droneinfo = cfm.get_collective_member(drone)
+        if not util.cert_matches(droneinfo['fingerprint'], cert):
+            tlvdata.send(connection,
+                         {'error': 'Invalid certificate, '
+                                   'redo invitation process'})
+            return
+        if request['txcount'] < cfm._txcount:
+            tlvdata.send(connection,
+                         {'error': 'Refusing to be assimilated by inferior'
+                                   'transaction count',
+                          'txcount': cfm._txcount})
+            return
+        eventlet.spawn_n(connect_to_leader, None, None,
+                         leader=connection.getpeername()[0])
+        tlvdata.send(connection, {'status': 0})
     if 'connect' == operation:
         myself = connection.getsockname()[0]
         if myself != get_leader(connection):
@@ -171,8 +191,17 @@ def handle_connection(connection, cert, request, local=False):
         droneinfo = cfm.get_collective_member(drone)
         if not util.cert_matches(droneinfo['fingerprint'], cert):
             tlvdata.send(connection,
-                         {'error': 'Invalid certificate,'
+                         {'error': 'Invalid certificate, '
                                    'redo invitation process'})
+            return
+        if request['txcount'] > cfm._txcount:
+            retire_as_leader()
+            tlvdata.send(connection,
+                         {'error': 'Client has higher tranasaction count, '
+                                   'should assimilate me, connecting..',
+                          'txcount': cfm._txcount})
+            eventlet.spawn_n(connect_to_leader, None, None,
+                             connection.getpeername()[0])
             return
         tlvdata.send(connection, cfm._dump_keys(None, False))
         tlvdata.send(connection, cfm._cfgstore['collective'])
@@ -186,11 +215,29 @@ def handle_connection(connection, cert, request, local=False):
         # ok, we have a connecting member whose certificate checks out
         # He needs to bootstrap his configuration and subscribe it to updates
 
+def try_assimilate(drone):
+    pass
+
 def get_leader(connection):
-    global currentleader
-    if currentleader is None:
-        currentleader = connection.getsockname()[0]
+    if currentleader is None or connection.getpeername()[0] == currentleader:
+        become_leader(connection)
     return currentleader
+
+def retire_as_leader():
+    global currentleader
+    cfm.stop_leading()
+    currentleader = None
+
+def become_leader(connection):
+    global currentleader
+    currentleader = connection.getsockname()[0]
+    skipaddr = connection.getpeername()[0]
+    for member in cfm.list_collective():
+        dronecandidate = cfm.get_collective_member(member)['address']
+        if dronecandidate in (currentleader, skipaddr):
+            continue
+        eventlet.spawn_n(try_assimilate, dronecandidate)
+
 
 def startup():
     members = list(cfm.list_collective())

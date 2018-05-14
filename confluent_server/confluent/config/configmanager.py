@@ -395,6 +395,12 @@ def relay_slaved_requests(name, listener):
         msg = listener.recv(8)
 
 
+def stop_leading():
+    for stream in list(cfgstreams):
+        cfgstreams[stream].close()
+        del cfgstreams[stream]
+
+
 def clear_configuration():
     global _cfgstore
     _cfgstore = {}
