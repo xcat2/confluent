@@ -1668,7 +1668,7 @@ class ConfigManager(object):
         _cfgstore = {}
         rootpath = cls._cfgdir
         try:
-            with open(os.path.join(rootpath, 'transactioncount', 'r')) as f:
+            with open(os.path.join(rootpath, 'transactioncount'), 'r') as f:
                 _txcount = struct.unpack('!Q', f.read())[0]
         except IOError:
             pass
