@@ -35,18 +35,6 @@ import confluent.screensqueeze as sq
 
 exitcode = 0
 
-def printerror(res, node=None):
-    global exitcode
-    if 'errorcode' in res:
-        exitcode = res['errorcode']
-    if 'error' in res:
-        if node:
-            sys.stderr.write('{0}: {1}\n'.format(node, res['error']))
-        else:
-            sys.stderr.write('{0}\n'.format(res['error']))
-        if 'errorcode' not in res:
-            exitcode = 1
-
 
 def printfirm(node, prefix, data):
     if 'model' in data:
@@ -144,11 +132,11 @@ def show_firmware(session):
         for res in session.read(
                 '/noderange/{0}/inventory/firmware/all/{1}'.format(
                     noderange, component)):
-            printerror(res)
+            exitcode |= client.printerror(res)
             if 'databynode' not in res:
                 continue
             for node in res['databynode']:
-                printerror(res['databynode'][node], node)
+                exitcode |= client.printerror(res['databynode'][node], node)
                 if 'firmware' not in res['databynode'][node]:
                     continue
                 for inv in res['databynode'][node]['firmware']:

@@ -187,8 +187,10 @@ if setmode:
     for path in updatebypath:
         for fr in session.update('/noderange/{0}/{1}'.format(noderange, path),
                                 updatebypath[path]):
-            for node in fr['databynode']:
+            rcode |= client.printerror(fr)
+            for node in fr.get('databynode', []):
                 r = fr['databynode'][node]
+                exitcode |= client.printerror(r, node)
                 if 'error' in r:
                     sys.stderr.write(node + ': ' + r['error'] + '\n')
                     if 'errorcode' in r:

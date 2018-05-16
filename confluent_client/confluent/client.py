@@ -33,6 +33,20 @@ _attraliases = {
     'bmcpass': 'secret.hardwaremanagementpassword',
 }
 
+
+def printerror(res, node=None):
+    if 'errorcode' in res:
+        exitcode = res['errorcode']
+    if 'error' in res:
+        if node:
+            sys.stderr.write('{0}: {1}\n'.format(node, res['error']))
+        else:
+            sys.stderr.write('{0}\n'.format(res['error']))
+        if 'errorcode' not in res:
+            exitcode = 1
+    return exitcode
+
+
 def cprint(txt):
     print(txt)
     sys.stdout.flush()
