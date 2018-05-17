@@ -127,6 +127,7 @@ def update_firmware(session, filename):
         sys.stderr.write('{0}: {1}\n'.format(node, noderrs[node]))
 
 def show_firmware(session):
+    global exitcode
     firmware_shown = False
     for component in components:
         for res in session.read(

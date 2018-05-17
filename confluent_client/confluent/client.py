@@ -35,6 +35,7 @@ _attraliases = {
 
 
 def printerror(res, node=None):
+    exitcode = 0
     if 'errorcode' in res:
         exitcode = res['errorcode']
     if 'error' in res:
