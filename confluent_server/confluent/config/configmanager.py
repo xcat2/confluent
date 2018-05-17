@@ -1415,6 +1415,13 @@ class ConfigManager(object):
             tmpconfig[confarea] = {}
             for element in dumpdata[confarea]:
                 newelement = copy.deepcopy(dumpdata[confarea][element])
+                try:
+                    noderange._parser.parseString(
+                        '({0})'.format(element)).asList()
+                except noderange.pp.ParseException as pe:
+                    raise ValueError(
+                        '"{0}" is not a supported name, it must be renamed or '
+                        'removed from backup to restore'.format(element))
                 for attribute in dumpdata[confarea][element]:
                     if newelement[attribute] == '*REDACTED*':
                         raise Exception(
