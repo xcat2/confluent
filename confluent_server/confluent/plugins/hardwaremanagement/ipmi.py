@@ -597,10 +597,20 @@ class IpmiHandler(object):
                 ))
             elif self.op == 'update':
                 config = self.inputdata.netconfig(self.node)
-                self.ipmicmd.set_net_configuration(
-                                ipv4_address=config['ipv4_address'],
-                                ipv4_configuration=config['ipv4_configuration'],
-                                ipv4_gateway=config['ipv4_gateway'])
+                try:
+                    self.ipmicmd.set_net_configuration(
+                        ipv4_address=config['ipv4_address'],
+                        ipv4_configuration=config['ipv4_configuration'],
+                        ipv4_gateway=config['ipv4_gateway'])
+                except socket.error as se:
+                    self.output.put(msg.ConfluentNodeError(self.node,
+                                                           se.message))
+                except ValueError as e:
+                    if e.message == 'negative shift count':
+                        self.output.put(msg.ConfluentNodeError(
+                            self.node, 'Invalid prefix length given'))
+                    else:
+                        raise
 
     def handle_users(self):
         # Create user

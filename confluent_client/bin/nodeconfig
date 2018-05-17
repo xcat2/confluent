@@ -191,10 +191,6 @@ if setmode:
             for node in fr.get('databynode', []):
                 r = fr['databynode'][node]
                 exitcode |= client.printerror(r, node)
-                if 'error' in r:
-                    sys.stderr.write(node + ': ' + r['error'] + '\n')
-                    if 'errorcode' in r:
-                        rcode |= r['errorcode']
                 if 'value' not in r:
                     continue
                 keyval = r['value']
