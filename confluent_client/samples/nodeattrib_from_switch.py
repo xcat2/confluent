@@ -22,7 +22,7 @@ for mac in macs:
     macinfo = list(c.read('/networking/macs/by-mac/{0}'.format(mac)))[0]
     if 'possiblenode' in macinfo and macinfo['possiblenode']:
         if macinfo['macsonport'] > 1:
-            print('Ambiguous set of macs on port for ' + macinfo[
+            print('#Ambiguous set of macs on port for ' + macinfo[
                 'possiblenode'])
         prefix = int(mac.replace('-', '')[:6], 16) ^ 0b100000000000000000
         prefix = prefix << 8
