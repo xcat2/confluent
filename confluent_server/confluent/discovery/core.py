@@ -741,6 +741,8 @@ def get_smm_neighbor_fingerprints(smmaddr, cv):
         smmaddr = '[{0}]'.format(smmaddr)
     wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
     neighs = wc.grab_json_response('/scripts/neighdata.json')
+    if not neighs:
+        return
     for idx in (4, 5):
         if 'sha256' not in neighs[idx]:
             continue
