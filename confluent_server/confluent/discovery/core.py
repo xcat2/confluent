@@ -897,6 +897,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             # to match uuid
             encuuid = info['attributes'].get('chassis-uuid', None)
             if encuuid:
+                encuuid = encuuid[0]
                 enl = list(cfg.filter_node_attributes('id.uuid=' + encuuid))
                 if len(enl) != 1:
                     # errorstr = 'No SMM by given UUID known, *yet*'
