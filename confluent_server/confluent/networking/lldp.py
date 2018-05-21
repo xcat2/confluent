@@ -151,6 +151,9 @@ def _extract_extended_desc(info, source, integritychecked):
         info['peerdescription'] = source
 
 def sanitize(val):
+    # This is pretty much the same approach net-snmp takes.
+    # if the string is printable as-is, then just give it as-is
+    # if the string has non-printable, then hexify it
     val = str(val)
     for x in val.strip('\x00'):
         if ord(x) < 32 or ord(x) > 128:
@@ -161,7 +164,7 @@ def sanitize(val):
 def _init_lldp(data, iname, idx, idxtoportid, switch):
     if iname not in data:
         data[iname] = {'port': iname, 'portid': str(idxtoportid[idx]),
-                       'chassisid': str(_chassisidbyswitch[switch])}
+                       'chassisid': _chassisidbyswitch[switch]}
 
 def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
@@ -180,7 +183,8 @@ def _extract_neighbor_data_b(args):
         sid = str(sysid[1][6:])
     idxtoifname = {}
     idxtoportid = {}
-    _chassisidbyswitch[switch] = list(conn.walk('1.0.8802.1.1.2.1.3.2'))[0][1]
+    _chassisidbyswitch[switch] = sanitize(list(
+        conn.walk('1.0.8802.1.1.2.1.3.2'))[0][1])
     for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.3'):
         idx = oidindex[0][-1]
         idxtoportid[idx] = sanitize(oidindex[1])
