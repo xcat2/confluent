@@ -99,6 +99,10 @@ class Session(object):
                 elif errnum:
                     raise exc.ConfluentException(errnum.prettyPrint())
                 for ans in answers:
+                    if not obj[0].isPrefixOf(ans[0]):
+                        # PySNMP returns leftovers in a bulk command
+                        # filter out such leftovers
+                        break
                     yield ans
         except snmperr.WrongValueError:
             raise exc.TargetEndpointBadCredentials('Invalid SNMPv3 password')
