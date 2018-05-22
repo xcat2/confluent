@@ -186,7 +186,7 @@ def _expand_expression(nodes, configmanager, inputdata):
     except (SyntaxError, ValueError) as e:
         raise exc.InvalidArgumentException(
             'Bad confluent expression syntax (must use "{{" and "}}" if not '
-            'desiring confluent exparnsion): ' + str(e))
+            'desiring confluent expansion): ' + str(e))
 
 
 
