@@ -200,7 +200,7 @@ def _rpc_master_del_nodes(tenant, nodes):
     ConfigManager(tenant).del_nodes(nodes)
 
 
-def _rpc_del_nodes(tenant, nodes)
+def _rpc_del_nodes(tenant, nodes):
     ConfigManager(tenant)._true_del_nodes(nodes)
 
 
