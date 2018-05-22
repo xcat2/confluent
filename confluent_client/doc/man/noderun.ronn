@@ -48,6 +48,10 @@ themselves, see nodeshell(8).
   `n4:  01 10 00`  
   `n2:  01 10 00`  
 
+
+* If wanting to use literal {} in the command, they must be escaped by doubling:
+  `# noderun n1-n4 "echo {node} | awk '{{print $1}}'"`
+
 ## SEE ALSO
 
 nodeshell(8)
