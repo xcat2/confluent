@@ -88,7 +88,7 @@ _chassisidbyswitch = {}
 
 def lenovoname(idx, desc):
     if desc.isdigit():
-        return 'Ethernet' + str(idx)
+        return 'Ethernet' + str(desc)
     return desc
 
 nameoverrides = [
