@@ -27,7 +27,10 @@ as stderr, unlike psh which combines all stdout and stderr into stdout.
   `n4: hi`  
 
 * Setting a new static ip address temporarily on secondary interface of four nodes:
-  `# nodeshell n1-n4 ifconfig eth1 172.30.93.{n1}`  
+  `# nodeshell n1-n4 ifconfig eth1 172.30.93.{n1}`
+
+* If wanting to use literal {} in the command, they must be escaped by doubling:
+  `# nodeshell n1-n4 "ps | awk '{{print $1}}'"`
   
 ## SEE ALSO
 

@@ -183,8 +183,10 @@ def _expand_expression(nodes, configmanager, inputdata):
             pernodeexpressions[expanded[0]] = expanded[1]
         for node in util.natural_sort(pernodeexpressions):
             yield msg.KeyValueData({'value': pernodeexpressions[node]}, node)
-    except ValueError as e:
-        raise exc.InvalidArgumentException(str(e))
+    except (SyntaxError, ValueError) as e:
+        raise exc.InvalidArgumentException(
+            'Bad confluent expression syntax (must use "{{" and "}}" if not '
+            'desiring confluent expansion): ' + str(e))
 
 
 

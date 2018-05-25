@@ -200,7 +200,7 @@ def _rpc_master_del_nodes(tenant, nodes):
     ConfigManager(tenant).del_nodes(nodes)
 
 
-def _rpc_del_nodes(tenant, nodes)
+def _rpc_del_nodes(tenant, nodes):
     ConfigManager(tenant)._true_del_nodes(nodes)
 
 
@@ -1432,7 +1432,7 @@ class ConfigManager(object):
 
     def del_nodes(self, nodes):
         if cfgleader:  # slaved to a collective
-            return exec_on_loader('_rpc_master_del_nodes', self.tenant,
+            return exec_on_leader('_rpc_master_del_nodes', self.tenant,
                                   nodes)
         if cfgstreams:
             exec_on_followers('_rpc_del_nodes', self.tenant, nodes)
