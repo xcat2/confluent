@@ -1025,7 +1025,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_create_user', self.tenant,
                                   name, role, uid, displayname, attributemap)
         if cfgstreams:
-            exec_on_followers('_rpc_set_group_attributes', self.tenant, name,
+            exec_on_followers('_rpc_create_user', self.tenant, name,
                               role, uid, displayname, attributemap)
         self._true_create_user(name, role, uid, displayname, attributemap)
 
