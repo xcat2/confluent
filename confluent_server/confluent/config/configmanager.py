@@ -1051,7 +1051,7 @@ class ConfigManager(object):
             'username': name
         }
         if attributemap is not None:
-            self.set_user(name, attributemap)
+            self._true_set_user(name, attributemap)
         _mark_dirtykey('users', name, self.tenant)
         _mark_dirtykey('idmap', uid)
         self._bg_sync_to_file()
