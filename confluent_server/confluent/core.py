@@ -36,6 +36,7 @@
 import confluent
 import confluent.alerts as alerts
 import confluent.config.attributes as attrscheme
+import confluent.collective.manager as collective
 import confluent.discovery.core as disco
 import confluent.interface.console as console
 import confluent.exceptions as exc
@@ -51,6 +52,7 @@ import os
 import sys
 
 pluginmap = {}
+dispatch_plugins = (b'ipmi', u'ipmi')
 
 
 def seek_element(currplace, currkey):
@@ -659,16 +661,28 @@ def handle_node_request(configmanager, inputdata, operation,
             return stripnode(passvalue, nodes[0])
     elif 'pluginattrs' in plugroute:
         nodeattr = configmanager.get_node_attributes(
-            nodes, plugroute['pluginattrs'])
+            nodes, plugroute['pluginattrs'] + ['collective.manager'])
         plugpath = None
         if 'default' in plugroute:
             plugpath = plugroute['default']
+        mynodes = set(nodes)
+        nodesbymanager = {}
         nodesbyhandler = {}
         for node in nodes:
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
                     plugpath = nodeattr[node][attrname]['value']
-            if plugpath is not None:
+            if plugpath in dispatch_plugins:
+                manager = nodeattr[node].get('collective.manager', {}).get(
+                    'value', None)
+                if manager:
+                    if collective.get_myname() != manager:
+                        mynodes.discard(manager)
+                        if manager not in nodesbymanager:
+                            nodesbymanager[manager] = set([node])
+                        else:
+                            nodesbymanager[manager].add(node)
+            if plugpath is not None and node in mynodes:
                 try:
                     hfunc = getattr(pluginmap[plugpath], operation)
                 except KeyError:
@@ -683,6 +697,8 @@ def handle_node_request(configmanager, inputdata, operation,
                 nodes=nodesbyhandler[hfunc], element=pathcomponents,
                 configmanager=configmanager,
                 inputdata=inputdata))
+        for manager in nodesbymanager:
+            raise Exception('TODO: dispatch requests')
         if isnoderange or not autostrip:
             return itertools.chain(*passvalues)
         else:
