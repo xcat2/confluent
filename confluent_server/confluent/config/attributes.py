@@ -148,6 +148,14 @@ node = {
 #                        'autonode.servername, so that would not need to be '
 #                        'copied ')
 #    },
+    'collective.manager': {
+        'description': ('When in collective mode, the member of the '
+                        'collective currently considered to be responsible '
+                        'for this node.  At a future date, this may be '
+                        'modified automatically if another attribute '
+                        'indicates candidate managers, either for '
+                        'high availability or load balancing purposes.')
+    },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
                         'and identified nodes. Valid values are "manual", '
