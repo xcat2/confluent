@@ -673,6 +673,9 @@ class ConsoleSession(object):
         it is a hook for confluent to abstract the concept of a terminal
         between console and shell.
         """
+        #TODO(jjohnosn2): collective mode, connect to collective manager
+        #if not self.  This avoids sockapi and httpapi from having to
+        #understand the situation
         self.conshdl = connect_node(self.node, self.configmanager,
                                     self.username)
     def send_break(self):
