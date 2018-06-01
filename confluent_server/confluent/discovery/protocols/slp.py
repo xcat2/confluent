@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import confluent.log as log
 import confluent.neighutil as neighutil
 import confluent.util as util
 import os
@@ -21,8 +22,6 @@ import random
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import struct
-import subprocess
-
 
 _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
@@ -391,6 +390,7 @@ def snoop(handler):
     :param handler:
     :return:
     """
+    tracelog = log.Logger('trace')
     active_scan(handler)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -420,54 +420,58 @@ def snoop(handler):
     net4.bind(('', 427))
 
     while True:
-        newmacs = set([])
-        r, _, _ = select.select((net, net4), (), (), 60)
-        # clear known_peers and peerbymacaddress
-        # to avoid stale info getting in...
-        # rely upon the select(0.2) to catch rapid fire and aggregate ip
-        # addresses that come close together
-        # calling code needs to understand deeper context, as snoop
-        # will now yield dupe info over time
-        known_peers = set([])
-        peerbymacaddress = {}
-        neighutil.update_neigh()
-        while r:
-            for s in r:
-                (rsp, peer) = s.recvfrom(9000)
-                ip = peer[0].partition('%')[0]
-                if ip not in neighutil.neightable:
-                    continue
-                if peer in known_peers:
-                    continue
-                known_peers.add(peer)
-                mac = neighutil.neightable[ip]
-                if mac in peerbymacaddress:
-                    peerbymacaddress[mac]['addresses'].append(peer)
-                else:
-                    q = query_srvtypes(peer)
-                    if not q or not q[0]:
-                        # SLP might have started and not ready yet
-                        # ignore for now
-                        known_peers.discard(peer)
+        try:
+            newmacs = set([])
+            r, _, _ = select.select((net, net4), (), (), 60)
+            # clear known_peers and peerbymacaddress
+            # to avoid stale info getting in...
+            # rely upon the select(0.2) to catch rapid fire and aggregate ip
+            # addresses that come close together
+            # calling code needs to understand deeper context, as snoop
+            # will now yield dupe info over time
+            known_peers = set([])
+            peerbymacaddress = {}
+            neighutil.update_neigh()
+            while r:
+                for s in r:
+                    (rsp, peer) = s.recvfrom(9000)
+                    ip = peer[0].partition('%')[0]
+                    if ip not in neighutil.neightable:
                         continue
-                    # we want to prioritize the very well known services
-                    svcs = []
-                    for svc in q:
-                        if svc in _slp_services:
-                            svcs.insert(0, svc)
-                        else:
-                            svcs.append(svc)
-                    peerbymacaddress[mac] = {
-                        'services': svcs,
-                        'addresses': [peer],
-                    }
-                newmacs.add(mac)
-            r, _, _ = select.select((net, net4), (), (), 0.2)
-        for mac in newmacs:
-            peerbymacaddress[mac]['xid'] = 1
-            _add_attributes(peerbymacaddress[mac])
-            peerbymacaddress[mac]['hwaddr'] = mac
-            handler(peerbymacaddress[mac])
+                    if peer in known_peers:
+                        continue
+                    known_peers.add(peer)
+                    mac = neighutil.neightable[ip]
+                    if mac in peerbymacaddress:
+                        peerbymacaddress[mac]['addresses'].append(peer)
+                    else:
+                        q = query_srvtypes(peer)
+                        if not q or not q[0]:
+                            # SLP might have started and not ready yet
+                            # ignore for now
+                            known_peers.discard(peer)
+                            continue
+                        # we want to prioritize the very well known services
+                        svcs = []
+                        for svc in q:
+                            if svc in _slp_services:
+                                svcs.insert(0, svc)
+                            else:
+                                svcs.append(svc)
+                        peerbymacaddress[mac] = {
+                            'services': svcs,
+                            'addresses': [peer],
+                        }
+                    newmacs.add(mac)
+                r, _, _ = select.select((net, net4), (), (), 0.2)
+            for mac in newmacs:
+                peerbymacaddress[mac]['xid'] = 1
+                _add_attributes(peerbymacaddress[mac])
+                peerbymacaddress[mac]['hwaddr'] = mac
+                handler(peerbymacaddress[mac])
+        except Exception as e:
+            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                         event=log.Events.stacktrace)
 
 
 def active_scan(handler):
