@@ -953,26 +953,25 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # but... is this really ok?  could be on an upstream port or
         # erroneously put in the enclosure with no nodes yet
         # so first, see if the candidate node is a chain host
-        if info.get('maccount', False):
-            # discovery happened through switch
-            nl = list(cfg.filter_node_attributes(
-                'enclosure.extends=' + nodename))
-            if nl:
-                # The candidate nodename is the head of a chain, we must
-                # validate the smm certificate by the switch
-                macmap.get_node_fingerprint(nodename, cfg)
-                util.handler.cert_matches(fprint, handler.https_cert)
+        if not manual:
+            if info.get('maccount', False):
+                # discovery happened through switch
+                nl = list(cfg.filter_node_attributes(
+                    'enclosure.extends=' + nodename))
+                if nl:
+                    # The candidate nodename is the head of a chain, we must
+                    # validate the smm certificate by the switch
+                    macmap.get_node_fingerprint(nodename, cfg)
+                    util.handler.cert_matches(fprint, handler.https_cert)
+                    return
+            if (info.get('maccount', False) and
+                    not handler.discoverable_by_switch(info['maccount'])):
+                errorstr = 'The detected node {0} was detected using switch, ' \
+                           'however the relevant port has too many macs learned ' \
+                           'for this type of device ({1}) to be discovered by ' \
+                           'switch.'.format(nodename, handler.devname)
+                log.log({'error': errorstr})
                 return
-        if (info.get('maccount', False) and
-                not handler.discoverable_by_switch(info['maccount'])):
-            errorstr = 'The detected node {0} was detected using switch, ' \
-                       'however the relevant port has too many macs learned ' \
-                       'for this type of device ({1}) to be discovered by ' \
-                       'switch.'.format(nodename, handler.devname)
-            if manual:
-                raise exc.InvalidArgumentException(errorstr)
-            log.log({'error': errorstr})
-            return
         if not discover_node(cfg, handler, info, nodename, manual):
             pending_nodes[nodename] = info
 
