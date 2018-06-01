@@ -785,7 +785,7 @@ def serve(bind_host, bind_port):
                 ' a second\n')
             eventlet.sleep(1)
     eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
-                         debug=False)
+                         debug=False, socket_timeout=60)
 
 
 class HttpApi(object):
