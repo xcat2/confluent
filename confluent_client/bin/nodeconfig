@@ -202,12 +202,14 @@ else:
     for path in queryparms:
         if options.comparedefault:
             continue
-        client.print_attrib_path(path, session, list(queryparms[path]),
-                                 NullOpt(), queryparms[path])
+        rc = client.print_attrib_path(path, session, list(queryparms[path]),
+                                      NullOpt(), queryparms[path])
+        if rc:
+            sys.exit(rc)
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
         path = '/noderange/{0}/configuration/system/all'.format(noderange)
-        client.print_attrib_path(path, session, printsys,
-                                 options)
+        rcode = client.print_attrib_path(path, session, printsys,
+                                         options)
 sys.exit(rcode)
