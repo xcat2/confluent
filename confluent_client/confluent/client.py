@@ -338,6 +338,12 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
             for attr, val in sorted(
                     res['databynode'][node].items(),
                     key=lambda (k, v): v.get('sortid', k) if isinstance(v, dict) else k):
+                if attr == 'error':
+                    sys.stderr.write('{0}: Error: {1}\n'.format(node, val))
+                    continue
+                if attr == 'errorcode':
+                    exitcode |= val
+                    continue
                 seenattributes.add(attr)
                 if rename:
                     printattr = rename.get(attr, attr)
