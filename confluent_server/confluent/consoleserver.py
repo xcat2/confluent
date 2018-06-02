@@ -237,6 +237,7 @@ class ConsoleHandler(object):
             # Do not do console connect for nodes managed by another
             # confluent collective member
             self._is_local = False
+            self._disconnect()
         else:
             self._is_local = True
 
