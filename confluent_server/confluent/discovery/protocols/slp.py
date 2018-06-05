@@ -22,6 +22,7 @@ import random
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import struct
+import traceback
 
 _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
