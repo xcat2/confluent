@@ -1,0 +1,81 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+import socket
+import subprocess
+import sys
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    # if installed into system path, do not muck with things
+    sys.path.append(path)
+
+import confluent.client as client
+import confluent.tlvdata as tlvdata
+
+try:
+    input = raw_input
+except NameError:
+    pass
+
+def make_certificate():
+    umask = os.umask(0077)
+    if subprocess.check_call(
+            'openssl ecparam -name secp384r1 -genkey -out '
+            '/etc/confluent/privkey.pem'.split(' ')):
+        raise Exception('Error generating private key')
+
+    if subprocess.check_call('openssl req -new -x509 -key '
+                              '/etc/confluent/privkey.pem -days 7300 -out '
+                              '/etc/confluent/srvcert.pem -subj /CN='
+                              '{0}'.format(socket.gethostname()).split(' ')):
+        raise Exception('Error generating certificate')
+    print('Certificate generated successfully')
+    os.umask(umask)
+
+
+def show_invitation(name):
+    s = client.Command().connection
+    tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name}})
+    invite = tlvdata.recv(s)['collective']['invitation']
+    print ('Invitatation for {0}: {1}'.format(name, invite))
+
+
+def join_collective(server, invitation):
+    s = client.Command().connection
+    while not invitation:
+        invitation = raw_input('Paste the invitation here: ')
+    tlvdata.send(s, {'collective': {'operation': 'join',
+                                    'invitation': invitation,
+                                    'server': server}})
+    res = tlvdata.recv(s)
+    print(res.get('collective',
+                  {'status': 'Unknown response: ' + repr(res)})['status'])
+
+
+def main():
+    a = argparse.ArgumentParser(description='Confluent server utility')
+    sp = a.add_subparsers(dest='command')
+    gc = sp.add_parser('gencert', help='Generate Confluent Certificates for '
+                                'collective mode and remote CLI access')
+    ic = sp.add_parser('invite', help='Generate a invitation to allow a new '
+                                    'confluent instance to join as a '
+                                    'collective member')
+    ic.add_argument('name', help='Name of server to invite to join the '
+                                 'collective')
+    jc = sp.add_parser('join', help='Join a collective')
+    jc.add_argument('server', help='A server currently in the collective')
+    jc.add_argument('-i', help='Invitation provided by runniing invite on an '
+                               'existing collective member')
+    cmdset = a.parse_args()
+    if cmdset.command == 'gencert':
+        make_certificate()
+    elif cmdset.command == 'invite':
+        show_invitation(cmdset.name)
+    elif cmdset.command == 'join':
+        join_collective(cmdset.server, cmdset.i)
+
+if __name__ == '__main__':
+    main()
