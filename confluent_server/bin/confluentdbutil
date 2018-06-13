@@ -16,6 +16,7 @@
 # limitations under the License.
 
 
+import getpass
 import optparse
 import sys
 import os
@@ -32,6 +33,8 @@ argparser = optparse.OptionParser(
     usage="Usage: %prog [options] [dump|restore] [path]")
 argparser.add_option('-p', '--password',
                      help='Password to use to protect/unlock a protected dump')
+argparser.add_option('-i', '--interactivepassword', help='Prompt for password',
+                     action='store_true')
 argparser.add_option('-r', '--redact', action='store_true',
                      help='Redact potentially sensitive data rather than store')
 argparser.add_option('-u', '--unprotected', action='store_true',
@@ -39,6 +42,14 @@ argparser.add_option('-u', '--unprotected', action='store_true',
                            ' the key information.  Fields will be encrypted, '
                            'but keys.json will contain unencrypted decryption'
                            ' keys that may be used to read the dump')
+argparser.add_option('-s', '--skipkeys', action='store_true',
+                      help='This specifies to dump the encrypted data without '
+                           'dumping the keys needed to decrypt it.  This is '
+                           'suitable for an automated incremental backup, '
+                           'where an earlier password protected dump has a '
+                           'protected keys.json file, and only the protected '
+                           'data is needed.  keys do not change and as such '
+                           'they do not require incremental backup')
 (options, args) = argparser.parse_args()
 if len(args) != 2 or args[0] not in ('dump', 'restore'):
     argparser.print_help()
@@ -57,15 +68,26 @@ if args[0] == 'restore':
         print(str(e))
         sys.exit(1)
 elif args[0] == 'dump':
-    if options.password is None and not (options.unprotected or options.redact):
+    password = options.password
+    if not password and options.interactivepassword:
+        passcfm = None
+        while passcfm is None or password != passcfm:
+            password = getpass.getpass(
+                'Enter password to protect the backup: ')
+            passcfm = getpass.getpass('Confirm password to protect the backup: ')
+    if password is None and not (options.unprotected or options.redact
+                                         or options.skipkeys):
         print("Must indicate a password to protect or -u to opt opt of "
-              "secure value protection or -r to skip all protected data")
+              "secure value protection or -r to redact sensitive information, "
+              "or -s to do encrypted backup that requires keys.json from "
+              "another backup to restore.")
         sys.exit(1)
     os.umask(077)
     main._initsecurity(conf.get_config())
     if not os.path.exists(dumpdir):
         os.makedirs(dumpdir)
-    cfm.dump_db_to_directory(dumpdir, options.password, options.redact)
+    cfm.dump_db_to_directory(dumpdir, options.password, options.redact,
+                             options.skipkeys)
 
 
 
