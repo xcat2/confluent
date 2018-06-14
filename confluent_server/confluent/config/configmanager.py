@@ -759,6 +759,9 @@ class ConfigManager(object):
             self._cfgstore['nodes'] = {}
         self._bg_sync_to_file()
 
+    def get_collective_member(self, name):
+        return get_collective_member(name)
+
     def filter_node_attributes(self, expression, nodes=None):
         """Filtered nodelist according to expression
 

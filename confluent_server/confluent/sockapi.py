@@ -119,6 +119,9 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         if 'collective' in response:
             return collective.handle_connection(connection, cert,
                                            response['collective'])
+        if 'dispatch' in response:
+            return pluginapi.handle_dispatch(connection, cert,
+                                             response['dispatch'])
         authname = response['username']
         passphrase = response['password']
         # note(jbjohnso): here, we need to authenticate, but not
