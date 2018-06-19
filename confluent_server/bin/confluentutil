@@ -37,6 +37,8 @@ def make_certificate():
 
 
 def show_invitation(name):
+    if not os.path.exists('/etc/confluent/srvcert.pem'):
+        make_certificate()
     s = client.Command().connection
     tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name}})
     invite = tlvdata.recv(s)['collective']['invitation']
@@ -44,6 +46,8 @@ def show_invitation(name):
 
 
 def join_collective(server, invitation):
+    if not os.path.exists('/etc/confluent/srvcert.pem'):
+        make_certificate()
     s = client.Command().connection
     while not invitation:
         invitation = raw_input('Paste the invitation here: ')
