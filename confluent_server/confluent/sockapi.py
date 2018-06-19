@@ -45,6 +45,7 @@ import confluent.log as log
 import confluent.core as pluginapi
 import confluent.shellserver as shellserver
 import confluent.collective.manager as collective
+import confluent.util as util
 
 tracelog = None
 auditlog = None
@@ -65,10 +66,12 @@ try:
     # further, not even pyopenssl exposes SSL_CTX_set_cert_verify_callback
     # so we need to ffi that in using a strategy compatible with PyOpenSSL
     import OpenSSL.SSL as libssln
+    import OpenSSL.crypto as crypto
     from OpenSSL._util import ffi
 except ImportError:
     libssl = None
     ffi = None
+    crypto = None
 
 plainsocket = None
 
@@ -122,6 +125,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         if 'dispatch' in response:
             return pluginapi.handle_dispatch(connection, cert,
                                              response['dispatch'])
+        if 'proxyconsole' in response:
+            return start_proxy_term(connection, cert, response['proxyconsole'])
         authname = response['username']
         passphrase = response['password']
         # note(jbjohnso): here, we need to authenticate, but not
@@ -213,6 +218,20 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
     send_response(hdlr, connection)
     return
 
+def start_proxy_term(connection, cert, request):
+    cert = crypto.dump_certificate(crypto.FILETYPE_ASN1, cert)
+    droneinfo = configmanager.get_collective_member(request['name'])
+    if not util.cert_matches(droneinfo['fingerprint'], cert):
+        connection.close()
+        return
+    cfm = configmanager.ConfigManager(request['tenant'])
+    ccons = ClientConsole(connection)
+    if params and 'skipreplay' in params and params['skipreplay']:
+        skipreplay = True
+    consession = consoleserver.ConsoleSession(
+        node=request['node'], configmanager=cfm, username=request['user'],
+        datacallback=ccons.sendall, skipreplay=skipreplay)
+    term_interact(None, None, ccons, None, connection, consession, None)
 
 def start_term(authname, cfm, connection, params, path, authdata, skipauth):
     elems = path.split('/')
@@ -236,12 +255,16 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
             node=node, configmanager=cfm, username=authname,
             datacallback=ccons.sendall, skipreplay=skipreplay,
             sessionid=sessionid)
-
     else:
         raise exc.InvalidArgumentException('Invalid path {0}'.format(path))
-
     if consession is None:
         raise Exception("TODO")
+    term_interact(authdata, authname, ccons, cfm, connection, consession,
+                  skipauth)
+
+
+def term_interact(authdata, authname, ccons, cfm, connection, consession,
+                  skipauth):
     send_data(connection, {'started': 1})
     ccons.startsending()
     bufferage = consession.get_buffer_age()
@@ -252,7 +275,7 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
         if type(data) == dict:
             if data['operation'] == 'stop':
                 consession.destroy()
-                return
+                break
             elif data['operation'] == 'break':
                 consession.send_break()
                 continue
@@ -273,7 +296,7 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
                 continue
         if not data:
             consession.destroy()
-            return
+            break
         consession.write(data)
 
 
