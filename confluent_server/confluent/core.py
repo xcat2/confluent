@@ -580,6 +580,7 @@ def handle_dispatch(connection, cert, dispatch):
     if not util.cert_matches(
             cfm.get_collective_member(dispatch['name'])['fingerprint'], cert):
         connection.close()
+        return
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
     inputdata = dispatch['inputdata']
