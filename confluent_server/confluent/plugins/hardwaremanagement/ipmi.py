@@ -132,7 +132,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
         self._inhealth = False
         self._lasthealth = None
         self._attribwatcher = cfm.watch_attributes(
-            (node,), ('secret.hardwaremanagementuser',
+            (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
                       'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
