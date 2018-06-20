@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import confluent.log as log
 import confluent.neighutil as neighutil
 import confluent.util as util
+import confluent.log as log
 import os
 import random
 import eventlet.green.select as select
