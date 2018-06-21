@@ -20,6 +20,11 @@ from datetime import datetime
 import json
 import struct
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
 def decodestr(value):
     ret = None
     try:
@@ -54,7 +59,11 @@ def _unicode_list(currlist):
 
 
 def send(handle, data):
-    if isinstance(data, str):
+    if isinstance(data, str) or isinstance(data, unicode):
+        try:
+            data = data.encode('utf-8')
+        except AttributeError:
+            pass
         # plain text, e.g. console data
         tl = len(data)
         if tl == 0:
