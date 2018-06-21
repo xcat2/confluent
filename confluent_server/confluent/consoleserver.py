@@ -240,6 +240,7 @@ class ConsoleHandler(object):
             # Do not do console connect for nodes managed by another
             # confluent collective member
             self._is_local = False
+            self._detach()
             self._disconnect()
         else:
             self._is_local = True
@@ -305,6 +306,10 @@ class ConsoleHandler(object):
             '\x1bc[no replay buffer due to console.logging attribute set to '
             'none or interactive,\r\nconnection loss, or service restart]')
         self.clearpending = True
+
+    def _detach(self):
+        for ses in list(self.livesessions):
+            ses.detach()
 
     def _disconnect(self):
         if self.connectionthread:
@@ -752,9 +757,6 @@ class ConsoleSession(object):
         it is a hook for confluent to abstract the concept of a terminal
         between console and shell.
         """
-        #TODO(jjohnosn2): collective mode, connect to collective manager
-        #if not self.  This avoids sockapi and httpapi from having to
-        #understand the situation
         self.conshdl = connect_node(self.node, self.configmanager,
                                     self.username)
     def send_break(self):
@@ -794,7 +796,10 @@ class ConsoleSession(object):
 
         :return:
         """
-        pass
+        self.conshdl.detachsession(self)
+        self.connect_session()
+        self.conshdl.attachsession(self)
+        self.write = self.conshdl.write
 
     def got_data(self, data):
         """Receive data from console and buffer
