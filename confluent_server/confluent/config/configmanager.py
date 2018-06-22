@@ -212,6 +212,8 @@ def _rpc_set_group_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant)._true_set_group_attributes(attribmap, autocreate)
 
 def exec_on_leader(function, *args):
+    if isinstance(cfgleader, bool):
+        raise exc.DegradedCollective()
     xid = os.urandom(8)
     while xid in _pendingchangesets:
         xid = os.urandom(8)

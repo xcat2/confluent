@@ -68,6 +68,11 @@ class LockedCredentials(ConfluentException):
     _apierrorstr = 'Credential store locked'
 
 
+class DegradedCollective(ConfluentException):
+    # We are in a collective with at least half of the member nodes missing
+    _apierrorstr = 'Collective does not have quorum'
+
+
 class ForbiddenRequest(ConfluentException):
     # The client request is not allowed by authorization engine
     apierrorcode = 403

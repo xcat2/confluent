@@ -251,6 +251,8 @@ def start_collective():
     for member in cfm.list_collective():
         if member == myname:
             continue
+        if cfm.cfgleader is None:
+            cfm.cfgleader = True
         ldrcandidate = cfm.get_collective_member(member)['address']
         connect_to_leader(name=myname, leader=ldrcandidate)
 
