@@ -73,6 +73,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
         if not ndata:
             raise Exception("Error doing initial DB transfer")
         dbjson += ndata
+    cfm.cfgleader = None
     cfm.clear_configuration()
     cfm._restore_keys(keydata, None)
     for c in colldata:
