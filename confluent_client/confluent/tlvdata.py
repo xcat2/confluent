@@ -89,6 +89,14 @@ def send(handle, data):
         handle.sendall(struct.pack("!I", tl))
         handle.sendall(sdata)
 
+def recvall(handle, size):
+    rd = handle.recv(size)
+    while len(rd) < size:
+        nd = handle.recv(size - len(rd))
+        if not nd:
+            raise Exception("Error reading data")
+        rd += nd
+    return rd
 
 def recv(handle):
     tl = handle.recv(4)

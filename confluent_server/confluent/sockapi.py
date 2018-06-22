@@ -123,8 +123,9 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             return collective.handle_connection(connection, cert,
                                            response['collective'])
         if 'dispatch' in response:
-            return pluginapi.handle_dispatch(connection, cert,
-                                             response['dispatch'])
+            dreq = tlvdata.recvall(connection, response['dispatch']['length'])
+            return pluginapi.handle_dispatch(connection, cert, dreq,
+                                             response['dispatch']['name'])
         if 'proxyconsole' in response:
             return start_proxy_term(connection, cert, response['proxyconsole'])
         authname = response['username']

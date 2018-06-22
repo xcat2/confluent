@@ -575,12 +575,13 @@ def abbreviate_noderange(configmanager, inputdata, operation):
     return (msg.KeyValueData({'noderange': noderange.ReverseNodeRange(inputdata['nodes'], configmanager).noderange}),)
 
 
-def handle_dispatch(connection, cert, dispatch):
+def handle_dispatch(connection, cert, dispatch, peername):
     cert = crypto.dump_certificate(crypto.FILETYPE_ASN1, cert)
     if not util.cert_matches(
-            cfm.get_collective_member(dispatch['name'])['fingerprint'], cert):
+            cfm.get_collective_member(peername)['fingerprint'], cert):
         connection.close()
         return
+    dispatch = pickle.loads(dispatch)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
     inputdata = dispatch['inputdata']
@@ -802,12 +803,11 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     tlvdata.recv(remote)
     tlvdata.recv(remote)
     myname = collective.get_myname()
-    tlvdata.send(remote,
-                 {'dispatch': {'name': myname, 'nodes': list(nodes),
-                               'path': element,
-                               'tenant': configmanager.tenant,
-                               'operation': operation,
-                               'inputdata': inputdata}})
+    dreq = pickle.dumps({'name': myname, 'nodes': list(nodes),
+                         'path': element,'tenant': configmanager.tenant,
+                         'operation': operation, 'inputdata': inputdata})
+    tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
+    remote.sendall(dreq)
     while True:
         rlen = remote.recv(8)
         while len(rlen) < 8:
