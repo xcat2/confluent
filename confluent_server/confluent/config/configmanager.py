@@ -449,6 +449,7 @@ def set_global(globalname, value):
 
 cfgstreams = {}
 def relay_slaved_requests(name, listener):
+    global cfgleader
     cfgstreams[name] = listener
     msg = listener.recv(8)
     while msg:
@@ -465,6 +466,9 @@ def relay_slaved_requests(name, listener):
             if 'xid' in rpc:
                 _push_rpc(listener, cPickle.dumps({'xid': rpc['xid']}))
         msg = listener.recv(8)
+    del cfgstreams[name]
+    if not cfgstreams:
+        cfgleader = True
 
 
 def stop_leading():
