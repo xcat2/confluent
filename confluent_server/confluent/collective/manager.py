@@ -212,6 +212,7 @@ def handle_connection(connection, cert, request, local=False):
         connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
+        cfm.cfgleader = None
         cfm.relay_slaved_requests(drone, connection)
         # ok, we have a connecting member whose certificate checks out
         # He needs to bootstrap his configuration and subscribe it to updates
