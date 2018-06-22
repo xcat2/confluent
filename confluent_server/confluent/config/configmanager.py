@@ -460,10 +460,10 @@ def relay_slaved_requests(name, listener):
                 if not nrpc:
                     raise Exception('Truncated client error')
                 rpc += nrpc
-        rpc = cPickle.loads(rpc)
-        globals()[rpc['function']](*rpc['args'])
-        if 'xid' in rpc:
-            _push_rpc(listener, cPickle.dumps({'xid': rpc['xid']}))
+            rpc = cPickle.loads(rpc)
+            globals()[rpc['function']](*rpc['args'])
+            if 'xid' in rpc:
+                _push_rpc(listener, cPickle.dumps({'xid': rpc['xid']}))
         msg = listener.recv(8)
 
 
