@@ -474,7 +474,7 @@ def stop_leading():
 def clear_configuration():
     global _cfgstore
     _cfgstore = {}
-    todelete = _config_areas + ('globals', 'collective')
+    todelete = _config_areas + ('globals', 'collective', 'transactioncount')
     for cfg in todelete:
         try:
             os.remove(os.path.join(ConfigManager._cfgdir, cfg))
