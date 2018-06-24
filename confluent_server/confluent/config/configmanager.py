@@ -510,6 +510,8 @@ def follow_channel(channel):
             if 'xid' in rpc and rpc['xid']:
                 _pendingchangesets[rpc['xid']].send()
         msg = channel.recv(8)
+    # mark the connection as broken
+    cfgleader = True
 
 def add_collective_member(name, address, fingerprint):
     try:
