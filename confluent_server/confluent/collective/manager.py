@@ -86,6 +86,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
     cfm.ConfigManager._bg_sync_to_file()
     currentleader = leader
     cfm.follow_channel(remote)
+    # The leader has folded, time to startup again...
+    eventlet.spawn_n(start_collective)
 
 def get_myname():
     try:
