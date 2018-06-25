@@ -36,7 +36,10 @@ def connect_to_leader(cert=None, name=None, leader=None):
     global currentleader
     if leader is None:
         leader = currentleader
-    remote = socket.create_connection((leader, 13001))
+    try:
+        remote = socket.create_connection((leader, 13001))
+    except socket.error:
+        return
     # TLS cert validation is custom and will not pass normal CA vetting
     # to override completely in the right place requires enormous effort, so just defer until after connect
     remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE, keyfile='/etc/confluent/privkey.pem',
@@ -108,6 +111,8 @@ def handle_connection(connection, cert, request, local=False):
         if not local:
             return
         if 'invite' == operation:
+            #TODO(jjohnson2): Cannot do the invitation if not the head node, the certificate hand-carrying
+            #can't work in such a case.
             name = request['name']
             invitation = invites.create_server_invitation(name)
             tlvdata.send(connection,
@@ -147,6 +152,7 @@ def handle_connection(connection, cert, request, local=False):
             f.close()
             eventlet.spawn_n(connect_to_leader, cert, name)
     if 'enroll' == operation:
+        #TODO(jjohnson2): error appropriately when asked to enroll, but the master is elsewhere
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
         proof = base64.b64decode(request['hmac'])
         myrsp = invites.check_client_proof(request['name'], mycert,
