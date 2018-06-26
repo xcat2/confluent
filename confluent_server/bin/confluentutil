@@ -41,8 +41,11 @@ def show_invitation(name):
         make_certificate()
     s = client.Command().connection
     tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name}})
-    invite = tlvdata.recv(s)['collective']['invitation']
-    print ('Invitatation for {0}: {1}'.format(name, invite))
+    invite = tlvdata.recv(s)['collective']
+    if 'error' in invite:
+        sys.stderr.write(invite['error'] + '\n')
+        return
+    print ('Invitatation for {0}: {1}'.format(name, invite['invitation']))
 
 
 def join_collective(server, invitation):
