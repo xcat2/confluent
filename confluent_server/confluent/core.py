@@ -744,6 +744,7 @@ def handle_node_request(configmanager, inputdata, operation,
                 elif 'default' in plugroute:
                     plugpath = plugroute['default']
             if plugpath in dispatch_plugins:
+                cfm.check_quorum()
                 manager = nodeattr[node].get('collective.manager', {}).get(
                     'value', None)
                 if manager:

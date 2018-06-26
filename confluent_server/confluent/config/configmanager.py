@@ -211,6 +211,15 @@ def _rpc_set_node_attributes(tenant, attribmap, autocreate):
 def _rpc_set_group_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant)._true_set_group_attributes(attribmap, autocreate)
 
+
+def check_quorum():
+    if isinstance(cfgleader, bool):
+        raise exc.DegradedCollective()
+    if cfgstreams and len(cfgstreams) < (len(_cfgstore['collective']) // 2):
+        # the leader counts in addition to registered streams
+        raise exc.DegradedCollective()
+
+
 def exec_on_leader(function, *args):
     if isinstance(cfgleader, bool):
         raise exc.DegradedCollective()
@@ -231,9 +240,9 @@ def exec_on_leader(function, *args):
 def exec_on_followers(fnname, *args):
     global _txcount
     _txcount += 1
-    if len(cfgstreams) < (len(_cfgstore['collective']) // 2) :
+    if len(cfgstreams) < (len(_cfgstore['collective']) // 2):
         # the leader counts in addition to registered streams
-        raise Exception("collective does not have quorum")
+        raise exc.DegradedCollective()
     pushes = eventlet.GreenPool()
     payload = cPickle.dumps({'function': fnname, 'args': args,
                              'txcount': _txcount})
