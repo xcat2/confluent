@@ -263,8 +263,15 @@ def handle_connection(connection, cert, request, local=False):
         # He needs to bootstrap his configuration and subscribe it to updates
 
 def try_assimilate(drone):
-    remote = connect_to_collective(None, drone)
-    tlvdata.send(remote, {'operation': 'assimilate', 'name': get_myname(), 'txcount': cfm._txcount})
+    try:
+        remote = connect_to_collective(None, drone)
+    except socket.error:
+        # Oh well, unable to connect, hopefully the rest will be
+        # in order
+        return
+    tlvdata.send(remote, {'collective': {'operation': 'assimilate',
+                                         'name': get_myname(),
+                                         'txcount': cfm._txcount}})
     answer = tlvdata.recv(remote)
     if 'error' in answer:
         connect_to_leader(None, None, leader=remote.getpeername()[0])
