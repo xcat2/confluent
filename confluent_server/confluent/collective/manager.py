@@ -17,6 +17,7 @@
 import base64
 import confluent.collective.invites as invites
 import confluent.config.configmanager as cfm
+import confluent.exceptions as exc
 import confluent.tlvdata as tlvdata
 import confluent.util as util
 import eventlet
@@ -139,6 +140,13 @@ def handle_connection(connection, cert, request, local=False):
                     {'collective':
                          {'error': 'Invite can only be run from current '
                                    'leader ({0})'.format(currentleader)}})
+                return
+            try:
+                cfm.check_quorum()
+            except exc.DegradedCollective:
+                tlvdata.send(connection,
+                    {'collective':
+                         {'error': 'Collective does not have quorum'})
                 return
             #TODO(jjohnson2): Cannot do the invitation if not the head node, the certificate hand-carrying
             #can't work in such a case.
