@@ -146,7 +146,7 @@ def handle_connection(connection, cert, request, local=False):
             except exc.DegradedCollective:
                 tlvdata.send(connection,
                     {'collective':
-                         {'error': 'Collective does not have quorum'})
+                         {'error': 'Collective does not have quorum'}})
                 return
             #TODO(jjohnson2): Cannot do the invitation if not the head node, the certificate hand-carrying
             #can't work in such a case.
