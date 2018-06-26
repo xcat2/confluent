@@ -20,7 +20,7 @@ setup(
     install_requires=['paramiko', 'pycrypto>=2.6', 'confluent_client>=0.1.0', 'eventlet',
                       'dnspython', 'netifaces', 'pyte', 'pysnmp', 'pyparsing',
                       'pyghmi>=1.0.44'],
-    scripts=['bin/confluent', 'bin/confluentdbutil'],
+    scripts=['bin/confluent', 'bin/confluentdbutil', 'bin/confluentutil'],
     data_files=[('/etc/init.d', ['sysvinit/confluent']),
                 ('/usr/lib/sysctl.d', ['sysctl/confluent.conf']),
                 ('/usr/lib/systemd/system', ['systemd/confluent.service']),
