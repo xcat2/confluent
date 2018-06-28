@@ -70,7 +70,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
         follower = None
     colldata = tlvdata.recv(remote)
     globaldata = tlvdata.recv(remote)
-    dbsize = tlvdata.recv(remote)['dbsize']
+    dbi = tlvdata.recv(remote)
+    dbsize = dbi['dbsize']
     dbjson = ''
     while (len(dbjson) < dbsize):
         ndata = remote.recv(dbsize - len(dbjson))
@@ -88,6 +89,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
         for globvar in globaldata:
             cfm.set_global(globvar, globaldata[globvar])
         cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
+        cfm._txcount = dbix['txcount']
         cfm.ConfigManager._bg_sync_to_file()
         currentleader = leader
     #spawn this as a thread...
@@ -265,7 +267,8 @@ def handle_connection(connection, cert, request, local=False):
         tlvdata.send(connection, cfm._cfgstore['collective'])
         tlvdata.send(connection, cfm.get_globals())
         cfgdata = cfm.ConfigManager(None)._dump_to_json()
-        tlvdata.send(connection, {'dbsize': len(cfgdata)})
+        tlvdata.send(connection, {'txcount': cfm._txcount,
+                                  'dbsize': len(cfgdata)})
         connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
