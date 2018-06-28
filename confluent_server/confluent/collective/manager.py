@@ -62,6 +62,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
             if ldrc and ldrc['name'] == name:
                 raise Exception("Redirected to self")
             return connect_to_leader(name=name, leader=keydata['leader'])
+        if 'txcount' in keydata:
+            return become_leader(remote)
         raise Exception(keydata['error'])
     if follower is not None:
         follower.kill()
@@ -94,9 +96,11 @@ def connect_to_leader(cert=None, name=None, leader=None):
 
 
 def follow_leader(remote):
+    global currentleader
     cfm.follow_channel(remote)
     # The leader has folded, time to startup again...
     remote.close()
+    currentleader = None
     eventlet.spawn_n(start_collective)
 
 
