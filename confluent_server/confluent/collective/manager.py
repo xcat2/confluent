@@ -89,7 +89,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
         for globvar in globaldata:
             cfm.set_global(globvar, globaldata[globvar])
         cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
-        cfm._txcount = dbix['txcount']
+        cfm._txcount = dbi['txcount']
         cfm.ConfigManager._bg_sync_to_file()
         currentleader = leader
     #spawn this as a thread...
