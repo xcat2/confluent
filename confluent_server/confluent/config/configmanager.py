@@ -475,6 +475,7 @@ def relay_slaved_requests(name, listener):
             if 'xid' in rpc:
                 _push_rpc(listener, cPickle.dumps({'xid': rpc['xid']}))
         msg = listener.recv(8)
+    listener.close()
     del cfgstreams[name]
     if not cfgstreams:
         cfgleader = True

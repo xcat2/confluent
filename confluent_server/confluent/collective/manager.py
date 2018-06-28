@@ -96,6 +96,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
 def follow_leader(remote):
     cfm.follow_channel(remote)
     # The leader has folded, time to startup again...
+    remote.close()
     eventlet.spawn_n(start_collective)
 
 
@@ -272,6 +273,8 @@ def try_assimilate(drone):
     tlvdata.send(remote, {'collective': {'operation': 'assimilate',
                                          'name': get_myname(),
                                          'txcount': cfm._txcount}})
+    tlvdata.recv(remote)  # the banner
+    tlvdata.recv(remote)  # authpassed... 0..
     answer = tlvdata.recv(remote)
     if 'error' in answer:
         connect_to_leader(None, None, leader=remote.getpeername()[0])
