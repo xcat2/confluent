@@ -155,6 +155,7 @@ def handle_connection(connection, cert, request, local=False):
             invitation = invites.create_server_invitation(name)
             tlvdata.send(connection,
                          {'collective': {'invitation': invitation}})
+            connection.close()
         if 'join' == operation:
             invitation = request['invitation']
             invitation = base64.b64decode(invitation)
@@ -182,8 +183,10 @@ def handle_connection(connection, cert, request, local=False):
             proof = base64.b64decode(proof)
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
+                remote.close()
                 return
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
+            connection.close()
             currentleader = rsp['collective']['leader']
             f = open('/etc/confluent/cfg/myname', 'w')
             f.write(name)
@@ -226,6 +229,7 @@ def handle_connection(connection, cert, request, local=False):
         eventlet.spawn_n(connect_to_leader, None, None,
                          leader=connection.getpeername()[0])
         tlvdata.send(connection, {'status': 0})
+        connection.close()
     if 'connect' == operation:
         myself = connection.getsockname()[0]
         if myself != get_leader(connection):
@@ -233,6 +237,7 @@ def handle_connection(connection, cert, request, local=False):
                 connection,
                 {'error': 'Cannot assimilate, our leader is '
                           'in another castle', 'leader': currentleader})
+            connection.close()
             return
         drone = request['name']
         droneinfo = cfm.get_collective_member(drone)
@@ -240,6 +245,7 @@ def handle_connection(connection, cert, request, local=False):
             tlvdata.send(connection,
                          {'error': 'Invalid certificate, '
                                    'redo invitation process'})
+            connection.close()
             return
         if request['txcount'] > cfm._txcount:
             retire_as_leader()
@@ -247,6 +253,7 @@ def handle_connection(connection, cert, request, local=False):
                          {'error': 'Client has higher tranasaction count, '
                                    'should assimilate me, connecting..',
                           'txcount': cfm._txcount})
+            connection.close()
             eventlet.spawn_n(connect_to_leader, None, None,
                              connection.getpeername()[0])
             return
