@@ -479,7 +479,7 @@ def relay_slaved_requests(name, listener):
         msg = listener.recv(8)
     listener.close()
     del cfgstreams[name]
-    if not cfgstreams:
+    if not cfgstreams and not cfgleader:
         cfgleader = True
 
 
