@@ -292,6 +292,7 @@ class IpmiConsole(conapi.Console):
             self.solconnection.out_handler = _donothing
             self.solconnection.close()
         self.solconnection = None
+        self.datacallback = None
         self.broken = True
         self.error = "closed"
 
