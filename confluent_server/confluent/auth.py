@@ -22,7 +22,7 @@
 import confluent.config.configmanager as configmanager
 import eventlet
 import eventlet.tpool
-import Crypto.Protocol.KDF as KDF
+import Cryptodome.Protocol.KDF as KDF
 import hashlib
 import hmac
 import multiprocessing

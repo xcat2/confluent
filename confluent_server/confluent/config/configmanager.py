@@ -42,10 +42,10 @@
 # by passphrase and optionally TPM
 
 
-import Crypto.Protocol.KDF as KDF
-from Crypto.Cipher import AES
-from Crypto.Hash import HMAC
-from Crypto.Hash import SHA256
+import Cryptodome.Protocol.KDF as KDF
+from Cryptodome.Cipher import AES
+from Cryptodome.Hash import HMAC
+from Cryptodome.Hash import SHA256
 import anydbm as dbm
 import ast
 import base64
