@@ -462,6 +462,8 @@ def relay_slaved_requests(name, listener):
     cfgstreams[name] = listener
     msg = listener.recv(8)
     while msg:
+        if name not in cfgstreams:
+            raise Exception("Unexpected loss of node in followers: " + name)
         sz = struct.unpack('!Q', msg)[0]
         if sz != 0:
             rpc = ''
