@@ -442,6 +442,9 @@ class ConsoleHandler(object):
         if self.connectionthread:
             self.connectionthread.kill()
             self.connectionthread = None
+        if self._attribwatcher:
+            self.cfgmgr.remove_watcher(self._attribwatcher)
+            self._attribwatcher = None
 
     def get_console_output(self, data):
         # Spawn as a greenthread, return control as soon as possible

@@ -116,6 +116,7 @@ class ExecConsole(conapi.Console):
                 break
         if self.subproc is not None and self.subproc.poll() is None:
             self.subproc.kill()
+        self._datacallback = None
 
 
 class Plugin(object):
