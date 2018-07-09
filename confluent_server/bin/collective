@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import errno
 import os
 import socket
 import subprocess
@@ -22,6 +23,13 @@ except NameError:
 
 def make_certificate():
     umask = os.umask(0077)
+    try:
+        os.makedirs('/etc/confluent/cfg')
+    except OSError as e:
+        if e.errno == errno.EEXIST and os.path.isdir('/etc/confluent/cfg'):
+            pass
+        else:
+            raise
     if subprocess.check_call(
             'openssl ecparam -name secp384r1 -genkey -out '
             '/etc/confluent/privkey.pem'.split(' ')):
@@ -62,11 +70,18 @@ def join_collective(server, invitation):
                   {'status': 'Unknown response: ' + repr(res)})['status'])
 
 
+def show_collective():
+    s = client.Command().connection
+    tlvdata.send(s, {'collective': {'operation': 'show'}})
+    res = tlvdata.recv(s)
+    print(repr(res))
+
 def main():
     a = argparse.ArgumentParser(description='Confluent server utility')
     sp = a.add_subparsers(dest='command')
     gc = sp.add_parser('gencert', help='Generate Confluent Certificates for '
                                 'collective mode and remote CLI access')
+    sl = sp.add_parser('show', help='Show information about the collective')
     ic = sp.add_parser('invite', help='Generate a invitation to allow a new '
                                     'confluent instance to join as a '
                                     'collective member')
@@ -83,6 +98,8 @@ def main():
         show_invitation(cmdset.name)
     elif cmdset.command == 'join':
         join_collective(cmdset.server, cmdset.i)
+    elif cmdset.command == 'show':
+        show_collective()
 
 if __name__ == '__main__':
     main()

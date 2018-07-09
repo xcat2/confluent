@@ -160,6 +160,21 @@ def handle_connection(connection, cert, request, local=False):
     else:
         if not local:
             return
+
+        if 'show' == operation:
+            try:
+                cfm.check_quorum()
+            except exc.DegradedCollective:
+                tlvdata.send(connection,
+                    {'collective':
+                         {'error': 'Collective does not have quorum'}})
+            if follower:
+                myleader = cfm.get_collective_member_by_address(
+                    currentleader)['name']
+            else:
+                myleader = get_myname()
+            tlvdata.send(connection, {'collective':  {'leader': myleader}})
+            return
         if 'invite' == operation:
             if follower:
                 tlvdata.send(connection,
