@@ -319,9 +319,12 @@ def _tlshandler(bind_host, bind_port):
         cnn, addr = plainsocket.accept()
         eventlet.spawn_n(_tlsstartup, cnn)
 
-@ffi.callback("int(*)( X509_STORE_CTX *, void*)")
-def verify_stub(store, misc):
-    return 1
+
+if ffi:
+    @ffi.callback("int(*)( X509_STORE_CTX *, void*)")
+    def verify_stub(store, misc):
+        return 1
+
 
 def _tlsstartup(cnn):
     authname = None
