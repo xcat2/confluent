@@ -3,7 +3,7 @@ nodeattrib(8) -- List or change confluent nodes attributes
 
 ## SYNOPSIS
 
-`nodeattrib [-b] <noderange> [<nodeattribute>...]`  
+`nodeattrib [-b] <noderange> [all|<nodeattribute>...]`
 `nodeattrib <noderange> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`  
 `nodeattrib -c <noderange> <nodeattribute1> <nodeattribute2> ...`  
 `nodeattrib -e <noderange> <nodeattribute1> <nodeattribute2> ...`  
