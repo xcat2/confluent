@@ -45,7 +45,7 @@ def show_invitation(name):
     if 'error' in invite:
         sys.stderr.write(invite['error'] + '\n')
         return
-    print ('Invitatation for {0}: {1}'.format(name, invite['invitation']))
+    print('{0}'.format(invite['invitation']))
 
 
 def join_collective(server, invitation):
