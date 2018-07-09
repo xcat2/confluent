@@ -35,7 +35,7 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage='''\n       %prog [-b] noderange [list of attributes]  \
+    usage='''\n       %prog [-b] noderange [list of attributes or 'all']  \
              \n       %prog -c noderange <list of attributes>  \
              \n       %prog -e noderange <attribute names to set>  \
              \n       %prog noderange attribute1=value1 attribute2=value,...
