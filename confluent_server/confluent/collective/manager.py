@@ -108,9 +108,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
             cfm._cfgstore['collective'] = colldata
             for globvar in globaldata:
                 cfm.set_global(globvar, globaldata[globvar])
-            cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
             cfm._txcount = dbi['txcount']
-            cfm.ConfigManager._bg_sync_to_file()
+            cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
             currentleader = leader
         #spawn this as a thread...
         follower = eventlet.spawn(follow_leader, remote)
