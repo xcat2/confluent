@@ -525,7 +525,16 @@ def follow_channel(channel):
     # mark the connection as broken
     cfgleader = True
 
+
 def add_collective_member(name, address, fingerprint):
+    if cfgleader:
+        return exec_on_leader('add_collective_member', name, address, fingerprint)
+    if cfgstreams:
+        exec_on_followers('_true_add_collective_member', name, address, fingerprint)
+    _true_add_collective_member(name, address, fingerprint)
+
+
+def _true_add_collective_member(name, address, fingerprint):
     try:
         name = name.encode('utf-8')
     except AttributeError:
