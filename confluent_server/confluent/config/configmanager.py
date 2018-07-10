@@ -478,7 +478,10 @@ def relay_slaved_requests(name, listener):
                 _push_rpc(listener, cPickle.dumps({'xid': rpc['xid']}))
         msg = listener.recv(8)
     listener.close()
-    del cfgstreams[name]
+    try:
+        del cfgstreams[name]
+    except KeyError:
+        pass  # May have already been closed/deleted...
     if not cfgstreams and not cfgleader:
         cfgleader = True
 
@@ -486,7 +489,10 @@ def relay_slaved_requests(name, listener):
 def stop_leading():
     for stream in list(cfgstreams):
         cfgstreams[stream].close()
-        del cfgstreams[stream]
+        try:
+            del cfgstreams[stream]
+        except KeyError:
+            pass  # may have already been deleted..
 
 
 def clear_configuration():
