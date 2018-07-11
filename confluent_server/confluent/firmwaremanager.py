@@ -21,6 +21,8 @@
 import confluent.exceptions as exc
 import confluent.messages as msg
 import eventlet
+import os
+import socket
 
 updatesbytarget = {}
 uploadsbytarget = {}
@@ -28,6 +30,10 @@ updatepool = eventlet.greenpool.GreenPool(256)
 
 
 def execupdate(handler, filename, updateobj, type):
+    if not os.path.exists(filename):
+        raise exc.InvalidArgumentException(
+            '{0} does not appear to exist on {1}'.format(filename,
+                                                         socket.gethostname()))
     try:
         if type == 'firmware':
             completion = handler(filename, progress=updateobj.handle_progress,
