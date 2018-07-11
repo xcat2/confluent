@@ -675,6 +675,8 @@ class ProxyConsole(object):
                 'tenant': self.cfm.tenant,
                 'node': self.node,
                 'skipreplay': self.skipreplay,
+                #TODO(jjohnson2): declare myself as a proxy,
+                #facilitate redirect rather than relay on manager change
             },
         }
         remote = socket.create_connection((self.managerinfo['address'], 13001))
