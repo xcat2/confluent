@@ -147,7 +147,7 @@ def connect_to_collective(cert, member):
 def get_myname():
     try:
         with open('/etc/confluent/cfg/myname', 'r') as f:
-            return f.read()
+            return f.read().strip()
     except IOError:
         myname = socket.gethostname()
         with open('/etc/confluent/cfg/myname', 'w') as f:
