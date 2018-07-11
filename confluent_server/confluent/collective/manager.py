@@ -103,11 +103,11 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 dbjson += ndata
             cfm.cfgleader = None
             cfm.clear_configuration()
-            cfm._restore_keys(keydata, None)
+            cfm._restore_keys(keydata, None, sync=False)
             for c in colldata:
-                cfm.add_collective_member(c, colldata[c]['address'],
-                                          colldata[c]['fingerprint'])
-            cfm._cfgstore['collective'] = colldata
+                cfm._true_add_collective_member(c, colldata[c]['address'],
+                                                colldata[c]['fingerprint'],
+                                                sync=False)
             for globvar in globaldata:
                 cfm.set_global(globvar, globaldata[globvar])
             cfm._txcount = dbi.get('txcount', 0)

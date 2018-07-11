@@ -427,7 +427,7 @@ def get_global(globalname):
         return None
 
 
-def set_global(globalname, value):
+def set_global(globalname, value, sync=True):
     """Set a global variable.
 
     Globals should be rarely ever used.  Almost everything should be under a
@@ -438,7 +438,7 @@ def set_global(globalname, value):
     :param value: The value to set the global parameter to.
     """
     if _cfgstore is None:
-        init()
+        init(not sync)
     try:
         globalname = globalname.encode('utf-8')
     except AttributeError:
@@ -454,7 +454,8 @@ def set_global(globalname, value):
         _cfgstore['globals'] = {globalname: value}
     else:
         _cfgstore['globals'][globalname] = value
-    ConfigManager._bg_sync_to_file()
+    if sync:
+        ConfigManager._bg_sync_to_file()
 
 cfgstreams = {}
 def relay_slaved_requests(name, listener):
@@ -542,13 +543,13 @@ def add_collective_member(name, address, fingerprint):
     _true_add_collective_member(name, address, fingerprint)
 
 
-def _true_add_collective_member(name, address, fingerprint):
+def _true_add_collective_member(name, address, fingerprint, sync=True):
     try:
         name = name.encode('utf-8')
     except AttributeError:
         pass
     if _cfgstore is None:
-        init()
+        init(not sync)  # use not sync to avoid read from disk
     if 'collective' not in _cfgstore:
         _cfgstore['collective'] = {}
     _cfgstore['collective'][name] = {'name': name, 'address': address,
@@ -557,7 +558,8 @@ def _true_add_collective_member(name, address, fingerprint):
         if 'collectivedirty' not in _cfgstore:
             _cfgstore['collectivedirty'] = set([])
         _cfgstore['collectivedirty'].add(name)
-    ConfigManager._bg_sync_to_file()
+    if sync:
+        ConfigManager._bg_sync_to_file()
 
 def list_collective():
     if _cfgstore is None:
@@ -1939,7 +1941,7 @@ class ConfigManager(object):
                                               changeset)
 
 
-def _restore_keys(jsond, password, newpassword=None):
+def _restore_keys(jsond, password, newpassword=None, sync=True):
     # the jsond from the restored file, password (if any) used to protect
     # the file, and newpassword to use, (also check the service.cfg file)
     global _masterkey
@@ -1962,8 +1964,8 @@ def _restore_keys(jsond, password, newpassword=None):
                                                    password=newpassword))
     _masterkey = cryptkey
     _masterintegritykey = integritykey
-    ConfigManager.wait_for_sync()
-    # At this point, we should have the key situation all sorted
+    if sync:
+        ConfigManager.wait_for_sync()
 
 
 def _dump_keys(password, dojson=True):
