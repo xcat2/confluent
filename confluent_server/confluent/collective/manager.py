@@ -227,6 +227,7 @@ def handle_connection(connection, cert, request, local=False):
             f = open('/etc/confluent/cfg/myname', 'w')
             f.write(name)
             f.close()
+            cfm.clear_configuration()
             eventlet.spawn_n(connect_to_leader, rsp['collective']['fingerprint'], name)
     if 'enroll' == operation:
         #TODO(jjohnson2): error appropriately when asked to enroll, but the master is elsewhere
