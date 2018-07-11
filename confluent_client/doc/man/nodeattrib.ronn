@@ -23,7 +23,7 @@ If `-c` is specified, this will set the nodeattribute to a null valid.
 This is different from setting the value to an empty string.
 
 For the `groups` attribute, it is possible to add a group by doing
-`groups,=<newgroup>`` and to remove by doing `groups^=<oldgroup>`
+`groups,=<newgroup>` and to remove by doing `groups^=<oldgroup>`
 
 Note that `nodeattrib <group>` will likely not provide the expected behavior.
 See nodegroupattrib(8) command on how to manage attributes on a group level.
