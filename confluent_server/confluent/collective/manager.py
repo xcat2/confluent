@@ -287,7 +287,8 @@ def handle_connection(connection, cert, request, local=False):
             return
         drone = request['name']
         droneinfo = cfm.get_collective_member(drone)
-        if not util.cert_matches(droneinfo['fingerprint'], cert):
+        if not (droneinfo and util.cert_matches(droneinfo['fingerprint'],
+                                                cert)):
             tlvdata.send(connection,
                          {'error': 'Invalid certificate, '
                                    'redo invitation process'})
