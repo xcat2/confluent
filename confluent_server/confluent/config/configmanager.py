@@ -267,14 +267,14 @@ def _do_add_watcher(watcher, added, configmanager):
         logException()
 
 
-def init_masterkey(password=None):
+def init_masterkey(password=None, autogen=True):
     global _masterkey
     global _masterintegritykey
     cfgn = get_global('master_privacy_key')
 
     if cfgn:
         _masterkey = _get_protected_key(cfgn, password, 'master_privacy_key')
-    else:
+    elif autogen:
         _masterkey = os.urandom(32)
         set_global('master_privacy_key', _format_key(
             _masterkey,
@@ -283,7 +283,7 @@ def init_masterkey(password=None):
     if cfgn:
         _masterintegritykey = _get_protected_key(cfgn, password,
                                                  'master_integrity_key')
-    else:
+    elif autogen:
         _masterintegritykey = os.urandom(64)
         set_global('master_integrity_key', _format_key(
             _masterintegritykey,
@@ -301,7 +301,7 @@ def decrypt_value(cryptvalue,
     iv, cipherdata, hmac = cryptvalue
     if key is None and integritykey is None:
         if _masterkey is None or _masterintegritykey is None:
-            init_masterkey()
+            init_masterkey(autogen=False)
         key = _masterkey
         integritykey = _masterintegritykey
     check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
