@@ -528,7 +528,7 @@ def commit_clear():
             os.remove(os.path.join(ConfigManager._cfgdir, cfg))
         except OSError as oe:
             pass
-    self._bg_sync_to_file()
+    ConfigManager._bg_sync_to_file()
 
 cfgleader = None
 def follow_channel(channel):
