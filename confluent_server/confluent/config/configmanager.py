@@ -509,11 +509,16 @@ def rollback_clear():
     _cfgstore = _oldcfgstore
     _oldtxcount = 0
     _oldcfgstore = None
+    ConfigManager._bg_sync_to_file()
 
 
 def clear_configuration():
     global _cfgstore
     global _txcount
+    global _oldcfgstore
+    global _oldtxcount
+    _oldcfgstore = _cfgstore
+    _oldtxcount = _txcount
     _cfgstore = {}
     _txcount = 0
 
