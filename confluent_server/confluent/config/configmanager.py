@@ -533,6 +533,7 @@ def commit_clear():
             os.remove(os.path.join(ConfigManager._cfgdir, cfg))
         except OSError as oe:
             pass
+    ConfigManager._sync_to_file(fullsync=True)
     ConfigManager._bg_sync_to_file()
 
 cfgleader = None
@@ -1886,15 +1887,18 @@ class ConfigManager(object):
         cls._cfgwriter.start()
 
     @classmethod
-    def _sync_to_file(cls):
+    def _sync_to_file(cls, fullsync=False):
         if statelessmode:
             return
         with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
             f.write(struct.pack('!Q', _txcount))
-        if 'dirtyglobals' in _cfgstore:
-            with _dirtylock:
-                dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
-                del _cfgstore['dirtyglobals']
+        if fullsync or 'dirtyglobals' in _cfgstore:
+            if fullsync:
+                dirtyglobals = _cfgstore['globals']
+            else:
+                with _dirtylock:
+                    dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
+                    del _cfgstore['dirtyglobals']
             _mkpath(cls._cfgdir)
             globalf = dbm.open(os.path.join(cls._cfgdir, "globals"), 'c', 384)  # 0600
             try:
@@ -1907,13 +1911,16 @@ class ConfigManager(object):
                             del globalf[globalkey]
             finally:
                 globalf.close()
-        if 'collectivedirty' in _cfgstore:
+        if fullsync or 'collectivedirty' in _cfgstore:
             collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
                                    'c', 384)
             try:
-                with _dirtylock:
-                    colls = copy.deepcopy(_cfgstore['collectivedirty'])
-                    del _cfgstore['collectivedirty']
+                if fullsync:
+                    colls = _cfgstore['collective']
+                else:
+                    with _dirtylock:
+                        colls = copy.deepcopy(_cfgstore['collectivedirty'])
+                        del _cfgstore['collectivedirty']
                 for coll in colls:
                     if coll in _cfgstore['collective']:
                         collectivef[coll] = cPickle.dumps(
@@ -1923,7 +1930,18 @@ class ConfigManager(object):
                             del globalf[coll]
             finally:
                 collectivef.close()
-        if 'dirtykeys' in _cfgstore:
+        if fullsync:
+            pathname = cls._cfgdir
+            currdict = _cfgstore['main']
+            for category in currdict:
+                _mkpath(pathname)
+                dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
+                try:
+                    for ck in currdict[category]:
+                        dbf[ck] = cPickle.dumps(currdict[category][ck])
+                finally:
+                    dbf.close()
+        elif 'dirtykeys' in _cfgstore:
             with _dirtylock:
                 currdirt = copy.deepcopy(_cfgstore['dirtykeys'])
                 del _cfgstore['dirtykeys']
