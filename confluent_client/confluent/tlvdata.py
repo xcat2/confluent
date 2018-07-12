@@ -59,11 +59,12 @@ def _unicode_list(currlist):
 
 
 def send(handle, data):
-    if isinstance(data, str) or isinstance(data, unicode):
+    if isinstance(data, unicode):
         try:
             data = data.encode('utf-8')
         except AttributeError:
             pass
+    if isinstance(data, str) or isinstance(data, unicode):
         # plain text, e.g. console data
         tl = len(data)
         if tl == 0:
