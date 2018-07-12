@@ -20,6 +20,7 @@ import confluent.util as util
 
 
 def retrieve(nodes, element, configmanager, inputdata):
+    configmanager.check_quorum()
     if nodes is not None:
         return retrieve_nodes(nodes, element, configmanager, inputdata)
     elif element[0] == 'nodegroups':

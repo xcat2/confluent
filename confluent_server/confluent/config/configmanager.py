@@ -828,6 +828,10 @@ class ConfigManager(object):
     def get_collective_member(self, name):
         return get_collective_member(name)
 
+    @classmethod
+    def check_quorum(cls):
+        return check_quorum()
+
     def filter_node_attributes(self, expression, nodes=None):
         """Filtered nodelist according to expression
 
