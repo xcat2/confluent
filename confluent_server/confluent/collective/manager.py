@@ -103,15 +103,21 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 dbjson += ndata
             cfm.cfgleader = None
             cfm.clear_configuration()
-            cfm._restore_keys(keydata, None, sync=False)
-            for c in colldata:
-                cfm._true_add_collective_member(c, colldata[c]['address'],
-                                                colldata[c]['fingerprint'],
-                                                sync=False)
-            for globvar in globaldata:
-                cfm.set_global(globvar, globaldata[globvar])
-            cfm._txcount = dbi.get('txcount', 0)
-            cfm.ConfigManager(tenant=None)._load_from_json(dbjson)
+            try:
+                cfm._restore_keys(keydata, None, sync=False)
+                for c in colldata:
+                    cfm._true_add_collective_member(c, colldata[c]['address'],
+                                                    colldata[c]['fingerprint'],
+                                                    sync=False)
+                for globvar in globaldata:
+                    cfm.set_global(globvar, globaldata[globvar])
+                cfm._txcount = dbi.get('txcount', 0)
+                cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
+                                                               sync=False)
+                cfm.commit_clear()
+            except Exception:
+                cfm.rollback_clear()
+                raise
             currentleader = leader
         #spawn this as a thread...
         follower = eventlet.spawn(follow_leader, remote)
@@ -227,8 +233,8 @@ def handle_connection(connection, cert, request, local=False):
             f = open('/etc/confluent/cfg/myname', 'w')
             f.write(name)
             f.close()
-            cfm.clear_configuration()
-            eventlet.spawn_n(connect_to_leader, rsp['collective']['fingerprint'], name)
+            eventlet.spawn_n(connect_to_leader, rsp['collective'][
+                'fingerprint'], name)
     if 'enroll' == operation:
         #TODO(jjohnson2): error appropriately when asked to enroll, but the master is elsewhere
         mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')

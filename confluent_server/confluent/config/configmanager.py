@@ -496,17 +496,39 @@ def stop_leading():
             pass  # may have already been deleted..
 
 
+_oldcfgstore = None
+_oldtxcount = 0
+
+
+def rollback_clear():
+    global _cfgstore
+    global _txcount
+    global _oldcfgstore
+    global _oldtxcount
+    _txcount = _oldtxcount
+    _cfgstore = _oldcfgstore
+    _oldtxcount = 0
+    _oldcfgstore = None
+
+
 def clear_configuration():
     global _cfgstore
     global _txcount
     _cfgstore = {}
-    todelete = _config_areas + ('globals', 'collective', 'transactioncount')
     _txcount = 0
+
+def commit_clear():
+    global _oldtxcount
+    global _oldcfgstore
+    _oldcfgstore = None
+    _oldtxcount = 0
+    todelete = _config_areas + ('globals', 'collective', 'transactioncount')
     for cfg in todelete:
         try:
             os.remove(os.path.join(ConfigManager._cfgdir, cfg))
         except OSError as oe:
             pass
+    self._bg_sync_to_file()
 
 cfgleader = None
 def follow_channel(channel):
@@ -1680,7 +1702,7 @@ class ConfigManager(object):
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
-    def _load_from_json(self, jsondata):
+    def _load_from_json(self, jsondata, sync=True):
         """Load fresh configuration data from jsondata
 
         :param jsondata: String of jsondata
@@ -1751,7 +1773,8 @@ class ConfigManager(object):
                         self._cfgstore['users'][user]['cryptpass'] = \
                             tmpconfig[confarea][user]['cryptpass']
                         _mark_dirtykey('users', user, self.tenant)
-        self._bg_sync_to_file()
+        if sync:
+            self._bg_sync_to_file()
 
     def _dump_to_json(self, redact=None):
         """Dump the configuration in json form to output
