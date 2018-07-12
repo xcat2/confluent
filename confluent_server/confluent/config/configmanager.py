@@ -239,11 +239,11 @@ def exec_on_leader(function, *args):
 
 def exec_on_followers(fnname, *args):
     global _txcount
-    _txcount += 1
     if len(cfgstreams) < (len(_cfgstore['collective']) // 2):
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
     pushes = eventlet.GreenPool()
+    _txcount += 1
     payload = cPickle.dumps({'function': fnname, 'args': args,
                              'txcount': _txcount})
     for res in pushes.starmap(
