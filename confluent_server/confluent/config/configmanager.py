@@ -61,6 +61,7 @@ import cPickle
 import errno
 import eventlet
 import eventlet.event as event
+import eventlet.green.threading as gthread
 import fnmatch
 import json
 import operator
@@ -77,6 +78,7 @@ import traceback
 _masterkey = None
 _masterintegritykey = None
 _dirtylock = threading.RLock()
+_leaderlock = gthread.RLock()
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 tracelog = None
 statelessmode = False
@@ -460,6 +462,7 @@ def set_global(globalname, value, sync=True):
 cfgstreams = {}
 def relay_slaved_requests(name, listener):
     global cfgleader
+    stop_following()
     cfgstreams[name] = listener
     msg = listener.recv(8)
     while msg:
@@ -484,8 +487,18 @@ def relay_slaved_requests(name, listener):
     except KeyError:
         pass  # May have already been closed/deleted...
     if not cfgstreams and not cfgleader:
-        cfgleader = True
+        stop_following(True)
 
+
+def stop_following(replacement=None):
+    with _leaderlock:
+        global cfgleader
+        if cfgleader and not isinstance(cfgleader, bool):
+            try:
+                cfgleader.close()
+            except Exception:
+                pass
+        cfgleader = replacement
 
 def stop_leading():
     for stream in list(cfgstreams):
@@ -537,10 +550,11 @@ def commit_clear():
     ConfigManager._bg_sync_to_file()
 
 cfgleader = None
+
+
 def follow_channel(channel):
-    global cfgleader
     global _txcount
-    cfgleader = channel
+    stop_following(channel)
     msg = channel.recv(8)
     while msg:
         sz = struct.unpack('!Q', msg)[0]
@@ -560,7 +574,7 @@ def follow_channel(channel):
                 _pendingchangesets[rpc['xid']].send()
         msg = channel.recv(8)
     # mark the connection as broken
-    cfgleader = True
+    stop_following(True)
 
 
 def add_collective_member(name, address, fingerprint):

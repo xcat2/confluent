@@ -101,7 +101,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 if not ndata:
                     raise Exception("Error doing initial DB transfer")
                 dbjson += ndata
-            cfm.cfgleader = None
+            cfm.stop_following()
             cfm.clear_configuration()
             try:
                 cfm._restore_keys(keydata, None, sync=False)
@@ -128,7 +128,7 @@ def follow_leader(remote):
     global currentleader
     cfm.follow_channel(remote)
     # The leader has folded, time to startup again...
-    remote.close()
+    cfm.stop_following()
     currentleader = None
     eventlet.spawn_n(start_collective)
 
@@ -319,7 +319,6 @@ def handle_connection(connection, cert, request, local=False):
         connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
-        cfm.cfgleader = None
         cfm.relay_slaved_requests(drone, connection)
         # ok, we have a connecting member whose certificate checks out
         # He needs to bootstrap his configuration and subscribe it to updates
@@ -386,7 +385,7 @@ def start_collective():
         if member == myname:
             continue
         if cfm.cfgleader is None:
-            cfm.cfgleader = True
+            cfm.stop_following(True)
         ldrcandidate = cfm.get_collective_member(member)['address']
         if connect_to_leader(name=myname, leader=ldrcandidate):
             break
