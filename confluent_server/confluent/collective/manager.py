@@ -222,11 +222,19 @@ def handle_connection(connection, cert, request, local=False):
             tlvdata.send(remote, {'collective': {'operation': 'enroll',
                                                  'name': name, 'hmac': proof}})
             rsp = tlvdata.recv(remote)
+            if 'error' in rsp:
+                tlvdata.send(connection, {'collective':
+                                              {'status': rsp['error']}})
+                connection.close()
+                return
             proof = rsp['collective']['approval']
             proof = base64.b64decode(proof)
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
                 remote.close()
+                tlvdata.send(connection, {'collective':
+                                              {'status': 'Bad server token'}})
+                connection.close()
                 return
             tlvdata.send(connection, {'collective': {'status': 'Success'}})
             connection.close()
