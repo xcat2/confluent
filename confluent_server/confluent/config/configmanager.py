@@ -1900,7 +1900,7 @@ class ConfigManager(object):
         # if the thread is exiting, join it to let it close, just in case
         if cls._cfgwriter is not None:
             cls._cfgwriter.join()
-        cls._cfgwriter = threading.Thread(target=cls._sync_to_file, args=fullsync)
+        cls._cfgwriter = threading.Thread(target=cls._sync_to_file, args=(fullsync,))
         cls._cfgwriter.start()
 
     @classmethod
