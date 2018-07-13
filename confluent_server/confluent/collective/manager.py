@@ -90,6 +90,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 raise Exception(keydata['error'])
             if follower is not None:
                 follower.kill()
+                cfm.stop_following()
                 follower = None
             colldata = tlvdata.recv(remote)
             globaldata = tlvdata.recv(remote)
