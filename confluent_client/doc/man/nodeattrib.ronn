@@ -19,7 +19,7 @@ displayed.  If `-b` is specified, it will also display information on
 how inherited and expression based attributes are defined.  Attributes can be
 straightforward values, or an expression as documented in nodeattribexpressions(5).
 For a full list of attributes, run `nodeattrib <node> all` against a node.
-If `-c` is specified, this will set the nodeattribute to a null valid.
+If `-c` is specified, this will set the nodeattribute to a null value.
 This is different from setting the value to an empty string.
 
 For the `groups` attribute, it is possible to add a group by doing
