@@ -201,17 +201,33 @@ def handle_connection(connection, cert, request, local=False):
             connection.close()
         if 'join' == operation:
             invitation = request['invitation']
-            invitation = base64.b64decode(invitation)
+            try:
+                invitation = base64.b64decode(invitation)
+            except Exception:
+                tlvdata.send(
+                    connection,
+                    {'collective':
+                         {'status': 'Invalid token format'}})
+                connection.close()
+                return
             name, invitation = invitation.split('@', 1)
             host = request['server']
-            remote = socket.create_connection((host, 13001))
-            # This isn't what it looks like.  We do CERT_NONE to disable
-            # openssl verification, but then use the invitation as a
-            # shared secret to validate the certs as part of the join
-            # operation
-            remote = ssl.wrap_socket(remote,  cert_reqs=ssl.CERT_NONE,
-                                     keyfile='/etc/confluent/privkey.pem',
-                                     certfile='/etc/confluent/srvcert.pem')
+            try:
+                remote = socket.create_connection((host, 13001))
+                # This isn't what it looks like.  We do CERT_NONE to disable
+                # openssl verification, but then use the invitation as a
+                # shared secret to validate the certs as part of the join
+                # operation
+                remote = ssl.wrap_socket(remote,  cert_reqs=ssl.CERT_NONE,
+                                         keyfile='/etc/confluent/privkey.pem',
+                                         certfile='/etc/confluent/srvcert.pem')
+            except Exception:
+                tlvdata.send(
+                    connection,
+                    {'collective':
+                         {'status': 'Failed to connect to {0}'.format(host)}})
+                connection.close()
+                return
             mycert = util.get_certificate_from_file(
                 '/etc/confluent/srvcert.pem')
             cert = remote.getpeercert(binary_form=True)
