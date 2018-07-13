@@ -463,6 +463,8 @@ cfgstreams = {}
 def relay_slaved_requests(name, listener):
     global cfgleader
     stop_following()
+    if name in cfgstreams:
+        cfgstreams[name].close()
     cfgstreams[name] = listener
     msg = listener.recv(8)
     while msg:
