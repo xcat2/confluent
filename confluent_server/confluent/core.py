@@ -794,10 +794,14 @@ def handle_node_request(configmanager, inputdata, operation,
 def dispatch_request(nodes, manager, element, configmanager, inputdata,
                      operation):
     a = configmanager.get_collective_member(manager)
-    remote = socket.create_connection((a['address'], 13001))
-    remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
-                             keyfile='/etc/confluent/privkey.pem',
-                             certfile='/etc/confluent/srvcert.pem')
+    try:
+        remote = socket.create_connection((a['address'], 13001))
+        remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
+                                 keyfile='/etc/confluent/privkey.pem',
+                                 certfile='/etc/confluent/srvcert.pem')
+    except Exception:
+        raise exc.TargetEndpointUnreachable(
+            'Collective member {0} is unreachable'.format(a['name']))
     if not util.cert_matches(a['fingerprint'], remote.getpeercert(
             binary_form=True)):
         raise Exception("Invalid certificate on peer")
