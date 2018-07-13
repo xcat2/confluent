@@ -22,6 +22,10 @@ For a full list of attributes, run `nodeattrib <node> all` against a node.
 If `-c` is specified, this will set the nodeattribute to a null value.
 This is different from setting the value to an empty string.
 
+If the word all is specified, then all available attributes are given.
+Omitting any attribute name or the word 'all' will display only attributes
+that are currently set.
+
 For the `groups` attribute, it is possible to add a group by doing
 `groups,=<newgroup>` and to remove by doing `groups^=<oldgroup>`
 
