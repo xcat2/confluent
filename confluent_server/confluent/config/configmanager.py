@@ -1906,6 +1906,8 @@ class ConfigManager(object):
 
     @classmethod
     def wait_for_sync(cls, fullsync=False):
+        if cls._cfgwriter is not None:
+            cls._cfgwriter.join()
         cls._bg_sync_to_file(fullsync)
         if cls._cfgwriter is not None:
             cls._cfgwriter.join()
