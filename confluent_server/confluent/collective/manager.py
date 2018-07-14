@@ -114,7 +114,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                                                     colldata[c]['fingerprint'],
                                                     sync=False)
                 for globvar in globaldata:
-                    cfm.set_global(globvar, globaldata[globvar])
+                    cfm.set_global(globvar, globaldata[globvar], False)
                 cfm._txcount = dbi.get('txcount', 0)
                 cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
                                                                sync=False)
