@@ -100,9 +100,12 @@ def connect_to_leader(cert=None, name=None, leader=None):
             while (len(dbjson) < dbsize):
                 ndata = remote.recv(dbsize - len(dbjson))
                 if not ndata:
+                    try:
+                        remote.close()
+                    except Exception:
+                        pass
                     raise Exception("Error doing initial DB transfer")
                 dbjson += ndata
-            cfm.stop_following()
             cfm.clear_configuration()
             try:
                 cfm._restore_keys(keydata, None, sync=False)
@@ -117,6 +120,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                                                                sync=False)
                 cfm.commit_clear()
             except Exception:
+                cfm.stop_following()
                 cfm.rollback_clear()
                 raise
             currentleader = leader
