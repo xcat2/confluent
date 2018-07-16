@@ -357,6 +357,7 @@ def _tlsstartup(cnn):
             ctx.set_ciphers(
                 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
                 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384')
+            ctx.set_tmp_ecdh(crypto.get_elliptic_curve('secp384r1'))
             ctx.load_cert_chain('/etc/confluent/srvcert.pem',
                                 '/etc/confluent/privkey.pem')
             cnn = ctx.wrap_socket(cnn, server_side=True)
