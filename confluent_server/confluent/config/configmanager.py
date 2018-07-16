@@ -68,7 +68,6 @@ import operator
 import os
 import random
 import re
-import eventlet.green.socket as socket
 import string
 import struct
 import sys
@@ -474,7 +473,7 @@ def relay_slaved_requests(name, listener):
         cfgstreams[name] = listener
         try:
             msg = listener.recv(8)
-        except socket.error:
+        except Exception:
             msg = None
         while msg:
             if name not in cfgstreams:
@@ -493,7 +492,7 @@ def relay_slaved_requests(name, listener):
                     _push_rpc(listener, cPickle.dumps({'xid': rpc['xid']}))
             try:
                 msg = listener.recv(8)
-            except socket.error:
+            except Exception:
                 msg = None
     finally:
         try:
@@ -581,7 +580,7 @@ def follow_channel(channel):
     stop_following(channel)
     try:
         msg = channel.recv(8)
-    except socket.error:
+    except Exception:
         msg = None
     while msg:
         sz = struct.unpack('!Q', msg)[0]
@@ -601,7 +600,7 @@ def follow_channel(channel):
                 _pendingchangesets[rpc['xid']].send()
         try:
             msg = channel.recv(8)
-        except socket.error:
+        except Exception:
             msg = None
     # mark the connection as broken
     stop_following(True)
