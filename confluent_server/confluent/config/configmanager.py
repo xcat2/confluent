@@ -68,7 +68,7 @@ import operator
 import os
 import random
 import re
-import socket
+import eventlet.green.socket as socket
 import string
 import struct
 import sys
