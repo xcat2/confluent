@@ -31,9 +31,10 @@ updatepool = eventlet.greenpool.GreenPool(256)
 
 def execupdate(handler, filename, updateobj, type):
     if not os.path.exists(filename):
-        raise exc.InvalidArgumentException(
-            '{0} does not appear to exist on {1}'.format(filename,
-                                                         socket.gethostname()))
+        errstr =  '{0} does not appear to exist on {1}'.format(
+            filename, socket.gethostname())
+        updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
+                                   'detail': errstr})
     try:
         if type == 'firmware':
             completion = handler(filename, progress=updateobj.handle_progress,
