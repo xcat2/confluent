@@ -646,6 +646,7 @@ class ProxyConsole(object):
         self.cfm = configmanager
         self.node = node
         self.user = user
+        self.remote = None
         self.clisession = None
         self._attribwatcher = configmanager.watch_attributes(
             (self.node,), self._genwatchattribs, self._attribschanged)
@@ -704,7 +705,8 @@ class ProxyConsole(object):
 
     def detachsession(self, session):
         # we will disappear, so just let that happen...
-        tlvdata.send(self.remote, {'operation': 'stop'})
+        if self.remote:
+            tlvdata.send(self.remote, {'operation': 'stop'})
         self.clisession = None
 
     def send_break(self):
