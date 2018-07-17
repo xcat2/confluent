@@ -772,7 +772,7 @@ def handle_node_request(configmanager, inputdata, operation,
         if badcollnodes:
             raise exc.ConfluentException(
                 'collective management active, '
-                'collective.manager must by set for {0}'.format(
+                'collective.manager must be set for {0}'.format(
                     ','.join(badcollnodes)))
         workers = greenpool.GreenPool()
         numworkers = 0
