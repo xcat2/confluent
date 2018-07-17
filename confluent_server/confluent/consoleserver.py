@@ -349,9 +349,9 @@ class ConsoleHandler(object):
             self.reconnect.cancel()
             self.reconnect = None
         try:
-            self._console = plugin.handle_path(
+            self._console = list(plugin.handle_path(
                 self._plugin_path.format(self.node),
-                "create", self.cfgmgr)
+                "create", self.cfgmgr))[0]
         except (exc.NotImplementedException, exc.NotFoundException):
             self._console = None
         except:
