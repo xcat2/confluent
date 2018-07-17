@@ -175,8 +175,24 @@ def _rpc_master_set_node_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant).set_node_attributes(attribmap, autocreate)
 
 
+def _rpc_master_clear_node_attributes(tenant, nodes, attributes):
+    ConfigManager(tenant).clear_node_attributes(nodes, attributes)
+
+
+def _rpc_clear_node_attributes(tenant, nodes, attributes):
+    ConfigManager(tenant)._true_clear_node_attributes(nodes, attributes)
+
+
 def _rpc_master_set_group_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant).set_group_attributes(attribmap, autocreate)
+
+
+def _rpc_master_clear_group_attributes(tenant, groups, attributes):
+    ConfigManager(tenant).clear_group_attributes(groups, attributes)
+
+
+def _rpc_clear_group_attributes(tenant, groups, attributes):
+    ConfigManager(tenant)._true_clear_group_attributes(groups, attributes)
 
 
 def _rpc_master_del_user(tenant, name):
@@ -1448,6 +1464,15 @@ class ConfigManager(object):
         self._bg_sync_to_file()
 
     def clear_group_attributes(self, groups, attributes):
+        if cfgleader:
+            return exec_on_leader('_rpc_master_clear_group_attributes',
+                                  self.tenant, groups, attributes)
+        if cfgstreams:
+            exec_on_followers('_rpc_clear_group_attributes', self.tenant,
+                              groups, attributes)
+        self._true_clear_group_attributes(groups, attributes)
+
+    def _true_clear_group_attributes(self, groups, attributes):
         changeset = {}
         realattributes = []
         for attrname in list(attributes):
@@ -1600,6 +1625,15 @@ class ConfigManager(object):
         self._bg_sync_to_file()
 
     def clear_node_attributes(self, nodes, attributes):
+        if cfgleader:
+            return exec_on_leader('_rpc_master_clear_node_attributes',
+                                  self.tenant, nodes, attributes)
+        if cfgstreams:
+            exec_on_followers('_rpc_clear_node_attributes', self.tenant,
+                              nodes, attributes)
+        self._true_clear_node_attributes(nodes, attributes)
+
+    def _true_clear_node_attributes(self, nodes, attributes):
         # accumulate all changes into a changeset and push in one go
         changeset = {}
         realattributes = []
