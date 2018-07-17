@@ -236,6 +236,10 @@ class ConsoleHandler(object):
     def check_collective(self, attrvalue):
         myc = attrvalue.get(self.node, {}).get('collective.manager', {}).get(
             'value', None)
+        if configmodule.list_collective() and not myc:
+            self._is_local = False
+            self._detach()
+            self._disconnect()
         if myc and myc != collective.get_myname():
             # Do not do console connect for nodes managed by another
             # confluent collective member

@@ -30,6 +30,9 @@ class _ShellHandler(consoleserver.ConsoleHandler):
     _genwatchattribs = False
     _logtobuffer = False
 
+    def check_collective(self, attrvalue):
+        return
+
     def log(self, *args, **kwargs):
         # suppress logging through proving a stub 'log' function
         return

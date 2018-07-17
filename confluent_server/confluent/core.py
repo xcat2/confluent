@@ -739,6 +739,7 @@ def handle_node_request(configmanager, inputdata, operation,
         plugpath = None
         nodesbymanager = {}
         nodesbyhandler = {}
+        badcollnodes = []
         for node in nodes:
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
@@ -756,6 +757,8 @@ def handle_node_request(configmanager, inputdata, operation,
                         else:
                             nodesbymanager[manager].add(node)
                         continue
+                elif cfm.list_collective():
+                    badcollnodes.append(node)
             if plugpath is not None:
                 try:
                     hfunc = getattr(pluginmap[plugpath], operation)
@@ -766,6 +769,11 @@ def handle_node_request(configmanager, inputdata, operation,
                     nodesbyhandler[hfunc].append(node)
                 else:
                     nodesbyhandler[hfunc] = [node]
+        if badcollnodes:
+            raise exc.ConfluentException(
+                'collective management active, '
+                'collective.manager must by set for {0}'.format(
+                    ','.join(badcollnodes)))
         workers = greenpool.GreenPool()
         numworkers = 0
         for hfunc in nodesbyhandler:
