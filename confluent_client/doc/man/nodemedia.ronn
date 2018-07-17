@@ -15,7 +15,8 @@ are mounted in an insecure fashion.  http is insecure, and https is also
 insecure when no meaningful certificate validation is performed.  Currently
 there is no action that can change this, and this is purely informational.  A
 future version of software may provide a means to increase security of attached
-remote media.
+remote media.  If no media is mounted, this will provide no output, error
+conditions will result in output to standard error.
 
 `detachall` removes all the currently provided media to the host.  This unlinks
 remote media from urls and deletes uploaded media from the BMC.
