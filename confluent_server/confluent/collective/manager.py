@@ -207,6 +207,7 @@ def handle_connection(connection, cert, request, local=False):
             invitation = request['invitation']
             try:
                 invitation = base64.b64decode(invitation)
+                name, invitation = invitation.split('@', 1)
             except Exception:
                 tlvdata.send(
                     connection,
@@ -214,7 +215,6 @@ def handle_connection(connection, cert, request, local=False):
                          {'status': 'Invalid token format'}})
                 connection.close()
                 return
-            name, invitation = invitation.split('@', 1)
             host = request['server']
             try:
                 remote = socket.create_connection((host, 13001))
