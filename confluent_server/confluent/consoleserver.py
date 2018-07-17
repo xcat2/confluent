@@ -710,10 +710,10 @@ class ProxyConsole(object):
         self.clisession = None
 
     def send_break(self):
-        tlvdata.send(self.remote, {'operation:': 'break'})
+        tlvdata.send(self.remote, {'operation': 'break'})
 
     def reopen(self):
-        tlvdata.send(self.remote, {'operation:': 'reopen'})
+        tlvdata.send(self.remote, {'operation': 'reopen'})
 
 
 # this represents some api view of a console handler.  This handles things like
