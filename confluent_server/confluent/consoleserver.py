@@ -637,6 +637,8 @@ def connect_node(node, configmanager, username=None):
 # collective member.  It can skip the multi-session sharing as that is handled
 # remotely
 class ProxyConsole(object):
+    _genwatchattribs = frozenset(('collective.manager',))
+
     def __init__(self, node, managerinfo, myname, configmanager, user):
         self.skipreplay = True
         self.managerinfo = managerinfo
@@ -644,7 +646,14 @@ class ProxyConsole(object):
         self.cfm = configmanager
         self.node = node
         self.user = user
+        self.clisession = None
+        self._attribwatcher = configmanager.watch_attributes(
+            (self.node,), self._genwatchattribs, self._attribschanged)
 
+    def _attribschanged(self, nodeattribs, configmanager, **kwargs):
+        if self.clisession:
+            self.clisession.detach()
+            self.clisession = None
 
     def relay_data(self):
         data = tlvdata.recv(self.remote)
@@ -667,6 +676,7 @@ class ProxyConsole(object):
         tlvdata.send(self.remote, data)
 
     def attachsession(self, session):
+        self.clisession = session
         self.data_handler = session.data_handler
         termreq = {
             'proxyconsole': {
@@ -695,6 +705,7 @@ class ProxyConsole(object):
     def detachsession(self, session):
         # we will disappear, so just let that happen...
         tlvdata.send(self.remote, {'operation': 'stop'})
+        self.clisession = None
 
     def send_break(self):
         tlvdata.send(self.remote, {'operation:': 'break'})
