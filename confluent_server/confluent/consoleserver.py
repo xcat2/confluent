@@ -678,7 +678,13 @@ class ProxyConsole(object):
 
     def write(self, data):
         # Relay data to the collective manager
-        tlvdata.send(self.remote, data)
+        try:
+            tlvdata.send(self.remote, data)
+        except Exception:
+            if self.clisession:
+                self.clisession.detach()
+            self.clisession = None
+
 
     def attachsession(self, session):
         self.clisession = session
@@ -694,13 +700,20 @@ class ProxyConsole(object):
                 #facilitate redirect rather than relay on manager change
             },
         }
-        remote = socket.create_connection((self.managerinfo['address'], 13001))
-        remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
-                                 keyfile='/etc/confluent/privkey.pem',
-                                 certfile='/etc/confluent/srvcert.pem')
-        if not util.cert_matches(self.managerinfo['fingerprint'],
-                                 remote.getpeercert(binary_form=True)):
-            raise Exception('Invalid peer certificate')
+        try:
+            remote = socket.create_connection((self.managerinfo['address'], 13001))
+            remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
+                                     keyfile='/etc/confluent/privkey.pem',
+                                     certfile='/etc/confluent/srvcert.pem')
+            if not util.cert_matches(self.managerinfo['fingerprint'],
+                                     remote.getpeercert(binary_form=True)):
+                raise Exception('Invalid peer certificate')
+        except Exception:
+            eventlet.sleep(3)
+            if self.clisession:
+                self.clisession.detach()
+            self.detachsession(None)
+            return
         tlvdata.recv(remote)
         tlvdata.recv(remote)
         tlvdata.send(remote, termreq)
@@ -710,7 +723,10 @@ class ProxyConsole(object):
     def detachsession(self, session):
         # we will disappear, so just let that happen...
         if self.remote:
-            tlvdata.send(self.remote, {'operation': 'stop'})
+            try:
+                tlvdata.send(self.remote, {'operation': 'stop'})
+            except Exception:
+                pass
         self.clisession = None
 
     def send_break(self):
