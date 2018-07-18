@@ -757,7 +757,7 @@ def handle_node_request(configmanager, inputdata, operation,
                         else:
                             nodesbymanager[manager].add(node)
                         continue
-                elif cfm.list_collective():
+                elif list(cfm.list_collective()):
                     badcollnodes.append(node)
             if plugpath is not None:
                 try:
