@@ -835,8 +835,10 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
                                  keyfile='/etc/confluent/privkey.pem',
                                  certfile='/etc/confluent/srvcert.pem')
     except Exception:
-        raise exc.TargetEndpointUnreachable(
-            'Collective member {0} is unreachable'.format(a['name']))
+        for node in nodes:
+            yield msg.ConfluentResourceUnavailable(
+                node, 'Collective member {0} is unreachable'.format(a['name']))
+        return
     if not util.cert_matches(a['fingerprint'], remote.getpeercert(
             binary_form=True)):
         raise Exception("Invalid certificate on peer")
