@@ -87,7 +87,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
                                              leader=keydata['leader'])
                 if 'txcount' in keydata:
                     return become_leader(remote)
-                raise Exception(keydata['error'])
+                print(keydata['error'])
+                return False
             if follower is not None:
                 follower.kill()
                 cfm.stop_following()
