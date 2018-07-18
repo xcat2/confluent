@@ -45,11 +45,11 @@ except IndexError:
     sys.exit(1)
 client.check_globbing(noderange)
 setstate = None
-if len(sys.argv) > 2:
+if len(args) > 1:
     if setstate == 'softoff':
         setstate = 'shutdown'
-    elif not sys.argv[2] in ('stat', 'state', 'status'):
-        setstate = sys.argv[2]
+    elif not args[1] in ('stat', 'state', 'status'):
+        setstate = args[1]
 
 if setstate not in (None, 'on', 'off', 'shutdown', 'boot', 'reset'):
     argparser.print_help()
