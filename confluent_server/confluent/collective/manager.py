@@ -178,7 +178,7 @@ def handle_connection(connection, cert, request, local=False):
             return
 
         if 'show' == operation:
-            if list(cfm.list_collective()) == 0:
+            if not list(cfm.list_collective()):
                 tlvdata.send(connection,
                              {'collective': {'error': 'Collective mode not '
                                                       'enabled on this '
