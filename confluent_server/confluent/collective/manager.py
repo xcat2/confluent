@@ -340,6 +340,8 @@ def handle_connection(connection, cert, request, local=False):
                              connection.getpeername()[0])
             connection.close()
             return
+        cfm.update_collective_address(request['name'],
+                                      connection.getpeername()[0])
         tlvdata.send(connection, cfm._dump_keys(None, False))
         tlvdata.send(connection, cfm._cfgstore['collective'])
         tlvdata.send(connection, cfm.get_globals())
