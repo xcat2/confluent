@@ -178,12 +178,19 @@ def handle_connection(connection, cert, request, local=False):
             return
 
         if 'show' == operation:
+            if list(cfm.list_collective()) == 0:
+                tlvdata.send(connection,
+                             {'collective': {'error': 'Collective mode not '
+                                                      'enabled on this '
+                                                      'system'}})
+                return
             try:
                 cfm.check_quorum()
             except exc.DegradedCollective:
                 tlvdata.send(connection,
                     {'collective':
                          {'error': 'Collective does not have quorum'}})
+                return
             if follower:
                 myleader = cfm.get_collective_member_by_address(
                     currentleader)['name']
