@@ -75,7 +75,7 @@ def show_collective():
     tlvdata.send(s, {'collective': {'operation': 'show'}})
     res = tlvdata.recv(s)
     if 'error' in res['collective']:
-        print(res['error']['collective'])
+        print(res['collective']['error'])
         return
     print('Leader: {0}'.format(res['collective']['leader']))
     if 'active' in res['collective']:
