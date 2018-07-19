@@ -191,12 +191,21 @@ def handle_connection(connection, cert, request, local=False):
                     {'collective':
                          {'error': 'Collective does not have quorum'}})
                 return
+            collinfo = {}
             if follower:
-                myleader = cfm.get_collective_member_by_address(
+                collinfo['leader'] = cfm.get_collective_member_by_address(
                     currentleader)['name']
             else:
-                myleader = get_myname()
-            tlvdata.send(connection, {'collective':  {'leader': myleader}})
+                iam = get_myname()
+                collinfo['leader'] = iam
+                collinfo['active'] = list(cfm.cfgstreams)
+                activemembers = set(cfm.cfgstreams)
+                activemembers.add(iam)
+                collinfo['offline'] = []
+                for member in cfm.list_collective():
+                    if member not in activemembers:
+                        collinfo['offline'].append(member)
+            tlvdata.send(connection, {'collective':  collinfo})
             return
         if 'invite' == operation:
             try:
