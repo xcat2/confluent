@@ -350,6 +350,15 @@ def handle_connection(connection, cert, request, local=False):
         populate_collinfo(collinfo)
         tlvdata.send(connection, collinfo)
     if 'connect' == operation:
+        drone = request['name']
+        droneinfo = cfm.get_collective_member(drone)
+        if not (droneinfo and util.cert_matches(droneinfo['fingerprint'],
+                                                cert)):
+            tlvdata.send(connection,
+                         {'error': 'Invalid certificate, '
+                                   'redo invitation process'})
+            connection.close()
+            return
         myself = connection.getsockname()[0]
         if myself != get_leader(connection):
             tlvdata.send(
@@ -361,15 +370,6 @@ def handle_connection(connection, cert, request, local=False):
         if connecting.active:
             tlvdata.send(connection, {'error': 'Connecting right now',
                                       'backoff': True})
-            connection.close()
-            return
-        drone = request['name']
-        droneinfo = cfm.get_collective_member(drone)
-        if not (droneinfo and util.cert_matches(droneinfo['fingerprint'],
-                                                cert)):
-            tlvdata.send(connection,
-                         {'error': 'Invalid certificate, '
-                                   'redo invitation process'})
             connection.close()
             return
         if request['txcount'] > cfm._txcount:
