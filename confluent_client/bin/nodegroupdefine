@@ -47,7 +47,7 @@ session = client.Command()
 exitcode = 0
 attribs = {'name': noderange}
 for arg in args[1:]:
-    key, val = arg.split('=')
+    key, val = arg.split('=', 1)
     attribs[key] = val
 for r in session.create('/nodegroups/', attribs):
     if 'error' in r:

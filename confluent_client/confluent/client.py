@@ -530,7 +530,7 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
         if "=" in updateargs[1]:
             try:
                 for val in updateargs[1:]:
-                    val = val.split('=')
+                    val = val.split('=', 1)
                     if val[0][-1] in (',', '-', '^'):
                         key = val[0][:-1]
                         if val[0][-1] == ',':

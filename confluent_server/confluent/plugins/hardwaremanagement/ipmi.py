@@ -406,8 +406,8 @@ class IpmiHandler(object):
                 ipmisess = persistent_ipmicmds[(node, tenant)].ipmi_session
                 begin = util.monotonic_time()
                 while ((not (self.broken or self.loggedin)) and
-                               (util.monotonic_time() - begin) < 180):
-                    ipmisess.wait_for_rsp(180)
+                               (util.monotonic_time() - begin) < 80):
+                    ipmisess.wait_for_rsp(80)
                 if not (self.broken or self.loggedin):
                     raise exc.TargetEndpointUnreachable(
                         "Login process to " + connparams['bmc'] + " died")
