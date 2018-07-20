@@ -550,6 +550,8 @@ def relay_slaved_requests(name, listener):
                     pass
             if not cfgstreams and not cfgleader:  # last one out, set cfgleader to boolean to mark dead collective
                 stop_following(True)
+                return False
+            return True
 
 
 class StreamHandler(object):
