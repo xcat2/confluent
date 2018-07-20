@@ -77,6 +77,8 @@ def show_collective():
     if 'error' in res['collective']:
         print(res['collective']['error'])
         return
+    if 'quorum' in res['collective']:
+        print('Quorum: {0}'.format(res['collective']['quorum']))
     print('Leader: {0}'.format(res['collective']['leader']))
     if 'active' in res['collective']:
         if res['collective']['active']:

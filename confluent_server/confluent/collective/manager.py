@@ -185,13 +185,6 @@ def handle_connection(connection, cert, request, local=False):
                                                       'enabled on this '
                                                       'system'}})
                 return
-            try:
-                cfm.check_quorum()
-            except exc.DegradedCollective:
-                tlvdata.send(connection,
-                    {'collective':
-                         {'error': 'Collective does not have quorum'}})
-                return
             if follower:
                 linfo = cfm.get_collective_member_by_address(currentleader)
                 remote = socket.create_connection((currentleader, 13001))
@@ -217,6 +210,11 @@ def handle_connection(connection, cert, request, local=False):
             else:
                 collinfo = {}
                 populate_collinfo(collinfo)
+            try:
+                cfm.check_quorum()
+                collinfo['quorum'] = True
+            except exc.DegradedCollective:
+                collinfo['quorum'] = False
             tlvdata.send(connection, {'collective':  collinfo})
             return
         if 'invite' == operation:
