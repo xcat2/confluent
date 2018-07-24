@@ -21,6 +21,7 @@
 
 import optparse
 import os
+import select
 import sys
 
 path = os.path.dirname(os.path.realpath(__file__))
@@ -70,6 +71,9 @@ def print_current():
     sys.stdout.flush()
 
 fullline = sys.stdin.readline()
+printpending = True
+clearpending = False
+holdoff = 0
 while fullline:
     for line in fullline.split('\n'):
         if not line:
@@ -78,9 +82,22 @@ while fullline:
             line = 'UNKNOWN: ' + line
         grouped.add_line(*line.split(': ', 1))
         if options.watch:
-            sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
-            print_current()
+            if not holdoff:
+                holdoff = os.times()[4] + 0.250
+            if (holdoff < os.times()[4] or
+                    not select.select((sys.stdin,), (), (), 0.250)[0]):
+                # print now, nothing pending
+                holdoff = 0
+                sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
+                print_current()
+                printpending = False
+                clearpending = True
+            else:
+                printpending = True
     fullline = sys.stdin.readline()
-if not options.watch:
+
+if printpending:
+    if clearpending:
+        sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
     print_current()
 
