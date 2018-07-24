@@ -730,7 +730,7 @@ def handle_node_request(configmanager, inputdata, operation,
         if isnoderange:
             return passvalue
         elif isinstance(passvalue, console.Console):
-            return passvalue
+            return [passvalue]
         else:
             return stripnode(passvalue, nodes[0])
     elif 'pluginattrs' in plugroute:
