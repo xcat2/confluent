@@ -129,7 +129,7 @@ class SshShell(conapi.Console):
                 data = data[:delidx - 1] + data[delidx + 1:]
             self.username += data
             if '\r' in self.username:
-                self.username, self.password = self.username.split('\r')
+                self.username, self.password = self.username.split('\r')[:2]
                 lastdata = data.split('\r')[0]
                 if lastdata != '':
                     self.datacallback(lastdata)
