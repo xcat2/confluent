@@ -518,9 +518,6 @@ class ConsoleHandler(object):
             eventdata |= 1
         if self.shiftin is not None:
             eventdata |= 2
-        self.log(data, eventdata=eventdata)
-        self.lasttime = util.monotonic_time()
-        self.feedbuffer(data)
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
@@ -529,6 +526,10 @@ class ConsoleHandler(object):
             self.feedbuffer(b'\x1bc')
             self._send_rcpts(b'\x1bc')
         self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
+        self.log(data, eventdata=eventdata)
+        self.lasttime = util.monotonic_time()
+        self.feedbuffer(data)
+
 
     def _send_rcpts(self, data):
         for rcpt in list(self.livesessions):
