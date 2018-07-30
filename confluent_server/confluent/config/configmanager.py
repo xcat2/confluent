@@ -680,7 +680,7 @@ def follow_channel(channel):
                 except Exception as e:
                     print(repr(e))
             if 'xid' in rpc and rpc['xid']:
-                if rpc['exc']:
+                if rpc.get('exc', None):
                     _pendingchangesets[rpc['xid']].send_exception(rpc['exc'])
                 else:
                     _pendingchangesets[rpc['xid']].send()
