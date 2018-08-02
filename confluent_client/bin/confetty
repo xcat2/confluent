@@ -585,7 +585,6 @@ def startconsole(nodename):
     tty.setraw(sys.stdin.fileno())
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
-    sys.stdout.write('\x1b[?1049h\x1b[H')
     inconsole = True
 
 
@@ -594,7 +593,6 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
     global currconsole
     global didconsole
     if fixterm or didconsole:
-        sys.stdout.write('\x1b[?1049l')
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
         if oldtcattr is not None:
