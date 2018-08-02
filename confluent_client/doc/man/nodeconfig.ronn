@@ -35,6 +35,9 @@ given as a node expression, as documented in the man page for nodeattribexpressi
   configuration reset to default.  Currently the only component implemented
   is uefi.
 
+* `-b`, '--batch':
+   Provide arguments as lines of a file, rather than the command line.
+
 
 ## EXAMPLES
 * Showing the current IP configuration of noderange BMC/IMM/XCC:

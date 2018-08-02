@@ -19,6 +19,7 @@
 import os
 import signal
 import optparse
+import shlex
 import sys
 
 try:
@@ -47,6 +48,8 @@ argparser.add_option('-c', '--comparedefault', dest='comparedefault',
                      action='store_true', default=False,
                      help='Compare given settings to default or list settings '
                           'that are non default')
+argparser.add_option('-b', '--batch', dest='batch', metavar='settings.batch',
+                     default=False, help='Provide settings in a batch file')
 argparser.add_option('-d', '--detail', dest='detail',
                      action='store_true', default=False,
                      help='Provide verbose information as available, such as '
@@ -118,61 +121,73 @@ def _assign_value():
     assignment[key] = value
 
 
-for param in args[1:]:
-    if param == 'show':
-        continue  # forgive muscle memory of pasu users
-    if param == 'set':
-        setmode = True
-        forceset = True
-        continue
-    if needval:
-        key = needval
-        value = param
-        _assign_value()
-        continue
-    if '=' in param or param[-1] == ':' or forceset:
-        if setmode is None:
+def parse_config_line(arguments):
+    global setmode, forceset, key, value, needval, candidate, path, attrib
+    for param in arguments:
+        if param == 'show':
+            continue  # forgive muscle memory of pasu users
+        if param == 'set':
             setmode = True
-        if setmode != True:
-            bailout('Cannot do set and query in same command')
-        if '=' in param:
-            key, _, value = param.partition('=')
+            forceset = True
+            continue
+        if needval:
+            key = needval
+            value = param
             _assign_value()
-        elif param[-1] == ':':
-            needval = param[:-1]
+            continue
+        if '=' in param or param[-1] == ':' or forceset:
+            if setmode is None:
+                setmode = True
+            if setmode != True:
+                bailout('Cannot do set and query in same command')
+            if '=' in param:
+                key, _, value = param.partition('=')
+                _assign_value()
+            elif param[-1] == ':':
+                needval = param[:-1]
+            else:
+                needval = param
         else:
-            needval = param
-    else:
-        if setmode is None:
-            setmode = False
-        if setmode != False:
-            bailout('Cannot do set and query in same command')
-        if '.' not in param:
-            matchedparms = False
-            for candidate in cfgpaths:
-                if candidate.startswith('{0}.'.format(param)):
-                    matchedparms = True
-                    if not options.exclude:
-                        path, attrib = cfgpaths[candidate]
-                        path = '/noderange/{0}/{1}'.format(noderange, path)
-                        if path not in queryparms:
-                            queryparms[path] = {}
-                        queryparms[path][attrib] = candidate
-                    else:
-                        try:
-                            del queryparms[path]
-                        except KeyError:
-                            pass
-            if not matchedparms:
+            if setmode is None:
+                setmode = False
+            if setmode != False:
+                bailout('Cannot do set and query in same command')
+            if '.' not in param:
+                matchedparms = False
+                for candidate in cfgpaths:
+                    if candidate.startswith('{0}.'.format(param)):
+                        matchedparms = True
+                        if not options.exclude:
+                            path, attrib = cfgpaths[candidate]
+                            path = '/noderange/{0}/{1}'.format(noderange, path)
+                            if path not in queryparms:
+                                queryparms[path] = {}
+                            queryparms[path][attrib] = candidate
+                        else:
+                            try:
+                                del queryparms[path]
+                            except KeyError:
+                                pass
+                if not matchedparms:
+                    printsys.append(param)
+            elif param not in cfgpaths:
                 printsys.append(param)
-        elif param not in cfgpaths:
-            printsys.append(param)
-        else:
-            path, attrib = cfgpaths[param]
-            path = '/noderange/{0}/{1}'.format(noderange, path)
-            if path not in queryparms:
-                queryparms[path] = {}
-            queryparms[path][attrib] = param
+            else:
+                path, attrib = cfgpaths[param]
+                path = '/noderange/{0}/{1}'.format(noderange, path)
+                if path not in queryparms:
+                    queryparms[path] = {}
+                queryparms[path][attrib] = param
+
+if options.batch:
+    printsys = []
+    argfile = open(options.batch, 'r')
+    argset = argfile.readline()
+    while argset:
+        parse_config_line(shlex.split(argset))
+        argset = argfile.readline()
+else:
+    parse_config_line(args[1:])
 session = client.Command()
 rcode = 0
 if options.restoredefault and options.restoredefault.lower() in (
