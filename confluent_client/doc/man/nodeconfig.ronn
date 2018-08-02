@@ -30,6 +30,9 @@ given as a node expression, as documented in the man page for nodeattribexpressi
   Provide detailed data as available.  This can include help text and valid
   values for a setting.
 
+* `-b`, '--batch':
+   Provide arguments as lines of a file, rather than the command line.
+
 
 ## EXAMPLES
 * Showing the current IP configuration of noderange BMC/IMM/XCC:
