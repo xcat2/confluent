@@ -271,19 +271,19 @@ class IpmiConsole(conapi.Console):
                                                  iohandler=self.handle_data)
             self.solconnection.outputlock = NullLock()
             while (not self.solconnection.connected and
-                   not (self.broken or self.solconnection.connected or
+                   not (self.broken or self.solconnection.broken or
                         self.solconnection.ipmi_session.broken)):
                 w = eventlet.event.Event()
                 _ipmiwaiters.append(w)
                 w.wait(15)
-            if (self.broken or self.solconnection.connected or
+            if (self.broken or self.solconnection.broken or
                     self.solconnection.ipmi_session.broken):
+                if not self.error:
+                    self.error = 'Unknown error'
                 if (self.error.startswith('Incorrect password') or
                         self.error.startswith('Unauthorized name')):
                     raise exc.TargetEndpointBadCredentials
                 else:
-                    if not self.error:
-                        self.error = 'Unknown error'
                     raise exc.TargetEndpointUnreachable(self.error)
             self.connected = True
         except socket.gaierror as err:
