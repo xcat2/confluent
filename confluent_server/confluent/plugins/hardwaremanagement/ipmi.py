@@ -270,13 +270,14 @@ class IpmiConsole(conapi.Console):
                                                  kg=self.kg, force=True,
                                                  iohandler=self.handle_data)
             self.solconnection.outputlock = NullLock()
-            while (not self.solconnection.connected and
+            while (self.solconnection and not self.solconnection.connected and
                    not (self.broken or self.solconnection.broken or
                         self.solconnection.ipmi_session.broken)):
                 w = eventlet.event.Event()
                 _ipmiwaiters.append(w)
                 w.wait(15)
-            if (self.broken or self.solconnection.broken or
+            if (self.broken or not self.solconnection or
+                    self.solconnection.broken or
                     self.solconnection.ipmi_session.broken):
                 if not self.error:
                     self.error = 'Unknown error'
