@@ -2065,6 +2065,7 @@ class ConfigManager(object):
         with _synclock:
             if statelessmode:
                 return
+            _mkpath(cls._cfgdir)
             with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
                 f.write(struct.pack('!Q', _txcount))
             if fullsync or 'dirtyglobals' in _cfgstore:
@@ -2074,7 +2075,6 @@ class ConfigManager(object):
                     with _dirtylock:
                         dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
                         del _cfgstore['dirtyglobals']
-                _mkpath(cls._cfgdir)
                 globalf = dbm.open(os.path.join(cls._cfgdir, "globals"), 'c', 384)  # 0600
                 try:
                     for globalkey in dirtyglobals:
