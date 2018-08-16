@@ -395,7 +395,8 @@ class IpmiHandler(object):
         self.tenant = cfg.tenant
         tenant = cfg.tenant
         if ((node, tenant) not in persistent_ipmicmds or
-                not persistent_ipmicmds[(node, tenant)].ipmi_session.logged):
+                not persistent_ipmicmds[(node, tenant)].ipmi_session.logged or
+                persistent_ipmicmds[(node, tenant)].ipmi_session.broken):
             try:
                 persistent_ipmicmds[(node, tenant)].close_confluent()
             except KeyError:  # was no previous session
