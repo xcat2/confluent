@@ -144,6 +144,14 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
     if 'collective' in request and skipauth:
+        if not libssl:
+            tlvdata.send(
+                connection,
+                {'collective': {'error': 'Server either does not have '
+                                         'python-openssl installed or has an '
+                                         'incorrect version installed '
+                                         '(e.g. pyOpenSSL)'}})
+            return
         return collective.handle_connection(connection, None, request['collective'],
                                      local=True)
     while request is not None:
