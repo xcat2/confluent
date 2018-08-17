@@ -148,9 +148,10 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             tlvdata.send(
                 connection,
                 {'collective': {'error': 'Server either does not have '
-                                         'python-openssl installed or has an '
+                                         'python-pyopenssl installed or has an '
                                          'incorrect version installed '
-                                         '(e.g. pyOpenSSL)'}})
+                                         '(e.g. pyOpenSSL would need to be '
+                                         'replaced with python-pyopenssl)'}})
             return
         return collective.handle_connection(connection, None, request['collective'],
                                      local=True)
