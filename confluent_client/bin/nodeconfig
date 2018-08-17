@@ -55,6 +55,11 @@ argparser.add_option('-x', '--exclude', dest='exclude',
                      action='store_true', default=False,
                      help='Treat positional arguments as items to not '
                           'examine, compare, or restore default')
+argparser.add_option('-a', '--advanced', dest='advanced',
+                     action='store_true', default=False,
+                     help='Include advanced settings, which are normally not '
+                          'intended to be used without direction from the '
+                          'relevant server vendor.')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -209,7 +214,11 @@ else:
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
-        path = '/noderange/{0}/configuration/system/all'.format(noderange)
+        if printsys == [] and not options.advanced:
+            path = '/noderange/{0}/configuration/system/all'.format(noderange)
+        else:
+            path = '/noderange/{0}/configuration/system/advanced'.format(
+                noderange)
         rcode = client.print_attrib_path(path, session, printsys,
                                          options)
 sys.exit(rcode)
