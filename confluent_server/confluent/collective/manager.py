@@ -134,11 +134,13 @@ def connect_to_leader(cert=None, name=None, leader=None):
 
 def follow_leader(remote):
     global currentleader
-    cfm.follow_channel(remote)
-    # The leader has folded, time to startup again...
-    cfm.stop_following()
-    currentleader = None
-    eventlet.spawn_n(start_collective)
+    try:
+        cfm.follow_channel(remote)
+    finally:
+        # The leader has folded, time to startup again...
+        cfm.stop_following()
+        currentleader = None
+        eventlet.spawn_n(start_collective)
 
 
 def connect_to_collective(cert, member):
