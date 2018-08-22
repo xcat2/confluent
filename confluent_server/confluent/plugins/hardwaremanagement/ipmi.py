@@ -533,6 +533,8 @@ class IpmiHandler(object):
             return self.handle_ntp()
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
+        elif self.element[1:3] == ['system', 'advanced']:
+            return self.handle_sysconfig(True)
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -1025,10 +1027,11 @@ class IpmiHandler(object):
             self.ipmicmd.set_domain_name(dn)
             return
 
-    def handle_sysconfig(self):
+    def handle_sysconfig(self, advanced=False):
         if 'read' == self.op:
             self.output.put(msg.ConfigSet(
-                self.node, self.ipmicmd.get_system_configuration()))
+                self.node, self.ipmicmd.get_system_configuration(
+                    hideadvanced=not advanced)))
         elif 'update' == self.op:
             self.ipmicmd.set_system_configuration(
                 self.inputdata.get_attributes(self.node))
