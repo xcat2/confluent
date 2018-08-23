@@ -31,7 +31,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
-import confluent.screensqueeze as sj q
+import confluent.screensqueeze as sq
 
 exitcode = 0
 
@@ -69,7 +69,7 @@ def download_servicedata(noderange, media):
     session = client.Command()
     output = sq.ScreenPrinter(noderange, session)
     filename = os.path.abspath(media)
-    resource = '/noderange/{0}/media/uploads/'.format(noderange)
+    resource = '/noderange/{0}/support/servicedata/'.format(noderange)
     upargs = {'filename': filename}
     noderrs = {}
     nodeurls = {}

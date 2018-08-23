@@ -385,7 +385,7 @@ class IpmiHandler(object):
         self.error = None
         eventlet.sleep(0)
         self.cfg = cfd[node]
-        self.current_user = cfd.current_user
+        self.current_user = cfg.current_user
         self.loggedin = False
         self.node = node
         self.element = element
