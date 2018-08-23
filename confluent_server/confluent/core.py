@@ -823,6 +823,8 @@ def iterate_queue(numworkers, passvalues, strip=False):
         if nv == 'theend':
             completions += 1
         else:
+            if isinstance(nv, Exception):
+                raise nv
             if strip and not isinstance(nv, console.Console):
                 nv.strip_node(strip)
             yield nv

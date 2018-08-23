@@ -422,6 +422,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return DetachMedia(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/') and inputdata:
         return InputMedia(path, nodes, inputdata)
+    elif '/'.join(path).startswith('support/servicedata') and inputdata:
+        return InputMedia(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException(
             'No known input handler for request')

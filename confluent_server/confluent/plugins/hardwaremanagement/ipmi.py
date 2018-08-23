@@ -1148,7 +1148,7 @@ def retrieve(nodes, element, configmanager, inputdata):
                                             element, 'mediaupload')
     elif '/'.join(element).startswith('support/servicedata'):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
-                                            element, 'mediaupload')
+                                            element, 'ffdc')
     else:
         return perform_requests('read', nodes, element, configmanager, inputdata)
 
@@ -1160,5 +1160,8 @@ def delete(nodes, element, configmanager, inputdata):
     elif '/'.join(element).startswith('media/uploads'):
         return firmwaremanager.remove_updates(nodes, configmanager.tenant,
                                               element, type='mediaupload')
+    elif '/'.join(element).startswith('support/servicedata'):
+        return firmwaremanager.remove_updates(nodes, configmanager.tenant,
+                                              element, type='ffdc')
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata)
