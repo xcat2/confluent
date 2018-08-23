@@ -237,6 +237,10 @@ def _init_core():
                 'default': 'ipmi',
             }),
         },
+        'description': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
         'events': {
             'hardware': {
                 'log': PluginRoute({
@@ -260,10 +264,6 @@ def _init_core():
             }),
         },
         'identify': PluginRoute({
-            'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
-        }),
-        'description': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
             'default': 'ipmi',
         }),
@@ -341,6 +341,12 @@ def _init_core():
                 }),
             },
 
+        },
+        'support': {
+            'servicedata': PluginCollection({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
         },
     }
 

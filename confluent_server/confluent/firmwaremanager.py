@@ -26,6 +26,7 @@ import socket
 
 updatesbytarget = {}
 uploadsbytarget = {}
+downloadsbytarget = {}
 updatepool = eventlet.greenpool.GreenPool(256)
 
 
@@ -67,6 +68,8 @@ class Updater(object):
             myparty = updatesbytarget
         elif type == 'mediaupload':
             myparty = uploadsbytarget
+        elif type == 'ffdc':
+            myparty = downloadsbytarget
         if (node, tenant) not in myparty:
             myparty[(node, tenant)] = {}
         if name is None:
@@ -96,6 +99,8 @@ def remove_updates(nodes, tenant, element, type='firmware'):
     upid = element[-1]
     if type == 'firmware':
         myparty = updatesbytarget
+    elif type == 'ffdc':
+        myparty = downloadsbytarget
     else:
         myparty = uploadsbytarget
     for node in nodes:
@@ -115,6 +120,9 @@ def list_updates(nodes, tenant, element, type='firmware'):
     if type == 'mediaupload':
         myparty = uploadsbytarget
         verb = 'upload'
+    elif type == 'ffdc':
+        verb = 'download'
+        myparty = downloadsbytarget
     else:
         myparty = updatesbytarget
         verb = 'update'

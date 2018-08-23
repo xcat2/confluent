@@ -482,6 +482,8 @@ class IpmiHandler(object):
             self.decode_alert()
         elif self.element == ['console', 'license']:
             self.handle_license()
+        elif self.element == ['support', 'servicedata']:
+            self.handle_servicedata_fetch()
         elif self.element == ['description']:
             self.handle_description()
         else:
@@ -502,6 +504,13 @@ class IpmiHandler(object):
                                      type='mediaupload')
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
+
+    def handle_servicedata_fetch(self):
+        u = firmwaremanager.Updater(
+            self.node, self.ipmicmd.get_diagnostic_data,
+            self.inputdata.filename, self.tenant, type='ffdc')
+        self.output.put(msg.CreatedResource(
+            'nodes/{0}/support/servicedata/{1}'.format(self.node, u.name)))
 
     def handle_attach_media(self):
         try:
@@ -1135,6 +1144,9 @@ def retrieve(nodes, element, configmanager, inputdata):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element)
     elif '/'.join(element).startswith('media/uploads'):
+        return firmwaremanager.list_updates(nodes, configmanager.tenant,
+                                            element, 'mediaupload')
+    elif '/'.join(element).startswith('support/servicedata'):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'mediaupload')
     else:
