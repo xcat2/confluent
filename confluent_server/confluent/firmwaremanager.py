@@ -22,6 +22,7 @@ import confluent.exceptions as exc
 import confluent.messages as msg
 import eventlet
 import os
+import pwd
 import socket
 
 updatesbytarget = {}
@@ -30,12 +31,14 @@ downloadsbytarget = {}
 updatepool = eventlet.greenpool.GreenPool(256)
 
 
-def execupdate(handler, filename, updateobj, type):
+def execupdate(handler, filename, updateobj, type, owner, node):
     if type != 'ffdc' and not os.path.exists(filename):
         errstr =  '{0} does not appear to exist on {1}'.format(
             filename, socket.gethostname())
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': errstr})
+    if type == 'ffdc' and os.path.isdir(filename):
+        filename += '/' + node + '.svcdata'
     try:
         if type == 'firmware':
             completion = handler(filename, progress=updateobj.handle_progress,
@@ -44,6 +47,9 @@ def execupdate(handler, filename, updateobj, type):
             completion = handler(filename, progress=updateobj.handle_progress)
         if completion is None:
             completion = 'complete'
+        if owner:
+            pwent = pwd.getpwnam(owner)
+            os.chown(filename, pwent.pw_uid, pwent.pw_gid)
         updateobj.handle_progress({'phase': completion, 'progress': 100.0})
     except exc.PubkeyInvalid as pi:
         errstr = 'Certificate mismatch detected, does not match value in ' \
@@ -56,14 +62,14 @@ def execupdate(handler, filename, updateobj, type):
 
 class Updater(object):
     def __init__(self, node, handler, filename, tenant=None, name=None,
-                 bank=None, type='firmware'):
+                 bank=None, type='firmware', owner=None):
         self.bank = bank
         self.node = node
         self.phase = 'initializing'
         self.detail = ''
         self.percent = 0.0
         self.updateproc = updatepool.spawn(execupdate, handler, filename,
-                                           self, type)
+                                           self, type, owner, node)
         if type == 'firmware':
             myparty = updatesbytarget
         elif type == 'mediaupload':

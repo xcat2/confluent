@@ -385,6 +385,7 @@ class IpmiHandler(object):
         self.error = None
         eventlet.sleep(0)
         self.cfg = cfd[node]
+        self.current_user = cfd.current_user
         self.loggedin = False
         self.node = node
         self.element = element
@@ -508,7 +509,8 @@ class IpmiHandler(object):
     def handle_servicedata_fetch(self):
         u = firmwaremanager.Updater(
             self.node, self.ipmicmd.get_diagnostic_data,
-            self.inputdata.filename, self.tenant, type='ffdc')
+            self.inputdata.filename, self.tenant, type='ffdc',
+            self.current_user)
         self.output.put(msg.CreatedResource(
             'nodes/{0}/support/servicedata/{1}'.format(self.node, u.name)))
 
