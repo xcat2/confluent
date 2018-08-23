@@ -263,6 +263,10 @@ def _init_core():
             'pluginattrs': ['hardwaremanagement.method'],
             'default': 'ipmi',
         }),
+        'description': PluginRoute({
+            'pluginattrs': ['hardwaremanagement.method'],
+            'default': 'ipmi',
+        }),
         'inventory': {
             'hardware': {
                 'all': PluginCollection({
@@ -826,6 +830,8 @@ def addtoqueue(theq, fun, kwargs):
         else:
             for pv in result:
                 theq.put(pv)
+    except Exception as e:
+        theq.put(e)
     finally:
         theq.put('theend')
 

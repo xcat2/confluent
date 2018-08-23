@@ -482,6 +482,8 @@ class IpmiHandler(object):
             self.decode_alert()
         elif self.element == ['console', 'license']:
             self.handle_license()
+        elif self.element == ['description']:
+            self.handle_description()
         else:
             raise Exception('Not Implemented')
 
@@ -1085,6 +1087,11 @@ class IpmiHandler(object):
         available = self.ipmicmd.get_remote_kvm_available()
         self.output.put(msg.License(self.node, available))
         return
+
+    def handle_description(self):
+        dsc = self.ipmicmd.get_description()
+        self.output.put(msg.KeyValueData(dsc, self.node))
+
 
 def _str_health(health):
     if isinstance(health, str):
