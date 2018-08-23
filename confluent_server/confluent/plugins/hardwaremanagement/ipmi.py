@@ -510,7 +510,7 @@ class IpmiHandler(object):
         u = firmwaremanager.Updater(
             self.node, self.ipmicmd.get_diagnostic_data,
             self.inputdata.filename, self.tenant, type='ffdc',
-            self.current_user)
+            owner=self.current_user)
         self.output.put(msg.CreatedResource(
             'nodes/{0}/support/servicedata/{1}'.format(self.node, u.name)))
 
