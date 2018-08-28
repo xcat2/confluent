@@ -1,4 +1,5 @@
 nodedefine(8) -- Define new confluent nodes
+===================================================================
 
 ## SYNOPSIS
 

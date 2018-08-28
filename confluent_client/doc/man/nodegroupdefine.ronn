@@ -1,4 +1,5 @@
 nodegroupdefine(8) -- Define new confluent node group
+===================================================================
 
 ## SYNOPSIS
 
