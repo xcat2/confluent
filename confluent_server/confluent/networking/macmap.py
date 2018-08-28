@@ -47,6 +47,7 @@ import eventlet.semaphore
 import re
 
 _macmap = {}
+_apimacmap = {}
 _macsbyswitch = {}
 _nodesbymac = {}
 _switchportmap = {}
@@ -211,7 +212,7 @@ def _map_switch_backend(args):
                 maccounts[ifname] = 1
             else:
                 maccounts[ifname] += 1
-    _macsbyswitch[switch] = {}
+    newmacs = {}
     for mac in mactobridge:
         # We want to merge it so that when a mac appears in multiple
         # places, it is captured.
@@ -223,10 +224,10 @@ def _map_switch_backend(args):
             _macmap[mac].append((switch, ifname, maccounts[ifname]))
         else:
             _macmap[mac] = [(switch, ifname, maccounts[ifname])]
-        if ifname in _macsbyswitch[switch]:
-            _macsbyswitch[switch][ifname].append(mac)
+        if ifname in newmacs:
+            newmacs[ifname].append(mac)
         else:
-            _macsbyswitch[switch][ifname] = [mac]
+            newmacs[ifname] = [mac]
         nodename = _nodelookup(switch, ifname)
         if nodename is not None:
             if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
@@ -238,6 +239,7 @@ def _map_switch_backend(args):
                 _nodesbymac[mac] = (None, None)
             else:
                 _nodesbymac[mac] = (nodename, maccounts[ifname])
+    _macsbyswitch[switch] = newmacs
 
 
 switchbackoff = 30
@@ -307,7 +309,6 @@ def _full_updatemacmap(configmanager):
         _macmap = {}
         _nodesbymac = {}
         _switchportmap = {}
-        _macsbyswitch = {}
         if configmanager.tenant is not None:
             raise exc.ForbiddenRequest(
                 'Network topology not available to tenants')
@@ -340,11 +341,15 @@ def _full_updatemacmap(configmanager):
                         _switchportmap[curswitch][portname] = None
                     else:
                         _switchportmap[curswitch][portname] = node
+        for switch in _macsbyswitch:
+            if switch not in switches:
+                del _macsbyswitch[switch]
         switchauth = get_switchcreds(configmanager, switches)
         pool = GreenPool(64)
         for ans in pool.imap(_map_switch, switchauth):
             vintage = util.monotonic_time()
             yield ans
+    _apimacmap = _macmap
     endtime = util.monotonic_time()
     duration = endtime - start
     duration = duration * 15  # wait 15 times as long as it takes to walk
@@ -424,7 +429,7 @@ def handle_read_api_request(pathcomponents, configmanager):
     elif pathcomponents[2] == 'by-mac':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x.replace(':', '-'))
-                    for x in sorted(list(_macmap))]
+                    for x in sorted(list(_apimacmap))]
         elif len(pathcomponents) == 4:
             return dump_macinfo(pathcomponents[-1])
     elif pathcomponents[2] == 'by-switch':
@@ -457,6 +462,8 @@ def handle_read_api_request(pathcomponents, configmanager):
                     for x in sorted(maclist)]
         if len(pathcomponents) == 8:
             return dump_macinfo(pathcomponents[-1])
+    elif pathcomponents[2] == 'rescan':
+        return [msg.KeyValueData({'scanning': mapupdating.locked()})]
     raise exc.NotFoundException('Unrecognized path {0}'.format(
         '/'.join(pathcomponents)))
 
