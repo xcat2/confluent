@@ -86,6 +86,8 @@ import eventlet.greenpool
 import eventlet.semaphore
 
 autosensors = set()
+scanner = None
+
 class nesteddict(dict):
 
     def __missing__(self, key):
@@ -381,6 +383,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             raise exc.InvalidArgumentException()
         rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
+
     elif operation in ('update', 'create'):
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
@@ -416,6 +419,8 @@ def handle_read_api_request(pathcomponents):
     # TODO(jjohnson2): This should be more generalized...
     #  odd indexes into components are 'by-'*, even indexes
     # starting at 2 are parameters to previous index
+    if pathcomponents == ['discovery', 'rescan']:
+        return (msg.KeyValueData({'scanning': bool(scanner)}),)
     subcats, queryparms, indexof, coll = _parameterize_path(pathcomponents[1:])
     if len(pathcomponents) == 1:
         dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
@@ -1142,7 +1147,11 @@ def _periodic_recheck(configmanager):
 
 def rescan():
     _map_unique_ids()
-    eventlet.spawn_n(slp.active_scan, safe_detected)
+    global scanner
+    if scanner:
+        return
+    else:
+        scanner = eventlet.spawn(slp.active_scan, safe_detected)
 
 
 def start_detection():
