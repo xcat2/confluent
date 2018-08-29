@@ -205,6 +205,10 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
+                'clear': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                })
             },
         },
         '_console': {

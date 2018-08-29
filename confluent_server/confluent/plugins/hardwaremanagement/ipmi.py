@@ -548,6 +548,8 @@ class IpmiHandler(object):
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
             return self.handle_sysconfig(True)
+        elif self.element[1:3] == ['system', 'clear']:
+            return self.handle_sysconfigclear()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -1039,6 +1041,12 @@ class IpmiHandler(object):
             dn = self.inputdata.domain_name(self.node)
             self.ipmicmd.set_domain_name(dn)
             return
+
+    def handle_sysconfigclear(self):
+        if 'read' == self.op:
+            raise exc.InvalidArgumentException(
+                'Cannot read the "clear" resource')
+        self.ipmicmd.clear_system_configuration()
 
     def handle_sysconfig(self, advanced=False):
         if 'read' == self.op:

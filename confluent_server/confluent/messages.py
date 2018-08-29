@@ -416,6 +416,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'system', 'all'] and
             operation != 'retrieve'):
         return InputConfigChangeSet(path, inputdata, nodes, configmanager)
+    elif (path[:3] == ['configuration', 'system', 'clear'] and
+            operation != 'retrieve'):
+        return InputConfigClear(path, inputdata, nodes, configmanager)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
         return InputFirmwareUpdate(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
@@ -491,6 +494,13 @@ class InputExpression(ConfluentMessage):
             return {}
         nodeattr = deepcopy(self.nodeattribs[node])
         return nodeattr
+
+class InputConfigClear(ConfluentMessage):
+    def __init__(self, path, inputdata, nodes=None):
+        if not inputdata:
+            raise exc.InvalidArgumentException('no request data provided')
+        if 'clear' not in inputdata or not inputdata['clear']:
+            raise exc.InvalidArgumentException('Input must be {"clear":true}')
 
 class InputConfigChangeSet(InputExpression):
     # For now, this is identical to InputExpression, later it may

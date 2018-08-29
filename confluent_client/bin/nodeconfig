@@ -60,6 +60,10 @@ argparser.add_option('-a', '--advanced', dest='advanced',
                      help='Include advanced settings, which are normally not '
                           'intended to be used without direction from the '
                           'relevant server vendor.')
+argparser.add_option('-r', '--restoredefault', default=False,
+                     action='store_true',
+                     help='Restore the BIOS/UEFI configuration of the node '
+                          'to factory default')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -170,6 +174,11 @@ for param in args[1:]:
             queryparms[path][attrib] = param
 session = client.Command()
 rcode = 0
+if options.restoredefault:
+    for fr in session.update('/noderange/{0}/configuration/system/clear',
+                   {'clear': True}):
+        rcode |= client.printerror(fr)
+    sys.exit(rcode)
 if setmode:
     if options.exclude:
         sys.stderr.write('Cannot use exclude and assign at the same time\n')
