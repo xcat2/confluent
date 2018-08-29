@@ -175,8 +175,9 @@ for param in args[1:]:
 session = client.Command()
 rcode = 0
 if options.restoredefault:
-    for fr in session.update('/noderange/{0}/configuration/system/clear',
-                   {'clear': True}):
+    for fr in session.update(
+            '/noderange/{0}/configuration/system/clear'.format(noderange),
+            {'clear': True}):
         rcode |= client.printerror(fr)
     sys.exit(rcode)
 if setmode:

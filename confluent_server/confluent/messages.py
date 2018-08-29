@@ -496,7 +496,7 @@ class InputExpression(ConfluentMessage):
         return nodeattr
 
 class InputConfigClear(ConfluentMessage):
-    def __init__(self, path, inputdata, nodes=None):
+    def __init__(self, path, inputdata, nodes=None, configmanager=None):
         if not inputdata:
             raise exc.InvalidArgumentException('no request data provided')
         if 'clear' not in inputdata or not inputdata['clear']:
