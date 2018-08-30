@@ -61,9 +61,10 @@ argparser.add_option('-a', '--advanced', dest='advanced',
                           'intended to be used without direction from the '
                           'relevant server vendor.')
 argparser.add_option('-r', '--restoredefault', default=False,
-                     action='store_true',
-                     help='Restore the BIOS/UEFI configuration of the node '
-                          'to factory default')
+                     dest='restoredefault', metavar="COMPONENT",
+                     help='Restore the configuration of the node '
+                          'to factory default for given component. '
+                          'Currently only uefi is supported')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -174,12 +175,18 @@ for param in args[1:]:
             queryparms[path][attrib] = param
 session = client.Command()
 rcode = 0
-if options.restoredefault:
+if options.restoredefault and options.restoredefault.lower() in (
+        'sys', 'system', 'uefi', 'bios'):
     for fr in session.update(
             '/noderange/{0}/configuration/system/clear'.format(noderange),
             {'clear': True}):
         rcode |= client.printerror(fr)
     sys.exit(rcode)
+elif options.restoredefault:
+    sys.stderr.write(
+        'Unrecognized component to restore defaults: {0}\n'.format(
+            options.restoredefault))
+    sys.exit(1)
 if setmode:
     if options.exclude:
         sys.stderr.write('Cannot use exclude and assign at the same time\n')

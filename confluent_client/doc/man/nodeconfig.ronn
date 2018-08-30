@@ -31,9 +31,9 @@ given as a node expression, as documented in the man page for nodeattribexpressi
   values for a setting.
 
 * `-r`, `--restoredefault`:
-  Request that the specified nodes be restored to default BIOS/UEFI
-  configuration.  This excludes BMC configuration which is not supported
-  to be cleared at this time.
+  Request that the specified component of the targeted nodes will have its
+  configuration reset to default.  Currently the only component implemented
+  is uefi.
 
 
 ## EXAMPLES
