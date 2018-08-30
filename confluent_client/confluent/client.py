@@ -17,6 +17,7 @@
 
 import anydbm as dbm
 import errno
+import fnmatch
 import hashlib
 import os
 import shlex
@@ -311,7 +312,7 @@ def attrrequested(attr, attrlist, seenattributes):
             candidate = candidate.replace('hm', 'hardwaremanagement', 1)
         if candidate in _attraliases:
             candidate = _attraliases[candidate]
-        if candidate.lower() == attr.lower():
+        if fnmatch.fnmatch(attr.lower(), candidate.lower()):
             seenattributes.add(truename)
             return True
         elif attr.lower().startswith(candidate.lower() + '.'):
