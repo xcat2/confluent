@@ -231,7 +231,7 @@ else:
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
-        if printsys == [] and not options.advanced:
+        if (options.comparedefault or printsys == []) and not options.advanced:
             path = '/noderange/{0}/configuration/system/all'.format(noderange)
         else:
             path = '/noderange/{0}/configuration/system/advanced'.format(
