@@ -35,6 +35,9 @@ argparser = optparse.OptionParser()
 argparser.add_option('-b', '--bios', dest='biosmode',
                      action='store_true', default=False,
                      help='Request BIOS style boot (rather than UEFI)')
+argparser.add_option('-u', '--uefi', dest='uefimode',
+                     action='store_true', default=False,
+                     help='Request UEFI style boot (rather than BIOS)')
 argparser.add_option('-p', '--persist', dest='persist', action='store_true',
                      default=False,
                      help='Request the boot device be persistent rather than '
