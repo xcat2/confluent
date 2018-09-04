@@ -494,7 +494,7 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                     exitcode = 1
     return exitcode
 
-def updateattrib(session, updateargs, nodetype, noderange, options):
+def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=None):
     # update attribute
     exitcode = 0
     if options.clear:
@@ -527,6 +527,16 @@ def updateattrib(session, updateargs, nodetype, noderange, options):
                                                             'attributes/all',
                                                             value, key)
         sys.exit(exitcode)
+    elif dictassign:
+        for key in dictassign:
+            if nodetype == 'nodegroups':
+                exitcode = session.simp_nodegroups_command(noderange,
+                                                           'attributes/all',
+                                                           dictassign[key], key)
+            else:
+                exitcode = session.simp_nodegroups_command(noderange,
+                                                           'attributes/all',
+                                                           dictassign[key], key)
     else:
         if "=" in updateargs[1]:
             try:

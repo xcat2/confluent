@@ -17,6 +17,7 @@
 
 __author__ = 'alin37'
 
+from getpass import getpass
 import optparse
 import os
 import signal
@@ -47,6 +48,8 @@ argparser.add_option('-e', '--environment', action='store_true',
                           'same name')
 argparser.add_option('-c', '--clear', action='store_true',
                      help='Clear attributes')
+argparser.add_option('-p', '--prompt', action='store_true',
+                     help='Prompt for attribute values interactively')
 (options, args) = argparser.parse_args()
 
 
@@ -67,12 +70,24 @@ exitcode = 0
 nodetype="noderange"
 
 if len(args) > 1:
-    if "=" in args[1] or options.clear or options.environment:
+    if "=" in args[1] or options.clear or options.environment or options.prompt:
         if "=" in args[1] and options.clear:
             print("Can not clear and set at the same time!")
             argparser.print_help()
             sys.exit(1)
-        exitcode=client.updateattrib(session,args,nodetype, noderange, options)
+        argassign = None
+        if options.prompt:
+            argassign = {}
+            for arg in args[1:]:
+                oneval = 1
+                twoval = 2
+                while oneval != twoval:
+                    oneval = getpass('Enter value for {0}: '.format(arg))
+                    twoval = getpass('Confirm value for {0}: '.format(arg))
+                    if oneval != twoval:
+                        print('Values did not match.')
+                argassign[arg] = twoval
+        exitcode=client.updateattrib(session,args,nodetype, noderange, options, argassign)
     try:
         # setting user output to what the user inputs
         if args[1] == 'all':
