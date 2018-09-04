@@ -7,6 +7,7 @@ nodegroupattrib(8) -- List or change confluent nodegroup attributes
 `nodegroupattrib <group> [<nodeattribute>...]`  
 `nodegroupattrib <group> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`  
 `nodegroupattrib <group> [-c] [<nodeattribute1> <nodeattribute2=value2> ...]`  
+`nodeattrib -p <noderange> <nodeattribute1> <nodeattribute2> ...`  
 
 ## DESCRIPTION
 

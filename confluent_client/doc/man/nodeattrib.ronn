@@ -7,6 +7,7 @@ nodeattrib(8) -- List or change confluent nodes attributes
 `nodeattrib <noderange> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`  
 `nodeattrib -c <noderange> <nodeattribute1> <nodeattribute2> ...`  
 `nodeattrib -e <noderange> <nodeattribute1> <nodeattribute2> ...`  
+`nodeattrib -p <noderange> <nodeattribute1> <nodeattribute2> ...`  
 
 ## DESCRIPTION
 
@@ -40,6 +41,8 @@ See nodegroupattrib(8) command on how to manage attributes on a group level.
   Clear specified nodeattributes
 * `-e`, `--environment`:
   Set specified attributes based on exported environment variable of matching name.  Environment variable names may be lower case or all upper case.  Replace . with _ as needed (e.g. info.note may be specified as either $info_note or $INFO_NOTE
+* `-p`, `--prompt`:
+  Request interactive prompting to provide values rather than the command line or environment variables.
 
 ## EXAMPLES
 * Listing matching nodes of a simple noderange:
