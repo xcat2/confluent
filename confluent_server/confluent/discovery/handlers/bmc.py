@@ -45,7 +45,7 @@ class NodeHandler(generic.NodeHandler):
     def config(self, nodename, reset=False):
         self._bmcconfig(nodename, reset)
 
-    def _bmcconfig(self, nodename, reset=False):
+    def _bmcconfig(self, nodename, reset=False, customconfig=None):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
@@ -74,6 +74,8 @@ class NodeHandler(generic.NodeHandler):
                 ic = self._get_ipmicmd(user, passwd)
             else:
                 raise
+        if customconfig:
+            customconfig(ic)
         currusers = ic.get_users()
         lanchan = ic.get_network_channel()
         userdata = ic.xraw_command(netfn=6, command=0x44, data=(lanchan,

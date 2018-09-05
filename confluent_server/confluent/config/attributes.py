@@ -156,6 +156,12 @@ node = {
                         'indicates candidate managers, either for '
                         'high availability or load balancing purposes.')
     },
+    'discovery.passwordrules': {
+        'description':  'Any specified rules shall be configured on the BMC '
+                        'upon discovery.  "expiration=no,loginfailures=no" '
+                        'would disable password expiration and login failures '
+                        'triggering a lockout.'
+    },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
                         'and identified nodes. Valid values are "manual", '
