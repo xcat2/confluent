@@ -94,7 +94,9 @@ _hasquorum = True
 _attraliases = {
     'bmc': 'hardwaremanagement.manager',
     'bmcuser': 'secret.hardwaremanagementuser',
+    'switchuser': 'secret.hardwaremanagementuser',
     'bmcpass': 'secret.hardwaremanagementpassword',
+    'switchpass': 'secret.hardwaremanagementpassword',
 }
 
 def _mkpath(pathname):
