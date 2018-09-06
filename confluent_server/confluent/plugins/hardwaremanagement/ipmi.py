@@ -905,7 +905,8 @@ class IpmiHandler(object):
             self.output.put(errorneeded)
 
     def add_invitem(self, invitems, newinf):
-        if fnmatch(newinf['name'], 'Adapter ??:??:??'):
+        if fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
+                newinf['name'], 'PCIeGen? x*'):
             myinf = newinf.get('information', {})
             sdid = myinf.get('PCI Subsystem Device ID', None)
             svid = myinf.get('PCI Subsystem Vendor ID', None)
