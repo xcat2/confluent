@@ -410,6 +410,7 @@ persistent_ipmicmds = {}
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg, output):
         self.sensormap = {}
+        self.usedlabels = {}
         self.invmap = {}
         self.output = output
         self.sensorcategory = None
@@ -916,7 +917,12 @@ class IpmiHandler(object):
             if vstr:
                 newinf['information']['PCI Vendor'] = vstr
             if dstr:
-                newinf['name'] = dstr
+                newname = dstr
+                instance = 1
+                while newname in self.usednames:
+                    instance += 1
+                    newname = dstr + ' {1}'.format(instance)
+                newinf['name'] = newname
         invitems.append(newinf)
 
     def handle_sensors(self):
