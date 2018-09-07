@@ -87,6 +87,7 @@ def printerror(res, node=None):
 
 
 url = '/noderange/{0}/inventory/hardware/all/all'
+usedprefixes = set([])
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog <noderange> [serial|model|uuid|mac]")
@@ -129,6 +130,11 @@ try:
                 continue
             for inv in res['databynode'][node]['inventory']:
                 prefix = inv['name']
+                idx = 2
+                while prefix in usedprefixes:
+                    prefix = '{0} {1}'.format(inv['name'], idx)
+                    idx += 1
+                usedprefixes.add(prefix)
                 if not inv['present']:
                     if not filters:
                         if options.json:
