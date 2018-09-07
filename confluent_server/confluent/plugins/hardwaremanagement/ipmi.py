@@ -19,6 +19,7 @@ import confluent.firmwaremanager as firmwaremanager
 import confluent.interface.console as conapi
 import confluent.messages as msg
 import confluent.util as util
+import copy
 import eventlet
 import eventlet.event
 import eventlet.green.threading as threading
@@ -868,11 +869,13 @@ class IpmiHandler(object):
             if component == 'all':
                 for invdata in self.ipmicmd.get_inventory():
                     if invdata[1] is None:
-                        newinf = {'present': False, 'information': None}
+                        newinf = {'present': False, 'information': None,
+                                  'name': invdata[0]}
+
                     else:
                         sanitize_invdata(invdata[1])
                         newinf = {'present': True, 'information': invdata[1]}
-                    newinf['name'] = invdata[0]
+                        newinf['name'] = invdata[1].get('name', invdata[0])
                     self.add_invitem(invitems, newinf)
             else:
                 self.make_inventory_map()
@@ -882,11 +885,12 @@ class IpmiHandler(object):
                     return
                 invdata = self.ipmicmd.get_inventory_of_component(compname)
                 if invdata is None:
-                    newinf = {'present': False, 'information': None}
+                    newinf = {'present': False, 'information': None,
+                              'name': compname}
                 else:
                     sanitize_invdata(invdata)
-                    newinf = {'present': True, 'information': invdata}
-                newinf['name'] = compname
+                    newinf = {'present': True, 'information': invdata,
+                              'name': invdata.get('name', compname)}
                 self.add_invitem(invitems, newinf)
         except ssl.SSLEOFError:
             errorneeded = msg.ConfluentNodeError(
@@ -896,7 +900,7 @@ class IpmiHandler(object):
         except exc.PubkeyInvalid:
             errorneeded = msg.ConfluentNodeError(
                 self.node,
-                'Extended information unavailable, mismatch detected between '
+                'Extended information unakvailable, mismatch detected between '
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute')
         newinvdata = {'inventory': invitems}
@@ -905,6 +909,9 @@ class IpmiHandler(object):
             self.output.put(errorneeded)
 
     def add_invitem(self, invitems, newinf):
+        if newinf.get('information', None) and 'name' in newinf['information']:
+            newinf = copy.deepcopy(newinf)
+            del newinf['information']['name']
         if fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
                 newinf['name'], 'PCIeGen? x*'):
             myinf = newinf.get('information', {})
