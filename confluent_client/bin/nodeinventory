@@ -131,10 +131,10 @@ try:
             for inv in res['databynode'][node]['inventory']:
                 prefix = inv['name']
                 idx = 2
-                while prefix in usedprefixes:
+                while (node, prefix) in usedprefixes:
                     prefix = '{0} {1}'.format(inv['name'], idx)
                     idx += 1
-                usedprefixes.add(prefix)
+                usedprefixes.add((node, prefix))
                 if not inv['present']:
                     if not filters:
                         if options.json:
