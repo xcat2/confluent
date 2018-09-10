@@ -900,7 +900,7 @@ class IpmiHandler(object):
         except exc.PubkeyInvalid:
             errorneeded = msg.ConfluentNodeError(
                 self.node,
-                'Extended information unakvailable, mismatch detected between '
+                'Extended information unavailable, mismatch detected between '
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute')
         newinvdata = {'inventory': invitems}
