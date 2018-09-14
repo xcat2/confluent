@@ -965,6 +965,7 @@ class ConfigManager(object):
             self._cfgstore = _cfgstore['main']
             if 'nodegroups' not in self._cfgstore:
                 self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
+                _mark_dirtykey('nodegroups', 'everything', self.tenant)
                 self._bg_sync_to_file()
             if 'nodes' not in self._cfgstore:
                 self._cfgstore['nodes'] = {}
@@ -980,6 +981,7 @@ class ConfigManager(object):
         self._cfgstore = _cfgstore['tenant'][tenant]
         if 'nodegroups' not in self._cfgstore:
             self._cfgstore['nodegroups'] = {'everything': {}}
+            _mark_dirtykey('nodegroups', 'everything', self.tenant)
         if 'nodes' not in self._cfgstore:
             self._cfgstore['nodes'] = {}
         self._bg_sync_to_file()
