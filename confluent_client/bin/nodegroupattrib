@@ -17,6 +17,7 @@
 
 __author__ = 'alin37'
 
+from getpass import getpass
 import optparse
 import os
 import signal

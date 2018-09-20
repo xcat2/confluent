@@ -530,13 +530,11 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
     elif dictassign:
         for key in dictassign:
             if nodetype == 'nodegroups':
-                exitcode = session.simp_nodegroups_command(noderange,
-                                                           'attributes/all',
-                                                           dictassign[key], key)
+                exitcode = session.simple_nodegroups_command(
+                    noderange, 'attributes/all', dictassign[key], key)
             else:
-                exitcode = session.simp_nodegroups_command(noderange,
-                                                           'attributes/all',
-                                                           dictassign[key], key)
+                exitcode = session.simple_noderange_command(
+                    noderange, 'attributes/all', dictassign[key], key)
     else:
         if "=" in updateargs[1]:
             try:

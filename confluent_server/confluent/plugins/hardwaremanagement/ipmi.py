@@ -19,18 +19,51 @@ import confluent.firmwaremanager as firmwaremanager
 import confluent.interface.console as conapi
 import confluent.messages as msg
 import confluent.util as util
+import copy
 import eventlet
 import eventlet.event
 import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
 import eventlet.queue as queue
 import eventlet.support.greendns
+from fnmatch import fnmatch
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
 console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
 import ssl
+
+pci_cache = {}
+
+def get_dns_txt(qstring):
+    return eventlet.support.greendns.resolver.query(
+        qstring, 'TXT')[0].strings[0].replace('i=', '')
+
+def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
+    fqpi = '{0}.{1}.{2}.{3}'.format(subdevice, subvendor, device, vendor)
+    if fqpi in pci_cache:
+        return pci_cache[fqpi]
+    vendorstr = None
+    try:
+        vendorstr = get_dns_txt('{0}.pci.id.ucw.cz'.format(subvendor))
+    except Exception:
+        try:
+            vendorstr = get_dns_txt('{0}.pci.id.ucw.cz'.format(vendor))
+        except Exception:
+            pass
+    devstr = None
+    try:
+        devstr = get_dns_txt(fqpi + '.pci.id.ucw.cz')
+    except Exception:
+        try:
+            devstr = get_dns_txt('{0}.{1}.pci.id.ucw.cz'.format(
+                device, vendor))
+        except Exception:
+            pass
+    if vendorstr and devstr:
+        pci_cache[fqpi] = vendorstr, devstr
+    return vendorstr, devstr
 
 
 # There is something not right with the RLocks used in pyghmi when
@@ -836,12 +869,14 @@ class IpmiHandler(object):
             if component == 'all':
                 for invdata in self.ipmicmd.get_inventory():
                     if invdata[1] is None:
-                        newinf = {'present': False, 'information': None}
+                        newinf = {'present': False, 'information': None,
+                                  'name': invdata[0]}
+
                     else:
                         sanitize_invdata(invdata[1])
                         newinf = {'present': True, 'information': invdata[1]}
-                    newinf['name'] = invdata[0]
-                    invitems.append(newinf)
+                        newinf['name'] = invdata[1].get('name', invdata[0])
+                    self.add_invitem(invitems, newinf)
             else:
                 self.make_inventory_map()
                 compname = self.invmap.get(component, None)
@@ -850,12 +885,13 @@ class IpmiHandler(object):
                     return
                 invdata = self.ipmicmd.get_inventory_of_component(compname)
                 if invdata is None:
-                    newinf = {'present': False, 'information': None}
+                    newinf = {'present': False, 'information': None,
+                              'name': compname}
                 else:
                     sanitize_invdata(invdata)
-                    newinf = {'present': True, 'information': invdata}
-                newinf['name'] = compname
-                invitems.append(newinf)
+                    newinf = {'present': True, 'information': invdata,
+                              'name': invdata.get('name', compname)}
+                self.add_invitem(invitems, newinf)
         except ssl.SSLEOFError:
             errorneeded = msg.ConfluentNodeError(
                 self.node, 'Unable to communicate with the https server on '
@@ -871,6 +907,24 @@ class IpmiHandler(object):
         self.output.put(msg.KeyValueData(newinvdata, self.node))
         if errorneeded:
             self.output.put(errorneeded)
+
+    def add_invitem(self, invitems, newinf):
+        if newinf.get('information', None) and 'name' in newinf['information']:
+            newinf = copy.deepcopy(newinf)
+            del newinf['information']['name']
+        if fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
+                newinf['name'], 'PCIeGen? x*'):
+            myinf = newinf.get('information', {})
+            sdid = myinf.get('PCI Subsystem Device ID', None)
+            svid = myinf.get('PCI Subsystem Vendor ID', None)
+            did = myinf.get('PCI Device ID', None)
+            vid = myinf.get('PCI Vendor ID', None)
+            vstr, dstr = get_pci_text_from_ids(sdid, svid, did, vid)
+            if vstr:
+                newinf['information']['PCI Vendor'] = vstr
+            if dstr:
+                newinf['name'] = dstr
+        invitems.append(newinf)
 
     def handle_sensors(self):
         if self.element[-1] == '':

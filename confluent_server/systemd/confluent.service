@@ -4,7 +4,7 @@ Description=Confluent hardware manager
 
 [Service]
 Type=forking
-PIDFile=/var/run/confluent/pid
+#PIDFile=/var/run/confluent/pid
 ExecStart=/opt/confluent/bin/confluent
 ExecStop=/opt/confluent/bin/confetty shutdown /
 Restart=on-failure
