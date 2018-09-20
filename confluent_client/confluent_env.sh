@@ -37,3 +37,130 @@ alias noderun='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURR
 alias nodesensors='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesensors'
 alias nodesetboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesetboot'
 alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeshell'
+
+
+
+_confluent_np_completion()
+{
+    CMPARGS=($COMP_LINE)
+    if [ "${CMPARGS[-1]:0:1}" == '-' ]; then
+        COMPREPLY=($(compgen -W "-h -p" -- ${COMP_WORDS[-1]}))
+        return
+    fi
+    NUMARGS=${#CMPARGS[@]}
+    if [ "${COMP_WORDS[-1]}" == '' ]; then
+        NUMARGS=$((NUMARGS+1))
+    fi
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "boot off on status" -- ${COMP_WORDS[-1]}))
+        return;
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+_confluent_nr_completion()
+{
+    INPUT=${COMP_WORDS[-1]}
+    INPUT=${INPUT##*,-}
+    INPUT=${INPUT##*,}
+    INPUT=${INPUT##*@}
+    PREFIX=""
+    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
+        PREFIX=${COMP_WORDS[-1]}
+        PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
+    fi
+
+    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+}
+_confluent_nn_completion()
+{
+    CMPARGS=($COMP_LINE)
+    NUMARGS=${#CMPARGS[@]}
+    if [ "${COMP_WORDS[-1]}" == '' ]; then
+        NUMARGS=$((NUMARGS+1))
+    fi
+    if [ $NUMARGS -gt 2 ]; then
+        return;
+    fi
+    INPUT=${COMP_WORDS[-1]}
+    INPUT=${INPUT##*,-}
+    INPUT=${INPUT##*,}
+    INPUT=${INPUT##*@}
+    PREFIX=""
+    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
+        PREFIX=${COMP_WORDS[-1]}
+        PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
+    fi
+
+    COMPREPLY=($(compgen -W "$(nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+}
+_confluent_nr_completion()
+{
+    CMPARGS=($COMP_LINE)
+    NUMARGS=${#CMPARGS[@]}
+    if [ "${COMP_WORDS[-1]}" == '' ]; then
+        NUMARGS=$((NUMARGS+1))
+    fi
+    if [ $NUMARGS -gt 2 ]; then
+        return;
+    fi
+    INPUT=${COMP_WORDS[-1]}
+    INPUT=${INPUT##*,-}
+    INPUT=${INPUT##*,}
+    INPUT=${INPUT##*@}
+    PREFIX=""
+    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
+        PREFIX=${COMP_WORDS[-1]}
+        PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
+    fi
+
+    #COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+}
+_confluent_ng_completion()
+{
+    CMPARGS=($COMP_LINE)
+    NUMARGS=${#CMPARGS[@]}
+    if [ "${COMP_WORDS[-1]}" == '' ]; then
+        NUMARGS=$((NUMARGS+1))
+    fi
+    if [ $NUMARGS -gt 2 ]; then
+        return;
+    fi
+    INPUT=${COMP_WORDS[-1]}
+    INPUT=${INPUT##*,-}
+    INPUT=${INPUT##*,}
+    INPUT=${INPUT##*@}
+    PREFIX=""
+    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
+        PREFIX=${COMP_WORDS[-1]}
+        PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
+    fi
+
+    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+}
+complete -F _confluent_nr_completion nodeattrib
+complete -F _confluent_nr_completion nodebmcreset
+complete -F _confluent_nr_completion nodeboot
+complete -F _confluent_nr_completion nodeconfig
+complete -F _confluent_nn_completion nodeconsole
+complete -F _confluent_nr_completion nodeeventlog
+complete -F _confluent_nr_completion nodefirmware
+complete -F _confluent_ng_completion nodegroupattrib
+complete -F _confluent_ng_completion nodegroupremove
+complete -F _confluent_nr_completion nodehealth
+complete -F _confluent_nr_completion nodeidentify
+complete -F _confluent_nr_completion nodeinventory
+complete -F _confluent_nr_completion nodelist
+complete -F _confluent_nr_completion nodemedia
+complete -F _confluent_np_completion nodepower
+complete -F _confluent_nr_completion noderemove
+complete -F _confluent_nr_completion nodereseat
+complete -F _confluent_nr_completion noderun
+complete -F _confluent_nr_completion nodesensors
+complete -F _confluent_nr_completion nodesetboot
+complete -F _confluent_nr_completion nodeshell
+complete -F _confluent_nr_completion nodesupport
+
