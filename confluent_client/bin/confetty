@@ -598,9 +598,10 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
         if oldtcattr is not None:
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     # Request default color scheme, to undo potential weirdness of terminal
-    sys.stdout.write('\x1b[m')
+    if sys.stdout.isatty():
+        sys.stdout.write('\x1b[m')
     if fullexit:
-        if os.environ.get('TERM', '') not in ('linux'):
+        if sys.stdout.isatty() and os.environ.get('TERM', '') not in ('linux'):
             sys.stdout.write('\x1b]0;\x07')
         sys.exit(code)
     else:
