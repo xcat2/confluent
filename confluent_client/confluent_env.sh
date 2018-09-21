@@ -90,6 +90,24 @@ _confluent_nodepower_completion()
     fi
 }
 
+_confluent_nodemedia_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "list upload attach detachall" -- ${COMP_WORDS[-1]}))
+        return;
+    fi
+    if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[2]} == 'upload' ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+
 _confluent_nodefirmware_completion()
 {
     _confluent_get_args
@@ -199,7 +217,7 @@ complete -F _confluent_nr_completion nodehealth
 complete -F _confluent_nodeidentify_completion nodeidentify
 complete -F _confluent_nr_completion nodeinventory
 complete -F _confluent_nr_completion nodelist
-complete -F _confluent_nr_completion nodemedia
+complete -F _confluent_nodemedia_completion nodemedia
 complete -F _confluent_nodepower_completion nodepower
 complete -F _confluent_nr_completion noderemove
 complete -F _confluent_nr_completion nodereseat
