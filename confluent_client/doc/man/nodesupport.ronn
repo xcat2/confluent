@@ -1,0 +1,25 @@
+nodesupport(8) -- Utilities for interacting with vendor support
+=================================================================
+
+## SYNOPSIS
+
+`nodesupport <noderange> servicedata <directory or filename>`  
+
+## DESCRIPTION
+
+`nodesupport` provides capabilities associated with interactiong with support.
+Currently it only has the `servicedata` subcommand.  `servicedata` takes
+an argument that is either a directory name (that can be used for a single node
+or multiple nodes) or a file name (only to be used with single node noderange)
+
+## EXAMPLES
+
+* Download support data from a single node to a specific filename  
+`# nodesupport d1 servicedata svcdata.out`  
+`d1:initializing:  15%`  
+
+* Download support data from multiple nodes to a directory  
+`# nodesupport d1-d4 servicedata service/`    
+`d1:initializing:   0% d2:initializing:   0% d3:initializing:   0% d4:initializing:   0%`  
+`# ls service/`  
+`d1.svcdata d2.svcdata  d3.svcdata  d4.svcdata`  
