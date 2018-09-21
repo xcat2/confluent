@@ -24,6 +24,8 @@ import confluent.interface.console as conapi
 import confluent.log as log
 import eventlet
 import hashlib
+import sys
+sys.modules['gssapi'] = None
 paramiko = eventlet.import_patched('paramiko')
 
 
