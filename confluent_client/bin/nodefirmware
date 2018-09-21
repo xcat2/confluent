@@ -74,6 +74,8 @@ try:
             components = []
             for arg in comps:
                 components += arg.split(',')
+            if not components:
+                components = ['all']
 
 except IndexError:
     argparser.print_help()
