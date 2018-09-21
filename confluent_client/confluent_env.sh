@@ -60,6 +60,19 @@ _confluent_nodeidentify_completion()
     fi
 }
 
+
+_confluent_nodesetboot_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "default cd network setup hd" -- ${COMP_WORDS[-1]}))
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+
 _confluent_nodepower_completion()
 {
     _confluent_get_args
@@ -175,7 +188,7 @@ _confluent_ng_completion()
 }
 complete -F _confluent_nr_completion nodeattrib
 complete -F _confluent_nr_completion nodebmcreset
-complete -F _confluent_nr_completion nodeboot
+complete -F _confluent_nodesetboot_completion nodeboot
 complete -F _confluent_nr_completion nodeconfig
 complete -F _confluent_nn_completion nodeconsole
 complete -F _confluent_nr_completion nodeeventlog
@@ -192,7 +205,7 @@ complete -F _confluent_nr_completion noderemove
 complete -F _confluent_nr_completion nodereseat
 complete -F _confluent_nr_completion noderun
 complete -F _confluent_nr_completion nodesensors
-complete -F _confluent_nr_completion nodesetboot
+complete -F _confluent_nodesetboot_completion nodesetboot
 complete -F _confluent_nr_completion nodeshell
 complete -F _confluent_nodesupport_completion nodesupport
 
