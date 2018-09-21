@@ -39,17 +39,33 @@ alias nodesetboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export 
 alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeshell'
 
 
-
-_confluent_nodepower_completion()
+_confluent_get_args()
 {
     CMPARGS=($COMP_LINE)
-    if [ "${CMPARGS[-1]:0:1}" == '-' ]; then
-        COMPREPLY=($(compgen -W "-h -p" -- ${COMP_WORDS[-1]}))
-        return
-    fi
     NUMARGS=${#CMPARGS[@]}
     if [ "${COMP_WORDS[-1]}" == '' ]; then
         NUMARGS=$((NUMARGS+1))
+    fi
+}
+
+_confluent_nodeidentify_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "on off" -- ${COMP_WORDS[-1]}))
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+
+_confluent_nodepower_completion()
+{
+    _confluent_get_args
+    if [ "${CMPARGS[-1]:0:1}" == '-' ]; then
+        COMPREPLY=($(compgen -W "-h -p" -- ${COMP_WORDS[-1]}))
+        return
     fi
     if [ $NUMARGS == 3 ]; then
         COMPREPLY=($(compgen -W "boot off on status" -- ${COMP_WORDS[-1]}))
@@ -63,11 +79,7 @@ _confluent_nodepower_completion()
 
 _confluent_nodefirmware_completion()
 {
-    CMPARGS=($COMP_LINE)
-    NUMARGS=${#CMPARGS[@]}
-    if [ "${COMP_WORDS[-1]}" == '' ]; then
-        NUMARGS=$((NUMARGS+1))
-    fi
+    _confluent_get_args
     if [ $NUMARGS == 3 ]; then
         COMPREPLY=($(compgen -W "list update" -- ${COMP_WORDS[-1]}))
         return;
@@ -85,11 +97,7 @@ _confluent_nodefirmware_completion()
 
 _confluent_nodesupport_completion()
 {
-    CMPARGS=($COMP_LINE)
-    NUMARGS=${#CMPARGS[@]}
-        if [ "${COMP_WORDS[-1]}" == '' ]; then
-        NUMARGS=$((NUMARGS+1))
-    fi
+    _confluent_get_args
     if [ $NUMARGS == 3 ]; then
         COMPREPLY=($(compgen -W "servicedata" -- ${COMP_WORDS[-1]}))
         return;
@@ -104,27 +112,10 @@ _confluent_nodesupport_completion()
          return
     fi
 }
-_confluent_nr_completion()
-{
-    INPUT=${COMP_WORDS[-1]}
-    INPUT=${INPUT##*,-}
-    INPUT=${INPUT##*,}
-    INPUT=${INPUT##*@}
-    PREFIX=""
-    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
-        PREFIX=${COMP_WORDS[-1]}
-        PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
-    fi
 
-    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
-}
 _confluent_nn_completion()
 {
-    CMPARGS=($COMP_LINE)
-    NUMARGS=${#CMPARGS[@]}
-    if [ "${COMP_WORDS[-1]}" == '' ]; then
-        NUMARGS=$((NUMARGS+1))
-    fi
+    _confluent_get_args
     if [ $NUMARGS -gt 2 ]; then
         return;
     fi
@@ -147,6 +138,7 @@ _confluent_nr_completion()
     if [ "${COMP_WORDS[-1]}" == '' ]; then
         NUMARGS=$((NUMARGS+1))
     fi
+    _confluent_get_args
     if [ $NUMARGS -gt 2 ]; then
         return;
     fi
@@ -165,11 +157,7 @@ _confluent_nr_completion()
 }
 _confluent_ng_completion()
 {
-    CMPARGS=($COMP_LINE)
-    NUMARGS=${#CMPARGS[@]}
-    if [ "${COMP_WORDS[-1]}" == '' ]; then
-        NUMARGS=$((NUMARGS+1))
-    fi
+    _confluent_get_args
     if [ $NUMARGS -gt 2 ]; then
         return;
     fi
@@ -195,7 +183,7 @@ complete -F _confluent_nodefirmware_completion nodefirmware
 complete -F _confluent_ng_completion nodegroupattrib
 complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
-complete -F _confluent_nr_completion nodeidentify
+complete -F _confluent_nodeidentify_completion nodeidentify
 complete -F _confluent_nr_completion nodeinventory
 complete -F _confluent_nr_completion nodelist
 complete -F _confluent_nr_completion nodemedia
