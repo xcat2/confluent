@@ -4,7 +4,7 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 ## SYNOPSIS
 
 `nodefirmware <noderange>`  
-`nodefirmware <noderange> <components>|core`  
+`nodefirmware <noderange> list|<components>|core`  
 `nodefirmware <noderange> update [--backup] <filename>`  
 
 ## DESCRIPTION

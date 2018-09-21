@@ -40,7 +40,7 @@ alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CU
 
 
 
-_confluent_np_completion()
+_confluent_nodepower_completion()
 {
     CMPARGS=($COMP_LINE)
     if [ "${CMPARGS[-1]:0:1}" == '-' ]; then
@@ -58,6 +58,50 @@ _confluent_np_completion()
     if [ $NUMARGS -lt 3 ]; then
         _confluent_nr_completion
         return;
+    fi
+}
+
+_confluent_nodefirmware_completion()
+{
+    CMPARGS=($COMP_LINE)
+    NUMARGS=${#CMPARGS[@]}
+    if [ "${COMP_WORDS[-1]}" == '' ]; then
+        NUMARGS=$((NUMARGS+1))
+    fi
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "list update" -- ${COMP_WORDS[-1]}))
+        return;
+    fi
+    if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[2]} == 'update' ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+
+_confluent_nodesupport_completion()
+{
+    CMPARGS=($COMP_LINE)
+    NUMARGS=${#CMPARGS[@]}
+        if [ "${COMP_WORDS[-1]}" == '' ]; then
+        NUMARGS=$((NUMARGS+1))
+    fi
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "servicedata" -- ${COMP_WORDS[-1]}))
+        return;
+    fi
+    if [ $NUMARGS == 4 ] && [ ${CMPARGS[2]} == 'servicedata' ]; then
+        compopt -o  dirnames
+        COMPREPLY=()
+        return
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+         _confluent_nr_completion
+         return
     fi
 }
 _confluent_nr_completion()
@@ -147,7 +191,7 @@ complete -F _confluent_nr_completion nodeboot
 complete -F _confluent_nr_completion nodeconfig
 complete -F _confluent_nn_completion nodeconsole
 complete -F _confluent_nr_completion nodeeventlog
-complete -F _confluent_nr_completion nodefirmware
+complete -F _confluent_nodefirmware_completion nodefirmware
 complete -F _confluent_ng_completion nodegroupattrib
 complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
@@ -155,12 +199,12 @@ complete -F _confluent_nr_completion nodeidentify
 complete -F _confluent_nr_completion nodeinventory
 complete -F _confluent_nr_completion nodelist
 complete -F _confluent_nr_completion nodemedia
-complete -F _confluent_np_completion nodepower
+complete -F _confluent_nodepower_completion nodepower
 complete -F _confluent_nr_completion noderemove
 complete -F _confluent_nr_completion nodereseat
 complete -F _confluent_nr_completion noderun
 complete -F _confluent_nr_completion nodesensors
 complete -F _confluent_nr_completion nodesetboot
 complete -F _confluent_nr_completion nodeshell
-complete -F _confluent_nr_completion nodesupport
+complete -F _confluent_nodesupport_completion nodesupport
 

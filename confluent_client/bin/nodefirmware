@@ -55,7 +55,8 @@ def printfirm(node, prefix, data):
 components = ['all']
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog <noderange> [update [--backup <file>]]|[<components>]")
+    usage="Usage: "
+          "%prog <noderange> [list][update [--backup <file>]]|[<components>]")
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
 (options, args) = argparser.parse_args()
@@ -66,8 +67,12 @@ try:
         if args[1] == 'update':
             upfile = args[2]
         else:
+            if args[1] == 'list':
+                comps = args[2:]
+            else:
+                comps = args[1:]
             components = []
-            for arg in args[1:]:
+            for arg in comps:
                 components += arg.split(',')
 
 except IndexError:
