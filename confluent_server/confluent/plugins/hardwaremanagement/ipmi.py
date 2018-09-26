@@ -1,5 +1,5 @@
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2017 Lenovo
+# Copyright 2015-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -496,6 +496,8 @@ class IpmiHandler(object):
             self.identify()
         elif self.element[0] == 'sensors':
             self.handle_sensors()
+        elif self.element[:2] == ['configuration', 'storage']:
+            self.handle_storage()
         elif self.element[0] == 'configuration':
             self.handle_configuration()
         elif self.element[:3] == ['inventory', 'firmware', 'updates']:
@@ -926,6 +928,15 @@ class IpmiHandler(object):
                 newinf['name'] = dstr
         invitems.append(newinf)
 
+    def handle_storage(self):
+        if self.element[-1] == '':
+            self.element = self.element[:-1]
+        storelem = self.element[2:]
+        if storelem[0] == 'drives':
+            if len(storelem) == 1:
+                return self.list_disks()
+            return self.show_disk(storelem[1])
+
     def handle_sensors(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
@@ -948,6 +959,22 @@ class IpmiHandler(object):
         if sensor['type'] in sensor_categories[self.sensorcategory]:
             return True
         return False
+
+    def show_disk(self, name):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for disk in scfg.disks:
+            if (name == 'all' or simplify_name(disk.name) == name or
+                    disk == name):
+                self.output.put(
+                    msg.Disk(self.node, disk.name, disk.description,
+                                         disk.id, disk.status, disk.serial,
+                                         disk.fru))
+
+    def list_disks(self):
+        scfg = self.ipmicmd.get_storage_configuration()
+        self.output.put(msg.ChildCollection('all'))
+        for disk in scfg.disks:
+            self.output.put(msg.ChildCollection(simplify_name(disk.name)))
 
     def list_sensors(self):
         try:

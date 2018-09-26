@@ -523,7 +523,6 @@ class InputConfigChangeSet(InputExpression):
                     [node], attrs[attr]))[0][1]
         return endattrs
 
-
 class InputAttributes(ConfluentMessage):
     # This is particularly designed for attributes, where a simple string
     # should become either a string value or a dict with {'expression':} to
@@ -1240,6 +1239,22 @@ class KeyValueData(ConfluentMessage):
             self.kvpairs = kvdata
         else:
             self.kvpairs = {name: kvdata}
+
+class Disk(ConfluentMessage):
+
+    def __init__(self, name, label=None, description=None,
+                 diskid=None, status=None, serial=None, fru=None):
+        self.kvpairs = {
+            name: {
+                'label': label,
+                'description': description,
+                'diskid': diskid,
+                'status': status,
+                'serial': serial,
+                'fru': fru,
+            }
+        }
+
 
 
 class LEDStatus(ConfluentMessage):
