@@ -60,6 +60,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
         cfginitlock = threading.RLock()
     if leader is None:
         leader = currentleader
+    log.log({'info': 'Attempting connection to leader {0}'.format(leader)})
     try:
         remote = connect_to_collective(cert, leader)
     except socket.error as e:
@@ -104,7 +105,6 @@ def connect_to_leader(cert=None, name=None, leader=None):
                     return become_leader(remote)
                 print(keydata['error'])
                 return False
-            if follower is not None:
                 follower.kill()
                 cfm.stop_following()
                 follower = None
@@ -485,6 +485,7 @@ def retire_as_leader():
 def become_leader(connection):
     global currentleader
     global follower
+    log.log({'info': 'Becoming leader of collective'})
     if follower:
         follower.kill()
         follower = None
