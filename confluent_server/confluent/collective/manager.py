@@ -322,6 +322,11 @@ def handle_connection(connection, cert, request, local=False):
     if 'assimilate' == operation:
         drone = request['name']
         droneinfo = cfm.get_collective_member(drone)
+        if not droneinfo:
+            tlvdata.send(connection,
+                         {'error': 'Unrecognized leader, '
+                                   'redo invitation process'})
+            return
         if not util.cert_matches(droneinfo['fingerprint'], cert):
             tlvdata.send(connection,
                          {'error': 'Invalid certificate, '
@@ -432,7 +437,7 @@ def try_assimilate(drone):
     tlvdata.recv(remote)  # the banner
     tlvdata.recv(remote)  # authpassed... 0..
     answer = tlvdata.recv(remote)
-    if answer and 'error' in answer:
+    if answer and 'txcount' in answer:
         connect_to_leader(None, None, leader=remote.getpeername()[0])
 
 def get_leader(connection):
