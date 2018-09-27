@@ -18,6 +18,7 @@ import base64
 import confluent.collective.invites as invites
 import confluent.config.configmanager as cfm
 import confluent.exceptions as exc
+import confluent.log as log
 import confluent.tlvdata as tlvdata
 import confluent.util as util
 import eventlet
@@ -437,8 +438,24 @@ def try_assimilate(drone):
     tlvdata.recv(remote)  # the banner
     tlvdata.recv(remote)  # authpassed... 0..
     answer = tlvdata.recv(remote)
-    if answer and 'txcount' in answer:
+    if not answer:
+        log.log(
+            {'error':
+                 'No answer from {0} while trying to assimilate'.format(
+                     drone)})
+        return
+    if 'txcount' in answer:
+        log.log({'info': 'Deferring to {0} due to transaction count'.format(
+            drone)})
         connect_to_leader(None, None, leader=remote.getpeername()[0])
+        return
+    if 'error' in answer:
+        log.log({
+            'error': 'Error encountered while attempting to '
+                     'assimilate {0}: {1}'.format(drone, answer['error'])})
+        return
+    log.log({'Assimilated {0} into collective'.format(drone)})
+
 
 def get_leader(connection):
     if currentleader is None or connection.getpeername()[0] == currentleader:
