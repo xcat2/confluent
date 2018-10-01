@@ -297,6 +297,7 @@ def _finish_update(completions):
 
 def _full_updatemacmap(configmanager):
     global vintage
+    global _apimacmap
     global _macmap
     global _nodesbymac
     global _switchportmap
