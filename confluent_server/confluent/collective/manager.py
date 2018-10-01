@@ -500,11 +500,15 @@ def retire_as_leader():
 def become_leader(connection):
     global currentleader
     global follower
+    global retrythread
     log.log({'info': 'Becoming leader of collective',
              'subsystem': 'collective'})
     if follower:
         follower.kill()
         follower = None
+    if retrythread:
+        retrythread.cancel()
+        retrythread = None
     currentleader = connection.getsockname()[0]
     skipaddr = connection.getpeername()[0]
     myname = get_myname()
