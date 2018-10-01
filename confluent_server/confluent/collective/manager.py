@@ -535,6 +535,12 @@ def start_collective():
     if follower:
         follower.kill()
         follower = None
+    try:
+        if cfm.cfgstreams and cfm.check_quorum():
+            # Do not start if we have quorum and are leader
+            return
+    except exc.DegradedCollective:
+        pass
     if leader_init.active:  # do not start trying to connect if we are
         # xmitting data to a follower
         return
