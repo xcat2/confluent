@@ -1232,9 +1232,9 @@ class ConfigManager(object):
 
     def del_user(self, name):
         if cfgleader:
-            return exec_on_leader('_rpc_master_del_user', name)
+            return exec_on_leader('_rpc_master_del_user', self.tenant, name)
         if cfgstreams:
-            exec_on_followers('_rpc_del_user', name)
+            exec_on_followers('_rpc_del_user', self.tenant, name)
         self._true_del_user(name)
 
     def _true_del_user(self, name):
