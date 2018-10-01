@@ -536,7 +536,8 @@ def start_collective():
         follower.kill()
         follower = None
     try:
-        if cfm.cfgstreams and cfm.check_quorum():
+        if cfm.cfgstreams:
+            cfm.check_quorum()
             # Do not start if we have quorum and are leader
             return
     except exc.DegradedCollective:
