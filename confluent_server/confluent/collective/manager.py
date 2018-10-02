@@ -35,7 +35,6 @@ except ImportError:
     crypto = None
 
 currentleader = None
-cfginitlock = None
 follower = None
 retrythread = None
 
@@ -54,10 +53,7 @@ leader_init = ContextBool()
 
 def connect_to_leader(cert=None, name=None, leader=None):
     global currentleader
-    global cfginitlock
     global follower
-    if cfginitlock is None:
-        cfginitlock = threading.RLock()
     if leader is None:
         leader = currentleader
     log.log({'info': 'Attempting connection to leader {0}'.format(leader),
@@ -70,7 +66,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                  'subsystem': 'collective'})
         return False
     with connecting:
-        with cfginitlock:
+        with cfm._initlock:
             tlvdata.recv(remote)  # the banner
             tlvdata.recv(remote)  # authpassed... 0..
             if name is None:
@@ -520,13 +516,10 @@ def become_leader(connection):
 
 
 def startup():
-    global cfginitlock
     members = list(cfm.list_collective())
     if len(members) < 2:
         # Not in collective mode, return
         return
-    if cfginitlock is None:
-        cfginitlock = threading.RLock()
     eventlet.spawn_n(start_collective)
 
 def start_collective():
