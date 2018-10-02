@@ -51,8 +51,8 @@ _confluent_get_args()
 _confluent_nodeidentify_completion()
 {
     _confluent_get_args
-    if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "on off" -- ${COMP_WORDS[-1]}))
+    if [ $NUMARGS -ge 3 ]; then
+        COMPREPLY=($(compgen -W "on off -h" -- ${COMP_WORDS[-1]}))
     fi
     if [ $NUMARGS -lt 3 ]; then
         _confluent_nr_completion
@@ -64,8 +64,8 @@ _confluent_nodeidentify_completion()
 _confluent_nodesetboot_completion()
 {
     _confluent_get_args
-    if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "default cd network setup hd" -- ${COMP_WORDS[-1]}))
+    if [ $NUMARGS -ge 3 ]; then
+        COMPREPLY=($(compgen -W "default cd network setup hd -h -b -p" -- ${COMP_WORDS[-1]}))
     fi
     if [ $NUMARGS -lt 3 ]; then
         _confluent_nr_completion
@@ -76,12 +76,8 @@ _confluent_nodesetboot_completion()
 _confluent_nodepower_completion()
 {
     _confluent_get_args
-    if [ "${CMPARGS[-1]:0:1}" == '-' ]; then
-        COMPREPLY=($(compgen -W "-h -p" -- ${COMP_WORDS[-1]}))
-        return
-    fi
-    if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "boot off on status" -- ${COMP_WORDS[-1]}))
+    if [ $NUMARGS -ge 3 ]; then
+        COMPREPLY=($(compgen -W "boot off on status -h -p" -- ${COMP_WORDS[-1]}))
         return;
     fi
     if [ $NUMARGS -lt 3 ]; then
@@ -93,14 +89,14 @@ _confluent_nodepower_completion()
 _confluent_nodemedia_completion()
 {
     _confluent_get_args
-    if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "list upload attach detachall" -- ${COMP_WORDS[-1]}))
-        return;
-    fi
-    if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[2]} == 'upload' ]; then
+    if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[-2]} == 'upload' ]; then
         compopt -o default
         COMPREPLY=()
         return
+    fi
+        if [ $NUMARGS --ge 3 ]; then
+        COMPREPLY=($(compgen -W "list upload attach detachall -h" -- ${COMP_WORDS[-1]}))
+        return;
     fi
     if [ $NUMARGS -lt 3 ]; then
         _confluent_nr_completion
