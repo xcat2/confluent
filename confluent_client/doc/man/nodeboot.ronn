@@ -4,12 +4,41 @@ nodeboot(8) -- Reboot a confluent node to a specific device
 ## SYNOPSIS
 
 `nodeboot <noderange>`  
-`nodeboot <noderange>` [net|setup]  
+`nodeboot [options] <noderange>` [default|cd|network|setup|hd]  
 
 ## DESCRIPTION
 
 **nodeboot** reboots nodes in a noderange.  If an additional argument is given,
-it sets the node to specifically boot to that as the next boot.
+it sets the node to specifically boot to that as the next boot.  This 
+performs an immediate reboot without waiting for the OS.  To set the boot
+device without inducing a reboot, see the `nodesetboot` command.
+
+## OPTIONS
+
+* `-b`, `--bios`:
+  For a system that supports both BIOS and UEFI style boot, request BIOS style
+  boot if supported (some platforms will UEFI boot with this flag anyway).
+
+* `-p`, `--persist`:
+  For a system that supports it, mark the boot override to persist rather than
+  be a one time change.  Many systems do not support this functionality.
+
+* `default`:
+  Request a normal default boot with no particular device override
+
+* `cd`:
+  Request boot from media.  Note that this can include physical CD,
+  remote media mounted as CD/DVD, and detachable hard disks drives such as usb
+  key devices.
+  
+* `network`:
+  Request boot to network
+  
+* `setup`:
+  Request to enter the firmware configuration menu (e.g. F1 setup) on next boot.
+
+* `hd`:
+  Boot straight to hard disk drive
 
 ## EXAMPLES
 * Booting n3 and n4 to the default boot behavior:
