@@ -859,8 +859,16 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
                                  certfile='/etc/confluent/srvcert.pem')
     except Exception:
         for node in nodes:
-            yield msg.ConfluentResourceUnavailable(
-                node, 'Collective member {0} is unreachable'.format(a['name']))
+            if a:
+                yield msg.ConfluentResourceUnavailable(
+                    node, 'Collective member {0} is unreachable'.format(
+                        a['name']))
+            else:
+                yield msg.ConfluentResourceUnavailable(
+                    node,
+                    '"{0}" is not recognized as a collective member'.format(
+                        manager))
+
         return
     if not util.cert_matches(a['fingerprint'], remote.getpeercert(
             binary_form=True)):
