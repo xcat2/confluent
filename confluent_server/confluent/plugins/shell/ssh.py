@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015 Lenovo
+# Copyright 2015-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -113,13 +113,48 @@ class SshShell(conapi.Console):
             self.password = ''
             self.datacallback('\r\nlogin as: ')
             return
+        except cexc.PubkeyInvalid as pi:
+            self.keyaction = ''
+            self.candidatefprint = pi.fingerprint
+            self.datacallback(pi.message)
+            self.keyattrname = pi.attrname
+            self.datacallback('\r\nNew fingerprint: ' + pi.fingerprint)
+            self.inputmode = -1
+            self.datacallback('\r\nEnter "disconnect" or "accept": ')
+            return
         self.inputmode = 2
         self.connected = True
         self.shell = self.ssh.invoke_shell()
         self.rxthread = eventlet.spawn(self.recvdata)
 
     def write(self, data):
-        if self.inputmode == 0:
+        if self.inputmode == -1:
+            while len(data) and data[0] == b'\x7f' and len(self.keyaction):
+                self.datacallback('\b \b')  # erase previously echoed value
+                self.keyaction = self.keyaction[:-1]
+                data = data[1:]
+            while len(data) and data[0] == b'\x7f':
+                data = data[1:]
+            while b'\x7f' in data:
+                delidx = data.index(b'\x7f')
+                data = data[:delidx - 1] + data[delidx + 1:]
+            self.keyaction += data
+            if '\r' in self.keyaction:
+                action = self.keyaction.split('\r')[0]
+                if action.lower() == 'accept':
+                    self.nodeconfig.set_node_attributes(
+                        {self.node:
+                             {self.keyattrname: self.candidatefprint}})
+                    self.datacallback('\r\n')
+                    self.logon()
+                elif action.lower() == 'disconnect':
+                    self.datacallback(conapi.ConsoleEvent.Disconnect)
+                else:
+                    self.keyaction = ''
+                    self.datacallback('\r\nEnter "disconnect" or "accept": ')
+            elif len(data) > 0:
+                self.datacallback(data)
+        elif self.inputmode == 0:
             while len(data) and data[0] == b'\x7f' and len(self.username):
                 self.datacallback('\b \b')  # erase previously echoed value
                 self.username = self.username[:-1]
