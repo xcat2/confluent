@@ -92,12 +92,17 @@ class Session(object):
                 errstr, errnum, erridx, answers = rsp
                 if errstr:
                     errstr = str(errstr)
-                    if errstr in ('unknownUserName', 'wrongDigest'):
-                        raise exc.TargetEndpointBadCredentials(errstr)
+                    finerr = errstr + ' while trying to connect to ' \
+                                      '{0}'.format(self.server)
+                    if errstr in ('Unknown USM user', 'unknownUserName',
+                                  'wrongDigest', 'Wrong SNMP PDU digest'):
+                        raise exc.TargetEndpointBadCredentials(finerr)
                     # need to do bad credential versus timeout
-                    raise exc.TargetEndpointUnreachable(errstr)
+                    raise exc.TargetEndpointUnreachable(finerr)
                 elif errnum:
-                    raise exc.ConfluentException(errnum.prettyPrint())
+                    raise exc.ConfluentException(errnum.prettyPrint() +
+                                                 ' while trying to connect to '
+                                                 '{0}'.format(self.server))
                 for ans in answers:
                     if not obj[0].isPrefixOf(ans[0]):
                         # PySNMP returns leftovers in a bulk command
