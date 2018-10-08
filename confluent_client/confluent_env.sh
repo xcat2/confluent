@@ -45,57 +45,69 @@ _confluent_get_args()
     NUMARGS=${#CMPARGS[@]}
     if [ "${COMP_WORDS[-1]}" == '' ]; then
         NUMARGS=$((NUMARGS+1))
+        CMPARGS+=("")
     fi
+    GENNED=""
+    for CAND in ${COMP_CANDIDATES[@]}; do
+        candarray=(${CAND//,/ })
+        matched=0
+        for c in "${candarray[@]}"; do
+            for arg in "${CMPARGS[@]}"; do
+                if [ "$arg" = "$c" ]; then
+                    matched=1
+                    break
+                fi
+            done
+        done
+        if [ 0 = $matched ]; then
+            for c in "${candarray[@]}"; do
+                GENNED+=" $c"
+            done
+        fi
+    done
 }
 
-_confluent_nodeidentify_completion()
+function _confluent_generic_completion()
 {
     _confluent_get_args
-    if [ $NUMARGS -ge 3 ]; then
-        COMPREPLY=($(compgen -W "on off -h" -- ${COMP_WORDS[-1]}))
+    if [ $NUMARGS -ge 3 ] && [ ! -z "$GENNED" ]; then
+        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[-1]}))
     fi
     if [ $NUMARGS -lt 3 ]; then
         _confluent_nr_completion
         return;
     fi
+}
+_confluent_nodeidentify_completion()
+{
+    COMP_CANDIDATES=("on,off -h")
+    _confluent_generic_completion
 }
 
 
 _confluent_nodesetboot_completion()
 {
-    _confluent_get_args
-    if [ $NUMARGS -ge 3 ]; then
-        COMPREPLY=($(compgen -W "default cd network setup hd -h -b -p" -- ${COMP_WORDS[-1]}))
-    fi
-    if [ $NUMARGS -lt 3 ]; then
-        _confluent_nr_completion
-        return;
-    fi
+    COMP_CANDIDATES=("default,cd,network,setup,hd -h -b -p")
+    _confluent_generic_completion
 }
 
 _confluent_nodepower_completion()
 {
-    _confluent_get_args
-    if [ $NUMARGS -ge 3 ]; then
-        COMPREPLY=($(compgen -W "boot off on status -h -p" -- ${COMP_WORDS[-1]}))
-        return;
-    fi
-    if [ $NUMARGS -lt 3 ]; then
-        _confluent_nr_completion
-        return;
-    fi
+   COMP_CANDIDATES=("boot,off,on,status -h -p")
+   _confluent_generic_completion
 }
 
 _confluent_nodemedia_completion()
 {
+    COMP_CANDIDATES=("list,upload,attach,detachall -h")
     _confluent_get_args
     if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[-2]} == 'upload' ]; then
         compopt -o default
         COMPREPLY=()
         return
     fi
-        if [ $NUMARGS --ge 3 ]; then
-        COMPREPLY=($(compgen -W "list upload attach detachall -h" -- ${COMP_WORDS[-1]}))
+    if [ $NUMARGS -ge 3 ] && [ ! -z "$GENNED" ]; then
+        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[-1]}))
         return;
     fi
     if [ $NUMARGS -lt 3 ]; then
