@@ -66,8 +66,9 @@ def join_collective(server, invitation):
                                     'invitation': invitation,
                                     'server': server}})
     res = tlvdata.recv(s)
-    print(res.get('collective',
-                  {'status': 'Unknown response: ' + repr(res)})['status'])
+    res = res.get('collective',
+                  {'status': 'Unknown response: ' + repr(res)})
+    print(res.get('status', res['error']))
 
 
 def show_collective():

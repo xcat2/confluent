@@ -30,7 +30,10 @@ control.
 * `-p`, `--persist`:
   For a system that supports it, mark the boot override to persist rather than
   be a one time change.  Many systems do not support this functionality.
-  
+
+* `-u`, `--uefi`:
+  This flag does nothing, it is for command compatibility with xCAT's rsetboot
+
 * `default`:
   Request a normal default boot with no particular device override
 

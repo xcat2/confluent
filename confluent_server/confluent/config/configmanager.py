@@ -82,6 +82,7 @@ _dirtylock = threading.RLock()
 _leaderlock = gthread.RLock()
 _synclock = threading.RLock()
 _rpclock = gthread.RLock()
+_initlock = gthread.RLock()
 _followerlocks = {}
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 tracelog = None
@@ -953,38 +954,39 @@ class ConfigManager(object):
 
     def __init__(self, tenant, decrypt=False, username=None):
         global _cfgstore
-        if _cfgstore is None:
-            init()
-        self.decrypt = decrypt
-        self.current_user = username
-        if tenant is None:
-            self.tenant = None
-            if 'main' not in _cfgstore:
-                _cfgstore['main'] = {}
+        with _initlock:
+            if _cfgstore is None:
+                init()
+            self.decrypt = decrypt
+            self.current_user = username
+            if tenant is None:
+                self.tenant = None
+                if 'main' not in _cfgstore:
+                    _cfgstore['main'] = {}
+                    self._bg_sync_to_file()
+                self._cfgstore = _cfgstore['main']
+                if 'nodegroups' not in self._cfgstore:
+                    self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
+                    _mark_dirtykey('nodegroups', 'everything', self.tenant)
+                    self._bg_sync_to_file()
+                if 'nodes' not in self._cfgstore:
+                    self._cfgstore['nodes'] = {}
+                    self._bg_sync_to_file()
+                return
+            elif 'tenant' not in _cfgstore:
+                _cfgstore['tenant'] = {tenant: {}}
                 self._bg_sync_to_file()
-            self._cfgstore = _cfgstore['main']
+            elif tenant not in _cfgstore['tenant']:
+                _cfgstore['tenant'][tenant] = {}
+                self._bg_sync_to_file()
+            self.tenant = tenant
+            self._cfgstore = _cfgstore['tenant'][tenant]
             if 'nodegroups' not in self._cfgstore:
-                self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
+                self._cfgstore['nodegroups'] = {'everything': {}}
                 _mark_dirtykey('nodegroups', 'everything', self.tenant)
-                self._bg_sync_to_file()
             if 'nodes' not in self._cfgstore:
                 self._cfgstore['nodes'] = {}
-                self._bg_sync_to_file()
-            return
-        elif 'tenant' not in _cfgstore:
-            _cfgstore['tenant'] = {tenant: {}}
             self._bg_sync_to_file()
-        elif tenant not in _cfgstore['tenant']:
-            _cfgstore['tenant'][tenant] = {}
-            self._bg_sync_to_file()
-        self.tenant = tenant
-        self._cfgstore = _cfgstore['tenant'][tenant]
-        if 'nodegroups' not in self._cfgstore:
-            self._cfgstore['nodegroups'] = {'everything': {}}
-            _mark_dirtykey('nodegroups', 'everything', self.tenant)
-        if 'nodes' not in self._cfgstore:
-            self._cfgstore['nodes'] = {}
-        self._bg_sync_to_file()
 
     def get_collective_member(self, name):
         return get_collective_member(name)

@@ -171,7 +171,7 @@ def _extract_neighbor_data_b(args):
 
     args are carried as a tuple, because of eventlet convenience
     """
-    switch, password, user, force = args
+    switch, password, user, force = args[:4]
     vintage = _neighdata.get(switch, {}).get('!!vintage', 0)
     now = util.monotonic_time()
     if vintage > (now - 60) and not force:
@@ -220,17 +220,19 @@ def _extract_neighbor_data_b(args):
     _neighdata[switch] = lldpdata
 
 
-def update_switch_data(switch, configmanager, force=False):
+def update_switch_data(switch, configmanager, force=False, retexc=False):
     switchcreds = netutil.get_switchcreds(configmanager, (switch,))[0]
-    _extract_neighbor_data(switchcreds + (force,))
+    ndr = _extract_neighbor_data(switchcreds + (force, retexc))
+    if retexc and isinstance(ndr, Exception):
+        raise ndr
     return _neighdata.get(switch, {})
 
 
-def update_neighbors(configmanager, force=False):
-    return _update_neighbors_backend(configmanager, force)
+def update_neighbors(configmanager, force=False, retexc=False):
+    return _update_neighbors_backend(configmanager, force, retexc)
 
 
-def _update_neighbors_backend(configmanager, force):
+def _update_neighbors_backend(configmanager, force, retexc):
     global _neighdata
     global _neighbypeerid
     vintage = _neighdata.get('!!vintage', 0)
@@ -241,7 +243,7 @@ def _update_neighbors_backend(configmanager, force):
     _neighbypeerid = {'!!vintage': now}
     switches = netutil.list_switches(configmanager)
     switchcreds = netutil.get_switchcreds(configmanager, switches)
-    switchcreds = [ x + (force,) for x in switchcreds]
+    switchcreds = [ x + (force, retexc) for x in switchcreds]
     pool = GreenPool(64)
     for ans in pool.imap(_extract_neighbor_data, switchcreds):
         yield ans
@@ -258,9 +260,15 @@ def _extract_neighbor_data(args):
         return
     try:
         with _updatelocks[switch]:
-            _extract_neighbor_data_b(args)
-    except Exception:
-        log.logtrace()
+            return _extract_neighbor_data_b(args)
+    except Exception as e:
+        yieldexc = False
+        if len(args) >= 5:
+            yieldexc = args[4]
+        if yieldexc:
+            return e
+        else:
+            log.logtrace()
 
 if __name__ == '__main__':
     # a quick one-shot test, args are switch and snmpv1 string for now
@@ -327,7 +335,9 @@ def _handle_neighbor_query(pathcomponents, configmanager):
         # guaranteed
         if (parms['by-peerid'] not in _neighbypeerid and
                 _neighbypeerid.get('!!vintage', 0) < util.monotonic_time() - 60):
-            list(update_neighbors(configmanager))
+            for x in update_neighbors(configmanager, retexc=True):
+                if isinstance(x, Exception):
+                    raise x
         if parms['by-peerid'] not in _neighbypeerid:
             raise exc.NotFoundException('No matching peer known')
         return _dump_neighbordatum(_neighbypeerid[parms['by-peerid']])
@@ -336,9 +346,11 @@ def _handle_neighbor_query(pathcomponents, configmanager):
     if listrequested not in multi_selectors | single_selectors:
         raise exc.NotFoundException('{0} is not found'.format(listrequested))
     if 'by-switch' in parms:
-        update_switch_data(parms['by-switch'], configmanager)
+        update_switch_data(parms['by-switch'], configmanager, retexc=True)
     else:
-        list(update_neighbors(configmanager))
+        for x in update_neighbors(configmanager, retexc=True):
+            if isinstance(x, Exception):
+                raise x
     return list_info(parms, listrequested)
 
 
