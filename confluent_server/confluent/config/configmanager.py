@@ -638,7 +638,10 @@ def clear_configuration():
     stop_following()
     _oldcfgstore = _cfgstore
     _oldtxcount = _txcount
-    _cfgstore = {}
+    if _cfgstore is None or 'main' not in _cfgstore:
+        _cfgstore = {}
+    else:
+        _cfgstore['main'].clear()
     _txcount = 0
 
 def commit_clear():
