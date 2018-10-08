@@ -7,7 +7,7 @@ nodegroupdefine(8) -- Define new confluent node group
 
 ## DESCRIPTION
 
-`nodegroupdefine` allows the definition of a new node for the confluent management
+`nodegroupdefine` allows the definition of a new nodegroup for the confluent management
 service.  It may only define a single group name at a time.
 It has the same syntax as `nodegroupattrib(8)`, and the commands differ in
 that `nodegroupattrib(8)` will error if a node group does not exist.
