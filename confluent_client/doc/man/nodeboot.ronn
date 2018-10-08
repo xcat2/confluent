@@ -19,6 +19,9 @@ device without inducing a reboot, see the `nodesetboot` command.
   For a system that supports both BIOS and UEFI style boot, request BIOS style
   boot if supported (some platforms will UEFI boot with this flag anyway).
 
+* `-u`, `--uefi`:
+  This flag does nothing, it is for command compatibility with xCAT's rsetboot
+
 * `-p`, `--persist`:
   For a system that supports it, mark the boot override to persist rather than
   be a one time change.  Many systems do not support this functionality.
