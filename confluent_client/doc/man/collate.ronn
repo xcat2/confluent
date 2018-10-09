@@ -3,7 +3,7 @@ collate(1) -- Organize text input by node
 
 ## SYNOPSIS
 
-`<other command> | collate [-a] [-d] [-w] [-s] [-c] [-r]`
+`<other command> | collate [-a] [-d] [-w] [-s] [-c] [-r] [-l lognametemplate]`
 
 ## DESCRIPTION
 
@@ -25,6 +25,10 @@ node and group names sorted alphanumerically.
 * `-d`, `--diff`:
    Express all but the most common result group in terms of diff from
    the most common result group
+
+* `-l`, `--log`:
+   Save output per node to individual log files, replacing {node} in the name
+   with the nodename of each
 
 * `-w`, `--watch`:
    Update results dynamically as data becomes available, rather than

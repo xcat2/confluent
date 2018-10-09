@@ -48,6 +48,8 @@ argparser.add_option('-c', '--count', action='store_true',
 argparser.add_option('-r', '--reverse', action='store_true',
                      help='Reverse sort order to show biggest output group '
                           'last')
+argparser.add_option('-l', '--log', action='store', type='string', dest='log',
+                     help='Log each output to file, using {node} as a placeholder for node.')
 (options, args) = argparser.parse_args()
 if sys.stdin.isatty():
     argparser.print_help()
@@ -64,7 +66,7 @@ def print_current():
     if options.diff:
         grouped.print_deviants(skipmodal=options.skipcommon, count=options.count,
                           reverse=options.reverse)
-    else:
+    else options.log:
         grouped.print_all(skipmodal=options.skipcommon,
                                count=options.count,
                                reverse=options.reverse)
@@ -80,6 +82,12 @@ while fullline:
             continue
         if ': ' not in line:
             line = 'UNKNOWN: ' + line
+        if options.log:
+            node, output = line.split(': ', 1)
+            currlog = options.log.format(node=node, nodename=node)
+            with open(currlog, mode='a')  as log:
+                log.write(output + '\n')
+            continue
         grouped.add_line(*line.split(': ', 1))
         if options.watch:
             if not holdoff:
