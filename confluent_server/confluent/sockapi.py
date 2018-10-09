@@ -238,7 +238,8 @@ def start_proxy_term(connection, cert, request):
     ccons = ClientConsole(connection)
     consession = consoleserver.ConsoleSession(
         node=request['node'], configmanager=cfm, username=request['user'],
-        datacallback=ccons.sendall, skipreplay=request['skipreplay'])
+        datacallback=ccons.sendall, skipreplay=request['skipreplay'],
+        direct=False)
     term_interact(None, None, ccons, None, connection, consession, None)
 
 def start_term(authname, cfm, connection, params, path, authdata, skipauth):

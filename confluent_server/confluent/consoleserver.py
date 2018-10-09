@@ -625,12 +625,12 @@ def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
-def connect_node(node, configmanager, username=None):
+def connect_node(node, configmanager, username=None, direct=True):
     attrval = configmanager.get_node_attributes(node, 'collective.manager')
     myc = attrval.get(node, {}).get('collective.manager', {}).get(
         'value', None)
     myname = collective.get_myname()
-    if myc and myc != collective.get_myname():
+    if myc and myc != collective.get_myname() and direct:
         minfo = configmodule.get_collective_member(myc)
         return ProxyConsole(node, minfo, myname, configmanager, username)
     consk = (node, configmanager.tenant)
@@ -758,10 +758,9 @@ class ConsoleSession(object):
                          'get_next_output' non-functional
     :param skipreplay: If true, will skip the attempt to redraw the screen
     """
-    connector = connect_node
 
     def __init__(self, node, configmanager, username, datacallback=None,
-                 skipreplay=False):
+                 skipreplay=False, direct=True):
         self.registered = False
         self.tenant = configmanager.tenant
         if not configmanager.is_node(node):
@@ -769,6 +768,8 @@ class ConsoleSession(object):
         self.username = username
         self.node = node
         self.configmanager = configmanager
+        self.direct = direct  # true if client is directly connected versus
+                              # relay
         self.connect_session()
         self.registered = True
         self._evt = None
@@ -797,7 +798,7 @@ class ConsoleSession(object):
         between console and shell.
         """
         self.conshdl = connect_node(self.node, self.configmanager,
-                                    self.username)
+                                    self.username, self.direct)
     def send_break(self):
         """Send break to remote system
         """
