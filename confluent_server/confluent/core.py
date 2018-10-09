@@ -585,6 +585,15 @@ class BadPlugin(object):
             self.node, self.plugin + ' is not a supported plugin')
 
 
+class BadCollective(object):
+    def __init__(self, node):
+        self.node = node
+
+    def error(self, *args, **kwargs):
+        yield msg.ConfluentNodeError(
+            self.node, 'collective mode is active, but collective.manager '
+                       'is not set for this node')
+
 def abbreviate_noderange(configmanager, inputdata, operation):
     if operation != 'create':
         raise exc.InvalidArgumentException('Must be a create with nodes in list')
@@ -777,6 +786,7 @@ def handle_node_request(configmanager, inputdata, operation,
                         continue
                 elif list(cfm.list_collective()):
                     badcollnodes.append(node)
+                    continue
             if plugpath is not None:
                 try:
                     hfunc = getattr(pluginmap[plugpath], operation)
@@ -787,11 +797,8 @@ def handle_node_request(configmanager, inputdata, operation,
                     nodesbyhandler[hfunc].append(node)
                 else:
                     nodesbyhandler[hfunc] = [node]
-        if badcollnodes:
-            raise exc.ConfluentException(
-                'collective management active, '
-                'collective.manager must be set for {0}'.format(
-                    ','.join(badcollnodes)))
+        for bn in badcollnodes:
+            nodesbyhandler[BadCollective(bn).error] = [bn]
         workers = greenpool.GreenPool()
         numworkers = 0
         for hfunc in nodesbyhandler:
