@@ -1203,7 +1203,7 @@ def _map_unique_ids(nodes=None):
     uuid_by_nodes = {}
     fprint_by_nodes = {}
     for uuid in nodes_by_uuid:
-        if not uuid_is_valid():
+        if not uuid_is_valid(uuid):
             continue
         node = nodes_by_uuid[uuid]
         if node in bigmap:
