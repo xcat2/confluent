@@ -63,7 +63,6 @@ import eventlet
 import eventlet.event as event
 import eventlet.green.select as select
 import eventlet.green.threading as gthread
-import eventlet.greenpool as gpool
 import fnmatch
 import json
 import operator
@@ -948,7 +947,7 @@ class ConfigManager(object):
             os.getenv('SystemDrive'), '\\ProgramData', 'confluent', 'cfg')
     else:
         _cfgdir = "/etc/confluent/cfg"
-    _cfgwriter = gpool.GreenPool(1)
+    _cfgwriter = None
     _writepending = False
     _syncrunning = False
     _syncstate = threading.RLock()
@@ -2046,9 +2045,11 @@ class ConfigManager(object):
 
     @classmethod
     def wait_for_sync(cls, fullsync=False):
-        cls._cfgwriter.waitall()
+        if cls._cfgwriter is not None:
+            cls._cfgwriter.join()
         cls._bg_sync_to_file(fullsync)
-        cls._cfgwriter.waitall()
+        if cls._cfgwriter is not None:
+            cls._cfgwriter.join()
 
     @classmethod
     def shutdown(cls):
@@ -2064,13 +2065,11 @@ class ConfigManager(object):
                 cls._writepending = True
                 return
             cls._syncrunning = True
-        cls._cfgwriter.spawn_n(cls._g_sync_to_file, fullsync)
-
-    @classmethod
-    def _g_sync_to_file(cls, fullsync):
-        cls._sync_to_file(fullsync)
-
-
+        # if the thread is exiting, join it to let it close, just in case
+        if cls._cfgwriter is not None:
+            cls._cfgwriter.join()
+        cls._cfgwriter = threading.Thread(target=cls._sync_to_file, args=(fullsync,))
+        cls._cfgwriter.start()
 
     @classmethod
     def _sync_to_file(cls, fullsync=False):
