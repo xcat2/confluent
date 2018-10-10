@@ -968,7 +968,7 @@ class ConfigManager(object):
                     _cfgstore['main'] = {}
                     self._bg_sync_to_file()
                 self._cfgstore = _cfgstore['main']
-                if 'nodegroups' not in self._cfgstore:
+                if 'nodegroups' not in self._cfgstore:  # This can happen during a clear... it seams... and if so it messes up...
                     self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
                     _mark_dirtykey('nodegroups', 'everything', self.tenant)
                     self._bg_sync_to_file()
@@ -2080,8 +2080,9 @@ class ConfigManager(object):
             _mkpath(cls._cfgdir)
             with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
                 f.write(struct.pack('!Q', _txcount))
-            if fullsync or 'dirtyglobals' in _cfgstore:
-                if fullsync:
+            if (fullsync or 'dirtyglobals' in _cfgstore and
+                    'globals' in _cfgstore):
+                if fullsync:  # globals is not a given to be set..
                     dirtyglobals = _cfgstore['globals']
                 else:
                     with _dirtylock:
