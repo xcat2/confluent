@@ -2065,6 +2065,9 @@ class ConfigManager(object):
                     cls._cfgwriter.isAlive()):
                 cls._writepending = True
                 return
+            if cls._syncrunning:  # This suggests an unclean write attempt,
+                # do a fullsync as a recovery
+                fullsync = True
             cls._syncrunning = True
         # if the thread is exiting, join it to let it close, just in case
         if cls._cfgwriter is not None:
