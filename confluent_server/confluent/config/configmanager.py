@@ -626,7 +626,7 @@ def rollback_clear():
     _cfgstore = _oldcfgstore
     _oldtxcount = 0
     _oldcfgstore = None
-    ConfigManager._bg_sync_to_file()
+    ConfigManager.wait_for_sync(True)
 
 
 def clear_configuration():
@@ -990,6 +990,7 @@ class ConfigManager(object):
             if 'nodes' not in self._cfgstore:
                 self._cfgstore['nodes'] = {}
             self._bg_sync_to_file()
+            self.wait_for_sync()
 
     def get_collective_member(self, name):
         return get_collective_member(name)
