@@ -101,7 +101,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                     log.log({'info':
                                  'Prospective leader {0} has inferior '
                                  'transaction count, becoming leader'
-                                 ''.format(leader)})
+                                 ''.format(leader), 'subsystem': 'collective'})
                     return become_leader(remote)
                 print(keydata['error'])
                 return False
@@ -360,7 +360,7 @@ def handle_connection(connection, cert, request, local=False):
             tlvdata.send(connection,
                          {'error': 'Refusing to be assimilated by inferior'
                                    'transaction count',
-                          'txcount': cfm._txcount})
+                          'txcount': cfm._txcount,})
             return
         eventlet.spawn_n(connect_to_leader, None, None,
                          leader=connection.getpeername()[0])
