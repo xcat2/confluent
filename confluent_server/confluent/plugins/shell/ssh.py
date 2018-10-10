@@ -22,11 +22,22 @@
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
+import cryptography
+
 import eventlet
 import hashlib
 import sys
 sys.modules['gssapi'] = None
 paramiko = eventlet.import_patched('paramiko')
+warnhostkey = False
+if cryptography.__version__.split('.') < ['1', '5']:
+    # older cryptography with paramiko breaks most key support except
+    # ed25519
+    warnhostkey = True
+    paramiko.transport.Transport._preferred_keys = filter(
+        lambda x: 'ed25519' in x,
+        paramiko.transport.Transport._preferred_keys)
+
 
 
 class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
@@ -122,13 +133,27 @@ class SshShell(conapi.Console):
             self.inputmode = -1
             self.datacallback('\r\nEnter "disconnect" or "accept": ')
             return
+        except paramiko.SSHException as pi:
+            self.inputmode = -2
+            warn = str(pi)
+            if warnhostkey:
+                warn += ' (Older cryptography package on this host only ' \
+                        'works with ed25519, check ssh startup on target ' \
+                        'and permissions on /etc/ssh/*key)\r\n' \
+                        'Press Enter to close...'
+            self.datacallback('\r\n' + warn)
+
+            return
         self.inputmode = 2
         self.connected = True
         self.shell = self.ssh.invoke_shell()
         self.rxthread = eventlet.spawn(self.recvdata)
 
     def write(self, data):
-        if self.inputmode == -1:
+        if self.inputmode == -2:
+            self.datacallback(conapi.ConsoleEvent.Disconnect)
+            return
+        elif self.inputmode == -1:
             while len(data) and data[0] == b'\x7f' and len(self.keyaction):
                 self.datacallback('\b \b')  # erase previously echoed value
                 self.keyaction = self.keyaction[:-1]
