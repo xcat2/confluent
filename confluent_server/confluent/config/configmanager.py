@@ -646,12 +646,13 @@ def commit_clear():
     global _oldcfgstore
     _oldcfgstore = None
     _oldtxcount = 0
-    todelete = _config_areas + ('globals', 'collective', 'transactioncount')
-    for cfg in todelete:
-        try:
-            os.remove(os.path.join(ConfigManager._cfgdir, cfg))
-        except OSError as oe:
-            pass
+    with _synclock:
+        todelete = _config_areas + ('globals', 'collective', 'transactioncount')
+        for cfg in todelete:
+            try:
+                os.remove(os.path.join(ConfigManager._cfgdir, cfg))
+            except OSError as oe:
+                pass
     ConfigManager.wait_for_sync(True)
     ConfigManager._bg_sync_to_file()
 
