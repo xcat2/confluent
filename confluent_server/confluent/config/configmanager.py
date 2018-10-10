@@ -638,10 +638,7 @@ def clear_configuration():
     stop_following()
     _oldcfgstore = _cfgstore
     _oldtxcount = _txcount
-    if _cfgstore is None or 'main' not in _cfgstore:
-        _cfgstore = {}
-    else:
-        _cfgstore['main'].clear()
+    _cfgstore = {}
     _txcount = 0
 
 def commit_clear():
@@ -955,6 +952,12 @@ class ConfigManager(object):
     _nodecollwatchers = {}
     _notifierids = {}
 
+    @property
+    def _cfgstore(self):
+        if self.tenant is None:
+            return _cfgstore['main']
+        return _cfgstore['tenant'][self.tenant]
+
     def __init__(self, tenant, decrypt=False, username=None):
         global _cfgstore
         with _initlock:
@@ -967,7 +970,6 @@ class ConfigManager(object):
                 if 'main' not in _cfgstore:
                     _cfgstore['main'] = {}
                     self._bg_sync_to_file()
-                self._cfgstore = _cfgstore['main']
                 if 'nodegroups' not in self._cfgstore:  # This can happen during a clear... it seams... and if so it messes up...
                     self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
                     _mark_dirtykey('nodegroups', 'everything', self.tenant)
@@ -983,7 +985,6 @@ class ConfigManager(object):
                 _cfgstore['tenant'][tenant] = {}
                 self._bg_sync_to_file()
             self.tenant = tenant
-            self._cfgstore = _cfgstore['tenant'][tenant]
             if 'nodegroups' not in self._cfgstore:
                 self._cfgstore['nodegroups'] = {'everything': {}}
                 _mark_dirtykey('nodegroups', 'everything', self.tenant)
