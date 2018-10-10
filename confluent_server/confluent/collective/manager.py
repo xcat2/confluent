@@ -82,7 +82,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
                     log.log({
                         'info': 'Collective initialization in progress on '
                                 '{0}, will retry connection'.format(leader),
-                        'subsystem': 'collective'})
+                        'subsystem': 'collective'}) ####### bad idea?
                     eventlet.spawn_after(random.random(), connect_to_leader,
                                          cert, name, leader)
                     return True

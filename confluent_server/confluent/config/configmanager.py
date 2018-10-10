@@ -2061,7 +2061,8 @@ class ConfigManager(object):
         if statelessmode:
             return
         with cls._syncstate:
-            if cls._syncrunning:
+            if (cls._syncrunning and cls._cfgwriter is not None and
+                    cls._cfgwriter.isAlive()):
                 cls._writepending = True
                 return
             cls._syncrunning = True
