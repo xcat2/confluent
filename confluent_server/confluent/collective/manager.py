@@ -317,6 +317,8 @@ def handle_connection(connection, cert, request, local=False):
             f = open('/etc/confluent/cfg/myname', 'w')
             f.write(name)
             f.close()
+            log.log({'info': 'Connecting to collective due to join',
+                     'subsystem': 'collective'})
             eventlet.spawn_n(connect_to_leader, rsp['collective'][
                 'fingerprint'], name)
     if 'enroll' == operation:
@@ -362,6 +364,8 @@ def handle_connection(connection, cert, request, local=False):
                                    'transaction count',
                           'txcount': cfm._txcount,})
             return
+        log.log({'info': 'Connecting in response to assimilation',
+                 'subsystem': 'collective'})
         eventlet.spawn_n(connect_to_leader, None, None,
                          leader=connection.getpeername()[0])
         tlvdata.send(connection, {'status': 0})
@@ -408,6 +412,8 @@ def handle_connection(connection, cert, request, local=False):
                          {'error': 'Client has higher tranasaction count, '
                                    'should assimilate me, connecting..',
                           'txcount': cfm._txcount})
+            log.log({'info': 'Connecting to leader due to superior '
+                             'transaction count', 'subsystem': collective})
             eventlet.spawn_n(connect_to_leader, None, None,
                              connection.getpeername()[0])
             connection.close()
@@ -545,6 +551,8 @@ def start_collective():
         if cfm.cfgleader is None:
             cfm.stop_following(True)
         ldrcandidate = cfm.get_collective_member(member)['address']
+        log.log({'info': 'Performing startup attempt to {0}'.format(
+            ldrcandidate), 'subsystem': 'collective'})
         if connect_to_leader(name=myname, leader=ldrcandidate):
             break
     else:
