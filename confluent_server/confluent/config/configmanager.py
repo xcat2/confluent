@@ -647,7 +647,7 @@ def commit_clear():
     _oldcfgstore = None
     _oldtxcount = 0
     with _synclock:
-        todelete = _config_areas + ('globals', 'collective', 'transactioncount')
+        todelete = ('transactioncount', 'globals', 'collective') + _config_areas
         for cfg in todelete:
             try:
                 os.remove(os.path.join(ConfigManager._cfgdir, cfg))
