@@ -477,6 +477,10 @@ class IpmiHandler(object):
                 self.output.put(msg.ConfluentTargetTimeout(
                     self.node, self.error))
                 return
+            elif 'Invalid Session ID' in self.error:
+                self.output.put(msg.ConfluentTargetTimeout(
+                    self.node, 'Temporary Login Error'))
+                return
             elif ('Unauthorized' in self.error or
                     'Incorrect password' in self.error):
                 self.output.put(

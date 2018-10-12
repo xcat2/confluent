@@ -359,8 +359,11 @@ class ConsoleHandler(object):
         except (exc.NotImplementedException, exc.NotFoundException):
             self._console = None
         except:
-            _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                          event=log.Events.stacktrace)
+            if _tracelog:
+                _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                              event=log.Events.stacktrace)
+            else:
+                print(traceback.format_exc())
         if not isinstance(self._console, conapi.Console):
             self.clearbuffer()
             self.connectstate = 'unconnected'
