@@ -626,7 +626,7 @@ def rollback_clear():
     _cfgstore = _oldcfgstore
     _oldtxcount = 0
     _oldcfgstore = None
-    ConfigManager._bg_sync_to_file()
+    ConfigManager.wait_for_sync(True)
 
 
 def clear_configuration():
@@ -638,10 +638,7 @@ def clear_configuration():
     stop_following()
     _oldcfgstore = _cfgstore
     _oldtxcount = _txcount
-    if _cfgstore is None or 'main' not in _cfgstore:
-        _cfgstore = {}
-    else:
-        _cfgstore['main'].clear()
+    _cfgstore = {}
     _txcount = 0
 
 def commit_clear():
@@ -649,12 +646,13 @@ def commit_clear():
     global _oldcfgstore
     _oldcfgstore = None
     _oldtxcount = 0
-    todelete = _config_areas + ('globals', 'collective', 'transactioncount')
-    for cfg in todelete:
-        try:
-            os.remove(os.path.join(ConfigManager._cfgdir, cfg))
-        except OSError as oe:
-            pass
+    with _synclock:
+        todelete = ('transactioncount', 'globals', 'collective') + _config_areas
+        for cfg in todelete:
+            try:
+                os.remove(os.path.join(ConfigManager._cfgdir, cfg))
+            except OSError as oe:
+                pass
     ConfigManager.wait_for_sync(True)
     ConfigManager._bg_sync_to_file()
 
@@ -955,6 +953,12 @@ class ConfigManager(object):
     _nodecollwatchers = {}
     _notifierids = {}
 
+    @property
+    def _cfgstore(self):
+        if self.tenant is None:
+            return _cfgstore['main']
+        return _cfgstore['tenant'][self.tenant]
+
     def __init__(self, tenant, decrypt=False, username=None):
         global _cfgstore
         with _initlock:
@@ -967,8 +971,7 @@ class ConfigManager(object):
                 if 'main' not in _cfgstore:
                     _cfgstore['main'] = {}
                     self._bg_sync_to_file()
-                self._cfgstore = _cfgstore['main']
-                if 'nodegroups' not in self._cfgstore:
+                if 'nodegroups' not in self._cfgstore:  # This can happen during a clear... it seams... and if so it messes up...
                     self._cfgstore['nodegroups'] = {'everything': {'nodes': set()}}
                     _mark_dirtykey('nodegroups', 'everything', self.tenant)
                     self._bg_sync_to_file()
@@ -983,13 +986,13 @@ class ConfigManager(object):
                 _cfgstore['tenant'][tenant] = {}
                 self._bg_sync_to_file()
             self.tenant = tenant
-            self._cfgstore = _cfgstore['tenant'][tenant]
             if 'nodegroups' not in self._cfgstore:
                 self._cfgstore['nodegroups'] = {'everything': {}}
                 _mark_dirtykey('nodegroups', 'everything', self.tenant)
             if 'nodes' not in self._cfgstore:
                 self._cfgstore['nodes'] = {}
             self._bg_sync_to_file()
+            self.wait_for_sync()
 
     def get_collective_member(self, name):
         return get_collective_member(name)
@@ -2061,9 +2064,13 @@ class ConfigManager(object):
         if statelessmode:
             return
         with cls._syncstate:
-            if cls._syncrunning:
+            if (cls._syncrunning and cls._cfgwriter is not None and
+                    cls._cfgwriter.isAlive()):
                 cls._writepending = True
                 return
+            if cls._syncrunning:  # This suggests an unclean write attempt,
+                # do a fullsync as a recovery
+                fullsync = True
             cls._syncrunning = True
         # if the thread is exiting, join it to let it close, just in case
         if cls._cfgwriter is not None:
@@ -2079,8 +2086,9 @@ class ConfigManager(object):
             _mkpath(cls._cfgdir)
             with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
                 f.write(struct.pack('!Q', _txcount))
-            if fullsync or 'dirtyglobals' in _cfgstore:
-                if fullsync:
+            if (fullsync or 'dirtyglobals' in _cfgstore and
+                    'globals' in _cfgstore):
+                if fullsync:  # globals is not a given to be set..
                     dirtyglobals = _cfgstore['globals']
                 else:
                     with _dirtylock:
