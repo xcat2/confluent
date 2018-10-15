@@ -940,6 +940,15 @@ class IpmiHandler(object):
             if len(storelem) == 1:
                 return self.list_disks()
             return self.show_disk(storelem[1])
+        elif storelem[0] == 'arrays':
+            if len(storelem) == 1:
+                return self.list_arrays()
+            return self.show_array(storelem[1])
+        elif storelem[0] == 'volumes':
+            if len(storelem) == 1:
+                return self.list_volumes()
+            return self.show_volume(storelem[1])
+
 
     def handle_sensors(self):
         if self.element[-1] == '':
@@ -979,6 +988,19 @@ class IpmiHandler(object):
         self.output.put(msg.ChildCollection('all'))
         for disk in scfg.disks:
             self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+
+    def list_arrays(self):
+        scfg = self.ipmicmd.get_storage_configuration()
+        self.output.put(msg.ChildCollection('all'))
+        for arr in scfg.arrays:
+            self.output.put(msg.ChildCollection('{0}-{1}'.format(*arr.id)))
+
+    def list_volumes(self):
+        scfg = self.ipmicmd.get_storage_configuration()
+        self.output.put(msg.ChildCollection('all'))
+        for arr in scfg.arrays:
+            for vol in arr.volumes:
+                self.output.put(msg.ChildCollection(simplify_name(vol.name)))
 
     def list_sensors(self):
         try:
