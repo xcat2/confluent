@@ -37,6 +37,7 @@ def execupdate(handler, filename, updateobj, type, owner, node):
             filename, socket.gethostname())
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': errstr})
+        return
     if type == 'ffdc' and os.path.isdir(filename):
         filename += '/' + node + '.svcdata'
     try:
