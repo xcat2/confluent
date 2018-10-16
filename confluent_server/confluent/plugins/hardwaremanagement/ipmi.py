@@ -936,7 +936,7 @@ class IpmiHandler(object):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         storelem = self.element[2:]
-        if storelem[0] == 'drives':
+        if storelem[0] == 'disks':
             if len(storelem) == 1:
                 return self.list_disks()
             return self.show_disk(storelem[1])
