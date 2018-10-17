@@ -1249,7 +1249,7 @@ class Disk(ConfluentMessage):
                 'label': label,
                 'description': description,
                 'diskid': diskid,
-                'status': status,
+                'state': status,
                 'serial': serial,
                 'fru': fru,
             }
