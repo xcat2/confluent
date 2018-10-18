@@ -85,7 +85,7 @@ def run():
             desc = pipedesc[r]
             node = desc['node']
             data = True
-            while data and select.select([r], [], [], 0):
+            while data and select.select([r], [], [], 0)[0]:
                 data = r.readline()
                 if data:
                     if desc['type'] == 'stdout':
