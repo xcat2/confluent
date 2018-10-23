@@ -124,16 +124,18 @@ class NodeHandler(generic.NodeHandler):
             if currusers[uid]['name'] == newuser:
                 # Use existing account that has been created
                 newuserslot = uid
+                if newpass != passwd:  # don't mess with existing if no change
+                    ic.set_user_password(newuserslot, password=newpass)
                 break
         else:
             newuserslot = lockedusers + 1
             if newuserslot < 2:
                 newuserslot = 2
+            if newpass != passwd:  # don't mess with existing if no change
+                ic.set_user_password(newuserslot, password=newpass)
             ic.set_user_name(newuserslot, newuser)
             ic.set_user_access(newuserslot, lanchan,
                                privilege_level='administrator')
-        if newpass != passwd:  # don't mess with existing if no change
-            ic.set_user_password(newuserslot, password=newpass)
         # Now to zap others
         for uid in currusers:
             if uid != newuserslot:
