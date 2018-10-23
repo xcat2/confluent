@@ -134,6 +134,24 @@ _confluent_nodefirmware_completion()
     fi
 }
 
+_confluent_nodeshell_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -c -- ${COMP_WORDS[-1]}))
+        return
+    fi
+    if [ $NUMARGS -gt 3 ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+
 _confluent_nodesupport_completion()
 {
     _confluent_get_args
@@ -229,9 +247,9 @@ complete -F _confluent_nodemedia_completion nodemedia
 complete -F _confluent_nodepower_completion nodepower
 complete -F _confluent_nr_completion noderemove
 complete -F _confluent_nr_completion nodereseat
-complete -F _confluent_nr_completion noderun
+complete -F _confluent_nodeshell_completion noderun
 complete -F _confluent_nr_completion nodesensors
 complete -F _confluent_nodesetboot_completion nodesetboot
-complete -F _confluent_nr_completion nodeshell
+complete -F _confluent_nodeshell_completion nodeshell
 complete -F _confluent_nodesupport_completion nodesupport
 
