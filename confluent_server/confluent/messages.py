@@ -419,6 +419,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'system', 'clear'] and
             operation != 'retrieve'):
         return InputConfigClear(path, inputdata, nodes, configmanager)
+    elif (path[:3] == ['configuration', 'storage', 'disks'] and
+            operation != 'retrieve'):
+        return InputDisk(path, nodes, inputdata)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
         return InputFirmwareUpdate(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
@@ -698,6 +701,16 @@ class InputIdentifyMessage(ConfluentInputMessage):
     ])
 
     keyname = 'identify'
+
+
+class InputDisk(ConfluentInputMessage):
+    valid_values = set([
+        'jbod',
+        'unconfigured',
+        'hotspare',
+    ])
+
+    keyname = 'state'
 
 
 class InputPowerMessage(ConfluentInputMessage):
@@ -1241,15 +1254,33 @@ class KeyValueData(ConfluentMessage):
             self.kvpairs = {name: kvdata}
 
 class Disk(ConfluentMessage):
+    valid_states = set([
+        'jbod',
+        'unconfigured',
+        'hotspare',
+    ])
+    state_aliases = {
+        'unconfigured good': 'unconfigured',
+    }
+
+    def _normalize_state(self, instate):
+        newstate = instate.lower()
+        if newstate in self.valid_states:
+            return newstate
+        elif newstate in self.state_aliases:
+            return self.state_aliases[newstate]
+        raise Exception("Unknown state")
+
 
     def __init__(self, name, label=None, description=None,
-                 diskid=None, status=None, serial=None, fru=None):
+                 diskid=None, state=None, serial=None, fru=None):
+        state = self._normalize_state(state)
         self.kvpairs = {
             name: {
                 'label': label,
                 'description': description,
                 'diskid': diskid,
-                'state': status,
+                'state': state,
                 'serial': serial,
                 'fru': fru,
             }
