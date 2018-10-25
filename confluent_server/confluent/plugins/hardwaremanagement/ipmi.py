@@ -1005,18 +1005,54 @@ class IpmiHandler(object):
                     msg.Disk(self.node, disk.name, disk.description,
                                          disk.id, disk.status, disk.serial,
                                          disk.fru))
+        for arr in scfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            for disk in arr.disks:
+                if (name == 'all' or simplify_name(disk.name) == name or
+                        disk == name):
+                    self.output.put(
+                        msg.Disk(self.node, disk.name, disk.description,
+                                 disk.id, disk.status, disk.serial,
+                                 disk.fru, arrname))
 
     def list_disks(self):
         scfg = self.ipmicmd.get_storage_configuration()
         self.output.put(msg.ChildCollection('all'))
         for disk in scfg.disks:
             self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+        for arr in scfg.arrays:
+            for disk in arr.disks:
+                self.output.put(msg.ChildCollection(simplify_name(disk.name)))
 
     def list_arrays(self):
         scfg = self.ipmicmd.get_storage_configuration()
         self.output.put(msg.ChildCollection('all'))
         for arr in scfg.arrays:
             self.output.put(msg.ChildCollection('{0}-{1}'.format(*arr.id)))
+
+    def show_array(self, name):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for arr in scfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            if arrname == name:
+                vols = []
+                for vol in arr.volumes:
+                    vols.append(simplify_name(vol.name))
+                disks = []
+                for disk in arr.disks:
+                    disks.append(simplify_name(disk.name))
+                self.output.put(msg.Array(self.node, disks, arr.raid,
+                                          vols, arrname, arr.capacity,
+                                          arr.available_capacity))
+
+    def show_volume(self, name):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for arr in scfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            for vol in arr.volumes:
+                if name == simplify_name(vol.name):
+                    self.output.put(msg.Volume(self.node, vol.name, vol.size,
+                                               vol.status, arrname))
 
     def list_volumes(self):
         scfg = self.ipmicmd.get_storage_configuration()

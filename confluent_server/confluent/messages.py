@@ -1253,11 +1253,37 @@ class KeyValueData(ConfluentMessage):
         else:
             self.kvpairs = {name: kvdata}
 
+class Array(ConfluentMessage):
+    def __init__(self, name, disks=None, raid=None, volumes=None,
+                 id=None, capacity=None, available=None):
+        self.kvpairs = {
+            name: {
+                'disks': disks,
+                'raid': raid,
+                'id': id,
+                'volumes': volumes,
+                'capacity': capacity,
+                'available': available,
+            }
+        }
+
+class Volume(ConfluentMessage):
+    def __init__(self, name, volname, size, state, array):
+        self.kvpairs = {
+            name: {
+                'name': volname,
+                'size': size,
+                'state': state,
+                'array': array,
+            }
+        }
+
 class Disk(ConfluentMessage):
     valid_states = set([
         'jbod',
         'unconfigured',
         'hotspare',
+        'online',
     ])
     state_aliases = {
         'unconfigured good': 'unconfigured',
@@ -1274,7 +1300,8 @@ class Disk(ConfluentMessage):
 
 
     def __init__(self, name, label=None, description=None,
-                 diskid=None, state=None, serial=None, fru=None):
+                 diskid=None, state=None, serial=None, fru=None,
+                 array=None):
         state = self._normalize_state(state)
         self.kvpairs = {
             name: {
@@ -1284,6 +1311,7 @@ class Disk(ConfluentMessage):
                 'state': state,
                 'serial': serial,
                 'fru': fru,
+                'array': array,
             }
         }
 
