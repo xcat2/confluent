@@ -29,6 +29,7 @@ import eventlet.support.greendns
 from fnmatch import fnmatch
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
+import pyghmi.storage as storage
 console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
@@ -391,8 +392,8 @@ def perform_request(operator, node, element,
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except ssl.SSLEOFError:
             results.put(msg.ConfluentNodeError(
-                self.node, 'Unable to communicate with the https server on '
-                           'the target BMC'))
+                node, 'Unable to communicate with the https server on '
+                      'the target BMC'))
         except exc.PubkeyInvalid:
             results.put(msg.ConfluentNodeError(
                 node,
@@ -936,6 +937,19 @@ class IpmiHandler(object):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         storelem = self.element[2:]
+        if 'read' == self.op:
+            return self._show_storage(storelem)
+        elif 'update' == self.op:
+            return self._update_storage(storelem)
+
+    def _update_storage(self, storelem):
+        if storelem[0] == 'disks':
+            if len(storelem) == 1:
+                raise exc.InvalidArgumentException('Must target a disk')
+            self.set_disk(storelem[-1],
+                          self.inputdata.inputbynode[self.node])
+
+    def _show_storage(self, storelem):
         if storelem[0] == 'disks':
             if len(storelem) == 1:
                 return self.list_disks()
@@ -972,6 +986,15 @@ class IpmiHandler(object):
         if sensor['type'] in sensor_categories[self.sensorcategory]:
             return True
         return False
+
+    def set_disk(self, name, state):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for disk in scfg.disks:
+            if (name == 'all' or simplify_name(disk.name) == name or
+                    disk == name):
+                disk.status = state
+        self.ipmicmd.apply_storage_configuration(
+            storage.ConfigSpec(disks=scfg.disks))
 
     def show_disk(self, name):
         scfg = self.ipmicmd.get_storage_configuration()
@@ -1282,3 +1305,4 @@ def delete(nodes, element, configmanager, inputdata):
                                               element, type='ffdc')
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata)
+

@@ -1261,6 +1261,7 @@ class Disk(ConfluentMessage):
     ])
     state_aliases = {
         'unconfigured good': 'unconfigured',
+        'global hot spare': 'hotspare',
     }
 
     def _normalize_state(self, instate):
@@ -1269,7 +1270,7 @@ class Disk(ConfluentMessage):
             return newstate
         elif newstate in self.state_aliases:
             return self.state_aliases[newstate]
-        raise Exception("Unknown state")
+        raise Exception("Unknown state {0}".format(instate))
 
 
     def __init__(self, name, label=None, description=None,
