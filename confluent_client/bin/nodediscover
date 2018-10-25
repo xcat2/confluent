@@ -122,16 +122,31 @@ def datum_to_attrib(datum):
     del datum['node']
     return datum
 
+unique_fields = frozenset(['serial', 'mac', 'uuid'])
+
 def import_csv(options, session):
     nodedata = []
+    unique_data = {}
     with open(options.importfile, 'r') as datasrc:
         records = csv.reader(datasrc)
         fields = process_header(next(records))
+        for field in fields:
+            if field in unique_fields:
+                unique_data[field] = set([])
         for record in records:
             currfields = list(fields)
             nodedatum = {}
             for datum in record:
-                nodedatum[currfields.pop(0)] = datum
+                currfield = currfields.pop(0)
+                if currfield in unique_fields:
+                    if datum in unique_data[field]:
+                        sys.stderr.write(
+                            "Import contains duplicate values "
+                            "({0} with value {1}\n".format(currfield, datum)
+                        )
+                        sys.exit(1)
+                    unique_data[field].add(datum)
+                nodedatum[currfield] = datum
             if not datum_complete(nodedatum):
                 sys.exit(1)
             if not search_record(nodedatum, options, session):
