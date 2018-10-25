@@ -941,6 +941,22 @@ class IpmiHandler(object):
             return self._show_storage(storelem)
         elif 'update' == self.op:
             return self._update_storage(storelem)
+        elif 'delete' == self.op:
+            return self._delete_storage(storelem)
+
+    def _delete_storage(self, storelem):
+        if len(storelem) < 2 or storelem[0] != 'volumes':
+            raise exc.InvalidArgumentException('Must target a specific volume')
+        volname = storelem[-1]
+        curr = self.ipmicmd.get_storage_configuration()
+        volumes = []
+        toremove = storage.ConfigSpec(arrays=[storage.Array(volumes=volumes)])
+        for pool in curr.arrays:
+            for vol in pool.volumes:
+                if simplify_name(vol.name) == volname:
+                    volumes.append(vol)
+        self.ipmicmd.remove_storage_configuration(toremove)
+
 
     def _update_storage(self, storelem):
         if storelem[0] == 'disks':
