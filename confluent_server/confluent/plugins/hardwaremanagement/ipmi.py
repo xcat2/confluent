@@ -948,6 +948,7 @@ class IpmiHandler(object):
                 raise exc.InvalidArgumentException('Must target a disk')
             self.set_disk(storelem[-1],
                           self.inputdata.inputbynode[self.node])
+        self._show_storage(storelem)
 
     def _show_storage(self, storelem):
         if storelem[0] == 'disks':
