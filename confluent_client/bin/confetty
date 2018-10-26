@@ -478,7 +478,8 @@ def createresource(args):
         collection = targpath
     else:
         collection, _, resname = targpath.rpartition('/')
-        keydata['name'] = resname
+        if 'name' not in keydata:
+            keydata['name'] = resname
     makecall(session.create, (collection, keydata))
 
 

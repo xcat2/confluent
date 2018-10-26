@@ -422,6 +422,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:3] == ['configuration', 'storage', 'disks'] and
             operation != 'retrieve'):
         return InputDisk(path, nodes, inputdata)
+    elif (path[:3] == ['configuration', 'storage', 'volumes'] and
+          operation in ('update', 'create')):
+        return InputVolumes(path, nodes, inputdata)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
         return InputFirmwareUpdate(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
@@ -711,6 +714,60 @@ class InputDisk(ConfluentInputMessage):
     ])
 
     keyname = 'state'
+
+
+class InputVolumes(ConfluentInputMessage):
+    def __init__(self, path, nodes, inputdata):
+        self.inputbynode = {}
+        self.stripped = False
+        if not inputdata:
+            raise exc.InvalidArgumentException('missing input data')
+        if isinstance(inputdata, dict):
+            volnames = [None]
+            if len(path) == 6:
+                volnames = path[-1]
+            volnames = inputdata.get('name', volnames)
+            if not isinstance(volnames, list):
+                volnames = volnames.split(',')
+            sizes = inputdata.get('size', [None])
+            if not isinstance(sizes, list):
+                sizes = sizes.split(',')
+            disks = inputdata.get('disks', [])
+            if not disks:
+                raise exc.InvalidArgumentException(
+                    'disks are currently required to create a volume')
+            raidlvl = inputdata.get('raidlevel', None)
+            inputdata = []
+            for size in sizes:
+                if volnames:
+                    currname = volnames.pop(0)
+                else:
+                    currname = None
+                inputdata.append(
+                    {'name': currname, 'size': size,
+                     'disks': disks,
+                     'raidlevel': raidlvl})
+        for node in nodes:
+            self.inputbynode[node] = []
+        for input in inputdata:
+            volname = None
+            if len(path) == 6:
+                volname = path[-1]
+            volname = input.get('name', volname)
+            if not volname:
+                volname = None
+            volsize = input.get('size', None)
+            if isinstance(input['disks'], list):
+                disks = input['disks']
+            else:
+                disks = input['disks'].split(',')
+            raidlvl = input.get('raidlevel', None)
+            for node in nodes:
+                self.inputbynode[node].append({'name': volname,
+                                               'size': volsize,
+                                               'disks': disks,
+                                               'raidlevel': raidlvl,
+                                               })
 
 
 class InputPowerMessage(ConfluentInputMessage):
