@@ -29,6 +29,7 @@ import eventlet.support.greendns
 from fnmatch import fnmatch
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
+import pyghmi.storage as storage
 console = eventlet.import_patched('pyghmi.ipmi.console')
 ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
@@ -340,7 +341,7 @@ class IpmiConsole(conapi.Console):
         self.solconnection.send_break()
 
 
-def perform_requests(operator, nodes, element, cfg, inputdata):
+def perform_requests(operator, nodes, element, cfg, inputdata, realop):
     cryptit = cfg.decrypt
     cfg.decrypt = True
     configdata = cfg.get_node_attributes(nodes, _configattributes)
@@ -350,7 +351,7 @@ def perform_requests(operator, nodes, element, cfg, inputdata):
     for node in nodes:
         livingthreads.add(_ipmiworkers.spawn(
             perform_request, operator, node, element, configdata, inputdata,
-            cfg, resultdata))
+            cfg, resultdata, realop))
     while livingthreads:
         try:
             datum = resultdata.get(timeout=10)
@@ -376,10 +377,10 @@ def perform_requests(operator, nodes, element, cfg, inputdata):
 
 
 def perform_request(operator, node, element,
-                    configdata, inputdata, cfg, results):
+                    configdata, inputdata, cfg, results, realop):
         try:
             return IpmiHandler(operator, node, element, configdata, inputdata,
-                               cfg, results).handle_request()
+                               cfg, results, realop).handle_request()
         except pygexc.IpmiException as ipmiexc:
             excmsg = str(ipmiexc)
             if excmsg in ('Session no longer connected', 'timeout'):
@@ -391,8 +392,8 @@ def perform_request(operator, node, element,
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
         except ssl.SSLEOFError:
             results.put(msg.ConfluentNodeError(
-                self.node, 'Unable to communicate with the https server on '
-                           'the target BMC'))
+                node, 'Unable to communicate with the https server on '
+                      'the target BMC'))
         except exc.PubkeyInvalid:
             results.put(msg.ConfluentNodeError(
                 node,
@@ -409,7 +410,8 @@ def perform_request(operator, node, element,
 persistent_ipmicmds = {}
 
 class IpmiHandler(object):
-    def __init__(self, operation, node, element, cfd, inputdata, cfg, output):
+    def __init__(self, operation, node, element, cfd, inputdata, cfg, output,
+                 realop):
         self.sensormap = {}
         self.invmap = {}
         self.output = output
@@ -423,6 +425,7 @@ class IpmiHandler(object):
         self.node = node
         self.element = element
         self.op = operation
+        self.realop = realop
         connparams = get_conn_params(node, self.cfg)
         self.ipmicmd = None
         self.inputdata = inputdata
@@ -936,6 +939,70 @@ class IpmiHandler(object):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         storelem = self.element[2:]
+        if 'read' == self.op:
+            return self._show_storage(storelem)
+        elif 'update' == self.realop:
+            return self._update_storage(storelem)
+        elif 'delete' == self.op:
+            return self._delete_storage(storelem)
+        elif 'create' == self.realop:
+            return self._create_storage(storelem)
+
+    def _delete_storage(self, storelem):
+        if len(storelem) < 2 or storelem[0] != 'volumes':
+            raise exc.InvalidArgumentException('Must target a specific volume')
+        volname = storelem[-1]
+        curr = self.ipmicmd.get_storage_configuration()
+        volumes = []
+        toremove = storage.ConfigSpec(arrays=[storage.Array(volumes=volumes)])
+        for pool in curr.arrays:
+            for vol in pool.volumes:
+                if simplify_name(vol.name) == volname:
+                    volumes.append(vol)
+        self.ipmicmd.remove_storage_configuration(toremove)
+        self.output.put(msg.DeletedResource(volname))
+
+    def _create_storage(self, storelem):
+        if 'volumes' not in storelem:
+            raise exc.InvalidArgumentException('Can only create volumes')
+        vols = []
+        thedisks = None
+        currcfg = self.ipmicmd.get_storage_configuration()
+        disks = []
+        vols = []
+        vol = self.inputdata.inputbynode[self.node][0]
+        raidlvl = vol['raidlevel']
+        for disk in currcfg.disks:
+            if simplify_name(disk.name) in vol['disks']:
+                disks.append(disk)
+            elif (disk.status == 'Unconfigured Good' and
+                  vol['disks'][0] in ('remainder', 'rest')):
+                disks.append(disk)
+            elif vol['disks'][0] == 'all':
+                disks.append(disk)
+        for vol in self.inputdata.inputbynode[self.node]:
+            if thedisks and thedisks != vol['disks']:
+                    raise exc.InvalidArgumentException(
+                        'Not currently supported to create multiple arrays '
+                        'in a single request')
+            if raidlvl and vol['raidlevel'] != raidlvl:
+                raise exc.InvalidArgumentException('Cannot mix raid levels in '
+                                                   'a single array')
+            vols.append(storage.Volume(name=vol['name'], size=vol['size']))
+        newcfg = storage.ConfigSpec(
+            arrays=(storage.Array(raid=raidlvl, disks=disks, volumes=vols),))
+        self.ipmicmd.apply_storage_configuration(newcfg)
+        return self._show_storage(storelem)
+
+    def _update_storage(self, storelem):
+        if storelem[0] == 'disks':
+            if len(storelem) == 1:
+                raise exc.InvalidArgumentException('Must target a disk')
+            self.set_disk(storelem[-1],
+                          self.inputdata.inputbynode[self.node])
+        self._show_storage(storelem)
+
+    def _show_storage(self, storelem):
         if storelem[0] == 'disks':
             if len(storelem) == 1:
                 return self.list_disks()
@@ -973,6 +1040,15 @@ class IpmiHandler(object):
             return True
         return False
 
+    def set_disk(self, name, state):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for disk in scfg.disks:
+            if (name == 'all' or simplify_name(disk.name) == name or
+                    disk == name):
+                disk.status = state
+        self.ipmicmd.apply_storage_configuration(
+            storage.ConfigSpec(disks=scfg.disks))
+
     def show_disk(self, name):
         scfg = self.ipmicmd.get_storage_configuration()
         for disk in scfg.disks:
@@ -982,18 +1058,54 @@ class IpmiHandler(object):
                     msg.Disk(self.node, disk.name, disk.description,
                                          disk.id, disk.status, disk.serial,
                                          disk.fru))
+        for arr in scfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            for disk in arr.disks:
+                if (name == 'all' or simplify_name(disk.name) == name or
+                        disk == name):
+                    self.output.put(
+                        msg.Disk(self.node, disk.name, disk.description,
+                                 disk.id, disk.status, disk.serial,
+                                 disk.fru, arrname))
 
     def list_disks(self):
         scfg = self.ipmicmd.get_storage_configuration()
         self.output.put(msg.ChildCollection('all'))
         for disk in scfg.disks:
             self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+        for arr in scfg.arrays:
+            for disk in arr.disks:
+                self.output.put(msg.ChildCollection(simplify_name(disk.name)))
 
     def list_arrays(self):
         scfg = self.ipmicmd.get_storage_configuration()
         self.output.put(msg.ChildCollection('all'))
         for arr in scfg.arrays:
             self.output.put(msg.ChildCollection('{0}-{1}'.format(*arr.id)))
+
+    def show_array(self, name):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for arr in scfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            if arrname == name:
+                vols = []
+                for vol in arr.volumes:
+                    vols.append(simplify_name(vol.name))
+                disks = []
+                for disk in arr.disks:
+                    disks.append(simplify_name(disk.name))
+                self.output.put(msg.Array(self.node, disks, arr.raid,
+                                          vols, arrname, arr.capacity,
+                                          arr.available_capacity))
+
+    def show_volume(self, name):
+        scfg = self.ipmicmd.get_storage_configuration()
+        for arr in scfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            for vol in arr.volumes:
+                if name == simplify_name(vol.name):
+                    self.output.put(msg.Volume(self.node, vol.name, vol.size,
+                                               vol.status, arrname))
 
     def list_volumes(self):
         scfg = self.ipmicmd.get_storage_configuration()
@@ -1239,7 +1351,7 @@ def initthread():
         _ipmithread = eventlet.spawn(_ipmi_evtloop)
 
 
-def create(nodes, element, configmanager, inputdata):
+def create(nodes, element, configmanager, inputdata, realop='create'):
     initthread()
     if element == ['_console', 'session']:
         if len(nodes) > 1:
@@ -1247,12 +1359,12 @@ def create(nodes, element, configmanager, inputdata):
         return IpmiConsole(nodes[0], configmanager)
     else:
         return perform_requests(
-            'update', nodes, element, configmanager, inputdata)
+            'update', nodes, element, configmanager, inputdata, realop)
 
 
 def update(nodes, element, configmanager, inputdata):
     initthread()
-    return create(nodes, element, configmanager, inputdata)
+    return create(nodes, element, configmanager, inputdata, 'update')
 
 
 def retrieve(nodes, element, configmanager, inputdata):
@@ -1267,7 +1379,8 @@ def retrieve(nodes, element, configmanager, inputdata):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'ffdc')
     else:
-        return perform_requests('read', nodes, element, configmanager, inputdata)
+        return perform_requests('read', nodes, element, configmanager,
+                                inputdata, 'read')
 
 def delete(nodes, element, configmanager, inputdata):
     initthread()
@@ -1281,4 +1394,5 @@ def delete(nodes, element, configmanager, inputdata):
         return firmwaremanager.remove_updates(nodes, configmanager.tenant,
                                               element, type='ffdc')
     return perform_requests(
-        'delete', nodes, element, configmanager, inputdata)
+        'delete', nodes, element, configmanager, inputdata, 'delete')
+

@@ -143,7 +143,7 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
-    if 'collective' in request and skipauth:
+    if request and 'collective' in request and skipauth:
         if not libssl:
             tlvdata.send(
                 connection,
