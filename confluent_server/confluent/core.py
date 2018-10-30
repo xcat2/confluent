@@ -197,6 +197,10 @@ def _init_core():
                 },
             },
             'storage': {
+                'all': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
                 'arrays': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
