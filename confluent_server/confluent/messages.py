@@ -1315,6 +1315,7 @@ class Array(ConfluentMessage):
                  id=None, capacity=None, available=None):
         self.kvpairs = {
             name: {
+                'type': 'array',
                 'disks': disks,
                 'raid': raid,
                 'id': id,
@@ -1328,6 +1329,7 @@ class Volume(ConfluentMessage):
     def __init__(self, name, volname, size, state, array):
         self.kvpairs = {
             name: {
+                'type': 'volume',
                 'name': volname,
                 'size': size,
                 'state': state,
@@ -1362,6 +1364,7 @@ class Disk(ConfluentMessage):
         state = self._normalize_state(state)
         self.kvpairs = {
             name: {
+                'type': 'disk',
                 'label': label,
                 'description': description,
                 'diskid': diskid,
