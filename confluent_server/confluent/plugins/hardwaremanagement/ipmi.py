@@ -1052,8 +1052,7 @@ class IpmiHandler(object):
     def show_disk(self, name):
         scfg = self.ipmicmd.get_storage_configuration()
         for disk in scfg.disks:
-            if (name == 'all' or simplify_name(disk.name) == name or
-                    disk == name):
+            if simplify_name(disk.name) == name or disk == name:
                 self.output.put(
                     msg.Disk(self.node, disk.name, disk.description,
                                          disk.id, disk.status, disk.serial,
@@ -1070,7 +1069,6 @@ class IpmiHandler(object):
 
     def list_disks(self):
         scfg = self.ipmicmd.get_storage_configuration()
-        self.output.put(msg.ChildCollection('all'))
         for disk in scfg.disks:
             self.output.put(msg.ChildCollection(simplify_name(disk.name)))
         for arr in scfg.arrays:
@@ -1079,7 +1077,6 @@ class IpmiHandler(object):
 
     def list_arrays(self):
         scfg = self.ipmicmd.get_storage_configuration()
-        self.output.put(msg.ChildCollection('all'))
         for arr in scfg.arrays:
             self.output.put(msg.ChildCollection('{0}-{1}'.format(*arr.id)))
 
@@ -1109,7 +1106,6 @@ class IpmiHandler(object):
 
     def list_volumes(self):
         scfg = self.ipmicmd.get_storage_configuration()
-        self.output.put(msg.ChildCollection('all'))
         for arr in scfg.arrays:
             for vol in arr.volumes:
                 self.output.put(msg.ChildCollection(simplify_name(vol.name)))
