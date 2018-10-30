@@ -130,7 +130,8 @@ def hex2bin(hexstring):
 
 
 def simplify_name(name):
-    return name.lower().replace(' ', '_').replace('/', '-')
+    return name.lower().replace(' ', '_').replace('/', '-').replace(
+        '_-_', '-')
 
 
 def sanitize_invdata(indata):

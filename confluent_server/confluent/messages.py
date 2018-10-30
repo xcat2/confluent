@@ -32,6 +32,11 @@ valid_health_values = set([
     'unknown',
 ])
 
+def simplify_name(name):
+    return name.lower().replace(' ', '_').replace('/', '-').replace(
+        '_-_', '-')
+
+
 def _htmlify_structure(indict):
     ret = "<ul>"
     if isinstance(indict, dict):
@@ -1330,7 +1335,8 @@ class Volume(ConfluentMessage):
         self.kvpairs = {
             name: {
                 'type': 'volume',
-                'name': volname,
+                'name': simplify_name(volname),
+                'label': volname,
                 'size': size,
                 'state': state,
                 'array': array,
@@ -1365,6 +1371,7 @@ class Disk(ConfluentMessage):
         self.kvpairs = {
             name: {
                 'type': 'disk',
+                'name': simplify_name(label),
                 'label': label,
                 'description': description,
                 'diskid': diskid,
