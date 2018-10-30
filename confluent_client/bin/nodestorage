@@ -57,8 +57,12 @@ def showstorage(noderange, options, args):
             curr = e['databynode'][node]
             storagebynode[node][curr['type'] + 's'].append(curr)
     for node in storagebynode:
+        print('{0:10}{1:28}{2:10}{3:10}'.format('Disk', 'Description',
+                                                'Status', 'Serial', 'FRU'))
         for disk in storagebynode[node]['disks']:
-            print(repr(disk))
+            print('{0:10}{1:28}{2:10}{3:10}'.format(
+                disk['name'], disk['description'], disk['status'],
+                disk['serial'], disk['fru']))
 
 
 def createstorage(noderange, options, args):
