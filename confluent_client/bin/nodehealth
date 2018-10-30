@@ -44,6 +44,13 @@ except IndexError:
 client.check_globbing(noderange)
 
 
+codemappings = {
+    'ok': 0,
+    'warning': 1,
+    'critical': 2,
+    'failed': 2,
+}
+
 def main():
     global session, exitcode, healthbynode, healthexplanations, health, node, sensor, explanation
     session = client.Command()
@@ -66,9 +73,11 @@ def main():
             if 'error' in health[node]:
                 sys.stderr.write('{0}: Error: {1}\n'.format(
                     node, health[node]['error']))
-                exitcode |= 1
+                exitcode = 3
             if 'health' in health[node]:
                 healthbynode[node] = health[node]['health']['value']
+                if codemappings[healthbynode[node]] > exitcode:
+                    exitcode = codemappings[healthbynode[node]]
             if 'sensors' in health[node]:
                 healthexplanations[node] = []
                 for sensor in health[node]['sensors']:
@@ -94,5 +103,5 @@ try:
     main()
 except KeyboardInterrupt:
     print('')
-    sys.exit(0)
+sys.exit(exitcode)
 
