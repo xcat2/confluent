@@ -35,6 +35,30 @@ _attraliases = {
 }
 
 
+class Tabulator(object):
+    def __init__(self, headers):
+        self.headers = headers
+        self.rows = []
+
+    def add_row(self, row):
+        self.rows.append(row)
+
+    def get_table(self):
+        i = 0
+        fmtstr = ''
+        for head in self.headers:
+            neededlen = len(head)
+            for row in self.rows:
+                if len(row[i]) > neededlen:
+                    neededlen = len(row[i])
+            fmtstr += '{{{0}:>{1}}} |'.format(i, neededlen + 1)
+            i = i + 1
+        fmtstr = fmtstr[:-2]
+        yield fmtstr.format(*self.headers)
+        for row in self.rows:
+            yield fmtstr.format(*row)
+
+
 def printerror(res, node=None):
     exitcode = 0
     if 'errorcode' in res:
