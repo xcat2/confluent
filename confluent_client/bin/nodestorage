@@ -96,10 +96,37 @@ def showstorage(noderange, options, args):
                                                       vol['array']))
 
 def createstorage(noderange, options, args):
+    if options.raidlevel is None or options.disks is None:
+        sys.stderr.write('-r and -d are required arguments to create array\n')
+        sys.exit(1)
     session = client.Command()
+    names = options.name
+    if names is None:
+        names = ''
+    parms = {'disks': options.disks, 'raidlevel': options.raidlevel}
+    if options.size:
+        parms['size'] = options.size
+    for rsp in session.create(
+            '/noderange/{0}/configuration/storage/volumes/{1}'.format(
+                noderange, names), parms):
+        print(repr(rsp))
+
 
 def deletestorage(noderange, options, args):
-    pass
+    if options.name is None:
+        if len(args) == 1:
+            names = args[0]
+        else:
+            sys.stderr.write('-n is required to indicate volume(s) to delete\n')
+            sys.exit(1)
+    else:
+        names = options.name
+    session = client.Command()
+    for rsp in session.delete(
+            '/noderange/{0}/configuration/storage/volumes/{1}'.format(
+                noderange, names)):
+        print(repr(rsp))
+
 
 def setstorage(noderange, options, args):
     pass
@@ -150,7 +177,7 @@ def main():
     except KeyError:
         argparser.print_help()
         sys.exit(1)
-    handler(noderange, options, args)
+    handler(noderange, options, args[2:])
 
 
 if __name__ == '__main__':
