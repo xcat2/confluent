@@ -37,6 +37,12 @@ class OptParser(optparse.OptionParser):
     def format_epilog(self, formatter):
         return self.expand_prog_name(self.epilog)
 
+def mbtohuman(mb):
+    if mb > 1000000:
+        return '{0:.3f} TB'.format(mb/1000000.0)
+    if mb > 1000:
+        return '{0:.3f} GB'.format(mb/1000.0)
+    return '{0:.3f} MB'.format(mb)
 
 def showstorage(noderange, options, args):
     global exitcode
@@ -57,10 +63,37 @@ def showstorage(noderange, options, args):
             curr = e['databynode'][node]
             storagebynode[node][curr['type'] + 's'].append(curr)
     for node in storagebynode:
-        for disk in storagebynode[node]['disks']:
-            print('{0}: {1} Description: {2}'.format(
-                node, disk['label'], disk['description']))
-
+        for disk in sorted(storagebynode[node]['disks'],
+                           key=lambda x: x['name']):
+            print('{0}: Disk {1} Description: {2}'.format(
+                node, disk['name'], disk['description']))
+            print('{0}: Disk {1} State: {2}'.format(node, disk['name'],
+                                               disk['state']))
+            print('{0}: Disk {1} FRU: {2}'.format(node, disk['name'],
+                                                  disk['fru']))
+            print('{0}: Disk {1} Serial Number: {2}'.format(node, disk['name'],
+                                                       disk['serial']))
+            if disk['array']:
+                print('{0}: Disk {1} Array: {2}'.format(node, disk['name'],
+                                                        disk['array']))
+        for arr in storagebynode[node]['arrays']:
+            print('{0}: Array {1} Available Capacity: {2}'.format(
+                node, arr['id'], mbtohuman(arr['available'])))
+            print('{0}: Array {1} Total Capacity: {2}'.format(
+                node, arr['id'], mbtohuman(arr['capacity'])))
+            print('{0}: Array {1} RAID: {2}'.format(node, arr['id'],
+                                                    arr['raid']))
+            print('{0}: Array {1} Disks: {2}'.format(node, arr['id'], ','.join(
+                arr['disks'])))
+            print('{0}: Array {1} Volumes: {2}'.format(node, arr['id'], ','.join(
+                arr['volumes'])))
+        for vol in storagebynode[node]['volumes']:
+            print('{0}: Volume {1}: Size: {2}'.format(node, vol['name'],
+                                                       mbtohuman(vol['size'])))
+            print('{0}: Volume {1}: State: {2}'.format(node, vol['name'],
+                                                       vol['state']))
+            print('{0}: Volume {1}: Array {2}'.format(node, vol['name'],
+                                                      vol['array']))
 
 def createstorage(noderange, options, args):
     session = client.Command()

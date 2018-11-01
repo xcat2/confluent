@@ -1060,6 +1060,12 @@ class IpmiHandler(object):
                          disk.id, disk.status, disk.serial,
                          disk.fru))
         for arr in scfg.arrays:
+            for disk in arr.disks:
+                self.output.put(
+                    msg.Disk(self.node, disk.name, disk.description,
+                             disk.id, disk.status, disk.serial,
+                             disk.fru, array='{0}-{1}'.format(*arr.id)))
+        for arr in scfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
             self._detail_array(arr, arrname, True)
 
