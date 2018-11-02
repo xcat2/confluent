@@ -691,6 +691,10 @@ def get_enclosure_chain_head(nodename, cfg):
         if ne in members:
             raise exc.InvalidArgumentException(
                 'Circular chain that includes ' + nodename)
+        if not cfg.is_node(ne):
+            raise exc.InvalidArgumentException(
+                '{0} is chained to nonexistent node {1} '.format(
+                    nodename, ne))
         nodename = ne
         members.append(nodename)
     return nodename
