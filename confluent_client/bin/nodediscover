@@ -140,13 +140,13 @@ def import_csv(options, session):
             for datum in record:
                 currfield = currfields.pop(0)
                 if currfield in unique_fields:
-                    if datum in unique_data[field]:
+                    if datum in unique_data[currfield]:
                         sys.stderr.write(
                             "Import contains duplicate values "
                             "({0} with value {1}\n".format(currfield, datum)
                         )
                         sys.exit(1)
-                    unique_data[field].add(datum)
+                    unique_data[currfield].add(datum)
                 nodedatum[currfield] = datum
             if not datum_complete(nodedatum):
                 sys.exit(1)
