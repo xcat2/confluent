@@ -19,6 +19,7 @@ import csv
 import optparse
 import os
 import sys
+import time
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -149,6 +150,10 @@ def import_csv(options, session):
                 nodedatum[currfield] = datum
             if not datum_complete(nodedatum):
                 sys.exit(1)
+            if not search_record(nodedatum, options, session):
+                list(session.update('/discovery/rescan',
+                                    {'rescan': 'start'}))
+                time.sleep(5)
             if not search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
