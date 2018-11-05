@@ -37,14 +37,14 @@ exitcode = 0
 
 
 def printfirm(node, prefix, data):
-    if 'model' in data:
+    if 'model' in data and data['model']:
         prefix += ' ' + data['model']
     builddesc = []
-    if 'build' in data:
+    if 'build' in data and data['build']:
         builddesc.append(data['build'])
-    if 'date' in data:
+    if 'date' in data and data['date']:
         builddesc.append(data['date'])
-    if 'version' in data:
+    if 'version' in data and data['version']:
         version = data['version']
         if builddesc:
             version += ' ({0})'.format(' '.join(builddesc))
