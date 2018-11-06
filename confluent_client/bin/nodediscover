@@ -28,7 +28,6 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-tabformat = '{0:>15}|{1:>15}|{2:>15}|{3:>36}|{4:>17}|{5:>12}|{6:>48}'
 columns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
            'Current IP Addresses']
 
@@ -50,7 +49,6 @@ def print_disco(options, session, currmac, outhandler):
         csv.writer(sys.stdout).writerow(record)
     else:
         outhandler.add_row(record)
-        #print(tabformat.format(*record))
 
 
 def process_header(header):
@@ -188,8 +186,6 @@ def list_discovery(options, session):
         csv.writer(sys.stdout).writerow(columns)
     else:
         outhandler = client.Tabulator(columns)
-        #print(tabformat.format(*columns))
-        #print(tabformat.format(*delimit))
     for mac in list_matching_macs(options, session):
         print_disco(options, session, mac, outhandler)
     print(outhandler.get_table())
