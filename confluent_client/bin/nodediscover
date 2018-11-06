@@ -182,13 +182,16 @@ def import_csv(options, session):
 
 
 def list_discovery(options, session):
+    outhandler = None
     if options.csv:
         csv.writer(sys.stdout).writerow(columns)
     else:
         outhandler = client.Tabulator(columns)
     for mac in list_matching_macs(options, session):
         print_disco(options, session, mac, outhandler)
-    print(outhandler.get_table())
+    if outhandler:
+        for row in outhandler.get_table():
+            print(row)
 
 def clear_discovery(options, session):
     for mac in list_matching_macs(options, session):
