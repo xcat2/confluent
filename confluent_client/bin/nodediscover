@@ -27,6 +27,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
+import confluent.sortutil as sortutil
 
 defcolumns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
               'Current IP Addresses']
@@ -195,12 +196,15 @@ def import_csv(options, session):
 
 def list_discovery(options, session):
     outhandler = None
+    orderby = None
     if options.fields:
         columns = []
         for field in options.fields.split(','):
             for cdt in columnmapping:
                 if cdt.lower() == field.lower():
                     columns.append(cdt)
+                if options.order and options.order.lower() == cdt.lower():
+                    orderby = cdt
     else:
         columns = defcolumns
     if options.csv:
@@ -210,7 +214,7 @@ def list_discovery(options, session):
     for mac in list_matching_macs(options, session):
         print_disco(options, session, mac, outhandler, columns)
     if outhandler:
-        for row in outhandler.get_table():
+        for row in outhandler.get_table(orderby):
             print(row)
 
 def clear_discovery(options, session):
@@ -309,6 +313,8 @@ def main():
     parser.add_option('-f', '--fields', dest='fields',
                       help='Select fields for output',
                       metavar='FIELDS')
+    parser.add_option('-o', '--order', dest='order',
+                      help='Order output by given field', metavar='ORDER')
     (options, args) = parser.parse_args()
     if len(args) == 0 or args[0] not in ('list', 'assign', 'rescan', 'clear'):
         parser.print_help()

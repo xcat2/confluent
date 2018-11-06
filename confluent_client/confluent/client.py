@@ -25,6 +25,7 @@ import socket
 import ssl
 import sys
 import confluent.tlvdata as tlvdata
+import confluent.sortutil as sortutil
 
 SO_PASSCRED = 16
 
@@ -43,11 +44,13 @@ class Tabulator(object):
     def add_row(self, row):
         self.rows.append(row)
 
-    def get_table(self):
+    def get_table(self, order=None):
         i = 0
         fmtstr = ''
         separator = []
         for head in self.headers:
+            if order and order == head:
+                order = i
             neededlen = len(head)
             for row in self.rows:
                 if len(row[i]) > neededlen:
@@ -58,8 +61,14 @@ class Tabulator(object):
         fmtstr = fmtstr[:-1]
         yield fmtstr.format(*self.headers)
         yield fmtstr.format(*separator)
-        for row in self.rows:
-            yield fmtstr.format(*row)
+        if order is not None:
+            for row in sorted(
+                    self.rows,
+                    key=lambda x: sortutil.naturalize_string(x[order])):
+                yield fmtstr.format(*row)
+        else:
+            for row in self.rows:
+                yield fmtstr.format(*row)
 
 
 def printerror(res, node=None):
