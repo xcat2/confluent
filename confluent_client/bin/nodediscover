@@ -31,15 +31,13 @@ import confluent.client as client
 tabformat = '{0:>15}|{1:>15}|{2:>15}|{3:>36}|{4:>17}|{5:>12}|{6:>48}'
 columns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
            'Current IP Addresses']
-delimit = ['-' * 15, '-' * 15, '-' * 15, '-' * 36, '-' * 17, '-' * 12,
-           '-' * 48]
 
 
 def dumpmacs(procinfo):
     return ','.join(procinfo['macs']) # + procinfo.get('relatedmacs', []))
 
 
-def print_disco(options, session, currmac):
+def print_disco(options, session, currmac, outhandler):
     procinfo = {}
     for tmpinfo in session.read('/discovery/by-mac/{0}'.format(currmac)):
 
@@ -51,7 +49,8 @@ def print_disco(options, session, currmac):
     if options.csv:
         csv.writer(sys.stdout).writerow(record)
     else:
-        print(tabformat.format(*record))
+        outhandler.add_row(record)
+        #print(tabformat.format(*record))
 
 
 def process_header(header):
@@ -188,10 +187,12 @@ def list_discovery(options, session):
     if options.csv:
         csv.writer(sys.stdout).writerow(columns)
     else:
-        print(tabformat.format(*columns))
-        print(tabformat.format(*delimit))
+        outhandler = client.Tabulator(columns)
+        #print(tabformat.format(*columns))
+        #print(tabformat.format(*delimit))
     for mac in list_matching_macs(options, session):
-        print_disco(options, session, mac)
+        print_disco(options, session, mac, outhandler)
+    print(outhandler.get_table())
 
 def clear_discovery(options, session):
     for mac in list_matching_macs(options, session):

@@ -46,15 +46,18 @@ class Tabulator(object):
     def get_table(self):
         i = 0
         fmtstr = ''
+        separator = []
         for head in self.headers:
             neededlen = len(head)
             for row in self.rows:
                 if len(row[i]) > neededlen:
                     neededlen = len(row[i])
-            fmtstr += '{{{0}:>{1}}} |'.format(i, neededlen + 1)
+            separator.append('-' * (neededlen + 1))
+            fmtstr += '{{{0}:>{1}}}|'.format(i, neededlen + 1)
             i = i + 1
-        fmtstr = fmtstr[:-2]
+        fmtstr = fmtstr[:-1]
         yield fmtstr.format(*self.headers)
+        yield fmtstr.format(*separator)
         for row in self.rows:
             yield fmtstr.format(*row)
 
