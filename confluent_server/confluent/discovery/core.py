@@ -463,6 +463,9 @@ def _recheck_nodes_backend(nodeattribs, configmanager):
     _map_unique_ids(nodeattribs)
     # for the nodes whose attributes have changed, consider them as potential
     # strangers
+    if nodeattribs:
+        macmap.vintage = 0  # expire current mac map data, in case
+        # the attributes changed impacted the result
     for node in nodeattribs:
         if node in known_nodes:
             for somemac in known_nodes[node]:
@@ -1100,6 +1103,7 @@ needaddhandled = False
 def _handle_nodelist_change(configmanager):
     global needaddhandled
     global nodeaddhandler
+    macmap.vintage = 0  # the current mac map is probably inaccurate
     _recheck_nodes((), configmanager)
     if needaddhandled:
         needaddhandled = False
