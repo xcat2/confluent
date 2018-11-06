@@ -28,23 +28,35 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-columns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
-           'Current IP Addresses']
+defcolumns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
+              'Current IP Addresses']
+columnmapping = {
+    'Node': 'nodename',
+    'Model': 'modelnumber',
+    'Serial': 'serialnumber',
+    'UUID': 'uuid',
+    'Type': 'types',
+    'Current IP Addresses': 'ipaddrs',
+    'IP': 'ipaddrs',
+    'Bay': 'bay',
+    'Mac Address': 'macs',
+    'Mac': 'macs',
+}
 
 
-def dumpmacs(procinfo):
-    return ','.join(procinfo['macs']) # + procinfo.get('relatedmacs', []))
-
-
-def print_disco(options, session, currmac, outhandler):
+def print_disco(options, session, currmac, outhandler, columns):
     procinfo = {}
     for tmpinfo in session.read('/discovery/by-mac/{0}'.format(currmac)):
 
         procinfo.update(tmpinfo)
-    record = [procinfo['nodename'], procinfo['modelnumber'],
-              procinfo['serialnumber'], procinfo['uuid'], dumpmacs(procinfo),
-              ','.join(procinfo['types']),
-              ','.join(sorted(procinfo['ipaddrs']))]
+    record = []
+    for col in columns:
+        rawcol = columnmapping[col]
+        rawval = procinfo.get(rawcol, '')
+        if isinstance(rawval, list):
+            record.append(','.join(rawval))
+        else:
+            record.append(str(rawval))
     if options.csv:
         csv.writer(sys.stdout).writerow(record)
     else:
@@ -183,12 +195,20 @@ def import_csv(options, session):
 
 def list_discovery(options, session):
     outhandler = None
+    if options.fields:
+        columns = []
+        for field in options.fields.split(','):
+            for cdt in columnmapping:
+                if cdt.lower() == field.lower():
+                    columns.append(cdt)
+    else:
+        columns = defcolumns
     if options.csv:
         csv.writer(sys.stdout).writerow(columns)
     else:
         outhandler = client.Tabulator(columns)
     for mac in list_matching_macs(options, session):
-        print_disco(options, session, mac, outhandler)
+        print_disco(options, session, mac, outhandler, columns)
     if outhandler:
         for row in outhandler.get_table():
             print(row)
@@ -286,6 +306,9 @@ def main():
     parser.add_option('-i', '--import', dest='importfile',
                       help='Import bulk assignment data from given CSV file',
                       metavar='IMPORT.CSV')
+    parser.add_option('-f', '--fields', dest='fields',
+                      help='Select fields for output',
+                      metavar='FIELDS')
     (options, args) = parser.parse_args()
     if len(args) == 0 or args[0] not in ('list', 'assign', 'rescan', 'clear'):
         parser.print_help()
