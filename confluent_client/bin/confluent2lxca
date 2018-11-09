@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+import csv
+import optparse
+import signal
+import sys
+import os
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+import confluent.sortutil as sortutil
+
+headers = '# Type,Serial Number,Current IP,Current username,Current password,New password,Recovery password,Switch enable password,New IPv4,IPv4 Subnet mask,IPv4 Default gateway,IPv4 DNS1,IPv4 DNS2,New IPv6,IPv6 Prefix,IPv6 Default gateway,IPv6 DNS1,IPv6 DNS2,Domain,Host name,Display name,Rack,Lowest Rack Unit,Height,Force,Stored credentials ID,Managed authentication,Group Name'.split(',')
+
+def lookupdata(data, key):
+    ret = data.get(key, {}).get('value', '')
+    if ret is None:
+        ret = ''
+    return ret
+
+def main():
+    argparser = optparse.OptionParser(
+    usage='''\n       %prog noderange -o bulkimport.csv
+             \n ''')
+    argparser.add_option('-o', '--output',
+                         help='File to write for bulk import into xClarity Administrator')
+    (options, args) = argparser.parse_args()
+    try:
+        noderange = args[0]
+    except IndexError:
+        argparser.print_help()
+        sys.exit(1)
+    if not options.output:
+        sys.stderr.write('Output file must be specified by -o\n')
+        sys.exit(1)
+    if 'XCCUSER' not in os.environ or 'XCCPASS' not in os.environ:
+        sys.stderr.write('Must specify XCCUSER and XCCPASS in environment variables\n')
+        sys.exit(1)
+    xccuser = os.environ['XCCUSER']
+    xccpass = os.environ['XCCPASS']
+    sess = client.Command()
+    databynode = {}
+    for res in sess.read('/noderange/{0}/attributes/all'.format(noderange)):
+        for node in res.get('databynode', {}):
+            if node not in databynode:
+                databynode[node] = {}
+            databynode[node].update(res['databynode'][node])
+    with open(options.output, 'w') as importfile:
+        bulkimport = csv.writer(importfile)
+        bulkimport.writerow(headers)
+        for node in sortutil.natural_sort(databynode):
+            data = databynode[node]
+            row = ['server', lookupdata(data, 'id.serial'), lookupdata(data, 'hardwaremanagement.manager'), xccuser, xccpass, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', node, lookupdata(data, 'location.rack'), lookupdata(data, 'location.u'), '', '', '','', '']
+            bulkimport.writerow(row)
+
+
+
+
+if __name__ == '__main__':
+    main()
