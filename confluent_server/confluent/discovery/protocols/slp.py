@@ -255,7 +255,7 @@ def _parse_attrlist(attrstr):
                 currattr = currattr.decode('utf-8')
                 attribs[currattr] = None
             else:
-                attrname, attrval = currattr.split('=')
+                attrname, attrval = currattr.split('=', 1)
                 attrname = attrname.decode('utf-8')
                 attribs[attrname] = []
                 for val in attrval.split(','):
