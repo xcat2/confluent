@@ -203,10 +203,12 @@ def list_discovery(options, session):
             for cdt in columnmapping:
                 if cdt.lower() == field.lower():
                     columns.append(cdt)
-                if options.order and options.order.lower() == cdt.lower():
-                    orderby = cdt
     else:
         columns = defcolumns
+    if options.order:
+        for field in columns:
+            if options.order.lower() == field.lower():
+                orderby = field
     if options.csv:
         csv.writer(sys.stdout).writerow(columns)
     else:
