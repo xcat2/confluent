@@ -52,6 +52,15 @@ def main():
             if node not in databynode:
                 databynode[node] = {}
             databynode[node].update(res['databynode'][node])
+    for res in sess.read(
+            '/noderange/{0}/configuration/management_controller/net_interfaces/management'.format(
+                    noderange)):
+        for node in res.get('databynode', {}):
+            currip = res['databynode'][node].get('ipv4_address', {}).get(
+                'value', '')
+            if currip:
+                databynode[node]['hardwaremanagement.manager'] = {
+                    'value': currip.split('/', 1)[0]}
     with open(options.output, 'w') as importfile:
         bulkimport = csv.writer(importfile)
         bulkimport.writerow(headers)
