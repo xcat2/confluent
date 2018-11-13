@@ -579,7 +579,8 @@ def detected(info):
             break
     else:  # no nodehandler, ignore for now
         return
-    if not handler.adequate(info) and info.get('protocol', None):
+    if (handler and not handler.NodeHandler.adequate(info) and
+            info.get('protocol', None)):
         eventlet.spawn_after(10, info['protocol'].fix_info, info,
                              safe_detected)
         return

@@ -23,7 +23,8 @@ import pyghmi.ipmi.oem.lenovo.imm as imm
 class NodeHandler(immhandler.NodeHandler):
     devname = 'XCC'
 
-    def adequate(self, info):
+    @classmethod
+    def adequate(cls, info):
         # We can sometimes receive a partially initialized SLP packet
         # This is not adequate for being satisfied
         return bool(info['attributes'])
