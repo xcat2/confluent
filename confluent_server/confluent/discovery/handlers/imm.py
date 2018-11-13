@@ -21,7 +21,8 @@ import struct
 class NodeHandler(bmchandler.NodeHandler):
     devname = 'IMM'
 
-    def adequate(self, info):
+    @classmethod
+    def adequate(cls, info):
         # We can sometimes receive a partially initialized SLP packet
         # This is not adequate for being satisfied
         return bool(info['attributes'])
