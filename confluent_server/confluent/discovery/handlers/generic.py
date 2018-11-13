@@ -40,6 +40,11 @@ class NodeHandler(object):
                 targsa = info['addresses'][0]
         self.ipaddr = targsa[0]
 
+    def adequate(self, info):
+        # Check if the referenced info is really enough, if false, a rescan
+        # may occur against the target in a short while
+        return True
+
     def scan(self):
         # Do completely passive things to enhance data.
         # Probe is permitted to for example attempt a login

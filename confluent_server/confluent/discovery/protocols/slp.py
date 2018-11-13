@@ -307,6 +307,15 @@ def _parse_attrs(data, parsed):
     parsed['attributes'] = _parse_attrlist(attrstr)
 
 
+def fix_info(info, handler):
+    if '_attempts' not in info:
+        info['_attempts'] = 10
+    if info['_attempts'] == 0:
+        return
+    info['_attempts'] -= 1
+    _add_attributes(info)
+    handler(info)
+
 def _add_attributes(parsed):
     attrq = _generate_attr_request(parsed['services'][0], parsed['xid'])
     target = None
@@ -383,7 +392,7 @@ def rescan(handler):
             handler(scanned)
 
 
-def snoop(handler):
+def snoop(handler, protocol=None):
     """Watch for SLP activity
 
     handler will be called with a dictionary of relevant attributes
@@ -392,7 +401,7 @@ def snoop(handler):
     :return:
     """
     tracelog = log.Logger('trace')
-    active_scan(handler)
+    active_scan(handler, protocol)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
@@ -469,13 +478,14 @@ def snoop(handler):
                 peerbymacaddress[mac]['xid'] = 1
                 _add_attributes(peerbymacaddress[mac])
                 peerbymacaddress[mac]['hwaddr'] = mac
+                peerbymacaddress[mac]['protocol'] = protocol
                 handler(peerbymacaddress[mac])
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)
 
 
-def active_scan(handler):
+def active_scan(handler, protocol=None):
     known_peers = set([])
     for scanned in scan():
         for addr in scanned['addresses']:
@@ -486,6 +496,7 @@ def active_scan(handler):
                 break
             known_peers.add(addr)
         else:
+            scanned['protocol'] = protocol
             handler(scanned)
 
 

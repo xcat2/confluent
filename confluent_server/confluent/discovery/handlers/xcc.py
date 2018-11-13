@@ -23,6 +23,11 @@ import pyghmi.ipmi.oem.lenovo.imm as imm
 class NodeHandler(immhandler.NodeHandler):
     devname = 'XCC'
 
+    def adequate(self, info):
+        # We can sometimes receive a partially initialized SLP packet
+        # This is not adequate for being satisfied
+        return bool(info['attributes'])
+
     def preconfig(self):
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):

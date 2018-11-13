@@ -72,7 +72,7 @@ def find_info_in_options(rq, optidx):
         return uuid, arch
     return uuid, arch
 
-def snoop(handler):
+def snoop(handler, protocol=None):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
     #TODO(jjohnson2): IP_PKTINFO, recvmsg to get the destination ip, per

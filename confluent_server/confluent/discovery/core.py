@@ -579,6 +579,10 @@ def detected(info):
             break
     else:  # no nodehandler, ignore for now
         return
+    if not handler.adequate(info) and info.get('protocol', None):
+        eventlet.spawn_after(10, info['protocol'].fix_info, info,
+                             safe_detected)
+        return
     try:
         snum = info['attributes']['enclosure-serial-number'][0].strip()
         if snum:
@@ -1159,7 +1163,7 @@ def rescan():
     if scanner:
         return
     else:
-        scanner = eventlet.spawn(slp.active_scan, safe_detected)
+        scanner = eventlet.spawn(slp.active_scan, safe_detected, slp)
 
 
 def start_detection():
@@ -1188,8 +1192,8 @@ def stop_autosense():
         autosensors.discard(watcher)
 
 def start_autosense():
-    autosensors.add(eventlet.spawn(slp.snoop, safe_detected))
-    autosensors.add(eventlet.spawn(pxe.snoop, safe_detected))
+    autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
+    autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe))
 
 
 nodes_by_fprint = {}
