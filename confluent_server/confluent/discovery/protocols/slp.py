@@ -295,9 +295,11 @@ def _parse_attrlist(attrstr):
     return attribs
 
 
-def _parse_attrs(data, parsed):
+def _parse_attrs(data, parsed, xid=None):
     headinfo = _parse_slp_header(data)
-    if headinfo['function'] != 7 or headinfo['xid'] != parsed['xid']:
+    if xid is None:
+        xid = parsed['xid']
+    if headinfo['function'] != 7 or headinfo['xid'] != xid:
         return
     payload = headinfo['payload']
     if struct.unpack('!H', bytes(payload[:2]))[0] != 0:
@@ -317,7 +319,8 @@ def fix_info(info, handler):
     handler(info)
 
 def _add_attributes(parsed):
-    attrq = _generate_attr_request(parsed['services'][0], parsed['xid'])
+    xid = parsed.get('xid', 42)
+    attrq = _generate_attr_request(parsed['services'][0], xid)
     target = None
     # prefer reaching out to an fe80 if present, to be highly robust
     # in face of network changes
@@ -338,7 +341,7 @@ def _add_attributes(parsed):
     net.sendall(attrq)
     rsp = net.recv(8192)
     net.close()
-    _parse_attrs(rsp, parsed)
+    _parse_attrs(rsp, parsed, xid)
 
 
 def query_srvtypes(target):
