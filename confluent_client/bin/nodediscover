@@ -170,9 +170,7 @@ def import_csv(options, session):
             if not datum_complete(nodedatum):
                 sys.exit(1)
             if not search_record(nodedatum, options, session):
-                list(session.update('/discovery/rescan',
-                                    {'rescan': 'start'}))
-                time.sleep(5)
+                blocking_scan(session)
             if not search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
@@ -285,6 +283,10 @@ def assign_discovery(options, session):
         else:
             print(repr(res))
 
+def blocking_scan(session):
+    list(session.update('/discovery/rescan', {'rescan': 'start'}))
+    while(list(session.read('/discovery/rescan'))[0].get('scanning', False)):
+        time.sleep(0.5)
 
 
 def main():
@@ -338,8 +340,8 @@ def main():
     if args[0] == 'assign':
         assign_discovery(options, session)
     if args[0] == 'rescan':
-        list(session.update('/discovery/rescan', {'rescan': 'start'}))
-        print("Rescan initiated")
+        blocking_scan(session)
+        print("Rescan complete")
 
 
 if __name__ == '__main__':
