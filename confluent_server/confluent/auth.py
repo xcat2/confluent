@@ -158,20 +158,13 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         # but here there's no need for that
         eventlet.sleep(0.5)
     credobj = Credentials(user, passphrase)
-    try:
-        pammy = PAM.pam()
-        pammy.start(_pamservice, user, credobj.pam_conv)
-        pammy.authenticate()
-        pammy.acct_mgmt()
-        del pammy
-        return authorize(user, element, tenant, skipuserobj=False)
-    except NameError:
-        pass
-    except PAM.error:
-        if credobj.haspam:
-            return None
+    cfm = configmanager.ConfigManager(tenant, username=user)
+    ucfg = cfm.get_user(user)
+    if ucfg is None:
+        eventlet.sleep(0.05)
+        return None
     if (user, tenant) in _passcache:
-        if passphrase == _passcache[(user, tenant)]:
+        if hashlib.sha256(passphrase).digest() == _passcache[(user, tenant)]:
             return authorize(user, element, tenant)
         else:
             # In case of someone trying to guess,
@@ -179,38 +172,48 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
             # invalidate cache and force the slower check
             del _passcache[(user, tenant)]
             return None
-    cfm = configmanager.ConfigManager(tenant, username=user)
-    ucfg = cfm.get_user(user)
-    if ucfg is None or 'cryptpass' not in ucfg:
-        eventlet.sleep(0.05)  # stall even on test for existence of a username
-        return None
-    _passchecking[(user, tenant)] = True
-    # TODO(jbjohnso): WORKERPOOL
-    # PBKDF2 is, by design, cpu intensive
-    # throw it at the worker pool when implemented
-    # maybe a distinct worker pool, wondering about starving out non-auth stuff
-    salt, crypt = ucfg['cryptpass']
-    # execute inside tpool to get greenthreads to give it a special thread
-    # world
-    #TODO(jbjohnso): util function to generically offload a call
-    #such a beast could be passed into pyghmi as a way for pyghmi to
-    #magically get offload of the crypto functions without having
-    #to explicitly get into the eventlet tpool game
-    global authworkers
-    global authcleaner
-    if authworkers is None:
-        authworkers = multiprocessing.Pool(processes=1)
-    else:
-        authcleaner.cancel()
-    authcleaner = eventlet.spawn_after(30, _clean_authworkers)
-    crypted = eventlet.tpool.execute(_do_pbkdf, passphrase, salt)
-    del _passchecking[(user, tenant)]
-    eventlet.sleep(0.05)  # either way, we want to stall so that client can't
+    if 'cryptpass' in ucfg:
+        _passchecking[(user, tenant)] = True
+        # TODO(jbjohnso): WORKERPOOL
+        # PBKDF2 is, by design, cpu intensive
+        # throw it at the worker pool when implemented
+        # maybe a distinct worker pool, wondering about starving out non-auth stuff
+        salt, crypt = ucfg['cryptpass']
+        # execute inside tpool to get greenthreads to give it a special thread
+        # world
+        # TODO(jbjohnso): util function to generically offload a call
+        # such a beast could be passed into pyghmi as a way for pyghmi to
+        # magically get offload of the crypto functions without having
+        # to explicitly get into the eventlet tpool game
+        global authworkers
+        global authcleaner
+        if authworkers is None:
+            authworkers = multiprocessing.Pool(processes=1)
+        else:
+            authcleaner.cancel()
+        authcleaner = eventlet.spawn_after(30, _clean_authworkers)
+        crypted = eventlet.tpool.execute(_do_pbkdf, passphrase, salt)
+        del _passchecking[(user, tenant)]
+        eventlet.sleep(
+            0.05)  # either way, we want to stall so that client can't
         # determine failure because there is a delay, valid response will
         # delay as well
-    if crypt == crypted:
-        _passcache[(user, tenant)] = passphrase
-        return authorize(user, element, tenant)
+        if crypt == crypted:
+            _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
+            return authorize(user, element, tenant)
+    try:
+        pammy = PAM.pam()
+        pammy.start(_pamservice, user, credobj.pam_conv)
+        pammy.authenticate()
+        pammy.acct_mgmt()
+        del pammy
+        _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
+        return authorize(user, element, tenant, skipuserobj=False)
+    except NameError:
+        pass
+    except PAM.error:
+        pass
+    eventlet.sleep(0.05)  # stall even on test for existence of a username
     return None
 
 
