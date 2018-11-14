@@ -40,6 +40,9 @@ true
 %post
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
 if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
+if [ ! -e /etc/pam.d/confluent ]; then
+    ln -s /etc/pam.d/sshd /etc/pam.d/confluent
+fi
 true
 
 %clean

@@ -22,7 +22,6 @@ setup(
                       'pyghmi>=1.0.44'],
     scripts=['bin/confluent', 'bin/confluentdbutil', 'bin/collective'],
     data_files=[('/etc/init.d', ['sysvinit/confluent']),
-                ('/etc/pam.d/', ['pam/confluent']),
                 ('/usr/lib/sysctl.d', ['sysctl/confluent.conf']),
                 ('/usr/lib/systemd/system', ['systemd/confluent.service']),
 		('/opt/confluent/lib/python/confluent/plugins/console/', [])],
