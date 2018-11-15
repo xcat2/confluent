@@ -103,7 +103,8 @@ def createstorage(noderange, options, args):
     names = options.name
     if names is None:
         names = ''
-    parms = {'disks': options.disks, 'raidlevel': options.raidlevel}
+    parms = {'disks': options.disks, 'raidlevel': options.raidlevel,
+             'name': options.names}
     if options.size:
         parms['size'] = options.size
     for rsp in session.create(
