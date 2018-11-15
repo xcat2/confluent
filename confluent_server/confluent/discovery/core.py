@@ -394,8 +394,15 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
                 'Unable to {0} to {1}'.format(operation,
                                               '/'.join(pathcomponents)))
         handler = info['handler'].NodeHandler(info, configmanager)
-        eval_node(configmanager, handler, info, inputdata['node'],
-                  manual=True)
+        try:
+            eval_node(configmanager, handler, info, inputdata['node'],
+                      manual=True)
+        except Exception as e:
+            # or... incorrect passworod provided..
+            if 'Incorrect password' in str(e) or 'Unauthorized name' in str(e):
+                return [msg.ConfluentTargetInvalidCredentials(
+                    inputdata['node'])]
+            raise
         return [msg.AssignedResource(inputdata['node'])]
     elif operation == 'delete':
         mac = _get_mac_from_query(pathcomponents)
