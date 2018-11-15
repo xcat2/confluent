@@ -36,6 +36,7 @@ alias nodereseat='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export C
 alias noderun='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; noderun'
 alias nodesensors='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesensors'
 alias nodesetboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesetboot'
+alias nodestorage='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodestorage'
 alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeshell'
 
 
