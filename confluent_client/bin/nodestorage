@@ -125,7 +125,10 @@ def deletestorage(noderange, options, args):
     for rsp in session.delete(
             '/noderange/{0}/configuration/storage/volumes/{1}'.format(
                 noderange, names)):
-        print(repr(rsp))
+        if 'deleted' in rsp:
+            print('Deleted: {0}'.format(rsp['deleted']))
+        else:
+            print(repr(rsp))
 
 
 def setstorage(noderange, options, args):
