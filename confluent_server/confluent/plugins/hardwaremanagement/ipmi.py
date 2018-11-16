@@ -969,6 +969,11 @@ class IpmiHandler(object):
         vols = []
         thedisks = None
         currcfg = self.ipmicmd.get_storage_configuration()
+        currnames = []
+        for arr in currcfg.arrays:
+            arrname = '{0}-{1}'.format(*arr.id)
+            for vol in arr.volumes:
+                currnames.append(vol.name)
         disks = []
         vols = []
         vol = self.inputdata.inputbynode[self.node][0]
@@ -993,7 +998,19 @@ class IpmiHandler(object):
         newcfg = storage.ConfigSpec(
             arrays=(storage.Array(raid=raidlvl, disks=disks, volumes=vols),))
         self.ipmicmd.apply_storage_configuration(newcfg)
-        return self._show_storage(storelem)
+        for vol in self.inputdata.inputbynode[self.node]:
+            if vol['name'] is None:
+                newcfg = self.ipmicmd.get_storage_configuration()
+                for arr in newcfg.arrays:
+                    arrname = '{0}-{1}'.format(*arr.id)
+                    for vol in arr.volumes:
+                        if vol.name not in currnames:
+                            self.output.put(
+                                msg.Volume(self.node, vol.name, vol.size,
+                                           vol.status, arrname))
+                return
+            else:
+                self._show_storage(storelem[:1] + [vol['name']])
 
     def _update_storage(self, storelem):
         if storelem[0] == 'disks':
