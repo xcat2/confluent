@@ -135,6 +135,14 @@ def deletestorage(noderange, options, args):
                 noderange, names)):
         if 'deleted' in rsp:
             print('Deleted: {0}'.format(rsp['deleted']))
+        elif 'databynode' in rsp:
+            for node in rsp['databynode']:
+                if 'error' in rsp['databynode'][node]:
+                    sys.stderr.write('{0}: {1}\n'.format(
+                        node, rsp['databynode'][node]['error']))
+                else:
+                    sys.stderr.write('{0}: {1}\n'.format(
+                        node, repr(rsp['databynode'][node])))
         else:
             print(repr(rsp))
 

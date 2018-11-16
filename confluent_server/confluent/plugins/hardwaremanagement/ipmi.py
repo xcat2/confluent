@@ -955,11 +955,17 @@ class IpmiHandler(object):
         volname = storelem[-1]
         curr = self.ipmicmd.get_storage_configuration()
         volumes = []
+        volsfound = False
         toremove = storage.ConfigSpec(arrays=[storage.Array(volumes=volumes)])
         for pool in curr.arrays:
             for vol in pool.volumes:
                 if simplify_name(vol.name) == volname:
+                    volsfound = True
                     volumes.append(vol)
+        if not volsfound:
+            self.output.put(msg.ConfluentTargetNotFound(
+                self.node, "No volume named '{0}' found".format(volname)))
+            return
         self.ipmicmd.remove_storage_configuration(toremove)
         self.output.put(msg.DeletedResource(volname))
 
