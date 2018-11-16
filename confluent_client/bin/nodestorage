@@ -47,19 +47,25 @@ def mbtohuman(mb):
 def showstorage(noderange, options, args):
     global exitcode
     session = client.Command()
-    storagebynode = {}
     disks = {}
     arrays = {}
     volumes = {}
     scfg = session.read('/noderange/{0}/configuration/storage/all'.format(
         noderange))
+    _print_cfg(scfg)
+
+
+def _print_cfg(scfg):
+    global exitcode
+    storagebynode = {}
     for e in scfg:
         if 'error' in e:
             sys.stderr.write(e['error'] + '\n')
             exitcode = e.get('errorcode', 1)
         for node in e.get('databynode', {}):
             if node not in storagebynode:
-                storagebynode[node] = {'disks': [], 'arrays': [], 'volumes': []}
+                storagebynode[node] = {'disks': [], 'arrays': [],
+                                       'volumes': []}
             curr = e['databynode'][node]
             storagebynode[node][curr['type'] + 's'].append(curr)
     for node in storagebynode:
@@ -68,11 +74,11 @@ def showstorage(noderange, options, args):
             print('{0}: Disk {1} Description: {2}'.format(
                 node, disk['name'], disk['description']))
             print('{0}: Disk {1} State: {2}'.format(node, disk['name'],
-                                               disk['state']))
+                                                    disk['state']))
             print('{0}: Disk {1} FRU: {2}'.format(node, disk['name'],
                                                   disk['fru']))
             print('{0}: Disk {1} Serial Number: {2}'.format(node, disk['name'],
-                                                       disk['serial']))
+                                                            disk['serial']))
             if disk['array']:
                 print('{0}: Disk {1} Array: {2}'.format(node, disk['name'],
                                                         disk['array']))
@@ -85,15 +91,17 @@ def showstorage(noderange, options, args):
                                                     arr['raid']))
             print('{0}: Array {1} Disks: {2}'.format(node, arr['id'], ','.join(
                 arr['disks'])))
-            print('{0}: Array {1} Volumes: {2}'.format(node, arr['id'], ','.join(
-                arr['volumes'])))
+            print(
+                '{0}: Array {1} Volumes: {2}'.format(node, arr['id'], ','.join(
+                    arr['volumes'])))
         for vol in storagebynode[node]['volumes']:
             print('{0}: Volume {1}: Size: {2}'.format(node, vol['name'],
-                                                       mbtohuman(vol['size'])))
+                                                      mbtohuman(vol['size'])))
             print('{0}: Volume {1}: State: {2}'.format(node, vol['name'],
                                                        vol['state']))
             print('{0}: Volume {1}: Array {2}'.format(node, vol['name'],
                                                       vol['array']))
+
 
 def createstorage(noderange, options, args):
     if options.raidlevel is None or options.disks is None:
@@ -104,13 +112,12 @@ def createstorage(noderange, options, args):
     if names is None:
         names = ''
     parms = {'disks': options.disks, 'raidlevel': options.raidlevel,
-             'name': options.names}
+             'name': names}
     if options.size:
         parms['size'] = options.size
-    for rsp in session.create(
+    _print_cfg(session.create(
             '/noderange/{0}/configuration/storage/volumes/{1}'.format(
-                noderange, names), parms):
-        print(repr(rsp))
+                noderange, names), parms))
 
 
 def deletestorage(noderange, options, args):
