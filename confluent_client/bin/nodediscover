@@ -44,6 +44,8 @@ columnmapping = {
     'Mac': 'macs',
     'Switch': 'switch',
     'Port': 'port',
+    'Advertised IP': 'otheripaddrs',
+    'Other IP': 'otheripaddrs',
 }
 
 
@@ -208,7 +210,8 @@ def list_discovery(options, session):
         columns = []
         for field in options.fields.split(','):
             for cdt in columnmapping:
-                if cdt.lower() == field.lower():
+                if cdt.lower().replace(
+                        ' ', '') == field.lower().replace(' ', ''):
                     columns.append(cdt)
     else:
         columns = defcolumns

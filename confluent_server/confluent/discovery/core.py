@@ -211,6 +211,8 @@ def send_discovery_datum(info):
         if infotype in servicenames:
             types.append(servicenames[infotype])
     yield msg.KeyValueData({'types': types})
+    if 'otheraddresses' in info:
+        yield msg.KeyValueData({'otheripaddrs': list(info['otheraddresses'])})
 
 
 def _info_matches(info, criteria):
@@ -637,6 +639,9 @@ def detected(info):
     uuid = info.get('uuid', None)
     if uuid_is_valid(uuid):
         known_uuids[uuid][info['hwaddr']] = info
+    info['otheraddresses'] = set([])
+    for i4addr in info.get('attributes', {}).get('ipv4-address', []):
+        info['otheraddresses'].add(i4addr)
     if handler and handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
             log.log(
