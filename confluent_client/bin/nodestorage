@@ -110,7 +110,7 @@ def createstorage(noderange, options, args):
     session = client.Command()
     names = options.name
     if names is None:
-        names = ''
+        names = ''.join(args)
     parms = {'disks': options.disks, 'raidlevel': options.raidlevel,
              'name': names}
     if options.size:
