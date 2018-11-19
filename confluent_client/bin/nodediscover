@@ -92,7 +92,7 @@ def process_header(header):
         elif datum in ('bmc', 'imm', 'xcc'):
             fields.append('hardwaremanagement.manager')
         elif datum in ('bmc gateway', 'xcc gateway', 'imm gateway'):
-            fields.append('net.bmc.gateway')
+            fields.append('net.bmc.ipv4_gateway')
         elif datum in ('bmcuser', 'username', 'user'):
             fields.append('secret.hardwaremanagementuser')
         elif datum in ('bmcpass', 'password', 'pass'):
