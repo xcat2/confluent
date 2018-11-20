@@ -49,6 +49,7 @@ import select
 import shlex
 import signal
 import socket
+import struct
 import sys
 import time
 try:
@@ -576,11 +577,18 @@ def fullpath_target(currpath, forcepath=False):
         ntarget += '/'
     return ntarget
 
+def do_resize(a, b):
+    if not inconsole:
+        return
+    height, width = struct.unpack(
+        'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
+
 
 def startconsole(nodename):
     global inconsole
     global consolename
     global didconsole
+    signal.signal(signal.SIGWINCH, do_resize)
     didconsole = True
     consolename = nodename
     tty.setraw(sys.stdin.fileno())
