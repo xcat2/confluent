@@ -496,6 +496,8 @@ def resourcehandler_backend(env, start_response):
             skipreplay = False
             if 'skipreplay' in querydict and querydict['skipreplay']:
                 skipreplay = True
+            width = querydict.get('width', 80)
+            height = querydict.get('height', 24)
             datacallback = None
             async = None
             if 'HTTP_CONFLUENTASYNCID' in env:
@@ -507,13 +509,13 @@ def resourcehandler_backend(env, start_response):
                     consession = shellserver.ShellSession(
                         node=nodename, configmanager=cfgmgr,
                         username=authorized['username'], skipreplay=skipreplay,
-                        datacallback=datacallback
+                        datacallback=datacallback, width=width, height=height
                     )
                 else:
                     consession = consoleserver.ConsoleSession(
                         node=nodename, configmanager=cfgmgr,
                         username=authorized['username'], skipreplay=skipreplay,
-                        datacallback=datacallback
+                        datacallback=datacallback, width=width, height=height
                     )
             except exc.NotFoundException:
                 start_response("404 Not found", headers)
