@@ -372,6 +372,7 @@ class ConsoleHandler(object):
                               'error': self.error})
             return
         self.send_break = self._console.send_break
+        self.resize = self._console.resize
         if self._attribwatcher:
             self.cfgmgr.remove_watcher(self._attribwatcher)
             self._attribwatcher = None
@@ -739,6 +740,10 @@ class ProxyConsole(object):
     def reopen(self):
         tlvdata.send(self.remote, {'operation': 'reopen'})
 
+    def resize(self, width, height):
+        tlvdata.send(self.remote, {'operation': 'resize', 'width': width,
+                                   'height': height})
+
 
 # this represents some api view of a console handler.  This handles things like
 # holding the caller specific queue data, for example, when http api should be
@@ -806,6 +811,9 @@ class ConsoleSession(object):
         """Send break to remote system
         """
         self.conshdl.send_break()
+
+    def resize(self, width, height):
+        self.conshdl.resize(width, height)
 
     def get_buffer_age(self):
         """Get the age in seconds of the buffered data

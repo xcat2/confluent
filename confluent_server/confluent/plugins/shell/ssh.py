@@ -82,6 +82,9 @@ class SshShell(conapi.Console):
         self.password = password
         self.inputmode = 0  # 0 = username, 1 = password...
 
+    def resize(self, width, height):
+        self.shell.resize_pty(width=width, height=height)
+
     def recvdata(self):
         while self.connected:
             pendingdata = self.shell.recv(8192)

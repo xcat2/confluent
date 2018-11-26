@@ -582,6 +582,8 @@ def do_resize(a, b):
         return
     height, width = struct.unpack(
         'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
+    tlvdata.send(session.connection, {'operation': 'resize', 'width': width,
+                                      'height': height})
 
 
 def startconsole(nodename):

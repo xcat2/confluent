@@ -41,6 +41,11 @@ class Console(object):
         the remote console"""
         return
 
+    def resize(self, width, height):
+        """This function is responsible for relaying resize request from
+        client terminal to remote console"""
+        return
+
     def ping(self):
         """This function is a hint to the console plugin that now would be a
         nice time to assess health of console connection.  Plugins that see

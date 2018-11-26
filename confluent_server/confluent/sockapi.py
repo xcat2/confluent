@@ -291,6 +291,9 @@ def term_interact(authdata, authname, ccons, cfm, connection, consession,
             elif data['operation'] == 'reopen':
                 consession.reopen()
                 continue
+            elif data['operation'] == 'resize':
+                consession.resize(width=data['width'], height=data['height'])
+                continue
             else:
                 try:
                     process_request(connection, data, cfm, authdata, authname,
