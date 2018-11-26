@@ -80,9 +80,16 @@ class SshShell(conapi.Console):
         self.nodeconfig = config
         self.username = username
         self.password = password
+        self.connected = False
+        self.width = 80
+        self.height = 24
         self.inputmode = 0  # 0 = username, 1 = password...
 
     def resize(self, width, height):
+        self.width = width
+        self.height = height
+        if not self.connected:
+            return
         self.shell.resize_pty(width=width, height=height)
 
     def recvdata(self):
@@ -149,7 +156,8 @@ class SshShell(conapi.Console):
             return
         self.inputmode = 2
         self.connected = True
-        self.shell = self.ssh.invoke_shell()
+        self.shell = self.ssh.invoke_shell(width=self.width,
+                                           height=self.height)
         self.rxthread = eventlet.spawn(self.recvdata)
 
     def write(self, data):

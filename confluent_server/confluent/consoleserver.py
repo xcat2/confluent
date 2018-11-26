@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2017 Lenovo
+# Copyright 2017-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -145,8 +145,9 @@ class ConsoleHandler(object):
     _genwatchattribs = frozenset(('console.method', 'console.logging',
                                   'collective.manager'))
 
-    def __init__(self, node, configmanager):
+    def __init__(self, node, configmanager, width=80, height=24):
         self.clearpending = False
+        self.initsize = (width, height)
         self._dologging = True
         self._is_local = True
         self._isondemand = False
@@ -384,6 +385,7 @@ class ConsoleHandler(object):
             self._attribwatcher = self.cfgmgr.watch_attributes(
                 (self.node,), attribstowatch, self._attribschanged)
         try:
+            self.resize(width=self.initsize[0], height=self.initsize[1])
             self._console.connect(self.get_console_output)
         except exc.TargetEndpointBadCredentials:
             self.clearbuffer()
@@ -629,17 +631,20 @@ def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
-def connect_node(node, configmanager, username=None, direct=True):
+def connect_node(node, configmanager, username=None, direct=True, width=80,
+                 height=24):
     attrval = configmanager.get_node_attributes(node, 'collective.manager')
     myc = attrval.get(node, {}).get('collective.manager', {}).get(
         'value', None)
     myname = collective.get_myname()
     if myc and myc != collective.get_myname() and direct:
         minfo = configmodule.get_collective_member(myc)
-        return ProxyConsole(node, minfo, myname, configmanager, username)
+        return ProxyConsole(node, minfo, myname, configmanager, username,
+                            width, height)
     consk = (node, configmanager.tenant)
     if consk not in _handled_consoles:
-        _handled_consoles[consk] = ConsoleHandler(node, configmanager)
+        _handled_consoles[consk] = ConsoleHandler(node, configmanager, width,
+                                                  height)
     return _handled_consoles[consk]
 
 # A stub console handler that just passes through to a remote confluent
@@ -768,7 +773,7 @@ class ConsoleSession(object):
     """
 
     def __init__(self, node, configmanager, username, datacallback=None,
-                 skipreplay=False, direct=True):
+                 skipreplay=False, direct=True, width=80, height=24):
         self.registered = False
         self.tenant = configmanager.tenant
         if not configmanager.is_node(node):
@@ -778,6 +783,8 @@ class ConsoleSession(object):
         self.configmanager = configmanager
         self.direct = direct  # true if client is directly connected versus
                               # relay
+        self.width = width
+        self.height = height
         self.connect_session()
         self.registered = True
         self._evt = None
@@ -806,7 +813,8 @@ class ConsoleSession(object):
         between console and shell.
         """
         self.conshdl = connect_node(self.node, self.configmanager,
-                                    self.username, self.direct)
+                                    self.username, self.direct, self.width,
+                                    self.height)
     def send_break(self):
         """Send break to remote system
         """

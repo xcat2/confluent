@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -87,12 +87,13 @@ class ShellSession(consoleserver.ConsoleSession):
     """
 
     def __init__(self, node, configmanager, username, datacallback=None,
-                 skipreplay=False, sessionid=None):
+                 skipreplay=False, sessionid=None, width=80, height=24):
         self.sessionid = sessionid
         self.configmanager = configmanager
         self.node = node
         super(ShellSession, self).__init__(node, configmanager, username,
-                                           datacallback, skipreplay)
+                                           datacallback, skipreplay,
+                                           width=width, height=height)
 
     def connect_session(self):
         global activesessions
@@ -105,7 +106,7 @@ class ShellSession(consoleserver.ConsoleSession):
                 self.sessionid += 1
             self.sessionid = str(self.sessionid)
         if self.sessionid not in activesessions[(tenant, self.node, self.username)]:
-            activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager)
+            activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager, width=self.width, height=self.height)
         self.conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
 
     def destroy(self):

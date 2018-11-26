@@ -2,7 +2,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -435,6 +435,10 @@ def do_command(command, server):
         currconsole = targpath
         startrequest = {'operation': 'start', 'path': targpath,
                         'parameters': {}}
+        height, width = struct.unpack(
+            'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
+        startrequest['parameters']['width'] = width
+        startrequest['parameters']['height'] = height
         for param in argv[2:]:
             (parmkey, parmval) = param.split("=")
             startrequest['parameters'][parmkey] = parmval

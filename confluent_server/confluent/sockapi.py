@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -239,7 +239,8 @@ def start_proxy_term(connection, cert, request):
     consession = consoleserver.ConsoleSession(
         node=request['node'], configmanager=cfm, username=request['user'],
         datacallback=ccons.sendall, skipreplay=request['skipreplay'],
-        direct=False)
+        direct=False, width=request.get('width', 80), height=request.get(
+            'height', 24))
     term_interact(None, None, ccons, None, connection, consession, None)
 
 def start_term(authname, cfm, connection, params, path, authdata, skipauth):
@@ -263,7 +264,8 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
         consession = shellserver.ShellSession(
             node=node, configmanager=cfm, username=authname,
             datacallback=ccons.sendall, skipreplay=skipreplay,
-            sessionid=sessionid)
+            sessionid=sessionid, width=params.get('width', 80),
+            height=params.get('height', 24))
     else:
         raise exc.InvalidArgumentException('Invalid path {0}'.format(path))
     if consession is None:
