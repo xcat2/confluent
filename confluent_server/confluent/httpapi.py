@@ -550,6 +550,9 @@ def resourcehandler_backend(env, start_response):
         elif 'action' in querydict:
             if querydict['action'] == 'break':
                 consolesessions[querydict['session']]['session'].send_break()
+            elif querydict['action'] == 'resize':
+                consolesessions[querydict['session']]['session'].resize(
+                    width=querydict['width'], height=querydict['height'])
             elif querydict['action'] == 'reopen':
                 consolesessions[querydict['session']]['session'].reopen()
             else:
