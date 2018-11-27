@@ -76,17 +76,17 @@ the nodes.
   Operate against the system with the specified MAC
   address
 * `-f FIELDS`, `--fields=FIELDS`:
-  Request a custom set of fields.  The available fields are:
-  * Node: The node name if a correlation has been identified
-  * Model: The model number
-  * Serial: The serial number
-  * UUID: The UUID as it should appear in DMI
-  * Type: Device type (e.g. lenovo-xcc, pxe-client, etc)
-  * IP: The confirmed working IP addresses associated with the record
-  * Mac: Mac address of the relevant network interface
-  * Switch: The nearest detected switch to the entry
-  * Port: Port of the switch that most closely connects to the network interface
-  * Advertised IP: IP addresses that may not have been confirmed, but are advertised
+  Request a custom set of fields.  The available fields are:  
+  * Node: The node name if a correlation has been identified  
+  * Model: The model number  
+  * Serial: The serial number  
+  * UUID: The UUID as it should appear in DMI  
+  * Type: Device type (e.g. lenovo-xcc, pxe-client, etc)  
+  * IP: The confirmed working IP addresses associated with the record  
+  * Mac: Mac address of the relevant network interface  
+  * Switch: The nearest detected switch to the entry  
+  * Port: Port of the switch that most closely connects to the network interface  
+  * Advertised IP: IP addresses that may not have been confirmed, but are advertised  
 * `-o ORDER`, `--order=ORDER`:
   Order output by given field.  Field names are the same as documented in the -f argument.
 * `-t TYPE`, `--type=TYPE`:
