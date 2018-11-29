@@ -63,7 +63,5 @@ def main():
                 importfile.write('{0}\n'.format(node))
 
 
-
-
 if __name__ == '__main__':
     main()
