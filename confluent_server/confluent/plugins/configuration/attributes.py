@@ -100,7 +100,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
 def retrieve_nodes(nodes, element, configmanager, inputdata):
     attributes = configmanager.get_node_attributes(nodes)
     if element[-1] == 'all':
-        for node in nodes:
+        for node in util.natural_sort(nodes):
             theattrs = set(allattributes.node).union(set(attributes[node]))
             for attribute in sorted(theattrs):
                 if attribute in attributes[node]:  # have a setting for it
@@ -125,7 +125,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                         allattributes.node.get(
                             attribute, {}).get('description', ''))
     elif element[-1] == 'current':
-        for node in sorted(list(attributes)):
+        for node in util.natural_sort(list(attributes)):
             for attribute in sorted(attributes[node].iterkeys()):
                 currattr = attributes[node][attribute]
                 try:
