@@ -349,21 +349,32 @@ def perform_requests(operator, nodes, element, cfg, inputdata, realop):
     cfg.decrypt = cryptit
     resultdata = queue.LightQueue()
     livingthreads = set([])
+    numnodes = len(nodes)
     for node in nodes:
         livingthreads.add(_ipmiworkers.spawn(
             perform_request, operator, node, element, configdata, inputdata,
             cfg, resultdata, realop))
     while livingthreads:
         try:
+            bundle = []
             datum = resultdata.get(timeout=10)
             while datum:
                 if datum != 'Done':
                     if isinstance(datum, Exception):
                         raise datum
-                    yield datum
-                datum = resultdata.get_nowait()
+                    if hasattr(datum, 'kvpairs') and len(datum.kvpairs) == 1:
+                        bundle.append((datum.kvpairs.keys()[0], datum))
+                        numnodes -= 1
+                    else:
+                        yield datum
+                timeout = 0.1 if numnodes else 0.001
+                datum = resultdata.get(timeout=timeout)
         except queue.Empty:
             pass
+        finally:
+            for datum in sorted(
+                    bundle, key=lambda x: util.naturalize_string(x[0])):
+                yield datum[1]
         for t in list(livingthreads):
             if t.dead:
                 livingthreads.discard(t)
