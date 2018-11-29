@@ -48,19 +48,24 @@ def main():
             databynode[node].update(res['databynode'][node])
     nodesbygroup = {}
     with open(options.output, 'w') as importfile:
+        needempty = False
         for node in sortutil.natural_sort(databynode):
             data = databynode[node]
             if not data.get('groups', []):
                 importfile.write(node + '\n')
+                needempty = True
             for g in data.get('groups', []):
                 if g not in nodesbygroup:
                     nodesbygroup[g] = set([node])
                 else:
                     nodesbygroup[g].add(node)
+        if needempty:
+            importfile.write('\n')
         for group in sortutil.natural_sort(nodesbygroup):
             importfile.write('[{0}]\n'.format(group))
             for node in sortutil.natural_sort(nodesbygroup[group]):
                 importfile.write('{0}\n'.format(node))
+            importfile.write('\n')
 
 
 if __name__ == '__main__':
