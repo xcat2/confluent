@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+import csv
+import optparse
+import signal
+import sys
+import os
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+import confluent.sortutil as sortutil
+
+
+def lookupdata(data, key):
+    ret = data.get(key, {}).get('value', '')
+    if ret is None:
+        ret = ''
+    return ret
+
+def main():
+    argparser = optparse.OptionParser(
+    usage='''\n       %prog noderange -o ansible.hosts
+             \n ''')
+    argparser.add_option('-o', '--output',
+                         help='Ansible hosts file')
+    (options, args) = argparser.parse_args()
+    try:
+        noderange = args[0]
+    except IndexError:
+        argparser.print_help()
+        sys.exit(1)
+    if not options.output:
+        sys.stderr.write('Output file must be specified by -o\n')
+        sys.exit(1)
+    sess = client.Command()
+    databynode = {}
+    for res in sess.read('/noderange/{0}/attributes/all'.format(noderange)):
+        for node in res.get('databynode', {}):
+            if node not in databynode:
+                databynode[node] = {}
+            databynode[node].update(res['databynode'][node])
+    nodesbygroup = {}
+    with open(options.output, 'w') as importfile:
+        needempty = False
+        for node in sortutil.natural_sort(databynode):
+            data = databynode[node]
+            if not data.get('groups', []):
+                importfile.write(node + '\n')
+                needempty = True
+            for g in data.get('groups', []):
+                if g not in nodesbygroup:
+                    nodesbygroup[g] = set([node])
+                else:
+                    nodesbygroup[g].add(node)
+        if needempty:
+            importfile.write('\n')
+        for group in sortutil.natural_sort(nodesbygroup):
+            importfile.write('[{0}]\n'.format(group))
+            for node in sortutil.natural_sort(nodesbygroup[group]):
+                importfile.write('{0}\n'.format(node))
+            importfile.write('\n')
+
+
+if __name__ == '__main__':
+    main()
