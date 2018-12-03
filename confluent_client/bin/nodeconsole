@@ -17,7 +17,14 @@
 
 import optparse
 import os
+import subprocess
 import sys
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+import confluent.client as client
+import confluent.sortutil as sortutil
 
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
@@ -26,9 +33,44 @@ argparser = optparse.OptionParser(
            "ctrl-'e', then release ctrl, then 'c', then '?' for a full list. "
            "For example, ctrl-'e', then 'c', then '.' will exit the current "
            "console")
+argparser.add_option('-t', '--tile', action='store_true', default=False,
+                     help='Tile console windows in the terminal')
+argparser.add_option('-m', '--mintime', action='store_true', default=False,
+                     help='Minimum time to be open (pause for input if early exit)')
 (options, args) = argparser.parse_args()
 if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
-os.execl(confettypath, confettypath, 'start',
-         '/nodes/{0}/console/session'.format(args[0]))
+if options.tile:
+    nodes = []
+    sess = client.Command()
+    for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
+        node = res.get('item', {}).get('href', '/').replace('/', '')
+        if not node:
+            sys.stderr.write(res.get('error', repr(res)) + '\n')
+            sys.exit(1)
+        nodes.append(node)
+    initial = True
+    pane = 0
+    for node in sortutil.natural_sort(nodes):
+        if initial:
+            initial = False
+            subprocess.call(
+                ['tmux', 'new-session', '-d', '-s',
+                 'nodeconsole_{0}'.format(os.getpid()), '-x', '800', '-y',
+                 '800', '{0} -m 5 start /nodes/{1}/console/session'.format(
+                    confettypath, node)])
+        else:
+            subprocess.call(['tmux', 'select-pane', '-t', str(pane)])
+            pane += 1
+            subprocess.call(
+                ['tmux', 'split', '-h',
+                 '{0} -m 5 start /nodes/{1}/console/session'.format(
+                     confettypath, node)])
+            subprocess.call(['tmux', 'select-layout', 'tiled'])
+    subprocess.call(['tmux', 'select-pane', '-t', '0'])
+    os.execlp('tmux', 'tmux', 'attach', '-t', 'nodeconsole_{0}'.format(
+        os.getpid()))
+else:
+    os.execl(confettypath, confettypath, 'start',
+             '/nodes/{0}/console/session'.format(args[0]))
