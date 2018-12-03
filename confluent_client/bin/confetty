@@ -90,6 +90,11 @@ netserver = None
 laststate = {}
 
 
+class BailOut(Exception):
+    def __init__(self, errorcode=0):
+        self.errorcode = errorcode
+
+
 def print_help():
     print("confetty provides a filesystem like interface to confluent.  "
           "Navigation is done using the same commands as would be used in a "
@@ -354,7 +359,7 @@ def do_command(command, server):
     if argv[0] == 'exit':
         if os.environ.get('TERM', '') not in ('linux'):
             sys.stdout.write('\x1b]0;\x07')
-        sys.exit(0)
+        raise Bailout()
     elif argv[0] in ('help', '?'):
         return print_help()
     elif argv[0] == 'cd':
@@ -618,7 +623,7 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
     if fullexit:
         if sys.stdout.isatty() and os.environ.get('TERM', '') not in ('linux'):
             sys.stdout.write('\x1b]0;\x07')
-        sys.exit(code)
+        raise BailOut(code)
     else:
         tlvdata.send(session.connection, {'operation': 'stop',
                                           'path': currconsole})
@@ -811,6 +816,10 @@ parser.add_option("-s", "--server", dest="netserver",
 parser.add_option("-c", "--control", dest="controlpath",
                   help="Path to offer terminal control",
                   metavar="PATH")
+parser.add_option(
+    '-m', '--mintime', default=0,
+    help='Minimum time to run or else pause for input (used to keep a '
+         'terminal from closing quickly on error)')
 opts, shellargs = parser.parse_args()
 
 username = None
@@ -839,45 +848,6 @@ def server_connect():
         passphrase = getpass.getpass("Passphrase: ")
         session.authenticate(username, passphrase)
 
-
-try:
-    server_connect()
-except EOFError, KeyboardInterrupt:
-    sys.exit(0)
-except socket.gaierror:
-    sys.stderr.write('Could not connect to confluent\n')
-    sys.exit(1)
-# clear on start can help with readable of TUI, but it
-# can be annoying, so for now don't do it.
-# sys.stdout.write('\x1b[H\x1b[J')
-# sys.stdout.flush()
-
-if sys.stdout.isatty():
-    import readline
-
-    readline.parse_and_bind("tab: complete")
-    readline.parse_and_bind("set bell-style none")
-    dl = readline.get_completer_delims().replace('-', '')
-    readline.set_completer_delims(dl)
-    readline.set_completer(completer)
-
-doexit = False
-inconsole = False
-pendingcommand = ""
-session_node = get_session_node(shellargs)
-if session_node is not None:
-    consoleonly = True
-    do_command("start /nodes/%s/console/session" % session_node, netserver)
-    doexit = True
-elif shellargs:
-    command = " ".join(shellargs)
-    do_command(command, netserver)
-    quitconfetty(fullexit=True, fixterm=False)
-
-powerstate = None
-powertime = None
-
-
 def check_power_state():
     tlvdata.send(
         session.connection,
@@ -886,86 +856,142 @@ def check_power_state():
     return
 
 
-while inconsole or not doexit:
-    if inconsole:
-        try:
-            rdylist, _, _ = select.select(
-                (sys.stdin, session.connection), (), (), 10)
-        except select.error:
-            rdylist = ()
-        for fh in rdylist:
-            if fh == session.connection:
-                # this only should get called in the
-                # case of a console session
-                # each command should slurp up all relevant
-                # recv potential
-                #fh.read()
-                try:
-                    data = tlvdata.recv(fh)
-                except Exception:
-                    data = None
-                if type(data) == dict:
-                    updatestatus(data)
-                    continue
-                if data is not None:
-                    if clearpowermessage:
-                        sys.stdout.write("\x1b[2J\x1b[;H")
-                        clearpowermessage = False
-                    try:
-                        sys.stdout.write(data)
-                    except IOError:  # Some times circumstances are bad
-                        # resort to byte at a time...
-                        for d in data:
-                            sys.stdout.write(d)
-                    now = time.time()
-                    if ('showtime' not in laststate or
-                            (now // 60) != laststate['showtime'] // 60):
-                        # don't bother churning if minute does not change
-                        laststate['showtime'] = now
-                        updatestatus()
-                    sys.stdout.flush()
-                else:
-                    deadline = 5
-                    connected = False
-                    while not connected and deadline > 0:
-                        try:
-                            server_connect()
-                            connected = True
-                        except (socket.gaierror, socket.error):
-                            pass
-                        if not connected:
-                            time.sleep(1)
-                            deadline -=1
-                    if connected:
-                        do_command(
-                            "start /nodes/%s/console/session skipreplay=True" % consolename,
-                            netserver)
-                    else:
-                        doexit = True
-                        inconsole = False
-                        sys.stdout.write("\r\n[remote disconnected]\r\n")
-                    break
-            else:
-                try:
-                    myinput = fh.read()
-                    myinput = check_escape_seq(myinput, fh)
-                    if myinput:
-                        tlvdata.send(session.connection, myinput)
-                except IOError:
-                    pass
-        if powerstate is None or powertime < time.time() - 10:  # Check powerstate every 10 seconds
-            powertime = time.time()
-            powerstate = True
-            check_power_state()
-    else:
-        currcommand = prompt()
-        try:
-            do_command(currcommand, netserver)
-        except socket.error:
+def main():
+    global inconsole
+    try:
+        server_connect()
+    except EOFError, KeyboardInterrupt:
+        raise BailOut(0)
+    except socket.gaierror:
+        sys.stderr.write('Could not connect to confluent\n')
+        raise BailOut(1)
+    # clear on start can help with readable of TUI, but it
+    # can be annoying, so for now don't do it.
+    # sys.stdout.write('\x1b[H\x1b[J')
+    # sys.stdout.flush()
+    global powerstate, powertime, clearpowermessage
+
+
+    if sys.stdout.isatty():
+        import readline
+
+        readline.parse_and_bind("tab: complete")
+        readline.parse_and_bind("set bell-style none")
+        dl = readline.get_completer_delims().replace('-', '')
+        readline.set_completer_delims(dl)
+        readline.set_completer(completer)
+
+    doexit = False
+    inconsole = False
+    pendingcommand = ""
+    session_node = get_session_node(shellargs)
+    if session_node is not None:
+        consoleonly = True
+        do_command("start /nodes/%s/console/session" % session_node, netserver)
+        doexit = True
+    elif shellargs:
+        command = " ".join(shellargs)
+        do_command(command, netserver)
+        quitconfetty(fullexit=True, fixterm=False)
+
+    powerstate = None
+    powertime = None
+
+    while inconsole or not doexit:
+        if inconsole:
             try:
-                server_connect()
+                rdylist, _, _ = select.select(
+                    (sys.stdin, session.connection), (), (), 10)
+            except select.error:
+                rdylist = ()
+            for fh in rdylist:
+                if fh == session.connection:
+                    # this only should get called in the
+                    # case of a console session
+                    # each command should slurp up all relevant
+                    # recv potential
+                    #fh.read()
+                    try:
+                        data = tlvdata.recv(fh)
+                    except Exception:
+                        data = None
+                    if type(data) == dict:
+                        updatestatus(data)
+                        continue
+                    if data is not None:
+                        if clearpowermessage:
+                            sys.stdout.write("\x1b[2J\x1b[;H")
+                            clearpowermessage = False
+                        try:
+                            sys.stdout.write(data)
+                        except IOError:  # Some times circumstances are bad
+                            # resort to byte at a time...
+                            for d in data:
+                                sys.stdout.write(d)
+                        now = time.time()
+                        if ('showtime' not in laststate or
+                                (now // 60) != laststate['showtime'] // 60):
+                            # don't bother churning if minute does not change
+                            laststate['showtime'] = now
+                            updatestatus()
+                        sys.stdout.flush()
+                    else:
+                        deadline = 5
+                        connected = False
+                        while not connected and deadline > 0:
+                            try:
+                                server_connect()
+                                connected = True
+                            except (socket.gaierror, socket.error):
+                                pass
+                            if not connected:
+                                time.sleep(1)
+                                deadline -=1
+                        if connected:
+                            do_command(
+                                "start /nodes/%s/console/session skipreplay=True" % consolename,
+                                netserver)
+                        else:
+                            doexit = True
+                            inconsole = False
+                            sys.stdout.write("\r\n[remote disconnected]\r\n")
+                        break
+                else:
+                    try:
+                        myinput = fh.read()
+                        myinput = check_escape_seq(myinput, fh)
+                        if myinput:
+                            tlvdata.send(session.connection, myinput)
+                    except IOError:
+                        pass
+            if powerstate is None or powertime < time.time() - 10:  # Check powerstate every 10 seconds
+                powertime = time.time()
+                powerstate = True
+                check_power_state()
+        else:
+            currcommand = prompt()
+            try:
                 do_command(currcommand, netserver)
             except socket.error:
-                doexit = True
-                sys.stdout.write('Lost connection to server')
-quitconfetty(fullexit=True)
+                try:
+                    server_connect()
+                    do_command(currcommand, netserver)
+                except socket.error:
+                    doexit = True
+                    sys.stdout.write('Lost connection to server')
+    quitconfetty(fullexit=True)
+
+if __name__ == '__main__':
+    errcode = 0
+    deadline = 0
+    if opts.mintime:
+        deadline = os.times()[4] + float(opts.mintime)
+    try:
+        main()
+    except BailOut as e:
+        errcode = e.errorcode
+    finally:
+        if deadline and os.times()[4] < deadline:
+            sys.stderr.write('[Exited early, hit enter to continue]')
+            sys.stdin.readline()
+        sys.exit(errcode)
