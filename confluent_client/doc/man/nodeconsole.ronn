@@ -2,7 +2,7 @@ nodeconsole(8) -- Open a console to a confluent node
 =====================================================
 
 ## SYNOPSIS
-`nodeconsole <node>`
+`nodeconsole [options] <noderange>`
 
 ## DESCRIPTION
 
@@ -15,6 +15,12 @@ When the console connection to the target is broken, then confluent on backend
 will initiate an automatic retry interval that is randomized between 2 and 4 minutes.
 The reopen escape sequence below requests an immediate retry, as does connecting
 a new session.
+
+## OPTIONS
+
+* `-t`, `--tile`:
+  Use tmux to arrange consoles of the given noderange into a tiled layout on
+  the terminal screen
 
 ## ESCAPE SEQUENCE COMMANDS
 

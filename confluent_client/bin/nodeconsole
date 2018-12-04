@@ -35,8 +35,6 @@ argparser = optparse.OptionParser(
            "console")
 argparser.add_option('-t', '--tile', action='store_true', default=False,
                      help='Tile console windows in the terminal')
-argparser.add_option('-m', '--mintime', action='store_true', default=False,
-                     help='Minimum time to be open (pause for input if early exit)')
 (options, args) = argparser.parse_args()
 if len(args) != 1:
     argparser.print_help()
