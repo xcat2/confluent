@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+import csv
+import optparse
+import signal
+import sys
+import os
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+import confluent.sortutil as sortutil
+
+
+def lookupdata(data, key):
+    ret = data.get(key, {}).get('value', '')
+    if ret is None:
+        ret = ''
+    return ret
+
+def main():
+    argparser = optparse.OptionParser(
+    usage='''\n       %prog noderange -o ansible.hosts
+             \n ''')
+    argparser.add_option('-o', '--output',
+                         help='xCAT stanza file')
+    (options, args) = argparser.parse_args()
+    try:
+        noderange = args[0]
+    except IndexError:
+        argparser.print_help()
+        sys.exit(1)
+    if not options.output:
+        sys.stderr.write('Output file must be specified by -o\n')
+        sys.exit(1)
+    sess = client.Command()
+    databynode = {}
+    for res in sess.read('/noderange/{0}/attributes/all'.format(noderange)):
+        for node in res.get('databynode', {}):
+            if node not in databynode:
+                databynode[node] = {}
+            databynode[node].update(res['databynode'][node])
+    with open(options.output, 'w') as importfile:
+        for node in sortutil.natural_sort(databynode):
+            data = databynode[node]
+            xcatattrs = {}
+            xcatattrs['groups'] = ','.join(data.get('groups', []))
+            xcatattrs['bmc'] = data.get('hardwaremanagement.manager', {}).get(
+                'value',None)
+            xcatattrs['mpa'] = data.get('enclosure.manager', {}).get(
+                'value', None)
+            xcatattrs['slotid'] = data.get('enclosure.bay', {}).get(
+                'value', None)
+            gotmac = False
+            for key in data:
+                if key.startswith('net.') and 'hwaddr' in key:
+                    currmac = data[key].get('value', None)
+                    if currmac:
+                        if gotmac:
+                            sys.stderr.write(
+                                'Ignoring {0} and using only {1} for mac, '
+                                'multiple macs not supported by '
+                                'confluent2xcat\n'.format(key, gotmac))
+                            continue
+                        gotmac = key
+                        xcatattrs['mac'] = currmac
+            importfile.write('{0}:\n'.format(node))
+            importfile.write('   objtype=node\n')
+            importfile.write('   arch=x86_64\n')
+            importfile.write('   netboot=xnba\n')
+            importfile.write('   mgt=ipmi\n')
+            for attr in xcatattrs:
+                if xcatattrs[attr] is None:
+                    continue
+                importfile.write('   {0}={1}\n'.format(attr, xcatattrs[attr]))
+            importfile.write('\n')
+
+
+if __name__ == '__main__':
+    main()
