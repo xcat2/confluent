@@ -30,14 +30,16 @@ def main():
              \n ''')
     argparser.add_option('-o', '--output',
                          help='xCAT stanza file')
+    argparser.add_option('-m', '--macs',
+                         help='xCAT macs.csv to write')
     (options, args) = argparser.parse_args()
     try:
         noderange = args[0]
     except IndexError:
         argparser.print_help()
         sys.exit(1)
-    if not options.output:
-        sys.stderr.write('Output file must be specified by -o\n')
+    if not (options.output or options.macs):
+        sys.stderr.write('Output file must be specified by -o or -m\n')
         sys.exit(1)
     sess = client.Command()
     databynode = {}
@@ -46,40 +48,55 @@ def main():
             if node not in databynode:
                 databynode[node] = {}
             databynode[node].update(res['databynode'][node])
-    with open(options.output, 'w') as importfile:
-        for node in sortutil.natural_sort(databynode):
-            data = databynode[node]
-            xcatattrs = {}
-            xcatattrs['groups'] = ','.join(data.get('groups', []))
-            xcatattrs['bmc'] = data.get('hardwaremanagement.manager', {}).get(
-                'value',None)
-            xcatattrs['mpa'] = data.get('enclosure.manager', {}).get(
-                'value', None)
-            xcatattrs['slotid'] = data.get('enclosure.bay', {}).get(
-                'value', None)
-            gotmac = False
-            for key in data:
-                if key.startswith('net.') and 'hwaddr' in key:
-                    currmac = data[key].get('value', None)
-                    if currmac:
-                        if gotmac:
-                            sys.stderr.write(
-                                'Ignoring {0} and using only {1} for mac, '
-                                'multiple macs not supported by '
-                                'confluent2xcat\n'.format(key, gotmac))
-                            continue
-                        gotmac = key
-                        xcatattrs['mac'] = currmac
-            importfile.write('{0}:\n'.format(node))
-            importfile.write('   objtype=node\n')
-            importfile.write('   arch=x86_64\n')
-            importfile.write('   netboot=xnba\n')
-            importfile.write('   mgt=ipmi\n')
-            for attr in xcatattrs:
-                if xcatattrs[attr] is None:
+    if options.output:
+        with open(options.output, 'w') as importfile:
+            for node in sortutil.natural_sort(databynode):
+                xcatattrs = collect_attribute_data(databynode, node)
+                importfile.write('{0}:\n'.format(node))
+                importfile.write('   objtype=node\n')
+                importfile.write('   arch=x86_64\n')
+                importfile.write('   netboot=xnba\n')
+                importfile.write('   mgt=ipmi\n')
+                for attr in xcatattrs:
+                    if xcatattrs[attr] is None:
+                        continue
+                    importfile.write('   {0}={1}\n'.format(attr,
+                                                           xcatattrs[attr]))
+                importfile.write('\n')
+    if options.macs:
+        with open(options.macs, 'w') as importfile:
+            macsv = csv.writer(importfile)
+            macsv.writerow(['#node', 'mac'])
+            for node in sortutil.natural_sort(databynode):
+                xcatattrs = collect_attribute_data(databynode, node)
+                macsv.writerow([node, xcatattrs['mac']])
+
+
+
+def collect_attribute_data(databynode, node):
+    data = databynode[node]
+    xcatattrs = {}
+    xcatattrs['groups'] = ','.join(data.get('groups', []))
+    xcatattrs['bmc'] = data.get('hardwaremanagement.manager', {}).get(
+        'value', None)
+    xcatattrs['mpa'] = data.get('enclosure.manager', {}).get(
+        'value', None)
+    xcatattrs['slotid'] = data.get('enclosure.bay', {}).get(
+        'value', None)
+    gotmac = False
+    for key in data:
+        if key.startswith('net.') and 'hwaddr' in key:
+            currmac = data[key].get('value', None)
+            if currmac:
+                if gotmac:
+                    sys.stderr.write(
+                        'Ignoring {0} and using only {1} for mac, '
+                        'multiple macs not supported by '
+                        'confluent2xcat\n'.format(key, gotmac))
                     continue
-                importfile.write('   {0}={1}\n'.format(attr, xcatattrs[attr]))
-            importfile.write('\n')
+                gotmac = key
+                xcatattrs['mac'] = currmac
+    return xcatattrs
 
 
 if __name__ == '__main__':
