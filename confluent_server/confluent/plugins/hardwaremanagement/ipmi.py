@@ -27,6 +27,7 @@ import eventlet.greenpool as greenpool
 import eventlet.queue as queue
 import eventlet.support.greendns
 from fnmatch import fnmatch
+import os
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
 import pyghmi.storage as storage
@@ -172,6 +173,17 @@ class IpmiCommandWrapper(ipmicommand.Command):
                       'hardwaremanagement.manager'), self._attribschanged)
         super(self.__class__, self).__init__(**kwargs)
         self.setup_confluent_keyhandler()
+        try:
+            os.makedirs('/var/cache/confluent/ipmi/')
+        except OSError as e:
+            if e.errno != errno.EEXIST or not os.path.isdir(
+                    '/var/cache/confluent/ipmi/'):
+                raise
+        try:
+            self.set_sdr_cachedir('/var/cache/confluent/ipmi/')
+        except Exception:
+            pass
+
 
     def setup_confluent_keyhandler(self):
         self.register_key_handler(util.TLSCertVerifier(
