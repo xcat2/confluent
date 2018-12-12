@@ -20,6 +20,7 @@ import confluent.interface.console as conapi
 import confluent.messages as msg
 import confluent.util as util
 import copy
+import errno
 import eventlet
 import eventlet.event
 import eventlet.green.threading as threading
