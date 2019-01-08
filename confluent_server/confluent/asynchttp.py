@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2018 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,6 +83,8 @@ class AsyncSession(object):
         self.reaper = eventlet.spawn_after(15, self.destroy)
 
     def add(self, requestid, rsp):
+        if self.responses is None:
+            return
         self.responses.append((requestid, rsp))
         if self._evt:
             self._evt.send()
@@ -107,6 +109,7 @@ class AsyncSession(object):
         for console in self.consoles:
             _consolesessions[console]['session'].destroy()
         self.consoles = None
+        self.responses = None
         del _asyncsessions[self.asyncid]
 
     def run_handler(self, handler, requestid):
@@ -166,6 +169,9 @@ def handle_async(env, querydict, threadset):
         currsess = AsyncSession()
         yield messages.AsyncSession(currsess.asyncid)
         return
+    if  querydict['asyncid'] not in _asyncsessions:
+        raise exc.InvalidArgumentException(
+                'Invalid or expired async id')
     mythreadid = greenlet.getcurrent()
     threadset.add(mythreadid)
     loggedout = None
