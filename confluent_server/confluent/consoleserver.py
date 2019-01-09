@@ -653,8 +653,10 @@ def connect_node(node, configmanager, username=None, direct=True, width=80,
 class ProxyConsole(object):
     _genwatchattribs = frozenset(('collective.manager',))
 
-    def __init__(self, node, managerinfo, myname, configmanager, user):
+    def __init__(self, node, managerinfo, myname, configmanager, user, width,
+                 height):
         self.skipreplay = True
+        self.initsize = (width, height)
         self.managerinfo = managerinfo
         self.myname = myname
         self.cfm = configmanager
@@ -664,6 +666,7 @@ class ProxyConsole(object):
         self.clisession = None
         self._attribwatcher = configmanager.watch_attributes(
             (self.node,), self._genwatchattribs, self._attribschanged)
+
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         if self.clisession:
@@ -706,6 +709,8 @@ class ProxyConsole(object):
                 'tenant': self.cfm.tenant,
                 'node': self.node,
                 'skipreplay': self.skipreplay,
+                'width': self.initsize[0],
+                'height': self.initsize[1],
                 #TODO(jjohnson2): declare myself as a proxy,
                 #facilitate redirect rather than relay on manager change
             },
