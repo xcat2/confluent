@@ -27,7 +27,7 @@ class NodeHandler(immhandler.NodeHandler):
     def adequate(cls, info):
         # We can sometimes receive a partially initialized SLP packet
         # This is not adequate for being satisfied
-        return bool(info['attributes'])
+        return bool(info.get('attributes', {}))
 
     def preconfig(self):
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
