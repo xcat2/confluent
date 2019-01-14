@@ -375,7 +375,8 @@ def perform_requests(operator, nodes, element, cfg, inputdata, realop):
                 if datum != 'Done':
                     if isinstance(datum, Exception):
                         raise datum
-                    if hasattr(datum, 'kvpairs') and len(datum.kvpairs) == 1:
+                    if (hasattr(datum, 'kvpairs') and datum.kvpairs and
+                            len(datum.kvpairs) == 1):
                         bundle.append((datum.kvpairs.keys()[0], datum))
                         numnodes -= 1
                     else:
@@ -617,6 +618,8 @@ class IpmiHandler(object):
             return self.handle_sysconfig(True)
         elif self.element[1:3] == ['system', 'clear']:
             return self.handle_sysconfigclear()
+        elif self.element[1:3] == ['management_controller', 'licenses']:
+            return self.handle_licenses()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -1395,6 +1398,25 @@ class IpmiHandler(object):
         available = self.ipmicmd.get_remote_kvm_available()
         self.output.put(msg.License(self.node, available))
         return
+
+    def handle_licenses(self):
+        if self.element[-1] == '':
+            self.element = self.element[:-1]
+        if len(self.element) == 3:
+            self.output.put(msg.ChildCollection('all'))
+            i = 1
+            for lic in self.ipmicmd.get_licenses():
+                self.output.put(msg.ChildCollection(str(i)))
+                i += 1
+            return
+        licname = self.element[3]
+        if licname == 'all':
+            for lic in self.ipmicmd.get_licenses():
+                self.output.put(msg.License(self.node, feature=lic['name']))
+        else:
+            index = int(licname)
+            lic = list(self.ipmicmd.get_licenses())[index - 1]
+            self.output.put(msg.License(self.node, feature=lic['name']))
 
     def handle_description(self):
         dsc = self.ipmicmd.get_description()

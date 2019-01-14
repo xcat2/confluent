@@ -1530,12 +1530,12 @@ class NTPServer(ConfluentMessage):
 class License(ConfluentMessage):
     readonly = True
 
-    def __init__(self, name=None, kvm=None):
+    def __init__(self, name=None, kvm=None, feature=None):
         self.notnode = name is None
         self.desc = 'License'
 
         kv = []
-        kv.append({'kvm_availability': str(kvm)})
+        kv.append({'kvm_availability': str(kvm), 'feature': feature})
         if self.notnode:
             self.kvpairs = {'License': kv}
         else:
