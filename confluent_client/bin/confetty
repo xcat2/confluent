@@ -856,6 +856,10 @@ def check_power_state():
     return
 
 
+if sys.stdout.isatty():
+    import readline
+
+
 def main():
     global inconsole
     try:
@@ -873,7 +877,6 @@ def main():
 
 
     if sys.stdout.isatty():
-        import readline
 
         readline.parse_and_bind("tab: complete")
         readline.parse_and_bind("set bell-style none")
