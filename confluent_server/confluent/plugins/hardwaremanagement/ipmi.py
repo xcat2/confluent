@@ -560,7 +560,7 @@ class IpmiHandler(object):
 
     def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
-                                    self.inputdata.filename, self.tenant,
+                                    self.inputdata.nodefile(self.node), self.tenant,
                                     bank=self.inputdata.bank)
         self.output.put(
             msg.CreatedResource(
@@ -569,7 +569,7 @@ class IpmiHandler(object):
 
     def handle_media_upload(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.upload_media,
-                                     self.inputdata.filename, self.tenant,
+                                     self.inputdata.nodefile(self.node), self.tenant,
                                      type='mediaupload')
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
@@ -577,14 +577,15 @@ class IpmiHandler(object):
     def handle_servicedata_fetch(self):
         u = firmwaremanager.Updater(
             self.node, self.ipmicmd.get_diagnostic_data,
-            self.inputdata.filename, self.tenant, type='ffdc',
+            self.inputdata.nodefile(self.node), self.tenant, type='ffdc',
             owner=self.current_user)
         self.output.put(msg.CreatedResource(
             'nodes/{0}/support/servicedata/{1}'.format(self.node, u.name)))
 
     def handle_attach_media(self):
         try:
-            self.ipmicmd.attach_remote_media(self.inputdata.filename)
+            self.ipmicmd.attach_remote_media(self.inputdata.nodefile(
+                self.node))
         except pygexc.UnsupportedFunctionality as uf:
             self.output.put(msg.ConfluentNodeError(self.node, str(uf)))
 
@@ -1403,7 +1404,7 @@ class IpmiHandler(object):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if self.op in ('create', 'update'):
-            self.ipmicmd.apply_license(self.inputdata.filename)
+            self.ipmicmd.apply_license(self.inputdata.nodefile(self.node))
         if len(self.element) == 3:
             self.output.put(msg.ChildCollection('all'))
             i = 1

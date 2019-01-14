@@ -431,26 +431,45 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
           operation in ('update', 'create')):
         return InputVolumes(path, nodes, inputdata)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
-        return InputFirmwareUpdate(path, nodes, inputdata)
+        return InputFirmwareUpdate(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('media/detach'):
         return DetachMedia(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/') and inputdata:
-        return InputMedia(path, nodes, inputdata)
+        return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('support/servicedata') and inputdata:
-        return InputMedia(path, nodes, inputdata)
+        return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
-        return InputLicense(path, nodes, inputdata)
+        return InputLicense(path, nodes, inputdata, configmanager)
     elif inputdata:
         raise exc.InvalidArgumentException(
             'No known input handler for request')
 
 class InputFirmwareUpdate(ConfluentMessage):
 
-    def __init__(self, path, nodes, inputdata):
-        self.filename = inputdata.get('filename', inputdata.get('url', None))
+    def __init__(self, path, nodes, inputdata, configmanager):
+        self._filename = inputdata.get('filename', inputdata.get('url', None))
         self.bank = inputdata.get('bank', None)
         self.nodes = nodes
+        self.filebynode = {}
+        self._complexname = False
+        for expanded in configmanager.expand_attrib_expression(
+                nodes, self._filename):
+            node, value = expanded
+            if value != self._filename:
+                self._complexname = True
+            self.filebynode[node] = value
+
+    @property
+    def filename(self):
+        if self._complexname:
+            raise Exception('User requested substitutions, but code is '
+                            'written against old api, code must be fixed or '
+                            'skip {} expansion')
+        return self._filename
+
+    def nodefile(self, node):
+        return self.filebynode[node]
 
 class InputMedia(InputFirmwareUpdate):
     # Use InputFirmwareUpdate
