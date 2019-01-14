@@ -329,6 +329,8 @@ def _tlshandler(bind_host, bind_port):
                 raise
             sys.stderr.write('TLS Socket in use, retrying in 1 second\n')
             eventlet.sleep(1)
+    # Enable TCP_FASTOPEN
+    plainsocket.setsockopt(socket.SOL_TCP, 23, 5)
     plainsocket.listen(5)
     while (1):  # TODO: exithook
         cnn, addr = plainsocket.accept()
