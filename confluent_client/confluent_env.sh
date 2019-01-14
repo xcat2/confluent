@@ -38,6 +38,7 @@ alias nodesensors='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export 
 alias nodesetboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodesetboot'
 alias nodestorage='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodestorage'
 alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeshell'
+alias nodelicense='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodelicense'
 
 
 _confluent_get_args()
@@ -153,6 +154,24 @@ _confluent_nodeshell_completion()
     fi
 }
 
+_confluent_nodelicense_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "install list" -- ${COMP_WORDS[-1]}))
+        return;
+    fi
+    if [ $NUMARGS == 4 ] && [ ${CMPARGS[2]} == 'install' ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+         _confluent_nr_completion
+         return
+    fi
+}
+
 _confluent_nodesupport_completion()
 {
     _confluent_get_args
@@ -253,4 +272,5 @@ complete -F _confluent_nr_completion nodesensors
 complete -F _confluent_nodesetboot_completion nodesetboot
 complete -F _confluent_nodeshell_completion nodeshell
 complete -F _confluent_nodesupport_completion nodesupport
+complete -F _confluent_nodelicense_completion nodelicense
 
