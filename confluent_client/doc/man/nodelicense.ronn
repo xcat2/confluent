@@ -1,0 +1,11 @@
+nodelicense(8) -- Manage license keys on BMC
+=================================================================
+
+## SYNOPSIS
+
+`nodelicense <noderange> [list|install <filename>]`
+
+## DESCRIPTION
+
+`nodelicense` shows and installs license keys on supported BMCs
+
