@@ -1402,6 +1402,8 @@ class IpmiHandler(object):
     def handle_licenses(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
+        if self.op in ('create', 'update'):
+            self.ipmicmd.apply_license(self.inputdata.filename)
         if len(self.element) == 3:
             self.output.put(msg.ChildCollection('all'))
             i = 1

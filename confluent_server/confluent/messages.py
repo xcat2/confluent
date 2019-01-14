@@ -438,6 +438,9 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputMedia(path, nodes, inputdata)
     elif '/'.join(path).startswith('support/servicedata') and inputdata:
         return InputMedia(path, nodes, inputdata)
+    elif '/'.join(path).startswith(
+            'configuration/management_controller/licenses') and inputdata:
+        return InputLicense(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException(
             'No known input handler for request')
@@ -451,6 +454,9 @@ class InputFirmwareUpdate(ConfluentMessage):
 
 class InputMedia(InputFirmwareUpdate):
     # Use InputFirmwareUpdate
+    pass
+
+class InputLicense(InputFirmwareUpdate):
     pass
 
 
