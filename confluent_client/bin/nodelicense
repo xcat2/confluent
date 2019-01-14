@@ -1,0 +1,84 @@
+#!/usr/bin/python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2019 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import optparse
+import os
+import signal
+import sys
+import time
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+exitcode = 0
+
+argparser = optparse.OptionParser(
+    usage="Usage: "
+          "%prog <noderange> [list][install <file>]")
+(options, args) = argparser.parse_args()
+upfile = None
+try:
+    noderange = args[0]
+    if len(args) > 1:
+        if args[1] == 'install':
+            upfile = args[2]
+        else:
+            components = ['all']
+except IndexError:
+    argparser.print_help()
+    sys.exit(1)
+client.check_globbing(noderange)
+
+def install_license(session, filename):
+    global exitcode
+    resource = '/noderange/{0}/configuration/' \
+               'management_controller/licenses/'.format(noderange)
+    filename = os.path.abspath(filename)
+    instargs = {'filename': filename}
+    for res in session.create(resource, instargs):
+        pass # print(repr(res))
+    show_licenses()
+
+def show_licenses(session):
+    global exitcode
+    firmware_shown = False
+    for res in session.read(
+            '/noderange/{0}/configuration/management_controller/licenses/'
+            'all'.format(noderange)):
+        for node in res.get('databynode', {}):
+            for license in res['databynode'][node].get('License', []):
+                print('{0}: {1}'.format(node, license.get('feature',
+                                                          'Unknown')))
+
+
+try:
+    session = client.Command()
+    if upfile is None:
+        show_licenses(session)
+    else:
+        install_license(session, upfile)
+except KeyboardInterrupt:
+    print('')
+sys.exit(exitcode)
