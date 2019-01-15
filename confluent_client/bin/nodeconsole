@@ -65,7 +65,7 @@ if options.tile:
                 ['tmux', 'split', '-h',
                  '{0} -m 5 start /nodes/{1}/console/session'.format(
                      confettypath, node)])
-    subprocess.call(['tmux', 'select-layout', 'tiled'])
+            subprocess.call(['tmux', 'select-layout', 'tiled'])
     subprocess.call(['tmux', 'select-pane', '-t', '0'])
     os.execlp('tmux', 'tmux', 'attach', '-t', 'nodeconsole_{0}'.format(
         os.getpid()))
