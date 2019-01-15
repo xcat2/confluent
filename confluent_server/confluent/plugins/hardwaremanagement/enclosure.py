@@ -14,6 +14,7 @@
 import confluent.core as core
 import confluent.messages as msg
 import pyghmi.exceptions as pygexc
+import confluent.exceptions as exc
 
 def update(nodes, element, configmanager, inputdata):
     emebs = configmanager.get_node_attributes(
@@ -35,4 +36,6 @@ def update(nodes, element, configmanager, inputdata):
                     inputdata={'reseat': int(eb)}):
                 yield rsp
         except pygexc.UnsupportedFunctionality as uf:
+            yield msg.ConfluentNodeError(node, str(uf))
+        except exc.TargetEndpointUnreachable as uf:
             yield msg.ConfluentNodeError(node, str(uf))
