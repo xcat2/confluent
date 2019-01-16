@@ -132,6 +132,7 @@ def parse_config_line(arguments):
             continue
         if needval:
             key = needval
+            needval = None
             value = param
             _assign_value()
             continue
