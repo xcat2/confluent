@@ -1,4 +1,4 @@
-# Copyright 2017 Lenovo
+# Copyright 2017-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,6 +71,10 @@ class NodeHandler(immhandler.NodeHandler):
                 if value.lower() in ('no', 'none', 'disable', 'disabled'):
                     value = '0'
                 ruleset['USER_GlobalMaxLoginFailures'] = value
+            if name.lower() == 'complexity':
+                ruleset['USER_GlobalPassComplexRequired'] = value
+            if name.lower() == 'reuse':
+                ruleset['USER_GlobalMinPassReuseCycle'] = value
         ic.register_key_handler(self.validate_cert)
         ic.oem_init()
         ic._oem.immhandler.wc.grab_json_response('/api/dataset', ruleset)

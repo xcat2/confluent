@@ -158,9 +158,10 @@ node = {
     },
     'discovery.passwordrules': {
         'description':  'Any specified rules shall be configured on the BMC '
-                        'upon discovery.  "expiration=no,loginfailures=no" '
-                        'would disable password expiration and login failures '
-                        'triggering a lockout.'
+                        'upon discovery.  "expiration=no,loginfailures=no,complexity=no,reuse=no" '
+                        'would disable password expiration, login failures '
+                        'triggering a lockout, password complexity requirements,'
+                        'and any restrictions around reusing an old password.'
     },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
