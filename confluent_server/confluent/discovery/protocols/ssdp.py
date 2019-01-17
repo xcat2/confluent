@@ -167,6 +167,7 @@ def _find_service(service, target):
             net4.sendto(smsg.format(bcast, service), (bcast, 1900))
     # SSDP by spec encourages responses to spread out over a 3 second interval
     # hence we must be a bit more patient
+    deadline = util.monotonic_time() + 4
     r, _, _ = select.select((net4, net6), (), (), 4)
     peerdata = {}
     while r:
@@ -174,7 +175,10 @@ def _find_service(service, target):
             (rsp, peer) = s.recvfrom(9000)
             neighutil.refresh_neigh()
             _parse_ssdp(peer, rsp, peerdata)
-        r, _, _ = select.select((net4, net6), (), (), 4)
+        timeout = deadline - util.monotonic_time()
+        if timeout < 0:
+            timeout = 0
+        r, _, _ = select.select((net4, net6), (), (), timeout)
     for nid in peerdata:
         yield peerdata[nid]
 
@@ -194,6 +198,8 @@ def _parse_ssdp(peer, rsp, peerdata):
     if code == '200':
         if nid in peerdata:
             peerdatum = peerdata[nid]
+            if peer not in peerdatum['peers']:
+                peerdatum['peers'].append(peer)
         else:
             peerdatum = {
                 'peers': [peer],
