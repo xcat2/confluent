@@ -169,13 +169,18 @@ class GroupedData(object):
         output.flush()
 
     def print_deviants(self, output=sys.stdout, skipmodal=False, reverse=False,
-                       count=False):
+                       count=False, basenode=None):
         self.generate_byoutput()
         modaloutput = None
         ismodal = True
         revoutput = []
+        if basenode:
+            for checkout in self.byoutput:
+                if basenode in self.byoutput[checkout]:
+                    modaloutput = checkout
         for outdata in sorted(
-                self.byoutput, key=lambda x: [0 - len(self.byoutput[x]),
+                self.byoutput, key=lambda x: [0 if modaloutput == x else 1,
+                                              0 - len(self.byoutput[x]),
                                               humanify_nodename(
                                                   self.get_group_text(
                                                       self.byoutput[x]

@@ -35,6 +35,9 @@ import confluent.client
 argparser = optparse.OptionParser(usage="Usage: <other command> | %prog [options]")
 argparser.add_option('-a', '--abbreviate', action='store_true',
                      help='Attempt to use confluent server to shorten noderanges')
+argparser.add_option('-b', '--base',
+                     help='Use given node as reference for comparison when '
+                          'using -d, instead of using the most common result')
 argparser.add_option('-d', '--diff', action='store_true',
                      help='Show what differs between most common '
                           'output group and others')
@@ -65,7 +68,7 @@ else:
 def print_current():
     if options.diff:
         grouped.print_deviants(skipmodal=options.skipcommon, count=options.count,
-                          reverse=options.reverse)
+                          reverse=options.reverse, basenode=options.base)
     else:
         grouped.print_all(skipmodal=options.skipcommon,
                                count=options.count,
