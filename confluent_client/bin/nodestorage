@@ -184,6 +184,8 @@ def main():
                               'delete.  Default behavior is to use '
                               'implementation provided default names.')
     (options, args) = argparser.parse_args()
+    if len(args) == 1:
+        args.append('show')
     try:
         noderange = args[0]
         operation = args[1]
