@@ -198,7 +198,7 @@ def create(nodes, element, configmanager, inputdata):
 def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
     for node in nodes:
-        updatenode = inputdata.get_attributes(node)
+        updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []
         if updatenode:
             for attrib in updatenode.iterkeys():

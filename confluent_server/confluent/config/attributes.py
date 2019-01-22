@@ -161,7 +161,8 @@ node = {
                         'upon discovery.  "expiration=no,loginfailures=no,complexity=no,reuse=no" '
                         'would disable password expiration, login failures '
                         'triggering a lockout, password complexity requirements,'
-                        'and any restrictions around reusing an old password.'
+                        'and any restrictions around reusing an old password.',
+        'validlistkeys': ('expiration', 'loginfailures', 'complexity', 'reuse'),
     },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
@@ -172,6 +173,7 @@ node = {
                         'so long as the node has no existing public key. '
                         '"open" allows discovery even if a known public key '
                         'is already stored',
+        'validlist': ('manual', 'permissive', 'pxe', 'open'),
     },
     'info.note': {
         'description':  'A field used for administrators to make arbitrary '
@@ -259,11 +261,13 @@ node = {
     'console.logging': {
         'description': ('Indicate logging level to apply to console.  Valid '
                         'values are currently "full", "interactive", and '
-                        '"none". Defaults to "full".')
+                        '"none". Defaults to "full".'),
+        'validvalues': ('full', 'interactive', 'none'),
     },
     'console.method': {
         'description': ('Indicate the method used to access the console of '
-                        'the managed node.')
+                        'the managed node.'),
+        'validvalues': ('ssh', 'ipmi'),
     },
 #    'virtualization.host': {
 #        'description': ('Hypervisor where this node does/should reside'),
