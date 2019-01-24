@@ -613,12 +613,12 @@ class InputAttributes(ConfluentMessage):
                     # an expression string will error if format() done
                     # use that as cue to put it into config as an expr
                     nodeattr[attr] = {'expression': nodeattr[attr]}
-            if validattrs and 'validvalues' in validattrs[attr]:
+            if validattrs and 'validvalues' in validattrs.get(attr, []):
                 if nodeattr[attr] not in validattrs[attr]['validvalues']:
                     raise exc.InvalidArgumentException(
                         'Attribute {0} does not accept value {1} (valid values would be {2})'.format(
                             attr, nodeattr[attr], ','.join(validattrs[attr]['validvalues'])))
-            elif validattrs and 'validlist' in validattrs[attr]:
+            elif validattrs and 'validlist' in validattrs.get(attr, []):
                 req = nodeattr[attr].split(',')
                 for v in req:
                     if v not in validattrs[attr]['validlist']:
@@ -627,7 +627,7 @@ class InputAttributes(ConfluentMessage):
                             '{1} (valid values would be {2})'.format(
                                 attr, v, ','.join(
                                     validattrs[attr]['validlist'])))
-            elif validattrs and 'validlistkeys' in validattrs[attr]:
+            elif validattrs and 'validlistkeys' in validattrs.get(attr, []):
                 req = nodeattr[attr].split(',')
                 for v in req:
                     if '=' not in v:
