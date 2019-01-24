@@ -614,14 +614,15 @@ class InputAttributes(ConfluentMessage):
                     # use that as cue to put it into config as an expr
                     nodeattr[attr] = {'expression': nodeattr[attr]}
             if validattrs and 'validvalues' in validattrs.get(attr, []):
-                if nodeattr[attr] not in validattrs[attr]['validvalues']:
+                if (nodeattr[attr] and
+                        nodeattr[attr] not in validattrs[attr]['validvalues']):
                     raise exc.InvalidArgumentException(
                         'Attribute {0} does not accept value {1} (valid values would be {2})'.format(
                             attr, nodeattr[attr], ','.join(validattrs[attr]['validvalues'])))
             elif validattrs and 'validlist' in validattrs.get(attr, []):
                 req = nodeattr[attr].split(',')
                 for v in req:
-                    if v not in validattrs[attr]['validlist']:
+                    if v and v not in validattrs[attr]['validlist']:
                         raise exc.InvalidArgumentException(
                             'Attribute {0} does not accept list member '
                             '{1} (valid values would be {2})'.format(
@@ -634,7 +635,7 @@ class InputAttributes(ConfluentMessage):
                         raise exc.InvalidArgumentException(
                             'Passed key {0} requires a parameter'.format(v))
                     v = v.split('=', 1)[0]
-                    if v not in validattrs[attr]['validlistkeys']:
+                    if v and v not in validattrs[attr]['validlistkeys']:
                         raise exc.InvalidArgumentException(
                             'Attribute {0} does not accept key {1} (valid values would be {2})'.format(
                                 attr, v, ','.join(
