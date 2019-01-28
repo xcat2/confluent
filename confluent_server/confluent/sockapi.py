@@ -75,6 +75,14 @@ except ImportError:
 
 plainsocket = None
 
+def _should_authlog(path, operation):
+    if (operation == 'retrieve' and
+            ('/sensors/' in path or '/health/' in path or
+             '/power/state' in path or '/nodes/' == path or
+             (path.startswith('/noderange/') and path.endswith('/nodes/')))):
+        return False
+    return True
+
 class ClientConsole(object):
     def __init__(self, client):
         self.client = client
@@ -194,12 +202,12 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
     path = request['path']
     params = request.get('parameters', {})
     hdlr = None
+    auditmsg = {
+        'operation': operation,
+        'target': path,
+    }
     if not skipauth:
         authdata = auth.authorize(authdata[2], path, authdata[3], operation)
-        auditmsg = {
-            'operation': operation,
-            'target': path,
-        }
         if authdata is None:
             auditmsg['allowed'] = False
             auditlog.log(auditmsg)
@@ -207,7 +215,8 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
         auditmsg['user'] = authdata[2]
         if authdata[3] is not None:
             auditmsg['tenant'] = authdata[3]
-        auditmsg['allowed'] = True
+    auditmsg['allowed'] = True
+    if _should_authlog(path, operation):
         auditlog.log(auditmsg)
     try:
         if operation == 'start':
