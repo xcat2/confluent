@@ -2029,7 +2029,9 @@ class ConfigManager(object):
         rootpath = cls._cfgdir
         try:
             with open(os.path.join(rootpath, 'transactioncount'), 'r') as f:
-                _txcount = struct.unpack('!Q', f.read())[0]
+                txbytes = f.read()
+                if len(txbytes) == 8:
+                    _txcount = struct.unpack('!Q', txbytes)[0]
         except IOError:
             pass
         _load_dict_from_dbm(['collective'], os.path.join(rootpath,
