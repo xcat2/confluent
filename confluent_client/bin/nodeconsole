@@ -40,6 +40,7 @@ if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
 if options.tile:
+    null = open('/dev/null', 'w')
     nodes = []
     sess = client.Command()
     for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
@@ -60,13 +61,15 @@ if options.tile:
                     confettypath, node)])
         else:
             subprocess.call(['tmux', 'select-pane', '-t', str(pane)])
+            subprocess.call(['tmux', 'set-option', 'pane-border-status', 'top'], stderr=null)
             pane += 1
             subprocess.call(
                 ['tmux', 'split', '-h',
                  '{0} -m 5 start /nodes/{1}/console/session'.format(
                      confettypath, node)])
-            subprocess.call(['tmux', 'select-layout', 'tiled'])
+            subprocess.call(['tmux', 'select-layout', 'tiled'], stdout=null)
     subprocess.call(['tmux', 'select-pane', '-t', '0'])
+    subprocess.call(['tmux', 'set-option', 'pane-border-status', 'top'], stderr=null)
     os.execlp('tmux', 'tmux', 'attach', '-t', 'nodeconsole_{0}'.format(
         os.getpid()))
 else:
