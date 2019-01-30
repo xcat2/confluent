@@ -199,8 +199,6 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         v6addrs = []
         v6hash = _v6mcasthash(srvtype)
-        print(repr(srvtype))
-        print(repr(v6hash))
         # do 'interface local' and 'link local'
         # it shouldn't make sense, but some configurations work with interface
         # local that do not work with link local
