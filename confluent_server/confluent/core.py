@@ -651,7 +651,7 @@ def handle_dispatch(connection, cert, dispatch, peername):
                 plugpath = nodeattr[node][attrname]['value']
             elif 'default' in plugroute:
                 plugpath = plugroute['default']
-        if plugpath is not None:
+        if plugpath:
             try:
                 hfunc = getattr(pluginmap[plugpath], operation)
             except KeyError:
@@ -809,7 +809,7 @@ def handle_node_request(configmanager, inputdata, operation,
                 elif list(cfm.list_collective()):
                     badcollnodes.append(node)
                     continue
-            if plugpath is not None:
+            if plugpath:
                 try:
                     hfunc = getattr(pluginmap[plugpath], operation)
                 except KeyError:
