@@ -1,7 +1,7 @@
 7# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2018 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1515,17 +1515,20 @@ class ConfigManager(object):
                         currnodes = list(self.get_nodegroup_attributes(
                             group, ['nodes']).get('nodes', []))
                         if attribmap[group][attr].get('prepend', False):
-                            newnodes = attribmap[group][attr][
-                                'prepend'].split(',')
-                            attribmap[group][attr] = newnodes + currnodes
+                            newnodes = noderange.NodeRange(attribmap[group][attr][
+                                'prepend'], config=self).nodes
+                            attribmap[group][attr] = list(
+                                newnodes) + currnodes
                         elif attribmap[group][attr].get('remove', False):
-                            delnodes = attribmap[group][attr][
-                                'remove'].split(',')
+                            delnodes = noderange.NodeRange(
+                                attribmap[group][attr]['remove'],
+                                config=self).nodes
                             attribmap[group][attr] = [
                                 x for x in currnodes if x not in delnodes]
                     if not isinstance(attribmap[group][attr], list):
                         if type(attribmap[group][attr]) is unicode or type(attribmap[group][attr]) is str:
-                            attribmap[group][attr]=attribmap[group][attr].split(",")
+                            attribmap[group][attr] = noderange.NodeRange(
+                                attribmap[group][attr], config=self).nodes
                         else:
                             raise ValueError("nodes attribute on group must be list")
                     for node in attribmap[group]['nodes']:
