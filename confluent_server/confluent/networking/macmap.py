@@ -342,7 +342,7 @@ def _full_updatemacmap(configmanager):
                         _switchportmap[curswitch][portname] = None
                     else:
                         _switchportmap[curswitch][portname] = node
-        for switch in _macsbyswitch:
+        for switch in list(_macsbyswitch):
             if switch not in switches:
                 del _macsbyswitch[switch]
         switchauth = get_switchcreds(configmanager, switches)
