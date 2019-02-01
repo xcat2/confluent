@@ -36,9 +36,42 @@ class NodeHandler(bmchandler.NodeHandler):
             uuid = fixuuid(uuid[0])
             self.info['uuid'] = uuid
 
+    def _validate_cert(self, certificate):
+        # Assumption is by the time we call config, that discovery core has
+        # vetted self._fp.  Our job here then is just to make sure that
+        # the currect connection matches the previously saved cert
+        return certificate == self._fp
+
+    def set_password_policy(self, ic):
+        rules = []
+        for rule in self.ruleset.split(','):
+            if '=' not in rule:
+                continue
+            name, value = rule.split('=')
+            if value.lower() in ('no', 'none', 'disable', 'disabled'):
+                value = '0'
+            if name.lower() in ('expiry', 'expiration'):
+                rules.append('passwordDurationDays:' + value)
+                warndays = '5' if int(value) > 5 else value
+                rules.append('passwordExpireWarningDays:' + warndays)
+            if name.lower() in ('lockout', 'loginfailures'):
+                rules.append('passwordFailAllowdNum:' + value)
+            if name.lower() == 'reuse':
+                rules.append('passwordReuseCheckNum:' + value)
+        if rules:
+            apirequest = 'set={0}'.format(','.join(rules))
+            ic.register_key_handler(self._validate_cert)
+            ic.oem_init()
+            ic._oem.smmhandler.wc.request('POST', '/data', apirequest)
+            ic._oem.smmhandler.wc.getresponse().read()
+
     def config(self, nodename):
         # SMM for now has to reset to assure configuration applies
-        super(NodeHandler, self).config(nodename)
+        dpp = self.configmanager.get_node_attributes(
+            nodename, 'discovery.passwordrules')
+        self.ruleset = dpp.get(nodename, {}).get(
+            'discovery.passwordrules', {}).get('value', '')
+        ic = self._bmcconfig(nodename, customconfig=self.set_password_policy)
 
 # notes for smm:
 # POST to:
