@@ -147,6 +147,7 @@ class ConsoleHandler(object):
 
     def __init__(self, node, configmanager, width=80, height=24):
         self.clearpending = False
+        self.clearerror = False
         self.initsize = (width, height)
         self._dologging = True
         self._is_local = True
@@ -371,7 +372,20 @@ class ConsoleHandler(object):
             self.error = 'misconfigured'
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
+            self.feedbuffer(
+                '\x1bc\x1b[2J\x1b[1;1H[The console.method attribute for this node is '
+                'not configured,\r\nset it to a valid value for console '
+                'function]')
+            self._send_rcpts(
+                '\x1bc\x1b[2J\x1b[1;1H[The console.method attribute for this node is '
+                'not configured,\r\nset it to a valid value for console '
+                'function]')
+            self.clearerror = True
             return
+        if self.clearerror:
+            self.clearerror = False
+            self.clearbuffer()
+            self._send_rcpts(b'\x1bc\x1b[2J\x1b[1;1H')
         self.send_break = self._console.send_break
         self.resize = self._console.resize
         if self._attribwatcher:
@@ -527,10 +541,11 @@ class ConsoleHandler(object):
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
-        if self.clearpending:
+        if self.clearpending or self.clearerror:
             self.clearpending = False
-            self.feedbuffer(b'\x1bc')
-            self._send_rcpts(b'\x1bc')
+            self.clearerror = False
+            self.feedbuffer(b'\x1bc\x1b[2J\x1b[1;1H')
+            self._send_rcpts(b'\x1bc\x1b[2J\x1b[1;1H')
         self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
         self.log(data, eventdata=eventdata)
         self.lasttime = util.monotonic_time()
