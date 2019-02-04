@@ -18,5 +18,6 @@ if [ $? -ne 0 ]; then
 else
     # Clean up the generated files in this directory
     rm -rf $PKGNAME.egg-info dist setup.py
+    rm -rf $(find deb_dist -mindepth 1 -maxdepth 1 -type d)
 fi
 exit 0
