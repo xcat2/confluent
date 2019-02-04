@@ -12,11 +12,11 @@ py2dsc dist/*.tar.gz
 shopt -s extglob
 cd deb_dist/!(*.orig)/
 dpkg-buildpackage -rfakeroot -uc  -us -i
-cd -
 if [ $? -ne 0 ]; then
     echo "[ERROR] rpmbuild returned non-zero, run: rpmbuild -ba ~/rpmbuild/SPECS/$PKGNAME.spec"
     exit 1
 else
+    cd -
     # Clean up the generated files in this directory
     rm -rf $PKGNAME.egg-info dist setup.py
     rm -rf $(find deb_dist -mindepth 1 -maxdepth 1 -type d)
