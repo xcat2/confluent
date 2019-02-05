@@ -6,7 +6,15 @@ fi
 ./makesetup
 VERSION=`cat VERSION`
 PKGNAME=$(basename $(pwd))
-touch setup.cfg
+cat > setup.cfg << EOF
+[install]
+install-purelib=/opt/confluent/lib/python
+install-scripts=/opt/confluent/bin
+
+[sdist_dsc]
+package=confluent-client
+EOF
+
 python setup.py sdist > /dev/null 2>&1
 py2dsc dist/*.tar.gz
 shopt -s extglob
