@@ -1134,6 +1134,8 @@ def newnodes(added, deleting, configmanager):
     global needaddhandled
     global nodeaddhandler
     for node in deleting:
+        if node not in known_nodes:
+            continue
         for mac in known_nodes[node]:
             if mac in known_info:
                 del known_info[mac]
