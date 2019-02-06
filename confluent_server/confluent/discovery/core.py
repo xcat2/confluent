@@ -1133,6 +1133,11 @@ def newnodes(added, deleting, configmanager):
     global attribwatcher
     global needaddhandled
     global nodeaddhandler
+    for node in deleting:
+        for mac in known_nodes[node]:
+            if mac in known_info:
+                del known_info[mac]
+        del known_nodes[node]
     _map_unique_ids()
     configmanager.remove_watcher(attribwatcher)
     allnodes = configmanager.list_nodes()
