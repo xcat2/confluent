@@ -22,7 +22,11 @@
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
-import cryptography
+try:
+    import cryptography
+except ImportError:
+    # Using older, non-crypography based paramiko
+    cryptography = None
 
 import eventlet
 import hashlib
@@ -30,7 +34,7 @@ import sys
 sys.modules['gssapi'] = None
 paramiko = eventlet.import_patched('paramiko')
 warnhostkey = False
-if cryptography.__version__.split('.') < ['1', '5']:
+if cryptography and cryptography.__version__.split('.') < ['1', '5']:
     # older cryptography with paramiko breaks most key support except
     # ed25519
     warnhostkey = True
