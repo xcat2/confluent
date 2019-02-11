@@ -1,12 +1,14 @@
 #!/bin/bash
 cd `dirname $0`
+PKGNAME=$(basename $(pwd))
+DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
+cp -a * .git /tmp/$DPKGNAME
+cd /tmp/$DPKGNAME
 if [ -x ./makeman ]; then
     ./makeman
 fi
 ./makesetup
 VERSION=`cat VERSION`
-PKGNAME=$(basename $(pwd))
-DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
 cat > setup.cfg << EOF
 [install]
 install-purelib=/opt/confluent/lib/python
