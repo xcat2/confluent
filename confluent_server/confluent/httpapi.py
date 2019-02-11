@@ -794,7 +794,7 @@ def serve(bind_host, bind_port):
     try:
         eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
                              debug=False, socket_timeout=60)
-    except InvalidTypeError:
+    except TypeError:
         # Older eventlet in place, skip arguments it does not understand
         eventlet.wsgi.server(sock, resourcehandler, log=False, debug=False)
 
