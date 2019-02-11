@@ -197,6 +197,10 @@ def create(nodes, element, configmanager, inputdata):
 
 def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
+    if not nodes:
+        raise exc.InvalidArgumentException(
+            'No action to take, noderange is empty (if trying to define '
+            'group attributes, use nodegroupattrib)')
     for node in nodes:
         updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []
