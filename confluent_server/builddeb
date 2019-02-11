@@ -2,9 +2,10 @@
 cd `dirname $0`
 PKGNAME=$(basename $(pwd))
 DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
-mkdir -p /tmp/$DPKGNAME
-cp -a * .git /tmp/$DPKGNAME
-cd /tmp/$DPKGNAME
+cd ..
+mkdir -p /tmp/confluent # $DPKGNAME
+cp -a * .git /tmp/confluent # $DPKGNAME
+cd /tmp/confluent/$PKGNAME
 if [ -x ./makeman ]; then
     ./makeman
 fi
