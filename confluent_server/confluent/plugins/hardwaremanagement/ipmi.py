@@ -37,6 +37,9 @@ ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
 import ssl
 
+if not hasattr(ssl, 'SSLEOFError'):
+    ssl.SSLEOFError = None
+
 pci_cache = {}
 
 def get_dns_txt(qstring):
