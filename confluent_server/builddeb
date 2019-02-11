@@ -21,7 +21,7 @@ py2dsc dist/*.tar.gz
 shopt -s extglob
 cd deb_dist/!(*.orig)/
 if [ "$DPKGNAME" = "confluent-server" ]; then
-    sed -e 's/^\(Depends:.*\)/\1, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
+    sed -i 's/^\(Depends:.*\)/\1, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
 fi
 dpkg-buildpackage -rfakeroot -uc  -us -i
 if [ $? -ne 0 ]; then
