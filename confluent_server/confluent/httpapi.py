@@ -791,8 +791,12 @@ def serve(bind_host, bind_port):
             eventlet.sleep(1)
     # TCP_FASTOPEN
     sock.setsockopt(socket.SOL_TCP, 23, 5)
-    eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
-                         debug=False, socket_timeout=60)
+    try:
+        eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
+                             debug=False, socket_timeout=60)
+    except InvalidTypeError:
+        # Older eventlet in place, skip arguments it does not understand
+        eventlet.wsgi.server(sock, resourcehandler, log=False, debug=False)
 
 
 class HttpApi(object):
