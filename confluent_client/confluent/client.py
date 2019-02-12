@@ -444,9 +444,12 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                                 (currattr.get('default', None) is not None and
                                 currattr.get('value', None) is not None and
                                 currattr['value'] != currattr['default'])):
+                            cval = ','.join(currattr['value']) if isinstance(
+                                currattr['value'], list) else currattr['value']
+                            dval = ','.join(currattr['default']) if isinstance(
+                                currattr['default'], list) else currattr['default']
                             cprint('{0}: {1}: {2} (Default: {3})'.format(
-                                node, printattr, currattr['value'],
-                                currattr['default']))
+                                node, printattr, cval, dval))
                     else:
 
                         try:
