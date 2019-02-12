@@ -25,8 +25,13 @@ py2dsc dist/*.tar.gz
 shopt -s extglob
 cd deb_dist/!(*.orig)/
 if [ "$DPKGNAME" = "confluent-server" ]; then
-    sed -i 's/^\(Depends:.*\)/\1, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
+    if grep wheezy /etc/os-release; then
+        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
+    else
+        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome/' debian/control
+    fi
 fi
+
 dpkg-buildpackage -rfakeroot -uc  -us -i
 if [ $? -ne 0 ]; then
     echo "[ERROR] rpmbuild returned non-zero, run: rpmbuild -ba ~/rpmbuild/SPECS/$PKGNAME.spec"
