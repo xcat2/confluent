@@ -185,7 +185,13 @@ if options.batch:
     argfile = open(options.batch, 'r')
     argset = argfile.readline()
     while argset:
-        parse_config_line(shlex.split(argset))
+        try:
+            argset = argset[:argset.index('#')]
+        except ValueError:
+            pass
+        argset = argset.strip()
+        if argset:
+            parse_config_line(shlex.split(argset))
         argset = argfile.readline()
 else:
     parse_config_line(args[1:])
