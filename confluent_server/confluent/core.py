@@ -123,7 +123,7 @@ def load_plugins():
 
 
 rootcollections = ['discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'version']
+                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'xcat/', 'version']
 
 
 class PluginRoute(object):
@@ -977,6 +977,16 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """
     pathcomponents = path.split('/')
     del pathcomponents[0]  # discard the value from leading /
+    xcat_url = False
+    if pathcomponents and pathcomponents[0] == 'xcat':
+        xcat_url = True
+        if 'xcat/' in rootcollections: 
+            rootcollections.remove('xcat/')
+        del pathcomponents[0]
+    elif 'xcat/' not in rootcollections:
+            rootcollections.insert(-1, 'xcat/')
+    if xcat_url:
+        configmanager.log("Start to deal with xCAT URL: %s" % path)
     if pathcomponents[-1] == '':
         del pathcomponents[-1]
     if not pathcomponents:  # root collection list

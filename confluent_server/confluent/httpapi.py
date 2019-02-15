@@ -30,6 +30,7 @@ import confluent.asynchttp
 import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
+from confluent.xcclient.xcat_manager import xCATConfigManager
 import copy
 import eventlet
 import eventlet.greenthread
@@ -437,6 +438,8 @@ def resourcehandler_backend(env, start_response):
         ("Set-Cookie", m.OutputString())
         for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
+    if (env['PATH_INFO'].startswith('/xcat')):
+        cfgmgr = xCATConfigManager()
     if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
         pagecontent = ""
         try:

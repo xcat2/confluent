@@ -46,7 +46,9 @@ import confluent.core as pluginapi
 import confluent.shellserver as shellserver
 import confluent.collective.manager as collective
 import confluent.util as util
+from confluent.xcclient.xcat_manager import xCATConfigManager
 
+xcat_cfm = None
 tracelog = None
 auditlog = None
 try:
@@ -115,6 +117,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         if authdata is not None:
             cfm = authdata[1]
             authenticated = True
+    if xcat_cfm is None:
+        xcat_cfm = xCATConfigManager()
     send_data(connection, "Confluent -- v0 --")
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
@@ -156,6 +160,9 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         return collective.handle_connection(connection, None, request['collective'],
                                      local=True)
     while request is not None:
+        if request['path'].startswith('/xcat'):
+            global xcat_cfm
+            cfm = xcat_cfm
         try:
             process_request(
                 connection, request, cfm, authdata, authname, skipauth)
