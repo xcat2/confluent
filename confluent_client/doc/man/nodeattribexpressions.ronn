@@ -9,6 +9,18 @@ expression to generate the value.
 An expression will contain some directives wrapped in `{}` characters. Within
 `{}` are a number of potential substitute values and operations.
 
+Note that syntax of expressions can have overlap with the shell syntax.
+For example:
+
+`$ echo (n2)`  
+`-bash: syntax error near unexpected token `n2'`  
+
+In such a case, it helps to quote the expression to allow it to be passed:
+
+`$ echo '(n2)'`  
+`(n2)`  
+
+
 The most common operation is to extract a number from the nodename. These 
 values are available as n1, n2, etc. So for example attributes for a node named 
 b1o2r3u4 would have {n1} as 1, {n2} as 2, {n3} as 3, and {n4} as 4. 
