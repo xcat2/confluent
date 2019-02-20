@@ -39,6 +39,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
     if element == 'all':
         theattrs = set(allattributes.node).union(set(grpcfg))
         theattrs.add('nodes')
+        theattrs.add('noderange')
         for attribute in sorted(theattrs):
             if attribute == 'groups':
                 continue
@@ -51,6 +52,10 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                 val = grpcfg[attribute]
             else:
                 val = {'value': None}
+            if attribute == 'noderange':
+                val['desc'] = 'The noderange this group is expanded ' \
+                    'to when used in noderange, exclusive with static ' \
+                    'nodes'
             if attribute.startswith('secret.'):
                 yield msg.CryptedAttributes(
                     kv={attribute: val},
