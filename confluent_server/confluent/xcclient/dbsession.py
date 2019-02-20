@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ###############################################################################
-# IBM(c) 2007 EPL license http://www.eclipse.org/legal/epl-v10.html
+# IBM(c) 2019 EPL license http://www.eclipse.org/legal/epl-v10.html
 ###############################################################################
 # -*- coding: utf-8 -*-
 #
