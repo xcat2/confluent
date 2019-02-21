@@ -19,19 +19,23 @@
 # the time comes
 
 import confluent.exceptions as exc
+import confluent.log as log
 import confluent.messages as msg
 import eventlet
 import os
 import pwd
 import socket
+import traceback
 
 updatesbytarget = {}
 uploadsbytarget = {}
 downloadsbytarget = {}
 updatepool = eventlet.greenpool.GreenPool(256)
+_tracelog = None
 
 
 def execupdate(handler, filename, updateobj, type, owner, node):
+    global _tracelog
     if type != 'ffdc' and not os.path.exists(filename):
         errstr =  '{0} does not appear to exist on {1}'.format(
             filename, socket.gethostname())
@@ -58,6 +62,9 @@ def execupdate(handler, filename, updateobj, type, owner, node):
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': errstr})
     except Exception as e:
+        if _tracelog is None:
+            _tracelog = log.logger('trace')
+        _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event, event=log.Events.stacktrace)
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': str(e)})
 
