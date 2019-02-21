@@ -73,6 +73,8 @@ import struct
 import time
 import traceback
 
+daemonized = False
+logfull = False
 try:
     from fcntl import flock, LOCK_EX, LOCK_UN, LOCK_SH
 except ImportError:
@@ -150,21 +152,34 @@ class BaseRotatingHandler(object):
         Output the record to the file, catering for rollover as described
         in doRollover().
         """
-        rolling_type = self.shouldRollover(binrecord, textrecord)
-        if rolling_type:
-            flock(self.textfile, LOCK_UN)
-            return self.doRollover(rolling_type)
-        return None
+        global logfull
+        try:
+            rolling_type = self.shouldRollover(binrecord, textrecord)
+            if rolling_type:
+                flock(self.textfile, LOCK_UN)
+                return self.doRollover(rolling_type)
+            return None
+        except (IOError, OSError) as e:
+            if not daemonized:
+                raise
+            logfull = True
+
 
     def emit(self, binrecord, textrecord):
-        if self.textfile is None:
-            self.textfile = open(self.textpath, mode='ab')
-        if self.binfile is None:
-            self.binfile = open(self.binpath, mode='ab')
-        self.textfile.write(textrecord)
-        self.binfile.write(binrecord)
-        self.textfile.flush()
-        self.binfile.flush()
+        global logfull
+        try:
+            if self.textfile is None:
+                self.textfile = open(self.textpath, mode='ab')
+            if self.binfile is None:
+                self.binfile = open(self.binpath, mode='ab')
+            self.textfile.write(textrecord)
+            self.binfile.write(binrecord)
+            self.textfile.flush()
+            self.binfile.flush()
+        except (IOError, OSError) as e:
+            if not daemonized:
+                raise
+            logfull = True
 
     def get_textfile_offset(self, data_len):
         if self.textfile is None:
@@ -753,11 +768,13 @@ globaleventlog = None
 tracelog = None
 
 
-def log(logdata=None, ltype=None, event=0, eventdata=None):
+def log(logdata=None, ltype=None, event=0, eventdata=None, flush=False):
     global globaleventlog
     if globaleventlog is None:
         globaleventlog = Logger('events')
     globaleventlog.log(logdata, ltype, event, eventdata)
+    if flush:
+        globaleventlog.writedata()
 
 def logtrace():
     global tracelog

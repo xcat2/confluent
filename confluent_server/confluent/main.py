@@ -72,7 +72,7 @@ def _daemonize():
     os.setsid()
     thispid = os.fork()
     if thispid > 0:
-        print 'confluent server starting as pid %d' % thispid
+        print('confluent server starting as pid {0}'.format(thispid))
         os._exit(0)
     os.closerange(0, 2)
     os.umask(63)
@@ -81,6 +81,7 @@ def _daemonize():
     os.dup2(0, 2)
     sys.stdout = log.Logger('stdout', buffered=False)
     sys.stderr = log.Logger('stderr', buffered=False)
+    log.daemonized = True
 
 
 def _updatepidfile():
@@ -224,6 +225,11 @@ def run():
     except:
         doexit()
         raise
+    try:
+        log.log({'info': 'Confluent management service starting'}, flush=True)
+    except (OSError, IOError) as e:
+        print(repr(e))
+        sys.exit(1)
     _daemonize()
     if havefcntl:
         _updatepidfile()

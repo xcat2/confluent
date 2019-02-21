@@ -35,6 +35,7 @@
 
 import confluent
 import confluent.alerts as alerts
+import confluent.log as log
 import confluent.tlvdata as tlvdata
 import confluent.config.attributes as attrscheme
 import confluent.config.configmanager as cfm
@@ -685,6 +686,8 @@ def _forward_rsp(connection, res):
 
 def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
+    if log.logfull:
+        raise exc.TargetResourceUnavailable('Filesystem full, free up space and restart confluent service')
     iscollection = False
     routespec = None
     if pathcomponents[0] == 'noderange':
