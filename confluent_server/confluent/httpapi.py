@@ -57,7 +57,7 @@ opmap = {
     'PUT': 'update',
     'DELETE': 'delete',
 }
-
+xcat_cfm = None
 
 class RobustCookie(Cookie.SimpleCookie):
     # this is very bad form, but BaseCookie has a terrible flaw
@@ -439,7 +439,10 @@ def resourcehandler_backend(env, start_response):
         for m in authorized['cookie'].values())
     cfgmgr = authorized['cfgmgr']
     if (env['PATH_INFO'].startswith('/xcat')):
-        cfgmgr = xCATConfigManager()
+        global xcat_cfm
+        if xcat_cfm is None:
+            xcat_cfm = xCATConfigManager()
+        cfgmgr = xcat_cfm
     if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
         pagecontent = ""
         try:

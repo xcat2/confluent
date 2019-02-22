@@ -128,6 +128,8 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
         for node in util.natural_sort(list(attributes)):
             for attribute in sorted(attributes[node].iterkeys()):
                 currattr = attributes[node][attribute]
+                if currattr is None:
+                    continue
                 try:
                     desc = allattributes.node[attribute]['description']
                 except KeyError:
@@ -140,6 +142,8 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                 elif isinstance(currattr, list):
                     yield msg.ListAttributes(
                         node, {attribute: currattr}, desc)
+                elif isinstance(currattr, str):
+                    yield msg.Attributes(node, {attribute: currattr}, desc)
                 else:
                     print attribute
                     print repr(currattr)
