@@ -310,9 +310,9 @@ class ConsoleHandler(object):
     def clearbuffer(self):
         self.feedbuffer(
             '\x1bc[No data has been received from the remote console since ' \
-            'connecting.  This could be due to having the console.logging ' \
-            'attribute set to none or interactive, serial console not '  \
-            'being enabled or incorrectly configured in the OS or firmware, ' \
+            'connecting.  This could\r\nbe due to having the console.logging ' \
+            'attribute set to none or interactive,\r\nserial console not '  \
+            'being enabled or incorrectly configured in the OS or\r\nfirmware, ' \
             'or the console simply not having any output since last connection]')
         self.clearpending = True
 
