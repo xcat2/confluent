@@ -36,6 +36,9 @@ class xCATConfigManager(object):
         if xcfm_logger is None:
             xcfm_logger = log.Logger("xcat_manager")
         xcfm_logger.log("Init xCAT configManager")
+        self.decrypt = False
+        self.current_user = 'xcat'
+        self.tenant = None
         self._list_nodes()
         self._list_nodegroup() 
     def _get_data_from_db(self):
@@ -63,14 +66,16 @@ class xCATConfigManager(object):
         for node in nodelist:
             nodeinfo = {} 
             for attr in attrs_dict.keys():
+                self.log("The attr:" + attr)
+                nodeinfo[attr] = {}
                 if attrs_dict[attr] is None:
-                    nodeinfo[attr] = None
+                    nodeinfo[attr]['value'] = None
                 elif isinstance(attrs_dict[attr], list):
-                    nodeinfo[attr] = attrs_dict[attr]
+                    nodeinfo[attr]['value'] = attrs_dict[attr]
                 elif attrs_dict[attr] in dataset[node]:
-                    nodeinfo[attr] = dataset[node][attrs_dict[attr]]
+                    nodeinfo[attr]['value'] = dataset[node][attrs_dict[attr]]
                 else:
-                    nodeinfo[attr] = None
+                    nodeinfo[attr]['value'] = attrs_dict[attr]
             data_store['nodes'][node] = nodeinfo
         
     def _list_nodes(self):
@@ -127,7 +132,14 @@ class xCATConfigManager(object):
                 nodeinfo[attr] = data_store['nodes'][node][attr]
             ret_dict[node] = nodeinfo
         return ret_dict
-   
+    @xcat_manager_decorator
+    def get_collective_member(self, name):
+        return None
+        #return get_collective_member(name)
+    @xcat_manager_decorator
+    def watch_attributes(self, nodes, attributes, callback): 
+        pass
+
     def log(self, logmsg):
         xcfm_logger.log(logmsg)
 if __name__ == '__main__':

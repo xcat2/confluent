@@ -7,7 +7,7 @@
 # 'node', which can be considered a 'system' or a 'vm'
 nodeattrs = {
     'groups': 'nodelist.groups',
-    'collective.manager': 'nodehm.mgt',
+    'collective.manager': None,
     'discovery.passwordrules': None,
     'discovery.policy': ['switch', 'mtms', 'sequential'],
     'info.note': 'nodelist.comments',

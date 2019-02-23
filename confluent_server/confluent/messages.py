@@ -1575,9 +1575,13 @@ class CryptedAttributes(Attributes):
         self.desc = desc
         nkv = {}
         for key in kv.iterkeys():
-            nkv[key] = {'isset': False}
             try:
-                if kv[key] is not None and kv[key]['cryptvalue'] != '':
+                if kv[key] is None:
+                    continue
+                elif not isinstance(kv[key], dict):
+                    self.defaulttype = 'text'
+                    nkv[key] = kv[key]
+                elif kv[key] is not None and kv[key]['cryptvalue'] != '':
                     nkv[key] = {'isset': True}
                     nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
             except KeyError:
