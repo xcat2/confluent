@@ -1499,6 +1499,9 @@ class ConfigManager(object):
                     newattr = _attraliases[attr]
                     attribmap[group][newattr] = attribmap[group][attr]
                     del attribmap[group][attr]
+            if 'noderange' in attribmap[group]:
+                if len(attribmap[group]) > 1:
+                    raise ValueErorr('noderange attribute must be set by itself')            
             for attr in attribmap[group]:
                 if attr in _attraliases:
                     newattr = _attraliases[attr]
@@ -1541,6 +1544,13 @@ class ConfigManager(object):
             if group not in self._cfgstore['nodegroups']:
                 self._cfgstore['nodegroups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['nodegroups'][group]
+            if 'noderange' in attribmap[group] and attribmap[group]['noderange']:
+                if cfgobj['nodes']:
+                    raise ValueError('Cannot set both nodes and noderange on group')
+                if set(cfgobj) - set(['noderange', 'nodes']):
+                    raise ValueError('Cannot set noderange on a group with attributes')
+            elif 'noderange' in cfgobj and cfgobj['noderange']:
+                raise ValueError('Attributes cannot be set on a group with a noderange')
             for attr in attribmap[group]:
                 if attr == 'nodes':
                     newdict = set(attribmap[group][attr])
