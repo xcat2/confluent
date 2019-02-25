@@ -36,9 +36,9 @@ import confluent.client as client
 
 argparser = optparse.OptionParser(
     usage='''\n       %prog [options]   \
-             \n       %prog [options] nodegroup [list of attributes]  \
+             \n       %prog [options] nodegroup [list of attributes|all]  \
              \n       %prog [options] nodegroup nodes=value1,value2   \
-             \n       %prog -e nodegroup <attribute names to set>  \             
+             \n       %prog -e nodegroup <attribute names to set>  \
              \n       %prog [options] nodegroup nodes=value1,value2
              \n ''')
 argparser.add_option('-b', '--blame', action='store_true',
