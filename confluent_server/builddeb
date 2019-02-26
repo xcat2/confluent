@@ -30,6 +30,7 @@ if [ "$DPKGNAME" = "confluent-server" ]; then
     else
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome/' debian/control
     fi
+    echo 'confluent_client confluent-client' >> debian/pydist-overrides
 fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
