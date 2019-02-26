@@ -876,6 +876,9 @@ class IpmiHandler(object):
                 'Extended information unavailable, mismatch detected between '
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute')
+        except pygexc.TemporaryError as e:
+                errorneeded = msg.ConfluentNodeError(
+                self.node, str(e))
         self.output.put(msg.Firmware(items, self.node))
         if errorneeded:
             self.output.put(errorneeded)
