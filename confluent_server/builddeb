@@ -35,8 +35,9 @@ fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
 echo 'Provides: python-'$DPKGNAME >> debian/control
-echo 'Conflicts: python-'$DPKGNAME >> debian/control
+#echo 'Conflicts: python-'$DPKGNAME >> debian/control
 echo 'Replaces: python-'$DPKGNAME >> debian/control
+echo 'Breaks: python-'$DPKGNAME >> debian/control
 
 dpkg-buildpackage -rfakeroot -uc  -us -i
 if [ $? -ne 0 ]; then
