@@ -30,10 +30,14 @@ if [ "$DPKGNAME" = "confluent-server" ]; then
     else
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome/' debian/control
     fi
+    echo 'confluent_client confluent-client' >> debian/pydist-overrides
 fi
+head -n -1 debian/control > debian/control1
+mv debian/control1 debian/control
 echo 'Provides: python-'$DPKGNAME >> debian/control
-echo 'Conflicts: python-'$DPKGNAME >> debian/control
-echo 'Replaces: python-'$DPKGNAME >> debian/control
+#echo 'Conflicts: python-'$DPKGNAME >> debian/control
+echo 'Replaces: python-'$DPKGNAME' (<<2)' >> debian/control
+echo 'Breaks: python-'$DPKGNAME' (<<2)' >> debian/control
 
 dpkg-buildpackage -rfakeroot -uc  -us -i
 if [ $? -ne 0 ]; then

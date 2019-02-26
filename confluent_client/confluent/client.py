@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import anydbm as dbm
+import csv
 import errno
 import fnmatch
 import hashlib
@@ -69,6 +70,23 @@ class Tabulator(object):
         else:
             for row in self.rows:
                 yield fmtstr.format(*row)
+
+    def write_csv(self, output, order=None):
+        output = csv.writer(output)
+        output.writerow(self.headers)
+        i = 0
+        for head in self.headers:
+            if order and order == head:
+                order = i
+            i = i + 1
+        if order is not None:
+            for row in sorted(
+                    self.rows,
+                    key=lambda x: sortutil.naturalize_string(x[order])):
+                output.writerow(row)
+        else:
+            for row in self.rows:
+                output.writerow(row)
 
 
 def printerror(res, node=None):

@@ -69,10 +69,7 @@ def print_disco(options, session, currmac, outhandler, columns):
             record.append(','.join(rawval))
         else:
             record.append(str(rawval))
-    if options.csv:
-        csv.writer(sys.stdout).writerow(record)
-    else:
-        outhandler.add_row(record)
+    outhandler.add_row(record)
 
 
 def process_header(header):
@@ -204,7 +201,6 @@ def import_csv(options, session):
 
 
 def list_discovery(options, session):
-    outhandler = None
     orderby = None
     if options.fields:
         columns = []
@@ -219,15 +215,12 @@ def list_discovery(options, session):
         for field in columns:
             if options.order.lower() == field.lower():
                 orderby = field
-    if options.csv:
-        if orderby:
-            hsht
-        csv.writer(sys.stdout).writerow(columns)
-    else:
-        outhandler = client.Tabulator(columns)
+    outhandler = client.Tabulator(columns)
     for mac in list_matching_macs(options, session):
         print_disco(options, session, mac, outhandler, columns)
-    if outhandler:
+    if options.csv:
+        outhandler.write_csv(sys.stdout, orderby)
+    else:
         for row in outhandler.get_table(orderby):
             print(row)
 
