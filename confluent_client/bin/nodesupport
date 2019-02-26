@@ -114,7 +114,7 @@ class OptParser(optparse.OptionParser):
 
 def main():
     argparser = OptParser(
-        usage="Usage: %prog <noderange> [servicedata] "
+        usage="Usage: %prog <noderange> servicedata "
               "<filename>",
         epilog='\nservicedata will save service data to the given '
                'directory\n'
