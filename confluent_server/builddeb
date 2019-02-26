@@ -31,6 +31,8 @@ if [ "$DPKGNAME" = "confluent-server" ]; then
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome/' debian/control
     fi
 fi
+head -n -1 debian/control > debian/control1
+mv debian/control1 debian/control
 echo 'Provides: python-'$DPKGNAME >> debian/control
 echo 'Conflicts: python-'$DPKGNAME >> debian/control
 echo 'Replaces: python-'$DPKGNAME >> debian/control
