@@ -117,7 +117,9 @@ def main():
         usage="Usage: %prog <noderange> servicedata "
               "<filename>",
         epilog='\nservicedata will save service data to the given '
-               'directory\n'
+               'directory.  It is saved to the location on the relevant '
+               'management server (the confluent server if running remote, '
+               'and the collective.manager if in collective)\n'
                '\n\nSee `man %prog` for more info.\n')
     (options, args) = argparser.parse_args()
     media = None
