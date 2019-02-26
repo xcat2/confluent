@@ -220,6 +220,8 @@ def list_discovery(options, session):
             if options.order.lower() == field.lower():
                 orderby = field
     if options.csv:
+        if orderby:
+            hsht
         csv.writer(sys.stdout).writerow(columns)
     else:
         outhandler = client.Tabulator(columns)

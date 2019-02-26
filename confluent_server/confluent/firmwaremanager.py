@@ -63,7 +63,7 @@ def execupdate(handler, filename, updateobj, type, owner, node):
                                    'detail': errstr})
     except Exception as e:
         if _tracelog is None:
-            _tracelog = log.logger('trace')
+            _tracelog = log.Logger('trace')
         _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event, event=log.Events.stacktrace)
         updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
                                    'detail': str(e)})
