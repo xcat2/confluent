@@ -619,7 +619,7 @@ class InputAttributes(ConfluentMessage):
                     raise exc.InvalidArgumentException(
                         'Attribute {0} does not accept value {1} (valid values would be {2})'.format(
                             attr, nodeattr[attr], ','.join(validattrs[attr]['validvalues'])))
-            elif validattrs and 'validlist' in validattrs.get(attr, []):
+            elif validattrs and 'validlist' in validattrs.get(attr, []) and nodeattr[attr]:
                 req = nodeattr[attr].split(',')
                 for v in req:
                     if v and v not in validattrs[attr]['validlist']:
@@ -628,7 +628,7 @@ class InputAttributes(ConfluentMessage):
                             '{1} (valid values would be {2})'.format(
                                 attr, v, ','.join(
                                     validattrs[attr]['validlist'])))
-            elif validattrs and 'validlistkeys' in validattrs.get(attr, []):
+            elif validattrs and 'validlistkeys' in validattrs.get(attr, []) and nodeattr[attr]:
                 req = nodeattr[attr].split(',')
                 for v in req:
                     if '=' not in v:
