@@ -93,9 +93,10 @@ node = {
         'description': ('List of static groups for which this node is '
                         'considered a member'),
     },
-    #'type': {
-    #    'description': ('Classification of node as system, vm, etc')
-    #},
+    'type': {
+        'description': ('Classification of node as server or switch'),
+        'validvalues': ('switch', 'server'),
+    },
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},
