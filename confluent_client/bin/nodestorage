@@ -147,13 +147,13 @@ def deletestorage(noderange, options, args):
             print(repr(rsp))
 
 
-def setstorage(noderange, options, args):
-    pass
+# def setstorage(noderange, options, args):
+#     pass
 
 funmap = {
     'create': createstorage,
     'show': showstorage,
-    'set': setstorage,
+#     'set': setstorage,
     'delete': deletestorage,
     'rm': deletestorage,
 }
@@ -162,7 +162,7 @@ funmap = {
 
 def main():
     argparser = OptParser(
-        usage='Usage: %prog <noderange> [show|create|set|delete]',
+        usage='Usage: %prog <noderange> [show|create|delete]',
         epilog='',
     )
     argparser.add_option('-r', '--raidlevel', type='int',
