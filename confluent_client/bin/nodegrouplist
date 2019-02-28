@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2015-2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+__author__ = 'jjohnson2,alin37,andywray'
+
+import optparse
+import os
+import signal
+import sys
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+def main():
+    argparser = optparse.OptionParser(
+    usage="Usage: %prog\n")
+    (options, args) = argparser.parse_args()
+    noderange=""
+    nodelist=""
+    nodelist = '/nodegroups/'
+    session = client.Command()
+    exitcode = 0
+    showtype='all'
+    requestargs=args[1:]
+    nodetype='noderange'
+    if len(args) > 1:
+        exitcode=client.printattributes(session,requestargs,showtype,nodetype,noderange,options)
+    else:
+        for res in session.read(nodelist):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
+                exitcode = 1
+            else:
+                print res['item']['href'].replace('/', '')
+
+    sys.exit(exitcode)
+
+if __name__ == '__main__':
+    main()
