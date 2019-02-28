@@ -45,15 +45,16 @@ def main():
     showtype='all'
     requestargs=args[1:]
     nodetype='noderange'
-    if len(args) > 1:
-        exitcode=client.printattributes(session,requestargs,showtype,nodetype,noderange,options)
+    if len(args) > 0:
+        argparser.print_help()
+        sys.exit(1)
     else:
         for res in session.read(nodelist):
             if 'error' in res:
                 sys.stderr.write(res['error'] + '\n')
                 exitcode = 1
             else:
-                print res['item']['href'].replace('/', '')
+                print(res['item']['href'].replace('/', ''))
 
     sys.exit(exitcode)
 
