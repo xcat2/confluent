@@ -42,10 +42,12 @@ def get_switchcreds(configmanager, switches):
 
 def list_switches(configmanager):
     nodelocations = configmanager.get_node_attributes(
-        configmanager.list_nodes(), ('net*.switch', 'net*.switchport'))
+        configmanager.list_nodes(), ('type', 'net*.switch', 'net*.switchport'))
     switches = set([])
     for node in nodelocations:
         cfg = nodelocations[node]
+        if cfg.get('type', {}).get('value', None) == 'switch':
+            switches.add(node)
         for attr in cfg:
             if not attr.endswith('.switch') or 'value' not in cfg[attr]:
                 continue
