@@ -290,7 +290,7 @@ def logException():
 
 def _do_add_watcher(watcher, added, configmanager):
     try:
-        watcher(added=added, deleting=[], configmanager=configmanager)
+        watcher(added=added, deleting=(), renamed=(), configmanager=configmanager)
     except Exception:
         logException()
 
@@ -1705,7 +1705,7 @@ class ConfigManager(object):
     def _true_del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
             for watcher in self._nodecollwatchers[self.tenant].itervalues():
-                watcher(added=[], deleting=nodes, configmanager=self)
+                watcher(added=(), deleting=nodes, renamed=(), configmanager=self)
         changeset = {}
         for node in nodes:
             # set a reserved attribute for the sake of the change notification

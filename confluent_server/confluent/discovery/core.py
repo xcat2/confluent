@@ -1129,7 +1129,7 @@ def _handle_nodelist_change(configmanager):
         nodeaddhandler = None
 
 
-def newnodes(added, deleting, configmanager):
+def newnodes(added, deleting, renamed, configmanager):
     global attribwatcher
     global needaddhandled
     global nodeaddhandler
