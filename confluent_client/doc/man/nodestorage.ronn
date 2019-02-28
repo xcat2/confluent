@@ -1,0 +1,65 @@
+nodestorage(8) -- Examine/Modify storage configuration of a node
+============================================
+
+## SYNOPSIS
+
+`nodestorage <noderange> [show|create|delete] [options]`  
+
+## DESCRIPTION
+
+`nodestorage` provides access to the remote storage configuration of
+the noderange.
+
+## OPTIONS
+* `-r` **RAIDLEVEL**, `--raidlevel`=**RAIDLEVEL**:
+  RAID level to use when creating an array
+
+* `-d` **DISKS**, `--disks`=**DISKS**:
+   Comma separated list of disks to use, or the word "rest" to
+   indicate use of all available disks
+
+* `-s` **SIZE**, `--size`=**SIZE**:
+  Comma separated list of sizes to use when creating
+  volumes.  The sizes may be absolute size (e.g. 16gb),
+  percentage (10%) or the word "rest" to use remaining
+  capacity, default behavior is to use all capacity to
+  make a volume
+* `-n` **NAME**, `--name`=**NAME**:
+  Comma separated list of names to use when naming
+  volumes, or selecting a volume for delete.  Default
+  behavior is to use implementation provided default
+
+## EXAMPLES
+
+* Deleting the volume `somedata`:
+    `$ nodestorage d5 delete somedata`  
+    `Deleted: somedata`  
+
+* Creating a raid5 of 4 disks and a volume named `somedata`:  
+    `$ nodestorage d5 create -r 5 -d drive0,drive_1,drive_2,drive_3 -n somedata
+    `d5: Volume somedata: Size: 1.905 TB`  
+    `d5: Volume somedata: State: Optimal`  
+    `d5: Volume somedata: Array 1-2`  
+
+* Showing current storage configuration of `d3`:
+    `$ nodestorage d3`  
+    `d3: Disk m.2-0 Description: 128GB M.2 SATA SSD`  
+    `d3: Disk m.2-0 State: online`  
+    `d3: Disk m.2-0 FRU: 00LF428`  
+    `d3: Disk m.2-0 Serial Number: H6B80054`  
+    `d3: Disk m.2-0 Array: 0-0`  
+    `d3: Disk m.2-1 Description: 128GB M.2 SATA SSD`  
+    `d3: Disk m.2-1 State: online`  
+    `d3: Disk m.2-1 FRU: 00LF428`  
+    `d3: Disk m.2-1 Serial Number: H6B80059`  
+    `d3: Disk m.2-1 Array: 0-0`  
+    `d3: Array 0-0 Available Capacity: 0.000 MB`  
+    `d3: Array 0-0 Total Capacity: 131.072 GB`  
+    `d3: Array 0-0 RAID: RAID 1`  
+    `d3: Array 0-0 Disks: m.2-0,m.2-1`  
+    `d3: Array 0-0 Volumes: new_vd`  
+    `d3: Volume new_vd: Size: 122.040 GB`  
+    `d3: Volume new_vd: State: Optimal`  
+    `d3: Volume new_vd: Array 0-0`  
+
+
