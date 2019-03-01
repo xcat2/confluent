@@ -1837,7 +1837,7 @@ class ConfigManager(object):
         if self.tenant in self._nodecollwatchers:
             nodecollwatchers = self._nodecollwatchers[self.tenant]
             for watcher in nodecollwatchers.itervalues():
-                eventlet.spawn_n(_do_add_watcher, watcher, None, self, renamemap)
+                eventlet.spawn_n(_do_add_watcher, watcher, (), self, renamemap)
         self._bg_sync_to_file()
 
     def set_node_attributes(self, attribmap, autocreate=False):
