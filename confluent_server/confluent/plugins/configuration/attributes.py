@@ -165,7 +165,7 @@ def update_nodegroup(group, element, configmanager, inputdata):
         namemap = {}
         namemap[group] = inputdata.attribs['rename']
         configmanager.rename_nodegroups(namemap)
-        return yield_rename_resources(namemap)
+        return yield_rename_resources(namemap, isnode=False)
     try:
         clearattribs = []
         for attrib in inputdata.attribs.iterkeys():
@@ -205,9 +205,12 @@ def create(nodes, element, configmanager, inputdata):
     if nodes is not None and element[-1] == 'expression':
         return _expand_expression(nodes, configmanager, inputdata)
 
-def yield_rename_resources(namemap):
+def yield_rename_resources(namemap, isnode):
     for node in namemap:
-        yield msg.RenamedResource(node, namemap[node])
+        if isnode:
+            yield msg.RenamedNode(node, namemap[node])
+        else:
+            yield msg.RenamedResource(node, namemap[node])
 
 def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
@@ -221,7 +224,7 @@ def update_nodes(nodes, element, configmanager, inputdata):
             rename = inputdata.get_attributes(node)
             namemap[node] = rename['rename']
         configmanager.rename_nodes(namemap)
-        return yield_rename_resources(namemap)
+        return yield_rename_resources(namemap, isnode=True)
     for node in nodes:
         updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []

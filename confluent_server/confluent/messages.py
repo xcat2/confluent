@@ -278,6 +278,13 @@ class RenamedResource(ConfluentMessage):
         pass
 
 
+class RenamedNode(ConfluentMessage):
+    def __init__(self, name, rename):
+        self.desc = 'New Name'
+        kv = {'rename': {'value': rename}}
+        self.kvpairs = {name: kv}
+
+
 class AssignedResource(ConfluentMessage):
     notnode = True
     readonly = True
