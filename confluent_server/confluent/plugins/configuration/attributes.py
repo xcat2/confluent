@@ -161,6 +161,11 @@ def update(nodes, element, configmanager, inputdata):
 
 
 def update_nodegroup(group, element, configmanager, inputdata):
+    if 'rename' in element:
+        namemap = {}
+        namemap[group] = inputdata.attribs['rename']
+        configmanager.rename_nodegroups(namemap)
+        return yield_rename_resources(namemap)
     try:
         clearattribs = []
         for attrib in inputdata.attribs.iterkeys():

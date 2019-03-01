@@ -380,6 +380,7 @@ def _init_core():
 
     nodegroupresources = {
         'attributes': {
+            'rename': PluginRoute({'handler': 'attributes'}),
             'all': PluginRoute({'handler': 'attributes'}),
             'current': PluginRoute({'handler': 'attributes'}),
         },

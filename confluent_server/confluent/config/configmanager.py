@@ -180,8 +180,14 @@ def _rpc_set_user(tenant, name, attributemap):
 def _rpc_master_set_node_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant).set_node_attributes(attribmap, autocreate)
 
+
 def _rpc_master_rename_nodes(tenant, renamemap):
     ConfigManager(tenant).rename_nodes(renamemap)
+
+
+def _rpc_master_rename_nodegroups(tenant, renamemap):
+    ConfigManager(tenant).rename_nodegroups(renamemap)
+
 
 def _rpc_master_clear_node_attributes(tenant, nodes, attributes):
     ConfigManager(tenant).clear_node_attributes(nodes, attributes)
@@ -238,6 +244,10 @@ def _rpc_set_node_attributes(tenant, attribmap, autocreate):
 
 def _rpc_rename_nodes(tenant, renamemap):
     ConfigManager(tenant)._true_rename_nodes(renamemap)
+
+
+def _rpc_rename_nodegroups(tenant, renamemap):
+    ConfigManager(tenant)._true_rename_nodegroups(renamemap)
 
 
 def _rpc_set_group_attributes(tenant, attribmap, autocreate):
@@ -1839,6 +1849,41 @@ class ConfigManager(object):
             for watcher in nodecollwatchers.itervalues():
                 eventlet.spawn_n(_do_add_watcher, watcher, (), self, renamemap)
         self._bg_sync_to_file()
+
+    def rename_nodegroups(self, renamemap):
+        if cfgleader:
+            return exec_on_leader('_rpc_master_rename_nodegroups', self.tenant, renamemap)
+        if cfgstreams:
+            exec_on_followers('_rpc_rename_nodegroups', self.tenant, renamemap)
+        self._true_rename_groups(renamemap)
+
+    def _true_rename_groups(self, renamemap):
+        oldnames = set(renamemap)
+        currgroups = set(self._cfgstore['nodegroups'])
+        missinggroups = oldnames - currgroups
+        if missinggroups:
+            raise ValueError(
+                'The following groups to rename do not exist: {0}'.format(
+                    ','.join(missinggroups)))
+        newnames = set([])
+        for name in renamemap:
+            newnames.add(renamemap[name])
+        if newnames & currgroups:
+            raise ValueError(
+                'The following requested new names conflict with existing groups: {0}'.format(
+                    ','.join(newnames & currgroups)))
+        for name in renamemap:
+            self._cfgstore['nodegroups'][renamemap[name]] = self._cfgstore['nodegroups'][name]
+            del self._cfgstore['nodegroups'][name]
+            _mark_dirtykey('nodegroups', name, self.tenant)
+            _mark_dirtykey('nodegroups', renamemap[name], self.tenant)
+            for node in self._cfgstore['nodegroups'][renamemap[name]].get('nodes', []):
+                lidx = self._cfgstore['nodes'][node]['groups'].index(name)
+                self._cfgstore['nodes'][node]['groups'][lidx] = renamemap[name]
+                _mark_dirtykey('nodes', node, self.tenant)
+        self._bg_sync_to_file()
+
+
 
     def set_node_attributes(self, attribmap, autocreate=False):
         if cfgleader:  # currently config slave to another
