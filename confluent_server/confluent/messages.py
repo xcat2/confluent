@@ -267,6 +267,24 @@ class CreatedResource(ConfluentMessage):
         pass
 
 
+class RenamedResource(ConfluentMessage):
+    notnode = True
+    readonly = True
+
+    def __init__(self, oldname, newname):
+        self.kvpairs = {'oldname': oldname, 'newname': newname}
+
+    def strip_node(self, node):
+        pass
+
+
+class RenamedNode(ConfluentMessage):
+    def __init__(self, name, rename):
+        self.desc = 'New Name'
+        kv = {'rename': {'value': rename}}
+        self.kvpairs = {name: kv}
+
+
 class AssignedResource(ConfluentMessage):
     notnode = True
     readonly = True
@@ -381,6 +399,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputReseatMessage(path, nodes, inputdata)
     elif path == ['attributes', 'expression']:
         return InputExpression(path, inputdata, nodes)
+    elif path == ['attributes', 'rename']:
+        return InputConfigChangeSet(path, inputdata, nodes, configmanager)
     elif path[0] in ('attributes', 'users') and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
@@ -539,8 +559,6 @@ class InputConfigClear(ConfluentMessage):
             raise exc.InvalidArgumentException('Input must be {"clear":true}')
 
 class InputConfigChangeSet(InputExpression):
-    # For now, this is identical to InputExpression, later it may
-    # internalize formula expansion, but not now..
     def __init__(self, path, inputdata, nodes=None, configmanager=None):
         self.cfm = configmanager
         super(InputConfigChangeSet, self).__init__(path, inputdata, nodes)

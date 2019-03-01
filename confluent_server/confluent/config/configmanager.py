@@ -181,6 +181,14 @@ def _rpc_master_set_node_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant).set_node_attributes(attribmap, autocreate)
 
 
+def _rpc_master_rename_nodes(tenant, renamemap):
+    ConfigManager(tenant).rename_nodes(renamemap)
+
+
+def _rpc_master_rename_nodegroups(tenant, renamemap):
+    ConfigManager(tenant).rename_nodegroups(renamemap)
+
+
 def _rpc_master_clear_node_attributes(tenant, nodes, attributes):
     ConfigManager(tenant).clear_node_attributes(nodes, attributes)
 
@@ -232,6 +240,14 @@ def _rpc_del_nodes(tenant, nodes):
 
 def _rpc_set_node_attributes(tenant, attribmap, autocreate):
     ConfigManager(tenant)._true_set_node_attributes(attribmap, autocreate)
+
+
+def _rpc_rename_nodes(tenant, renamemap):
+    ConfigManager(tenant)._true_rename_nodes(renamemap)
+
+
+def _rpc_rename_nodegroups(tenant, renamemap):
+    ConfigManager(tenant)._true_rename_nodegroups(renamemap)
 
 
 def _rpc_set_group_attributes(tenant, attribmap, autocreate):
@@ -288,9 +304,9 @@ def logException():
                  event=confluent.log.Events.stacktrace)
 
 
-def _do_add_watcher(watcher, added, configmanager):
+def _do_add_watcher(watcher, added, configmanager, renamed=()):
     try:
-        watcher(added=added, deleting=[], configmanager=configmanager)
+        watcher(added=added, deleting=(), renamed=renamed, configmanager=configmanager)
     except Exception:
         logException()
 
@@ -1705,7 +1721,7 @@ class ConfigManager(object):
     def _true_del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
             for watcher in self._nodecollwatchers[self.tenant].itervalues():
-                watcher(added=[], deleting=nodes, configmanager=self)
+                watcher(added=(), deleting=nodes, renamed=(), configmanager=self)
         changeset = {}
         for node in nodes:
             # set a reserved attribute for the sake of the change notification
@@ -1788,6 +1804,86 @@ class ConfigManager(object):
             if 'groups' not in attribmap[node]:
                 attribmap[node]['groups'] = []
         self.set_node_attributes(attribmap, autocreate=True)
+
+    def rename_nodes(self, renamemap):
+        if cfgleader:
+            return exec_on_leader('_rpc_master_rename_nodes', self.tenant,
+            renamemap)
+        if cfgstreams:
+            exec_on_followers('_rpc_rename_nodes', self.tenant, renamemap)
+        self._true_rename_nodes(renamemap)
+
+    def _true_rename_nodes(self, renamemap):
+        oldnames = set(renamemap)
+        exprmgr = None
+        currnodes = set(self._cfgstore['nodes'])
+        missingnodes = oldnames - currnodes
+        if missingnodes:
+            raise ValueError(
+                'The following nodes to rename do not exist: {0}'.format(
+                    ','.join(missingnodes)))
+        newnames = set([])
+        for name in renamemap:
+            newnames.add(renamemap[name])
+        if newnames & currnodes:
+            raise ValueError(
+                'The following requested new names conflict with existing nodes: {0}'.format(
+                    ','.join(newnames & currnodes)))
+        for name in renamemap:
+            self._cfgstore['nodes'][renamemap[name]] = self._cfgstore['nodes'][name]
+            del self._cfgstore['nodes'][name]
+            _mark_dirtykey('nodes', name, self.tenant)
+            _mark_dirtykey('nodes', renamemap[name], self.tenant)
+            for group in self._cfgstore['nodes'][renamemap[name]].get('groups', []):
+                self._cfgstore['nodegroups'][group]['nodes'].discard(name)
+                self._cfgstore['nodegroups'][group]['nodes'].add(renamemap[name])
+                _mark_dirtykey('nodegroups', group, self.tenant)
+            cfgobj = self._cfgstore['nodes'][renamemap[name]]
+            node = renamemap[name]
+            changeset = {}
+            if exprmgr is None:
+                exprmgr = _ExpressionFormat(cfgobj, node)
+            self._recalculate_expressions(cfgobj, formatter=exprmgr, node=renamemap[name], changeset=changeset)
+        if self.tenant in self._nodecollwatchers:
+            nodecollwatchers = self._nodecollwatchers[self.tenant]
+            for watcher in nodecollwatchers.itervalues():
+                eventlet.spawn_n(_do_add_watcher, watcher, (), self, renamemap)
+        self._bg_sync_to_file()
+
+    def rename_nodegroups(self, renamemap):
+        if cfgleader:
+            return exec_on_leader('_rpc_master_rename_nodegroups', self.tenant, renamemap)
+        if cfgstreams:
+            exec_on_followers('_rpc_rename_nodegroups', self.tenant, renamemap)
+        self._true_rename_groups(renamemap)
+
+    def _true_rename_groups(self, renamemap):
+        oldnames = set(renamemap)
+        currgroups = set(self._cfgstore['nodegroups'])
+        missinggroups = oldnames - currgroups
+        if missinggroups:
+            raise ValueError(
+                'The following groups to rename do not exist: {0}'.format(
+                    ','.join(missinggroups)))
+        newnames = set([])
+        for name in renamemap:
+            newnames.add(renamemap[name])
+        if newnames & currgroups:
+            raise ValueError(
+                'The following requested new names conflict with existing groups: {0}'.format(
+                    ','.join(newnames & currgroups)))
+        for name in renamemap:
+            self._cfgstore['nodegroups'][renamemap[name]] = self._cfgstore['nodegroups'][name]
+            del self._cfgstore['nodegroups'][name]
+            _mark_dirtykey('nodegroups', name, self.tenant)
+            _mark_dirtykey('nodegroups', renamemap[name], self.tenant)
+            for node in self._cfgstore['nodegroups'][renamemap[name]].get('nodes', []):
+                lidx = self._cfgstore['nodes'][node]['groups'].index(name)
+                self._cfgstore['nodes'][node]['groups'][lidx] = renamemap[name]
+                _mark_dirtykey('nodes', node, self.tenant)
+        self._bg_sync_to_file()
+
+
 
     def set_node_attributes(self, attribmap, autocreate=False):
         if cfgleader:  # currently config slave to another

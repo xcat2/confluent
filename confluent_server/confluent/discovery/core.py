@@ -1129,11 +1129,12 @@ def _handle_nodelist_change(configmanager):
         nodeaddhandler = None
 
 
-def newnodes(added, deleting, configmanager):
+def newnodes(added, deleting, renamed, configmanager):
     global attribwatcher
     global needaddhandled
     global nodeaddhandler
-    for node in deleting:
+    alldeleting = set(deleting) | set(renamed)
+    for node in alldeleting:
         if node not in known_nodes:
             continue
         for mac in known_nodes[node]:
