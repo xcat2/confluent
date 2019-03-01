@@ -622,10 +622,13 @@ def disconnect_node(node, configmanager):
 
 
 def _nodechange(added, deleting, renamed, configmanager, renamed=()):
-    for node in added:
-        connect_node(node, configmanager)
     for node in deleting:
         disconnect_node(node, configmanager)
+    for node in renamed:
+        disconnect_node(node, configmanager)
+        connect_node(renamed[node], configmanager)
+    for node in added:
+        connect_node(node, configmanager)
 
 
 def _start_tenant_sessions(cfm):

@@ -144,6 +144,7 @@ def _init_core():
     # be enumerated in any collection
     noderesources = {
         'attributes': {
+            'rename': PluginRoute({'handler': 'attributes'}),
             'all': PluginRoute({'handler': 'attributes'}),
             'current': PluginRoute({'handler': 'attributes'}),
             'expression': PluginRoute({'handler': 'attributes'}),
