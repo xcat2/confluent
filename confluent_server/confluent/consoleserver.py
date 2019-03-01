@@ -621,7 +621,7 @@ def disconnect_node(node, configmanager):
         del _handled_consoles[consk]
 
 
-def _nodechange(added, deleting, renamed, configmanager, renamed=()):
+def _nodechange(added, deleting, renamed, configmanager):
     for node in deleting:
         disconnect_node(node, configmanager)
     for node in renamed:
