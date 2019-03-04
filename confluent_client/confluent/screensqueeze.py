@@ -44,6 +44,8 @@ class ScreenPrinter(object):
         self.fieldwidth = maxlen + textlen + 1  # 1 for column
 
     def set_output(self, node, text):
+        if self.nodeoutput[node] == text:
+            return
         self.nodeoutput[node] = text
         if len(text) >= self.textlen:
             self.textlen = len(text) + 1
