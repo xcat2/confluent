@@ -57,6 +57,9 @@ int add_macs(char* destination, int maxsize) {
 }
 
 int main(int argc, char* argv[]) {
+    struct ifaddrs *ifc, *ifa;
+    struct sockaddr_in6 *in6;
+
     int ns;
     struct sockaddr_in6 addr, dst;
     char msg[1024];
@@ -85,9 +88,18 @@ int main(int argc, char* argv[]) {
     offset = strnlen(msg, 1024);
     ns = socket(PF_INET6, SOCK_DGRAM, 0);
     bind(ns, (const struct sockaddr *)&addr, sizeof(addr));
-    ifidx = 2;
-    setsockopt(ns, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifidx, sizeof(ifidx));
-    sendto(ns, msg, strlen(msg), 0, (const struct sockaddr *)&dst, sizeof(dst));
+    getifaddrs(&ifa);
+    for (ifc = ifa; ifc != NULL; ifc = ifc->ifa_next) {
+        if (ifc->ifa_addr->sa_family != PF_INET6) {
+            continue;
+        }
+        in6 = (struct sockaddr_in6 *)ifc->ifa_addr;
+        if (in6->sin6_scope_id == 0)
+            continue;
+        ifidx = in6->sin6_scope_id;
+        setsockopt(ns, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifidx, sizeof(ifidx));
+        sendto(ns, msg, strlen(msg), 0, (const struct sockaddr *)&dst, sizeof(dst));
+    }
     recvfrom(ns, msg, 1024, 0, (struct sockaddr *)&dst, &dstsize);
     inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
     printf(msg);
