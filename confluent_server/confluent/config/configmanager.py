@@ -1055,24 +1055,32 @@ class ConfigManager(object):
             raise Exception('Invalid Expression')
         for node in nodes:
             try:
-                currval = self._cfgstore['nodes'][node][attribute]['value']
+                currvals = [self._cfgstore['nodes'][node][attribute]['value']]
             except KeyError:
                 # Let's treat 'not set' as being an empty string for this path
-                currval = ''
-            if exmatch:
-                if yieldmatches:
-                    if exmatch.search(currval):
-                        yield node
+                currvals = list(
+                    [self._cfgstore['nodes'][node][x].get('value', '') 
+                    for x in fnmatch.filter(self._cfgstore['nodes'][node], attribute)])
+                currvals.append('')
+            for currval in currvals:
+                if exmatch:
+                    if yieldmatches:
+                        if exmatch.search(currval):
+                            yield node
+                            break
+                    else:
+                        if not exmatch.search(currval):
+                            yield node
+                            break
                 else:
-                    if not exmatch.search(currval):
-                        yield node
-            else:
-                if yieldmatches:
-                    if match == currval:
-                        yield node
-                else:
-                    if match != currval:
-                        yield node
+                    if yieldmatches:
+                        if match == currval:
+                            yield node
+                            break
+                    else:
+                        if match != currval:
+                            yield node
+                            break
 
     def filter_nodenames(self, expression, nodes=None):
         """Filter nodenames by regular expression
