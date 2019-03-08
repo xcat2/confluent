@@ -34,6 +34,7 @@ class SwitchSensor(object):
         self.name = name
         self.value = value
         self.states = states
+        self.health = health
 
 
 def cnos_login(node, configmanager, creds):
