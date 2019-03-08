@@ -68,7 +68,10 @@ int main(int argc, char* argv[]) {
     struct sockaddr_in6 addr, dst;
     struct sockaddr_in addr4, dst4;
     char msg[1024];
+    char lastmsg[1024];
     int ifidx, offset;
+    fd_set rfds;
+    struct timeval tv;
     socklen_t dstsize, dst4size;
     dstsize = sizeof(dst);
     dst4size = sizeof(dst4);
@@ -101,9 +104,10 @@ int main(int argc, char* argv[]) {
     offset = strnlen(msg, 1024);
     ns = socket(AF_INET6, SOCK_DGRAM, 0);
     n4 = socket(AF_INET, SOCK_DGRAM, 0);
-    ifidx = 1;
+    ifidx = 1; /* reuse ifidx because it's an unused int here */
     setsockopt(n4, SOL_SOCKET, SO_BROADCAST, &ifidx, sizeof(ifidx));
     setsockopt(ns, IPPROTO_IPV6, IPV6_V6ONLY, &ifidx, sizeof(ifidx));
+    /* For now, bind to 190 to prove we are a privileged process */
     bind(n4, (const struct sockaddr *)&addr4, sizeof(addr4));
     bind(ns, (const struct sockaddr *)&addr, sizeof(addr));
     getifaddrs(&ifa);
@@ -128,7 +132,37 @@ int main(int argc, char* argv[]) {
         }
         
     }
-    recvfrom(ns, msg, 1024, 0, (struct sockaddr *)&dst, &dstsize);
-    inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
-    printf(msg);
+    FD_ZERO(&rfds);
+    FD_SET(n4, &rfds);
+    FD_SET(ns, &rfds);
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+    ifidx = select(FD_SETSIZE, &rfds, NULL, NULL, &tv);
+    while (ifidx) {
+        if (ifidx == -1) perror("Unable to select");
+        if (ifidx) { 
+            if (FD_ISSET(n4, &rfds)) {
+                recvfrom(n4, msg, 1024, 0, (struct sockaddr *)&dst4, &dst4size);
+                inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
+                /* Take measure from printing out the same ip twice in a row */
+                if (strncmp(lastmsg, msg, 1024) != 0) {
+                    printf("%s\n", msg);
+                    strncpy(lastmsg, msg, 1024);
+                }
+            }
+            if (FD_ISSET(ns, &rfds)) {
+                recvfrom(ns, msg, 1024, 0, (struct sockaddr *)&dst, &dstsize);
+                inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
+                if (strncmp(lastmsg, msg, 1024) != 0) {
+                    printf("%s\n", msg);
+                    strncpy(lastmsg, msg, 1024);
+                }
+            }
+        }
+        tv.tv_sec = 0;
+        tv.tv_usec = 500000;
+        FD_SET(n4, &rfds);
+        FD_SET(ns, &rfds);
+        ifidx = select(FD_SETSIZE, &rfds, NULL, NULL, &tv);
+    }
 }
