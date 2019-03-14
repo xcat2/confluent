@@ -1,3 +1,4 @@
+import fcntl
 import os
 import struct
 import termios
@@ -46,6 +47,8 @@ def do_serial_config():
         currattr = termios.tcgetattr(ttyf)
         currattr[4:6] = [0, termiobaud[retval['speed']]]
         termios.tcsetattr(ttyf, termios.TCSANOW, currattr)
+    retval['connected'] = bool(struct.unpack('<I', fcntl.ioctl(
+        ttyf, termios.TIOCMGET, '\x00\x00\x00\x00'))[0] & termios.TIOCM_CAR)
     return retval
 
 
