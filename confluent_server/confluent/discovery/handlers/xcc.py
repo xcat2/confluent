@@ -94,8 +94,6 @@ class NodeHandler(immhandler.NodeHandler):
         # Ok, we can get the enclosure uuid now..
         enclosureuuid = ic._oem.immhandler.get_property(
             '/v2/ibmc/smm/chassis/uuid')
-        enclosureuuid = ic._oem.immhandler.get_property(
-            '/v2/ibmc/smm/chassis/uuid')
         if enclosureuuid:
             enclosureuuid = imm.fixup_uuid(enclosureuuid).lower()
             em = self.configmanager.get_node_attributes(nodename,
