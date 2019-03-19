@@ -2,6 +2,9 @@
 cd `dirname $0`
 PKGNAME=$(basename $(pwd))
 DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
+if grep wheezy /etc/os-release; then
+    DPKGNAME=python-$DPKGNAME
+fi
 cd ..
 mkdir -p /tmp/confluent # $DPKGNAME
 cp -a * .git /tmp/confluent # $DPKGNAME
