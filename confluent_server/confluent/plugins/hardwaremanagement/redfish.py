@@ -38,6 +38,7 @@ if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
 
 pci_cache = {}
+_workers = None
 
 def get_dns_txt(qstring):
     return eventlet.support.greendns.resolver.query(
@@ -151,6 +152,7 @@ def sanitize_invdata(indata):
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
+        global _workers
         self.cfm = cfm
         self.node = node
         self._inhealth = False
@@ -162,17 +164,11 @@ class IpmiCommandWrapper(ipmicommand.Command):
         kv = util.TLSCertVerifier(cfm, node,
                                   'pubkeys.tls_hardwaremanager').verify_cert
         kwargs['verifycallback'] = kv
+        if not _workers:
+            _workers = eventlet.greenpool.GreenPool()
+        kwargs['pool'] = _workers
         super(self.__class__, self).__init__(**kwargs)
-        try:
-            os.makedirs('/var/cache/confluent/ipmi/')
-        except OSError as e:
-            if e.errno != errno.EEXIST or not os.path.isdir(
-                    '/var/cache/confluent/ipmi/'):
-                raise
-        try:
-            self.set_sdr_cachedir('/var/cache/confluent/ipmi/')
-        except Exception:
-            pass
+
 
     def close_confluent(self):
         if self._attribwatcher:
