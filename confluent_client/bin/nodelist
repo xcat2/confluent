@@ -46,7 +46,10 @@ def main():
         noderange = args[0]
         nodelist = '/noderange/{0}/nodes/'.format(noderange)
     except IndexError:
-        nodelist = '/nodes/'
+        if os.environ.get('TEST_XCAT'):
+            nodelist = "/xcat/nodes/"
+        else:
+            nodelist = '/nodes/'
     client.check_globbing(noderange)
     session = client.Command()
     exitcode = 0
