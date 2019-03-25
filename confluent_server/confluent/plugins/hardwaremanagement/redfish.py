@@ -37,8 +37,8 @@ import ssl
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
 
-pci_cache = {}
 _workers = None
+pci_cache = {}
 
 def get_dns_txt(qstring):
     return eventlet.support.greendns.resolver.query(
@@ -153,6 +153,9 @@ def sanitize_invdata(indata):
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         global _workers
+        if _workers is None:
+            _workers = eventlet.greenpool.GreenPool()
+        kwargs['pool'] = _workers
         self.cfm = cfm
         self.node = node
         self._inhealth = False
@@ -164,11 +167,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
         kv = util.TLSCertVerifier(cfm, node,
                                   'pubkeys.tls_hardwaremanager').verify_cert
         kwargs['verifycallback'] = kv
-        if not _workers:
-            _workers = eventlet.greenpool.GreenPool()
-        kwargs['pool'] = _workers
         super(self.__class__, self).__init__(**kwargs)
-
 
     def close_confluent(self):
         if self._attribwatcher:
@@ -191,7 +190,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
         self._inhealth = True
         try:
             self._lasthealth = super(IpmiCommandWrapper, self).get_health()
-        except Exception:
+        except Exception as e:
             self._inhealth = False
             raise
         self._inhealth = False
@@ -826,8 +825,11 @@ class IpmiHandler(object):
         if newinf.get('information', None) and 'name' in newinf['information']:
             newinf = copy.deepcopy(newinf)
             del newinf['information']['name']
-        if fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
-                newinf['name'], 'PCIeGen? x*'):
+        if (fnmatch(newinf['name'], 'Adapter ??:??:??') or
+                fnmatch(newinf['name'], 'PCIeGen? x*') or
+                newinf['name'] == 'Adapter' or
+                newinf['name'].startswith('slot_') or
+                newinf['name'].startswith('ob_')):
             myinf = newinf.get('information', {})
             sdid = myinf.get('PCI Subsystem Device ID', None)
             svid = myinf.get('PCI Subsystem Vendor ID', None)
@@ -1352,4 +1354,5 @@ def delete(nodes, element, configmanager, inputdata):
                                               element, type='ffdc')
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata, 'delete')
+
 
