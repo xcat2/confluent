@@ -2,6 +2,7 @@
 cd `dirname $0`
 PKGNAME=$(basename $(pwd))
 DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
+OPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
 if grep wheezy /etc/os-release; then
     DPKGNAME=python-$DPKGNAME
 fi
@@ -27,9 +28,9 @@ python setup.py sdist > /dev/null 2>&1
 py2dsc dist/*.tar.gz
 shopt -s extglob
 cd deb_dist/!(*.orig)/
-if [ "$DPKGNAME" = "confluent-server" ]; then
+if [ "$OPKGNAME" = "confluent-server" ]; then
     if grep wheezy /etc/os-release; then
-        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
+        sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
     else
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome/' debian/control
     fi
@@ -41,10 +42,10 @@ if [ "$DPKGNAME" = "confluent-server" ]; then
 fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
-echo 'Provides: python-'$DPKGNAME >> debian/control
+#echo 'Provides: python-'$DPKGNAME >> debian/control
 #echo 'Conflicts: python-'$DPKGNAME >> debian/control
-echo 'Replaces: python-'$DPKGNAME' (<<2)' >> debian/control
-echo 'Breaks: python-'$DPKGNAME' (<<2)' >> debian/control
+#echo 'Replaces: python-'$DPKGNAME' (<<2)' >> debian/control
+#echo 'Breaks: python-'$DPKGNAME' (<<2)' >> debian/control
 
 dpkg-buildpackage -rfakeroot -uc  -us -i
 if [ $? -ne 0 ]; then
