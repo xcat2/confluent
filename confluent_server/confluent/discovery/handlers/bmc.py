@@ -109,9 +109,14 @@ class NodeHandler(generic.NodeHandler):
             netconfig = netutil.get_nic_config(cfg, nodename, ip=newip)
             plen = netconfig['prefix']
             newip = '{0}/{1}'.format(newip, plen)
-            ic.set_net_configuration(ipv4_address=newip,
-                                     ipv4_configuration='static',
-                                     ipv4_gateway=netconfig['ipv4_gateway'])
+            currcfg = ic.get_net_configuration()
+            if currcfg['ipv4_address'] != newip:
+                # do not change the ipv4_config if the current config looks
+                # like it is already accurate
+                ic.set_net_configuration(ipv4_address=newip,
+                                         ipv4_configuration='static',
+                                         ipv4_gateway=netconfig[
+                                             'ipv4_gateway'])
         elif self.ipaddr.startswith('fe80::'):
             cfg.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
