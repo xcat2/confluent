@@ -1,4 +1,4 @@
-nodegroupattrib(8) -- List or change confluent nodegroup attributes
+nodegrouplist(8) -- List the defined confluent nodegroups
 ===================================================================
 
 ## SYNOPSIS
