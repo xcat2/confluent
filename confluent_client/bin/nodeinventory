@@ -50,12 +50,12 @@ def print_mem_info(node, prefix, meminfo):
     memdescfmt = '{0}GB PC'
     if meminfo['memory_type'] == 'DDR3 SDRAM':
         memdescfmt += '3-{1} '
-    elif meminfo['memory_type'] == 'DDR4 SDRAM':
+    elif 'DDR4' in meminfo['memory_type']:
         memdescfmt += '4-{1} '
     else:
         print('{0}: {1}: Unrecognized Memory'.format(node, prefix))
         return
-    if meminfo['ecc']:
+    if meminfo.get('ecc', False):
         memdescfmt += 'ECC '
     capacity = meminfo['capacity_mb'] / 1024
     memdescfmt += meminfo['module_type']
@@ -66,10 +66,11 @@ def print_mem_info(node, prefix, meminfo):
     print('{0}: {1} model: {2}'.format(node, prefix, meminfo['model']))
     print('{0}: {1} serial number: {2}'.format(node, prefix,
                                                meminfo['serial']))
-    print('{0}: {1} manufacture date: {2}'.format(node, prefix,
-                                                  meminfo['manufacture_date']))
-    print('{0}: {1} manufacture location: {2}'.format(
-        node, prefix, meminfo['manufacture_location']))
+    if 'manufacture_date' in meminfo:
+        print('{0}: {1} manufacture date: {2}'.format(node, prefix,
+                                                      meminfo['manufacture_date']))
+        print('{0}: {1} manufacture location: {2}'.format(
+            node, prefix, meminfo['manufacture_location']))
 
 exitcode = 0
 
