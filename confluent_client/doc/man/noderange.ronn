@@ -36,6 +36,9 @@ Also, regular expressions may be used to indicate nodes with names matching cert
 The other major noderange primitive is indicating nodes by some attribute value:
 `location.rack=7`
 
+The attribute name may use a wildcard:
+`net.*switch=switch1`
+
 Commas can be used to indicate multiple nodes, and can mix and match any of the above primitives. The following can be a valid single noderange, combining any and all members of each comma separated component
 `n1,n2,rack1,storage,location.rack=9,~s1..,n20-n30`
 
