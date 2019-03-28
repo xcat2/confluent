@@ -23,6 +23,9 @@ For a full list of attributes, run `nodeattrib <node> all` against a node.
 If `-c` is specified, this will set the nodeattribute to a null value.
 This is different from setting the value to an empty string.
 
+Attributes may be specified by wildcard, for example `net.*switch` will report
+all attributes that begin with `net.` and end with `switch`.
+
 If the word all is specified, then all available attributes are given.
 Omitting any attribute name or the word 'all' will display only attributes
 that are currently set.
@@ -87,6 +90,12 @@ See nodegroupattrib(8) command on how to manage attributes on a group level.
     `# nodeattrib n1-n2 console.method`  
     `n1: console.method: `  
     `n2: console.method: `  
+
+* List all switches that a node is described as connected to:
+    `# nodeattrib d1 net.*switch`  
+    `d1: net.mgt.switch: mgtswitch1`  
+    `d1: net.pxe.switch: pxeswitch1`  
+    `d1: net.switch:`  
 
 ## SEE ALSO
 
