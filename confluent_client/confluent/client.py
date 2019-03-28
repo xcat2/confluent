@@ -136,6 +136,8 @@ class Command(object):
             self.serverloc = server
         if os.path.isabs(self.serverloc) and os.path.exists(self.serverloc):
             self._connect_unix()
+        elif self.serverloc == '/var/run/confluent/api.sock':
+            raise Exception('Confluent service is not available')
         else:
             self._connect_tls()
         tlvdata.recv(self.connection)
