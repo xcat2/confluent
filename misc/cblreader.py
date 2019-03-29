@@ -1,3 +1,4 @@
+import collections
 import os
 import struct
 import sys
@@ -19,29 +20,34 @@ def writeout(data):
 def main(binfile, txtfile):
     binf = open(binfile, 'r')
     txtf = open(txtfile, 'r')
-    record = binf.read(16)
+    records = collections.deque([])
+    records.append(get_next_text_record(binf))
     oldtcattr = termios.tcgetattr(sys.stdin.fileno())
     tty.setraw(sys.stdin.fileno())
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
-    recordcount = 1
-    while record:
-        showrecords(record, txtf, binf, recordcount)
-        recordcount = 1
+    while True:
+        newdata = showrecords(records, txtf, binf)
         select.select((sys.stdin,), (), (), 86400)
         myinput = sys.stdin.read()
         if myinput == '\x1b[C':  # right
-            record = binf.read(16)
+            if newdata:
+                sys.stdout.write(newdata)
+                newdata = ''
+            if not records:
+                records.append(get_next_text_record(binf))
         elif myinput == '\x1b[D':  # left
             sys.stdout.write('\x1b[2J\x1b[;H')
-            numrecords = 0
             prevoffset = 1
-            while numrecords < 16 and prevoffset > 0:
+            restoreoffset = binf.tell() - 16
+            while len(records) < 16 and prevoffset > 0:
                 prevoffset = binf.tell() - 32
                 if prevoffset < 0:
                     prevoffset = 0
                 binf.seek(prevoffset)
                 record = binf.read(16)
+                if not record:
+                    break
                 while record[1] != '\x02' and prevoffset > 0:
                     prevoffset = binf.tell() - 32
                     if prevoffset < 0:
@@ -49,19 +55,33 @@ def main(binfile, txtfile):
                     binf.seek(prevoffset)
                     record = binf.read(16)
                 if record[1] == '\x02':
-                    numrecords += 1
-            recordcount = numrecords
+                    records.appendleft(record)
+                else:
+                    records.appendleft(get_next_text_record(binf))
+            binf.seek(restoreoffset if restoreoffset > 0 else 0)
         elif myinput.lower() == 'q':
             break
+        elif myinput.lower() == 'd':
+            print(repr(records))
+            print(repr(binf.tell()))
         else:
-            record = binf.read(16)
+            records.append(get_next_text_record(binf))
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     sys.stdout.write('\x1b[m')
 
-def showrecords(record, txtf, binf, recordcount):
-    while record and recordcount:
+def get_next_text_record(binf):
+    record = binf.read(16)
+    while record and record[1] != '\x02':
+        record = binf.read(16)
+    return record
+
+
+def showrecords(records, txtf, binf):
+    extradata = ''
+    while records and records[0] and not extradata:
+        record = records.popleft()
         recs = struct.unpack('!BBIHIBBH', record)
         offset = recs[2]
         size = recs[3]
@@ -70,14 +90,13 @@ def showrecords(record, txtf, binf, recordcount):
             tstamp = time.strftime('%m/%d %H:%M:%S ', time.localtime(tstamp))
             txtf.seek(offset)
             currdata = txtf.read(size)
+            if not records and not currdata.startswith('\x1b[2J') and '\x1b[2J' in currdata:
+                currdata, extradata = currdata.split('\x1b[2J', 1)
+                extradata = '\x1b[2J' + extradata
             sys.stdout.write(currdata)
             sys.stdout.write('\x1b]0;{0}\x07'.format(tstamp))
             sys.stdout.flush()
-            recordcount -= 1
-            if recordcount:
-                record = binf.read(16)
-        else:
-            record = binf.read(16)
+    return extradata
 
 
 
