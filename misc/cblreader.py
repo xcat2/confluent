@@ -17,92 +17,146 @@ def writeout(data):
         except IOError:
             pass
 
-def main(binfile, txtfile):
-    binf = open(binfile, 'r')
-    txtf = open(txtfile, 'r')
-    records = collections.deque([])
-    records.append(get_next_text_record(binf))
+
+class LogReplay(object):
+    def __init__(self, logfile, cblfile):
+        self.bin = open(cblfile, 'r')
+        self.txt = open(logfile, 'r')
+        self.dbgout = open('/tmp/cbldbg.out', 'w')
+        self.cleardata = []
+        self.clearidx = 0
+        self.pendingdata = collections.deque([])
+        self.priordata = collections.deque([])
+        self.laststamp = None
+
+    def _rewind(self, datasize=None):
+        curroffset = self.bin.tell() - 16
+        if self.cleardata and self.clearidx > 0:
+            self.clearidx -= 1
+            priordata = self.cleardata[self.clearidx]
+            return curroffset, priordata
+        newoffset = curroffset - 32
+        if newoffset < 0:  #TODO: Follow a log roll
+            newoffset = 0
+        if datasize:
+            while datasize > 0 and newoffset > 0:
+                self.dbgout.write('seeking to {0}!\n'.format(newoffset))
+                self.dbgout.flush()
+                self.bin.seek(newoffset)
+                tmprec = self.bin.read(16)
+                newoffset -= 32
+                tmprec = struct.unpack('!BBIHIBBH', tmprec)
+                if tmprec[1] == 2:
+                    datasize -= tmprec[3]
+        if newoffset >= 0:
+            self.dbgout.write('seeking to {0}!\n'.format(newoffset))
+            self.dbgout.flush()
+            self.bin.seek(newoffset)
+        return curroffset, None
+
+    def debuginfo(self):
+        return '{0}, {1}'.format(self.bin.tell(), self.clearidx)
+
+    def get_output(self, reverse=False):
+        endoffset = None
+        output = ''
+        if reverse:  # Forget the uncommited future, if present
+            output += '\x1b[2J'
+            endoffset, priordata = self._rewind(4096)
+            if priordata is not None:
+                return priordata, 1
+        if self.cleardata and self.clearidx < len(self.cleardata):
+            datachunk = self.cleardata[self.clearidx]
+            self.clearidx += 1
+            return datachunk, 1
+        self.cleardata = []
+        self.clearidx = 0
+        while (not reverse) or (self.bin.tell() < endoffset):
+            record = self.bin.read(16)
+            record = struct.unpack('!BBIHIBBH', record)
+            if record[0] > 16:
+                # Unsupported record, skip
+                self.bin.seek(record[0] - 16, 1)
+                continue
+            type = record[1]
+            offset = record[2]
+            size = record[3]
+            evtdata = record[5]
+            auxdata = record[6]
+            if type == 3:
+                #TODO: provide data for status bar
+                continue
+            elif type == 2:
+                self.laststamp = record[4]
+                self.txt.seek(offset)
+                txtout = self.txt.read(size)
+                if reverse and self.bin.tell() < endoffset:
+                    output += txtout
+                    continue
+                if '\x1b[2J' in txtout:
+                    self.cleardata = ['\x1b[2J' + x for x in txtout.split('\x1b[2J') if x]
+                    self.clearidx = 0
+                    if self.cleardata:
+                        output += self.cleardata[0]
+                        self.clearidx = 1
+                else:
+                    output += txtout
+                break
+        if endoffset is not None and endoffset >= 0:
+            self.dbgout.write('seeking to {0}\n'.format(endoffset))
+            self.dbgout.flush()
+            self.bin.seek(endoffset)
+        return output, 1
+
+
+def main(txtfile, binfile):
+    replay = LogReplay(txtfile, binfile)
     oldtcattr = termios.tcgetattr(sys.stdin.fileno())
     tty.setraw(sys.stdin.fileno())
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
-    while True:
-        newdata = showrecords(records, txtf, binf)
-        select.select((sys.stdin,), (), (), 86400)
-        myinput = sys.stdin.read()
-        if myinput == '\x1b[C':  # right
-            if newdata:
-                sys.stdout.write(newdata)
-                newdata = ''
-            if not records:
-                records.append(get_next_text_record(binf))
-        elif myinput == '\x1b[D':  # left
-            sys.stdout.write('\x1b[2J\x1b[;H')
-            prevoffset = 1
-            restoreoffset = binf.tell() - 16
-            while len(records) < 16 and prevoffset > 0:
-                prevoffset = binf.tell() - 32
-                if prevoffset < 0:
-                    prevoffset = 0
-                binf.seek(prevoffset)
-                record = binf.read(16)
-                if not record:
-                    break
-                while record[1] != '\x02' and prevoffset > 0:
-                    prevoffset = binf.tell() - 32
-                    if prevoffset < 0:
-                        prevoffset = 0
-                    binf.seek(prevoffset)
-                    record = binf.read(16)
-                if record[1] == '\x02':
-                    records.appendleft(record)
-                else:
-                    records.appendleft(get_next_text_record(binf))
-            binf.seek(restoreoffset if restoreoffset > 0 else 0)
-        elif myinput.lower() == 'q':
-            break
-        elif myinput.lower() == 'd':
-            print(repr(records))
-            print(repr(binf.tell()))
-        else:
-            records.append(get_next_text_record(binf))
+    reverse = False
+    skipnext = False
+    try:
+        while True:
+            if not skipnext:
+                newdata, delay = replay.get_output(reverse)
+            skipnext = False
+            reverse = False
+            writeout(newdata)
+            writeout('\x1b]0;[Time: {0}]\x07'.format(
+                time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
+            sys.stdout.flush()
+            select.select((sys.stdin,), (), (), 86400)
+            myinput = sys.stdin.read()
+            if myinput == '\x1b[C':  # right
+                continue
+            elif myinput == '\x1b[D':  # left
+                writeout('\x1b[2J\x1b[;H')
+                reverse = True
+                continue
+            elif myinput.lower() == 'q':
+                break
+            elif myinput.lower() == 'd':
+                writeout('\x1b];{0}\x07'.format(replay.debuginfo()))
+                sys.stdout.flush()
+                select.select((sys.stdin,), (), (), 3200)
+                skipnext = True
+            else:
+                continue
+    except Exception:
+        currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+        writeout('\x1b[m')
+        raise
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
-    sys.stdout.write('\x1b[m')
+    writeout('\x1b[m')
 
-def get_next_text_record(binf):
-    record = binf.read(16)
-    while record and record[1] != '\x02':
-        record = binf.read(16)
-    return record
-
-
-def showrecords(records, txtf, binf):
-    extradata = ''
-    while records and records[0] and not extradata:
-        record = records.popleft()
-        recs = struct.unpack('!BBIHIBBH', record)
-        offset = recs[2]
-        size = recs[3]
-        tstamp = recs[4]
-        if recs[1] == 2:
-            tstamp = time.strftime('%m/%d %H:%M:%S ', time.localtime(tstamp))
-            txtf.seek(offset)
-            currdata = txtf.read(size)
-            if not records and not currdata.startswith('\x1b[2J') and '\x1b[2J' in currdata:
-                currdata, extradata = currdata.split('\x1b[2J', 1)
-                extradata = '\x1b[2J' + extradata
-            sys.stdout.write(currdata)
-            sys.stdout.write('\x1b]0;{0}\x07'.format(tstamp))
-            sys.stdout.flush()
-    return extradata
-
-
-
-    
 if __name__ == '__main__':
-    binfile = sys.argv[1]
-    txtfile = sys.argv[2]
-    main(binfile, txtfile)
+    binfile = sys.argv[2]
+    txtfile = sys.argv[1]
+    main(txtfile, binfile)
 
