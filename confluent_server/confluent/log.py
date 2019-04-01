@@ -51,11 +51,15 @@
 #    - leading bit reserved, 0 for now
 #    - length of metadata record 7 bits
 #    - type of data referenced by this entry (one byte), currently:
-#       0=text event, 1=json, 2=console data
+#       0=text event, 1=json, 2=console data, 3=event
 #    - offset into the text log to begin (4 bytes)
 #    - length of data referenced by this entry (2 bytes)
-#    - UTC timestamp of this entry in seconds since epoch (unsigned 32 bit?)
-#    - CRC32 over the record
+#    - UTC timestamp of this entry in seconds since epoch (unsigned 32 bit)
+#    - Event type (per 'Events' class below)
+#    - Event data (per event, currently used by connect/disconnect to represent
+#      single or multiple connections by user and for 'appmode' and 'shiftin'
+#      status for console
+#    - 2 reserved bytes
 #    (a future extended version might include suport for Forward Secure Sealing
 #    or other fields)
 
