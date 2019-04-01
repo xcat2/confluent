@@ -3,8 +3,8 @@ nodeconfig(8) -- Show or change node configuration
 
 ## SYNOPSIS
 
-`nodeconfig <noderange> [options] [<configuration>..]`
-`nodeconfig <noderange> [options] [<configuration=value>..]`
+`nodeconfig <noderange> [options] [<configuration>..]`  
+`nodeconfig <noderange> [options] [<configuration=value>..]`  
 
 ## DESCRIPTION
 
