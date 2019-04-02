@@ -159,7 +159,9 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
                                          'python-pyopenssl installed or has an '
                                          'incorrect version installed '
                                          '(e.g. pyOpenSSL would need to be '
-                                         'replaced with python-pyopenssl)'}})
+                                         'replaced with python-pyopenssl). '
+                                         'Restart confluent after updating '
+                                         'the dependency.'}})
             return
         return collective.handle_connection(connection, None, request['collective'],
                                      local=True)
