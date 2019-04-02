@@ -77,7 +77,11 @@ class NodeHandler(immhandler.NodeHandler):
                 ruleset['USER_GlobalMinPassReuseCycle'] = value
         ic.register_key_handler(self.validate_cert)
         ic.oem_init()
-        ic._oem.immhandler.wc.grab_json_response('/api/dataset', ruleset)
+        try:
+            ic._oem.immhandler.wc.grab_json_response('/api/dataset', ruleset)
+        except Exception as e:
+            print(repr(e))
+            pass
 
     def config(self, nodename, reset=False):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
