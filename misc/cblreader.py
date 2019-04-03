@@ -22,7 +22,6 @@ class LogReplay(object):
     def __init__(self, logfile, cblfile):
         self.bin = open(cblfile, 'r')
         self.txt = open(logfile, 'r')
-        self.dbgout = open('/tmp/cbldbg.out', 'w')
         self.cleardata = []
         self.clearidx = 0
         self.pendingdata = collections.deque([])
@@ -31,17 +30,17 @@ class LogReplay(object):
 
     def _rewind(self, datasize=None):
         curroffset = self.bin.tell() - 16
-        if self.cleardata and self.clearidx > 0:
+        if self.cleardata and self.clearidx > 1:
             self.clearidx -= 1
-            priordata = self.cleardata[self.clearidx]
+            priordata = self.cleardata[self.clearidx - 1]
             return curroffset, priordata
+        self.cleardata = []
+        self.clearidx = 0
         newoffset = curroffset - 32
         if newoffset < 0:  #TODO: Follow a log roll
             newoffset = 0
         if datasize:
             while datasize > 0 and newoffset > 0:
-                self.dbgout.write('seeking to {0}!\n'.format(newoffset))
-                self.dbgout.flush()
                 self.bin.seek(newoffset)
                 tmprec = self.bin.read(16)
                 newoffset -= 32
@@ -49,8 +48,6 @@ class LogReplay(object):
                 if tmprec[1] == 2:
                     datasize -= tmprec[3]
         if newoffset >= 0:
-            self.dbgout.write('seeking to {0}!\n'.format(newoffset))
-            self.dbgout.flush()
             self.bin.seek(newoffset)
         return curroffset, None
 
@@ -94,17 +91,23 @@ class LogReplay(object):
                     output += txtout
                     continue
                 if '\x1b[2J' in txtout:
-                    self.cleardata = ['\x1b[2J' + x for x in txtout.split('\x1b[2J') if x]
+                    self.cleardata = txtout.split('\x1b[2J')
+                    for idx in range(1, len(self.cleardata)):
+                        self.cleardata[idx] = '\x1b[2J' + self.cleardata[idx]
                     self.clearidx = 0
+                    if not self.cleardata[0]:
+                        self.cleardata = self.cleardata[1:]
                     if self.cleardata:
-                        output += self.cleardata[0]
-                        self.clearidx = 1
+                        if reverse:
+                            output = self.cleardata[-1]
+                            self.clearidx = len(self.cleardata)
+                        else:
+                            output += self.cleardata[0]
+                            self.clearidx = 1
                 else:
                     output += txtout
                 break
         if endoffset is not None and endoffset >= 0:
-            self.dbgout.write('seeking to {0}\n'.format(endoffset))
-            self.dbgout.flush()
             self.bin.seek(endoffset)
         return output, 1
 
@@ -117,6 +120,7 @@ def main(txtfile, binfile):
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
     reverse = False
     skipnext = False
+    writeout('\x1b[2J\x1b[;H')
     try:
         while True:
             if not skipnext:
