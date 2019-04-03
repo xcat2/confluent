@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import collections
 import os
 import struct
@@ -10,12 +11,12 @@ import tty
 
 def writeout(data):
     done = False
-    while not done:
-        try:
-            sys.stdout.write(data)
-            done = True
-        except IOError:
-            pass
+    try:
+        sys.stdout.write(data)
+        done = True
+    except IOError:
+        time.sleep(0.1)
+        pass
 
 
 class LogReplay(object):
@@ -120,9 +121,10 @@ def main(txtfile, binfile):
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
     reverse = False
     skipnext = False
+    quitit = False
     writeout('\x1b[2J\x1b[;H')
     try:
-        while True:
+        while not quitit:
             if not skipnext:
                 newdata, delay = replay.get_output(reverse)
             skipnext = False
@@ -131,23 +133,21 @@ def main(txtfile, binfile):
             writeout('\x1b]0;[Time: {0}]\x07'.format(
                 time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
             sys.stdout.flush()
-            select.select((sys.stdin,), (), (), 86400)
-            myinput = sys.stdin.read()
-            if myinput == '\x1b[C':  # right
-                continue
-            elif myinput == '\x1b[D':  # left
-                writeout('\x1b[2J\x1b[;H')
-                reverse = True
-                continue
-            elif myinput.lower() == 'q':
-                break
-            elif myinput.lower() == 'd':
-                writeout('\x1b];{0}\x07'.format(replay.debuginfo()))
-                sys.stdout.flush()
-                select.select((sys.stdin,), (), (), 3200)
-                skipnext = True
-            else:
-                continue
+            while True:
+                select.select((sys.stdin,), (), (), 86400)
+                myinput = sys.stdin.read()
+                if myinput.startswith('\x1b[C') or myinput.startswith('\x1bOC'):  # right
+                    break
+                elif myinput.startswith('\x1b[D') or myinput.startswith('\x1bOD'):  # left
+                    writeout('\x1b[2J\x1b[;H')
+                    reverse = True
+                    break
+                elif myinput.lower() == 'q':
+                    quitit = True
+                    break
+                elif myinput.lower() == 'd':
+                    writeout('\x1b];{0}\x07'.format(replay.debuginfo()))
+                    sys.stdout.flush()
     except Exception:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
@@ -163,4 +163,3 @@ if __name__ == '__main__':
     binfile = sys.argv[2]
     txtfile = sys.argv[1]
     main(txtfile, binfile)
-
