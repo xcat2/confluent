@@ -101,11 +101,11 @@ def main():
     sl = sp.add_parser('show', help='Show information about the collective')
     ic = sp.add_parser('invite', help='Generate a invitation to allow a new '
                                     'confluent instance to join as a '
-                                    'collective member')
+                                    'collective member.  Run collective invite -h for more information')
     ic.add_argument('name', help='Name of server to invite to join the '
                                  'collective')
-    jc = sp.add_parser('join', help='Join a collective')
-    jc.add_argument('server', help='A server currently in the collective')
+    jc = sp.add_parser('join', help='Join a collective.  Run collective join -h for more information')
+    jc.add_argument('server', help='Existing collective member that ran invite and generated a token')
     jc.add_argument('-i', help='Invitation provided by runniing invite on an '
                                'existing collective member')
     cmdset = a.parse_args()
