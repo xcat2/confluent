@@ -335,6 +335,7 @@ def _add_attributes(parsed):
     else:
         net = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
+        net.settimeout(1.0)
         net.connect(target)
     except socket.error:
         return
@@ -363,6 +364,7 @@ def query_srvtypes(target):
     while tries and not connected:
         tries -= 1
         try:
+            net.settimeout(1.0)
             net.connect(target)
             connected = True
         except socket.error:
