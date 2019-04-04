@@ -63,6 +63,7 @@
 
 import base64
 import confluent.config.configmanager as cfm
+import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
 #import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
@@ -1055,6 +1056,14 @@ def discover_node(cfg, handler, info, nodename, manual):
                 traceback.print_exc()
                 return False
             newnodeattribs = {}
+            if cfm.list_collective():
+                # We are in a collective, check collective.manager
+                cmc = cfg.get_node_attributes(nodename, 'collective.manager')
+                cm = cmc.get(nodename, {}).get('collective.manager', {}).get('value', None)
+                if not cm:
+                    # Node is being discovered in collective, but no collective.manager, default
+                    # to the collective member actually able to execute the discovery
+                    newnodeattribs['collective.manager'] = collective.get_myname()
             if 'uuid' in info:
                 newnodeattribs['id.uuid'] = info['uuid']
             if 'serialnumber' in info:
