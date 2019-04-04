@@ -1,0 +1,55 @@
+collective(1) -- Check and manage a confluent collective
+==============================
+
+## SYNOPSIS
+
+`collective invite <server>`  
+`collective join <server> [-i TOKEN]`  
+`collective show`  
+`collective gencert`  
+
+
+## DESCRIPTION
+
+**collective** helps manage the collective mode of confluent, where multiple
+confluent servers are linked together to act as one.  For example, the procedure to set up
+a collective to run on three servers called mgt1, mgt2, and mgt3, first install and start
+confluent as usual on the three servers.  On mgt1, run `collective invite mgt2` and an
+invitation token will be output.  On mgt2, either run `collective join mgt1` to paste
+the token interactively, or `collective join mgt1 -i <token>`.  At this point, either
+mgt1 or mgt2 can bring in mgt3.  For example on mgt2 run `collective invite mgt3` and
+on mgt3 run `collective join mgt2 -i <token>`
+
+This can be linked together in the following manner with ssh:
+on mgt1:
+  `# ssh mgt2 collective join mgt1 -i $(collective invite mgt2)`
+
+Note that a collective is only redundant with 3 or more members.  The collective
+will function so long as more than half of the members are online.  A collective
+of two members is supported, but without redundancy.
+
+Also note that the collective leader role is dynamic, but has no impact on interacting
+with confluent.  It is merely an internal role that can dynamically change depending
+on circumstances.
+
+## OPTIONS
+
+ * `-i`:
+    Provide the token as an argument rather than interactively.
+   
+## EXAMPLES
+ * Inviting a server called mgt2:
+  `# collective invite mgt2`  
+  `bWd0MkA+BNQ6XAxMXlqJJa+EQRlihL/k9xCXnasgSQXZr989Pa1/ln7G3e1Ncxx6BMzMqqreHJVkPr2FrzjNit/UgHlg`  
+
+* On mgt2, joining mgt1:
+  `# collective join mgt1 -i bWd0MkA+BNQ6XAxMXlqJJa+EQRlihL/k9xCXnasgSQXZr989Pa1/ln7G3e1Ncxx6BMzMqqreHJVkPr2FrzjNit/UgHlg`  
+  `Success`  
+
+* Showing the collective state:
+  `# collective show`  
+  `Quorum: True`  
+  `Leader: mgt1`  
+  `Active collective members:`  
+  `  mgt2`  
+
