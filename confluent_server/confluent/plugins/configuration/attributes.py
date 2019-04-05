@@ -74,6 +74,8 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
         for attribute in sorted(list(grpcfg)):
             currattr = grpcfg[attribute]
             if attribute == 'nodes':
+                if not currattr:
+                    continue
                 desc = 'The nodes belonging to this group'
             elif attribute == 'noderange':
                 desc = 'A dynamic noderange that this group refers to in noderange expansion'
@@ -97,8 +99,8 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                     kv={attribute: currattr},
                     desc=desc)
             else:
-                print attribute
-                print repr(currattr)
+                print(attribute)
+                print(repr(currattr))
                 raise Exception("BUGGY ATTRIBUTE FOR NODEGROUP")
 
 
