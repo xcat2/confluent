@@ -28,6 +28,7 @@ class LogReplay(object):
         self.pendingdata = collections.deque([])
         self.priordata = collections.deque([])
         self.laststamp = None
+        self.needclear = False
 
     def _rewind(self, datasize=None):
         curroffset = self.bin.tell() - 16
@@ -59,10 +60,13 @@ class LogReplay(object):
         endoffset = None
         output = ''
         if reverse:  # Forget the uncommited future, if present
-            output += '\x1b[2J'
+            output += '\x1b[2J\x1b[H'
             endoffset, priordata = self._rewind(4096)
             if priordata is not None:
                 return priordata, 1
+        elif self.needclear:
+            output += '\x1b[2J\x1b[H'
+            self.needclear = False
         if self.cleardata and self.clearidx < len(self.cleardata):
             datachunk = self.cleardata[self.clearidx]
             self.clearidx += 1
@@ -71,6 +75,8 @@ class LogReplay(object):
         self.clearidx = 0
         while (not reverse) or (self.bin.tell() < endoffset):
             record = self.bin.read(16)
+            if not record:
+                return '', 0
             record = struct.unpack('!BBIHIBBH', record)
             if record[0] > 16:
                 # Unsupported record, skip
@@ -112,6 +118,13 @@ class LogReplay(object):
             self.bin.seek(endoffset)
         return output, 1
 
+    def begin(self):
+        self.needclear = True
+        self.bin.seek(0)
+
+    def end(self):
+        self.bin.seek(0, 2)
+
 
 def main(txtfile, binfile):
     replay = LogReplay(txtfile, binfile)
@@ -129,25 +142,35 @@ def main(txtfile, binfile):
                 newdata, delay = replay.get_output(reverse)
             skipnext = False
             reverse = False
-            writeout(newdata)
-            writeout('\x1b]0;[Time: {0}]\x07'.format(
-                time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
-            sys.stdout.flush()
+            if newdata:
+                writeout(newdata)
+                writeout('\x1b]0;[Time: {0}]\x07'.format(
+                    time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
+                sys.stdout.flush()
             while True:
                 select.select((sys.stdin,), (), (), 86400)
                 myinput = sys.stdin.read()
-                if myinput.startswith('\x1b[C') or myinput.startswith('\x1bOC'):  # right
+                if myinput.startswith('\x1b[C') or myinput.startswith('\x1bOC') or myinput == '\r':  # right
                     break
-                elif myinput.startswith('\x1b[D') or myinput.startswith('\x1bOD'):  # left
+                elif myinput.startswith('\x1b[D') or myinput.startswith('\x1bOD') or myinput == 'y':  # left
                     writeout('\x1b[2J\x1b[;H')
                     reverse = True
                     break
-                elif myinput.lower() == 'q':
+                elif myinput == 'G' or myinput.startswith('\x1b[F'):
+                    replay.end()
+                    reverse = True
+                    break
+                elif myinput == 'g' or myinput.startswith('\x1b[H'):
+                    replay.begin()
+                    break
+                elif myinput.lower() == 'q' or myinput == '\x03':
                     quitit = True
                     break
                 elif myinput.lower() == 'd':
                     writeout('\x1b];{0}\x07'.format(replay.debuginfo()))
                     sys.stdout.flush()
+                else:
+                    pass # print(repr(myinput))
     except Exception:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
@@ -160,6 +183,17 @@ def main(txtfile, binfile):
     writeout('\x1b[m')
 
 if __name__ == '__main__':
-    binfile = sys.argv[2]
     txtfile = sys.argv[1]
+    if len(sys.argv) > 2:
+        binfile = sys.argv[2]
+    else:
+        if os.path.exists(txtfile + '.cbl'):
+            binfile = txtfile + '.cbl'
+        else:
+            fileparts = txtfile.split('.')
+            prefix = '.'.join(fileparts[:-1])
+            binfile = prefix + '.cbl.' + fileparts[-1]
+            if not os.path.exists(binfile):
+                sys.stderr.write('Unable to locate cbl file\n')
+                sys.exit(1)
     main(txtfile, binfile)
