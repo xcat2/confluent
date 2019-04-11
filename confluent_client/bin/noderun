@@ -39,11 +39,13 @@ import confluent.sortutil as sortutil
 
 def run():
     argparser = optparse.OptionParser(
-        usage="Usage: %prog noderange commandexpression",
+        usage="Usage: %prog [options] noderange commandexpression",
         epilog="Expressions are the same as in attributes, e.g. "
                "'ipmitool -H {hardwaremanagement.manager}' will be expanded.")
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of commands to run at a time')
+    argparser.add_option('-n', '--nonodeprefix', action='store_true',
+                         help='Do not prefix output with node names')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
     # processes can be unkind for the unaware on memory pressure and such...
     argparser.disable_interspersed_args()
@@ -93,7 +95,10 @@ def run():
                             pernodeout[node] = []
                         pernodeout[node].append(data)
                     else:
-                        sys.stderr.write('{0}: {1}'.format(node, data))
+                        if options.nonodeprefix:
+                            sys.stderr.write(data)
+                        else:
+                            sys.stderr.write('{0}: {1}'.format(node, data))
                         sys.stderr.flush()
                 else:
                     pop = desc['popen']
@@ -107,7 +112,10 @@ def run():
                             run_cmdv(node, cmdv, all, pipedesc)
         for node in sortutil.natural_sort(pernodeout):
             for line in pernodeout[node]:
-                sys.stdout.write('{0}: {1}'.format(node, line))
+                if options.nonodeprefix:
+                    sys.stdout.write(line)
+                else:
+                    sys.stdout.write('{0}: {1}'.format(node, line))
         sys.stdout.flush()
         if all:
             rdy, _, _ = select.select(all, [], [], 10)
