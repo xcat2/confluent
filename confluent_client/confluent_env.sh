@@ -190,6 +190,13 @@ _confluent_nodesupport_completion()
     fi
 }
 
+_confluent_nodeattrib_completion()
+{
+    COMP_CANDIDATES=$(nodeattrib '~.>1' all | awk '{print $2}'|sed -e 's/://')
+    _confluent_generic_completion
+}
+
+
 _confluent_nn_completion()
 {
     _confluent_get_args
@@ -250,7 +257,8 @@ _confluent_ng_completion()
 
     COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
 }
-complete -F _confluent_nr_completion nodeattrib
+complete -F _confluent_nodeattrib_completion nodeattrib
+complete -F _confluent_nodeattrib_completion nodegroupattrib
 complete -F _confluent_nr_completion nodebmcreset
 complete -F _confluent_nodesetboot_completion nodeboot
 complete -F _confluent_nr_completion nodeconfig
