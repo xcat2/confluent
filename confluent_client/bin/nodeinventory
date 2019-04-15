@@ -58,7 +58,9 @@ def print_mem_info(node, prefix, meminfo):
     if meminfo.get('ecc', False):
         memdescfmt += 'ECC '
     capacity = meminfo['capacity_mb'] / 1024
-    memdescfmt += meminfo['module_type']
+    modtype = meminfo.get('module_type', None)
+    if modtype:
+        memdescfmt += modtype
     memdesc = memdescfmt.format(capacity, meminfo['speed'])
     print('{0}: {1} description: {2}'.format(node, prefix, memdesc))
     print('{0}: {1} manufacturer: {2}'.format(
