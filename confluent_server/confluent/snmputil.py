@@ -79,14 +79,16 @@ class Session(object):
         # overriden, but some devices only support DES)
         tp = _get_transport(self.server)
         ctx = snmp.ContextData(self.context)
+        resolvemib = False
         if '::' in oid:
+            resolvemib = True
             mib, field = oid.split('::')
             obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
         else:
             obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
 
         walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
-                               lexicographicMode=False)
+                               lexicographicMode=False, lookupMib=resolvemib)
         try:
             for rsp in walking:
                 errstr, errnum, erridx, answers = rsp
