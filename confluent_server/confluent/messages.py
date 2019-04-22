@@ -1192,6 +1192,7 @@ class EventCollection(ConfluentMessage):
                 'event': event.get('event', None),
                 'severity': event['severity'],
                 'timestamp': event.get('timestamp', None),
+                'message': event.get('message', None),
                 'record_id': event.get('record_id', None),
             }
             if event['severity'] not in valid_health_values:
