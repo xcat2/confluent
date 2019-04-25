@@ -1,0 +1,37 @@
+#!/usr/bin/python
+
+import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+import os
+import sixel
+import subprocess
+import sys
+import tempfile
+
+class DumbWriter(sixel.SixelWriter):
+    def restore_position(self, output):
+        return
+
+
+plotdata = []
+data = sys.stdin.readline()
+while data:
+    datum = float(data.split()[-1])
+    plotdata.append(datum)
+    data = sys.stdin.readline()
+n, bins, patches = plt.hist(plotdata, 20)
+plt.show()
+path = tempfile.mkdtemp()
+plt.savefig('{0}/histo.png'.format(path))
+writer = DumbWriter()
+writer.draw('{0}/histo.png'.format(path))
+print('Min: {3} Median: {0} Mean: {1} Max: {4} Standard Deviation: {2} Samples: {5}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata)))
+os.remove('{0}/histo.png'.format(path))
+os.rmdir(path)
+
+
+
+
+
