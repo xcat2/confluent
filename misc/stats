@@ -15,12 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import argparse
 import io
 import numpy as np
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
+
 import os
 import sixel
 import subprocess
@@ -32,17 +30,37 @@ class DumbWriter(sixel.SixelWriter):
         return
 
 
+def plot(gui, output, plotdata):
+    import matplotlib as mpl
+    if not gui:
+        mpl.use('Agg')
+    import matplotlib.pyplot as plt
+    n, bins, patches = plt.hist(plotdata, 20)
+    plt.show()
+    if not gui:
+        if output:
+            tdata = output
+        else:
+            tdata = io.BytesIO()
+        plt.savefig(tdata)
+    if not gui and not output:
+        writer = DumbWriter()
+        writer.draw(tdata)
+
+histogram = False
+aparser = argparse.ArgumentParser(description='Quick access to common statistics')
+aparser.add_argument('-c', type=int, default=0, help='Column number to analyze')
+aparser.add_argument('-s', default=False, action='store_true', help='Output histogram in sixel format')
+aparser.add_argument('-g', default=False, action='store_true', help='Open histogram in separate graphical window')
+aparser.add_argument('-o', default=None, help='Output histogram to the specified filename in PNG format')
+args = aparser.parse_args(sys.argv[1:])
 plotdata = []
 data = sys.stdin.readline()
 while data:
-    datum = float(data.split()[-1])
+    datum = float(data.split()[args.c - 1])
     plotdata.append(datum)
     data = sys.stdin.readline()
-n, bins, patches = plt.hist(plotdata, 20)
-plt.show()
-tdata = io.BytesIO()
-plt.savefig(tdata)
-writer = DumbWriter()
-writer.draw(tdata)
-print('Min: {3} Median: {0} Mean: {1} Max: {4} Standard Deviation: {2} Samples: {5}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata)))
+if args.g or args.o or args.s:
+    plot(args.g, args.o, plotdata)
+print('Samples: {5} Min: {3} Median: {0} Mean: {1} Max: {4} StandardDeviation: {2}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata)))
 
