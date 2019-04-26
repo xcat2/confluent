@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import argparse
+import fcntl
 import io
 import numpy as np
 
@@ -23,19 +24,18 @@ import os
 import sixel
 import subprocess
 import sys
-import tempfile
 
 class DumbWriter(sixel.SixelWriter):
     def restore_position(self, output):
         return
 
 
-def plot(gui, output, plotdata):
+def plot(gui, output, plotdata, bins):
     import matplotlib as mpl
     if not gui:
         mpl.use('Agg')
     import matplotlib.pyplot as plt
-    n, bins, patches = plt.hist(plotdata, 20)
+    n, bins, patches = plt.hist(plotdata, bins)
     plt.show()
     if not gui:
         if output:
@@ -46,21 +46,75 @@ def plot(gui, output, plotdata):
     if not gui and not output:
         writer = DumbWriter()
         writer.draw(tdata)
+    return n, bins
+
+def textplot(plotdata, bins):
+    n, bins = np.histogram(plotdata, bins)
+    labels = []
+    for bin in bins:
+        labels.append('{0:0.1f}'.format(bin))
+    width = 80
+    # Since this will be primarily piped into, hard to get 
+    # terminal width
+    labelwidth = 0
+    for lab in labels:
+        if len(lab) > labelwidth:
+            labelwidth = len(lab)
+    width -= (labelwidth) + 1
+    labelfmt = '{{0:>{0}s}}|'.format(labelwidth)
+    maxn = 0.0
+    for lgth in n:
+        if lgth > maxn:
+            maxn = float(lgth)
+    for i in range(len(n)):
+        print(labelfmt.format(labels[i]) + '=' * int(np.round((n[i]/maxn) * width)))
+    return n, bins
 
 histogram = False
 aparser = argparse.ArgumentParser(description='Quick access to common statistics')
-aparser.add_argument('-c', type=int, default=0, help='Column number to analyze')
+aparser.add_argument('-c', type=int, default=0, help='Column number to analyze (default is last column)')
 aparser.add_argument('-s', default=False, action='store_true', help='Output histogram in sixel format')
 aparser.add_argument('-g', default=False, action='store_true', help='Open histogram in separate graphical window')
 aparser.add_argument('-o', default=None, help='Output histogram to the specified filename in PNG format')
+aparser.add_argument('-t', default=False, action='store_true', help='Output a histogram in text format')
+aparser.add_argument('-v', default=False, action='store_true', help='Attempt to list nodes relevant to each histogram bar (requires -s, -o, or -t)')
+aparser.add_argument('-b', type=int, default=10, help='Number of bins to use in histogram (default is 10)')
 args = aparser.parse_args(sys.argv[1:])
 plotdata = []
 data = sys.stdin.readline()
+nodebydatum = {}
 while data:
+    node = None
+    if ':' in data:
+        node, data = data.split(':', 1)
     datum = float(data.split()[args.c - 1])
+    if node:
+        if datum in nodebydatum:
+            nodebydatum[datum].add(node)
+        else:
+            nodebydatum[datum] = set([node])
     plotdata.append(datum)
     data = sys.stdin.readline()
+n = None
 if args.g or args.o or args.s:
-    plot(args.g, args.o, plotdata)
+    n, bins = plot(args.g, args.o, plotdata, bins=args.b)
+if args.t:
+    n, bins = textplot(plotdata, bins=args.b)
 print('Samples: {5} Min: {3} Median: {0} Mean: {1} Max: {4} StandardDeviation: {2}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata)))
-
+if args.v and n is not None and nodebydatum:
+    print('')
+    currbin = bins[0]
+    bins = bins[1:]
+    currbinmembers = []
+    for datum in sorted(nodebydatum):
+        if datum > currbin:
+            print('Entries between {0} and {1}'.format(currbin, bins[0]))
+            print('-' * 80)
+            currbin = bins[0] if len(bins) else np.max(plotdata)
+            bins = bins[1:]
+            print(','.join(sorted(currbinmembers)))
+            print('')
+            print('')
+            currbinmembers = []
+        for node in nodebydatum[datum]:
+            currbinmembers.append(node)
