@@ -108,12 +108,14 @@ if args.v and n is not None and nodebydatum:
     currbinmembers = []
     for datum in sorted(nodebydatum):
         if datum > bins[0]:
-           while bins[0] < datum:
+           nextbin = None
+           while len(bins) and bins[0] < datum:
+                nextbin = bins[0]
                 bins = bins[1:]
-            print('Entries between {0} and {1}'.format(currbin, bins[0]))
+            if not nextbin:
+                nextbin = np.max(plotdata)
+            print('Entries between {0} and {1}'.format(currbin, nextbin))
             print('-' * 80)
-            currbin = bins[0] if len(bins) else np.max(plotdata)
-            bins = bins[1:]
             print(','.join(sorted(currbinmembers)))
             print('')
             print('')
