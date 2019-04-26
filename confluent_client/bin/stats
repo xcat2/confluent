@@ -115,6 +115,7 @@ if args.v and n is not None and nodebydatum:
            if not nextbin:
                nextbin = np.max(plotdata)
            print('Entries between {0} and {1}'.format(currbin, nextbin))
+           currbin = nextbin
            print('-' * 80)
            print(','.join(sorted(currbinmembers)))
            print('')
