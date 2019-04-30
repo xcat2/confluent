@@ -127,6 +127,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
+        if not response:
+            return
         if 'collective' in response:
             return collective.handle_connection(connection, cert,
                                            response['collective'])
