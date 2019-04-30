@@ -169,6 +169,24 @@ def _do_notifier(cfg, watcher, callback):
         logException()
 
 
+
+def _rpc_master_del_usergroup(tenant, name, attributemap):
+    ConfigManager(tenant).set_user(name, attributemap)
+
+
+def _rpc_del_usergroup(tenant, name, attributemap):
+    ConfigManager(tenant)._true_set_user(name, attributemap)
+
+
+
+def _rpc_master_set_usergroup(tenant, name, attributemap):
+    ConfigManager(tenant).set_user(name, attributemap)
+
+
+def _rpc_set_usergroup(tenant, name, attributemap):
+    ConfigManager(tenant)._true_set_user(name, attributemap)
+
+
 def _rpc_master_set_user(tenant, name, attributemap):
     ConfigManager(tenant).set_user(name, attributemap)
 
@@ -220,8 +238,18 @@ def _rpc_del_user(tenant, name):
 def _rpc_master_create_user(tenant, *args):
     ConfigManager(tenant).create_user(*args)
 
+
+def _rpc_master_create_usergroup(tenant, *args):
+    ConfigManager(tenant).create_usergroup(*args)
+
+
 def _rpc_create_user(tenant, *args):
     ConfigManager(tenant)._true_create_user(*args)
+
+
+def _rpc_create_usergroup(tenant, *args):
+    ConfigManager(tenant)._true_create_usergroup(*args)
+
 
 def _rpc_master_del_groups(tenant, groups):
     ConfigManager(tenant).del_groups(groups)
@@ -1182,6 +1210,12 @@ class ConfigManager(object):
         except KeyError:
             return []
 
+    def list_usergroups(self):
+        try:
+            return list(self._cfgstore['usergroups'])
+        except KeyError:
+            return []
+
     def get_user(self, name):
         """Get user information from DB
 
@@ -1219,12 +1253,37 @@ class ConfigManager(object):
         :param groupname: the name of teh group to modify
         :param attributemap: The mapping of keys to values to set
         """
+        if cfgleader:
+            return exec_on_leader('_rpc_master_set_usergroup', self.tenant,
+                                  groupname, attributemap)
+        if cfgstreams:
+            exec_on_followers('_rpc_set_usergroup', self.tenant, groupname,
+                              attributemap)
+        self._true_set_usergroup(groupname, attributemap)
 
+    def _true_set_usergroup(self, groupname, attributemap):
         for attribute in attributemap:
             self._cfgstore['usergroups'][attribute] = attributemap[attribute]
         _mark_dirtykey('usergroups', groupname, self.tenant)
+        self._bg_sync_to_file()
 
     def create_usergroup(self, groupname, role="Administrator"):
+        """Create a new user
+
+        :param groupname: The name of the user group
+        :param role: The role the user should be considered.  Can be
+                     "Administrator" or "Technician", defaults to
+                     "Administrator"
+        """
+        if cfgleader:
+            return exec_on_leader('_rpc_master_create_usergroup', self.tenant,
+                                  groupname, role)
+        if cfgstreams:
+            exec_on_followers('_rpc_create_usergroup', self.tenant, groupname,
+                              role)
+        self._true_create_usergroup(groupname, role)
+
+    def _true_create_usergroup(self, groupname, role="Administrator"):
         if 'usergroups' not in self._cfgstore:
             self._cfgstore['usergroups'] = {}
         groupname = groupname.encode('utf-8')
@@ -1232,6 +1291,20 @@ class ConfigManager(object):
             raise Exception("Duplicate groupname requested")
         self._cfgstore['usergroups'][groupname] = {'role': role}
         _mark_dirtykey('usergroups', groupname, self.tenant)
+        self._bg_sync_to_file()
+
+    def del_usergroup(self, name):
+        if cfgleader:
+            return exec_on_leader('_rpc_master_del_usergroup', self.tenant, name)
+        if cfgstreams:
+            exec_on_followers('_rpc_del_usergroup', self.tenant, name)
+        self._true_del_usergroup(name)
+
+    def _true_del_usergroup(self, name):
+        if name in self._cfgstore['usergroups']:
+            del self._cfgstore['usergroups'][name]
+            _mark_dirtykey('usergroups', name, self.tenant)
+        self._bg_sync_to_file()
 
     def set_user(self, name, attributemap):
         """Set user attribute(s)

@@ -26,6 +26,7 @@ import Cryptodome.Protocol.KDF as KDF
 import hashlib
 import hmac
 import multiprocessing
+import confluent.userutil as userutil
 try:
     import PAM
 except ImportError:
@@ -121,6 +122,11 @@ def authorize(name, element, tenant=False, operation='create',
     if skipuserobj:
         return None, manager, user, tenant, skipuserobj
     userobj = manager.get_user(user)
+    if not userobj:
+        for group in userutil.grouplist(user):
+            userobj = manager.get_usergroup(group)
+            if userobj:
+                break
     if userobj:  # returning
         return userobj, manager, user, tenant, skipuserobj
     return None
@@ -160,6 +166,14 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
     credobj = Credentials(user, passphrase)
     cfm = configmanager.ConfigManager(tenant, username=user)
     ucfg = cfm.get_user(user)
+    if ucfg is None:
+        try:
+            for group in userutil.grouplist(user):
+                ucfg = cfm.get_usergroup(group)
+                if ucfg:
+                    break
+        except KeyError:
+            pass
     if ucfg is None:
         eventlet.sleep(0.05)
         return None
