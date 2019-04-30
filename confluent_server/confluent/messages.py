@@ -401,7 +401,7 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputExpression(path, inputdata, nodes)
     elif path == ['attributes', 'rename']:
         return InputConfigChangeSet(path, inputdata, nodes, configmanager)
-    elif path[0] in ('attributes', 'users') and operation != 'retrieve':
+    elif path[0] in ('attributes', 'users', 'usergroups') and operation != 'retrieve':
         return InputAttributes(path, inputdata, nodes)
     elif path == ['boot', 'nextdevice'] and operation != 'retrieve':
         return InputBootDevice(path, nodes, inputdata)

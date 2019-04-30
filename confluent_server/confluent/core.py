@@ -124,7 +124,7 @@ def load_plugins():
 
 
 rootcollections = ['discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'users/', 'version']
+                   'noderange/', 'nodes/', 'nodegroups/', 'usergroups/' , 'users/', 'version']
 
 
 class PluginRoute(object):
@@ -396,12 +396,30 @@ def create_user(inputdata, configmanager):
     configmanager.create_user(username, attributemap=inputdata)
 
 
+def create_usergroup(inputdata, configmanager):
+    try:
+        groupname = inputdata['name']
+        del inputdata['name']
+    except (KeyError, ValueError):
+        raise exc.InvalidArgumentException()
+    configmanager.create_usergroup(groupname)
+
+
+def update_usergroup(groupname, attribmap, configmanager):
+    try:
+        configmanager.set_usergroup(name, attribmap)
+    except ValueError:
+        raise exc.InvalidArgumentException()
+
 def update_user(name, attribmap, configmanager):
     try:
         configmanager.set_user(name, attribmap)
     except ValueError:
         raise exc.InvalidArgumentException()
 
+
+def show_usergroup(groupname, configmanager):
+    return []
 
 def show_user(name, configmanager):
     userobj = configmanager.get_user(name)
@@ -450,6 +468,10 @@ def iterate_resources(fancydict):
 def delete_user(user, configmanager):
     configmanager.del_user(user)
     yield msg.DeletedResource(user)
+
+def delete_usergroup(usergroup, configmanager):
+    configmanager.del_usergroup(usergroup)
+    yield msg.DeletedResource(usergroup)
 
 
 def delete_nodegroup_collection(collectionpath, configmanager):
@@ -1005,6 +1027,31 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
             configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'version':
         return (msg.Attributes(kv={'version': confluent.__version__}),)
+    elif pathcomponents[0] == 'usergroups':
+        # TODO: when non-administrator accounts exist,
+        # they must only be allowed to see their own user
+        try:
+            usergroup = pathcomponents[1]
+        except IndexError:  # it's just users/
+            if operation == 'create':
+                inputdata = msg.get_input_message(
+                    pathcomponents, operation, inputdata,
+                    configmanager=configmanager)
+                create_usergroup(inputdata.attribs, configmanager)
+            return iterate_collections(configmanager.list_usergroups(),
+                                       forcecollection=False)
+        if usergroup not in configmanager.list_usergroups():
+            raise exc.NotFoundException("Invalid usergroup %s" % usergroup)
+        if operation == 'retrieve':
+            return show_usergroup(usergroup, configmanager)
+        elif operation == 'delete':
+            return delete_usergroup(usergroup, configmanager)
+        elif operation == 'update':
+            inputdata = msg.get_input_message(
+                pathcomponents, operation, inputdata,
+                configmanager=configmanager)
+            update_usergroup(usergroup, inputdata.attribs, configmanager)
+            return show_usergroup(usergroup, configmanager)
     elif pathcomponents[0] == 'users':
         # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user
