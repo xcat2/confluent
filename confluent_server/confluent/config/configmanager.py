@@ -170,12 +170,12 @@ def _do_notifier(cfg, watcher, callback):
 
 
 
-def _rpc_master_del_usergroup(tenant, name, attributemap):
-    ConfigManager(tenant).set_user(name, attributemap)
+def _rpc_master_del_usergroup(tenant, name):
+    ConfigManager(tenant).del_usergroup(name)
 
 
-def _rpc_del_usergroup(tenant, name, attributemap):
-    ConfigManager(tenant)._true_set_user(name, attributemap)
+def _rpc_del_usergroup(tenant, name):
+    ConfigManager(tenant)._true_del_usergroup(name)
 
 
 
@@ -2150,6 +2150,9 @@ class ConfigManager(object):
                 self.set_node_attributes(tmpconfig[confarea], True)
             elif confarea == 'nodegroups':
                 self.set_group_attributes(tmpconfig[confarea], True)
+            elif confarea == 'usergroups':
+                for usergroup in tmpconfig[confarea]:
+                    self.create_usergroup(usergroup)
             elif confarea == 'users':
                 for user in tmpconfig[confarea]:
                     uid = tmpconfig[confarea].get('id', None)
