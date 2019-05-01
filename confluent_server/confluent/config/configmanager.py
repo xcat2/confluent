@@ -99,6 +99,7 @@ _attraliases = {
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
 }
+_validroles = ('Administrator', 'Operator')
 
 def _mkpath(pathname):
     try:
@@ -1263,7 +1264,16 @@ class ConfigManager(object):
 
     def _true_set_usergroup(self, groupname, attributemap):
         for attribute in attributemap:
-            self._cfgstore['usergroups'][attribute] = attributemap[attribute]
+            if attribute == 'role':
+                therole = None
+                for candrole in _validroles:
+                    if candrole.lower().startswith(attributemap[attribute].lower()):
+                        therole = candrole
+                if therole not in _validroles:
+                    raise ValueError(
+                        'Unrecognized role "{0}" (valid roles: {1})'.format(attributemap[attribute], ','.join(_validroles)))
+                attributemap[attribute] = therole
+            self._cfgstore['usergroups'][groupname][attribute] = attributemap[attribute]
         _mark_dirtykey('usergroups', groupname, self.tenant)
         self._bg_sync_to_file()
 
@@ -1322,6 +1332,15 @@ class ConfigManager(object):
     def _true_set_user(self, name, attributemap):
         user = self._cfgstore['users'][name]
         for attribute in attributemap:
+            if attribute == 'role':
+                therole = None
+                for candrole in _validroles:
+                    if candrole.lower().startswith(attributemap[attribute].lower()):
+                        therole = candrole
+                if therole not in _validroles:
+                    raise ValueError(
+                        'Unrecognized role "{0}" (valid roles: {1})'.format(attributemap[attribute], ','.join(_validroles)))
+                attributemap[attribute] = therole
             if attribute == 'password':
                 salt = os.urandom(8)
                 #TODO: WORKERPOOL, offload password set to a worker
@@ -1598,7 +1617,7 @@ class ConfigManager(object):
                     del attribmap[group][attr]
             if 'noderange' in attribmap[group]:
                 if len(attribmap[group]) > 1:
-                    raise ValueErorr('noderange attribute must be set by itself')            
+                    raise ValueError('noderange attribute must be set by itself')            
             for attr in attribmap[group]:
                 if attr in _attraliases:
                     newattr = _attraliases[attr]

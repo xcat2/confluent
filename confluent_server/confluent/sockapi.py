@@ -120,7 +120,7 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         cfm = configmanager.ConfigManager(tenant=None, username=authname)
     elif authname:
         authdata = auth.authorize(authname, element=None)
-        if authdata is not None:
+        if authdata:
             cfm = authdata[1]
             authenticated = True
     send_data(connection, "Confluent -- v0 --")
@@ -145,7 +145,7 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         # element path, that authorization will need to be called
         # per request the user makes
         authdata = auth.check_user_passphrase(authname, passphrase)
-        if authdata is None:
+        if not authdata:
             auditlog.log(
                 {'operation': 'connect', 'user': authname, 'allowed': False})
         else:
@@ -212,7 +212,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
     }
     if not skipauth:
         authdata = auth.authorize(authdata[2], path, authdata[3], operation)
-        if authdata is None:
+        if not authdata:
             auditmsg['allowed'] = False
             auditlog.log(auditmsg)
             raise exc.ForbiddenRequest()
