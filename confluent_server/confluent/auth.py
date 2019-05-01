@@ -23,6 +23,7 @@ import confluent.config.configmanager as configmanager
 import eventlet
 import eventlet.tpool
 import Cryptodome.Protocol.KDF as KDF
+from fnmatch import fnmatch
 import hashlib
 import hmac
 import multiprocessing
@@ -40,7 +41,43 @@ _passchecking = {}
 authworkers = None
 authcleaner = None
 
+_allowedbyrole = {
+    'Operator': {
+        'retrieve': ['*'],
+        'create': [
+            '/node*/media/uploads/',
+            '/node*/inventory/firmware/updates/*',
+            '/node*/suppport/servicedata*',
+        ],
+        'update': [
+            '/discovery/*', 
+            '/networking/macs/rescan',
+            '/node*/power/state', 
+            '/node*/power/reseat',
+            '/node*/attributes/*',
+            '/node*/media/*tach',
+            '/node*/boot/nextdevice',
+            '/node*/identify',
+            '/node*/configuration/*',
+        ],
+        'start': [
+            '/nodes/*/console/session*',
+            '/nodes/*/shell/sessions*',
+        ],
+        'delete': [
+            '/node*/*/events/hardware/log',
+        ],
+    },
+}
 
+_deniedbyrole = {
+    # This supersedes the above and is only consulted after the allowed has happened
+    'Operator': {
+        'update': [
+            '/node*/configuration/management_controller/users/*',
+        ]
+    }
+}
 class Credentials(object):
     def __init__(self, username, passphrase):
         self.username = username
@@ -113,14 +150,15 @@ def authorize(name, element, tenant=False, operation='create',
             and the relevant ConfigManager object for the context of the
             request.
     """
-    if operation not in ('create', 'start', 'update', 'retrieve', 'delete'):
-        return None
+    # skipuserobj is a leftover from the now abandoned plan to use pam session
+    # to do authorization and authentication.  Now confluent always does authorization
+    # even if pam does authentication.
+    if operation not in ('create', 'start', 'update', 'retrieve', 'delete', None):
+        return False
     user, tenant = _get_usertenant(name, tenant)
     if tenant is not None and not configmanager.is_tenant(tenant):
-        return None
+        return False
     manager = configmanager.ConfigManager(tenant, username=user)
-    if skipuserobj:
-        return None, manager, user, tenant, skipuserobj
     userobj = manager.get_user(user)
     if not userobj:
         for group in userutil.grouplist(user):
@@ -128,11 +166,21 @@ def authorize(name, element, tenant=False, operation='create',
             if userobj:
                 break
     if userobj:  # returning
+        role = userobj.get('role', 'Administrator')
+        if element and role != 'Administrator':
+            for rule in _allowedbyrole.get(role, {}).get(operation, []):
+                if fnmatch(element, rule):
+                    break
+            else:
+                return False
+            for rule in _deniedbyrole.get(role, {}).get(operation, []):
+                if fnmatch(element, rule):
+                    return False
         return userobj, manager, user, tenant, skipuserobj
-    return None
+    return False
 
 
-def check_user_passphrase(name, passphrase, element=None, tenant=False):
+def check_user_passphrase(name, passphrase, operation=None, element=None, tenant=False):
     """Check a a login name and passphrase for authenticity and authorization
 
     The function combines authentication and authorization into one function.
@@ -179,7 +227,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         return None
     if (user, tenant) in _passcache:
         if hashlib.sha256(passphrase).digest() == _passcache[(user, tenant)]:
-            return authorize(user, element, tenant)
+            return authorize(user, element, tenant, operation=operation)
         else:
             # In case of someone trying to guess,
             # while someone is legitimately logged in
@@ -214,7 +262,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         # delay as well
         if crypt == crypted:
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
-            return authorize(user, element, tenant)
+            return authorize(user, element, tenant, operation)
     try:
         pammy = PAM.pam()
         pammy.start(_pamservice, user, credobj.pam_conv)
@@ -222,7 +270,7 @@ def check_user_passphrase(name, passphrase, element=None, tenant=False):
         pammy.acct_mgmt()
         del pammy
         _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
-        return authorize(user, element, tenant, skipuserobj=False)
+        return authorize(user, element, tenant, operation, skipuserobj=False)
     except NameError:
         pass
     except PAM.error:

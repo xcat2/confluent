@@ -269,6 +269,9 @@ def _authorize_request(env, operation):
     name = ''
     sessionid = None
     cookie = Cookie.SimpleCookie()
+    element = env['PATH_INFO']
+    if element.startswith('/sessions/current/'):
+        element = None
     if 'HTTP_COOKIE' in env:
         #attempt to use the cookie.  If it matches
         cc = RobustCookie()
@@ -290,7 +293,7 @@ def _authorize_request(env, operation):
                     httpsessions[sessionid]['expiry'] = time.time() + 90
                     name = httpsessions[sessionid]['name']
                     authdata = auth.authorize(
-                        name, element=None,
+                        name, element=element, operation=operation,
                         skipuserobj=httpsessions[sessionid]['skipuserobject'])
     if (not authdata) and 'HTTP_AUTHORIZATION' in env:
         if env['PATH_INFO'] == '/sessions/current/logout':
@@ -303,8 +306,10 @@ def _authorize_request(env, operation):
             return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
-        authdata = auth.check_user_passphrase(name, passphrase, element=None)
-        if not authdata:
+        authdata = auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
+        if authdata is False:
+            return {'code': 403}
+        elif not authdata:
             return {'code': 401}
         sessid = util.randomstring(32)
         while sessid in httpsessions:
@@ -341,15 +346,10 @@ def _authorize_request(env, operation):
         if 'csrftoken' in httpsessions[sessid]:
             authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
         return authinfo
-    else:
+    elif authdata is None:
         return {'code': 401}
-        # TODO(jbjohnso): actually evaluate the request for authorization
-        # In theory, the x509 or http auth stuff will get translated and then
-        # passed on to the core authorization function in an appropriate form
-        # expresses return in the form of http code
-        # 401 if there is no known identity
-        # 403 if valid identity, but no access
-        # going to run 200 just to get going for now
+    else:
+        return {'code': 403}
 
 
 def _pick_mimetype(env):
@@ -429,7 +429,7 @@ def resourcehandler_backend(env, start_response):
         return
     if authorized['code'] == 403:
         start_response('403 Forbidden', badauth)
-        yield 'authorization failed'
+        yield 'Forbidden'
         return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")

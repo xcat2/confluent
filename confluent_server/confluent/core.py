@@ -407,19 +407,21 @@ def create_usergroup(inputdata, configmanager):
 
 def update_usergroup(groupname, attribmap, configmanager):
     try:
-        configmanager.set_usergroup(name, attribmap)
-    except ValueError:
-        raise exc.InvalidArgumentException()
+        configmanager.set_usergroup(groupname, attribmap)
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
 
 def update_user(name, attribmap, configmanager):
     try:
         configmanager.set_user(name, attribmap)
-    except ValueError:
-        raise exc.InvalidArgumentException()
+    except ValueError as e:
+        raise exc.InvalidArgumentException(str(e))
 
 
 def show_usergroup(groupname, configmanager):
-    return []
+    groupinfo = configmanager.get_usergroup(groupname)
+    for attr in groupinfo:
+        yield msg.Attributes(kv={attr: groupinfo[attr]})
 
 def show_user(name, configmanager):
     userobj = configmanager.get_user(name)
@@ -437,6 +439,10 @@ def show_user(name, configmanager):
                 rv[attr] = userobj[attr]
             yield msg.Attributes(kv={attr: rv[attr]},
                                  desc=attrscheme.user[attr]['description'])
+    if 'role' in userobj:
+        yield msg.Attributes(kv={'role': userobj['role']})
+
+
 
 
 def stripnode(iterablersp, node):
