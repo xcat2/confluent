@@ -68,6 +68,15 @@ _allowedbyrole = {
             '/node*/*/events/hardware/log',
         ],
     },
+    'Monitor': {
+        'retrieve': [
+            '/node*/health/hardware',
+            '/node*/power/state',
+            '/node*/sensors/*',
+            '/nodes/',
+            '/',
+        ],
+    }
 }
 
 _deniedbyrole = {

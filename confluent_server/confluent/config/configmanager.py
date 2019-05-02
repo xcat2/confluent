@@ -99,7 +99,7 @@ _attraliases = {
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
 }
-_validroles = ('Administrator', 'Operator')
+_validroles = ('Administrator', 'Operator', 'Monitor')
 
 def _mkpath(pathname):
     try:
