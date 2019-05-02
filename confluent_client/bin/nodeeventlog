@@ -77,7 +77,10 @@ def format_event(evt):
             pass
         dscparts.append(evttext)
     retparts.append(' - '.join(dscparts))
-    return ' '.join(retparts) + evt.get('message', '')
+    msg = evt.get('message')
+    if not msg:
+        msg = ''
+    return ' '.join(retparts) + msg
 
 
 if deletemode:
