@@ -114,7 +114,8 @@ def sensorpass(showout=True, appendtime=False):
                         continue
                     for redundant_state in ('Non-Critical', 'Critical'):
                         try:
-                            sensedata['states'].remove(redundant_state)
+                            if sensedata.get('states', False):
+                                sensedata['states'].remove(redundant_state)
                         except ValueError:
                             pass
                     resultdata[node][sensedata['name']] = sensedata
@@ -132,11 +133,12 @@ def sensorpass(showout=True, appendtime=False):
                             showval = u' {0} '.format(sensedata['value'])
                         if sensedata['units'] not in (None, u''):
                             showval += sensedata['units']
-                        if sensedata['health'] != 'ok':
+                        if sensedata.get('health', 'ok') != 'ok':
                             datadescription = [sensedata['health']]
                         else:
                             datadescription = []
-                        datadescription.extend(sensedata['states'])
+                        if sensedata.get('states', False):
+                            datadescription.extend(sensedata['states'])
                         if datadescription:
                             if showval == '':
                                 showval += u' {0}'.format(
