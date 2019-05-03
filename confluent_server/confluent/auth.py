@@ -48,6 +48,7 @@ _allowedbyrole = {
             '/node*/media/uploads/',
             '/node*/inventory/firmware/updates/*',
             '/node*/suppport/servicedata*',
+            '/node*/attributes/expression',
         ],
         'update': [
             '/discovery/*', 
