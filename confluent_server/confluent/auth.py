@@ -49,6 +49,8 @@ _allowedbyrole = {
             '/node*/inventory/firmware/updates/*',
             '/node*/suppport/servicedata*',
             '/node*/attributes/expression',
+            '/nodes/*/console/session*',
+            '/nodes/*/shell/sessions*',
         ],
         'update': [
             '/discovery/*', 
