@@ -167,7 +167,15 @@ class IpmiCommandWrapper(ipmicommand.Command):
         kv = util.TLSCertVerifier(cfm, node,
                                   'pubkeys.tls_hardwaremanager').verify_cert
         kwargs['verifycallback'] = kv
-        super(self.__class__, self).__init__(**kwargs)
+        try:
+            super(IpmiCommandWrapper, self).__init__(**kwargs)
+        except socket.error as se:
+            if se[1] == 'EHOSTUNREACH':
+                raise exc.TargetEndpointUnreachable('timeout')
+            raise
+        except pygexc.PyghmiException as pe:
+            if 'Access Denied' in str(pe):
+                raise exc.TargetEndpointBadCredentials()
 
     def close_confluent(self):
         if self._attribwatcher:
@@ -304,6 +312,8 @@ def perform_request(operator, node, element,
                 raise
         except exc.TargetEndpointUnreachable as tu:
             results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        except exc.TargetEndpointBadCredentials:
+            results.put(msg.ConfluentTargetInvalidCredentials(node))
         except ssl.SSLEOFError:
             results.put(msg.ConfluentNodeError(
                 node, 'Unable to communicate with the https server on '
