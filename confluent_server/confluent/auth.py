@@ -45,6 +45,8 @@ _allowedbyrole = {
     'Operator': {
         'retrieve': ['*'],
         'create': [
+            '/noderange/',
+            '/nodes/',
             '/node*/media/uploads/',
             '/node*/inventory/firmware/updates/*',
             '/node*/suppport/servicedata*',
@@ -69,7 +71,7 @@ _allowedbyrole = {
         ],
         'delete': [
             '/discovery/*',
-            '/node*/*/events/hardware/log',
+            '/node*',
         ],
     },
     'Monitor': {
