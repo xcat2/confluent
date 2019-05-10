@@ -33,6 +33,7 @@ class NodeHandler(immhandler.NodeHandler):
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
+        self.trieddefault = None  # Reset state on a preconfig attempt
         # attempt to enable SMM
         #it's normal to get a 'not supported' (193) for systems without an SMM
         ipmicmd = None
@@ -44,6 +45,7 @@ class NodeHandler(immhandler.NodeHandler):
                     'Incorrect password' not in str(e)):
                 # raise an issue if anything other than to be expected
                 raise
+            self.trieddefault = True
         #TODO: decide how to clean out if important
         #as it stands, this can step on itself
         #if ipmicmd:

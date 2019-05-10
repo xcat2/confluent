@@ -171,6 +171,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
         self.node = node
         self._inhealth = False
         self._lasthealth = None
+        kwargs['keepalive'] = False
         self._attribwatcher = cfm.watch_attributes(
             (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
