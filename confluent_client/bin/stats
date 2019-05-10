@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import argparse
+import csv
 import fcntl
 import io
 import numpy as np
@@ -73,7 +74,9 @@ def textplot(plotdata, bins):
 histogram = False
 aparser = argparse.ArgumentParser(description='Quick access to common statistics')
 aparser.add_argument('-c', type=int, default=0, help='Column number to analyze (default is last column)')
-aparser.add_argument('-s', default=False, action='store_true', help='Output histogram in sixel format')
+aparser.add_argument('-d', default=None, help='Value used to separate columns')
+aparser.add_argument('-x', default=False, action='store_true', help='Output histogram in sixel format')
+aparser.add_argument('-s', default=0, help='Number of header lines to skip before processing')
 aparser.add_argument('-g', default=False, action='store_true', help='Open histogram in separate graphical window')
 aparser.add_argument('-o', default=None, help='Output histogram to the specified filename in PNG format')
 aparser.add_argument('-t', default=False, action='store_true', help='Output a histogram in text format')
@@ -81,18 +84,35 @@ aparser.add_argument('-v', default=False, action='store_true', help='Attempt to 
 aparser.add_argument('-b', type=int, default=10, help='Number of bins to use in histogram (default is 10)')
 args = aparser.parse_args(sys.argv[1:])
 plotdata = []
-data = sys.stdin.readline()
+headlines = int(args.s)
+while headlines >= 0:
+    data = sys.stdin.readline()
+    headlines -= 1
+if args.d:
+    delimiter = args.d
+else:
+    if '\t' in data:
+        delimiter = '\t'
+    elif ' ' in data:
+        delimiter = ' '
+    elif ',' in data:
+        delimiter = ','
+    else:
+        delimiter = ' '  # handle single column
+data = list(csv.reader([data], delimiter=delimiter))[0]
 nodebydatum = {}
 idx = args.c - 1
 autoidx = False
 while data:
     node = None
-    if ':' in data:
-        node, data = data.split(':', 1)
-    if idx == -1:
+    if ':' in data[0]:
+        node, data[0] = data[0].split(':', 1)
+    else:
+        node = data[0]
+    if idx == -1 and not autoidx:
         while not autoidx:
             try:
-                datum = float(data.split()[idx])
+                datum = float(data[idx])
             except ValueError:
                 idx -= 1
                 continue
@@ -101,7 +121,7 @@ while data:
                 sys.exit(1)
             autoidx = True
     else:
-        datum = float(data.split()[idx])
+        datum = float(data[idx])
     if node:
         if datum in nodebydatum:
             nodebydatum[datum].add(node)
@@ -109,8 +129,9 @@ while data:
             nodebydatum[datum] = set([node])
     plotdata.append(datum)
     data = sys.stdin.readline()
+    data = list(csv.reader([data], delimiter=delimiter))[0]
 n = None
-if args.g or args.o or args.s:
+if args.g or args.o or args.x:
     n, bins = plot(args.g, args.o, plotdata, bins=args.b)
 if args.t:
     n, bins = textplot(plotdata, bins=args.b)
