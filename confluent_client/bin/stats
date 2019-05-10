@@ -83,11 +83,25 @@ args = aparser.parse_args(sys.argv[1:])
 plotdata = []
 data = sys.stdin.readline()
 nodebydatum = {}
+idx = args.c - 1
+autoidx = False
 while data:
     node = None
     if ':' in data:
         node, data = data.split(':', 1)
-    datum = float(data.split()[args.c - 1])
+    if idx == -1:
+        while not autoidx:
+            try:
+                datum = float(data.split()[idx])
+            except ValueError:
+                idx -= 1
+                continue
+            except IndexError:
+                sys.stderr.write('Unable to identify a numerical column\n')
+                sys.exit(1)
+            autoidx = True
+    else:
+        datum = float(data.split()[idx])
     if node:
         if datum in nodebydatum:
             nodebydatum[datum].add(node)
@@ -100,7 +114,7 @@ if args.g or args.o or args.s:
     n, bins = plot(args.g, args.o, plotdata, bins=args.b)
 if args.t:
     n, bins = textplot(plotdata, bins=args.b)
-print('Samples: {5} Min: {3} Median: {0} Mean: {1} Max: {4} StandardDeviation: {2}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata)))
+print('Samples: {5} Min: {3} Median: {0} Mean: {1} Max: {4} StandardDeviation: {2} Sum: {6}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata), np.sum(plotdata)))
 if args.v and n is not None and nodebydatum:
     print('')
     currbin = bins[0]
