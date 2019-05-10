@@ -68,6 +68,7 @@ _allowedbyrole = {
             '/nodes/*/shell/sessions*',
         ],
         'delete': [
+            '/discovery/*',
             '/node*/*/events/hardware/log',
         ],
     },
