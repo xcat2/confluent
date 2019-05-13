@@ -33,6 +33,7 @@ import pyghmi.storage as storage
 ipmicommand = eventlet.import_patched('pyghmi.redfish.command')
 import socket
 import ssl
+import traceback
 
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
@@ -213,8 +214,6 @@ def _ipmi_evtloop():
                 waiter = _ipmiwaiters.pop()
                 waiter.send()
         except:  # TODO(jbjohnso): log the trace into the log
-            import traceback
-
             traceback.print_exc()
 
 
@@ -326,8 +325,8 @@ def perform_request(operator, node, element,
         except (pygexc.InvalidParameterValue, pygexc.RedfishError) as e:
             results.put(msg.ConfluentNodeError(node, str(e)))
         except Exception as e:
-            results.put(e)
-            raise
+            results.put(msg.ConfluentNodeError(node, 'Unexpected Error'))
+            traceback.print_exc()
         finally:
             results.put('Done')
 
