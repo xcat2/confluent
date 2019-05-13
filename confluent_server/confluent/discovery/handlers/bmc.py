@@ -32,10 +32,21 @@ DEFAULT_PASS = 'PASSW0RD'
 
 class NodeHandler(generic.NodeHandler):
 
-    def _get_ipmicmd(self, user=DEFAULT_USER, password=DEFAULT_PASS):
-        return ipmicommand.Command(self.ipaddr, user, password)
+    def _get_ipmicmd(self, user=None, password=None):
+        priv = None
+        if user is None or password is None:
+            if self.trieddefault:
+                raise pygexc.IpmiException()
+            priv = 4  # manually indicate priv to avoid double-attempt
+        if user is None:
+            user = DEFAULT_USER
+        if password is None:
+            password = DEFAULT_PASS
+        return ipmicommand.Command(self.ipaddr, user, password,
+                                   privlevel=priv, keepalive=False)
 
     def __init__(self, info, configmanager):
+        self.trieddefault = None
         super(NodeHandler, self).__init__(info, configmanager)
 
     def probe(self):
