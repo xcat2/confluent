@@ -53,6 +53,7 @@ _allowedbyrole = {
             '/node*/attributes/expression',
             '/nodes/*/console/session*',
             '/nodes/*/shell/sessions*',
+            '/node*/configuration/*',
         ],
         'update': [
             '/discovery/*', 
