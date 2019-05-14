@@ -35,7 +35,7 @@ the noderange.
     `$ nodestorage d5 delete somedata`  
     `Deleted: somedata`  
 
-* Creating a raid5 of 4 disks and a volume named `somedata`:  
+* Creating a raid5 of 4 disks and a volume named `somedata`:
     `$ nodestorage d5 create -r 5 -d drive0,drive_1,drive_2,drive_3 -n somedata`  
     `d5: Volume somedata: Size: 1.905 TB`  
     `d5: Volume somedata: State: Optimal`  
