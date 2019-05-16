@@ -469,6 +469,10 @@ def resourcehandler_backend(env, start_response):
         funport = forwarder.get_port(targip, env['HTTP_X_FORWARDED_FOR'],
                                      authorized['sessionid'])
         host = env['HTTP_X_FORWARDED_HOST']
+        if ']' in host:
+            host = host.split(']')[0] + ']'
+        elif ':' in host:
+            host = host.rsplit(':', 1)[0]
         url = 'https://{0}:{1}/'.format(host, funport)
         start_response('302', [('Location', url)])
         yield 'Our princess is in another castle!'
