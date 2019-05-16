@@ -222,7 +222,7 @@ def main():
                     sys.exit(exitcode)
             sleeptime = nextstart - os.times()[4]
             if sleeptime > 0:
-                time.sleep(nextstart - os.times()[4])
+                time.sleep(sleeptime)
     else:
         if options.csv:
             format_csv(csvwriter, orderedsensors, resdata, showtime=False)
