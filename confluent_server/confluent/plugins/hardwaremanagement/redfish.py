@@ -38,7 +38,6 @@ import traceback
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
 
-_workers = None
 pci_cache = {}
 
 def get_dns_txt(qstring):
@@ -153,10 +152,7 @@ def sanitize_invdata(indata):
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
-        global _workers
-        if _workers is None:
-            _workers = eventlet.greenpool.GreenPool()
-        kwargs['pool'] = _workers
+        kwargs['pool'] = eventlet.greenpool.GreenPool(4)
         self.cfm = cfm
         self.node = node
         self._inhealth = False
