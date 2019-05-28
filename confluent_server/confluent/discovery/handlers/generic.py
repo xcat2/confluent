@@ -68,6 +68,23 @@ class NodeHandler(object):
     def _savecert(self, certificate):
         self._fp = certificate
         return True
+    
+    def get_node_credentials(self, nodename, creds, defuser, defpass):
+        user = creds.get(nodename, {}).get(
+            'secret.hardwaremanagementuser', {}).get('value', None)
+        havecustomcreds = False
+        if user is not None and user != defuser:
+            havecustomcreds = True
+        else:
+            user = defuser
+        passwd = creds.get(nodename, {}).get(
+            'secret.hardwaremanagementpassword', {}).get('value', None)
+        if passwd is not None and passwd != defpass:
+            havecustomcreds = True
+        else:
+            passwd = defpass
+        return user, passwd, not havecustomcreds
+
 
     @property
     def cert_fail_reason(self):

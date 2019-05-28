@@ -14,14 +14,31 @@
 
 import confluent.discovery.handlers.imm as immhandler
 import confluent.util as util
+import json
 import pyghmi.exceptions as pygexc
-import pyghmi.ipmi.oem.lenovo.imm as imm
+import pyghmi.redfish.oem.lenovo.xcc as xcc
+import pyghmi.util.webclient as webclient
+import struct
+
+def fixup_uuid(uuidprop):
+    baduuid = ''.join(uuidprop.split())
+    uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
+    a = struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]).encode('hex')
+    uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
+    return '-'.join(uuid).upper()
 
 
 
 
 class NodeHandler(immhandler.NodeHandler):
     devname = 'XCC'
+
+    def __init__(self, info, configmanager):
+        self._xcchdlr = None
+        self._wc = None
+        self.nodename = None
+        self._atdefaultcreds = True
+        super(NodeHandler, self).__init__(info, configmanager)
 
     @classmethod
     def adequate(cls, info):
@@ -57,6 +74,32 @@ class NodeHandler(immhandler.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
+    @property
+    def wc(self):
+        if self._wc is None:
+            self._wc = webclient.SecureHTTPConnection(
+                self.ipaddr, 443, verifycallback=self.validate_cert)
+            self._wc.connect()
+            self._xcchdlr = xcc.OEMHandler(None, None, self._wc, False)
+        if not self.trieddefault:
+            self._xcchdlr.set_credentials('USERID', 'PASSW0RD')
+            wc = self._xcchdlr.get_webclient()
+            if wc:
+                return wc
+        self.trieddefault = True
+        creds = self.configmanager.get_node_attributes(
+            self.nodename, ['secret.hardwaremanagementuser',
+            'secret.hardwaremanagementpassword'], decrypt=True)
+        user, passwd, isdefault = self.get_node_credentials(
+            self.nodename, creds, 'USERID', 'PASSW0RD')
+        if isdefault:
+            return
+        self._atdefaultcreds = False
+        self._xcchdlr.set_credentials(user, passwd)
+        wc = self._xcchdlr.get_webclient()
+        if wc:
+            return wc
+
     def set_password_policy(self, ic):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
         for rule in self.ruleset.split(','):
@@ -85,7 +128,86 @@ class NodeHandler(immhandler.NodeHandler):
             print(repr(e))
             pass
 
+    def _get_next_userid(self):
+        userinfo = self.wc.grab_json_response('/api/dataset/imm_users')
+        userinfo = userinfo['items'][0]['users']
+        for user in userinfo:
+            if user['users_user_name'] == '':
+                return user['users_user_id']
+
+    def _create_tmp_user(self):
+        # If we need to convert a pre-hashed account, we will need a temporary account
+        userparams = "{0},6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,".format(self._get_next_userid())
+        result = self.wc.grab_json_response('/api/function/', {'USER_UserCreate', userparams})
+        # POST to /api/function
+        # {"USER_UserCreate":"2,6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,"}
+    
+    def _setup_xcc_account(self, username, passwd, wc):
+        userinfo = wc.grab_json_response('/api/dataset/imm_users')
+        uid = None
+        for user in userinfo['items'][0]['users']:
+            if user['users_user_name'] == username:
+                uid = user['users_user_id']
+                break
+        else:
+            for user in userinfo['items'][0]['users']:
+                if user['users_user_name'] == 'USERID':
+                    uid = user['users_user_id']
+                    break
+        if not uid:
+            raise Exception("XCC has neither the default user nor configured user")
+        # The following will work if the password is force change or normal..
+        wc.grab_json_response('/api/function',
+                             {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
+        if username != 'USERID':
+            wc.grab_json_response(
+                '/api/function', 
+                {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,'.format(uid, username)})
+
+    def _convert_sha256account(self, user, passwd, wc):
+        # First check if the specified user is sha256...
+        userinfo = wc.grab_json_response('/api/dataset/imm_users')
+        curruser = None
+        uid = None
+        for userent in userinfo['items'][0]['users']:
+            if userent['users_user_name'] == user:
+                curruser = userent
+                break
+        if curruser.get('users_pass_is_sha256', 0):
+            nwc = wc.dupe()
+            # Have to convert it for being useful with most Lenovo automation tools
+            # This requires deleting the account entirely and trying again
+            tmpuid = self._get_next_userid()
+            try:
+                userparams = "{0},6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,".format(tmpuid)
+                result = wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                adata = json.dumps({
+                    'username': '6pmu0ezczzcp',
+                    'password': 'pwrfijvpiw47$',
+                })
+                headers = {'Connection': 'keep-alive', 'Content-Type': 'application/json'}
+                nwc.request('POST', '/api/login', adata, headers)
+                rsp = nwc.getresponse()
+                if rsp.status == 200:
+                    rspdata = json.loads(rsp.read())
+                    nwc.set_header('Content-Type', 'application/json')
+                    nwc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
+                    if '_csrf_token' in wc.cookies:
+                        nwc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+                    if rspdata.get('reason', False):
+                        newpass = 'lkfBh2rGxqpJ$'
+                        nwc.grab_json_response(
+                            '/api/function',
+                            {'USER_UserPassChange': '{0},{1}'.format(tmpuid, newpass)})
+                    nwc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(curruser['users_user_id'], user)})
+                    userparams = "{0},{1},{2},1,4,0,0,0,0,,8,".format(curruser['users_user_id'], user, passwd)
+                    nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+            finally:
+                self._wc = None
+                self.wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
+
     def config(self, nodename, reset=False):
+        self.nodename = nodename
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
@@ -93,15 +215,25 @@ class NodeHandler(immhandler.NodeHandler):
             nodename, 'discovery.passwordrules')
         self.ruleset = dpp.get(nodename, {}).get(
             'discovery.passwordrules', {}).get('value', '')
-        ic = self._bmcconfig(nodename, customconfig=self.set_password_policy)
+        wc = self.wc
+        creds = self.configmanager.get_node_attributes(
+            self.nodename, ['secret.hardwaremanagementuser',
+            'secret.hardwaremanagementpassword'], decrypt=True)
+        user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
+        if self._atdefaultcreds:
+
+            if not isdefault:
+                self._setup_xcc_account(user, passwd, wc)
+        self._convert_sha256account(user, passwd, wc)
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
         # Ok, we can get the enclosure uuid now..
+        ic = self._bmcconfig(nodename, customconfig=self.set_password_policy)
         enclosureuuid = ic._oem.immhandler.get_property(
             '/v2/ibmc/smm/chassis/uuid')
         if enclosureuuid:
-            enclosureuuid = imm.fixup_uuid(enclosureuuid).lower()
+            enclosureuuid = fixup_uuid(enclosureuuid).lower()
             em = self.configmanager.get_node_attributes(nodename,
                                                         'enclosure.manager')
             em = em.get(nodename, {}).get('enclosure.manager', {}).get(
