@@ -13,12 +13,16 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.imm as immhandler
+import confluent.netutil as netutil
 import confluent.util as util
+import eventlet.support.greendns
 import json
 import pyghmi.exceptions as pygexc
 import pyghmi.redfish.oem.lenovo.xcc as xcc
 import pyghmi.util.webclient as webclient
 import struct
+getaddrinfo = eventlet.support.greendns.getaddrinfo
+
 
 def fixup_uuid(uuidprop):
     baduuid = ''.join(uuidprop.split())
@@ -225,6 +229,33 @@ class NodeHandler(immhandler.NodeHandler):
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
         self._convert_sha256account(user, passwd, wc)
+        cd = self.configmanager.get_node_attributes(
+            nodename, ['secret.hardwaremanagementuser',
+                       'secret.hardwaremanagementpassword',
+                       'hardwaremanagement.manager'], True)
+        cd = cd.get(nodename, {})
+        if ('hardwaremanagement.manager' in cd and
+                cd['hardwaremanagement.manager']['value'] and
+                not cd['hardwaremanagement.manager']['value'].startswith(
+                    'fe80::')):
+            newip = cd['hardwaremanagement.manager']['value']
+            newipinfo = getaddrinfo(newip, 0)[0]
+            newip = newipinfo[-1][0]
+            if ':' in newip:
+                raise exc.NotImplementedException('IPv6 remote config TODO')
+            netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=newip)
+            newmask = netutil.cidr_to_mask(netconfig['prefix'])
+            # do not change the ipv4_config if the current config looks
+            statargs = {'ENET_IPv4Ena': '1', 'ENET_IPv4AddrSource': '0', 'ENET_IPv4StaticIPAddr': newip, 'ENET_IPv4StaticIPNetMask': newmask}
+            if netconfig['ipv4_gateway']:
+                statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
+            wc.grab_json_response('/api/dataset', statargs)
+        elif self.ipaddr.startswith('fe80::'):
+            self.configmanager.set_node_attributes(
+                {nodename: {'hardwaremanagement.manager': self.ipaddr}})
+        else:
+            raise exc.TargetEndpointUnreachable(
+                'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return

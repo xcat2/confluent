@@ -24,6 +24,19 @@ import eventlet.support.greendns
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
+def mask_to_cidr(mask):
+    maskn = socket.inet_pton(socket.AF_INET, mask)
+    maskn = struct.unpack('!I', maskn)[0]
+    cidr = 32
+    while maskn & 0b1 == 0 and cidr > 0:
+        cidr -= 1
+        maskn >>= 1
+    return cidr
+
+def cidr_to_mask(cidr):
+    return socket.inet_ntop(
+        socket.AF_INET, struct.pack('!I', (2**32 - 1) ^ (2**(32 - cidr) - 1)))
+
 def ip_on_same_subnet(first, second, prefix):
     addrinf = socket.getaddrinfo(first, None, 0, socket.SOCK_STREAM)[0]
     fam = addrinf[0]
