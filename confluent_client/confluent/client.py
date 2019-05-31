@@ -481,7 +481,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                                 attrout += ' (Help: {0})'.format(
                                     currattr['help'].encode('utf-8'))
                             if currattr.get('possible', None):
-                                attrout += ' (Choices: {0})'.format(
+                                attrout += u' (Choices: {0})'.format(
                                     ','.join(currattr['possible']))
                         cprint(attrout)
     if not exitcode:
