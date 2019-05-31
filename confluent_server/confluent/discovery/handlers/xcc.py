@@ -142,7 +142,7 @@ class NodeHandler(immhandler.NodeHandler):
     def _create_tmp_user(self):
         # If we need to convert a pre-hashed account, we will need a temporary account
         userparams = "{0},6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,".format(self._get_next_userid())
-        result = self.wc.grab_json_response('/api/function/', {'USER_UserCreate', userparams})
+        self.wc.grab_json_response('/api/function/', {'USER_UserCreate', userparams})
         # POST to /api/function
         # {"USER_UserCreate":"2,6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,"}
     
@@ -259,12 +259,9 @@ class NodeHandler(immhandler.NodeHandler):
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
-        # Ok, we can get the enclosure uuid now..
-        ic = self._bmcconfig(nodename, customconfig=self.set_password_policy)
-        enclosureuuid = ic._oem.immhandler.get_property(
-            '/v2/ibmc/smm/chassis/uuid')
+        enclosureuuid = self.info.get('attributes', {}).get('chassis-uuid', [None])[0]
         if enclosureuuid:
-            enclosureuuid = fixup_uuid(enclosureuuid).lower()
+            enclosureuuid = enclosureuuid.lower()
             em = self.configmanager.get_node_attributes(nodename,
                                                         'enclosure.manager')
             em = em.get(nodename, {}).get('enclosure.manager', {}).get(
@@ -273,8 +270,3 @@ class NodeHandler(immhandler.NodeHandler):
             if em:
                 self.configmanager.set_node_attributes(
                     {em: {'id.uuid': enclosureuuid}})
-
-# TODO(jjohnson2): web based init config for future prevalidated cert scheme
-#    def config(self, nodename):
-#        return
-
