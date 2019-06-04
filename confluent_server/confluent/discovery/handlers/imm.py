@@ -15,7 +15,6 @@
 import confluent.discovery.handlers.bmc as bmchandler
 import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.private.util as pygutil
-import string
 import struct
 
 class NodeHandler(bmchandler.NodeHandler):
@@ -44,7 +43,7 @@ class NodeHandler(bmchandler.NodeHandler):
                          uuidprefix[12:16]
             self.info['uuid'] = uuidprefix + '-' + '-'.join(
                 wronguuid.split('-')[3:])
-            self.info['uuid'] = string.lower(self.info['uuid'])
+            self.info['uuid'] = self.info['uuid'].lower()
         if ff not in ('dense-computing', 'BC2'):
             # do not probe unless it's a dense platform
             return
