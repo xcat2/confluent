@@ -809,6 +809,9 @@ class InputVolumes(ConfluentInputMessage):
             sizes = inputdata.get('size', [None])
             if not isinstance(sizes, list):
                 sizes = sizes.split(',')
+            stripsizes = inputdata.get('stripsizes', [None])
+            if not isinstance(stripsizes, list):
+                stripsizes = stripsizes.split(',')
             disks = inputdata.get('disks', [])
             if not disks:
                 raise exc.InvalidArgumentException(
@@ -820,8 +823,13 @@ class InputVolumes(ConfluentInputMessage):
                     currname = volnames.pop(0)
                 else:
                     currname = None
+                if stripsizes:
+                    currstripsize = stripsizes.pop(0)
+                else:
+                    currstripsize = None
                 inputdata.append(
                     {'name': currname, 'size': size,
+                     'stripsize': currstripsize,
                      'disks': disks,
                      'raidlevel': raidlvl})
         for node in nodes:
@@ -1404,12 +1412,13 @@ class Array(ConfluentMessage):
         }
 
 class Volume(ConfluentMessage):
-    def __init__(self, name, volname, size, state, array):
+    def __init__(self, name, volname, size, state, array, stripsize=None):
         self.kvpairs = {
             name: {
                 'type': 'volume',
                 'name': simplify_name(volname),
                 'label': volname,
+                'stripsize': stripsize,
                 'size': size,
                 'state': state,
                 'array': array,

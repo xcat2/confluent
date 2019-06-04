@@ -1038,7 +1038,7 @@ class IpmiHandler(object):
             if raidlvl and vol['raidlevel'] != raidlvl:
                 raise exc.InvalidArgumentException('Cannot mix raid levels in '
                                                    'a single array')
-            vols.append(storage.Volume(name=vol['name'], size=vol['size']))
+            vols.append(storage.Volume(name=vol['name'], size=vol['size'], stripsize=vol['stripsize']))
         newcfg = storage.ConfigSpec(
             arrays=(storage.Array(raid=raidlvl, disks=disks, volumes=vols),))
         self.ipmicmd.apply_storage_configuration(newcfg)
