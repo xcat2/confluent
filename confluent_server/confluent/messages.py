@@ -851,6 +851,7 @@ class InputVolumes(ConfluentInputMessage):
                 self.inputbynode[node].append({'name': volname,
                                                'size': volsize,
                                                'disks': disks,
+                                               'stripsize': input.get('stripsize', None),
                                                'raidlevel': raidlvl,
                                                })
 
