@@ -824,7 +824,7 @@ class InputVolumes(ConfluentInputMessage):
                 else:
                     currname = None
                 if stripsizes:
-                    currstripsize = stripsizes.pop(0)
+                    currstripsize = int(stripsizes.pop(0))
                 else:
                     currstripsize = None
                 inputdata.append(
