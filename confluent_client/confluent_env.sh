@@ -39,6 +39,8 @@ alias nodesetboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export 
 alias nodestorage='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodestorage'
 alias nodeshell='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeshell'
 alias nodelicense='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodelicense'
+# Do not continue for non-bash shells, the rest of this sets up bash completion functions
+[ -z "$BASH_VERSION" -o -z "$PS1" ] && return
 
 
 _confluent_get_args()
