@@ -115,6 +115,8 @@ def createstorage(noderange, options, args):
              'name': names}
     if options.size:
         parms['size'] = options.size
+    if options.stripsizes:
+        parms['stripsizes'] = options.stripsizes
     _print_cfg(session.create(
             '/noderange/{0}/configuration/storage/volumes/{1}'.format(
                 noderange, names), parms))
@@ -147,13 +149,26 @@ def deletestorage(noderange, options, args):
             print(repr(rsp))
 
 
-# def setstorage(noderange, options, args):
-#     pass
+def setdisk(noderange, options, args):
+    if options.disks is None:
+        if len(args):
+            names = args.pop(0)
+        else:
+            sys.stderr.write('-d is required to indicate disk to modify\n')
+            sys.exit(1)
+    else:
+        names = options.disks
+    if not len(args) or args[0] not in ('hotspare', 'jbod', 'unconfigured'):
+        sys.stderr.write('diskset requires valid state as argument (hotspare, jbod, unconfigured)\n')
+        sys.exit(1)
+    session = client.Command()
+    scfg = session.update('/noderange/{0}/configuration/storage/disks/{1}'.format(noderange, names), {'state': args[0]})
+    _print_cfg(scfg)
 
 funmap = {
     'create': createstorage,
     'show': showstorage,
-#     'set': setstorage,
+    'diskset': setdisk,
     'delete': deletestorage,
     'rm': deletestorage,
 }
@@ -162,7 +177,7 @@ funmap = {
 
 def main():
     argparser = OptParser(
-        usage='Usage: %prog <noderange> [show|create|delete]',
+        usage='Usage: %prog <noderange> [show|create|delete|diskset]',
         epilog='',
     )
     argparser.add_option('-r', '--raidlevel', type='int',
@@ -183,6 +198,10 @@ def main():
                               'naming volumes, or selecting a volume for '
                               'delete.  Default behavior is to use '
                               'implementation provided default names.')
+    argparser.add_option('-z', '--stripsizes', type='str',
+                         help='Comma separated list of stripsizes to use when creating volumes. '
+                            'This value is in kilobytes.  The default behavior is to allow the '
+                            'storage controller to decide.')
     (options, args) = argparser.parse_args()
     if len(args) == 1:
         args.append('show')
