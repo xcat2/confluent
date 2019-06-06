@@ -999,6 +999,11 @@ class IpmiHandler(object):
                     msg.Disk(self.node, disk.name, disk.description,
                              disk.id, disk.status, disk.serial,
                              disk.fru, array='{0}-{1}'.format(*arr.id)))
+            for disk in arr.hotspares:
+                self.output.put(
+                    msg.Disk(self.node, disk.name, disk.description,
+                             disk.id, disk.status, disk.serial,
+                             disk.fru, array='{0}-{1}'.format(*arr.id)))
         for arr in scfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
             self._detail_array(arr, arrname, True)
@@ -1020,6 +1025,13 @@ class IpmiHandler(object):
                         msg.Disk(self.node, disk.name, disk.description,
                                  disk.id, disk.status, disk.serial,
                                  disk.fru, arrname))
+            for disk in arr.hotspares:
+                if (name == 'all' or simplify_name(disk.name) == name or
+                        disk == name):
+                    self.output.put(
+                        msg.Disk(self.node, disk.name, disk.description,
+                                 disk.id, disk.status, disk.serial,
+                                 disk.fru, arrname))
 
     def list_disks(self):
         scfg = self.ipmicmd.get_storage_configuration()
@@ -1027,6 +1039,8 @@ class IpmiHandler(object):
             self.output.put(msg.ChildCollection(simplify_name(disk.name)))
         for arr in scfg.arrays:
             for disk in arr.disks:
+                self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+            for disk in arr.hotspares:
                 self.output.put(msg.ChildCollection(simplify_name(disk.name)))
 
     def list_arrays(self):
@@ -1047,6 +1061,8 @@ class IpmiHandler(object):
             vols.append(simplify_name(vol.name))
         disks = []
         for disk in arr.disks:
+            disks.append(simplify_name(disk.name))
+        for disk in arr.hotspares:
             disks.append(simplify_name(disk.name))
         self.output.put(msg.Array(self.node, disks, arr.raid,
                                   vols, arrname, arr.capacity,
