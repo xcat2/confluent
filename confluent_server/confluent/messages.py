@@ -1438,6 +1438,7 @@ class Disk(ConfluentMessage):
     state_aliases = {
         'unconfigured good': 'unconfigured',
         'global hot spare': 'hotspare',
+        'dedicated hot spare': 'hotspare',
     }
 
     def _normalize_state(self, instate):
