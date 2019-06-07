@@ -580,28 +580,35 @@ class Logger(object):
                 textdate = time.strftime(
                     '%b %d %H:%M:%S ', time.localtime(tstamp))
             flock(textfile, LOCK_EX)
-            offset = textfile.tell() + len(textdate)
-            datalen = len(data)
-            eventaux = entry[4]
-            if eventaux is None:
-                eventaux = 0
-            # metadata length is always 16 for this code at the moment
-            binrecord = struct.pack(
-                ">BBIHIBBH", 16, ltype, offset, datalen, tstamp, evtdata,
-                eventaux, 0)
-            if self.isconsole:
-                if ltype == 2:
-                    textrecord = data
+            try:
+                offset = textfile.tell() + len(textdate)
+                datalen = len(data)
+                eventaux = entry[4]
+                if eventaux is None:
+                    eventaux = 0
+                # metadata length is always 16 for this code at the moment
+                binrecord = struct.pack(
+                    ">BBIHIBBH", 16, ltype, offset, datalen, tstamp, evtdata,
+                    eventaux, 0)
+                if self.isconsole:
+                    if ltype == 2:
+                        textrecord = data
+                    else:
+                        textrecord = textdate + data + ']'
                 else:
-                    textrecord = textdate + data + ']'
-            else:
-                textrecord = textdate + data
-                if not textrecord.endswith('\n'):
-                    textrecord += '\n'
-            files = self.handler.try_emit(binrecord, textrecord)
+                    textrecord = textdate + data
+                    if not textrecord.endswith('\n'):
+                        textrecord += '\n'
+                files = self.handler.try_emit(binrecord, textrecord)
+            except struct.error:
+                files = self.handler.doRollover(RollingTypes.size_rolling)
+            finally:
+                try:
+                    flock(textfile, LOCK_UN)
+                except Exception:
+                    pass
             if not files:
                 self.handler.emit(binrecord, textrecord)
-                flock(textfile, LOCK_UN)
             else:
                 # Log the rolling event at first, then log the last data
                 # which cause the rolling event.
