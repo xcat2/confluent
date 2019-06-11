@@ -83,7 +83,8 @@ def list_media(noderange, media):
         for node in res.get('databynode', []):
             url = res['databynode'][node].get('url', None)
             name =  res['databynode'][node].get('name', None)
-            if url and not res['databynode'][node].get('secure', False):
+            if (url and not url.startswith('file:') and
+                    not res['databynode'][node].get('secure', False)):
                 name += ' (insecure)'
             if not name:
                 continue
