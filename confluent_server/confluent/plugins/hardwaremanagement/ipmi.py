@@ -1369,9 +1369,13 @@ class IpmiHandler(object):
 
     def handle_sysconfig(self, advanced=False):
         if 'read' == self.op:
-            self.output.put(msg.ConfigSet(
-                self.node, self.ipmicmd.get_system_configuration(
-                    hideadvanced=not advanced)))
+            try:
+                self.output.put(msg.ConfigSet(
+                    self.node, self.ipmicmd.get_system_configuration(
+                        hideadvanced=not advanced)))
+            except Exception as e:
+                self.output.put(
+                    msg.ConfluentNodeError(self.node, str(e)))
         elif 'update' == self.op:
             self.ipmicmd.set_system_configuration(
                 self.inputdata.get_attributes(self.node))

@@ -706,7 +706,11 @@ def handle_dispatch(connection, cert, dispatch, peername):
 
 
 def _forward_rsp(connection, res):
-    r = pickle.dumps(res)
+    try:
+        r = pickle.dumps(res)
+    except TypeError:
+        r = pickle.dumps(Exception(
+            'Cannot serialize error, check collective.manager error logs for details' + str(res)))
     rlen = len(r)
     if not rlen:
         return
@@ -915,7 +919,7 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     a = configmanager.get_collective_member(manager)
     try:
         remote = socket.create_connection((a['address'], 13001))
-        remote.settimeout(90)
+        remote.settimeout(180)
         remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
                                  keyfile='/etc/confluent/privkey.pem',
                                  certfile='/etc/confluent/srvcert.pem')
