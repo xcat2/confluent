@@ -171,6 +171,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
         self.cfm = cfm
         self.node = node
+        self.sensormap = {}
         self._inhealth = False
         self._lasthealth = None
         kwargs['keepalive'] = False
@@ -443,7 +444,6 @@ persistent_ipmicmds = {}
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg, output,
                  realop):
-        self.sensormap = {}
         self.invmap = {}
         self.output = output
         self.sensorcategory = None
@@ -800,7 +800,7 @@ class IpmiHandler(object):
             sensors = self.ipmicmd.get_sensor_descriptions()
         for sensor in sensors:
             resourcename = sensor['name']
-            self.sensormap[simplify_name(resourcename)] = resourcename
+            self.ipmicmd.sensormap[simplify_name(resourcename)] = resourcename
 
     def read_sensors(self, sensorname):
         if sensorname == 'all':
@@ -821,15 +821,16 @@ class IpmiHandler(object):
                 readings.append(reading)
             self.output.put(msg.SensorReadings(readings, name=self.node))
         else:
-            self.make_sensor_map()
-            if sensorname not in self.sensormap:
+            if sensorname not in self.ipmicmd.sensormap:
+                self.make_sensor_map()
+            if sensorname not in self.ipmicmd.sensormap:
                 self.output.put(
                     msg.ConfluentTargetNotFound(self.node,
                                                 'Sensor not found'))
                 return
             try:
                 reading = self.ipmicmd.get_sensor_reading(
-                    self.sensormap[sensorname])
+                    self.ipmicmd.sensormap[sensorname])
                 if hasattr(reading, 'health'):
                     reading.health = _str_health(reading.health)
                 self.output.put(

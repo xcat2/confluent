@@ -59,7 +59,7 @@ def install_license(session, filename):
     instargs = {'filename': filename}
     for res in session.create(resource, instargs):
         pass # print(repr(res))
-    show_licenses()
+    show_licenses(session)
 
 def show_licenses(session):
     global exitcode
