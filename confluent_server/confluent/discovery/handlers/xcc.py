@@ -15,10 +15,11 @@
 import confluent.discovery.handlers.imm as immhandler
 import confluent.netutil as netutil
 import confluent.util as util
+import eventlet
 import eventlet.support.greendns
 import json
 import pyghmi.exceptions as pygexc
-import pyghmi.redfish.oem.lenovo.xcc as xcc
+xcc = eventlet.import_patched('pyghmi.redfish.oem.lenovo')
 import pyghmi.util.webclient as webclient
 import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
