@@ -624,12 +624,10 @@ class IpmiHandler(object):
                 if 'password' in user:
                     self.ipmicmd.set_user_password(uid=user['uid'],
                                                    password=user['password'])
-                    self.ipmicmd.set_user_password(uid=user['uid'],
-                                    mode='enable', password=user['password'])
-                    if 'privilege_level' in user:
-                        self.ipmicmd.set_user_access(uid=user['uid'],
-                                                     privilege_level=user[
-                                                         'privilege_level'])
+                if 'privilege_level' in user:
+                    self.ipmicmd.set_user_access(uid=user['uid'],
+                                                 privilege_level=user[
+                                                     'privilege_level'])
                 if 'enabled' in user:
                     if user['enabled'] == 'yes':
                         mode = 'enable'

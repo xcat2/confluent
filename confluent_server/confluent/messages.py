@@ -667,8 +667,11 @@ class InputCredential(ConfluentMessage):
     valid_privilege_levels = set([
         'callback',
         'user',
+        'ReadOnly',
         'operator',
+        'Operator',
         'administrator',
+        'Administrator',
         'proprietary',
         'no_access',
     ])
@@ -686,33 +689,19 @@ class InputCredential(ConfluentMessage):
         if len(path) == 4:
             inputdata['uid'] = path[-1]
         # if the operation is 'create' check if all fields are present
-        missingattrs = []
-        for attrname in ('uid', 'privilege_level', 'username', 'password'):
-            if attrname not in inputdata:
-                missingattrs.append(attrname)
-        if missingattrs:
-            raise exc.InvalidArgumentException(
-                'Required fields missing: {0}'.format(','.join(missingattrs)))
         if (isinstance(inputdata['uid'], str) and
                 not inputdata['uid'].isdigit()):
-            raise exc.InvalidArgumentException('uid must be a number')
+            inputdata['uid'] = inputdata['uid']
         else:
             inputdata['uid'] = int(inputdata['uid'])
         if ('privilege_level' in inputdata and
               inputdata['privilege_level'] not in self.valid_privilege_levels):
             raise exc.InvalidArgumentException('privilege_level is not one of '
                                         + ','.join(self.valid_privilege_levels))
-        if 'username' in inputdata and len(inputdata['username']) > 16:
-            raise exc.InvalidArgumentException(
-                                        'name must be less than or = 16 chars')
-        if 'password' in inputdata and len(inputdata['password']) > 20:
-            raise exc.InvalidArgumentException('password has limit of 20 chars')
-
         if ('enabled' in inputdata and
             inputdata['enabled'] not in self.valid_enabled_values):
             raise exc.InvalidArgumentException('valid values for enabled are '
                                                             + 'yes and no')
-
         if nodes is None:
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
