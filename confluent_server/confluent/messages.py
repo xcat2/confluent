@@ -458,6 +458,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith('support/servicedata') and inputdata:
         return InputMedia(path, nodes, inputdata, configmanager)
+    elif '/'.join(path).startswith('configuration/management_controller/save_licenses') and inputdata:
+        return InputMedia(path, nodes, inputdata, configmanager)
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
         return InputLicense(path, nodes, inputdata, configmanager)
@@ -468,7 +470,7 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
 class InputFirmwareUpdate(ConfluentMessage):
 
     def __init__(self, path, nodes, inputdata, configmanager):
-        self._filename = inputdata.get('filename', inputdata.get('url', None))
+        self._filename = inputdata.get('filename', inputdata.get('url', inputdata.get('dirname', None)))
         self.bank = inputdata.get('bank', None)
         self.nodes = nodes
         self.filebynode = {}
@@ -509,6 +511,10 @@ class DetachMedia(ConfluentMessage):
 class Media(ConfluentMessage):
     def __init__(self, node, media):
         self.kvpairs = {node: {'name': media.name, 'url': media.url}}
+
+class SavedFile(ConfluentMessage):
+    def __init__(self, node, file):
+        self.kvpairs = {node: {'filename': file}}
 
 class InputAlertData(ConfluentMessage):
 

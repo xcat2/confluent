@@ -626,6 +626,8 @@ class IpmiHandler(object):
             return self.handle_sysconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
             return self.handle_licenses()
+        elif self.element[1:3] == ['management_controller', 'save_licenses']:
+            return self.save_licenses()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -1430,6 +1432,11 @@ class IpmiHandler(object):
         available = self.ipmicmd.get_remote_kvm_available()
         self.output.put(msg.License(self.node, available))
         return
+
+    def save_licenses(self):
+        directory = self.inputdata.nodefile(self.node)
+        for saved in self.ipmicmd.save_licenses(directory):
+            self.output.put(msg.SavedFile(self.node, saved))
 
     def handle_licenses(self):
         if self.element[-1] == '':

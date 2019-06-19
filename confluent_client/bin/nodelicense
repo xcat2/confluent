@@ -36,20 +36,24 @@ exitcode = 0
 
 argparser = optparse.OptionParser(
     usage="Usage: "
-          "%prog <noderange> [list][install <file>]")
+          "%prog <noderange> [list][install <file>|save <directory>]")
 (options, args) = argparser.parse_args()
 upfile = None
+downdir = None
 try:
     noderange = args[0]
     if len(args) > 1:
         if args[1] == 'install':
             upfile = args[2]
+        elif args[1] == 'save':
+            downdir = args[2]
         else:
             components = ['all']
 except IndexError:
     argparser.print_help()
     sys.exit(1)
 client.check_globbing(noderange)
+
 
 def install_license(session, filename):
     global exitcode
@@ -60,6 +64,22 @@ def install_license(session, filename):
     for res in session.create(resource, instargs):
         pass # print(repr(res))
     show_licenses(session)
+
+
+def save_licenses(session, dirname):
+    global exitcode
+    resource = '/noderange/{0}/configuration/' \
+               'management_controller/save_licenses'.format(noderange)
+    filename = os.path.abspath(dirname)
+    instargs = {'dirname': filename}
+    for res in session.create(resource, instargs):
+        for node in res.get('databynode', {}):
+            fname = res['databynode'][node].get('filename', None)
+            if fname:
+                print('{0}: Saved license to {1}'.format(node, fname))
+            else:
+                sys.stderr.write('{0}: {1}', node, repr(res['databynode'][node]))
+
 
 def show_licenses(session):
     global exitcode
@@ -75,10 +95,12 @@ def show_licenses(session):
 
 try:
     session = client.Command()
-    if upfile is None:
-        show_licenses(session)
-    else:
+    if upfile:
         install_license(session, upfile)
+    elif downdir:
+        save_licenses(session, downdir)
+    else:
+        show_licenses(session)
 except KeyboardInterrupt:
     print('')
 sys.exit(exitcode)

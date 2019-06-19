@@ -171,6 +171,10 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
+                'save_licenses': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
                 'net_interfaces': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
