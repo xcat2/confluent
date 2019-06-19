@@ -36,10 +36,11 @@ exitcode = 0
 
 argparser = optparse.OptionParser(
     usage="Usage: "
-          "%prog <noderange> [list][install <file>|save <directory>]")
+          "%prog <noderange> [list][install <file>|save <directory>|delete <name>]")
 (options, args) = argparser.parse_args()
 upfile = None
 downdir = None
+delete = False
 try:
     noderange = args[0]
     if len(args) > 1:
@@ -47,6 +48,8 @@ try:
             upfile = args[2]
         elif args[1] == 'save':
             downdir = args[2]
+        elif args[1] == 'delete':
+            delete = args[2]
         else:
             components = ['all']
 except IndexError:
@@ -83,7 +86,6 @@ def save_licenses(session, dirname):
 
 def show_licenses(session):
     global exitcode
-    firmware_shown = False
     for res in session.read(
             '/noderange/{0}/configuration/management_controller/licenses/'
             'all'.format(noderange)):
@@ -93,12 +95,34 @@ def show_licenses(session):
                                                           'Unknown')))
 
 
+def delete_license(session, licname):
+    global exitcode
+    licstodel = []
+    for res in list(session.read(
+            '/noderange/{0}/configuration/management_controller/licenses/'
+            'all'.format(noderange))):
+        for node in res.get('databynode', {}):
+            for license in res['databynode'][node].get('License', []):
+                if license.get('feature', None) == licname:
+                    prefix = '/nodes/{0}/configuration/management_controller/licenses/'.format(node)
+                    for currlic in list(session.read(prefix)):
+                        currlic = currlic.get('item', {}).get('href', 'all')
+                        if currlic == 'all':
+                            continue
+                        currname = list(session.read(prefix + currlic))[0]
+                        currname = currname.get('License', [{}])[0].get('feature', None)
+                        if currname == licname:
+                            list(session.delete(prefix + currlic))
+    show_licenses(session)
+
 try:
     session = client.Command()
     if upfile:
         install_license(session, upfile)
     elif downdir:
         save_licenses(session, downdir)
+    elif delete:
+        delete_license(session, delete)
     else:
         show_licenses(session)
 except KeyboardInterrupt:

@@ -1319,11 +1319,17 @@ class IpmiHandler(object):
         licname = self.element[3]
         if licname == 'all':
             for lic in self.ipmicmd.get_licenses():
-                self.output.put(msg.License(self.node, feature=lic['name']))
+                if self.op == 'delete':
+                    self.ipmicmd.delete_license(lic['name'])
+                else:
+                    self.output.put(msg.License(self.node, feature=lic['name']))
         else:
             index = int(licname)
             lic = list(self.ipmicmd.get_licenses())[index - 1]
-            self.output.put(msg.License(self.node, feature=lic['name']))
+            if self.op == 'delete':
+                self.ipmicmd.delete_license(lic['name'])
+            else:
+                self.output.put(msg.License(self.node, feature=lic['name']))
 
     def handle_description(self):
         dsc = self.ipmicmd.get_description()

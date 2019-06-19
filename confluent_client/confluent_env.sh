@@ -160,7 +160,7 @@ _confluent_nodelicense_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "install list save" -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -W "install list save delete" -- ${COMP_WORDS[-1]}))
         return;
     fi
     if [ $NUMARGS == 4 ] && [ ${CMPARGS[2]} == 'install' ]; then
