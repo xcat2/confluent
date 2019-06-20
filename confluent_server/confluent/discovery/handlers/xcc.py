@@ -19,7 +19,7 @@ import eventlet
 import eventlet.support.greendns
 import json
 import pyghmi.exceptions as pygexc
-xcc = eventlet.import_patched('pyghmi.redfish.oem.lenovo')
+xcc = eventlet.import_patched('pyghmi.redfish.oem.lenovo.xcc')
 import pyghmi.util.webclient as webclient
 import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
