@@ -1463,7 +1463,7 @@ class IpmiHandler(object):
             if self.op == 'delete':
                 self.ipmicmd.delete_license(lic['name'])
             else:
-                self.output.put(msg.License(self.node, feature=lic['name']))
+                self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
     def handle_description(self):
         dsc = self.ipmicmd.get_description()
         self.output.put(msg.KeyValueData(dsc, self.node))

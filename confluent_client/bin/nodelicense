@@ -91,8 +91,11 @@ def show_licenses(session):
             'all'.format(noderange)):
         for node in res.get('databynode', {}):
             for license in res['databynode'][node].get('License', []):
-                print('{0}: {1}'.format(node, license.get('feature',
-                                                          'Unknown')))
+                msg = '{0}: {1}'.format(node, license.get('feature',
+                                                          'Unknown'))
+                if license.get('state', 'Active') != 'Active':
+                    msg += ' ({0})'.format(license['state'])
+                print(msg)
 
 
 def delete_license(session, licname):
