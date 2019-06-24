@@ -462,7 +462,7 @@ class IpmiHandler(object):
         self.inputdata = inputdata
         self.tenant = cfg.tenant
         tenant = cfg.tenant
-        if ((node, tenant) not in persistent_ipmicmds or
+        while ((node, tenant) not in persistent_ipmicmds or
                 not persistent_ipmicmds[(node, tenant)].ipmi_session.logged or
                 persistent_ipmicmds[(node, tenant)].ipmi_session.broken):
             try:
@@ -481,10 +481,11 @@ class IpmiHandler(object):
                 while ((not (self.broken or self.loggedin)) and
                                (util.monotonic_time() - begin) < 30):
                     ipmisess.wait_for_rsp(31 - (util.monotonic_time() - begin))
-                if not (self.broken or self.loggedin):
-                    ipmisess._mark_broken()
-                    raise exc.TargetEndpointUnreachable(
-                        "Login process to " + connparams['bmc'] + " died")
+                if self.broken or self.loggedin:
+                    break
+                ipmisess._mark_broken()
+                #    raise exc.TargetEndpointUnreachable(
+                #        "Login process to " + connparams['bmc'] + " died")
             except socket.gaierror as ge:
                 if ge[0] == -2:
                     raise exc.TargetEndpointUnreachable(ge[1])

@@ -26,7 +26,7 @@ def lookupdata(data, key):
 
 def main():
     argparser = optparse.OptionParser(
-    usage='''\n       %prog noderange -o xcatnodes.def 
+    usage='''\n       %prog noderange -o xcatnodes.def
              \n ''')
     argparser.add_option('-o', '--output',
                          help='xCAT stanza file')
