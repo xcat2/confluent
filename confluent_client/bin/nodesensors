@@ -185,6 +185,7 @@ def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
             except KeyError:
                 rowdata.append('N/A')
         csvwriter.writerow(rowdata)
+        sys.stdout.flush()
 
 
 def main():
