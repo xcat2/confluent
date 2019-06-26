@@ -60,6 +60,10 @@ client.check_globbing(noderange)
 
 def install_license(session, filename):
     global exitcode
+    if not os.path.exists(filename):
+        sys.stderr.write('Unable to locate requested file {0}\n'.format(
+            filename))
+        sys.exit(404)
     resource = '/noderange/{0}/configuration/' \
                'management_controller/licenses/'.format(noderange)
     filename = os.path.abspath(filename)
@@ -74,6 +78,10 @@ def save_licenses(session, dirname):
     resource = '/noderange/{0}/configuration/' \
                'management_controller/save_licenses'.format(noderange)
     filename = os.path.abspath(dirname)
+    if not os.path.exists(filename):
+        sys.stderr.write('Unable to locate specified directory {0}\n'.format(
+            filename))
+        sys.exit(404)
     instargs = {'dirname': filename}
     for res in session.create(resource, instargs):
         for node in res.get('databynode', {}):
