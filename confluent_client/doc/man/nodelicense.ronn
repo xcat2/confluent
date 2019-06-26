@@ -3,9 +3,15 @@ nodelicense(8) -- Manage license keys on BMC
 
 ## SYNOPSIS
 
-`nodelicense <noderange> [list|install <filename>]`
+`nodelicense <noderange> [list|install <filename>|delete <license>|save <directory>]`
 
 ## DESCRIPTION
 
-`nodelicense` shows and installs license keys on supported BMCs
+`nodelicense` manages license keys on supported BMCs. Without an argument, the command
+lists currently installed license.  Using `delete` will remove the specified license name
+from th eBMC.  The `save` subcommand will take the passed directory (which may be in the form
+of /path/to/{node}/ to have the node name substituted for each node) and back up installed licenses
+to that directory. The `install` command will take the specified filename and install.  The filename
+argument may be of the form  xcc_fod_0034_7X21{id.serial}.key to have the serial number substituted
+to allow unique licenses to be specified in a single command.
 
