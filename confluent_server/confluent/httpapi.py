@@ -794,7 +794,10 @@ def serve(bind_host, bind_port):
                 ' a second\n')
             eventlet.sleep(1)
     # TCP_FASTOPEN
-    sock.setsockopt(socket.SOL_TCP, 23, 5)
+    try:
+        sock.setsockopt(socket.SOL_TCP, 23, 5)
+    except Exception:
+        pass  # we gave it our best shot there
     try:
         eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
                              debug=False, socket_timeout=60)
