@@ -34,6 +34,8 @@ def decodestr(value):
             ret = value.decode('cp437')
         except UnicodeDecodeError:
             ret = value
+    except AttributeError:
+        return value
     return ret
 
 def unicode_dictvalues(dictdata):

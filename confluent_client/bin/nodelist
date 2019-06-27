@@ -61,7 +61,7 @@ def main():
                 sys.stderr.write(res['error'] + '\n')
                 exitcode = 1
             else:
-                print res['item']['href'].replace('/', '')
+                print(res['item']['href'].replace('/', ''))
 
     sys.exit(exitcode)
 

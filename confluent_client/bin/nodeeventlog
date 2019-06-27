@@ -33,7 +33,8 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+if sys.version_info[0] < 3:
+    sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] noderange [clear]")

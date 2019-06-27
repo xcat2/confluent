@@ -150,7 +150,7 @@ def sensorpass(showout=True, appendtime=False):
                             showval += ' @' + time.strftime(
                                 '%Y-%m-%dT%H:%M:%S')
                         print(u'{0}: {1}:{2}'.format(
-                            node, sensedata['name'], showval).encode('utf-8'))
+                            node, sensedata['name'], showval))
                         sys.stdout.flush()
     return resultdata
 
@@ -199,7 +199,7 @@ def main():
             orderedsensors.append(name)
         orderedsensors.sort()
         for name in orderedsensors:
-            headernames.append(sensorheaders[name].encode('utf-8'))
+            headernames.append(sensorheaders[name])
     if options.csv:
         linebyline = False
         csvwriter = csv.writer(sys.stdout)

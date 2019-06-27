@@ -15,7 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import anydbm as dbm
+try:
+    import anydbm as dbm
+except ImportError:
+    import dbm
 import csv
 import errno
 import fnmatch
@@ -322,14 +325,19 @@ class Command(object):
         if knownhosts:
             certdata = self.connection.getpeercert(binary_form=True)
             fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
+            fingerprint = fingerprint.encode('utf-8')
             hostid = '@'.join((port, server))
             khf = dbm.open(os.path.join(clientcfgdir, "knownhosts"), 'c', 384)
             if hostid in khf:
                 if fingerprint == khf[hostid]:
                     return
                 else:
-                    replace = raw_input(
-                        "MISMATCHED CERTIFICATE DATA, ACCEPT NEW? (y/n):")
+                    try:
+                        replace = raw_input(
+                            "MISMATCHED CERTIFICATE DATA, ACCEPT NEW? (y/n):")
+                    except NameError:
+                        replace = input(
+                            "MISMATCHED CERTIFICATE DATA, ACCEPT NEW? (y/n):")
                     if replace not in ('y', 'Y'):
                         raise Exception("BAD CERTIFICATE")
             cprint('Adding new key for %s:%s' % (server, port))
@@ -393,7 +401,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
         for node in sorted(res['databynode']):
             for attr, val in sorted(
                     res['databynode'][node].items(),
-                    key=lambda (k, v): v.get('sortid', k) if isinstance(v, dict) else k):
+                    key=lambda k: k[1].get('sortid', k[0]) if isinstance(k[1], dict) else k[0]):
                 if attr == 'error':
                     sys.stderr.write('{0}: Error: {1}\n'.format(node, val))
                     continue
