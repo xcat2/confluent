@@ -832,6 +832,7 @@ class IpmiHandler(object):
             del newinf['information']['name']
         if (fnmatch(newinf['name'], 'Adapter ??:??:??') or
                 fnmatch(newinf['name'], 'PCIeGen? x*') or
+                not newinf['name'] or
                 newinf['name'] == 'Adapter' or
                 newinf['name'].startswith('slot_') or
                 newinf['name'].startswith('ob_')):
