@@ -830,8 +830,8 @@ class IpmiHandler(object):
         if newinf.get('information', None) and 'name' in newinf['information']:
             newinf = copy.deepcopy(newinf)
             del newinf['information']['name']
-        if (fnmatch(newinf['name'], 'Adapter ??:??:??') or
-                fnmatch(newinf['name'], 'PCIeGen? x*') or
+        if (fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
+                newinf['name'], 'PCIeGen? x*') or not newinf['name']):
                 newinf['name'] == 'Adapter' or
                 newinf['name'].startswith('slot_') or
                 newinf['name'].startswith('ob_')):
