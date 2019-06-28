@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -182,6 +182,9 @@ node = {
                         'human use and not programmatic use, so it can be '
                         'freeform text data without concern for issues in how '
                         'the server will process it.',
+    },
+    'location.height': {
+        'description': 'Height in RU of the system (defaults to query the systems)',
     },
     'location.room': {
         'description': 'Room description for the node',
