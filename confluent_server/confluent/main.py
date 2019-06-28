@@ -237,7 +237,7 @@ def run():
     signal.signal(signal.SIGTERM, terminate)
     collective.startup()
     if dbgif:
-        oumask = os.umask(0077)
+        oumask = os.umask(0o077)
         try:
             os.remove('/var/run/confluent/dbg.sock')
         except OSError:

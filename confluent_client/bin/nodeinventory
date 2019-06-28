@@ -34,7 +34,8 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-sys.stdout = codecs.getwriter('utf8')(sys.stdout)
+if sys.version_info[0] < 3:
+    sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
 filters = []
 
@@ -145,7 +146,7 @@ try:
                                 databynode[node] = {}
                             databynode[node][prefix] = inv
                         else:
-                            print '{0}: {1}: Not Present'.format(node, prefix)
+                            print('{0}: {1}: Not Present'.format(node, prefix))
                     continue
                 info = inv['information']
                 info.pop('board_extra', None)
