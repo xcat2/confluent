@@ -964,8 +964,8 @@ class IpmiHandler(object):
         if newinf.get('information', None) and 'name' in newinf['information']:
             newinf = copy.deepcopy(newinf)
             del newinf['information']['name']
-        if fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
-                newinf['name'], 'PCIeGen? x*'):
+        if (fnmatch(newinf['name'], 'Adapter ??:??:??') or fnmatch(
+                newinf['name'], 'PCIeGen? x*') or not newinf['name']):
             myinf = newinf.get('information', {})
             sdid = myinf.get('PCI Subsystem Device ID', None)
             svid = myinf.get('PCI Subsystem Vendor ID', None)
