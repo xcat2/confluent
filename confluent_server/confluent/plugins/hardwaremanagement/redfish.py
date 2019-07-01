@@ -591,7 +591,6 @@ class IpmiHandler(object):
                 user = self.inputdata.credentials[self.node]
                 self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
                                     password=user['password'],
-                                    callback=True,link_auth=True, ipmi_msg=True,
                                     privilege_level=user['privilege_level'])
             # A list of users
             self.output.put(msg.ChildCollection('all'))
