@@ -484,6 +484,9 @@ class IpmiHandler(object):
                     ipmisess.wait_for_rsp(31 - (util.monotonic_time() - begin))
                 if self.broken or self.loggedin:
                     break
+                cfd = cfg.get_node_attributes(node, _configattributes, decrypt=True)
+                self.cfg = cfd[node]
+                connparams = get_conn_params(node, self.cfg)
                 ipmisess._mark_broken()
                 #    raise exc.TargetEndpointUnreachable(
                 #        "Login process to " + connparams['bmc'] + " died")
