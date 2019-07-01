@@ -467,6 +467,7 @@ class IpmiHandler(object):
                 persistent_ipmicmds[(node, tenant)].ipmi_session.broken):
             try:
                 persistent_ipmicmds[(node, tenant)].close_confluent()
+                persistent_ipmicmds[(node, tenant)].ipmi_session._mark_broken()
             except KeyError:  # was no previous session
                 pass
             try:
@@ -478,7 +479,7 @@ class IpmiHandler(object):
 
                 ipmisess = persistent_ipmicmds[(node, tenant)].ipmi_session
                 begin = util.monotonic_time()
-                while ((not (self.broken or self.loggedin)) and
+                while ((not (ipmisess.broken or self.loggedin)) and
                                (util.monotonic_time() - begin) < 30):
                     ipmisess.wait_for_rsp(31 - (util.monotonic_time() - begin))
                 if self.broken or self.loggedin:
