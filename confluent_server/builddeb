@@ -42,6 +42,7 @@ if [ "$OPKGNAME" = "confluent-server" ]; then
 fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
+echo 'export PYBUILD_INSTALL_ARGS=--install-lib=/opt/confluent/lib/python' >> debian/rules
 #echo 'Provides: python-'$DPKGNAME >> debian/control
 #echo 'Conflicts: python-'$DPKGNAME >> debian/control
 #echo 'Replaces: python-'$DPKGNAME' (<<2)' >> debian/control
