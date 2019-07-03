@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import confluent.discovery.handlers.imm as immhandler
 import confluent.netutil as netutil
 import confluent.util as util
 import eventlet
 import eventlet.support.greendns
 import json
+import os
 import pyghmi.exceptions as pygexc
 xcc = eventlet.import_patched('pyghmi.redfish.oem.lenovo.xcc')
 import pyghmi.util.webclient as webclient
@@ -133,20 +135,13 @@ class NodeHandler(immhandler.NodeHandler):
             print(repr(e))
             pass
 
-    def _get_next_userid(self):
-        userinfo = self.wc.grab_json_response('/api/dataset/imm_users')
+    def _get_next_userid(self, wc):
+        userinfo = wc.grab_json_response('/api/dataset/imm_users')
         userinfo = userinfo['items'][0]['users']
         for user in userinfo:
             if user['users_user_name'] == '':
                 return user['users_user_id']
 
-    def _create_tmp_user(self):
-        # If we need to convert a pre-hashed account, we will need a temporary account
-        userparams = "{0},6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,".format(self._get_next_userid())
-        self.wc.grab_json_response('/api/function/', {'USER_UserCreate', userparams})
-        # POST to /api/function
-        # {"USER_UserCreate":"2,6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,"}
-    
     def _setup_xcc_account(self, username, passwd, wc):
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         uid = None
@@ -166,7 +161,7 @@ class NodeHandler(immhandler.NodeHandler):
                              {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
         if username != 'USERID':
             wc.grab_json_response(
-                '/api/function', 
+                '/api/function',
                 {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,'.format(uid, username)})
 
     def _convert_sha256account(self, user, passwd, wc):
@@ -179,16 +174,19 @@ class NodeHandler(immhandler.NodeHandler):
                 curruser = userent
                 break
         if curruser.get('users_pass_is_sha256', 0):
+            self._wc = None
+            wc = self.wc
             nwc = wc.dupe()
             # Have to convert it for being useful with most Lenovo automation tools
             # This requires deleting the account entirely and trying again
-            tmpuid = self._get_next_userid()
+            tmpuid = self._get_next_userid(wc)
             try:
-                userparams = "{0},6pmu0ezczzcp,pwrfijvpiw47$,1,4,0,0,0,0,,8,".format(tmpuid)
+                tpass = base64.b64encode(os.urandom(9)) + 'Iw47$'
+                userparams = "{0},6pmu0ezczzcp,{1},1,4,0,0,0,0,,8,".format(tmpuid, tpass)
                 result = wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
                 adata = json.dumps({
                     'username': '6pmu0ezczzcp',
-                    'password': 'pwrfijvpiw47$',
+                    'password': tpass,
                 })
                 headers = {'Connection': 'keep-alive', 'Content-Type': 'application/json'}
                 nwc.request('POST', '/api/login', adata, headers)
@@ -200,7 +198,7 @@ class NodeHandler(immhandler.NodeHandler):
                     if '_csrf_token' in wc.cookies:
                         nwc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
                     if rspdata.get('reason', False):
-                        newpass = 'lkfBh2rGxqpJ$'
+                        newpass = base64.b64encode(os.urandom(9)) + 'q4J$'
                         nwc.grab_json_response(
                             '/api/function',
                             {'USER_UserPassChange': '{0},{1}'.format(tmpuid, newpass)})
@@ -226,7 +224,6 @@ class NodeHandler(immhandler.NodeHandler):
             'secret.hardwaremanagementpassword'], decrypt=True)
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
         if self._atdefaultcreds:
-
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
         self._convert_sha256account(user, passwd, wc)
