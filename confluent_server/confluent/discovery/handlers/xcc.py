@@ -107,7 +107,7 @@ class NodeHandler(immhandler.NodeHandler):
         if wc:
             return wc
 
-    def set_password_policy(self, ic):
+    def set_password_policy(self):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
         for rule in self.ruleset.split(','):
             if '=' not in rule:
@@ -127,10 +127,8 @@ class NodeHandler(immhandler.NodeHandler):
                 ruleset['USER_GlobalPassComplexRequired'] = value
             if name.lower() == 'reuse':
                 ruleset['USER_GlobalMinPassReuseCycle'] = value
-        ic.register_key_handler(self.validate_cert)
-        ic.oem_init()
         try:
-            ic._oem.immhandler.wc.grab_json_response('/api/dataset', ruleset)
+            self.wc.grab_json_response('/api/dataset', ruleset)
         except Exception as e:
             print(repr(e))
             pass
@@ -223,6 +221,7 @@ class NodeHandler(immhandler.NodeHandler):
             self.nodename, ['secret.hardwaremanagementuser',
             'secret.hardwaremanagementpassword'], decrypt=True)
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
+        self.set_password_policy()
         if self._atdefaultcreds:
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
