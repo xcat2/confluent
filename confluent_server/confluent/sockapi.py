@@ -182,11 +182,11 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             send_data(connection, {'_requestdone': 1})
         except SystemExit:
             sys.exit(0)
-        except:
+        except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)
             send_data(connection, {'errorcode': 500,
-                                      'error': 'Unexpected error'})
+                                      'error': 'Unexpected error - ' + str(e)})
             send_data(connection, {'_requestdone': 1})
         request = tlvdata.recv(connection)
 
@@ -313,12 +313,12 @@ def term_interact(authdata, authname, ccons, cfm, connection, consession,
                 try:
                     process_request(connection, data, cfm, authdata, authname,
                                     skipauth)
-                except Exception:
+                except Exception as e:
                     tracelog.log(traceback.format_exc(),
                                  ltype=log.DataTypes.event,
                                  event=log.Events.stacktrace)
                     send_data(connection, {'errorcode': 500,
-                                           'error': 'Unexpected error'})
+                                           'error': 'Unexpected error - ' + str(e)})
                     send_data(connection, {'_requestdone': 1})
                 continue
         if not data:

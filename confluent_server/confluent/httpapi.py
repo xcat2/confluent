@@ -384,11 +384,11 @@ def resourcehandler(env, start_response):
     try:
         for rsp in resourcehandler_backend(env, start_response):
             yield rsp
-    except:
+    except Exception as e:
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                      event=log.Events.stacktrace)
-        start_response('500 - Internal Server Error', [])
-        yield '500 - Internal Server Error'
+        start_response('500 - ' + str(e), [])
+        yield '500 - ' + str(e)
         return
 
 

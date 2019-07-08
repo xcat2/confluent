@@ -504,6 +504,13 @@ def makecall(callout, args):
             if 'errorcode' in response:
                 exitcode = response['errorcode']
             sys.stderr.write('Error: ' + response['error'] + '\n')
+        if 'databynode' in response:
+            lresponse = response['databynode']
+            for node in lresponse:
+                if 'errorcode' in lresponse[node]:
+                    exitcode = lresponse[node]['errorcode']
+                if 'error' in lresponse[node]:
+                    sys.stderr.write('{0}: Error - {1}\n'.format(node, lresponse[node]['error']))
 
 
 def clearvalues(resource, attribs):
@@ -997,4 +1004,6 @@ if __name__ == '__main__':
         if deadline and os.times()[4] < deadline:
             sys.stderr.write('[Exited early, hit enter to continue]')
             sys.stdin.readline()
+        if errcode == 0:
+            errcode = exitcode
         sys.exit(errcode)
