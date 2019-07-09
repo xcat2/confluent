@@ -749,6 +749,7 @@ class IpmiHandler(object):
                     uid=data['uid'],
                     username=data['name'],
                     privilege_level=data['access']['privilege_level'],
+                    expiration=data['expiration'],
                     name=self.node))
                 return
             elif self.op == 'update':
