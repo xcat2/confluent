@@ -1280,6 +1280,7 @@ class UserCollection(ConfluentMessage):
             entry = {
                 'uid': user['uid'],
                 'username': user['name'],
+                'expiration': user.get('expiration', None),
                 'privilege_level': user['access']['privilege_level']
             }
             userlist.append(entry)
