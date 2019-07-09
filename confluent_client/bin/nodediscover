@@ -232,8 +232,10 @@ def clear_discovery(options, session):
             else:
                 print(repr(res))
 
-def list_matching_macs(options, session):
+def list_matching_macs(options, session, node=None):
     path = '/discovery/'
+    if node:
+        path += 'by-node/{0}/'.format(node)
     if options.model:
         path += 'by-model/{0}/'.format(options.model)
     if options.serial:
@@ -256,25 +258,25 @@ def list_matching_macs(options, session):
         path += 'by-mac/'
         return [x['item']['href'] for x in session.read(path)]
 
-def assign_discovery(options, session):
+def assign_discovery(options, session, needid=True):
     abort = False
     if options.importfile:
         return import_csv(options, session)
-    if not (options.serial or options.uuid or options.mac):
+    if not options.node:
+        sys.stderr.write("Node (-n) must be specified for assignment\n")
+        abort = True
+    if needid and not (options.serial or options.uuid or options.mac):
         sys.stderr.write(
             "UUID (-u), serial (-s), or ether address (-e) required for "
             "assignment\n")
         abort = True
-    if not options.node:
-        sys.stderr.write("Node (-n) must be specified for assignment\n")
-        abort = True
     if abort:
         sys.exit(1)
-    matches = list_matching_macs(options, session)
+    matches = list_matching_macs(options, session, None if needid else options.node)
     if not matches:
         # Do a rescan to catch missing requested data
         blocking_scan(session)
-        matches = list_matching_macs(options, session)
+        matches = list_matching_macs(options, session, None if needid else options.node)
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")
         sys.exit(1)
@@ -332,7 +334,7 @@ def main():
     parser.add_option('-o', '--order', dest='order',
                       help='Order output by given field', metavar='ORDER')
     (options, args) = parser.parse_args()
-    if len(args) == 0 or args[0] not in ('list', 'assign', 'rescan', 'clear'):
+    if len(args) == 0 or args[0] not in ('list', 'assign', 'reassign', 'rescan', 'clear'):
         parser.print_help()
         sys.exit(1)
     session = client.Command()
@@ -342,6 +344,8 @@ def main():
         clear_discovery(options, session)
     if args[0] == 'assign':
         assign_discovery(options, session)
+    if args[0] == 'reassign':
+        assign_discovery(options, session, False)
     if args[0] == 'rescan':
         blocking_scan(session)
         print("Rescan complete")
