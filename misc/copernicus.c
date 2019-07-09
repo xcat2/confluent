@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
-#include <net/if_arp.h>         
+#include <net/if_arp.h>
 #include <linux/if_packet.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -41,13 +41,13 @@ int add_macs(char* destination, int maxsize) {
         lla = (struct sockaddr_ll *)ifc->ifa_addr;
         if (lla->sll_hatype == ARPHRD_INFINIBAND) {
             snprintf(macaddr, 32, "/mac=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
-                lla->sll_addr[12], lla->sll_addr[13], lla->sll_addr[14], 
+                lla->sll_addr[12], lla->sll_addr[13], lla->sll_addr[14],
                 lla->sll_addr[15], lla->sll_addr[16], lla->sll_addr[17],
                 lla->sll_addr[18], lla->sll_addr[19]
             );
         } else if (lla->sll_hatype == ARPHRD_ETHER) {
             snprintf(macaddr, 32, "/mac=%02x:%02x:%02x:%02x:%02x:%02x",
-                lla->sll_addr[0], lla->sll_addr[1], lla->sll_addr[2], 
+                lla->sll_addr[0], lla->sll_addr[1], lla->sll_addr[2],
                 lla->sll_addr[3], lla->sll_addr[4], lla->sll_addr[5],
                 lla->sll_addr[6]
             );
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
                 continue;
             ifidx = in6->sin6_scope_id;
             setsockopt(ns, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifidx, sizeof(ifidx));
-            sendto(ns, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst, sizeof(dst));            
+            sendto(ns, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst, sizeof(dst));
         } else if (ifc->ifa_addr->sa_family == AF_INET) {
             in = (struct sockaddr_in *)ifc->ifa_addr;
             bin = (struct sockaddr_in *)ifc->ifa_ifu.ifu_broadaddr;
@@ -130,7 +130,6 @@ int main(int argc, char* argv[]) {
             sendto(n4, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst4, sizeof(dst4));
             sendto(n4, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)bin, sizeof(*bin));
         }
-        
     }
     FD_ZERO(&rfds);
     FD_SET(n4, &rfds);
@@ -140,7 +139,7 @@ int main(int argc, char* argv[]) {
     ifidx = select(FD_SETSIZE, &rfds, NULL, NULL, &tv);
     while (ifidx) {
         if (ifidx == -1) perror("Unable to select");
-        if (ifidx) { 
+        if (ifidx) {
             if (FD_ISSET(n4, &rfds)) {
                 recvfrom(n4, msg, 1024, 0, (struct sockaddr *)&dst4, &dst4size);
                 inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
