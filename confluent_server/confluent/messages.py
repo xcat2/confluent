@@ -1253,14 +1253,15 @@ class AsyncSession(ConfluentMessage):
         self.kvpairs = {'asyncid': id}
 
 class User(ConfluentMessage):
-    def __init__(self, uid, username, privilege_level, name=None):
+    def __init__(self, uid, username, privilege_level, name=None, expiration=None):
         self.desc = 'foo'
         self.stripped = False
         self.notnode = name is None
         kvpairs = {'username': {'value': username},
                    'password': {'value': '', 'type': 'password'},
                    'privilege_level': {'value': privilege_level},
-                   'enabled': {'value': ''}
+                   'enabled': {'value': ''},
+                   'expiration': {'value': expiration},
                    }
         if self.notnode:
             self.kvpairs = kvpairs
