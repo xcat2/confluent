@@ -668,6 +668,27 @@ class InputAttributes(ConfluentMessage):
                         )
         return nodeattr
 
+def checkPassword(password, username):
+     lowercase = set('abcdefghijklmnopqrstuvwxyz')
+     uppercase = set('abcdefghijklmnopqrstuvwxyz'.upper())
+     numbers = set('0123456789')
+     special = set('`~!@#$%^&*()-_=+[{]};:"/?.>,<' + "'")
+     if not bool(set(password.lower()) & lowercase):  # rule 1
+         raise exc.InvalidArgumentException('Password must contain at least one letter')
+     thepass = set(password)
+     if not bool(thepass & numbers):  # rule 2
+         raise exc.InvalidArgumentException('Password must contain at least one number')
+     classes = 0
+     for charclass in (lowercase, uppercase, special):
+         if bool(thepass & charclass):
+             classes += 1
+     if classes < 2:
+         raise exc.InvalidArgumentException('Password must contain at least two of upper case letter, lower case letter, and/or special character')
+     if username and password in (username, username[::-1]): # rule 4
+         raise exc.InvalidArgumentException('Password must not be similar to username')
+     if len(password) < 12:
+         raise exc.InvalidArgumentException('Password must be at least 12 characters long')
+
 
 class InputCredential(ConfluentMessage):
     valid_privilege_levels = set([
@@ -708,6 +729,8 @@ class InputCredential(ConfluentMessage):
             inputdata['enabled'] not in self.valid_enabled_values):
             raise exc.InvalidArgumentException('valid values for enabled are '
                                                             + 'yes and no')
+        if 'password' in inputdata:
+            checkPassword(inputdata['password'], inputdata.get('username', None))
         if nodes is None:
             raise exc.InvalidArgumentException(
                 'This only supports per-node input')
