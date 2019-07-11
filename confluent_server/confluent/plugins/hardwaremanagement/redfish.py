@@ -152,7 +152,9 @@ def sanitize_invdata(indata):
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
-        kwargs['pool'] = eventlet.greenpool.GreenPool(4)
+        #kwargs['pool'] = eventlet.greenpool.GreenPool(4)
+        #Some BMCs at the time of this writing crumble under the weight
+        #of 4 concurrent requests.  For now give up on this optimization.
         self.cfm = cfm
         self.node = node
         self._inhealth = False
