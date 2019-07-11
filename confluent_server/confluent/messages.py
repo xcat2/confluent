@@ -20,6 +20,7 @@
 # format.  This is also how different data formats are supported
 import confluent.exceptions as exc
 import confluent.config.configmanager as cfm
+import confluent.config.conf as cfgfile
 from copy import deepcopy
 from datetime import datetime
 import json
@@ -31,6 +32,15 @@ valid_health_values = set([
     'failed',
     'unknown',
 ])
+
+passcomplexity = cfgfile.get_option('policy', 'passwordminlength')
+passminlength = cfgfile.get_option('policy', 'minpasswordlength')
+if passminlength:
+    passminlength = int(passminlength)
+if passcomplexity:
+    passcomplexity = int(passcomplexity)
+else:
+    passcomplexity = 0
 
 def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-').replace(
@@ -669,25 +679,39 @@ class InputAttributes(ConfluentMessage):
         return nodeattr
 
 def checkPassword(password, username):
-     lowercase = set('abcdefghijklmnopqrstuvwxyz')
-     uppercase = set('abcdefghijklmnopqrstuvwxyz'.upper())
-     numbers = set('0123456789')
-     special = set('`~!@#$%^&*()-_=+[{]};:"/?.>,<' + "'")
-     if not bool(set(password.lower()) & lowercase):  # rule 1
-         raise exc.InvalidArgumentException('Password must contain at least one letter')
-     thepass = set(password)
-     if not bool(thepass & numbers):  # rule 2
-         raise exc.InvalidArgumentException('Password must contain at least one number')
-     classes = 0
-     for charclass in (lowercase, uppercase, special):
-         if bool(thepass & charclass):
-             classes += 1
-     if classes < 2:
-         raise exc.InvalidArgumentException('Password must contain at least two of upper case letter, lower case letter, and/or special character')
-     if username and password in (username, username[::-1]): # rule 4
-         raise exc.InvalidArgumentException('Password must not be similar to username')
-     if len(password) < 12:
-         raise exc.InvalidArgumentException('Password must be at least 12 characters long')
+    lowercase = set('abcdefghijklmnopqrstuvwxyz')
+    uppercase = set('abcdefghijklmnopqrstuvwxyz'.upper())
+    numbers = set('0123456789')
+    special = set('`~!@#$%^&*()-_=+[{]};:"/?.>,<' + "'")
+    if len(password) < passminlength:
+        raise exc.InvalidArgumentException('Password must be at least {0} characters long'.format(passminlength))
+    if not isinstance(passcomplexity, int) or passcomplexity < 1:
+        return
+    if not bool(set(password.lower()) & lowercase):  # rule 1
+        raise exc.InvalidArgumentException('Password must contain at least one letter')
+    if passcomplexity < 2:
+        return
+    thepass = set(password)
+    if not bool(thepass & numbers):  # rule 2
+        raise exc.InvalidArgumentException('Password must contain at least one number')
+    if passcomplexity < 3:
+        return
+    classes = 0
+    for charclass in (lowercase, uppercase, special):
+        if bool(thepass & charclass):
+            classes += 1
+    if classes < 2:
+        raise exc.InvalidArgumentException('Password must contain at least two of upper case letter, lower case letter, and/or special character')
+    if passcomplexity < 4:
+        return
+    if username and password in (username, username[::-1]): # rule 4
+        raise exc.InvalidArgumentException('Password must not be similar to username')
+    if passcomplexity < 5:
+        return
+    for char in thepass:
+        if char * 3 in password:
+            raise exc.InvalidArgumentException('Password must not contain any of the same character repeated 3 times')
+
 
 
 class InputCredential(ConfluentMessage):
@@ -729,7 +753,7 @@ class InputCredential(ConfluentMessage):
             inputdata['enabled'] not in self.valid_enabled_values):
             raise exc.InvalidArgumentException('valid values for enabled are '
                                                             + 'yes and no')
-        if 'password' in inputdata:
+        if 'password' in inputdata and (passcomplexity or passminlength):
             checkPassword(inputdata['password'], inputdata.get('username', None))
         if nodes is None:
             raise exc.InvalidArgumentException(
