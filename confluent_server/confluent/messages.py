@@ -33,8 +33,8 @@ valid_health_values = set([
     'unknown',
 ])
 
-passcomplexity = cfgfile.get_option('policy', 'passwordminlength')
-passminlength = cfgfile.get_option('policy', 'minpasswordlength')
+passcomplexity = cfgfile.get_option('policy', 'passwordcomplexity')
+passminlength = cfgfile.get_option('policy', 'passwordminlength')
 if passminlength:
     passminlength = int(passminlength)
 if passcomplexity:
