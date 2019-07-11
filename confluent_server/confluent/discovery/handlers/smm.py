@@ -40,6 +40,8 @@ class NodeHandler(bmchandler.NodeHandler):
         # Assumption is by the time we call config, that discovery core has
         # vetted self._fp.  Our job here then is just to make sure that
         # the currect connection matches the previously saved cert
+        if not self._fp:  # circumstances are that we haven't validated yet
+            self._fp = certificate
         return certificate == self._fp
 
     def set_password_policy(self, ic):
