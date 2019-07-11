@@ -37,6 +37,8 @@ passcomplexity = cfgfile.get_option('policy', 'passwordcomplexity')
 passminlength = cfgfile.get_option('policy', 'passwordminlength')
 if passminlength:
     passminlength = int(passminlength)
+else:
+    passminlength = 0
 if passcomplexity:
     passcomplexity = int(passcomplexity)
 else:
