@@ -151,7 +151,7 @@ def show_firmware(session):
                     for prefix in inv:
                         firmware_shown = True
                         printfirm(node, prefix, inv[prefix])
-    if not firmware_shown:
+    if not firmware_shown and not exitcode:
         argparser.print_help()
 
 
