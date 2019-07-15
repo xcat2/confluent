@@ -70,7 +70,9 @@ int main(int argc, char* argv[]) {
     char msg[1024];
     char *nodenameidx;
     char nodename[1024];
+    char lastnodename[1024];
     char lastmsg[1024];
+    char last6msg[1024];
     int ifidx, offset;
     fd_set rfds;
     struct timeval tv;
@@ -82,6 +84,10 @@ int main(int argc, char* argv[]) {
     memset(&addr, 0, sizeof(addr));
     memset(&dst, 0, sizeof(dst));
     memset(&dst4, 0, sizeof(dst4));
+    memset(nodename, 0, 1024);
+    memset(lastnodename, 0, 1024);
+    memset(lastmsg, 0, 1024);
+    memset(last6msg, 0, 1024);
     addr.sin6_family = AF_INET6;
     addr.sin6_addr = in6addr_any;
     addr.sin6_port = htons(190);
@@ -151,7 +157,10 @@ int main(int argc, char* argv[]) {
                         strncpy(nodename, nodenameidx, 1024); 
                         nodenameidx = strstr(nodenameidx, "\r");
                         if (nodenameidx) { nodenameidx[0] = 0; }
-                        printf("NODENAME: %s\n", nodename);
+                        if (strncmp(lastnodename, nodename, 1024) != 0) {
+                            printf("NODENAME: %s\n", nodename);
+                            strncpy(lastnodename, nodename, 1024);
+                        }
                 }
                 memset(msg, 0, 1024);
                 inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
@@ -170,17 +179,20 @@ int main(int argc, char* argv[]) {
                         strncpy(nodename, nodenameidx, 1024); 
                         nodenameidx = strstr(nodenameidx, "\r");
                         if (nodenameidx) { nodenameidx[0] = 0; }
-                        printf("NODENAME: %s\n", nodename);
+                        if (strncmp(lastnodename, nodename, 1024) != 0) {
+                            printf("NODENAME: %s\n", nodename);
+                            strncpy(lastnodename, nodename, 1024);
+                        }
                 }
                 memset(msg, 0, 1024);
                 inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
-                if (strncmp(lastmsg, msg, 1024) != 0) {
+                if (strncmp(last6msg, msg, 1024) != 0) {
                     printf("MANAGER: %s", msg);
                     if (strncmp(msg, "fe80::", 6) == 0) {
                         printf("%%%u", dst.sin6_scope_id);
                     }
                     printf("\n");
-                    strncpy(lastmsg, msg, 1024);
+                    strncpy(last6msg, msg, 1024);
                 }
             }
         }
