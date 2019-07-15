@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016-2017 Lenovo
+# Copyright 2016-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -380,7 +380,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if (operation in ('update', 'create') and
             pathcomponents == ['networking', 'macs', 'rescan']):
         if inputdata != {'rescan': 'start'}:
-            raise exc.InvalidArgumentException()
+            raise exc.InvalidArgumentException('Input must be rescan=start')
         eventlet.spawn_n(rescan, configmanager)
         return [msg.KeyValueData({'rescan': 'started'})]
     raise exc.NotImplementedException(
@@ -458,9 +458,21 @@ def handle_read_api_request(pathcomponents, configmanager):
                     portname = portname.replace('-', '/')
                 maclist = _macsbyswitch[switchname][portname]
             except KeyError:
-                raise exc.NotFoundException('No known macs for switch {0} '
-                                            'port {1}'.format(switchname,
-                                                              portname))
+                foundsomemacs = False
+                if switchname in _macsbyswitch:
+                    try:
+                        matcher = re.compile(portname)
+                    except Exception:
+                        raise exc.InvalidArgumentException('Invalid regular expression specified')
+                    maclist = []
+                    for actualport in _macsbyswitch[switchname]:
+                        if bool(matcher.match(actualport)):
+                            foundsomemacs = True
+                            maclist = maclist + _macsbyswitch[switchname][actualport]
+                if not foundsomemacs:
+                    raise exc.NotFoundException('No known macs for switch {0} '
+                                                'port {1}'.format(switchname,
+                                                                  portname))
             return [msg.ChildCollection(x.replace(':', '-'))
                     for x in sorted(maclist)]
         if len(pathcomponents) == 8:

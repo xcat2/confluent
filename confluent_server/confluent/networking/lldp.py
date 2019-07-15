@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016, 2017 Lenovo
+# Copyright 2016-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,7 +105,11 @@ def close_enough(fuzz, literal):
     if fuzz == literal:
         return True
     fuzz = '^' + fuzz.replace('-', '[/: -]') + '$'
-    matcher = re.compile(fuzz)
+    try:
+        matcher = re.compile(fuzz)
+    except Exception:
+        raise exc.InvalidArgumentException(
+            'Invalid regular expression specified')
     return bool(matcher.match(literal))
 
 
