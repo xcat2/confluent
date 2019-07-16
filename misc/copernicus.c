@@ -162,10 +162,11 @@ int main(int argc, char* argv[]) {
                             strncpy(lastnodename, nodename, 1024);
                         }
                 }
-                memset(msg, 0, 1024);
+                memset(msg, 0, 1024);           
                 inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
                 /* Take measure from printing out the same ip twice in a row */
                 if (strncmp(lastmsg, msg, 1024) != 0) {
+                    sendto(n4, "PING", 4, 0, (const struct sockaddr *)&dst4, dst4size);
                     printf("MANAGER: %s\n", msg);
                     strncpy(lastmsg, msg, 1024);
                 }
@@ -187,6 +188,7 @@ int main(int argc, char* argv[]) {
                 memset(msg, 0, 1024);
                 inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
                 if (strncmp(last6msg, msg, 1024) != 0) {
+                    sendto(ns, "PING", 4, 0, (const struct sockaddr *)&dst, dstsize);
                     printf("MANAGER: %s", msg);
                     if (strncmp(msg, "fe80::", 6) == 0) {
                         printf("%%%u", dst.sin6_scope_id);
