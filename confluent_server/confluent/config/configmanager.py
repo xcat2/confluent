@@ -145,10 +145,13 @@ def _parse_key(keydata, password=None):
     if keydata.startswith('*unencrypted:'):
         return base64.b64decode(keydata[13:])
     elif password:
-        salt, iv, crypt, hmac = [base64.b64decode(x)
+        cryptbits = [base64.b64decode(x)
                                  for x in keydata.split('!')]
+        salt, iv, crypt, hmac = cryptbits[:4]
         privkey, integkey = _derive_keys(password, salt)
-        return decrypt_value([iv, crypt, hmac], privkey, integkey)
+        if len(cryptbits) > 4:
+            integkey = None
+        return decrypt_value(cryptbits[1:], privkey, integkey)
     raise(exc.LockedCredentials(
         "Passphrase protected secret requires password"))
 
@@ -157,7 +160,7 @@ def _format_key(key, password=None):
     if password is not None:
         salt = os.urandom(32)
         privkey, integkey = _derive_keys(password, salt)
-        cval = crypt_value(key, key=privkey, integritykey=integkey)
+        cval = crypt_value(key, key=privkey) # , integritykey=integkey)
         return {"passphraseprotected": (salt,) + cval}
     else:
         return {"unencryptedvalue": key}
@@ -348,7 +351,7 @@ def init_masterkey(password=None, autogen=True):
     if cfgn:
         _masterkey = _get_protected_key(cfgn, password, 'master_privacy_key')
     elif autogen:
-        _masterkey = os.urandom(32)
+        _masterkey = os.urandom(16)
         set_global('master_privacy_key', _format_key(
             _masterkey,
             password=password))
@@ -356,11 +359,11 @@ def init_masterkey(password=None, autogen=True):
     if cfgn:
         _masterintegritykey = _get_protected_key(cfgn, password,
                                                  'master_integrity_key')
-    elif autogen:
-        _masterintegritykey = os.urandom(64)
-        set_global('master_integrity_key', _format_key(
-            _masterintegritykey,
-            password=password))
+    #elif autogen:
+    #    _masterintegritykey = os.urandom(64)
+    #    set_global('master_integrity_key', _format_key(
+    #        _masterintegritykey,
+    #        password=password))
 
 
 def _push_rpc(stream, payload):
@@ -373,25 +376,34 @@ def _push_rpc(stream, payload):
 def decrypt_value(cryptvalue,
                   key=None,
                   integritykey=None):
-    iv, cipherdata, hmac = cryptvalue
+    # for future reference, if cryptvalue len == 3, then cbc+hmac, 4 includes version
+    iv, cipherdata, hmac = cryptvalue[:3]
     if key is None and integritykey is None:
-        if _masterkey is None or _masterintegritykey is None:
+        if _masterkey is None:
             init_masterkey(autogen=False)
         key = _masterkey
         integritykey = _masterintegritykey
-    check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
-    if hmac != check_hmac:
-        raise Exception("bad HMAC value on crypted value")
-    decrypter = AES.new(key, AES.MODE_CBC, iv)
-    value = decrypter.decrypt(cipherdata)
-    padsize = ord(value[-1])
-    pad = value[-padsize:]
-    # Note that I cannot grasp what could be done with a subliminal
-    # channel in padding in this case, but check the padding anyway
-    for padbyte in pad:
-        if ord(padbyte) != padsize:
-            raise Exception("bad padding in encrypted value")
-    return value[0:-padsize]
+    if len(cryptvalue) == 3:
+        check_hmac = HMAC.new(integritykey, cipherdata + iv, SHA256).digest()
+        if hmac != check_hmac:
+            check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
+        if hmac != check_hmac:
+            raise Exception("bad HMAC value on crypted value")
+        decrypter = AES.new(key, AES.MODE_CBC, iv)
+        value = decrypter.decrypt(cipherdata)
+        padsize = ord(value[-1])
+        pad = value[-padsize:]
+        # Note that I cannot grasp what could be done with a subliminal
+        # channel in padding in this case, but check the padding anyway
+        for padbyte in pad:
+            if ord(padbyte) != padsize:
+                raise Exception("bad padding in encrypted value")
+        return value[0:-padsize]
+    else:
+        decrypter = AES.new(key, AES.MODE_GCM, nonce=iv)
+        value = decrypter.decrypt(cipherdata)
+        decrypter.verify(hmac)
+        return value
 
 
 def fixup_attribute(attrname, attrval):
@@ -443,22 +455,32 @@ def crypt_value(value,
     # encrypt given value
     # PKCS7 is the padding scheme to employ, if no padded needed, pad with 16
     # check HMAC prior to attempting decrypt
-    if key is None or integritykey is None:
-        if _masterkey is None or _masterintegritykey is None:
+    hmac = None
+    if key is None:
+        if _masterkey is None:
             init_masterkey()
         key = _masterkey
         integritykey = _masterintegritykey
-    iv = os.urandom(16)
-    crypter = AES.new(key, AES.MODE_CBC, iv)
-    neededpad = 16 - (len(value) % 16)
-    pad = chr(neededpad) * neededpad
-    value += pad
-    try:
-        cryptval = crypter.encrypt(value)
-    except TypeError:
-        cryptval = crypter.encrypt(value.encode('utf-8'))
-    hmac = HMAC.new(integritykey, cryptval, SHA256).digest()
-    return iv, cryptval, hmac
+    if integritykey:
+        iv = os.urandom(16)
+        crypter = AES.new(key, AES.MODE_CBC, iv)
+        neededpad = 16 - (len(value) % 16)
+        pad = chr(neededpad) * neededpad
+        value += pad
+        try:
+            cryptval = crypter.encrypt(value)
+        except TypeError:
+            cryptval = crypter.encrypt(value.encode('utf-8'))
+        hmac = HMAC.new(integritykey, cryptval + iv, SHA256).digest()
+        return iv, cryptval, hmac
+    else:
+        iv = os.urandom(12)
+        crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
+        try:
+            cryptval, hmac = crypter.encrypt_and_digest(value)
+        except TypeError:
+            cryptval, hmac = crypter.encrypt_and_digest(value.encode('utf-8'))
+        return iv, cryptval, hmac, '\x02'
 
 
 def _load_dict_from_dbm(dpath, tdb):
@@ -2427,7 +2449,7 @@ def _restore_keys(jsond, password, newpassword=None, sync=True):
 
 
 def _dump_keys(password, dojson=True):
-    if _masterkey is None or _masterintegritykey is None:
+    if _masterkey is None:
         init_masterkey()
     cryptkey = _format_key(_masterkey, password=password)
     if 'passphraseprotected' in cryptkey:
@@ -2436,14 +2458,16 @@ def _dump_keys(password, dojson=True):
     else:
         cryptkey = '*unencrypted:{0}'.format(base64.b64encode(
             cryptkey['unencryptedvalue']))
-    integritykey = _format_key(_masterintegritykey, password=password)
-    if 'passphraseprotected' in integritykey:
-        integritykey = '!'.join(map(base64.b64encode,
-                                    integritykey['passphraseprotected']))
-    else:
-        integritykey = '*unencrypted:{0}'.format(base64.b64encode(
-            integritykey['unencryptedvalue']))
-    keydata = {'cryptkey': cryptkey, 'integritykey': integritykey}
+    keydata = {'cryptkey': cryptkey}
+    if _masterintegritykey is not None:
+        integritykey = _format_key(_masterintegritykey, password=password)
+        if 'passphraseprotected' in integritykey:
+            integritykey = '!'.join(map(base64.b64encode,
+                                        integritykey['passphraseprotected']))
+        else:
+            integritykey = '*unencrypted:{0}'.format(base64.b64encode(
+                integritykey['unencryptedvalue']))
+        keydata['integritykey'] = integritykey
     if dojson:
         return json.dumps(keydata, sort_keys=True, indent=4, separators=(',', ': '))
     return keydata
