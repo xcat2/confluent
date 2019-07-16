@@ -17,6 +17,7 @@ import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.config.attributes as allattributes
 import confluent.util as util
+from fnmatch import fnmatch
 
 
 def retrieve(nodes, element, configmanager, inputdata):
@@ -148,8 +149,8 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                     yield msg.ListAttributes(
                         node, {attribute: currattr}, desc)
                 else:
-                    print attribute
-                    print repr(currattr)
+                    print(attribute)
+                    print(repr(currattr))
                     raise Exception("BUGGY ATTRIBUTE FOR NODE")
 
 
@@ -231,12 +232,20 @@ def update_nodes(nodes, element, configmanager, inputdata):
         updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []
         if updatenode:
-            for attrib in updatenode.iterkeys():
+            for attrib in list(updatenode):
                 if updatenode[attrib] is None:
-                    clearattribs.append(attrib)
-            if len(clearattribs) > 0:
-                for attrib in clearattribs:
                     del updatenode[attrib]
+                    if attrib in allattributes.node  or attrib.startswith('custom.') or attrib.startswith('net.'):
+                        clearattribs.append(attrib)
+                    else:
+                        foundattrib = False
+                        for candattrib in allattributes.node:
+                            if fnmatch(candattrib, attrib):
+                                clearattribs.append(candattrib)
+                                foundattrib = True
+                        if not foundattrib:
+                            raise exc.InvalidArgumentException("No attribute matches '" + attrib + "' (try wildcard if trying to clear a group)")
+            if len(clearattribs) > 0:
                 configmanager.clear_node_attributes([node], clearattribs)
             updatedict[node] = updatenode
     try:
