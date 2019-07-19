@@ -277,7 +277,7 @@ complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
 complete -F _confluent_nodeidentify_completion nodeidentify
 complete -F _confluent_nr_completion nodeinventory
-complete -F _confluent_nr_completion nodelist
+complete -F _confluent_nodeattrib_completion nodelist
 complete -F _confluent_nodemedia_completion nodemedia
 complete -F _confluent_nodepower_completion nodepower
 complete -F _confluent_nr_completion noderemove
