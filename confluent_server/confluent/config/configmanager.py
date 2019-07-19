@@ -351,7 +351,7 @@ def init_masterkey(password=None, autogen=True):
     if cfgn:
         _masterkey = _get_protected_key(cfgn, password, 'master_privacy_key')
     elif autogen:
-        _masterkey = os.urandom(16)
+        _masterkey = os.urandom(32)
         set_global('master_privacy_key', _format_key(
             _masterkey,
             password=password))
@@ -384,9 +384,9 @@ def decrypt_value(cryptvalue,
         key = _masterkey
         integritykey = _masterintegritykey
     if len(cryptvalue) == 3:
-        check_hmac = HMAC.new(integritykey, cipherdata + iv, SHA256).digest()
+        check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
         if hmac != check_hmac:
-            check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
+            check_hmac = HMAC.new(integritykey, cipherdata + iv, SHA256).digest()
         if hmac != check_hmac:
             raise Exception("bad HMAC value on crypted value")
         decrypter = AES.new(key, AES.MODE_CBC, iv)
@@ -460,27 +460,13 @@ def crypt_value(value,
         if _masterkey is None:
             init_masterkey()
         key = _masterkey
-        integritykey = _masterintegritykey
-    if integritykey:
-        iv = os.urandom(16)
-        crypter = AES.new(key, AES.MODE_CBC, iv)
-        neededpad = 16 - (len(value) % 16)
-        pad = chr(neededpad) * neededpad
-        value += pad
-        try:
-            cryptval = crypter.encrypt(value)
-        except TypeError:
-            cryptval = crypter.encrypt(value.encode('utf-8'))
-        hmac = HMAC.new(integritykey, cryptval + iv, SHA256).digest()
-        return iv, cryptval, hmac
-    else:
-        iv = os.urandom(12)
-        crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
-        try:
-            cryptval, hmac = crypter.encrypt_and_digest(value)
-        except TypeError:
-            cryptval, hmac = crypter.encrypt_and_digest(value.encode('utf-8'))
-        return iv, cryptval, hmac, '\x02'
+    iv = os.urandom(12)
+    crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
+    try:
+        cryptval, hmac = crypter.encrypt_and_digest(value)
+    except TypeError:
+        cryptval, hmac = crypter.encrypt_and_digest(value.encode('utf-8'))
+    return iv, cryptval, hmac, '\x02'
 
 
 def _load_dict_from_dbm(dpath, tdb):
@@ -1639,7 +1625,7 @@ class ConfigManager(object):
                     del attribmap[group][attr]
             if 'noderange' in attribmap[group]:
                 if len(attribmap[group]) > 1:
-                    raise ValueError('noderange attribute must be set by itself')            
+                    raise ValueError('noderange attribute must be set by itself')
             for attr in attribmap[group]:
                 if attr in _attraliases:
                     newattr = _attraliases[attr]
