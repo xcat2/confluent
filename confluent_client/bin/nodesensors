@@ -158,7 +158,7 @@ def sensorpass(showout=True, appendtime=False):
 def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
     for nodekey in resdata:
         if showtime:
-            if showtime.is_integer():
+            if isinstance(showtime, int):
                 rowdata = [time.strftime('%Y-%m-%dT%H:%M:%S'), nodekey]
             else:
                 rowdata = [time.strftime('%Y-%m-%dT%H:%M:%S.') +
@@ -199,7 +199,7 @@ def main():
             orderedsensors.append(name)
         orderedsensors.sort()
         for name in orderedsensors:
-            headernames.append(sensorheaders[name])
+            headernames.append(sensorheaders[name].encode('utf-8'))
     if options.csv:
         linebyline = False
         csvwriter = csv.writer(sys.stdout)
