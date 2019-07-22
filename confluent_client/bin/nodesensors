@@ -150,7 +150,7 @@ def sensorpass(showout=True, appendtime=False):
                             showval += ' @' + time.strftime(
                                 '%Y-%m-%dT%H:%M:%S')
                         print(u'{0}: {1}:{2}'.format(
-                            node, sensedata['name'], showval))
+                            node, sensedata['name'], showval).encode('utf8'))
                         sys.stdout.flush()
     return resultdata
 
