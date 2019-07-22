@@ -70,7 +70,11 @@ def install_license(session, filename):
     filename = os.path.abspath(filename)
     instargs = {'filename': filename}
     for res in session.create(resource, instargs):
-        pass # print(repr(res))
+        for node in res.get('databynode', []):
+            if 'error' in res['databynode'][node]:
+                sys.stderr.write('{0}: {1}\n'.format(
+                    node, res['databynode'][node]['error']))
+                sys.exit(res['databynode'][node].get('errorcode', 1))        
     show_licenses(session)
 
 
