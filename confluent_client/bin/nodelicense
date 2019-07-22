@@ -51,7 +51,8 @@ try:
         elif args[1] == 'delete':
             delete = args[2]
         else:
-            components = ['all']
+            argparser.print_help()
+            sys.exit(1)
 except IndexError:
     argparser.print_help()
     sys.exit(1)
