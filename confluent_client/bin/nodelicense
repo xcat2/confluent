@@ -50,7 +50,7 @@ try:
             downdir = args[2]
         elif args[1] == 'delete':
             delete = args[2]
-        else:
+        elif args[1] != 'list':
             argparser.print_help()
             sys.exit(1)
 except IndexError:
