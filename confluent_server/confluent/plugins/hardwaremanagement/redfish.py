@@ -323,7 +323,7 @@ def perform_request(operator, node, element,
         except (pygexc.InvalidParameterValue, pygexc.RedfishError) as e:
             results.put(msg.ConfluentNodeError(node, str(e)))
         except Exception as e:
-            results.put(msg.ConfluentNodeError(node, 'Unexpected Error'))
+            results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
             traceback.print_exc()
         finally:
             results.put('Done')
