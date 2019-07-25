@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2017 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1249,6 +1249,7 @@ class EventCollection(ConfluentMessage):
                 'timestamp': event.get('timestamp', None),
                 'message': event.get('message', None),
                 'record_id': event.get('record_id', None),
+                'log_id': event.get('log_id', None),
             }
             if event['severity'] not in valid_health_values:
                 raise exc.NotImplementedException(

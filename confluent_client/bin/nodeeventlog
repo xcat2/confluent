@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2015-2017 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,8 @@ def format_event(evt):
         display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
         retparts.append(display.strftime('%m/%d/%Y %H:%M:%S'))
     dscparts = []
+    if evt.get('log_id', None):
+        retparts.append(evt['log_id'] + ':')
     if 'component_type' in evt and evt['component_type'] is not None:
         dscparts.append(evt['component_type'])
     if 'component' in evt and evt['component'] is not None:
@@ -102,4 +104,4 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
             if 'events' in thisdata:
                evtdata = thisdata['events']
                for evt in evtdata:
-                   print '{0}: {1}'.format(node, format_event(evt))
+                   print('{0}: {1}'.format(node, format_event(evt)))
