@@ -81,7 +81,7 @@ class NodeHandler(bmchandler.NodeHandler):
         if smmip and ':' not in smmip:
             smmip = getaddrinfo(smmip, 0)[0]
             smmip = smmip[-1][0]
-            if ':' in smmip:
+            if smmip and ':' in smmip:
                 raise exc.NotImplementedException('IPv6 not supported')
             netconfig = netutil.get_nic_config(cfg, nodename, ip=smmip)
             netmask = netutil.cidr_to_mask(netconfig['prefix'])
@@ -95,7 +95,7 @@ class NodeHandler(bmchandler.NodeHandler):
             if '<statusCode>0' not in rspdata:
                 raise Exception("Error configuring SMM Network")
             return
-        if ':' in smmip and not smmip.startswith('fe80::'):
+        if smmip and ':' in smmip and not smmip.startswith('fe80::'):
             raise exc.NotImplementedException('IPv6 configuration TODO')
         if self.ipaddr.startswith('fe80::'):
             cfg.set_node_attributes(
