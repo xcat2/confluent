@@ -169,7 +169,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
         try:
             super(IpmiCommandWrapper, self).__init__(**kwargs)
         except socket.error as se:
-            if se[1] == 'EHOSTUNREACH':
+            if isinstance(se, socket.timeout) or (len(se) > 1 and se[1] == 'EHOSTUNREACH'):
                 raise exc.TargetEndpointUnreachable('timeout')
             raise
         except pygexc.PyghmiException as pe:
@@ -323,7 +323,7 @@ def perform_request(operator, node, element,
         except (pygexc.InvalidParameterValue, pygexc.RedfishError) as e:
             results.put(msg.ConfluentNodeError(node, str(e)))
         except Exception as e:
-            results.put(msg.ConfluentNodeError(node, 'Unexpected Error'))
+            results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
             traceback.print_exc()
         finally:
             results.put('Done')

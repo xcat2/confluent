@@ -154,6 +154,7 @@ def import_csv(options, session):
         for field in fields:
             if field in unique_fields:
                 unique_data[field] = set([])
+        broken = False
         for record in records:
             currfields = list(fields)
             nodedatum = {}
@@ -170,14 +171,16 @@ def import_csv(options, session):
                 nodedatum[currfield] = datum
             if not datum_complete(nodedatum):
                 sys.exit(1)
-            if not search_record(nodedatum, options, session):
+            if not search_record(nodedatum, options, session) and not broken:
                 blocking_scan(session)
             if not search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
                     repr(nodedatum) + '\n')
-                sys.exit(1)
+                broken = True
             nodedata.append(nodedatum)
+    if broken:
+        sys.exit(1)
     for datum in nodedata:
         maclist = search_record(datum, options, session)
         datum = datum_to_attrib(datum)

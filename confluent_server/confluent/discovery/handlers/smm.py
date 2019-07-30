@@ -13,7 +13,15 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.bmc as bmchandler
+import confluent.exceptions as exc
+import pyghmi.util.webclient as webclient
 import struct
+import urllib
+import eventlet.support.greendns
+import confluent.netutil as netutil
+getaddrinfo = eventlet.support.greendns.getaddrinfo
+
+from xml.etree.ElementTree import fromstring
 
 def fixuuid(baduuid):
     # SMM dumps it out in hex
@@ -26,7 +34,7 @@ def fixuuid(baduuid):
 class NodeHandler(bmchandler.NodeHandler):
     is_enclosure = True
     devname = 'SMM'
-    maxmacs = 5  # support an enclosure, but try to avoid catching daisy chain
+    maxmacs = 6  # support an enclosure, but try to avoid catching daisy chain
 
     def scan(self):
         # the UUID is in a weird order, fix it up to match
@@ -44,7 +52,7 @@ class NodeHandler(bmchandler.NodeHandler):
             self._fp = certificate
         return certificate == self._fp
 
-    def set_password_policy(self, ic):
+    def _webconfigrules(self, wc):
         rules = []
         for rule in self.ruleset.split(','):
             if '=' not in rule:
@@ -62,10 +70,95 @@ class NodeHandler(bmchandler.NodeHandler):
                 rules.append('passwordReuseCheckNum:' + value)
         if rules:
             apirequest = 'set={0}'.format(','.join(rules))
-            ic.register_key_handler(self._validate_cert)
-            ic.oem_init()
-            ic._oem.smmhandler.wc.request('POST', '/data', apirequest)
-            ic._oem.smmhandler.wc.getresponse().read()
+            wc.request('POST', '/data', apirequest)
+            wc.getresponse().read()
+
+    def _webconfignet(self, wc, nodename):
+        cfg = self.configmanager
+        cd = cfg.get_node_attributes(
+            nodename, ['hardwaremanagement.manager'])
+        smmip = cd.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', None)
+        if smmip and ':' not in smmip:
+            smmip = getaddrinfo(smmip, 0)[0]
+            smmip = smmip[-1][0]
+            if smmip and ':' in smmip:
+                raise exc.NotImplementedException('IPv6 not supported')
+            netconfig = netutil.get_nic_config(cfg, nodename, ip=smmip)
+            netmask = netutil.cidr_to_mask(netconfig['prefix'])
+            setdata = 'set=ifIndex:0,v4DHCPEnabled:0,v4IPAddr:{0},v4NetMask:{1}'.format(smmip, netmask)
+            gateway = netconfig.get('ipv4_gateway', None)
+            if gateway:
+                setdata += ',v4Gateway:{0}'.format(gateway)
+            wc.request('POST', '/data', setdata)
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+            if '<statusCode>0' not in rspdata:
+                raise Exception("Error configuring SMM Network")
+            return
+        if smmip and ':' in smmip and not smmip.startswith('fe80::'):
+            raise exc.NotImplementedException('IPv6 configuration TODO')
+        if self.ipaddr.startswith('fe80::'):
+            cfg.set_node_attributes(
+                    {nodename: {'hardwaremanagement.manager': self.ipaddr}})
+
+    def _webconfigcreds(self, username, password):
+        wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self._validate_cert)
+        wc.connect()
+        authdata = {  # start by trying factory defaults
+            'user': 'USERID',
+            'password': 'PASSW0RD',
+        }
+        headers = {'Connection': 'keep-alive', 'Content-Type': 'application/x-www-form-urlencoded'}
+        wc.request('POST', '/data/login', urllib.urlencode(authdata), headers)
+        rsp = wc.getresponse()
+        rspdata = rsp.read()
+        if 'authResult>0' not in rspdata:
+            # default credentials are refused, try with the actual
+            authdata['user'] = username
+            authdata['password'] = password
+            wc.request('POST', '/data/login', urllib.urlencode(authdata), headers)
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+            if 'renew_account' in rspdata:
+                raise Exception('Configured password has expired')
+            if 'authResult>0' not in rspdata:
+                raise Exception('Unknown username/password on SMM')
+            tokens = fromstring(rspdata)
+            st2 = tokens.findall('st2')[0].text
+            wc.set_header('ST2', st2)
+            return wc
+        if 'renew_account' in rspdata:
+            passwdchange = {'oripwd': 'PASSW0RD', 'newpwd': password}
+            tokens = fromstring(rspdata)
+            st2 = tokens.findall('st2')[0].text
+            wc.set_header('ST2', st2)
+            wc.request('POST', '/data/changepwd', urllib.urlencode(passwdchange))
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+            authdata['password'] = password
+            wc.request('POST', '/data/login', urllib.urlencode(authdata), headers)
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+        if 'authResult>0' in rspdata:
+            tokens = fromstring(rspdata)
+            st2 = tokens.findall('st2')[0].text
+            wc.set_header('ST2', st2)
+            if username == 'USERID':
+                return wc
+            wc.request('POST', '/data', 'set=user(2,1,{0},511,,4,15,0)'.format(username))
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+            wc.request('POST', '/data/logout')
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+            authdata['user'] = username
+            wc.request('POST', '/data/login', urllib.urlencode(authdata, headers))
+            rsp = wc.getresponse()
+            rspdata = rsp.read()
+            tokens = fromstring(rspdata)
+            st2 = tokens.findall('st2')[0].text
+            wc.set_header('ST2', st2)
+            return wc
 
     def config(self, nodename):
         # SMM for now has to reset to assure configuration applies
@@ -73,7 +166,25 @@ class NodeHandler(bmchandler.NodeHandler):
             nodename, 'discovery.passwordrules')
         self.ruleset = dpp.get(nodename, {}).get(
             'discovery.passwordrules', {}).get('value', '')
-        ic = self._bmcconfig(nodename, customconfig=self.set_password_policy)
+        creds = self.configmanager.get_node_attributes(
+            nodename,
+            ['secret.hardwaremanagementuser',
+             'secret.hardwaremanagementpassword'], decrypt=True)
+        username = creds.get(nodename, {}).get(
+            'secret.hardwaremanagementuser', {}).get('value', 'USERID')
+        passwd = creds.get(nodename, {}).get(
+            'secret.hardwaremanagementpassword', {}).get('value', 'PASSW0RD')
+        if passwd == 'PASSW0RD' and self.ruleset:
+            raise Exception('Cannot support default password and setting password rules at same time')
+        if passwd == 'PASSW0RD':
+            # We must avoid hitting the web interface due to forced password change, best effert
+            self._bmcconfig(nodename)
+        else:
+            # Switch to full web based configuration, to mitigate risks with the SMM
+            wc = self._webconfigcreds(username, passwd)
+            self._webconfigrules(wc)
+            self._webconfignet(wc, nodename)
+
 
 # notes for smm:
 # POST to:
