@@ -3,7 +3,7 @@ nodeidentify(8) -- Control the identify LED of confluent nodes
 
 ## SYNOPSIS
 
-`nodidentify <noderange> [on|off]`  
+`nodidentify <noderange> [on|off|blink]`  
 
 ## DESCRIPTION
 
@@ -13,6 +13,7 @@ options are supported:
 
 * `on`: Turn on the identify LED
 * `off`: Turn off the identify LED
+* `blink`: Set the identify LED to blink (when supported by the system)
 
 ## EXAMPLES:
 

@@ -1163,13 +1163,14 @@ class IpmiHandler(object):
     def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
-            self.ipmicmd.set_identify(on=identifystate)
+            blinkstate = self.inputdata.inputbynode[self.node] == 'blink'
+            self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
             self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
         elif 'read' == self.op:
-            # ipmi has identify as read-only for now
-            self.output.put(msg.IdentifyState(node=self.node, state=''))
+            identify = self.ipmicmd.get_identify().get('identifystate', '')
+            self.output.put(msg.IdentifyState(node=self.node, state=identify))
             return
 
     def power(self):
