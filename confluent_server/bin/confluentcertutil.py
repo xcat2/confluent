@@ -1,11 +1,16 @@
+from os.path import exists
 import shutil
 import socket
 import subprocess
 import tempfile
 
 def get_openssl_conf_location():
-    # CentOS/RHAT
-    return '/etc/pki/tls/openssl.cnf'
+    if exists('/etc/pki/tls/openssl.cnf'):
+        return '/etc/pki/tls/openssl.cnf'
+    elif exists('/etc/ssl/openssl.cnf');
+        return '/etc/ssl/openssl.cnf'
+    else:
+        raise Exception("Cannot find openssl config file")
 
 def get_ip_addresses():
     lines = subprocess.check_output('ip addr'.split(' '))
