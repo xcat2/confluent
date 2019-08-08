@@ -84,7 +84,7 @@ function _confluent_generic_completion()
 }
 _confluent_nodeidentify_completion()
 {
-    COMP_CANDIDATES=("on,off -h")
+    COMP_CANDIDATES=("on,off,blink -h")
     _confluent_generic_completion
 }
 

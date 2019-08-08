@@ -31,7 +31,7 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-argparser = optparse.OptionParser(usage="Usage: %prog <noderange> [on|off]")
+argparser = optparse.OptionParser(usage="Usage: %prog <noderange> [on|off|blink]")
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -42,9 +42,6 @@ client.check_globbing(noderange)
 identifystate = None
 if len(sys.argv) > 2:
     identifystate = sys.argv[2]
-else:
-    argparser.print_help()
-    sys.exit(1)
 session = client.Command()
 exitcode = 0
 sys.exit(

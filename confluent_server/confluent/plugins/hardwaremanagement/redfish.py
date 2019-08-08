@@ -682,6 +682,10 @@ class IpmiHandler(object):
                 try:
                     reading = self.ipmicmd.get_sensor_reading(
                         sensor['name'])
+                    if reading.unavailable:
+                        self.output.put(msg.SensorReadings([EmptySensor(
+                            sensor['name'])], name=self.node))
+                        continue
                 except pygexc.IpmiException as ie:
                     if ie.ipmicode == 203:
                         self.output.put(msg.SensorReadings([EmptySensor(
@@ -702,6 +706,11 @@ class IpmiHandler(object):
             try:
                 reading = self.ipmicmd.get_sensor_reading(
                     self.sensormap[sensorname])
+                if reading.unavailable:
+                    self.output.put(msg.ConfluentResourceUnavailable(
+                            self.node, 'Unavailable'
+                        ))
+                    return
                 if hasattr(reading, 'health'):
                     reading.health = _str_health(reading.health)
                 self.output.put(
@@ -1163,13 +1172,14 @@ class IpmiHandler(object):
     def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
-            self.ipmicmd.set_identify(on=identifystate)
+            blinkstate = self.inputdata.inputbynode[self.node] == 'blink'
+            self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
             self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
         elif 'read' == self.op:
-            # ipmi has identify as read-only for now
-            self.output.put(msg.IdentifyState(node=self.node, state=''))
+            identify = self.ipmicmd.get_identify().get('identifystate', '')
+            self.output.put(msg.IdentifyState(node=self.node, state=identify))
             return
 
     def power(self):

@@ -822,6 +822,7 @@ class InputIdentifyMessage(ConfluentInputMessage):
     valid_values = set([
         'on',
         'off',
+        'blink',
     ])
 
     keyname = 'identify'
