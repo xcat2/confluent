@@ -78,14 +78,10 @@ class CredServer(object):
             echotoken = client.recv(tlv[1])
             self.cfm.set_node_attributes({nodename: {'api.key': echotoken, 'api.armed': ''}})
             client.recv(2)  # drain end of message
-            client.send('\x05\x00') # report success                
+            client.send('\x05\x00') # report success     
             client.close()
 
 if __name__ == '__main__':
     a = CredServer()
     while True:
         eventlet.sleep(86400)
-
-            
-            
-            
