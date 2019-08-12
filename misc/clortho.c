@@ -109,7 +109,9 @@ int main(int argc, char* argv[]) {
                 read(sock, buffer, currlen);  // Max is 255, well under MAX_PACKET
             }
             if (currtype == 2) {
-                dprintf(sock, "\x03%c%s\x04%c%s", strlen(buffer), buffer, strlen(cryptedpass), cryptedpass);
+                dprintf(sock, "\x03%c", currlen);
+                write(sock, buffer, currlen);
+                dprintf(sock, "\x04%c%s", strlen(cryptedpass), cryptedpass);
                 write(sock, "\x00\x00", 2);
             } else if (currtype == 5) {
                 printf(passwd);
