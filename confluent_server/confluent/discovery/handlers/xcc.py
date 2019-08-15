@@ -16,12 +16,13 @@ import base64
 import confluent.discovery.handlers.imm as immhandler
 import confluent.netutil as netutil
 import confluent.util as util
+import errno
 import eventlet
 import eventlet.support.greendns
 import json
 import os
 import pyghmi.exceptions as pygexc
-xcc = eventlet.import_patched('pyghmi.redfish.oem.lenovo.xcc')
+import eventlet.green.socket as socket
 import pyghmi.util.webclient as webclient
 import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
@@ -41,10 +42,13 @@ class NodeHandler(immhandler.NodeHandler):
     devname = 'XCC'
 
     def __init__(self, info, configmanager):
-        self._xcchdlr = None
         self._wc = None
         self.nodename = None
+        self.tmpnodename = None
+        self.tmppasswd = None
         self._atdefaultcreds = True
+        self._needpasswordchange = True
+        self._currcreds = (None, None)
         super(NodeHandler, self).__init__(info, configmanager)
 
     @classmethod
@@ -53,16 +57,34 @@ class NodeHandler(immhandler.NodeHandler):
         # This is not adequate for being satisfied
         return bool(info.get('attributes', {}))
 
-    def preconfig(self):
+    def preconfig(self, possiblenode):
+        self.tmpnodename = possiblenode
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
+            # skip preconfig for non-SD530 servers
             return
         self.trieddefault = None  # Reset state on a preconfig attempt
         # attempt to enable SMM
         #it's normal to get a 'not supported' (193) for systems without an SMM
+        # need to branch on 3.00+ firmware
+        currfirm = self.info.get('attributes', {}).get('firmware-image-info', [''])[0]
+        currfirm = currfirm.split(':')
+        if len(currfirm) > 1:
+            currfirm = float(currfirm[1])
+        if currfirm >= 3:
+            # IPMI is disabled and we need it, also we need to go to *some* password
+            wc = self.wc
+            if not wc:
+                # We cannot try to enable SMM here without risking real credentials
+                # on the wire to untrusted parties
+                return
+            wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
+            _, _ = wc.grab_json_response_with_status(
+                '/redfish/v1/Managers/1/NetworkProtocol',
+                {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
         ipmicmd = None
         try:
-            ipmicmd = self._get_ipmicmd()
+            ipmicmd = self._get_ipmicmd(self._currcreds[0], self._currcreds[1])
             ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
         except pygexc.IpmiException as e:
             if (e.ipmicode != 193 and 'Unauthorized name' not in str(e) and
@@ -81,29 +103,111 @@ class NodeHandler(immhandler.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
+    def get_webclient(self, username, password, newpassword):
+        wc = self._wc.dupe()
+        try:
+            wc.connect()
+        except socket.error as se:
+            if se.errno != errno.ECONNREFUSED:
+                raise
+            return (None, None)
+        pwdchanged = False
+        adata = json.dumps({'username': username,
+                            'password': password
+                            })
+        headers = {'Connection': 'keep-alive',
+                   'Content-Type': 'application/json'}
+        wc.request('POST', '/api/login', adata, headers)
+        rsp = wc.getresponse()
+        if rsp.status != 200 and password == 'PASSW0RD':
+            rsp.read()
+            adata = json.dumps({
+                'username': username,
+                'password': newpassword,
+                })
+            headers = {'Connection': 'keep-alive',
+                       'Content-Type': 'application/json'}
+            wc.request('POST', '/api/login', adata, headers)
+            rsp = wc.getresponse()
+            if rsp.status == 200:
+                pwdchanged = True
+                password = newpassword
+            else:
+                rsp.read()
+                return (None, None)
+        if rsp.status == 200:
+            self._currcreds = (username, password)
+            wc.set_basic_credentials(username, password)
+            rspdata = json.loads(rsp.read())
+            wc.set_header('Content-Type', 'application/json')
+            wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
+            if '_csrf_token' in wc.cookies:
+                wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            if rspdata.get('pwchg_required', None) == 'true':
+                wc.request('POST', '/api/function', json.dumps(
+                    {'USER_UserPassChange': '1,{0}'.format(newpassword)}))
+                rsp = wc.getresponse()
+                rsp.read()
+                if rsp.status != 200:
+                    return (None, None)
+                self._currcreds = (username, newpassword)
+                wc.set_basic_credentials(username, newpassword)
+                pwdchanged = True
+            if '_csrf_token' in wc.cookies:
+                wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            return (wc, pwdchanged)
+
     @property
     def wc(self):
+        passwd = None
+        isdefault = True
         if self._wc is None:
             self._wc = webclient.SecureHTTPConnection(
                 self.ipaddr, 443, verifycallback=self.validate_cert)
             self._wc.connect()
-            self._xcchdlr = xcc.OEMHandler(None, None, self._wc, False)
-        if not self.trieddefault:
-            self._xcchdlr.set_credentials('USERID', 'PASSW0RD')
-            wc = self._xcchdlr.get_webclient()
+        nodename = None
+        if self.nodename:
+            nodename = self.nodename
+            inpreconfig = False
+        elif self.tmpnodename:
+            nodename = None
+            inpreconfig = True
+        if self._currcreds[0] is not None:
+            wc, pwdchanged = self.get_webclient(self._currcreds[0], self._currcreds[1], None)
             if wc:
                 return wc
+        if nodename:
+            creds = self.configmanager.get_node_attributes(
+                nodename, ['secret.hardwaremanagementuser',
+                'secret.hardwaremanagementpassword'], decrypt=True)
+            user, passwd, isdefault = self.get_node_credentials(
+                nodename, creds, 'USERID', 'PASSW0RD')
+        if not self.trieddefault:
+            if not passwd:
+                # So in preconfig context, we don't have admin permission to
+                # actually divulge anything to the target
+                # however the target *will* demand a new password... if it's currently
+                # PASSW0RD
+                # use TempW0rd42 to avoid divulging a real password on the line
+                # This is replacing one well known password (PASSW0RD) with another 
+                # (TempW0rd42)
+                passwd = 'TempW0rd42'
+            wc, pwdchanged = self.get_webclient('USERID', 'PASSW0RD', passwd)
+            if wc:
+                if pwdchanged:
+                    if inpreconfig:
+                        self.tmppasswd = passwd
+                    else:
+                        self._needpasswordchange = False
+                return wc
         self.trieddefault = True
-        creds = self.configmanager.get_node_attributes(
-            self.nodename, ['secret.hardwaremanagementuser',
-            'secret.hardwaremanagementpassword'], decrypt=True)
-        user, passwd, isdefault = self.get_node_credentials(
-            self.nodename, creds, 'USERID', 'PASSW0RD')
         if isdefault:
             return
         self._atdefaultcreds = False
-        self._xcchdlr.set_credentials(user, passwd)
-        wc = self._xcchdlr.get_webclient()
+        if self.tmppasswd:
+            wc, _ = self.get_webclient('USERID', self.tmppasswd, passwd)
+        else:
+            wc, _ = self.get_webclient(user, passwd, None)
         if wc:
             return wc
 
@@ -155,12 +259,15 @@ class NodeHandler(immhandler.NodeHandler):
         if not uid:
             raise Exception("XCC has neither the default user nor configured user")
         # The following will work if the password is force change or normal..
-        wc.grab_json_response('/api/function',
-                             {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
+        if self._needpasswordchange and self.tmppasswd != passwd:
+            wc.grab_json_response('/api/function',
+                                {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
         if username != 'USERID':
             wc.grab_json_response(
                 '/api/function',
                 {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,'.format(uid, username)})
+            self.tmppasswd = None
+        self._currcreds = (username, passwd)
 
     def _convert_sha256account(self, user, passwd, wc):
         # First check if the specified user is sha256...
