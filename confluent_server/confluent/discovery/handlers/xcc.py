@@ -71,6 +71,7 @@ class NodeHandler(immhandler.NodeHandler):
         currfirm = currfirm.split(':')
         if len(currfirm) > 1:
             currfirm = float(currfirm[1])
+        disableipmi = False
         if currfirm >= 3:
             # IPMI is disabled and we need it, also we need to go to *some* password
             wc = self.wc
@@ -79,9 +80,12 @@ class NodeHandler(immhandler.NodeHandler):
                 # on the wire to untrusted parties
                 return
             wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
-            _, _ = wc.grab_json_response_with_status(
-                '/redfish/v1/Managers/1/NetworkProtocol',
-                {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
+            rsp = wc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
+            if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
+                disableipmi = True
+                _, _ = wc.grab_json_response_with_status(
+                    '/redfish/v1/Managers/1/NetworkProtocol',
+                    {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
         ipmicmd = None
         try:
             ipmicmd = self._get_ipmicmd(self._currcreds[0], self._currcreds[1])
@@ -90,8 +94,16 @@ class NodeHandler(immhandler.NodeHandler):
             if (e.ipmicode != 193 and 'Unauthorized name' not in str(e) and
                     'Incorrect password' not in str(e)):
                 # raise an issue if anything other than to be expected
+                if disableipmi:
+                    _, _ = wc.grab_json_response_with_status(
+                        '/redfish/v1/Managers/1/NetworkProtocol',
+                        {'IPMI': {'ProtocolEnabled': False}}, method='PATCH')
                 raise
             self.trieddefault = True
+        if disableipmi:
+            _, _ = wc.grab_json_response_with_status(
+                '/redfish/v1/Managers/1/NetworkProtocol',
+                {'IPMI': {'ProtocolEnabled': False}}, method='PATCH')
         #TODO: decide how to clean out if important
         #as it stands, this can step on itself
         #if ipmicmd:
@@ -308,8 +320,14 @@ class NodeHandler(immhandler.NodeHandler):
                             '/api/function',
                             {'USER_UserPassChange': '{0},{1}'.format(tmpuid, newpass)})
                     nwc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(curruser['users_user_id'], user)})
-                    userparams = "{0},{1},{2},1,4,0,0,0,0,,8,".format(curruser['users_user_id'], user, passwd)
+                    userparams = "{0},{1},{2},1,4,0,0,0,0,,8,".format(curruser['users_user_id'], user, tpass)
                     nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                    nwc, pwdchanged = self.get_webclient(user, tpass, passwd)
+                    if not pwdchanged:
+                        nwc.grab_json_response(
+                            '/api/function',
+                            {'USER_UserPassChange': '{0},{1}'.format(curruser['users_user_id'], passwd)})
+
             finally:
                 self._wc = None
                 self.wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
@@ -336,8 +354,19 @@ class NodeHandler(immhandler.NodeHandler):
         cd = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
                        'secret.hardwaremanagementpassword',
-                       'hardwaremanagement.manager'], True)
+                       'hardwaremanagement.manager', 'hardwaremanagement.method'],
+                       True)
         cd = cd.get(nodename, {})
+
+        if cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish':
+            wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
+            rsp = wc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
+            if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
+                # User has indicated IPMI support, but XCC is currently disabled
+                # change XCC to be consistent
+                _, _ = wc.grab_json_response_with_status(
+                        '/redfish/v1/Managers/1/NetworkProtocol',
+                        {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
         if ('hardwaremanagement.manager' in cd and
                 cd['hardwaremanagement.manager']['value'] and
                 not cd['hardwaremanagement.manager']['value'].startswith(
