@@ -79,6 +79,7 @@ class NodeHandler(immhandler.NodeHandler):
                 # We cannot try to enable SMM here without risking real credentials
                 # on the wire to untrusted parties
                 return
+            wc.grab_json_response('/api/providers/logout')
             wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
             rsp = wc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
             if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
@@ -244,7 +245,9 @@ class NodeHandler(immhandler.NodeHandler):
             if name.lower() == 'reuse':
                 ruleset['USER_GlobalMinPassReuseCycle'] = value
         try:
-            self.wc.grab_json_response('/api/dataset', ruleset)
+            wc = self.wc
+            wc.grab_json_response('/api/dataset', ruleset)
+            wc.grab_json_response('/api/providers/logout')
         except Exception as e:
             print(repr(e))
             pass
@@ -301,6 +304,7 @@ class NodeHandler(immhandler.NodeHandler):
                 tpass = base64.b64encode(os.urandom(9)) + 'Iw47$'
                 userparams = "{0},6pmu0ezczzcp,{1},1,4,0,0,0,0,,8,".format(tmpuid, tpass)
                 result = wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                wc.grab_json_response('/api/providers/logout')
                 adata = json.dumps({
                     'username': '6pmu0ezczzcp',
                     'password': tpass,
@@ -322,15 +326,18 @@ class NodeHandler(immhandler.NodeHandler):
                     nwc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(curruser['users_user_id'], user)})
                     userparams = "{0},{1},{2},1,4,0,0,0,0,,8,".format(curruser['users_user_id'], user, tpass)
                     nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                    nwc.grab_json_response('/api/providers/logout')
                     nwc, pwdchanged = self.get_webclient(user, tpass, passwd)
                     if not pwdchanged:
                         nwc.grab_json_response(
                             '/api/function',
                             {'USER_UserPassChange': '{0},{1}'.format(curruser['users_user_id'], passwd)})
-
+                    nwc.grab_json_response('/api/providers/logout')
             finally:
                 self._wc = None
-                self.wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
+                wc = self.wc
+                wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
+                wc.grab_json_response('/api/providers/logout')
 
     def config(self, nodename, reset=False):
         self.nodename = nodename
@@ -359,12 +366,13 @@ class NodeHandler(immhandler.NodeHandler):
         cd = cd.get(nodename, {})
 
         if cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish':
-            wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
-            rsp = wc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
+            nwc = wc.dupe()
+            nwc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
+            rsp = nwc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
             if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
                 # User has indicated IPMI support, but XCC is currently disabled
                 # change XCC to be consistent
-                _, _ = wc.grab_json_response_with_status(
+                _, _ = nwc.grab_json_response_with_status(
                         '/redfish/v1/Managers/1/NetworkProtocol',
                         {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
         if ('hardwaremanagement.manager' in cd and
@@ -389,6 +397,7 @@ class NodeHandler(immhandler.NodeHandler):
         else:
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
+        wc.grab_json_response('/api/providers/logout')
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
