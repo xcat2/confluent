@@ -27,6 +27,7 @@ import traceback
 _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
     'service:lenovo-smm',
+    'service:ipmi',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'service:management-hardware.IBM:chassis-management-module',
     'service:management-hardware.Lenovo:chassis-management-module',
@@ -484,6 +485,11 @@ def snoop(handler, protocol=None):
                 _add_attributes(peerbymacaddress[mac])
                 peerbymacaddress[mac]['hwaddr'] = mac
                 peerbymacaddress[mac]['protocol'] = protocol
+                if 'service:ipmi' in peerbymacaddress[mac]['services']:
+                    if 'service:ipmi//Athena:623' in peerbymacaddress[mac]['urls']:
+                        peerbymacaddress[mac]['services'] = ['thinkagile-storage']
+                    else:
+                        continue
                 handler(peerbymacaddress[mac])
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
@@ -547,6 +553,11 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     _grab_rsps((net, net4), rsps, 1, xidmap)
     # now to analyze and flesh out the responses
     for id in rsps:
+        if 'service:ipmi' in rsps[id]['services']:
+            if 'service:ipmi://Athena:623' in rsps[id]['urls']:
+                rsps[id]['services'] = ['service:thinkagile-storage']
+            else:
+                continue
         if localonly:
             for addr in rsps[id]['addresses']:
                 if 'fe80' in addr[0]:

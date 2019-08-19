@@ -78,8 +78,13 @@ def snoop(handler, byehandler=None):
     for i4 in util.list_ips():
         ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
                      socket.inet_aton(i4['addr'])
-        net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
-                        ssdp4mcast)
+        try:
+            net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                            ssdp4mcast)
+        except socket.error as e:
+            if e.errno != 98:
+                # errno 98 can happen if aliased, skip for now
+                raise
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.bind(('', 1900))
     net6.bind(('', 1900))
