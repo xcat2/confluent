@@ -361,11 +361,11 @@ class NodeHandler(immhandler.NodeHandler):
         cd = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
                        'secret.hardwaremanagementpassword',
-                       'hardwaremanagement.manager', 'hardwaremanagement.method'],
+                       'hardwaremanagement.manager', 'hardwaremanagement.method', 'console.method'],
                        True)
         cd = cd.get(nodename, {})
-
-        if cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish':
+        if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
+                or cd.get('console.method', {}).get('value', None) == 'ipmi'):
             nwc = wc.dupe()
             nwc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
             rsp = nwc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
