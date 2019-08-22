@@ -68,6 +68,7 @@ import confluent.discovery.protocols.pxe as pxe
 #import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
+import confluent.discovery.handlers.cpstorage as cpstorage
 import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
@@ -101,7 +102,7 @@ nodehandlers = {
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
     'service:io-device.Lenovo:management-module': None,
-    'service:thinkagile-storage': None,
+    'service:thinkagile-storage': cpstorage,
 }
 
 servicenames = {
