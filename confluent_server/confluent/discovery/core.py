@@ -69,6 +69,7 @@ import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
 import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
+import confluent.discovery.handlers.cpstorage as cpstorage
 import confluent.discovery.handlers.xcc as xcc
 import confluent.exceptions as exc
 import confluent.log as log
@@ -97,7 +98,7 @@ nodehandlers = {
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
-    'service:io-device.Lenovo:management-module': None,
+    'service:io-device.Lenovo:management-module': cpstorage,
 }
 
 servicenames = {
