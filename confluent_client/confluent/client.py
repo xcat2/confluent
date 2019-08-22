@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2018 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -107,7 +107,10 @@ def printerror(res, node=None):
 
 
 def cprint(txt):
-    print(txt)
+    try:
+        print(txt)
+    except UnicodeEncodeError:
+        print(txt.encode('utf8'))
     sys.stdout.flush()
 
 def _parseserver(string):
