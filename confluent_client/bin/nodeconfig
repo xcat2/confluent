@@ -98,6 +98,7 @@ setmode = None
 assignment = {}
 queryparms = {}
 printsys = []
+printbmc = []
 setsys = {}
 forceset = False
 needval = None
@@ -172,7 +173,10 @@ def parse_config_line(arguments):
                 if not matchedparms:
                     printsys.append(param)
             elif param not in cfgpaths:
-                printsys.append(param)
+                if param.startswith('bmc.'):
+                    printbmc.append(param.replace('bmc.', ''))
+                else:
+                    printsys.append(param)
             else:
                 path, attrib = cfgpaths[param]
                 path = '/noderange/{0}/{1}'.format(noderange, path)
@@ -197,18 +201,26 @@ else:
     parse_config_line(args[1:])
 session = client.Command()
 rcode = 0
-if options.restoredefault and options.restoredefault.lower() in (
+if options.restoredefault:
+    if options.restoredefault.lower() in (
         'sys', 'system', 'uefi', 'bios'):
-    for fr in session.update(
-            '/noderange/{0}/configuration/system/clear'.format(noderange),
-            {'clear': True}):
-        rcode |= client.printerror(fr)
-    sys.exit(rcode)
-elif options.restoredefault:
-    sys.stderr.write(
-        'Unrecognized component to restore defaults: {0}\n'.format(
-            options.restoredefault))
-    sys.exit(1)
+        for fr in session.update(
+                '/noderange/{0}/configuration/system/clear'.format(noderange),
+                {'clear': True}):
+            rcode |= client.printerror(fr)
+        sys.exit(rcode)
+    elif options.restoredefault.lower() in (
+        'bmc', 'imm', 'xcc'):
+        for fr in session.update(
+                '/noderange/{0}/configuration/management_controller/clear'.format(noderange),
+                {'clear': True}):
+            rcode |= client.printerror(fr)
+        sys.exit(rcode)
+    else:
+        sys.stderr.write(
+            'Unrecognized component to restore defaults: {0}\n'.format(
+                options.restoredefault))
+        sys.exit(1)
 if setmode:
     if options.exclude:
         sys.stderr.write('Cannot use exclude and assign at the same time\n')
@@ -217,8 +229,12 @@ if setmode:
     attrnamebypath = {}
     for key in assignment:
         if key not in cfgpaths:
-            path = 'configuration/system/all'
-            attrib = key
+            if key.startswith('bmc.'):
+                path = 'configuration/management_controller/extended/all'
+                attrib = key.replace('bmc.', '')
+            else:
+                path = 'configuration/system/all'
+                attrib = key
         else:
             path, attrib = cfgpaths[key]
         if path not in updatebypath:
@@ -250,6 +266,10 @@ else:
                                       NullOpt(), queryparms[path])
         if rc:
             sys.exit(rc)
+    if printbmc:
+        rcode = client.print_attrib_path(
+                    '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
+                    session, printbmc, options, attrprefix='bmc.')
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
@@ -258,6 +278,7 @@ else:
         else:
             path = '/noderange/{0}/configuration/system/advanced'.format(
                 noderange)
+        
         rcode = client.print_attrib_path(path, session, printsys,
                                          options)
 sys.exit(rcode)

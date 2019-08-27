@@ -393,7 +393,7 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
     return print_attrib_path(path, session, requestargs, options)
 
 
-def print_attrib_path(path, session, requestargs, options, rename=None):
+def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
     exitcode = 0
     seenattributes = set([])
     for res in session.read(path):
@@ -416,6 +416,8 @@ def print_attrib_path(path, session, requestargs, options, rename=None):
                     printattr = rename.get(attr, attr)
                 else:
                     printattr = attr
+                if attrprefix:
+                    printattr = attrprefix + printattr
                 currattr = res['databynode'][node][attr]
                 if show_attr(attr, requestargs, seenattributes, options):
                     if 'value' in currattr:
