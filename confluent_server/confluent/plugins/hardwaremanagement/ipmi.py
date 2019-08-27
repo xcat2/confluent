@@ -623,12 +623,18 @@ class IpmiHandler(object):
             return self.handle_domain_name()
         elif self.element[1:3] == ['management_controller', 'ntp']:
             return self.handle_ntp()
+        elif self.element[1:4] == ['management_controller', 'extended', 'all']:
+            return self.handle_bmcconfig()
+        elif self.element[1:4] == ['management_controller', 'extended', 'all']:
+            return self.handle_bmcconfig(True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
             return self.handle_sysconfig(True)
         elif self.element[1:3] == ['system', 'clear']:
             return self.handle_sysconfigclear()
+        elif self.element[1:3] == ['management_controller', 'clear']:
+            return self.handle_bmcconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
             return self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
@@ -1373,11 +1379,30 @@ class IpmiHandler(object):
             self.ipmicmd.set_domain_name(dn)
             return
 
+    def handle_bmcconfigclear(self):
+        if 'read' == self.op:
+            raise exc.InvalidArgumentException(
+                'Cannot read the "clear" resource')
+        self.ipmicmd.clear_bmc_configuration()
+
     def handle_sysconfigclear(self):
         if 'read' == self.op:
             raise exc.InvalidArgumentException(
                 'Cannot read the "clear" resource')
         self.ipmicmd.clear_system_configuration()
+
+    def handle_bmcconfig(self, advanced=False):
+        if 'read' == self.op:
+            try:
+                self.output.put(msg.ConfigSet(
+                    self.node,
+                    self.ipmicmd.get_bmc_configuration()))
+            except Exception as e:
+                self.output.put(
+                    msg.ConfluentNodeError(self.node, str(e)))
+        elif 'update' == self.op:
+            self.ipmicmd.set_bmc_configuration(
+                self.inputdata.get_attributes(self.node))
 
     def handle_sysconfig(self, advanced=False):
         if 'read' == self.op:

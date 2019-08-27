@@ -450,10 +450,11 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif (path[:4] == ['configuration', 'management_controller', 'ntp',
             'servers'] and operation != 'retrieve' and len(path) == 5):
         return InputNTPServer(path, nodes, inputdata)
-    elif (path[:3] == ['configuration', 'system', 'all'] and
+    elif (path[:3] in (['configuration', 'system', 'all'],
+            ['configuration', 'management_controller', 'extended']) and
             operation != 'retrieve'):
         return InputConfigChangeSet(path, inputdata, nodes, configmanager)
-    elif (path[:3] == ['configuration', 'system', 'clear'] and
+    elif (path[0] == 'configuration' and path[2] == 'clear'  and
             operation != 'retrieve'):
         return InputConfigClear(path, inputdata, nodes, configmanager)
     elif (path[:3] == ['configuration', 'storage', 'disks'] and
