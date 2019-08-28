@@ -386,11 +386,17 @@ class NodeHandler(immhandler.NodeHandler):
                 raise exc.NotImplementedException('IPv6 remote config TODO')
             netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=newip)
             newmask = netutil.cidr_to_mask(netconfig['prefix'])
-            # do not change the ipv4_config if the current config looks
-            statargs = {'ENET_IPv4Ena': '1', 'ENET_IPv4AddrSource': '0', 'ENET_IPv4StaticIPAddr': newip, 'ENET_IPv4StaticIPNetMask': newmask}
-            if netconfig['ipv4_gateway']:
-                statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
-            wc.grab_json_response('/api/dataset', statargs)
+            currinfo = wc.grab_json_response('/api/providers/logoninfo')
+            currip = currinfo.get('items', [{}])[0].get('ipv4_address', '')
+            # do not change the ipv4_config if the current config looks right already
+            if currip != newip:
+                statargs = {
+                    'ENET_IPv4Ena': '1', 'ENET_IPv4AddrSource': '0',
+                    'ENET_IPv4StaticIPAddr': newip, 'ENET_IPv4StaticIPNetMask': newmask
+                    }
+                if netconfig['ipv4_gateway']:
+                    statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
+                wc.grab_json_response('/api/dataset', statargs)
         elif self.ipaddr.startswith('fe80::'):
             self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
