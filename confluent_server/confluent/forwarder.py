@@ -49,6 +49,7 @@ def forward_port(sock, target, clientip, sessionid):
             continue
         try:
             client = socket.create_connection((target, 443))
+            client.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
         except Exception:
             conn.close()
             continue
@@ -68,6 +69,7 @@ def forward_video():
         try:
             vidclient = socket.create_connection((vidtargetbypeer[cli[0]],
                                                   3900))
+            vidclient.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
         except Exception:
             conn.close()
             continue
