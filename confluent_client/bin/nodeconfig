@@ -99,6 +99,7 @@ assignment = {}
 queryparms = {}
 printsys = []
 printbmc = []
+printallbmc = False
 setsys = {}
 forceset = False
 needval = None
@@ -123,7 +124,7 @@ def _assign_value():
 
 
 def parse_config_line(arguments):
-    global setmode, forceset, key, value, needval, candidate, path, attrib
+    global setmode, printallbmc, forceset, key, value, needval, candidate, path, attrib
     for param in arguments:
         if param == 'show':
             continue  # forgive muscle memory of pasu users
@@ -155,6 +156,8 @@ def parse_config_line(arguments):
             if setmode != False:
                 bailout('Cannot do set and query in same command')
             if '.' not in param:
+                if param == 'bmc':
+                    printallbmc = True
                 matchedparms = False
                 for candidate in cfgpaths:
                     if candidate.startswith('{0}.'.format(param)):
@@ -266,7 +269,7 @@ else:
                                       NullOpt(), queryparms[path])
         if rc:
             sys.exit(rc)
-    if printbmc:
+    if printbmc or printallbmc:
         rcode = client.print_attrib_path(
                     '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
                     session, printbmc, options, attrprefix='bmc.')
