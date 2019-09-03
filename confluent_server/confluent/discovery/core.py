@@ -103,6 +103,7 @@ nodehandlers = {
     'pxe-client': pxeh,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,
+    'service:lenovo-tsm': None,
 }
 
 servicenames = {
@@ -112,6 +113,7 @@ servicenames = {
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
     'service:io-device.Lenovo:management-module': 'lenovo-switch',
     'service:thinkagile-storage': 'thinkagile-storagebmc',
+    'service:lenovo-tsm': 'lenovo-tsm',
 }
 
 servicebyname = {
@@ -121,6 +123,7 @@ servicebyname = {
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',
     'thinkagile-storage': 'service:thinkagile-storagebmc',
+    'lenovo-tsm': 'service:lenovo-tsm',
 }
 
 discopool = eventlet.greenpool.GreenPool(500)
