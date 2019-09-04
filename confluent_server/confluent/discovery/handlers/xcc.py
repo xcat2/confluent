@@ -23,7 +23,7 @@ import json
 import os
 import pyghmi.exceptions as pygexc
 import eventlet.green.socket as socket
-import pyghmi.util.webclient as webclient
+webclient = eventlet.import_patched('pyghmi.util.webclient')
 import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 

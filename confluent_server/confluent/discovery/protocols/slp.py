@@ -487,7 +487,7 @@ def snoop(handler, protocol=None):
                 peerbymacaddress[mac]['hwaddr'] = mac
                 peerbymacaddress[mac]['protocol'] = protocol
                 if 'service:ipmi' in peerbymacaddress[mac]['services']:
-                    if 'service:ipmi//Athena:623' in peerbymacaddress[mac]['urls']:
+                    if 'service:ipmi//Athena:623' in peerbymacaddress[mac].get('urls', ()):
                         peerbymacaddress[mac]['services'] = ['service:thinkagile-storage']
                     else:
                         continue
