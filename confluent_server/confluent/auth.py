@@ -119,9 +119,9 @@ def _prune_passcache():
     while True:
         curtime = time.time()
         for passent in _passcache.iterkeys():
-            if passent[2] < curtime - 10:
+            if passent[2] < curtime - 90:
                 del _passcache[passent]
-        eventlet.sleep(10)
+        eventlet.sleep(90)
 
 
 def _get_usertenant(name, tenant=False):
@@ -249,7 +249,6 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             # while someone is legitimately logged in
             # invalidate cache and force the slower check
             del _passcache[(user, tenant)]
-            return None
     if 'cryptpass' in ucfg:
         _passchecking[(user, tenant)] = True
         # TODO(jbjohnso): WORKERPOOL
