@@ -43,7 +43,7 @@ class NodeHandler(generic.NodeHandler):
         # but if https_cert gets stricter, this check means something
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
-    
+
     def _get_wc(self):
         authdata = {  # start by trying factory defaults
             'username': self.DEFAULT_USER,
@@ -111,8 +111,6 @@ class NodeHandler(generic.NodeHandler):
         wc = self._get_wc()
         wc.set_header('X-CSRFTOKEN', self.csrftok)
         curruserinfo = {}
-        curruserinfo = wc.grab_json_response('/api/settings/users')
-        authchg = curruserinfo[1]
         authupdate = False
         wc.set_header('Content-Type', 'application/json')
         if user != self.curruser:
