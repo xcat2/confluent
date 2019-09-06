@@ -60,7 +60,7 @@ case $1 in
 		stop
 		;;
 	status)
-		status -p /var/run/confluent/pid $confluent
+		status_of_proc -p /var/run/confluent/pid $confluent
 		;;
 esac
 

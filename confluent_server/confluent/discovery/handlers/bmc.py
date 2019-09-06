@@ -26,11 +26,11 @@ ipmicommand.session.threading = eventlet.green.threading
 ipmicommand.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
-DEFAULT_USER = 'USERID'
-DEFAULT_PASS = 'PASSW0RD'
 
 
 class NodeHandler(generic.NodeHandler):
+    DEFAULT_USER = 'USERID'
+    DEFAULT_PASS = 'PASSW0RD'
 
     def _get_ipmicmd(self, user=None, password=None):
         priv = None
@@ -39,9 +39,9 @@ class NodeHandler(generic.NodeHandler):
                 raise pygexc.IpmiException()
             priv = 4  # manually indicate priv to avoid double-attempt
         if user is None:
-            user = DEFAULT_USER
+            user = self.DEFAULT_USER
         if password is None:
-            password = DEFAULT_PASS
+            password = self.DEFAULT_PASS
         return ipmicommand.Command(self.ipaddr, user, password,
                                    privlevel=priv, keepalive=False)
 
@@ -70,17 +70,17 @@ class NodeHandler(generic.NodeHandler):
             'secret.hardwaremanagementpassword', {}).get('value', None)
         try:
             ic = self._get_ipmicmd()
-            passwd = DEFAULT_PASS
+            passwd = self.DEFAULT_PASS
         except pygexc.IpmiException as pi:
             havecustomcreds = False
-            if user is not None and user != DEFAULT_USER:
+            if user is not None and user != self.DEFAULT_USER:
                 havecustomcreds = True
             else:
-                user = DEFAULT_USER
-            if passwd is not None and passwd != DEFAULT_PASS:
+                user = self.DEFAULT_USER
+            if passwd is not None and passwd != self.DEFAULT_PASS:
                 havecustomcreds = True
             else:
-                passwd = DEFAULT_PASS
+                passwd = self.DEFAULT_PASS
             if havecustomcreds:
                 ic = self._get_ipmicmd(user, passwd)
             else:

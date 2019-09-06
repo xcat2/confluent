@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2017 Lenovo
+# Copyright 2017-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ import traceback
 _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
     'service:lenovo-smm',
+    'service:ipmi',
+    'service:lighttpd',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'service:management-hardware.IBM:chassis-management-module',
     'service:management-hardware.Lenovo:chassis-management-module',
@@ -484,6 +486,18 @@ def snoop(handler, protocol=None):
                 _add_attributes(peerbymacaddress[mac])
                 peerbymacaddress[mac]['hwaddr'] = mac
                 peerbymacaddress[mac]['protocol'] = protocol
+                if 'service:ipmi' in peerbymacaddress[mac]['services']:
+                    if 'service:ipmi//Athena:623' in peerbymacaddress[mac].get('urls', ()):
+                        peerbymacaddress[mac]['services'] = ['service:thinkagile-storage']
+                    else:
+                        continue
+                if 'service:lightttpd' in peerbymacaddress[mac]['services']:
+                    currinf = peerbymacaddress[mac]
+                    curratt = currinf.get('attributes', {})
+                    if curratt.get('System-Manufacturing', [None])[0] == 'Lenovo' and curratt.get('type', [None])[0] == 'LenovoThinkServer':
+                        peerbymacaddress[mac]['services'] = ['service:lenovo-tsm']
+                    else:
+                        continue
                 handler(peerbymacaddress[mac])
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
@@ -547,6 +561,11 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     _grab_rsps((net, net4), rsps, 1, xidmap)
     # now to analyze and flesh out the responses
     for id in rsps:
+        if 'service:ipmi' in rsps[id]['services']:
+            if 'service:ipmi://Athena:623' in rsps[id]['urls']:
+                rsps[id]['services'] = ['service:thinkagile-storage']
+            else:
+                continue
         if localonly:
             for addr in rsps[id]['addresses']:
                 if 'fe80' in addr[0]:
@@ -554,6 +573,15 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
             else:
                 continue
         _add_attributes(rsps[id])
+        if 'service:lighttpd' in rsps[id]['services']:
+            currinf = rsps[id]
+            curratt = currinf.get('attributes', {})
+            if curratt.get('System-Manufacturing', [None])[0] == 'Lenovo' and curratt.get('type', [None])[0] == 'LenovoThinkServer':
+               currinf['services'] = ['service:lenovo-tsm']
+               curratt['enclosure-serial-number'] = curratt['Product-Serial']
+               curratt['enclosure-machinetype-model'] = curratt['Machine-Type']
+            else:
+                continue
         del rsps[id]['payload']
         del rsps[id]['function']
         del rsps[id]['xid']

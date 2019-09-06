@@ -1,5 +1,5 @@
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2018 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -169,6 +169,12 @@ class IpmiCommandWrapper(ipmicommand.Command):
         try:
             super(IpmiCommandWrapper, self).__init__(**kwargs)
         except socket.error as se:
+            if (hasattr(se, 'errno')
+                    and se.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH, errno.EADDRNOTAVAIL)):
+                if hasattr(se, 'strerror'):
+                    raise exc.TargetEndpointUnreachable(se.strerror)
+                else:
+                    raise exc.TargetEndpointUnreachable(str(se))
             if isinstance(se, socket.timeout) or (len(se) > 1 and se[1] == 'EHOSTUNREACH'):
                 raise exc.TargetEndpointUnreachable('timeout')
             raise
@@ -183,10 +189,8 @@ class IpmiCommandWrapper(ipmicommand.Command):
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:
-            self.ipmi_session._mark_broken()
-        except AttributeError:
-            # if ipmi_session doesn't already exist,
-            # then do nothing
+            del persistent_ipmicmds[(self.node, configmanager.tenant)]
+        except KeyError:
             pass
 
     def get_health(self):
@@ -300,6 +304,11 @@ def perform_request(operator, node, element,
         try:
             return IpmiHandler(operator, node, element, configdata, inputdata,
                                cfg, results, realop).handle_request()
+        except socket.error as se:
+            if hasattr(se, 'strerror'):
+                results.put(msg.ConfluentTargetTimeout(node, se.strerror))
+            else:
+                results.put(msg.ConfluentTargetTimeout(node, str(se)))
         except pygexc.IpmiException as ipmiexc:
             excmsg = str(ipmiexc)
             if excmsg in ('Session no longer connected', 'timeout'):
@@ -327,6 +336,8 @@ def perform_request(operator, node, element,
             traceback.print_exc()
         finally:
             results.put('Done')
+        if (node, cfg.tenant) in persistent_ipmicmds:
+            del persistent_ipmicmds[(node, cfg.tenant)]
 
 persistent_ipmicmds = {}
 
@@ -490,6 +501,8 @@ class IpmiHandler(object):
             return self.handle_domain_name()
         elif self.element[1:3] == ['management_controller', 'ntp']:
             return self.handle_ntp()
+        elif self.element[1:4] == ['management_controller', 'extended', 'all']:
+            return self.handle_bmcconfig()
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
@@ -1247,6 +1260,19 @@ class IpmiHandler(object):
             self.ipmicmd.set_domain_name(dn)
             return
 
+    def handle_bmcconfig(self, advanced=False):
+        if 'read' == self.op:
+            try:
+                self.output.put(msg.ConfigSet(
+                    self.node,
+                    self.ipmicmd.get_bmc_configuration()))
+            except Exception as e:
+                self.output.put(
+                    msg.ConfluentNodeError(self.node, str(e)))
+        elif 'update' == self.op:
+            self.ipmicmd.set_bmc_configuration(
+                self.inputdata.get_attributes(self.node))
+
     def handle_sysconfigclear(self):
         if 'read' == self.op:
             raise exc.InvalidArgumentException(
@@ -1399,5 +1425,3 @@ def delete(nodes, element, configmanager, inputdata):
                                               element, type='ffdc')
     return perform_requests(
         'delete', nodes, element, configmanager, inputdata, 'delete')
-
-

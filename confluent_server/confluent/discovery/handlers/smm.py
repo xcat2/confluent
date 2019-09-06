@@ -14,7 +14,8 @@
 
 import confluent.discovery.handlers.bmc as bmchandler
 import confluent.exceptions as exc
-import pyghmi.util.webclient as webclient
+import eventlet
+webclient = eventlet.import_patched('pyghmi.util.webclient')
 import struct
 import urllib
 import eventlet.support.greendns

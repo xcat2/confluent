@@ -68,6 +68,8 @@ import confluent.discovery.protocols.pxe as pxe
 import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
+import confluent.discovery.handlers.cpstorage as cpstorage
+import confluent.discovery.handlers.tsm as tsm
 import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
@@ -101,6 +103,8 @@ nodehandlers = {
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
     'service:io-device.Lenovo:management-module': None,
+    'service:thinkagile-storage': cpstorage,
+    'service:lenovo-tsm': tsm,
 }
 
 servicenames = {
@@ -109,6 +113,8 @@ servicenames = {
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
     'service:io-device.Lenovo:management-module': 'lenovo-switch',
+    'service:thinkagile-storage': 'thinkagile-storagebmc',
+    'service:lenovo-tsm': 'lenovo-tsm',
 }
 
 servicebyname = {
@@ -117,6 +123,8 @@ servicebyname = {
     'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',
+    'thinkagile-storage': 'service:thinkagile-storagebmc',
+    'lenovo-tsm': 'service:lenovo-tsm',
 }
 
 discopool = eventlet.greenpool.GreenPool(500)
@@ -883,7 +891,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         handler.probe()  # unicast interrogation as possible to get more data
         # switch concurrently
         # do some preconfig, for example, to bring a SMM online if applicable
-        handler.preconfig()
+        handler.preconfig(nodename)
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'

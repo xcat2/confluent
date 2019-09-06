@@ -30,7 +30,7 @@ shopt -s extglob
 cd deb_dist/!(*.orig)/
 if [ "$OPKGNAME" = "confluent-server" ]; then
     if grep wheezy /etc/os-release; then
-        sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex/' debian/control
+        sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex, python-dateutil, python-pyopenssl/' debian/control
     else
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome, python-dateutil/' debian/control
     fi
