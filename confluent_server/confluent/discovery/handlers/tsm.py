@@ -149,6 +149,9 @@ class NodeHandler(generic.NodeHandler):
                 raise exc.NotImplementedException('IPv6 remote config TODO')
             currnet = wc.grab_json_response('/api/settings/network')
             for net in currnet:
+                if net['channel_number'] == self.channel and net['lan_enable'] == 0:
+                    # ignore false indication and switch to 8 (dedicated)
+                    self.channel = 8
                 if net['channel_number'] == self.channel:
                     # we have found the interface to potentially manipulate
                     if net['ipv4_address'] != newip:
