@@ -24,6 +24,7 @@ getaddrinfo = eventlet.support.greendns.getaddrinfo
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 class NodeHandler(generic.NodeHandler):
+    devname = 'TSM'
     DEFAULT_USER = 'USERID'
     DEFAULT_PASS = 'PASSW0RD'
 
@@ -165,6 +166,12 @@ class NodeHandler(generic.NodeHandler):
                         rsp, status = wc.grab_json_response_with_status(
                             '/api/settings/network/{0}'.format(net['id']), net, method='PUT')
                     break
+        elif self.ipaddr.startswith('fe80::'):
+            self.configmanager.set_node_attributes(
+                {nodename: {'hardwaremanagement.manager': self.ipaddr}})
+        else:
+            raise exc.TargetEndpointUnreachable(
+                'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
         rsp, status = wc.grab_json_response_with_status('/api/session', method='DELETE')
 
 
