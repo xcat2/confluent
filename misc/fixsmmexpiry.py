@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 import pyghmi.util.webclient as webclient
 from xml.etree.ElementTree import fromstring
 import os

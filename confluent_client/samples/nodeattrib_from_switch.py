@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 
 # This is a sample python script for going through all observed mac addresses
 # and assuming they are BMC related and printing nodeattrib commands

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 import pyghmi.util.webclient as webclient
 import json
 import os
