@@ -23,10 +23,10 @@ Server for console management and systems management aggregation
 %setup -n %{name}-%{version} -n %{name}-%{version}
 
 %build
-python setup.py build
+python2 setup.py build
 
 %install
-python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
+python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
 for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
     rm $RPM_BUILD_ROOT/$file
 done
