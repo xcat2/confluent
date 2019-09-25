@@ -12,7 +12,11 @@ Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
+%if "%{dist}" == ".el8"
+Requires: python2-pyghmi >= 1.0.34, python2-eventlet, python2-greenlet, python2-pycryptodomex >= 3.4.7, confluent_client, python2-pyparsing, python2-paramiko, python2-dns, python2-netifaces, python2-pyasn1 >= 0.2.3, python2-pysnmp >= 4.3.4, python2-pyte, python2-lxml, python2-eficompressor, python2-setuptools, python2-dateutil
+%else
 Requires: python-pyghmi >= 1.0.34, python-eventlet, python-greenlet, python-pycryptodomex >= 3.4.7, confluent_client, python-pyparsing, python-paramiko, python-dns, python-netifaces, python2-pyasn1 >= 0.2.3, python-pysnmp >= 4.3.4, python-pyte, python-lxml, python-eficompressor, python-setuptools, python-dateutil
+%endif
 Vendor: Jarrod Johnson <jjohnson2@lenovo.com>
 Url: http://xcat.sf.net/
 
