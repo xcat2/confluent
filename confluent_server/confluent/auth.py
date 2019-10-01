@@ -28,8 +28,9 @@ import hashlib
 import hmac
 import multiprocessing
 import confluent.userutil as userutil
+pam = None
 try:
-    import PAM
+    import confluent.pam as pam
 except ImportError:
     pass
 import time
@@ -94,23 +95,6 @@ _deniedbyrole = {
         ]
     }
 }
-class Credentials(object):
-    def __init__(self, username, passphrase):
-        self.username = username
-        self.passphrase = passphrase
-        self.haspam = False
-
-    def pam_conv(self, auth, query_list):
-        # use stored credentials in a pam conversation
-        self.haspam = True
-        resp = []
-        for query_entry in query_list:
-            query, pamtype = query_entry
-            if query.startswith('Password'):
-                resp.append((self.passphrase, 0))
-            else:
-                return None
-        return resp
 
 
 def _prune_passcache():
@@ -227,7 +211,6 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         # would normally make an event and wait
         # but here there's no need for that
         eventlet.sleep(0.5)
-    credobj = Credentials(user, passphrase)
     cfm = configmanager.ConfigManager(tenant, username=user)
     ucfg = cfm.get_user(user)
     if ucfg is None:
@@ -278,21 +261,15 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         if crypt == crypted:
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
             return authorize(user, element, tenant, operation)
-    try:
-        pammy = PAM.pam()
-        pammy.start(_pamservice, user, credobj.pam_conv)
-        pammy.authenticate()
-        pammy.acct_mgmt()
+    if pam:
+        pammy = pam.pam()
+        usergood = pammy.authenticate(user, passphrase)
         del pammy
-        _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
-        return authorize(user, element, tenant, operation, skipuserobj=False)
-    except NameError:
-        pass
-    except PAM.error:
-        pass
+        if usergood:
+            _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
+            return authorize(user, element, tenant, operation, skipuserobj=False)    
     eventlet.sleep(0.05)  # stall even on test for existence of a username
     return None
-
 
 def _apply_pbkdf(passphrase, salt):
     return KDF.PBKDF2(passphrase, salt, 32, 10000,
