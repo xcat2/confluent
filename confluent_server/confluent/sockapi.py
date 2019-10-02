@@ -412,7 +412,7 @@ def _unixdomainhandler():
     except OSError:  # if file does not exist, no big deal
         pass
     if not os.path.isdir("/var/run/confluent"):
-        os.makedirs('/var/run/confluent', 0755)
+        os.makedirs('/var/run/confluent', 0o755)
     unixsocket.bind("/var/run/confluent/api.sock")
     os.chmod("/var/run/confluent/api.sock",
              stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |

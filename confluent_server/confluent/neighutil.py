@@ -26,7 +26,7 @@ neightime = 0
 
 import re
 
-_validmac = re.compile('..:..:..:..:..:..')
+_validmac = re.compile(b'..:..:..:..:..:..')
 
 
 def update_neigh():
@@ -39,11 +39,11 @@ def update_neigh():
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
     (neighdata, err) = ipn.communicate()
-    for entry in neighdata.split('\n'):
-        entry = entry.split(' ')
+    for entry in neighdata.split(b'\n'):
+        entry = entry.split(b' ')
         if len(entry) < 5 or not entry[4]:
             continue
-        if entry[0] in ('192.168.0.100', '192.168.70.100', '192.168.70.125'):
+        if entry[0] in (b'192.168.0.100', b'192.168.70.100', b'192.168.70.125'):
             # Note that these addresses are common static ip addresses
             # that are hopelessly ambiguous if there are many
             # so ignore such entries and move on

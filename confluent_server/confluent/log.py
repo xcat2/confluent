@@ -76,6 +76,10 @@ import stat
 import struct
 import time
 import traceback
+try:
+    unicode
+except NameError:
+    unicode = str
 
 daemonized = False
 logfull = False
@@ -176,6 +180,8 @@ class BaseRotatingHandler(object):
                 self.textfile = open(self.textpath, mode='ab')
             if self.binfile is None:
                 self.binfile = open(self.binpath, mode='ab')
+            if not isinstance(textrecord, bytes):
+                textrecord = textrecord.encode('utf-8')
             self.textfile.write(textrecord)
             self.binfile.write(binrecord)
             self.textfile.flush()

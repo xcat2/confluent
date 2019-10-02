@@ -249,18 +249,18 @@ def _parse_attrlist(attrstr):
     attribs = {}
     while attrstr:
         if attrstr[0] == '(':
-            if ')' not in attrstr:
+            if b')' not in attrstr:
                 attribs['INCOMPLETE'] = True
                 return attribs
-            currattr = attrstr[1:attrstr.index(')')]
-            if '=' not in currattr:  # Not allegedly kosher, but still..
+            currattr = attrstr[1:attrstr.index(b')')]
+            if b'=' not in currattr:  # Not allegedly kosher, but still..
                 currattr = currattr.decode('utf-8')
                 attribs[currattr] = None
             else:
                 attrname, attrval = currattr.split('=', 1)
                 attrname = attrname.decode('utf-8')
                 attribs[attrname] = []
-                for val in attrval.split(','):
+                for val in attrval.split(b','):
                     try:
                         val = val.decode('utf-8')
                     except UnicodeDecodeError:
@@ -284,9 +284,9 @@ def _parse_attrlist(attrstr):
                             ).lower()
                     attribs[attrname].append(val)
             attrstr = attrstr[attrstr.index(')'):]
-        elif attrstr[0] == ',':
+        elif attrstr[0] == b','[0]:
             attrstr = attrstr[1:]
-        elif ',' in attrstr:
+        elif b',' in attrstr:
             currattr = attrstr[:attrstr.index(',')]
             attribs[currattr] = None
             attrstr = attrstr[attrstr.index(','):]

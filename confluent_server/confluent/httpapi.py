@@ -17,7 +17,10 @@
 # This SCGI server provides a http wrap to confluent api
 # It additionally manages httprequest console sessions
 import base64
-import Cookie
+try:
+    import Cookie
+except ModuleNotFoundError:
+    import http.cookies as Cookie
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
@@ -39,7 +42,10 @@ import socket
 import sys
 import traceback
 import time
-import urlparse
+try:
+    import urlparse
+except ModuleNotFoundError:
+    import urllib.parse as urlparse
 import eventlet.wsgi
 #scgi = eventlet.import_patched('flup.server.scgi')
 tlvdata = confluent.tlvdata

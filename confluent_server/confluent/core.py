@@ -106,6 +106,8 @@ def load_plugins():
         for plugin in os.listdir(plugindir):
             if plugin.startswith('.'):
                 continue
+            if '__pycache__' in plugin:
+                continue
             (plugin, plugtype) = os.path.splitext(plugin)
             if plugtype == '.sh':
                 pluginmap[plugin] = shellmodule.Plugin(

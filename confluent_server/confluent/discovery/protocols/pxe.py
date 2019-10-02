@@ -98,7 +98,7 @@ def snoop(handler, protocol=None):
             netaddr = ':'.join(['{0:02x}'.format(x) for x in netaddr])
             optidx = 0
             try:
-                optidx = rq.index('\x63\x82\x53\x63') + 4
+                optidx = rq.index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
             uuid, arch = find_info_in_options(rq, optidx)

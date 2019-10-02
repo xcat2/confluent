@@ -46,7 +46,10 @@ import Cryptodome.Protocol.KDF as KDF
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import HMAC
 from Cryptodome.Hash import SHA256
-import anydbm as dbm
+try:
+    import anydbm as dbm
+except ModuleNotFoundError:
+    import dbm
 import ast
 import base64
 import confluent.config.attributes as allattributes
@@ -57,7 +60,10 @@ import confluent.util
 import confluent.netutil as netutil
 import confluent.exceptions as exc
 import copy
-import cPickle
+try:
+    import cPickle
+except ModuleNotFoundError:
+    import pickle as cPickle
 import errno
 import eventlet
 import eventlet.event as event
@@ -74,6 +80,10 @@ import struct
 import sys
 import threading
 import traceback
+try:
+    unicode
+except NameError:
+    unicode = str
 
 
 _masterkey = None
@@ -478,7 +488,7 @@ def _load_dict_from_dbm(dpath, tdb):
                 currdict[elem] = {}
             currdict = currdict[elem]
         try:
-            for tk in dbe:
+            for tk in dbe.keys():
                 currdict[tk] = cPickle.loads(dbe[tk])
         except AttributeError:
             tk = dbe.firstkey()
@@ -1145,9 +1155,9 @@ class ConfigManager(object):
         Returns an identifier that can be used to unsubscribe from these
         notifications using remove_watcher
         """
-        notifierid = random.randint(0, sys.maxint)
+        notifierid = random.randint(0, sys.maxsize)
         while notifierid in self._notifierids:
-            notifierid = random.randint(0, sys.maxint)
+            notifierid = random.randint(0, sys.maxsize)
         self._notifierids[notifierid] = {'attriblist': []}
         if self.tenant not in self._attribwatchers:
             self._attribwatchers[self.tenant] = {}
@@ -1186,9 +1196,9 @@ class ConfigManager(object):
         # use in case of cancellation.
         # I anticipate no more than a handful of watchers of this sort, so
         # this loop should not have to iterate too many times
-        notifierid = random.randint(0, sys.maxint)
+        notifierid = random.randint(0, sys.maxsize)
         while notifierid in self._notifierids:
-            notifierid = random.randint(0, sys.maxint)
+            notifierid = random.randint(0, sys.maxsize)
         # going to track that this is a nodecollection type watcher,
         # but there is no additional data associated.
         self._notifierids[notifierid] = set(['nodecollection'])
@@ -1665,6 +1675,8 @@ class ConfigManager(object):
                                     node, group))
         for group in attribmap:
             group = group.encode('utf-8')
+            if not isinstance(group, str):
+                group = group.decode('utf-8')
             if group not in self._cfgstore['nodegroups']:
                 self._cfgstore['nodegroups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['nodegroups'][group]
@@ -1836,6 +1848,8 @@ class ConfigManager(object):
             # framework to trigger on
             changeset[node] = {'_nodedeleted': 1}
             node = node.encode('utf-8')
+            if not isinstance(node, str):
+                node = node.decode('utf-8')
             if node in self._cfgstore['nodes']:
                 self._sync_groups_to_node(node=node, groups=[],
                                           changeset=changeset)
@@ -2012,6 +2026,8 @@ class ConfigManager(object):
         # this mitigates risk of arguments being partially applied
         for node in attribmap:
             node = node.encode('utf-8')
+            if not isinstance(group, str):
+                node = node.decode('utf-8')
             if node == '':
                 raise ValueError('"{0}" is not a valid node name'.format(node))
             if autocreate:
@@ -2068,6 +2084,8 @@ class ConfigManager(object):
                     attribmap[node][attrname] = attrval
         for node in attribmap:
             node = node.encode('utf-8')
+            if not isinstance(node, str):
+                node = node.decode('utf-8')
             exprmgr = None
             if node not in self._cfgstore['nodes']:
                 newnodes.append(node)
@@ -2248,7 +2266,7 @@ class ConfigManager(object):
         _cfgstore = {}
         rootpath = cls._cfgdir
         try:
-            with open(os.path.join(rootpath, 'transactioncount'), 'r') as f:
+            with open(os.path.join(rootpath, 'transactioncount'), 'rb') as f:
                 txbytes = f.read()
                 if len(txbytes) == 8:
                     _txcount = struct.unpack('!Q', txbytes)[0]
@@ -2306,7 +2324,7 @@ class ConfigManager(object):
             if statelessmode:
                 return
             _mkpath(cls._cfgdir)
-            with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
+            with open(os.path.join(cls._cfgdir, 'transactioncount'), 'wb') as f:
                 f.write(struct.pack('!Q', _txcount))
             if (fullsync or 'dirtyglobals' in _cfgstore and
                     'globals' in _cfgstore):
@@ -2417,7 +2435,9 @@ def _restore_keys(jsond, password, newpassword=None, sync=True):
     else:
         keydata = json.loads(jsond)
     cryptkey = _parse_key(keydata['cryptkey'], password)
-    integritykey = _parse_key(keydata['integritykey'], password)
+    integritykey = None
+    if 'integritykey' in keydata:
+        integritykey = _parse_key(keydata['integritykey'], password)
     conf.init_config()
     cfg = conf.get_config()
     if cfg.has_option('security', 'externalcfgkey'):
@@ -2426,8 +2446,9 @@ def _restore_keys(jsond, password, newpassword=None, sync=True):
             newpassword = keyfile.read()
     set_global('master_privacy_key', _format_key(cryptkey,
                                                  password=newpassword), sync)
-    set_global('master_integrity_key', _format_key(integritykey,
-                                                   password=newpassword), sync)
+    if integritykey:    
+        set_global('master_integrity_key', _format_key(integritykey,
+                                                       password=newpassword), sync)
     _masterkey = cryptkey
     _masterintegritykey = integritykey
     if sync:
