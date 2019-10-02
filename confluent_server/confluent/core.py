@@ -86,7 +86,10 @@ def seek_element(currplace, currkey):
 
 def nested_lookup(nestdict, key):
     try:
-        return reduce(seek_element, key, nestdict)
+        currloc = nestdict
+        for currk in key:
+            currloc = seek_element(currloc, currk)
+        return currloc
     except TypeError:
         raise exc.NotFoundException("Invalid element requested")
 

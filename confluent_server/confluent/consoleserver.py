@@ -94,7 +94,7 @@ def _utf8_normalize(data, shiftin, decoder):
 
 
 def pytechars2line(chars, maxlen=None):
-    line = '\x1b[m'  # start at default params
+    line = b'\x1b[m'  # start at default params
     lb = False  # last bold
     li = False  # last italic
     lu = False  # last underline
@@ -130,9 +130,12 @@ def pytechars2line(chars, maxlen=None):
             csi.append(7 if lr else 27)
         if csi:
             line += b'\x1b[' + b';'.join(['{0}'.format(x) for x in csi]) + b'm'
-        if not hasdata and char.data.encode('utf-8').rstrip():
+        if not hasdata and char.data.rstrip():
             hasdata = True
-        line += char.data.encode('utf-8')
+        chardata = char.data
+        if not isinstance(chardata, bytes):
+            chardata = chardata.encode('utf-8')
+        line += chardata
         if maxlen and len >= maxlen:
             break
         len += 1
@@ -185,7 +188,7 @@ class ConsoleHandler(object):
         if termstate & 1:
             self.appmodedetected = True
         if termstate & 2:
-            self.shiftin = '0'
+            self.shiftin = b'0'
         self.users = {}
         self._attribwatcher = None
         self._console = None
@@ -210,6 +213,8 @@ class ConsoleHandler(object):
         return retrytime + (retrytime * random.random())
 
     def feedbuffer(self, data):
+        if not isinstance(data, bytes):
+            data = data.encode('utf-8')
         try:
             self.termstream.feed(data)
         except StopIteration:  # corrupt parser state, start over
@@ -535,7 +540,7 @@ class ConsoleHandler(object):
             self.appmodedetected = True
         if '\x1b)0' in data:
             # console indicates it wants access to special drawing characters
-            self.shiftin = '0'
+            self.shiftin = b'0'
         eventdata = 0
         if self.appmodedetected:
             eventdata |= 1
@@ -588,20 +593,23 @@ class ConsoleHandler(object):
                 if pendingbl:
                     retdata += pendingbl
                     pendingbl = b''
-                retdata += nline + '\r\n'
+                retdata += nline + b'\r\n'
             else:
-                pendingbl += nline + '\r\n'
+                pendingbl += nline + b'\r\n'
         if len(retdata) >  6:
             retdata = retdata[:-2]  # remove the last \r\n
-        retdata += b'\x1b[{0};{1}H'.format(self.buffer.cursor.y + 1,
-                                           self.buffer.cursor.x + 1)
+        cursordata = '\x1b[{0};{1}H'.format(self.buffer.cursor.y + 1,
+                                            self.buffer.cursor.x + 1)
+        if not isinstance(cursordata, bytes):
+            cursordata = cursordata.encode('utf-8')
+        retdata += cursordata
         if self.shiftin is not None:  # detected that terminal requested a
             # shiftin character set, relay that to the terminal that cannected
-            retdata += '\x1b)' + self.shiftin
+            retdata += b'\x1b)' + self.shiftin
         if self.appmodedetected:
-            retdata += '\x1b[?1h'
+            retdata += b'\x1b[?1h'
         else:
-            retdata += '\x1b[?1l'
+            retdata += b'\x1b[?1l'
         return retdata, connstate
 
     def write(self, data):

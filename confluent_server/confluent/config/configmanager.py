@@ -1826,7 +1826,8 @@ class ConfigManager(object):
                             'nodeattrs': {node: [attrname]},
                             'callback': attribwatcher[watchkey][notifierid]
                         }
-        for watcher in notifdata.itervalues():
+        for watcher in notifdata:
+            watcher = notifdata[watcher]
             callback = watcher['callback']
             eventlet.spawn_n(_do_notifier, self, watcher, callback)
 
@@ -1840,7 +1841,8 @@ class ConfigManager(object):
 
     def _true_del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
-            for watcher in self._nodecollwatchers[self.tenant].itervalues():
+            for watcher in self._nodecollwatchers[self.tenant]:
+                watcher = self._nodecollwatchers[self.tenant][watcher]
                 watcher(added=(), deleting=nodes, renamed=(), configmanager=self)
         changeset = {}
         for node in nodes:
@@ -1968,7 +1970,8 @@ class ConfigManager(object):
             self._recalculate_expressions(cfgobj, formatter=exprmgr, node=renamemap[name], changeset=changeset)
         if self.tenant in self._nodecollwatchers:
             nodecollwatchers = self._nodecollwatchers[self.tenant]
-            for watcher in nodecollwatchers.itervalues():
+            for watcher in nodecollwatchers:
+                watcher = nodecollwatchers[watcher]
                 eventlet.spawn_n(_do_add_watcher, watcher, (), self, renamemap)
         self._bg_sync_to_file()
 
@@ -2026,7 +2029,7 @@ class ConfigManager(object):
         # this mitigates risk of arguments being partially applied
         for node in attribmap:
             node = node.encode('utf-8')
-            if not isinstance(group, str):
+            if not isinstance(node, str):
                 node = node.decode('utf-8')
             if node == '':
                 raise ValueError('"{0}" is not a valid node name'.format(node))
@@ -2128,7 +2131,8 @@ class ConfigManager(object):
         if newnodes:
             if self.tenant in self._nodecollwatchers:
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
-                for watcher in nodecollwatchers.itervalues():
+                for watcher in nodecollwatchers:
+                    watcher = nodecollwatchers[watcher]
                     eventlet.spawn_n(_do_add_watcher, watcher, newnodes, self)
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)

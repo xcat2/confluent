@@ -25,6 +25,11 @@ import itertools
 import pyparsing as pp
 import re
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 # construct custom grammar with pyparsing
 _nodeword = pp.Word(pp.alphanums + '~^$/=-_:.*+!')
 _nodebracket = pp.QuotedString(quoteChar='[', endQuoteChar=']',
@@ -166,7 +171,7 @@ class NodeRange(object):
             return self.failorreturn(seqrange)
         finalfmt = ''
         iterators = []
-        for idx in xrange(len(leftbits)):
+        for idx in range(len(leftbits)):
             if leftbits[idx] == rightbits[idx]:
                 finalfmt += leftbits[idx]
             elif leftbits[idx][0] in pp.alphas:
@@ -181,7 +186,7 @@ class NodeRange(object):
                 if leftnum > rightnum:
                     width = len(rightbits[idx])
                     minnum = rightnum
-                    maxnum = leftnum + 1  # xrange goes to n-1...
+                    maxnum = leftnum + 1  # range goes to n-1...
                 elif rightnum > leftnum:
                     width = len(leftbits[idx])
                     minnum = leftnum
@@ -189,7 +194,7 @@ class NodeRange(object):
                 else:  # differently padded, but same number...
                     return self.failorreturn(seqrange)
                 numformat = '{0:0%d}' % width
-                for num in xrange(minnum, maxnum):
+                for num in range(minnum, maxnum):
                     curseq.append(numformat.format(num))
         results = set([])
         for combo in itertools.product(*iterators):
@@ -222,7 +227,7 @@ class NodeRange(object):
             if self.cfm is None:
                 raise Exception('Verification configmanager required')
             return set(self.cfm.filter_node_attributes(element, filternodes))
-        for idx in xrange(len(element)):
+        for idx in range(len(element)):
             if element[idx][0] == '[':
                 nodes = set([])
                 for numeric in NodeRange(element[idx][1:-1]).nodes:

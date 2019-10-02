@@ -49,7 +49,6 @@ except AttributeError:
     IPPROTO_IPV6 = 41  # Assume Windows value if socket is missing it
 
 
-
 def _parse_slp_header(packet):
     packet = bytearray(packet)
     if len(packet) < 16 or packet[0] != 2:
@@ -247,7 +246,11 @@ def _grab_rsps(socks, rsps, interval, xidmap):
 
 def _parse_attrlist(attrstr):
     attribs = {}
+    previousattrlen = None
     while attrstr:
+        if len(attrstr) == previousattrlen:
+            raise Exception('Looping in attrstr parsing')
+        previousattrlen = len(attrstr)
         if attrstr[0] == '(':
             if b')' not in attrstr:
                 attribs['INCOMPLETE'] = True
@@ -274,9 +277,9 @@ def _parse_attrlist(attrstr):
                         val = finalval
                         if 'uuid' in attrname and len(val) == 16:
                             lebytes = struct.unpack_from(
-                                '<IHH', buffer(val[:8]))
+                                '<IHH', memoryview(val[:8]))
                             bebytes = struct.unpack_from(
-                                '>HHI', buffer(val[8:]))
+                                '>HHI', memoryview(val[8:]))
                             val = '{0:08X}-{1:04X}-{2:04X}-{3:04X}-' \
                                   '{4:04X}{5:08X}'.format(
                                 lebytes[0], lebytes[1], lebytes[2], bebytes[0],
@@ -287,9 +290,9 @@ def _parse_attrlist(attrstr):
         elif attrstr[0] == b','[0]:
             attrstr = attrstr[1:]
         elif b',' in attrstr:
-            currattr = attrstr[:attrstr.index(',')]
+            currattr = attrstr[:attrstr.index(b',')]
             attribs[currattr] = None
-            attrstr = attrstr[attrstr.index(','):]
+            attrstr = attrstr[attrstr.index(b','):]
         else:
             currattr = attrstr
             attribs[currattr] = None

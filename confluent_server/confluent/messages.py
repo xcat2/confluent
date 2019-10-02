@@ -25,6 +25,11 @@ from copy import deepcopy
 from datetime import datetime
 import json
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
 valid_health_values = set([
     'ok',
     'warning',
@@ -54,7 +59,7 @@ def _htmlify_structure(indict):
     if isinstance(indict, dict):
         for key in sorted(indict):
             ret += "<li>{0}: ".format(key)
-            if type(indict[key]) in (str, unicode, float, int):
+            if type(indict[key]) in (bytes, unicode, float, int):
                 ret += str(indict[key])
             elif isinstance(indict[key], datetime):
                 ret += indict[key].strftime('%Y-%m-%dT%H:%M:%S')
@@ -62,7 +67,7 @@ def _htmlify_structure(indict):
                 ret += _htmlify_structure(indict[key])
     elif isinstance(indict, list):
         if len(indict) > 0:
-            if type(indict[0]) in (str, unicode, None):
+            if type(indict[0]) in (bytes, unicode, None):
                 nd = []
                 for datum in indict:
                     if datum is None:
@@ -156,7 +161,7 @@ class ConfluentMessage(object):
                         '<input type="checkbox" name="restexplorerhonorkey" '
                         'value="{1}">\r').format(valtype, key, self.desc)
                 return snippet
-            if (isinstance(val, bool) or isinstance(val, str) or
+            if (isinstance(val, bool) or isinstance(val, bytes) or
                     isinstance(val, unicode)):
                 value = str(val)
             elif val is not None and 'value' in val:
@@ -587,7 +592,7 @@ class InputConfigChangeSet(InputExpression):
         endattrs = {}
         for attr in attrs:
             origval = attrs[attr]
-            if isinstance(origval, str) or isinstance(origval, unicode):
+            if isinstance(origval, bytes) or isinstance(origval, unicode):
                 origval = {'expression': origval}
             if 'expression' not in origval:
                 endattrs[attr] = attrs[attr]
@@ -614,7 +619,7 @@ class InputAttributes(ConfluentMessage):
         if nodes is None:
             self.attribs = inputdata
             for attrib in self.attribs:
-                if type(self.attribs[attrib]) in (str, unicode):
+                if type(self.attribs[attrib]) in (bytes, unicode):
                     try:
                         # ok, try to use format against the string
                         # store back result to the attribute to
@@ -640,7 +645,7 @@ class InputAttributes(ConfluentMessage):
             return {}
         nodeattr = deepcopy(self.nodeattribs[node])
         for attr in nodeattr:
-            if type(nodeattr[attr]) in (str, unicode):
+            if type(nodeattr[attr]) in (bytes, unicode):
                 try:
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
@@ -743,7 +748,7 @@ class InputCredential(ConfluentMessage):
         if len(path) == 4:
             inputdata['uid'] = path[-1]
         # if the operation is 'create' check if all fields are present
-        if (isinstance(inputdata['uid'], str) and
+        if (type(inputdata['uid']) in (bytes, unicode) and
                 not inputdata['uid'].isdigit()):
             inputdata['uid'] = inputdata['uid']
         else:
@@ -769,7 +774,7 @@ class InputCredential(ConfluentMessage):
             return {}
         credential = deepcopy(self.credentials[node])
         for attr in credential:
-            if type(credential[attr]) in (str, unicode):
+            if type(credential[attr]) in (bytes, unicode):
                 try:
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
@@ -1359,7 +1364,7 @@ class AlertDestination(ConfluentMessage):
 
 class InputAlertDestination(ConfluentMessage):
     valid_alert_params = {
-        'acknowledge': lambda x: False if type(x) in (unicode,str) and x.lower() == 'false' else bool(x),
+        'acknowledge': lambda x: False if type(x) in (unicode, bytes) and x.lower() == 'false' else bool(x),
         'acknowledge_timeout': lambda x: int(x) if x and x.isdigit() else None,
         'ip': lambda x: x,
         'retries': lambda x: int(x)
@@ -1573,7 +1578,7 @@ class Attributes(ConfluentMessage):
         nkv = {}
         self.notnode = name is None
         for key in kv:
-            if type(kv[key]) in (str, unicode):
+            if type(kv[key]) in (bytes, unicode):
                 nkv[key] = {'value': kv[key]}
             else:
                 nkv[key] = kv[key]
