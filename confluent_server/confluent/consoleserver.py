@@ -533,12 +533,12 @@ class ConsoleHandler(object):
         elif data == '':
             # ignore empty strings from a cconsole provider
             return
-        if '\x1b[?1l' in data:  # request for ansi mode cursor keys
+        if b'\x1b[?1l' in data:  # request for ansi mode cursor keys
             self.appmodedetected = False
-        if '\x1b[?1h' in data:  # remember the session wants the client to use
+        if b'\x1b[?1h' in data:  # remember the session wants the client to use
             # 'application mode'  Thus far only observed on esxi
             self.appmodedetected = True
-        if '\x1b)0' in data:
+        if b'\x1b)0' in data:
             # console indicates it wants access to special drawing characters
             self.shiftin = b'0'
         eventdata = 0

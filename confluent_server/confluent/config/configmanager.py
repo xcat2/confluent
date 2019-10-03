@@ -472,10 +472,8 @@ def crypt_value(value,
         key = _masterkey
     iv = os.urandom(12)
     crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
-    try:
-        cryptval, hmac = crypter.encrypt_and_digest(value)
-    except TypeError:
-        cryptval, hmac = crypter.encrypt_and_digest(value.encode('utf-8'))
+    value = confluent.util.stringify(value).encode('utf-8')
+    cryptval, hmac = crypter.encrypt_and_digest(value)
     return iv, cryptval, hmac, '\x02'
 
 
@@ -484,16 +482,19 @@ def _load_dict_from_dbm(dpath, tdb):
         dbe = dbm.open(tdb, 'r')
         currdict = _cfgstore
         for elem in dpath:
+            elem = confluent.util.stringify(elem)
             if elem not in currdict:
                 currdict[elem] = {}
             currdict = currdict[elem]
         try:
             for tk in dbe.keys():
-                currdict[tk] = cPickle.loads(dbe[tk])
+                tks = confluent.util.stringify(tk)
+                currdict[tks] = cPickle.loads(dbe[tk])
         except AttributeError:
             tk = dbe.firstkey()
             while tk != None:
-                currdict[tk] = cPickle.loads(dbe[tk])
+                tks = confluent.util.stringify(tk)
+                currdict[tks] = cPickle.loads(dbe[tk])
                 tk = dbe.nextkey(tk)
     except dbm.error:
         return
@@ -532,13 +533,7 @@ def set_global(globalname, value, sync=True):
     """
     if _cfgstore is None:
         init(not sync)
-    try:
-        globalname = globalname.encode('utf-8')
-    except AttributeError:
-        # We have to remove the unicode-ness of the string,
-        # but if it is already bytes in python 3, then we will
-        # get an attributeerror, so pass
-        pass
+    globalname = confluent.util.stringify(globalname)
     with _dirtylock:
         if 'dirtyglobals' not in _cfgstore:
             _cfgstore['dirtyglobals'] = set()
@@ -795,10 +790,7 @@ def apply_pending_collective_updates():
 
 
 def _true_add_collective_member(name, address, fingerprint, sync=True):
-    try:
-        name = name.encode('utf-8')
-    except AttributeError:
-        pass
+    name = confluent.util.stringify(name)
     if _cfgstore is None:
         init(not sync)  # use not sync to avoid read from disk
     if 'collective' not in _cfgstore:
@@ -833,8 +825,7 @@ def get_collective_member_by_address(address):
 
 
 def _mark_dirtykey(category, key, tenant=None):
-    if type(key) in (str, unicode):
-        key = key.encode('utf-8')
+    key = confluent.util.stringify(key)
     with _dirtylock:
         if 'dirtykeys' not in _cfgstore:
             _cfgstore['dirtykeys'] = {}
@@ -1314,7 +1305,7 @@ class ConfigManager(object):
     def _true_create_usergroup(self, groupname, role="Administrator"):
         if 'usergroups' not in self._cfgstore:
             self._cfgstore['usergroups'] = {}
-        groupname = groupname.encode('utf-8')
+        groupname = confluent.util.stringify(groupname)
         if groupname in self._cfgstore['usergroups']:
             raise Exception("Duplicate groupname requested")
         self._cfgstore['usergroups'][groupname] = {'role': role}
@@ -1416,7 +1407,7 @@ class ConfigManager(object):
                 raise Exception("Duplicate id requested")
         if 'users' not in self._cfgstore:
             self._cfgstore['users'] = {}
-        name = name.encode('utf-8')
+        name = confluent.util.stringify(name)
         if name in self._cfgstore['users']:
             raise Exception("Duplicate username requested")
         self._cfgstore['users'][name] = {'id': uid}
@@ -1674,9 +1665,7 @@ class ConfigManager(object):
                                 "{0} node does not exist to add to {1}".format(
                                     node, group))
         for group in attribmap:
-            group = group.encode('utf-8')
-            if not isinstance(group, str):
-                group = group.decode('utf-8')
+            group = confluent.util.stringify(group)
             if group not in self._cfgstore['nodegroups']:
                 self._cfgstore['nodegroups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['nodegroups'][group]
@@ -1734,8 +1723,8 @@ class ConfigManager(object):
         attributes = realattributes
         if type(groups) in (str, unicode):
             groups = (groups,)
-        for group in groups:
-                group = group.encode('utf-8')
+        for group in groups:                
+                group = confluent.util.stringify(group)
                 try:
                     groupentry = self._cfgstore['nodegroups'][group]
                 except KeyError:
@@ -1849,9 +1838,7 @@ class ConfigManager(object):
             # set a reserved attribute for the sake of the change notification
             # framework to trigger on
             changeset[node] = {'_nodedeleted': 1}
-            node = node.encode('utf-8')
-            if not isinstance(node, str):
-                node = node.decode('utf-8')
+            node = confluent.util.stringify(node)
             if node in self._cfgstore['nodes']:
                 self._sync_groups_to_node(node=node, groups=[],
                                           changeset=changeset)
@@ -1899,7 +1886,7 @@ class ConfigManager(object):
                 realattributes.append(attrname)
         attributes = realattributes
         for node in nodes:
-            node = node.encode('utf-8')
+            node = confluent.util.stringify(node)
             try:
                 nodek = self._cfgstore['nodes'][node]
             except KeyError:
@@ -2028,9 +2015,7 @@ class ConfigManager(object):
         # first do a sanity check of the input upfront
         # this mitigates risk of arguments being partially applied
         for node in attribmap:
-            node = node.encode('utf-8')
-            if not isinstance(node, str):
-                node = node.decode('utf-8')
+            node = confluent.util.stringify(node)
             if node == '':
                 raise ValueError('"{0}" is not a valid node name'.format(node))
             if autocreate:
@@ -2085,10 +2070,8 @@ class ConfigManager(object):
                             attrname, node)
                         raise ValueError(errstr)
                     attribmap[node][attrname] = attrval
-        for node in attribmap:
-            node = node.encode('utf-8')
-            if not isinstance(node, str):
-                node = node.decode('utf-8')
+        for node in attribmap:            
+            node = confluent.util.stringify(node)
             exprmgr = None
             if node not in self._cfgstore['nodes']:
                 newnodes.append(node)

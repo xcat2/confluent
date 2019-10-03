@@ -748,7 +748,7 @@ class Logger(object):
         pass
 
     def log(self, logdata=None, ltype=None, event=0, eventdata=None):
-        if type(logdata) not in (str, unicode, dict):
+        if type(logdata) not in (bytes, unicode, dict):
             raise Exception("Unsupported logdata")
         if ltype is None:
             if type(logdata) == dict:

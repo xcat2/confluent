@@ -1689,7 +1689,7 @@ class CryptedAttributes(Attributes):
         # for now, just keep the dictionary keys and discard crypt value
         self.desc = desc
         nkv = {}
-        for key in kv.iterkeys():
+        for key in kv:
             nkv[key] = {'isset': False}
             try:
                 if kv[key] is not None and kv[key]['cryptvalue'] != '':

@@ -134,7 +134,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                             attribute, {}).get('description', ''))
     elif element[-1] == 'current':
         for node in util.natural_sort(list(attributes)):
-            for attribute in sorted(attributes[node].iterkeys()):
+            for attribute in sorted(attributes[node]):
                 currattr = attributes[node][attribute]
                 try:
                     desc = allattributes.node[attribute]['description']
@@ -185,7 +185,7 @@ def update_nodegroup(group, element, configmanager, inputdata):
         return yield_rename_resources(namemap, isnode=False)
     try:
         clearattribs = []
-        for attrib in inputdata.attribs.iterkeys():
+        for attrib in inputdata.attribs:
             if inputdata.attribs[attrib] is None:
                 clearattribs.append(attrib)
         for attrib in clearattribs:
