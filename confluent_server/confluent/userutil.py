@@ -18,6 +18,8 @@ def getgrouplist(name, gid, ng=32):
     _getgrouplist.argtypes = [c_char_p, c_uint, POINTER(c_uint * ng), POINTER(c_int)]
     glist = (c_uint * ng)()
     nglist = c_int(ng)
+    if not isinstance(name, bytes):
+        name = name.encode('utf-8')
     count = _getgrouplist(name, gid, byref(glist), byref(nglist))
     if count < 0:
         raise TooSmallException(nglist.value)
