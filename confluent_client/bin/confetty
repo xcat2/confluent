@@ -89,6 +89,10 @@ except NameError:
 netserver = None
 laststate = {}
 
+try:
+    input = raw_input
+except NameError:
+    pass
 
 class BailOut(Exception):
     def __init__(self, errorcode=0):
@@ -195,9 +199,9 @@ def prompt():
     if os.environ.get('TERM', '') not in ('linux'):
         sys.stdout.write('\x1b]0;confetty: %s\x07' % target)
     try:
-        return raw_input(target + ' -> ')
+        return input(target + ' -> ')
     except KeyboardInterrupt:
-        print ""
+        print("")
         return ""
     except EOFError:  # ctrl-d
         print("exit")
@@ -296,7 +300,7 @@ currchildren = None
 
 def print_result(res):
     if 'errorcode' in res or 'error' in res:
-        print res['error']
+        print(res['error'])
         return
     if 'databynode' in res:
         print_result(res['databynode'])
@@ -309,9 +313,9 @@ def print_result(res):
             attrstr = '%s=%s' % (key, recurse_format(res[key]))
         elif not isinstance(res[key], dict):
             try:
-                print '{0}: {1}'.format(key, res[key])
+                print('{0}: {1}'.format(key, res[key]))
             except UnicodeEncodeError:
-                print '{0}: {1}'.format(key, repr(res[key]))
+                print('{0}: {1}'.format(key, repr(res[key])))
             continue
         elif 'value' in res[key] and res[key]['value'] is not None:
             attrstr = '%s="%s"' % (key, res[key]['value'])
@@ -324,7 +328,7 @@ def print_result(res):
         else:
             sys.stdout.write('{0}: '.format(key))
             if isinstance(res[key], str) or isinstance(res[key], unicode):
-                print res[key]
+                print(res[key])
             else:
                 print_result(res[key])
             continue
@@ -423,10 +427,10 @@ def do_command(command, server):
         for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
-                    print res['item']["href"]
+                    print(res['item']["href"])
                 else:
                     for item in res['item']:
-                        print item["href"]
+                        print(item["href"])
             else:  # generic attributes to list
                 if 'error' in res:
                     sys.stderr.write(res['error'] + '\n')
@@ -851,7 +855,7 @@ def server_connect():
         passphrase = os.environ['CONFLUENT_PASSPHRASE']
         session.authenticate(username, passphrase)
     while not session.authenticated:
-        username = raw_input("Name: ")
+        username = input("Name: ")
         passphrase = getpass.getpass("Passphrase: ")
         session.authenticate(username, passphrase)
 
@@ -871,7 +875,7 @@ def main():
     global inconsole
     try:
         server_connect()
-    except EOFError, KeyboardInterrupt:
+    except (EOFError, KeyboardInterrupt) as _:
         raise BailOut(0)
     except socket.gaierror:
         sys.stderr.write('Could not connect to confluent\n')

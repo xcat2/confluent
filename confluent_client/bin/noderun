@@ -71,7 +71,9 @@ def run():
             exitcode |= exp.get('errorcode', 1)
         ex = exp.get('databynode', ())
         for node in ex:
-            cmd = ex[node]['value'].encode('utf-8')
+            cmd = ex[node]['value']
+            if not isinstance(cmd, bytes) and not isinstance(cmd, str):
+                cmd = cmd.encode('utf-8')
             cmdv = shlex.split(cmd)
             if currprocs < concurrentprocs:
                 currprocs += 1
