@@ -101,6 +101,10 @@ _cfgstore = None
 _pendingchangesets = {}
 _txcount = 0
 _hasquorum = True
+if sys.version_info[0] >= 3:
+    lowestver = 4
+else:
+    lowestver = 2
 
 _attraliases = {
     'bmc': 'hardwaremanagement.manager',
@@ -314,7 +318,7 @@ def exec_on_leader(function, *args):
         xid = os.urandom(8)
     _pendingchangesets[xid] = event.Event()
     rpcpayload = cPickle.dumps({'function': function, 'args': args,
-                                'xid': xid})
+                                'xid': xid}, protocol=cfgproto)
     rpclen = len(rpcpayload)
     cfgleader.sendall(struct.pack('!Q', rpclen))
     cfgleader.sendall(rpcpayload)
@@ -331,7 +335,7 @@ def exec_on_followers(fnname, *args):
     pushes = eventlet.GreenPool()
     _txcount += 1
     payload = cPickle.dumps({'function': fnname, 'args': args,
-                             'txcount': _txcount})
+                             'txcount': _txcount}, protocol=lowestver)
     for res in pushes.starmap(
             _push_rpc, [(cfgstreams[s], payload) for s in cfgstreams]):
         pass
@@ -546,9 +550,14 @@ def set_global(globalname, value, sync=True):
         ConfigManager._bg_sync_to_file()
 
 cfgstreams = {}
-def relay_slaved_requests(name, listener):
+def relay_slaved_requests(name, listener, vers):
     global cfgleader
     global _hasquorum
+    global lowestver
+    if vers > 2 and sys.version_info[0] < 3:
+        vers = 2
+    if vers < lowestver:
+        lowestver = vers    
     pushes = eventlet.GreenPool()
     if name not in _followerlocks:
         _followerlocks[name] = gthread.RLock()
@@ -565,7 +574,7 @@ def relay_slaved_requests(name, listener):
             lh = StreamHandler(listener)
             _hasquorum = len(cfgstreams) >= (
                     len(_cfgstore['collective']) // 2)
-            payload = cPickle.dumps({'quorum': _hasquorum})
+            payload = cPickle.dumps({'quorum': _hasquorum}, protocol=vers)
             for _ in pushes.starmap(
                     _push_rpc,
                     [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -592,7 +601,7 @@ def relay_slaved_requests(name, listener):
                         exc = e
                     if 'xid' in rpc:
                         _push_rpc(listener, cPickle.dumps({'xid': rpc['xid'],
-                                                           'exc': exc}))
+                                                           'exc': exc}, protocol=vers))
                 try:
                     msg = lh.get_next_msg()
                 except Exception:
@@ -609,7 +618,7 @@ def relay_slaved_requests(name, listener):
             if cfgstreams:
                 _hasquorum = len(cfgstreams) >= (
                         len(_cfgstore['collective']) // 2)
-                payload = cPickle.dumps({'quorum': _hasquorum})
+                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=vers)
                 for _ in pushes.starmap(
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -649,15 +658,19 @@ class StreamHandler(object):
         self.sock = None
 
 
-def stop_following(replacement=None):
+def stop_following(replacement=None, proto=2):
     with _leaderlock:
         global cfgleader
+        global cfgproto
         if cfgleader and not isinstance(cfgleader, bool):
             try:
                 cfgleader.close()
             except Exception:
                 pass
         cfgleader = replacement
+        if proto > 2 and sys.version_info[0] < 3:
+            proto = 2
+        cfgproto = proto
 
 def stop_leading():
     for stream in list(cfgstreams):
@@ -715,14 +728,15 @@ def commit_clear():
     ConfigManager._bg_sync_to_file()
 
 cfgleader = None
+cfgproto = 2
 
 
-def follow_channel(channel):
+def follow_channel(channel, proto=2):
     global _txcount
     global _hasquorum
     try:
         stop_leading()
-        stop_following(channel)
+        stop_following(channel, proto)
         lh = StreamHandler(channel)
         msg = lh.get_next_msg()
         while msg:
@@ -2326,7 +2340,7 @@ class ConfigManager(object):
                     for globalkey in dirtyglobals:
                         if globalkey in _cfgstore['globals']:
                             globalf[globalkey] = \
-                                cPickle.dumps(_cfgstore['globals'][globalkey])
+                                cPickle.dumps(_cfgstore['globals'][globalkey], protocol=cPickle.HIGHEST_PROTOCOL)
                         else:
                             if globalkey in globalf:
                                 del globalf[globalkey]
@@ -2345,7 +2359,7 @@ class ConfigManager(object):
                     for coll in colls:
                         if coll in _cfgstore['collective']:
                             collectivef[coll] = cPickle.dumps(
-                                _cfgstore['collective'][coll])
+                                _cfgstore['collective'][coll], protocol=cPickle.HIGHEST_PROTOCOL)
                         else:
                             if coll in collectivef:
                                 del globalf[coll]
@@ -2359,7 +2373,7 @@ class ConfigManager(object):
                     dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
                     try:
                         for ck in currdict[category]:
-                            dbf[ck] = cPickle.dumps(currdict[category][ck])
+                            dbf[ck] = cPickle.dumps(currdict[category][ck], protocol=cPickle.HIGHEST_PROTOCOL)
                     finally:
                         dbf.close()
             elif 'dirtykeys' in _cfgstore:
@@ -2383,7 +2397,7 @@ class ConfigManager(object):
                                     if ck in dbf:
                                         del dbf[ck]
                                 else:
-                                    dbf[ck] = cPickle.dumps(currdict[category][ck])
+                                    dbf[ck] = cPickle.dumps(currdict[category][ck], protocol=cPickle.HIGHEST_PROTOCOL)
                         finally:
                             dbf.close()
         willrun = False

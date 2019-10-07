@@ -687,6 +687,9 @@ def handle_dispatch(connection, cert, dispatch, peername):
             cfm.get_collective_member(peername)['fingerprint'], cert):
         connection.close()
         return
+    pversion = 0
+    if bytearray(dispatch)[0] == 0x80:
+        pversion = bytearray(dispatch)[1]
     dispatch = pickle.loads(dispatch)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
@@ -723,18 +726,18 @@ def handle_dispatch(connection, cert, dispatch, peername):
                 configmanager=configmanager,
                 inputdata=inputdata))
         for res in itertools.chain(*passvalues):
-            _forward_rsp(connection, res)
+            _forward_rsp(connection, res, pversion)
     except Exception as res:
-        _forward_rsp(connection, res)
+        _forward_rsp(connection, res, pversion)
     connection.sendall('\x00\x00\x00\x00\x00\x00\x00\x00')
 
 
-def _forward_rsp(connection, res):
+def _forward_rsp(connection, res, pversion):
     try:
-        r = pickle.dumps(res)
+        r = pickle.dumps(res, protocol=pversion)
     except TypeError:
         r = pickle.dumps(Exception(
-            'Cannot serialize error, check collective.manager error logs for details' + str(res)))
+            'Cannot serialize error, check collective.manager error logs for details' + str(res)), protocol=pversion)
     rlen = len(r)
     if not rlen:
         return
@@ -963,12 +966,20 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     if not util.cert_matches(a['fingerprint'], remote.getpeercert(
             binary_form=True)):
         raise Exception("Invalid certificate on peer")
-    tlvdata.recv(remote)
+    banner = tlvdata.recv(remote)
+    vers = banner.split()[2]
+    if vers == 'v0':
+        pvers = 2
+    elif vers == 'v1':
+        pvers = 4
+    if sys.version_info[0] < 3:
+        pvers = 2
     tlvdata.recv(remote)
     myname = collective.get_myname()
     dreq = pickle.dumps({'name': myname, 'nodes': list(nodes),
                          'path': element,'tenant': configmanager.tenant,
-                         'operation': operation, 'inputdata': inputdata})
+                         'operation': operation, 'inputdata': inputdata},
+                         version=pvers)
     tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
     remote.sendall(dreq)
     while True:

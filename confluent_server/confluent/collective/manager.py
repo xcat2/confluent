@@ -27,6 +27,7 @@ import eventlet.green.ssl as ssl
 import eventlet.green.threading as threading
 import greenlet
 import random
+import sys
 try:
     import OpenSSL.crypto as crypto
 except ImportError:
@@ -70,11 +71,22 @@ def connect_to_leader(cert=None, name=None, leader=None):
         return False
     with connecting:
         with cfm._initlock:
-            tlvdata.recv(remote)  # the banner
+            banner = tlvdata.recv(remote)  # the banner
+            vers = banner.split()[2]
+            pvers = 0
+            reqver = 4
+            if vers == 'v0':
+                pvers = 2
+            elif vers == 'v1':
+                pvers = 4
+            if sys.version_info[0] < 3:
+                pvers = 2
+                reqver = 2
             tlvdata.recv(remote)  # authpassed... 0..
             if name is None:
                 name = get_myname()
             tlvdata.send(remote, {'collective': {'operation': 'connect',
+                                                 'protover': reqver,
                                                  'name': name,
                                                  'txcount': cfm._txcount}})
             keydata = tlvdata.recv(remote)
@@ -148,15 +160,15 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 raise
             currentleader = leader
         #spawn this as a thread...
-        follower = eventlet.spawn(follow_leader, remote)
+        follower = eventlet.spawn(follow_leader, remote, pvers)
     return True
 
 
-def follow_leader(remote):
+def follow_leader(remote, proto):
     global currentleader
     cleanexit = False
     try:
-        cfm.follow_channel(remote)
+        cfm.follow_channel(remote, proto)
     except greenlet.GreenletExit:
         cleanexit = True
     finally:
@@ -402,6 +414,7 @@ def handle_connection(connection, cert, request, local=False):
         tlvdata.send(connection, collinfo)
     if 'connect' == operation:
         drone = request['name']
+        folver = request.get('protover', 2)
         droneinfo = cfm.get_collective_member(drone)
         if not (droneinfo and util.cert_matches(droneinfo['fingerprint'],
                                                 cert)):
@@ -450,7 +463,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
-        if not cfm.relay_slaved_requests(drone, connection):
+        if not cfm.relay_slaved_requests(drone, connection, folver):
             if not retrythread:  # start a recovery if everyone else seems
                 # to have disappeared
                 retrythread = eventlet.spawn_after(30 + random.random(),
