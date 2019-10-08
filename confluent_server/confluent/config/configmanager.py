@@ -2247,7 +2247,7 @@ class ConfigManager(object):
                                 target = dumpdata[confarea][element][attribute]['cryptvalue']
                             cryptval = []
                             for value in target:
-                                cryptval.append(base64.b64encode(value))
+                                cryptval.append(confluent.util.stringify(base64.b64encode(value)))
                             if attribute == 'cryptpass':
                                 dumpdata[confarea][element][attribute] = '!'.join(cryptval)
                             else:
