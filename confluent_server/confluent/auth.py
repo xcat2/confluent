@@ -122,8 +122,8 @@ def _get_usertenant(name, tenant=False):
     if not isinstance(tenant, bool):
         # if not boolean, it must be explicit tenant
         user = name
-    elif '/' in name:  # tenant scoped name
-        tenant, user = name.split('/', 1)
+    elif b'/' in name:  # tenant scoped name
+        tenant, user = name.split(b'/', 1)
     elif configmanager.is_tenant(name):
         # the account is the implicit tenant owner account
         user = name

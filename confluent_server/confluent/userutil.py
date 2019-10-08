@@ -1,5 +1,6 @@
 from ctypes import *
 from ctypes.util import find_library
+import confluent.util as util
 import grp
 import pwd
 import os
@@ -29,6 +30,7 @@ def getgrouplist(name, gid, ng=32):
 
 
 def grouplist(username):
+    username = util.stringify(username)
     pent = pwd.getpwnam(username)
     try:
         groups = getgrouplist(pent.pw_name, pent.pw_gid)

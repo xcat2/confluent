@@ -126,14 +126,14 @@ class ConfluentMessage(object):
             return self._generic_html_value(self.kvpairs)
         if not self.stripped:
             htmlout = ''
-            for node in self.kvpairs.iterkeys():
+            for node in self.kvpairs:
                 htmlout += '{0}:{1}\n'.format(
                     node, self._generic_html_value(self.kvpairs[node]))
             return htmlout
 
     def _generic_html_value(self, pairs):
         snippet = ""
-        for key in pairs.iterkeys():
+        for key in pairs:
             val = pairs[key]
             value = self.defaultvalue
             if isinstance(val, dict) and 'type' in val:
@@ -326,14 +326,14 @@ class ConfluentChoiceMessage(ConfluentMessage):
             return self._create_option(self.kvpairs)
         else:
             htmlout = ''
-            for node in self.kvpairs.iterkeys():
+            for node in self.kvpairs:
                 htmlout += '{0}:{1}\n'.format(
                     node, self._create_option(self.kvpairs[node]))
             return htmlout
 
     def _create_option(self, pairdata):
         snippet = ''
-        for key in pairdata.iterkeys():
+        for key in pairdata:
             val = pairdata[key]
             snippet += key + ':<select name="%s">' % key
             valid_values = self.valid_values
