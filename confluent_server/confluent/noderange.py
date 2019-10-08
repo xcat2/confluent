@@ -162,7 +162,7 @@ class NodeRange(object):
         pieces = seqrange.split(delimiter)
         if len(pieces) % 2 != 0:
             return self.failorreturn(seqrange)
-        halflen = len(pieces) / 2
+        halflen = len(pieces) // 2
         left = delimiter.join(pieces[:halflen])
         right = delimiter.join(pieces[halflen:])
         leftbits = _numextractor.parseString(left).asList()

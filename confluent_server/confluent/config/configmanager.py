@@ -313,9 +313,9 @@ def check_quorum():
 def exec_on_leader(function, *args):
     if isinstance(cfgleader, bool):
         raise exc.DegradedCollective()
-    xid = os.urandom(8)
+    xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     while xid in _pendingchangesets:
-        xid = os.urandom(8)
+        xid = confluent.util.stringify(base64.b64encode(os.urandom(8))
     _pendingchangesets[xid] = event.Event()
     rpcpayload = cPickle.dumps({'function': function, 'args': args,
                                 'xid': xid}, protocol=cfgproto)
@@ -742,7 +742,7 @@ def follow_channel(channel, proto=2):
         while msg:
             sz = struct.unpack('!Q', msg)[0]
             if sz != 0:
-                rpc = ''
+                rpc = b''
                 while len(rpc) < sz:
                     nrpc = channel.recv(sz - len(rpc))
                     if not nrpc:

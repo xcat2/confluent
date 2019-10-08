@@ -63,8 +63,10 @@ import itertools
 import os
 try:
     import cPickle as pickle
+    pargs = {}
 except ImportError:
     import pickle
+    pargs = {'encoding': 'utf-8'}
 import socket
 import struct
 import sys
@@ -690,7 +692,7 @@ def handle_dispatch(connection, cert, dispatch, peername):
     pversion = 0
     if bytearray(dispatch)[0] == 0x80:
         pversion = bytearray(dispatch)[1]
-    dispatch = pickle.loads(dispatch)
+    dispatch = pickle.loads(dispatch, **pargs)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
     inputdata = dispatch['inputdata']
@@ -968,9 +970,9 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
         raise Exception("Invalid certificate on peer")
     banner = tlvdata.recv(remote)
     vers = banner.split()[2]
-    if vers == 'v0':
+    if vers == b'v0':
         pvers = 2
-    elif vers == 'v1':
+    elif vers == b'v1':
         pvers = 4
     if sys.version_info[0] < 3:
         pvers = 2
@@ -979,7 +981,7 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     dreq = pickle.dumps({'name': myname, 'nodes': list(nodes),
                          'path': element,'tenant': configmanager.tenant,
                          'operation': operation, 'inputdata': inputdata},
-                         version=pvers)
+                         protocol=pvers)
     tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
     remote.sendall(dreq)
     while True:
@@ -1026,7 +1028,7 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
                             a['name']))
                 return
             rsp += nrsp
-        rsp = pickle.loads(rsp)
+        rsp = pickle.loads(rsp, **pargs)
         if isinstance(rsp, Exception):
             raise rsp
         yield rsp

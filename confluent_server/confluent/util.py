@@ -109,7 +109,7 @@ def monotonic_time():
 
 
 def get_certificate_from_file(certfile):
-    cert = open(certfile, 'rb').read()
+    cert = open(certfile, 'r').read()
     inpemcert = False
     prunedcert = ''
     for line in cert.split('\n'):

@@ -75,9 +75,9 @@ def connect_to_leader(cert=None, name=None, leader=None):
             vers = banner.split()[2]
             pvers = 0
             reqver = 4
-            if vers == 'v0':
+            if vers == b'v0':
                 pvers = 2
-            elif vers == 'v1':
+            elif vers == b'v1':
                 pvers = 4
             if sys.version_info[0] < 3:
                 pvers = 2
@@ -131,7 +131,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
             globaldata = tlvdata.recv(remote)
             dbi = tlvdata.recv(remote)
             dbsize = dbi['dbsize']
-            dbjson = ''
+            dbjson = b''
             while (len(dbjson) < dbsize):
                 ndata = remote.recv(dbsize - len(dbjson))
                 if not ndata:
@@ -279,7 +279,8 @@ def handle_connection(connection, cert, request, local=False):
             invitation = request['invitation']
             try:
                 invitation = base64.b64decode(invitation)
-                name, invitation = invitation.split('@', 1)
+                name, invitation = invitation.split(b'@', 1)
+                name = util.stringify(name)
             except Exception:
                 tlvdata.send(
                     connection,

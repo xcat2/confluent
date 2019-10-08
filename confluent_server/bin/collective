@@ -61,7 +61,7 @@ def join_collective(server, invitation):
         make_certificate()
     s = client.Command().connection
     while not invitation:
-        invitation = raw_input('Paste the invitation here: ')
+        invitation = input('Paste the invitation here: ')
     tlvdata.send(s, {'collective': {'operation': 'join',
                                     'invitation': invitation,
                                     'server': server}})

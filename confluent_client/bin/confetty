@@ -933,6 +933,7 @@ def main():
                         updatestatus(data)
                         continue
                     if data is not None:
+                        data = client.stringify(data)
                         if clearpowermessage:
                             sys.stdout.write("\x1b[2J\x1b[;H")
                             clearpowermessage = False
