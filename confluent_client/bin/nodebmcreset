@@ -56,7 +56,7 @@ for node in session.read('/noderange/{0}/nodes/'.format(noderange)):
 goodNodes = allNodes - errorNodes
 
 for node in goodNodes:
-    print node + ": BMC Reset Successful"
+    print(node + ": BMC Reset Successful")
 
 
 sys.exit(success)
