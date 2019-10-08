@@ -2461,20 +2461,21 @@ def _dump_keys(password, dojson=True):
         init_masterkey()
     cryptkey = _format_key(_masterkey, password=password)
     if 'passphraseprotected' in cryptkey:
-        cryptkey = '!'.join(map(base64.b64encode,
-                                cryptkey['passphraseprotected']))
+        cryptkey = '!'.join(
+            [confluent.util.stringify(base64.b64encode(x))
+             for x in cryptkey['passphraseprotected']])
     else:
-        cryptkey = '*unencrypted:{0}'.format(base64.b64encode(
-            cryptkey['unencryptedvalue']))
+        cryptkey = '*unencrypted:{0}'.format(confluent.util.stringify(base64.b64encode(
+            cryptkey['unencryptedvalue'])))
     keydata = {'cryptkey': cryptkey}
     if _masterintegritykey is not None:
         integritykey = _format_key(_masterintegritykey, password=password)
         if 'passphraseprotected' in integritykey:
-            integritykey = '!'.join(map(base64.b64encode,
-                                        integritykey['passphraseprotected']))
+            integritykey = '!'.join([confluent.util.stringify(base64.b64encode(x)) for x in
+                                        integritykey['passphraseprotected']])
         else:
-            integritykey = '*unencrypted:{0}'.format(base64.b64encode(
-                integritykey['unencryptedvalue']))
+            integritykey = '*unencrypted:{0}'.format(confluent.util.stringify(base64.b64encode(
+                integritykey['unencryptedvalue'])))
         keydata['integritykey'] = integritykey
     if dojson:
         return json.dumps(keydata, sort_keys=True, indent=4, separators=(',', ': '))
