@@ -22,7 +22,7 @@ except NameError:
     pass
 
 def make_certificate():
-    umask = os.umask(0077)
+    umask = os.umask(0o77)
     try:
         os.makedirs('/etc/confluent/cfg')
     except OSError as e:
