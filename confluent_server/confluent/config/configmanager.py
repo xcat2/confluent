@@ -315,7 +315,7 @@ def exec_on_leader(function, *args):
         raise exc.DegradedCollective()
     xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     while xid in _pendingchangesets:
-        xid = confluent.util.stringify(base64.b64encode(os.urandom(8))
+        xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     _pendingchangesets[xid] = event.Event()
     rpcpayload = cPickle.dumps({'function': function, 'args': args,
                                 'xid': xid}, protocol=cfgproto)
