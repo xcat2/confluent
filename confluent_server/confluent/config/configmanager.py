@@ -405,12 +405,12 @@ def decrypt_value(cryptvalue,
             raise Exception("bad HMAC value on crypted value")
         decrypter = AES.new(key, AES.MODE_CBC, iv)
         value = decrypter.decrypt(cipherdata)
-        padsize = ord(value[-1])
+        padsize = bytearray(value)[-1]
         pad = value[-padsize:]
         # Note that I cannot grasp what could be done with a subliminal
         # channel in padding in this case, but check the padding anyway
-        for padbyte in pad:
-            if ord(padbyte) != padsize:
+        for padbyte in bytearray(pad):
+            if padbyte != padsize:
                 raise Exception("bad padding in encrypted value")
         return value[0:-padsize]
     else:
