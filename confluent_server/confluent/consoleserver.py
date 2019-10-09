@@ -531,9 +531,11 @@ class ConsoleHandler(object):
             if data == conapi.ConsoleEvent.Disconnect:
                 self._got_disconnected()
             return
-        elif data == '':
+        elif data in (b'', u''):
             # ignore empty strings from a cconsole provider
             return
+        if not isinstance(data, bytes):
+            data = data.encode('utf-8')
         if b'\x1b[?1l' in data:  # request for ansi mode cursor keys
             self.appmodedetected = False
         if b'\x1b[?1h' in data:  # remember the session wants the client to use
@@ -616,6 +618,8 @@ class ConsoleHandler(object):
     def write(self, data):
         if self.connectstate == 'connected':
             try:
+                if isinstance(data, str) and not isinstance(data, bytes):
+                    data = data.encode('utf-8')
                 self._console.write(data)
             except Exception:
                 _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,

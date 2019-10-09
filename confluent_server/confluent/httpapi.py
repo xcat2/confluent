@@ -499,7 +499,7 @@ def resourcehandler_backend(env, start_response):
             auditmsg = {
                 'operation': 'start',
                 'target': env['PATH_INFO'],
-                'user': authorized['username'],
+                'user': util.stringify(authorized['username']),
             }
             if 'tenant' in authorized:
                 auditmsg['tenant'] = authorized['tenant']
