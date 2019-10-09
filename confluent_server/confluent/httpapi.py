@@ -452,6 +452,8 @@ def resourcehandler_backend(env, start_response):
                             httpsessions[authorized['sessionid']]['inflight'])):
                 pagecontent += rsp
             start_response("200 OK", headers)
+            if not isinstance(pagecontent, bytes):
+                pagecontent = pagecontent.encode('utf-8')
             yield pagecontent
             return
         except exc.ConfluentException as e:
@@ -654,6 +656,8 @@ def resourcehandler_backend(env, start_response):
                 for datum in _assemble_json(hdlr, resource, url, extension):
                     pagecontent += datum
             start_response('200 OK', headers)
+            if not isinstance(pagecontent, bytes):
+                pagecontent = pagecontent.encode('utf-8')
             yield pagecontent
         except exc.ConfluentException as e:
             if ((not isinstance(e, exc.LockedCredentials)) and
