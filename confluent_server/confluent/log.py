@@ -600,7 +600,11 @@ class Logger(object):
                     if ltype == 2:
                         textrecord = data
                     else:
-                        textrecord = textdate + data + ']'
+                        if not isinstance(textdate, bytes):
+                            textdate = textdate.encode('utf-8')
+                        if not isinstance(data, bytes):
+                            data = data.encode('utf-8')
+                        textrecord = textdate + data + b']'
                 else:
                     textrecord = textdate + data
                     if not textrecord.endswith('\n'):
