@@ -106,7 +106,7 @@ def pytechars2line(chars, maxlen=None):
     len = 1
     for charidx in range(maxlen):
         char = chars[charidx]
-        csi = []
+        csi = bytearray([])
         if char.fg != lfg:
             csi.append(30 + pytecolors2ansi[char.fg])
             lfg = char.fg
@@ -129,7 +129,7 @@ def pytechars2line(chars, maxlen=None):
             lr = char.reverse
             csi.append(7 if lr else 27)
         if csi:
-            line += b'\x1b[' + b';'.join(['{0}'.format(x) for x in csi]) + b'm'
+            line += b'\x1b[' + b';'.join(['{0}'.format(x).encode('utf-8') for x in csi]) + b'm'
         if not hasdata and char.data.rstrip():
             hasdata = True
         chardata = char.data
