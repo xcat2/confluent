@@ -247,27 +247,22 @@ def _grab_rsps(socks, rsps, interval, xidmap):
 def _parse_attrlist(attrstr):
     attribs = {}
     previousattrlen = None
+    attrstr = util.stringify(attrstr)
     while attrstr:
         if len(attrstr) == previousattrlen:
             raise Exception('Looping in attrstr parsing')
         previousattrlen = len(attrstr)
         if attrstr[0] == '(':
-            if b')' not in attrstr:
+            if ')' not in attrstr:
                 attribs['INCOMPLETE'] = True
                 return attribs
-            currattr = attrstr[1:attrstr.index(b')')]
-            if b'=' not in currattr:  # Not allegedly kosher, but still..
-                currattr = currattr.decode('utf-8')
+            currattr = attrstr[1:attrstr.index(')')]
+            if '=' not in currattr:  # Not allegedly kosher, but still..
                 attribs[currattr] = None
             else:
                 attrname, attrval = currattr.split('=', 1)
-                attrname = attrname.decode('utf-8')
                 attribs[attrname] = []
-                for val in attrval.split(b','):
-                    try:
-                        val = val.decode('utf-8')
-                    except UnicodeDecodeError:
-                        val = '*DECODEERROR*'
+                for val in attrval.split(','):
                     if val[:3] == '\\FF':  # we should make this bytes
                         finalval = bytearray([])
                         for bnum in attrval[3:].split('\\'):
@@ -287,12 +282,12 @@ def _parse_attrlist(attrstr):
                             ).lower()
                     attribs[attrname].append(val)
             attrstr = attrstr[attrstr.index(')'):]
-        elif attrstr[0] == b','[0]:
+        elif attrstr[0] == ','[0]:
             attrstr = attrstr[1:]
-        elif b',' in attrstr:
-            currattr = attrstr[:attrstr.index(b',')]
+        elif ',' in attrstr:
+            currattr = attrstr[:attrstr.index(',')]
             attribs[currattr] = None
-            attrstr = attrstr[attrstr.index(b','):]
+            attrstr = attrstr[attrstr.index(','):]
         else:
             currattr = attrstr
             attribs[currattr] = None

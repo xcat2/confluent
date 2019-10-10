@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import codecs
 import confluent.discovery.handlers.bmc as bmchandler
 import confluent.exceptions as exc
 import eventlet
@@ -20,6 +21,7 @@ import struct
 import urllib
 import eventlet.support.greendns
 import confluent.netutil as netutil
+import confluent.util as util
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 from xml.etree.ElementTree import fromstring
@@ -27,8 +29,9 @@ from xml.etree.ElementTree import fromstring
 def fixuuid(baduuid):
     # SMM dumps it out in hex
     uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
-    a = struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]).encode(
+    a = codecs.encode(struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]),
         'hex')
+    a = util.stringify(a)
     uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
     return '-'.join(uuid).lower()
 

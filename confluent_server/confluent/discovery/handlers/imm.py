@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import codecs
 import confluent.discovery.handlers.bmc as bmchandler
 import pyghmi.exceptions as pygexc
 import pyghmi.ipmi.private.util as pygutil
+import confluent.util as util
 import struct
 
 class NodeHandler(bmchandler.NodeHandler):
@@ -37,8 +39,9 @@ class NodeHandler(bmchandler.NodeHandler):
         if wronguuid:
             # we need to fix the first three portions of the uuid
             uuidprefix = wronguuid.split('-')[:3]
-            uuidprefix = struct.pack(
-                '<IHH', *[int(x, 16) for x in uuidprefix]).encode('hex')
+            uuidprefix = codecs.encode(struct.pack(
+                '<IHH', *[int(x, 16) for x in uuidprefix]), 'hex')
+            uuidprefix = util.stringify(uuidprefix)
             uuidprefix = uuidprefix[:8] + '-' + uuidprefix[8:12] + '-' + \
                          uuidprefix[12:16]
             self.info['uuid'] = uuidprefix + '-' + '-'.join(

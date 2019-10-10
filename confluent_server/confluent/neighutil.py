@@ -18,6 +18,7 @@
 # Ultimately, this should use AF_NETLINK, but in the interest of time,
 # use ip neigh for the moment
 
+import confluent.util as util
 import eventlet.green.subprocess as subprocess
 import os
 
@@ -26,7 +27,7 @@ neightime = 0
 
 import re
 
-_validmac = re.compile(b'..:..:..:..:..:..')
+_validmac = re.compile('..:..:..:..:..:..')
 
 
 def update_neigh():
@@ -39,11 +40,12 @@ def update_neigh():
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
     (neighdata, err) = ipn.communicate()
-    for entry in neighdata.split(b'\n'):
-        entry = entry.split(b' ')
+    neighdata = util.stringify(neighdata)
+    for entry in neighdata.split('\n'):
+        entry = entry.split(' ')
         if len(entry) < 5 or not entry[4]:
             continue
-        if entry[0] in (b'192.168.0.100', b'192.168.70.100', b'192.168.70.125'):
+        if entry[0] in ('192.168.0.100', '192.168.70.100', '192.168.70.125'):
             # Note that these addresses are common static ip addresses
             # that are hopelessly ambiguous if there are many
             # so ignore such entries and move on
