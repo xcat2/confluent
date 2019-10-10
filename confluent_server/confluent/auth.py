@@ -119,6 +119,8 @@ def _get_usertenant(name, tenant=False):
     administrator account a tenant gets.
     Otherwise, just assume a user in the default tenant
     """
+    if not isinstance(name, bytes):
+        name = name.encode('utf-8')
     if not isinstance(tenant, bool):
         # if not boolean, it must be explicit tenant
         user = name
