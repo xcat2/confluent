@@ -127,8 +127,8 @@ class NodeHandler(immhandler.NodeHandler):
                 raise
             return (None, None)
         pwdchanged = False
-        adata = json.dumps({'username': username,
-                            'password': password
+        adata = json.dumps({'username': util.stringify(username),
+                            'password': util.stringify(password)
                             })
         headers = {'Connection': 'keep-alive',
                    'Content-Type': 'application/json'}
@@ -291,6 +291,8 @@ class NodeHandler(immhandler.NodeHandler):
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         curruser = None
         uid = None
+        user = util.stringify(user)
+        passwd = util.stringify(passwd)
         for userent in userinfo['items'][0]['users']:
             if userent['users_user_name'] == user:
                 curruser = userent
