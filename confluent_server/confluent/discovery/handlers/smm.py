@@ -18,7 +18,10 @@ import confluent.exceptions as exc
 import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 import struct
-import urllib
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
 import eventlet.support.greendns
 import confluent.netutil as netutil
 import confluent.util as util
@@ -113,16 +116,16 @@ class NodeHandler(bmchandler.NodeHandler):
             'password': 'PASSW0RD',
         }
         headers = {'Connection': 'keep-alive', 'Content-Type': 'application/x-www-form-urlencoded'}
-        wc.request('POST', '/data/login', urllib.urlencode(authdata), headers)
+        wc.request('POST', '/data/login', urlencode(authdata), headers)
         rsp = wc.getresponse()
-        rspdata = rsp.read()
+        rspdata = util.stringify(rsp.read())
         if 'authResult>0' not in rspdata:
             # default credentials are refused, try with the actual
             authdata['user'] = username
             authdata['password'] = password
-            wc.request('POST', '/data/login', urllib.urlencode(authdata), headers)
+            wc.request('POST', '/data/login', urlencode(authdata), headers)
             rsp = wc.getresponse()
-            rspdata = rsp.read()
+            rspdata = util.stringify(rsp.read())
             if 'renew_account' in rspdata:
                 raise Exception('Configured password has expired')
             if 'authResult>0' not in rspdata:
@@ -136,11 +139,11 @@ class NodeHandler(bmchandler.NodeHandler):
             tokens = fromstring(rspdata)
             st2 = tokens.findall('st2')[0].text
             wc.set_header('ST2', st2)
-            wc.request('POST', '/data/changepwd', urllib.urlencode(passwdchange))
+            wc.request('POST', '/data/changepwd', urlencode(passwdchange))
             rsp = wc.getresponse()
             rspdata = rsp.read()
             authdata['password'] = password
-            wc.request('POST', '/data/login', urllib.urlencode(authdata), headers)
+            wc.request('POST', '/data/login', urlencode(authdata), headers)
             rsp = wc.getresponse()
             rspdata = rsp.read()
         if 'authResult>0' in rspdata:
@@ -156,7 +159,7 @@ class NodeHandler(bmchandler.NodeHandler):
             rsp = wc.getresponse()
             rspdata = rsp.read()
             authdata['user'] = username
-            wc.request('POST', '/data/login', urllib.urlencode(authdata, headers))
+            wc.request('POST', '/data/login', urlencode(authdata, headers))
             rsp = wc.getresponse()
             rspdata = rsp.read()
             tokens = fromstring(rspdata)
