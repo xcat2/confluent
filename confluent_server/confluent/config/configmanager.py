@@ -780,6 +780,30 @@ def add_collective_member(name, address, fingerprint):
         exec_on_followers('_true_add_collective_member', name, address, fingerprint)
     _true_add_collective_member(name, address, fingerprint)
 
+def del_collective_member(name):
+    if cfgleader:
+        return exec_on_leader('add_collective_member', name)
+    if cfgstreams:
+        exec_on_followers('_true_add_collective_member', name)
+    _true_del_collective_member(name)
+
+def _true_del_collective_member(name, sync=True):
+    name = confluent.util.stringify(name)
+    if _cfgstore is None:
+        return
+    if 'collective' not in _cfgstore:
+        return
+    if name not in _cfgstore['collective']:
+        return
+    del _cfgstore['collective'][name]
+    with _dirtylock:
+        if 'collectivedirty' not in _cfgstore:
+            _cfgstore['collectivedirty'] = set([])
+        _cfgstore['collectivedirty'].add(name)
+    if sync:
+        ConfigManager._bg_sync_to_file()
+
+
 _pending_collective_updates = {}
 
 
