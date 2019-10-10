@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2018 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -222,6 +222,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
             auditmsg['tenant'] = authdata[3]
     auditmsg['allowed'] = True
     if _should_authlog(path, operation):
+        tlvdata.unicode_dictvalues(auditmsg)
         auditlog.log(auditmsg)
     try:
         if operation == 'start':
