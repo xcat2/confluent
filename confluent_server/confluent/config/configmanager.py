@@ -328,15 +328,19 @@ def exec_on_leader(function, *args):
 
 
 def exec_on_followers(fnname, *args):
-    global _txcount
     if len(cfgstreams) < (len(_cfgstore['collective']) // 2):
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
+    exec_on_followers_unconditional(fnname, *args)
+
+
+def exec_on_followers_unconditional(fnname, *args):
+    global _txcount
     pushes = eventlet.GreenPool()
     _txcount += 1
     payload = cPickle.dumps({'function': fnname, 'args': args,
                              'txcount': _txcount}, protocol=lowestver)
-    for res in pushes.starmap(
+    for _ in pushes.starmap(
             _push_rpc, [(cfgstreams[s], payload) for s in cfgstreams]):
         pass
 
@@ -781,13 +785,14 @@ def add_collective_member(name, address, fingerprint):
     _true_add_collective_member(name, address, fingerprint)
 
 def del_collective_member(name):
-    if cfgleader:
-        return exec_on_leader('add_collective_member', name)
+    if cfgleader and not isinstance(cfgleader, bool):
+        return exec_on_leader('del_collective_member', name)
     if cfgstreams:
-        exec_on_followers('_true_add_collective_member', name)
+        exec_on_followers_unconditional('_true_del_collective_member', name)
     _true_del_collective_member(name)
 
 def _true_del_collective_member(name, sync=True):
+    global cfgleader
     name = confluent.util.stringify(name)
     if _cfgstore is None:
         return
@@ -800,6 +805,9 @@ def _true_del_collective_member(name, sync=True):
         if 'collectivedirty' not in _cfgstore:
             _cfgstore['collectivedirty'] = set([])
         _cfgstore['collectivedirty'].add(name)
+    if len(_cfgstore['collective']) < 2:
+        del _cfgstore['collective']
+        cfgleader = None
     if sync:
         ConfigManager._bg_sync_to_file()
 
@@ -2371,24 +2379,30 @@ class ConfigManager(object):
                 finally:
                     globalf.close()
             if fullsync or 'collectivedirty' in _cfgstore:
-                collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
-                                       'c', 384)
-                try:
-                    if fullsync:
-                        colls = _cfgstore['collective']
-                    else:
-                        with _dirtylock:
-                            colls = copy.deepcopy(_cfgstore['collectivedirty'])
-                            del _cfgstore['collectivedirty']
-                    for coll in colls:
-                        if coll in _cfgstore['collective']:
-                            collectivef[coll] = cPickle.dumps(
-                                _cfgstore['collective'][coll], protocol=cPickle.HIGHEST_PROTOCOL)
+                if len(_cfgstore.get('collective', ())) > 1:
+                    collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
+                                        'c', 384)
+                    try:
+                        if fullsync:
+                            colls = _cfgstore['collective']
                         else:
-                            if coll in collectivef:
-                                del globalf[coll]
-                finally:
-                    collectivef.close()
+                            with _dirtylock:
+                                colls = copy.deepcopy(_cfgstore['collectivedirty'])
+                                del _cfgstore['collectivedirty']
+                        for coll in colls:
+                            if coll in _cfgstore['collective']:
+                                collectivef[coll] = cPickle.dumps(
+                                    _cfgstore['collective'][coll], protocol=cPickle.HIGHEST_PROTOCOL)
+                            else:
+                                if coll in collectivef:
+                                    del collectivef[coll]
+                    finally:
+                        collectivef.close()
+                else:
+                    try:
+                        os.remove(os.path.join(cls._cfgdir, "collective"))
+                    except OSError:
+                        pass
             if fullsync:
                 pathname = cls._cfgdir
                 currdict = _cfgstore['main']

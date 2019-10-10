@@ -220,8 +220,7 @@ def handle_connection(connection, cert, request, local=False):
     else:
         if not local:
             return
-
-        if 'show' == operation:
+        if operation in ('show', 'delete'):
             if not list(cfm.list_collective()):
                 tlvdata.send(connection,
                              {'collective': {'error': 'Collective mode not '
@@ -258,7 +257,23 @@ def handle_connection(connection, cert, request, local=False):
                 collinfo['quorum'] = True
             except exc.DegradedCollective:
                 collinfo['quorum'] = False
-            tlvdata.send(connection, {'collective':  collinfo})
+            if operation == 'show':
+                tlvdata.send(connection, {'collective':  collinfo})
+            elif operation == 'delete':
+                todelete = request['member']
+                if (todelete == collinfo['leader'] or 
+                       todelete in collinfo['active']):
+                    tlvdata.send(connection, {'collective':
+                            {'error': '{0} is still active, stop the confluent service to remove it'.format(todelete)}})
+                    return
+                if todelete not in collinfo['offline']:
+                    tlvdata.send(connection, {'collective':
+                            {'error': '{0} is not a recognized collective member'.format(todelete)}})
+                    return
+                cfm.del_collective_member(todelete)
+                tlvdata.send(connection,
+                    {'collective': {'status': 'Successfully deleted {0}'.format(todelete)}})
+                connection.close()
             return
         if 'invite' == operation:
             try:
