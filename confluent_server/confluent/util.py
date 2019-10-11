@@ -31,7 +31,7 @@ def stringify(instr):
     # Normalize unicode and bytes to 'str', correcting for
     # current python version
     if isinstance(instr, bytes) and not isinstance(instr, str):
-        return instr.decode('utf-8')
+        return instr.decode('utf-8', errors='replace')
     elif not isinstance(instr, bytes) and not isinstance(instr, str):
         return instr.encode('utf-8')
     return instr
