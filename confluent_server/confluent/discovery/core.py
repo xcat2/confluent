@@ -1207,6 +1207,7 @@ def rescan():
 def start_detection():
     global attribwatcher
     global rechecker
+    global rechecktime
     _map_unique_ids()
     cfg = cfm.ConfigManager(None)
     allnodes = cfg.list_nodes()
