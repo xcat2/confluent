@@ -591,7 +591,7 @@ def relay_slaved_requests(name, listener, vers):
                     raise Exception("Unexpected loss of node in followers: " + name)
                 sz = struct.unpack('!Q', msg)[0]
                 if sz != 0:
-                    rpc = ''
+                    rpc = b''
                     while len(rpc) < sz:
                         nrpc = listener.recv(sz - len(rpc))
                         if not nrpc:
