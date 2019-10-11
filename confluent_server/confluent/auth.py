@@ -28,6 +28,7 @@ import hashlib
 import hmac
 import multiprocessing
 import confluent.userutil as userutil
+import confluent.util as util
 pam = None
 try:
     import confluent.pam as pam
@@ -133,6 +134,9 @@ def _get_usertenant(name, tenant=False):
     else:  # assume it is a non-tenant user account
         user = name
         tenant = None
+    user = util.stringify(user)
+    if tenant:
+        tenant = util.stringify(tenant)
     yield user
     yield tenant
 
