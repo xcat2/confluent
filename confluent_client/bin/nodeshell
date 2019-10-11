@@ -98,6 +98,7 @@ def run():
                             pernodeout[node] = []
                         pernodeout[node].append(data)
                     else:
+                        data = client.stringify(data)
                         if options.nonodeprefix:
                             sys.stderr.write(data)
                         else:
@@ -115,6 +116,7 @@ def run():
                             run_cmdv(node, cmdv, all, pipedesc)
         for node in sortutil.natural_sort(pernodeout):
             for line in pernodeout[node]:
+                line = client.stringify(line)
                 if options.nonodeprefix:
                     sys.stdout.write(line)
                 else:
