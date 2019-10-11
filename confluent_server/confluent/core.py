@@ -452,7 +452,7 @@ def show_usergroup(groupname, configmanager):
 def show_user(name, configmanager):
     userobj = configmanager.get_user(name)
     rv = {}
-    for attr in attrscheme.user.iterkeys():
+    for attr in attrscheme.user:
         rv[attr] = None
         if attr == 'password':
             if 'cryptpass' in userobj:
