@@ -1028,7 +1028,10 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
                             a['name']))
                 return
             rsp += nrsp
-        rsp = pickle.loads(rsp, **pargs)
+        try:
+            rsp = pickle.loads(rsp, **pargs)
+        except UnicodeDecodeError:
+            rsp = pickle.loads(rsp, encoding='latin1')
         if isinstance(rsp, Exception):
             raise rsp
         yield rsp
