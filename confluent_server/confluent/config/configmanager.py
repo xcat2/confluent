@@ -578,7 +578,7 @@ def relay_slaved_requests(name, listener, vers):
             lh = StreamHandler(listener)
             _hasquorum = len(cfgstreams) >= (
                     len(_cfgstore['collective']) // 2)
-            payload = cPickle.dumps({'quorum': _hasquorum}, protocol=vers)
+            payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
             for _ in pushes.starmap(
                     _push_rpc,
                     [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -622,7 +622,7 @@ def relay_slaved_requests(name, listener, vers):
             if cfgstreams:
                 _hasquorum = len(cfgstreams) >= (
                         len(_cfgstore['collective']) // 2)
-                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=vers)
+                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
                 for _ in pushes.starmap(
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
