@@ -403,7 +403,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.close()
             return
         if (currentleader == connection.getpeername()[0] and
-                follower and not follower.dead:
+                follower and not follower.dead):
             # if we are happily following this leader already, don't stir
             # the pot
             tlvdata.send(connection, {'status': 0})
