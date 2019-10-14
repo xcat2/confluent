@@ -482,7 +482,7 @@ def crypt_value(value,
     crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
     value = confluent.util.stringify(value).encode('utf-8')
     cryptval, hmac = crypter.encrypt_and_digest(value)
-    return iv, cryptval, hmac, '\x02'
+    return iv, cryptval, hmac, b'\x02'
 
 
 def _load_dict_from_dbm(dpath, tdb):
