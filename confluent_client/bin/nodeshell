@@ -73,7 +73,7 @@ def run():
         ex = exp.get('databynode', ())
         for node in ex:
             cmd = ex[node]['value']
-            if not isinstance(str) and not isinstance(bytes):
+            if not isinstance(cmd, str) and not isinstance(cmd, bytes):
                 cmd = cmd.encode('utf-8')
             cmdv = ['ssh', node, cmd]
             if currprocs < concurrentprocs:

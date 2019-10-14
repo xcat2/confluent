@@ -100,7 +100,7 @@ def run():
                     if desc['type'] == 'stdout':
                         if node not in pernodeout:
                             pernodeout[node] = ''
-                        pernodeout[node] += data
+                        pernodeout[node] += stringify(data)
                         if '\n' in pernodeout[node]:
                             currout, pernodeout[node] = pernodeout[node].split('\n', 1)
                             if currout:
