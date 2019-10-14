@@ -2338,7 +2338,7 @@ class ConfigManager(object):
             return
         with cls._syncstate:
             if (cls._syncrunning and cls._cfgwriter is not None and
-                    not cls._cfgwriter.dead):
+                    cls._cfgwriter.isAlive()):
                 cls._writepending = True
                 return
             if cls._syncrunning:  # This suggests an unclean write attempt,
