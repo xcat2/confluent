@@ -42,7 +42,7 @@ The attribute name may use a wildcard:
 Commas can be used to indicate multiple nodes, and can mix and match any of the above primitives. The following can be a valid single noderange, combining any and all members of each comma separated component
 `n1,n2,rack1,storage,location.rack=9,~s1..,n20-n30`
 
-Exclusions can be done by prepending a ‘-‘ before a portion of a noderange:
+Exclusions can be done by prepending a '-' before a portion of a noderange:
 `rack1,-n2`
 `compute,-rack1`
 `compute,-location.row=12`
@@ -54,7 +54,7 @@ To indicate nodes that match multiple selections at once (set intersection), the
 For complex expressions, () may be used to indicate order of expanding the noderange to be explicit
 `rack1,-(console.logging=full@compute)`
 
-Noderange syntax can also indicate ‘pagination’, or separating the nodes into well defined chunks. > is used to indicate how many nodes to display at a time, and < is used to indicate how many nodes to skip into a noderange:
+Noderange syntax can also indicate 'pagination', or separating the nodes into well defined chunks. > is used to indicate how many nodes to display at a time, and < is used to indicate how many nodes to skip into a noderange:
 `rack1>3<6`
 
 The above would show the seventh through ninth nodes of the rack1 group. Like all other noderange operations, this may be combined with any of the above, but must appear as the very last operation. Ordering is done with a natural sort.
