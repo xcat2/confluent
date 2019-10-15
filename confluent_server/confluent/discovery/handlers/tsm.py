@@ -112,6 +112,8 @@ class NodeHandler(generic.NodeHandler):
         cd = creds.get(nodename, {})
         user, passwd, _ = self.get_node_credentials(
                 nodename, creds, self.DEFAULT_USER, self.DEFAULT_PASS)
+        user = util.stringify(user)
+        passwd = util.stringify(passwd)
         self.targuser = user
         self.targpass = passwd
         wc = self._get_wc()
