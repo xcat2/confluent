@@ -105,7 +105,7 @@ node = {
                         'The format is an expiration time in ISO8601 format. When '
                         'the indicated time passes or the first time a node claims '
                         'the key, key grants will not be allowed.'),
-    }
+    },
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},
