@@ -89,7 +89,7 @@ class ExecConsole(conapi.Console):
                 stdin=slave, stdout=slave,
                 stderr=subprocess.PIPE, close_fds=True)
         except OSError:
-            print "Unable to execute " + self.executable + " (permissions?)"
+            print("Unable to execute " + self.executable + " (permissions?)")
             self.close()
             return
         os.close(slave)
@@ -104,7 +104,7 @@ class ExecConsole(conapi.Console):
         try:
             os.close(self._master)
         except OSError:
-            print "Error closing master of child process, ignoring"
+            print("Error closing master of child process, ignoring")
         if self.subproc is None or self.subproc.poll() is not None:
             return
         self.subproc.terminate()

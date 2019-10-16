@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 
 import argparse
 import errno
@@ -22,7 +22,7 @@ except NameError:
     pass
 
 def make_certificate():
-    umask = os.umask(0077)
+    umask = os.umask(0o77)
     try:
         os.makedirs('/etc/confluent/cfg')
     except OSError as e:
@@ -61,7 +61,7 @@ def join_collective(server, invitation):
         make_certificate()
     s = client.Command().connection
     while not invitation:
-        invitation = raw_input('Paste the invitation here: ')
+        invitation = input('Paste the invitation here: ')
     tlvdata.send(s, {'collective': {'operation': 'join',
                                     'invitation': invitation,
                                     'server': server}})
@@ -69,6 +69,19 @@ def join_collective(server, invitation):
     res = res.get('collective',
                   {'status': 'Unknown response: ' + repr(res)})
     print(res.get('status', res.get('error', repr(res))))
+    if 'error' in res:
+        sys.exit(1)
+
+def delete_member(name):
+    s = client.Command().connection
+    tlvdata.send(s, {'collective': {'operation': 'delete',
+                                    'member': name}})
+    res = tlvdata.recv(s)
+    res = res.get('collective',
+                  {'status': 'Unknown response: ' + repr(res)})
+    print(res.get('status', res.get('error', repr(res))))
+    if 'error' in res:
+        sys.exit(1)
 
 
 def show_collective():
@@ -104,6 +117,8 @@ def main():
                                     'collective member.  Run collective invite -h for more information')
     ic.add_argument('name', help='Name of server to invite to join the '
                                  'collective')
+    dc = sp.add_parser('delete', help='Delete a member of a collective')
+    dc.add_argument('name', help='Name of server to delete from collective')
     jc = sp.add_parser('join', help='Join a collective.  Run collective join -h for more information')
     jc.add_argument('server', help='Existing collective member that ran invite and generated a token')
     jc.add_argument('-i', help='Invitation provided by runniing invite on an '
@@ -117,6 +132,8 @@ def main():
         join_collective(cmdset.server, cmdset.i)
     elif cmdset.command == 'show':
         show_collective()
+    elif cmdset.command == 'delete':
+        delete_member(cmdset.name)
 
 if __name__ == '__main__':
     main()

@@ -77,7 +77,7 @@ class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
 
 class SshShell(conapi.Console):
 
-    def __init__(self, node, config, username='', password=''):
+    def __init__(self, node, config, username=b'', password=b''):
         self.node = node
         self.ssh = None
         self.datacallback = None
@@ -127,15 +127,15 @@ class SshShell(conapi.Console):
                              look_for_keys=False)
         except paramiko.AuthenticationException:
             self.inputmode = 0
-            self.username = ''
-            self.password = ''
+            self.username = b''
+            self.password = b''
             self.datacallback('\r\nlogin as: ')
             return
         except paramiko.ssh_exception.NoValidConnectionsError as e:
             self.datacallback(str(e))
             self.inputmode = 0
-            self.username = ''
-            self.password = ''
+            self.username = b''
+            self.password = b''
             self.datacallback('\r\nlogin as: ')
             return
         except cexc.PubkeyInvalid as pi:
@@ -205,9 +205,9 @@ class SshShell(conapi.Console):
                 delidx = data.index(b'\x7f')
                 data = data[:delidx - 1] + data[delidx + 1:]
             self.username += data
-            if '\r' in self.username:
-                self.username, self.password = self.username.split('\r')[:2]
-                lastdata = data.split('\r')[0]
+            if b'\r' in self.username:
+                self.username, self.password = self.username.split(b'\r')[:2]
+                lastdata = data.split(b'\r')[0]
                 if lastdata != '':
                     self.datacallback(lastdata)
                 self.datacallback('\r\nEnter password: ')
@@ -223,9 +223,9 @@ class SshShell(conapi.Console):
                 delidx = data.index(b'\x7f')
                 data = data[:delidx - 1] + data[delidx + 1:]
             self.password += data
-            if '\r' in self.password:
-                self.password = self.password.split('\r')[0]
-                self.datacallback('\r\n')
+            if b'\r' in self.password:
+                self.password = self.password.split(b'\r')[0]
+                self.datacallback(b'\r\n')
                 self.logon()
         else:
             self.shell.sendall(data)

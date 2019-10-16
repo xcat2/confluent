@@ -274,7 +274,7 @@ def perform_requests(operator, nodes, element, cfg, inputdata, realop):
                         raise datum
                     if (hasattr(datum, 'kvpairs') and datum.kvpairs and
                             len(datum.kvpairs) == 1):
-                        bundle.append((datum.kvpairs.keys()[0], datum))
+                        bundle.append((list(datum.kvpairs)[0], datum))
                         numnodes -= 1
                     else:
                         yield datum
@@ -376,8 +376,8 @@ class IpmiHandler(object):
                 self.loggedin = True
                 self.ipmicmd = persistent_ipmicmds[(node, tenant)]
             except socket.gaierror as ge:
-                if ge[0] == -2:
-                    raise exc.TargetEndpointUnreachable(ge[1])
+                if ge.errno == -2:
+                    raise exc.TargetEndpointUnreachable(ge.strerror)
                 raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
 

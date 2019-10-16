@@ -34,8 +34,8 @@ pxearchs = {
 
 
 def decode_uuid(rawguid):
-    lebytes = struct.unpack_from('<IHH', buffer(rawguid[:8]))
-    bebytes = struct.unpack_from('>HHI', buffer(rawguid[8:]))
+    lebytes = struct.unpack_from('<IHH', rawguid[:8])
+    bebytes = struct.unpack_from('>HHI', rawguid[8:])
     return '{0:08X}-{1:04X}-{2:04X}-{3:04X}-{4:04X}{5:08X}'.format(
         lebytes[0], lebytes[1], lebytes[2], bebytes[0], bebytes[1], bebytes[2]).lower()
 
@@ -98,7 +98,7 @@ def snoop(handler, protocol=None):
             netaddr = ':'.join(['{0:02x}'.format(x) for x in netaddr])
             optidx = 0
             try:
-                optidx = rq.index('\x63\x82\x53\x63') + 4
+                optidx = rq.index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
             uuid, arch = find_info_in_options(rq, optidx)

@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2018 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -123,7 +123,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         if authdata:
             cfm = authdata[1]
             authenticated = True
-    send_data(connection, "Confluent -- v0 --")
+    # version 0 == original, version 1 == pickle3 allowed
+    send_data(connection, "Confluent -- v{0} --".format(sys.version_info[0] - 2))
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
@@ -221,6 +222,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
             auditmsg['tenant'] = authdata[3]
     auditmsg['allowed'] = True
     if _should_authlog(path, operation):
+        tlvdata.unicode_dictvalues(auditmsg)
         auditlog.log(auditmsg)
     try:
         if operation == 'start':
@@ -412,7 +414,7 @@ def _unixdomainhandler():
     except OSError:  # if file does not exist, no big deal
         pass
     if not os.path.isdir("/var/run/confluent"):
-        os.makedirs('/var/run/confluent', 0755)
+        os.makedirs('/var/run/confluent', 0o755)
     unixsocket.bind("/var/run/confluent/api.sock")
     os.chmod("/var/run/confluent/api.sock",
              stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |

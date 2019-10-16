@@ -76,6 +76,10 @@ import stat
 import struct
 import time
 import traceback
+try:
+    unicode
+except NameError:
+    unicode = str
 
 daemonized = False
 logfull = False
@@ -176,6 +180,8 @@ class BaseRotatingHandler(object):
                 self.textfile = open(self.textpath, mode='ab')
             if self.binfile is None:
                 self.binfile = open(self.binpath, mode='ab')
+            if not isinstance(textrecord, bytes):
+                textrecord = textrecord.encode('utf-8')
             self.textfile.write(textrecord)
             self.binfile.write(binrecord)
             self.textfile.flush()
@@ -594,7 +600,11 @@ class Logger(object):
                     if ltype == 2:
                         textrecord = data
                     else:
-                        textrecord = textdate + data + ']'
+                        if not isinstance(textdate, bytes):
+                            textdate = textdate.encode('utf-8')
+                        if not isinstance(data, bytes):
+                            data = data.encode('utf-8')
+                        textrecord = textdate + data + b']'
                 else:
                     textrecord = textdate + data
                     if not textrecord.endswith('\n'):
@@ -742,7 +752,7 @@ class Logger(object):
         pass
 
     def log(self, logdata=None, ltype=None, event=0, eventdata=None):
-        if type(logdata) not in (str, unicode, dict):
+        if type(logdata) not in (bytes, unicode, dict):
             raise Exception("Unsupported logdata")
         if ltype is None:
             if type(logdata) == dict:

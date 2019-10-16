@@ -27,6 +27,14 @@ import socket
 import ssl
 import struct
 
+def stringify(instr):
+    # Normalize unicode and bytes to 'str', correcting for
+    # current python version
+    if isinstance(instr, bytes) and not isinstance(instr, str):
+        return instr.decode('utf-8', errors='replace')
+    elif not isinstance(instr, bytes) and not isinstance(instr, str):
+        return instr.encode('utf-8')
+    return instr
 
 def list_interface_indexes():
     # Getting the interface indexes in a portable manner
@@ -67,11 +75,11 @@ def randomstring(length=20):
 
     :param length: The number of characters to produce, defaults to 20
     """
-    chunksize = length / 4
+    chunksize = length // 4
     if length % 4 > 0:
         chunksize += 1
     strval = base64.urlsafe_b64encode(os.urandom(chunksize * 3))
-    return strval[0:length-1]
+    return stringify(strval[0:length-1])
 
 
 def securerandomnumber(low=0, high=4294967295):
@@ -101,7 +109,7 @@ def monotonic_time():
 
 
 def get_certificate_from_file(certfile):
-    cert = open(certfile, 'rb').read()
+    cert = open(certfile, 'r').read()
     inpemcert = False
     prunedcert = ''
     for line in cert.split('\n'):

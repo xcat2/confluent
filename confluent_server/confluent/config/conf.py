@@ -16,7 +16,10 @@
 
 
 # This defines config variable to store the global configuration for confluent
-import ConfigParser
+try:
+    import ConfigParser
+except ModuleNotFoundError:
+    import configparser as ConfigParser
 import os
 
 _config = None

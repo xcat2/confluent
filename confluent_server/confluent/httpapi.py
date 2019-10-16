@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2016 Lenovo
+# Copyright 2015-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,10 @@
 # This SCGI server provides a http wrap to confluent api
 # It additionally manages httprequest console sessions
 import base64
-import Cookie
+try:
+    import Cookie
+except ModuleNotFoundError:
+    import http.cookies as Cookie
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
@@ -39,7 +42,10 @@ import socket
 import sys
 import traceback
 import time
-import urlparse
+try:
+    import urlparse
+except ModuleNotFoundError:
+    import urllib.parse as urlparse
 import eventlet.wsgi
 #scgi = eventlet.import_patched('flup.server.scgi')
 tlvdata = confluent.tlvdata
@@ -74,7 +80,7 @@ def group_creation_resources():
     yield confluent.messages.ListAttributes(kv={'nodes': []},
                                             desc='Nodes to add to the group'
                                             ).html() + '<br>\n'
-    for attr in sorted(attribs.node.iterkeys()):
+    for attr in sorted(attribs.node):
         if attr == 'groups':
             continue
         if attr.startswith("secret."):
@@ -95,7 +101,7 @@ def group_creation_resources():
 def node_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the node").html() + '<br>'
-    for attr in sorted(attribs.node.iterkeys()):
+    for attr in sorted(attribs.node):
         if attr.startswith("secret."):
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
@@ -126,7 +132,7 @@ def user_creation_resources():
             'description': (''),
         },
     }
-    for attr in sorted(credential.iterkeys()):
+    for attr in sorted(credential):
         if attr == "password":
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
@@ -176,7 +182,7 @@ def _get_query_dict(env, reqbody, reqtype):
     if reqbody is not None:
         if "application/x-www-form-urlencoded" in reqtype:
             pbody = urlparse.parse_qs(reqbody, True)
-            for ky in pbody.iterkeys():
+            for ky in pbody:
                 if len(pbody[ky]) > 1:  # e.g. REST explorer
                     na = [i for i in pbody[ky] if i != '']
                     qdict[ky] = na
@@ -184,7 +190,7 @@ def _get_query_dict(env, reqbody, reqtype):
                     qdict[ky] = pbody[ky][0]
         elif 'application/json' in reqtype:
             pbody = json.loads(reqbody)
-            for key in pbody.iterkeys():
+            for key in pbody:
                 qdict[key] = pbody[key]
     if 'restexplorerhonorkey' in qdict:
         nqdict = {}
@@ -305,7 +311,7 @@ def _authorize_request(env, operation):
                 return {'code': 401}
             return ('logout',)
         name, passphrase = base64.b64decode(
-            env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(':', 1)
+            env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(b':', 1)
         authdata = auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
         if authdata is False:
             return {'code': 403}
@@ -319,14 +325,14 @@ def _authorize_request(env, operation):
                                 'inflight': set([])}
         if 'HTTP_CONFLUENTAUTHTOKEN' in env:
             httpsessions[sessid]['csrftoken'] = util.randomstring(32)
-        cookie['confluentsessionid'] = sessid
+        cookie['confluentsessionid'] = util.stringify(sessid)
         cookie['confluentsessionid']['secure'] = 1
         cookie['confluentsessionid']['httponly'] = 1
         cookie['confluentsessionid']['path'] = '/'
     skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
-            'user': name,
+            'user': util.stringify(name),
             'operation': operation,
             'target': env['PATH_INFO'],
         }
@@ -338,7 +344,7 @@ def _authorize_request(env, operation):
         if authdata[3] is not None:
             auditmsg['tenant'] = authdata[3]
             authinfo['tenant'] = authdata[3]
-        auditmsg['user'] = authdata[2]
+        auditmsg['user'] = util.stringify(authdata[2])
         if sessid is not None:
             authinfo['sessionid'] = sessid
         if not skiplog:
@@ -446,6 +452,8 @@ def resourcehandler_backend(env, start_response):
                             httpsessions[authorized['sessionid']]['inflight'])):
                 pagecontent += rsp
             start_response("200 OK", headers)
+            if not isinstance(pagecontent, bytes):
+                pagecontent = pagecontent.encode('utf-8')
             yield pagecontent
             return
         except exc.ConfluentException as e:
@@ -491,7 +499,7 @@ def resourcehandler_backend(env, start_response):
             auditmsg = {
                 'operation': 'start',
                 'target': env['PATH_INFO'],
-                'user': authorized['username'],
+                'user': util.stringify(authorized['username']),
             }
             if 'tenant' in authorized:
                 auditmsg['tenant'] = authorized['tenant']
@@ -626,6 +634,7 @@ def resourcehandler_backend(env, start_response):
             sessinfo = {'username': authorized['username']}
             if 'authtoken' in authorized:
                 sessinfo['authtoken'] = authorized['authtoken']
+            tlvdata.unicode_dictvalues(sessinfo)
             yield json.dumps(sessinfo)
             return
         resource = '.' + url[url.rindex('/'):]
@@ -647,6 +656,8 @@ def resourcehandler_backend(env, start_response):
                 for datum in _assemble_json(hdlr, resource, url, extension):
                     pagecontent += datum
             start_response('200 OK', headers)
+            if not isinstance(pagecontent, bytes):
+                pagecontent = pagecontent.encode('utf-8')
             yield pagecontent
         except exc.ConfluentException as e:
             if ((not isinstance(e, exc.LockedCredentials)) and
@@ -731,7 +742,7 @@ def _assemble_json(responses, resource=None, url=None, extension=None):
     for rsp in responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
             haldata = rsp.raw()
-            for hk in haldata.iterkeys():
+            for hk in haldata:
                 if 'href' in haldata[hk]:
                     if isinstance(haldata[hk]['href'], int):
                         haldata[hk]['href'] = str(haldata[hk]['href'])
@@ -747,7 +758,7 @@ def _assemble_json(responses, resource=None, url=None, extension=None):
                     links[hk] = haldata[hk]
         else:
             rsp = rsp.raw()
-            for dk in rsp.iterkeys():
+            for dk in rsp:
                 if dk in rspdata:
                     if isinstance(rspdata[dk], list):
                         if isinstance(rsp[dk], list):
@@ -766,8 +777,8 @@ def _assemble_json(responses, resource=None, url=None, extension=None):
                         rspdata[dk] = rsp[dk]
     rspdata["_links"] = links
     tlvdata.unicode_dictvalues(rspdata)
-    yield json.dumps(
-        rspdata, sort_keys=True, indent=4, ensure_ascii=False).encode('utf-8')
+    yield util.stringify(json.dumps(
+        rspdata, sort_keys=True, indent=4, ensure_ascii=False).encode('utf-8'))
 
 
 def serve(bind_host, bind_port):

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import base64
+import codecs
 import confluent.discovery.handlers.imm as immhandler
 import confluent.netutil as netutil
 import confluent.util as util
@@ -31,7 +32,8 @@ getaddrinfo = eventlet.support.greendns.getaddrinfo
 def fixup_uuid(uuidprop):
     baduuid = ''.join(uuidprop.split())
     uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
-    a = struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]).encode('hex')
+    a = codecs.encode(struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]), 'hex')
+    a = util.stringify(a)
     uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
     return '-'.join(uuid).upper()
 
@@ -125,8 +127,8 @@ class NodeHandler(immhandler.NodeHandler):
                 raise
             return (None, None)
         pwdchanged = False
-        adata = json.dumps({'username': username,
-                            'password': password
+        adata = json.dumps({'username': util.stringify(username),
+                            'password': util.stringify(password)
                             })
         headers = {'Connection': 'keep-alive',
                    'Content-Type': 'application/json'}
@@ -289,6 +291,8 @@ class NodeHandler(immhandler.NodeHandler):
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         curruser = None
         uid = None
+        user = util.stringify(user)
+        passwd = util.stringify(passwd)
         for userent in userinfo['items'][0]['users']:
             if userent['users_user_name'] == user:
                 curruser = userent

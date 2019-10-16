@@ -46,7 +46,10 @@ import Cryptodome.Protocol.KDF as KDF
 from Cryptodome.Cipher import AES
 from Cryptodome.Hash import HMAC
 from Cryptodome.Hash import SHA256
-import anydbm as dbm
+try:
+    import anydbm as dbm
+except ModuleNotFoundError:
+    import dbm
 import ast
 import base64
 import confluent.config.attributes as allattributes
@@ -57,7 +60,10 @@ import confluent.util
 import confluent.netutil as netutil
 import confluent.exceptions as exc
 import copy
-import cPickle
+try:
+    import cPickle
+except ModuleNotFoundError:
+    import pickle as cPickle
 import errno
 import eventlet
 import eventlet.event as event
@@ -74,6 +80,10 @@ import struct
 import sys
 import threading
 import traceback
+try:
+    unicode
+except NameError:
+    unicode = str
 
 
 _masterkey = None
@@ -91,6 +101,10 @@ _cfgstore = None
 _pendingchangesets = {}
 _txcount = 0
 _hasquorum = True
+if sys.version_info[0] >= 3:
+    lowestver = 4
+else:
+    lowestver = 2
 
 _attraliases = {
     'bmc': 'hardwaremanagement.manager',
@@ -299,12 +313,12 @@ def check_quorum():
 def exec_on_leader(function, *args):
     if isinstance(cfgleader, bool):
         raise exc.DegradedCollective()
-    xid = os.urandom(8)
+    xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     while xid in _pendingchangesets:
-        xid = os.urandom(8)
+        xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     _pendingchangesets[xid] = event.Event()
     rpcpayload = cPickle.dumps({'function': function, 'args': args,
-                                'xid': xid})
+                                'xid': xid}, protocol=cfgproto)
     rpclen = len(rpcpayload)
     cfgleader.sendall(struct.pack('!Q', rpclen))
     cfgleader.sendall(rpcpayload)
@@ -314,15 +328,19 @@ def exec_on_leader(function, *args):
 
 
 def exec_on_followers(fnname, *args):
-    global _txcount
     if len(cfgstreams) < (len(_cfgstore['collective']) // 2):
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
+    exec_on_followers_unconditional(fnname, *args)
+
+
+def exec_on_followers_unconditional(fnname, *args):
+    global _txcount
     pushes = eventlet.GreenPool()
     _txcount += 1
     payload = cPickle.dumps({'function': fnname, 'args': args,
-                             'txcount': _txcount})
-    for res in pushes.starmap(
+                             'txcount': _txcount}, protocol=lowestver)
+    for _ in pushes.starmap(
             _push_rpc, [(cfgstreams[s], payload) for s in cfgstreams]):
         pass
 
@@ -391,12 +409,12 @@ def decrypt_value(cryptvalue,
             raise Exception("bad HMAC value on crypted value")
         decrypter = AES.new(key, AES.MODE_CBC, iv)
         value = decrypter.decrypt(cipherdata)
-        padsize = ord(value[-1])
+        padsize = bytearray(value)[-1]
         pad = value[-padsize:]
         # Note that I cannot grasp what could be done with a subliminal
         # channel in padding in this case, but check the padding anyway
-        for padbyte in pad:
-            if ord(padbyte) != padsize:
+        for padbyte in bytearray(pad):
+            if padbyte != padsize:
                 raise Exception("bad padding in encrypted value")
         return value[0:-padsize]
     else:
@@ -462,11 +480,9 @@ def crypt_value(value,
         key = _masterkey
     iv = os.urandom(12)
     crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
-    try:
-        cryptval, hmac = crypter.encrypt_and_digest(value)
-    except TypeError:
-        cryptval, hmac = crypter.encrypt_and_digest(value.encode('utf-8'))
-    return iv, cryptval, hmac, '\x02'
+    value = confluent.util.stringify(value).encode('utf-8')
+    cryptval, hmac = crypter.encrypt_and_digest(value)
+    return iv, cryptval, hmac, b'\x02'
 
 
 def _load_dict_from_dbm(dpath, tdb):
@@ -474,16 +490,19 @@ def _load_dict_from_dbm(dpath, tdb):
         dbe = dbm.open(tdb, 'r')
         currdict = _cfgstore
         for elem in dpath:
+            elem = confluent.util.stringify(elem)
             if elem not in currdict:
                 currdict[elem] = {}
             currdict = currdict[elem]
         try:
-            for tk in dbe:
-                currdict[tk] = cPickle.loads(dbe[tk])
+            for tk in dbe.keys():
+                tks = confluent.util.stringify(tk)
+                currdict[tks] = cPickle.loads(dbe[tk])
         except AttributeError:
             tk = dbe.firstkey()
             while tk != None:
-                currdict[tk] = cPickle.loads(dbe[tk])
+                tks = confluent.util.stringify(tk)
+                currdict[tks] = cPickle.loads(dbe[tk])
                 tk = dbe.nextkey(tk)
     except dbm.error:
         return
@@ -522,13 +541,7 @@ def set_global(globalname, value, sync=True):
     """
     if _cfgstore is None:
         init(not sync)
-    try:
-        globalname = globalname.encode('utf-8')
-    except AttributeError:
-        # We have to remove the unicode-ness of the string,
-        # but if it is already bytes in python 3, then we will
-        # get an attributeerror, so pass
-        pass
+    globalname = confluent.util.stringify(globalname)
     with _dirtylock:
         if 'dirtyglobals' not in _cfgstore:
             _cfgstore['dirtyglobals'] = set()
@@ -541,9 +554,14 @@ def set_global(globalname, value, sync=True):
         ConfigManager._bg_sync_to_file()
 
 cfgstreams = {}
-def relay_slaved_requests(name, listener):
+def relay_slaved_requests(name, listener, vers):
     global cfgleader
     global _hasquorum
+    global lowestver
+    if vers > 2 and sys.version_info[0] < 3:
+        vers = 2
+    if vers < lowestver:
+        lowestver = vers    
     pushes = eventlet.GreenPool()
     if name not in _followerlocks:
         _followerlocks[name] = gthread.RLock()
@@ -560,7 +578,7 @@ def relay_slaved_requests(name, listener):
             lh = StreamHandler(listener)
             _hasquorum = len(cfgstreams) >= (
                     len(_cfgstore['collective']) // 2)
-            payload = cPickle.dumps({'quorum': _hasquorum})
+            payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
             for _ in pushes.starmap(
                     _push_rpc,
                     [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -573,7 +591,7 @@ def relay_slaved_requests(name, listener):
                     raise Exception("Unexpected loss of node in followers: " + name)
                 sz = struct.unpack('!Q', msg)[0]
                 if sz != 0:
-                    rpc = ''
+                    rpc = b''
                     while len(rpc) < sz:
                         nrpc = listener.recv(sz - len(rpc))
                         if not nrpc:
@@ -587,7 +605,7 @@ def relay_slaved_requests(name, listener):
                         exc = e
                     if 'xid' in rpc:
                         _push_rpc(listener, cPickle.dumps({'xid': rpc['xid'],
-                                                           'exc': exc}))
+                                                           'exc': exc}, protocol=vers))
                 try:
                     msg = lh.get_next_msg()
                 except Exception:
@@ -604,7 +622,7 @@ def relay_slaved_requests(name, listener):
             if cfgstreams:
                 _hasquorum = len(cfgstreams) >= (
                         len(_cfgstore['collective']) // 2)
-                payload = cPickle.dumps({'quorum': _hasquorum})
+                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
                 for _ in pushes.starmap(
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -644,15 +662,19 @@ class StreamHandler(object):
         self.sock = None
 
 
-def stop_following(replacement=None):
+def stop_following(replacement=None, proto=2):
     with _leaderlock:
         global cfgleader
+        global cfgproto
         if cfgleader and not isinstance(cfgleader, bool):
             try:
                 cfgleader.close()
             except Exception:
                 pass
         cfgleader = replacement
+        if proto > 2 and sys.version_info[0] < 3:
+            proto = 2
+        cfgproto = proto
 
 def stop_leading():
     for stream in list(cfgstreams):
@@ -710,20 +732,21 @@ def commit_clear():
     ConfigManager._bg_sync_to_file()
 
 cfgleader = None
+cfgproto = 2
 
 
-def follow_channel(channel):
+def follow_channel(channel, proto=2):
     global _txcount
     global _hasquorum
     try:
         stop_leading()
-        stop_following(channel)
+        stop_following(channel, proto)
         lh = StreamHandler(channel)
         msg = lh.get_next_msg()
         while msg:
             sz = struct.unpack('!Q', msg)[0]
             if sz != 0:
-                rpc = ''
+                rpc = b''
                 while len(rpc) < sz:
                     nrpc = channel.recv(sz - len(rpc))
                     if not nrpc:
@@ -761,6 +784,34 @@ def add_collective_member(name, address, fingerprint):
         exec_on_followers('_true_add_collective_member', name, address, fingerprint)
     _true_add_collective_member(name, address, fingerprint)
 
+def del_collective_member(name):
+    if cfgleader and not isinstance(cfgleader, bool):
+        return exec_on_leader('del_collective_member', name)
+    if cfgstreams:
+        exec_on_followers_unconditional('_true_del_collective_member', name)
+    _true_del_collective_member(name)
+
+def _true_del_collective_member(name, sync=True):
+    global cfgleader
+    name = confluent.util.stringify(name)
+    if _cfgstore is None:
+        return
+    if 'collective' not in _cfgstore:
+        return
+    if name not in _cfgstore['collective']:
+        return
+    del _cfgstore['collective'][name]
+    with _dirtylock:
+        if 'collectivedirty' not in _cfgstore:
+            _cfgstore['collectivedirty'] = set([])
+        _cfgstore['collectivedirty'].add(name)
+    if len(_cfgstore['collective']) < 2:
+        del _cfgstore['collective']
+        cfgleader = None
+    if sync:
+        ConfigManager._bg_sync_to_file()
+
+
 _pending_collective_updates = {}
 
 
@@ -785,10 +836,7 @@ def apply_pending_collective_updates():
 
 
 def _true_add_collective_member(name, address, fingerprint, sync=True):
-    try:
-        name = name.encode('utf-8')
-    except AttributeError:
-        pass
+    name = confluent.util.stringify(name)
     if _cfgstore is None:
         init(not sync)  # use not sync to avoid read from disk
     if 'collective' not in _cfgstore:
@@ -823,8 +871,7 @@ def get_collective_member_by_address(address):
 
 
 def _mark_dirtykey(category, key, tenant=None):
-    if type(key) in (str, unicode):
-        key = key.encode('utf-8')
+    key = confluent.util.stringify(key)
     with _dirtylock:
         if 'dirtykeys' not in _cfgstore:
             _cfgstore['dirtykeys'] = {}
@@ -1145,9 +1192,9 @@ class ConfigManager(object):
         Returns an identifier that can be used to unsubscribe from these
         notifications using remove_watcher
         """
-        notifierid = random.randint(0, sys.maxint)
+        notifierid = random.randint(0, sys.maxsize)
         while notifierid in self._notifierids:
-            notifierid = random.randint(0, sys.maxint)
+            notifierid = random.randint(0, sys.maxsize)
         self._notifierids[notifierid] = {'attriblist': []}
         if self.tenant not in self._attribwatchers:
             self._attribwatchers[self.tenant] = {}
@@ -1186,9 +1233,9 @@ class ConfigManager(object):
         # use in case of cancellation.
         # I anticipate no more than a handful of watchers of this sort, so
         # this loop should not have to iterate too many times
-        notifierid = random.randint(0, sys.maxint)
+        notifierid = random.randint(0, sys.maxsize)
         while notifierid in self._notifierids:
-            notifierid = random.randint(0, sys.maxint)
+            notifierid = random.randint(0, sys.maxsize)
         # going to track that this is a nodecollection type watcher,
         # but there is no additional data associated.
         self._notifierids[notifierid] = set(['nodecollection'])
@@ -1304,7 +1351,7 @@ class ConfigManager(object):
     def _true_create_usergroup(self, groupname, role="Administrator"):
         if 'usergroups' not in self._cfgstore:
             self._cfgstore['usergroups'] = {}
-        groupname = groupname.encode('utf-8')
+        groupname = confluent.util.stringify(groupname)
         if groupname in self._cfgstore['usergroups']:
             raise Exception("Duplicate groupname requested")
         self._cfgstore['usergroups'][groupname] = {'role': role}
@@ -1406,7 +1453,7 @@ class ConfigManager(object):
                 raise Exception("Duplicate id requested")
         if 'users' not in self._cfgstore:
             self._cfgstore['users'] = {}
-        name = name.encode('utf-8')
+        name = confluent.util.stringify(name)
         if name in self._cfgstore['users']:
             raise Exception("Duplicate username requested")
         self._cfgstore['users'][name] = {'id': uid}
@@ -1664,7 +1711,7 @@ class ConfigManager(object):
                                 "{0} node does not exist to add to {1}".format(
                                     node, group))
         for group in attribmap:
-            group = group.encode('utf-8')
+            group = confluent.util.stringify(group)
             if group not in self._cfgstore['nodegroups']:
                 self._cfgstore['nodegroups'][group] = {'nodes': set()}
             cfgobj = self._cfgstore['nodegroups'][group]
@@ -1722,8 +1769,8 @@ class ConfigManager(object):
         attributes = realattributes
         if type(groups) in (str, unicode):
             groups = (groups,)
-        for group in groups:
-                group = group.encode('utf-8')
+        for group in groups:                
+                group = confluent.util.stringify(group)
                 try:
                     groupentry = self._cfgstore['nodegroups'][group]
                 except KeyError:
@@ -1814,7 +1861,8 @@ class ConfigManager(object):
                             'nodeattrs': {node: [attrname]},
                             'callback': attribwatcher[watchkey][notifierid]
                         }
-        for watcher in notifdata.itervalues():
+        for watcher in notifdata:
+            watcher = notifdata[watcher]
             callback = watcher['callback']
             eventlet.spawn_n(_do_notifier, self, watcher, callback)
 
@@ -1828,14 +1876,15 @@ class ConfigManager(object):
 
     def _true_del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
-            for watcher in self._nodecollwatchers[self.tenant].itervalues():
+            for watcher in self._nodecollwatchers[self.tenant]:
+                watcher = self._nodecollwatchers[self.tenant][watcher]
                 watcher(added=(), deleting=nodes, renamed=(), configmanager=self)
         changeset = {}
         for node in nodes:
             # set a reserved attribute for the sake of the change notification
             # framework to trigger on
             changeset[node] = {'_nodedeleted': 1}
-            node = node.encode('utf-8')
+            node = confluent.util.stringify(node)
             if node in self._cfgstore['nodes']:
                 self._sync_groups_to_node(node=node, groups=[],
                                           changeset=changeset)
@@ -1883,7 +1932,7 @@ class ConfigManager(object):
                 realattributes.append(attrname)
         attributes = realattributes
         for node in nodes:
-            node = node.encode('utf-8')
+            node = confluent.util.stringify(node)
             try:
                 nodek = self._cfgstore['nodes'][node]
             except KeyError:
@@ -1954,7 +2003,8 @@ class ConfigManager(object):
             self._recalculate_expressions(cfgobj, formatter=exprmgr, node=renamemap[name], changeset=changeset)
         if self.tenant in self._nodecollwatchers:
             nodecollwatchers = self._nodecollwatchers[self.tenant]
-            for watcher in nodecollwatchers.itervalues():
+            for watcher in nodecollwatchers:
+                watcher = nodecollwatchers[watcher]
                 eventlet.spawn_n(_do_add_watcher, watcher, (), self, renamemap)
         self._bg_sync_to_file()
 
@@ -2011,7 +2061,7 @@ class ConfigManager(object):
         # first do a sanity check of the input upfront
         # this mitigates risk of arguments being partially applied
         for node in attribmap:
-            node = node.encode('utf-8')
+            node = confluent.util.stringify(node)
             if node == '':
                 raise ValueError('"{0}" is not a valid node name'.format(node))
             if autocreate:
@@ -2066,8 +2116,8 @@ class ConfigManager(object):
                             attrname, node)
                         raise ValueError(errstr)
                     attribmap[node][attrname] = attrval
-        for node in attribmap:
-            node = node.encode('utf-8')
+        for node in attribmap:            
+            node = confluent.util.stringify(node)
             exprmgr = None
             if node not in self._cfgstore['nodes']:
                 newnodes.append(node)
@@ -2110,7 +2160,8 @@ class ConfigManager(object):
         if newnodes:
             if self.tenant in self._nodecollwatchers:
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
-                for watcher in nodecollwatchers.itervalues():
+                for watcher in nodecollwatchers:
+                    watcher = nodecollwatchers[watcher]
                     eventlet.spawn_n(_do_add_watcher, watcher, newnodes, self)
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
@@ -2228,7 +2279,7 @@ class ConfigManager(object):
                                 target = dumpdata[confarea][element][attribute]['cryptvalue']
                             cryptval = []
                             for value in target:
-                                cryptval.append(base64.b64encode(value))
+                                cryptval.append(confluent.util.stringify(base64.b64encode(value)))
                             if attribute == 'cryptpass':
                                 dumpdata[confarea][element][attribute] = '!'.join(cryptval)
                             else:
@@ -2248,7 +2299,7 @@ class ConfigManager(object):
         _cfgstore = {}
         rootpath = cls._cfgdir
         try:
-            with open(os.path.join(rootpath, 'transactioncount'), 'r') as f:
+            with open(os.path.join(rootpath, 'transactioncount'), 'rb') as f:
                 txbytes = f.read()
                 if len(txbytes) == 8:
                     _txcount = struct.unpack('!Q', txbytes)[0]
@@ -2306,7 +2357,7 @@ class ConfigManager(object):
             if statelessmode:
                 return
             _mkpath(cls._cfgdir)
-            with open(os.path.join(cls._cfgdir, 'transactioncount'), 'w') as f:
+            with open(os.path.join(cls._cfgdir, 'transactioncount'), 'wb') as f:
                 f.write(struct.pack('!Q', _txcount))
             if (fullsync or 'dirtyglobals' in _cfgstore and
                     'globals' in _cfgstore):
@@ -2321,31 +2372,37 @@ class ConfigManager(object):
                     for globalkey in dirtyglobals:
                         if globalkey in _cfgstore['globals']:
                             globalf[globalkey] = \
-                                cPickle.dumps(_cfgstore['globals'][globalkey])
+                                cPickle.dumps(_cfgstore['globals'][globalkey], protocol=cPickle.HIGHEST_PROTOCOL)
                         else:
                             if globalkey in globalf:
                                 del globalf[globalkey]
                 finally:
                     globalf.close()
             if fullsync or 'collectivedirty' in _cfgstore:
-                collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
-                                       'c', 384)
-                try:
-                    if fullsync:
-                        colls = _cfgstore['collective']
-                    else:
-                        with _dirtylock:
-                            colls = copy.deepcopy(_cfgstore['collectivedirty'])
-                            del _cfgstore['collectivedirty']
-                    for coll in colls:
-                        if coll in _cfgstore['collective']:
-                            collectivef[coll] = cPickle.dumps(
-                                _cfgstore['collective'][coll])
+                if len(_cfgstore.get('collective', ())) > 1:
+                    collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
+                                        'c', 384)
+                    try:
+                        if fullsync:
+                            colls = _cfgstore['collective']
                         else:
-                            if coll in collectivef:
-                                del globalf[coll]
-                finally:
-                    collectivef.close()
+                            with _dirtylock:
+                                colls = copy.deepcopy(_cfgstore['collectivedirty'])
+                                del _cfgstore['collectivedirty']
+                        for coll in colls:
+                            if coll in _cfgstore['collective']:
+                                collectivef[coll] = cPickle.dumps(
+                                    _cfgstore['collective'][coll], protocol=cPickle.HIGHEST_PROTOCOL)
+                            else:
+                                if coll in collectivef:
+                                    del collectivef[coll]
+                    finally:
+                        collectivef.close()
+                else:
+                    try:
+                        os.remove(os.path.join(cls._cfgdir, "collective"))
+                    except OSError:
+                        pass
             if fullsync:
                 pathname = cls._cfgdir
                 currdict = _cfgstore['main']
@@ -2354,7 +2411,7 @@ class ConfigManager(object):
                     dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
                     try:
                         for ck in currdict[category]:
-                            dbf[ck] = cPickle.dumps(currdict[category][ck])
+                            dbf[ck] = cPickle.dumps(currdict[category][ck], protocol=cPickle.HIGHEST_PROTOCOL)
                     finally:
                         dbf.close()
             elif 'dirtykeys' in _cfgstore:
@@ -2378,7 +2435,7 @@ class ConfigManager(object):
                                     if ck in dbf:
                                         del dbf[ck]
                                 else:
-                                    dbf[ck] = cPickle.dumps(currdict[category][ck])
+                                    dbf[ck] = cPickle.dumps(currdict[category][ck], protocol=cPickle.HIGHEST_PROTOCOL)
                         finally:
                             dbf.close()
         willrun = False
@@ -2417,7 +2474,9 @@ def _restore_keys(jsond, password, newpassword=None, sync=True):
     else:
         keydata = json.loads(jsond)
     cryptkey = _parse_key(keydata['cryptkey'], password)
-    integritykey = _parse_key(keydata['integritykey'], password)
+    integritykey = None
+    if 'integritykey' in keydata:
+        integritykey = _parse_key(keydata['integritykey'], password)
     conf.init_config()
     cfg = conf.get_config()
     if cfg.has_option('security', 'externalcfgkey'):
@@ -2426,8 +2485,9 @@ def _restore_keys(jsond, password, newpassword=None, sync=True):
             newpassword = keyfile.read()
     set_global('master_privacy_key', _format_key(cryptkey,
                                                  password=newpassword), sync)
-    set_global('master_integrity_key', _format_key(integritykey,
-                                                   password=newpassword), sync)
+    if integritykey:    
+        set_global('master_integrity_key', _format_key(integritykey,
+                                                       password=newpassword), sync)
     _masterkey = cryptkey
     _masterintegritykey = integritykey
     if sync:
@@ -2439,20 +2499,21 @@ def _dump_keys(password, dojson=True):
         init_masterkey()
     cryptkey = _format_key(_masterkey, password=password)
     if 'passphraseprotected' in cryptkey:
-        cryptkey = '!'.join(map(base64.b64encode,
-                                cryptkey['passphraseprotected']))
+        cryptkey = '!'.join(
+            [confluent.util.stringify(base64.b64encode(x))
+             for x in cryptkey['passphraseprotected']])
     else:
-        cryptkey = '*unencrypted:{0}'.format(base64.b64encode(
-            cryptkey['unencryptedvalue']))
+        cryptkey = '*unencrypted:{0}'.format(confluent.util.stringify(base64.b64encode(
+            cryptkey['unencryptedvalue'])))
     keydata = {'cryptkey': cryptkey}
     if _masterintegritykey is not None:
         integritykey = _format_key(_masterintegritykey, password=password)
         if 'passphraseprotected' in integritykey:
-            integritykey = '!'.join(map(base64.b64encode,
-                                        integritykey['passphraseprotected']))
+            integritykey = '!'.join([confluent.util.stringify(base64.b64encode(x)) for x in
+                                        integritykey['passphraseprotected']])
         else:
-            integritykey = '*unencrypted:{0}'.format(base64.b64encode(
-                integritykey['unencryptedvalue']))
+            integritykey = '*unencrypted:{0}'.format(confluent.util.stringify(base64.b64encode(
+                integritykey['unencryptedvalue'])))
         keydata['integritykey'] = integritykey
     if dojson:
         return json.dumps(keydata, sort_keys=True, indent=4, separators=(',', ': '))

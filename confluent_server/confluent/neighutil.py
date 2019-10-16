@@ -18,6 +18,7 @@
 # Ultimately, this should use AF_NETLINK, but in the interest of time,
 # use ip neigh for the moment
 
+import confluent.util as util
 import eventlet.green.subprocess as subprocess
 import os
 
@@ -39,6 +40,7 @@ def update_neigh():
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
     (neighdata, err) = ipn.communicate()
+    neighdata = util.stringify(neighdata)
     for entry in neighdata.split('\n'):
         entry = entry.split(' ')
         if len(entry) < 5 or not entry[4]:

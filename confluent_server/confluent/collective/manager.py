@@ -27,6 +27,7 @@ import eventlet.green.ssl as ssl
 import eventlet.green.threading as threading
 import greenlet
 import random
+import sys
 try:
     import OpenSSL.crypto as crypto
 except ImportError:
@@ -70,11 +71,22 @@ def connect_to_leader(cert=None, name=None, leader=None):
         return False
     with connecting:
         with cfm._initlock:
-            tlvdata.recv(remote)  # the banner
+            banner = tlvdata.recv(remote)  # the banner
+            vers = banner.split()[2]
+            pvers = 0
+            reqver = 4
+            if vers == b'v0':
+                pvers = 2
+            elif vers == b'v1':
+                pvers = 4
+            if sys.version_info[0] < 3:
+                pvers = 2
+                reqver = 2
             tlvdata.recv(remote)  # authpassed... 0..
             if name is None:
                 name = get_myname()
             tlvdata.send(remote, {'collective': {'operation': 'connect',
+                                                 'protover': reqver,
                                                  'name': name,
                                                  'txcount': cfm._txcount}})
             keydata = tlvdata.recv(remote)
@@ -119,7 +131,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
             globaldata = tlvdata.recv(remote)
             dbi = tlvdata.recv(remote)
             dbsize = dbi['dbsize']
-            dbjson = ''
+            dbjson = b''
             while (len(dbjson) < dbsize):
                 ndata = remote.recv(dbsize - len(dbjson))
                 if not ndata:
@@ -148,15 +160,15 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 raise
             currentleader = leader
         #spawn this as a thread...
-        follower = eventlet.spawn(follow_leader, remote)
+        follower = eventlet.spawn(follow_leader, remote, pvers)
     return True
 
 
-def follow_leader(remote):
+def follow_leader(remote, proto):
     global currentleader
     cleanexit = False
     try:
-        cfm.follow_channel(remote)
+        cfm.follow_channel(remote, proto)
     except greenlet.GreenletExit:
         cleanexit = True
     finally:
@@ -208,8 +220,7 @@ def handle_connection(connection, cert, request, local=False):
     else:
         if not local:
             return
-
-        if 'show' == operation:
+        if operation in ('show', 'delete'):
             if not list(cfm.list_collective()):
                 tlvdata.send(connection,
                              {'collective': {'error': 'Collective mode not '
@@ -246,7 +257,23 @@ def handle_connection(connection, cert, request, local=False):
                 collinfo['quorum'] = True
             except exc.DegradedCollective:
                 collinfo['quorum'] = False
-            tlvdata.send(connection, {'collective':  collinfo})
+            if operation == 'show':
+                tlvdata.send(connection, {'collective':  collinfo})
+            elif operation == 'delete':
+                todelete = request['member']
+                if (todelete == collinfo['leader'] or 
+                       todelete in collinfo['active']):
+                    tlvdata.send(connection, {'collective':
+                            {'error': '{0} is still active, stop the confluent service to remove it'.format(todelete)}})
+                    return
+                if todelete not in collinfo['offline']:
+                    tlvdata.send(connection, {'collective':
+                            {'error': '{0} is not a recognized collective member'.format(todelete)}})
+                    return
+                cfm.del_collective_member(todelete)
+                tlvdata.send(connection,
+                    {'collective': {'status': 'Successfully deleted {0}'.format(todelete)}})
+                connection.close()
             return
         if 'invite' == operation:
             try:
@@ -267,7 +294,8 @@ def handle_connection(connection, cert, request, local=False):
             invitation = request['invitation']
             try:
                 invitation = base64.b64decode(invitation)
-                name, invitation = invitation.split('@', 1)
+                name, invitation = invitation.split(b'@', 1)
+                name = util.stringify(name)
             except Exception:
                 tlvdata.send(
                     connection,
@@ -375,7 +403,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.close()
             return
         if (currentleader == connection.getpeername()[0] and
-                follower and follower.isAlive()):
+                follower and not follower.dead):
             # if we are happily following this leader already, don't stir
             # the pot
             tlvdata.send(connection, {'status': 0})
@@ -402,6 +430,7 @@ def handle_connection(connection, cert, request, local=False):
         tlvdata.send(connection, collinfo)
     if 'connect' == operation:
         drone = request['name']
+        folver = request.get('protover', 2)
         droneinfo = cfm.get_collective_member(drone)
         if not (droneinfo and util.cert_matches(droneinfo['fingerprint'],
                                                 cert)):
@@ -450,7 +479,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
-        if not cfm.relay_slaved_requests(drone, connection):
+        if not cfm.relay_slaved_requests(drone, connection, folver):
             if not retrythread:  # start a recovery if everyone else seems
                 # to have disappeared
                 retrythread = eventlet.spawn_after(30 + random.random(),

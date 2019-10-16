@@ -63,8 +63,10 @@ import itertools
 import os
 try:
     import cPickle as pickle
+    pargs = {}
 except ImportError:
     import pickle
+    pargs = {'encoding': 'utf-8'}
 import socket
 import struct
 import sys
@@ -86,7 +88,10 @@ def seek_element(currplace, currkey):
 
 def nested_lookup(nestdict, key):
     try:
-        return reduce(seek_element, key, nestdict)
+        currloc = nestdict
+        for currk in key:
+            currloc = seek_element(currloc, currk)
+        return currloc
     except TypeError:
         raise exc.NotFoundException("Invalid element requested")
 
@@ -105,6 +110,8 @@ def load_plugins():
         # two passes, to avoid adding both py and pyc files
         for plugin in os.listdir(plugindir):
             if plugin.startswith('.'):
+                continue
+            if '__pycache__' in plugin:
                 continue
             (plugin, plugtype) = os.path.splitext(plugin)
             if plugtype == '.sh':
@@ -398,6 +405,7 @@ def _init_core():
 
     nodegroupresources = {
         'attributes': {
+            'check': PluginRoute({'handler': 'attributes'}),
             'rename': PluginRoute({'handler': 'attributes'}),
             'all': PluginRoute({'handler': 'attributes'}),
             'current': PluginRoute({'handler': 'attributes'}),
@@ -444,7 +452,7 @@ def show_usergroup(groupname, configmanager):
 def show_user(name, configmanager):
     userobj = configmanager.get_user(name)
     rv = {}
-    for attr in attrscheme.user.iterkeys():
+    for attr in attrscheme.user:
         rv[attr] = None
         if attr == 'password':
             if 'cryptpass' in userobj:
@@ -681,7 +689,10 @@ def handle_dispatch(connection, cert, dispatch, peername):
             cfm.get_collective_member(peername)['fingerprint'], cert):
         connection.close()
         return
-    dispatch = pickle.loads(dispatch)
+    pversion = 0
+    if bytearray(dispatch)[0] == 0x80:
+        pversion = bytearray(dispatch)[1]
+    dispatch = pickle.loads(dispatch, **pargs)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
     inputdata = dispatch['inputdata']
@@ -717,18 +728,18 @@ def handle_dispatch(connection, cert, dispatch, peername):
                 configmanager=configmanager,
                 inputdata=inputdata))
         for res in itertools.chain(*passvalues):
-            _forward_rsp(connection, res)
+            _forward_rsp(connection, res, pversion)
     except Exception as res:
-        _forward_rsp(connection, res)
+        _forward_rsp(connection, res, pversion)
     connection.sendall('\x00\x00\x00\x00\x00\x00\x00\x00')
 
 
-def _forward_rsp(connection, res):
+def _forward_rsp(connection, res, pversion):
     try:
-        r = pickle.dumps(res)
+        r = pickle.dumps(res, protocol=pversion)
     except TypeError:
         r = pickle.dumps(Exception(
-            'Cannot serialize error, check collective.manager error logs for details' + str(res)))
+            'Cannot serialize error, check collective.manager error logs for details' + str(res)), protocol=pversion)
     rlen = len(r)
     if not rlen:
         return
@@ -957,12 +968,20 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     if not util.cert_matches(a['fingerprint'], remote.getpeercert(
             binary_form=True)):
         raise Exception("Invalid certificate on peer")
-    tlvdata.recv(remote)
+    banner = tlvdata.recv(remote)
+    vers = banner.split()[2]
+    if vers == b'v0':
+        pvers = 2
+    elif vers == b'v1':
+        pvers = 4
+    if sys.version_info[0] < 3:
+        pvers = 2
     tlvdata.recv(remote)
     myname = collective.get_myname()
     dreq = pickle.dumps({'name': myname, 'nodes': list(nodes),
                          'path': element,'tenant': configmanager.tenant,
-                         'operation': operation, 'inputdata': inputdata})
+                         'operation': operation, 'inputdata': inputdata},
+                         protocol=pvers)
     tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
     remote.sendall(dreq)
     while True:
@@ -1009,7 +1028,10 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
                             a['name']))
                 return
             rsp += nrsp
-        rsp = pickle.loads(rsp)
+        try:
+            rsp = pickle.loads(rsp, **pargs)
+        except UnicodeDecodeError:
+            rsp = pickle.loads(rsp, encoding='latin1')
         if isinstance(rsp, Exception):
             raise rsp
         yield rsp

@@ -134,7 +134,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                             attribute, {}).get('description', ''))
     elif element[-1] == 'current':
         for node in util.natural_sort(list(attributes)):
-            for attribute in sorted(attributes[node].iterkeys()):
+            for attribute in sorted(attributes[node]):
                 currattr = attributes[node][attribute]
                 try:
                     desc = allattributes.node[attribute]['description']
@@ -164,6 +164,20 @@ def update(nodes, element, configmanager, inputdata):
 
 
 def update_nodegroup(group, element, configmanager, inputdata):
+    if element == 'check':
+        check = inputdata.attribs
+        decrypt = configmanager.decrypt
+        configmanager.decrypt = True
+        currinfo = configmanager.get_nodegroup_attributes(group, list(check))
+        configmanager.decrypt = decrypt
+        for inf in check:
+            checkvalue = check[inf]
+            if isinstance(checkvalue, dict):
+                checkvalue = checkvalue.get('value', None)
+            currvalue = currinfo.get(inf, {}).get('value')
+            if checkvalue == currvalue:
+                raise exc.InvalidArgumentException('Checked value matches existing value')
+        return retrieve_nodegroup(group, element, configmanager, inputdata)
     if 'rename' in element:
         namemap = {}
         namemap[group] = inputdata.attribs['rename']
@@ -171,7 +185,7 @@ def update_nodegroup(group, element, configmanager, inputdata):
         return yield_rename_resources(namemap, isnode=False)
     try:
         clearattribs = []
-        for attrib in inputdata.attribs.iterkeys():
+        for attrib in inputdata.attribs:
             if inputdata.attribs[attrib] is None:
                 clearattribs.append(attrib)
         for attrib in clearattribs:
@@ -221,6 +235,18 @@ def update_nodes(nodes, element, configmanager, inputdata):
         raise exc.InvalidArgumentException(
             'No action to take, noderange is empty (if trying to define '
             'group attributes, use nodegroupattrib)')
+    if element[-1] == 'check':
+        for node in nodes:
+            check = inputdata.get_attributes(node, allattributes.node)
+            currinfo = configmanager.get_node_attributes(node, list(check), decrypt=True)
+            for inf in check:
+                checkvalue = check[inf]
+                if isinstance(checkvalue, dict):
+                    checkvalue = checkvalue.get('value', None)
+                currvalue = currinfo.get(node, {}).get(inf, {}).get('value')
+                if checkvalue == currvalue:
+                    raise exc.InvalidArgumentException('Checked value matches existing value')
+        return retrieve(nodes, element, configmanager, inputdata)
     if 'rename' in element:
         namemap = {}
         for node in nodes:

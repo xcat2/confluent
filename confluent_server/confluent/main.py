@@ -43,9 +43,11 @@ except ImportError:
 import confluent.discovery.core as disco
 import eventlet
 dbgif = False
-if  map(int, (eventlet.__version__.split('.'))) > [0, 18]:
+try:
     import eventlet.backdoor as backdoor
     dbgif = True
+except Exception:
+    pass
 havefcntl = True
 try:
     import fcntl

@@ -1,5 +1,6 @@
 from ctypes import *
 from ctypes.util import find_library
+import confluent.util as util
 import grp
 import pwd
 import os
@@ -18,6 +19,8 @@ def getgrouplist(name, gid, ng=32):
     _getgrouplist.argtypes = [c_char_p, c_uint, POINTER(c_uint * ng), POINTER(c_int)]
     glist = (c_uint * ng)()
     nglist = c_int(ng)
+    if not isinstance(name, bytes):
+        name = name.encode('utf-8')
     count = _getgrouplist(name, gid, byref(glist), byref(nglist))
     if count < 0:
         raise TooSmallException(nglist.value)
@@ -27,6 +30,7 @@ def getgrouplist(name, gid, ng=32):
 
 
 def grouplist(username):
+    username = util.stringify(username)
     pent = pwd.getpwnam(username)
     try:
         groups = getgrouplist(pent.pw_name, pent.pw_gid)

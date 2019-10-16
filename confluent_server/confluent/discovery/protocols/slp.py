@@ -49,7 +49,6 @@ except AttributeError:
     IPPROTO_IPV6 = 41  # Assume Windows value if socket is missing it
 
 
-
 def _parse_slp_header(packet):
     packet = bytearray(packet)
     if len(packet) < 16 or packet[0] != 2:
@@ -247,24 +246,23 @@ def _grab_rsps(socks, rsps, interval, xidmap):
 
 def _parse_attrlist(attrstr):
     attribs = {}
+    previousattrlen = None
+    attrstr = util.stringify(attrstr)
     while attrstr:
+        if len(attrstr) == previousattrlen:
+            raise Exception('Looping in attrstr parsing')
+        previousattrlen = len(attrstr)
         if attrstr[0] == '(':
             if ')' not in attrstr:
                 attribs['INCOMPLETE'] = True
                 return attribs
             currattr = attrstr[1:attrstr.index(')')]
             if '=' not in currattr:  # Not allegedly kosher, but still..
-                currattr = currattr.decode('utf-8')
                 attribs[currattr] = None
             else:
                 attrname, attrval = currattr.split('=', 1)
-                attrname = attrname.decode('utf-8')
                 attribs[attrname] = []
                 for val in attrval.split(','):
-                    try:
-                        val = val.decode('utf-8')
-                    except UnicodeDecodeError:
-                        val = '*DECODEERROR*'
                     if val[:3] == '\\FF':  # we should make this bytes
                         finalval = bytearray([])
                         for bnum in attrval[3:].split('\\'):
@@ -274,9 +272,9 @@ def _parse_attrlist(attrstr):
                         val = finalval
                         if 'uuid' in attrname and len(val) == 16:
                             lebytes = struct.unpack_from(
-                                '<IHH', buffer(val[:8]))
+                                '<IHH', memoryview(val[:8]))
                             bebytes = struct.unpack_from(
-                                '>HHI', buffer(val[8:]))
+                                '>HHI', memoryview(val[8:]))
                             val = '{0:08X}-{1:04X}-{2:04X}-{3:04X}-' \
                                   '{4:04X}{5:08X}'.format(
                                 lebytes[0], lebytes[1], lebytes[2], bebytes[0],
@@ -284,7 +282,7 @@ def _parse_attrlist(attrstr):
                             ).lower()
                     attribs[attrname].append(val)
             attrstr = attrstr[attrstr.index(')'):]
-        elif attrstr[0] == ',':
+        elif attrstr[0] == ','[0]:
             attrstr = attrstr[1:]
         elif ',' in attrstr:
             currattr = attrstr[:attrstr.index(',')]

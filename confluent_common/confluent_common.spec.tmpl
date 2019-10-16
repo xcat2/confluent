@@ -22,10 +22,10 @@ This provides the modules common for both client and server
 %setup -n %{name}-%{version} -n %{name}-%{version}
 
 %build
-python setup.py build
+python2 setup.py build
 
 %install
-python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
+python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
 
 %clean
 rm -rf $RPM_BUILD_ROOT

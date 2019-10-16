@@ -25,6 +25,11 @@ try:
 except NameError:
     unicode = str
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 def decodestr(value):
     ret = None
     try:
@@ -40,7 +45,7 @@ def decodestr(value):
 
 def unicode_dictvalues(dictdata):
     for key in dictdata:
-        if isinstance(dictdata[key], str):
+        if isinstance(dictdata[key], bytes):
             dictdata[key] = decodestr(dictdata[key])
         elif isinstance(dictdata[key], datetime):
             dictdata[key] = dictdata[key].strftime('%Y-%m-%dT%H:%M:%S')
@@ -51,7 +56,7 @@ def unicode_dictvalues(dictdata):
 
 
 def _unicode_list(currlist):
-    for i in xrange(len(currlist)):
+    for i in range(len(currlist)):
         if isinstance(currlist[i], str):
             currlist[i] = decodestr(currlist[i])
         elif isinstance(currlist[i], dict):
@@ -66,7 +71,7 @@ def send(handle, data):
             data = data.encode('utf-8')
         except AttributeError:
             pass
-    if isinstance(data, str) or isinstance(data, unicode):
+    if isinstance(data, bytes) or isinstance(data, unicode):
         # plain text, e.g. console data
         tl = len(data)
         if tl == 0:

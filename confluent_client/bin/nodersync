@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2016-2017 Lenovo
@@ -55,7 +55,7 @@ def run():
     noderange, targpath = args[-1].split(':', 1)
     client.check_globbing(noderange)
     c = client.Command()
-    cmdstr = " ".join(args[:-1])
+    cmdstr = ' '.join(args[:-1])
     cmdstr = 'rsync -av --info=progress2 ' + cmdstr
     cmdstr += ' {node}:' + targpath
 
@@ -66,13 +66,15 @@ def run():
     exitcode = 0
 
     for exp in c.create('/noderange/{0}/attributes/expression'.format(noderange),
-                        {'expression': cmdstr}):
+            {'expression': cmdstr}):
         if 'error' in exp:
             sys.stderr.write(exp['error'] + '\n')
             exitcode |= exp.get('errorcode', 1)
         ex = exp.get('databynode', ())
         for node in ex:
-            cmd = ex[node]['value'].encode('utf-8')
+            cmd = ex[node]['value']
+            if not isinstance(cmd, bytes) and not isinstance(cmd, str):
+                cmd = cmd.encode('utf-8')
             cmdv = shlex.split(cmd)
             if currprocs < concurrentprocs:
                 currprocs += 1
@@ -98,7 +100,7 @@ def run():
                     if desc['type'] == 'stdout':
                         if node not in pernodeout:
                             pernodeout[node] = ''
-                        pernodeout[node] += data
+                        pernodeout[node] += stringify(data)
                         if '\n' in pernodeout[node]:
                             currout, pernodeout[node] = pernodeout[node].split('\n', 1)
                             if currout:
@@ -117,7 +119,7 @@ def run():
                         output.set_output(node, 'error!')
                         if node not in nodeerrs:
                             nodeerrs[node] = ''
-                        nodeerrs[node] += data
+                        nodeerrs[node] += client.stringify(data)
                 else:
                     pop = desc['popen']
                     ret = pop.poll()

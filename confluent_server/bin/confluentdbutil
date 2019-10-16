@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -82,7 +82,7 @@ elif args[0] == 'dump':
               "or -s to do encrypted backup that requires keys.json from "
               "another backup to restore.")
         sys.exit(1)
-    os.umask(077)
+    os.umask(0o77)
     main._initsecurity(conf.get_config())
     if not os.path.exists(dumpdir):
         os.makedirs(dumpdir)

@@ -28,8 +28,10 @@ import hashlib
 import hmac
 import multiprocessing
 import confluent.userutil as userutil
+import confluent.util as util
+pam = None
 try:
-    import PAM
+    import confluent.pam as pam
 except ImportError:
     pass
 import time
@@ -94,23 +96,6 @@ _deniedbyrole = {
         ]
     }
 }
-class Credentials(object):
-    def __init__(self, username, passphrase):
-        self.username = username
-        self.passphrase = passphrase
-        self.haspam = False
-
-    def pam_conv(self, auth, query_list):
-        # use stored credentials in a pam conversation
-        self.haspam = True
-        resp = []
-        for query_entry in query_list:
-            query, pamtype = query_entry
-            if query.startswith('Password'):
-                resp.append((self.passphrase, 0))
-            else:
-                return None
-        return resp
 
 
 def _prune_passcache():
@@ -135,11 +120,13 @@ def _get_usertenant(name, tenant=False):
     administrator account a tenant gets.
     Otherwise, just assume a user in the default tenant
     """
+    if not isinstance(name, bytes):
+        name = name.encode('utf-8')
     if not isinstance(tenant, bool):
         # if not boolean, it must be explicit tenant
         user = name
-    elif '/' in name:  # tenant scoped name
-        tenant, user = name.split('/', 1)
+    elif b'/' in name:  # tenant scoped name
+        tenant, user = name.split(b'/', 1)
     elif configmanager.is_tenant(name):
         # the account is the implicit tenant owner account
         user = name
@@ -147,6 +134,9 @@ def _get_usertenant(name, tenant=False):
     else:  # assume it is a non-tenant user account
         user = name
         tenant = None
+    user = util.stringify(user)
+    if tenant:
+        tenant = util.stringify(tenant)
     yield user
     yield tenant
 
@@ -227,7 +217,6 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         # would normally make an event and wait
         # but here there's no need for that
         eventlet.sleep(0.5)
-    credobj = Credentials(user, passphrase)
     cfm = configmanager.ConfigManager(tenant, username=user)
     ucfg = cfm.get_user(user)
     if ucfg is None:
@@ -278,21 +267,15 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         if crypt == crypted:
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
             return authorize(user, element, tenant, operation)
-    try:
-        pammy = PAM.pam()
-        pammy.start(_pamservice, user, credobj.pam_conv)
-        pammy.authenticate()
-        pammy.acct_mgmt()
+    if pam:
+        pammy = pam.pam()
+        usergood = pammy.authenticate(user, passphrase)
         del pammy
-        _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
-        return authorize(user, element, tenant, operation, skipuserobj=False)
-    except NameError:
-        pass
-    except PAM.error:
-        pass
+        if usergood:
+            _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
+            return authorize(user, element, tenant, operation, skipuserobj=False)    
     eventlet.sleep(0.05)  # stall even on test for existence of a username
     return None
-
 
 def _apply_pbkdf(passphrase, salt):
     return KDF.PBKDF2(passphrase, salt, 32, 10000,

@@ -705,7 +705,8 @@ def detected(info):
 
 def b64tohex(b64str):
     bd = base64.b64decode(b64str)
-    return ''.join(['{0:02x}'.format(ord(x)) for x in bd])
+    bd = bytearray(bd)
+    return ''.join(['{0:02x}'.format(x) for x in bd])
 
 
 def get_enclosure_chain_head(nodename, cfg):
@@ -1209,6 +1210,7 @@ def rescan():
 def start_detection():
     global attribwatcher
     global rechecker
+    global rechecktime
     _map_unique_ids()
     cfg = cfm.ConfigManager(None)
     allnodes = cfg.list_nodes()

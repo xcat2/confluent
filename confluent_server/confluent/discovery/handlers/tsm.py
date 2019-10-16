@@ -18,12 +18,16 @@ import confluent.netutil as netutil
 import confluent.util as util
 import eventlet.support.greendns
 import json
-import urllib
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 class NodeHandler(generic.NodeHandler):
+    devname = 'TSM'
     DEFAULT_USER = 'USERID'
     DEFAULT_PASS = 'PASSW0RD'
 
@@ -52,8 +56,9 @@ class NodeHandler(generic.NodeHandler):
         }
         if not self.trieddefault:
             wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
-            rsp, status = wc.grab_json_response_with_status('/api/session', urllib.urlencode(authdata))
+            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
             if status > 400:
+                rsp = util.stringify(rsp)
                 self.trieddefault = True
                 if '555' in rsp:
                     passchange = {
@@ -63,9 +68,9 @@ class NodeHandler(generic.NodeHandler):
                         'default_password': self.DEFAULT_PASS,
                         'username': self.DEFAULT_USER
                         }
-                    rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urllib.urlencode(passchange))
+                    rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
                     authdata['password'] = self.targpass
-                    rsp, status = wc.grab_json_response_with_status('/api/session', urllib.urlencode(authdata))
+                    rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
                     self.csrftok = rsp['CSRFToken']
                     self.channel = rsp['channel']
                     self.curruser = self.DEFAULT_USER
@@ -80,7 +85,7 @@ class NodeHandler(generic.NodeHandler):
         if self.curruser:
             authdata['username'] = self.curruser
             authdata['password'] = self.currpass
-            rsp, status = wc.grab_json_response_with_status('/api/session', urllib.urlencode(authdata))
+            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
             if rsp.status != 200:
                 return None
             self.csrftok = rsp['CSRFToken']
@@ -88,7 +93,7 @@ class NodeHandler(generic.NodeHandler):
             return wc
         authdata['username'] = self.targuser
         authdata['password'] = self.targpass
-        rsp, status = wc.grab_json_response_with_status('/api/session', urllib.urlencode(authdata))
+        rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
         if status != 200:
             return None
         self.curruser = self.targuser
@@ -107,6 +112,8 @@ class NodeHandler(generic.NodeHandler):
         cd = creds.get(nodename, {})
         user, passwd, _ = self.get_node_credentials(
                 nodename, creds, self.DEFAULT_USER, self.DEFAULT_PASS)
+        user = util.stringify(user)
+        passwd = util.stringify(passwd)
         self.targuser = user
         self.targpass = passwd
         wc = self._get_wc()
@@ -149,6 +156,9 @@ class NodeHandler(generic.NodeHandler):
                 raise exc.NotImplementedException('IPv6 remote config TODO')
             currnet = wc.grab_json_response('/api/settings/network')
             for net in currnet:
+                if net['channel_number'] == self.channel and net['lan_enable'] == 0:
+                    # ignore false indication and switch to 8 (dedicated)
+                    self.channel = 8
                 if net['channel_number'] == self.channel:
                     # we have found the interface to potentially manipulate
                     if net['ipv4_address'] != newip:
@@ -162,6 +172,12 @@ class NodeHandler(generic.NodeHandler):
                         rsp, status = wc.grab_json_response_with_status(
                             '/api/settings/network/{0}'.format(net['id']), net, method='PUT')
                     break
+        elif self.ipaddr.startswith('fe80::'):
+            self.configmanager.set_node_attributes(
+                {nodename: {'hardwaremanagement.manager': self.ipaddr}})
+        else:
+            raise exc.TargetEndpointUnreachable(
+                'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
         rsp, status = wc.grab_json_response_with_status('/api/session', method='DELETE')
 
 
