@@ -6,7 +6,7 @@ fi
 ./makesetup
 VERSION=`cat VERSION`
 PKGNAME=$(basename $(pwd))
-python setup.py sdist > /dev/null 2>&1
+python3 setup.py sdist > /dev/null 2>&1
 cp dist/*.tar.gz ~/rpmbuild/SOURCES
 sed -e 's/#VERSION#/'$VERSION/ $PKGNAME.spec.tmpl > ~/rpmbuild/SPECS/$PKGNAME.spec
 rpmbuild -ba ~/rpmbuild/SPECS/$PKGNAME.spec 2> /dev/null |grep ^Wrote:
