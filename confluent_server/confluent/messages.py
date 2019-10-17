@@ -76,7 +76,7 @@ def _htmlify_structure(indict):
                     if datum is None:
                         nd.append('')
                     else:
-                        nd.append(datum)
+                        nd.append(util.stringify(datum))
                 ret += ",".join(nd)
             else:
                 for v in indict:
@@ -138,6 +138,7 @@ class ConfluentMessage(object):
         snippet = ""
         for key in pairs:
             val = pairs[key]
+            key = util.stringify(key)
             value = self.defaultvalue
             if isinstance(val, dict) and 'type' in val:
                 valtype = val['type']
@@ -338,6 +339,7 @@ class ConfluentChoiceMessage(ConfluentMessage):
         snippet = ''
         for key in pairdata:
             val = pairdata[key]
+            key = util.stringify(key)
             snippet += key + ':<select name="%s">' % key
             valid_values = self.valid_values
             if key in self.valid_paramset:
