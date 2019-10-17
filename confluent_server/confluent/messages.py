@@ -23,6 +23,7 @@ import confluent.config.configmanager as cfm
 import confluent.config.conf as cfgfile
 from copy import deepcopy
 from datetime import datetime
+import confluent.util as util
 import json
 
 try:
@@ -59,7 +60,9 @@ def _htmlify_structure(indict):
     if isinstance(indict, dict):
         for key in sorted(indict):
             ret += "<li>{0}: ".format(key)
-            if type(indict[key]) in (bytes, unicode, float, int):
+            if type(indict[key]) in (bytes, unicode):
+                ret += util.stringify(indict[key])
+            if type(indict[key]) in (float, int):
                 ret += str(indict[key])
             elif isinstance(indict[key], datetime):
                 ret += indict[key].strftime('%Y-%m-%dT%H:%M:%S')
