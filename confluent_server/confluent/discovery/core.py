@@ -91,6 +91,11 @@ import eventlet.semaphore
 autosensors = set()
 scanner = None
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
 class nesteddict(dict):
 
     def __missing__(self, key):
@@ -371,7 +376,7 @@ def handle_autosense_config(operation, inputdata):
         yield msg.KeyValueData({'enabled': autosense})
     elif operation == 'update':
         enabled = inputdata['enabled']
-        if type(enabled) in (unicode, str):
+        if type(enabled) in (unicode, bytes):
             enabled = enabled.lower() in ('true', '1', 'y', 'yes', 'enable',
                                           'enabled')
         if autosense == enabled:
