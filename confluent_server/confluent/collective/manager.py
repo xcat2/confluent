@@ -160,11 +160,11 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 raise
             currentleader = leader
         #spawn this as a thread...
-        follower = eventlet.spawn(follow_leader, remote, pvers)
+        follower = eventlet.spawn(follow_leader, remote, pvers, leader)
     return True
 
 
-def follow_leader(remote, proto):
+def follow_leader(remote, proto, leader):
     global currentleader
     cleanexit = False
     try:
@@ -176,8 +176,8 @@ def follow_leader(remote, proto):
             log.log({'info': 'Previous following cleanly closed',
                      'subsystem': 'collective'})
             return
-        log.log({'info': 'Current leader has disappeared, restarting '
-                         'collective membership', 'subsystem': 'collective'})
+        log.log({'info': 'Current leader ({0}) has disappeared, restarting '
+                         'collective membership'.format(leader), 'subsystem': 'collective'})
         # The leader has folded, time to startup again...
         cfm.stop_following()
         currentleader = None
