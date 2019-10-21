@@ -18,10 +18,6 @@ import confluent.netutil as netutil
 import confluent.util as util
 import eventlet.support.greendns
 import json
-try:
-    from urllib import urlencode
-except ImportError:
-    from urllib.parse import urlencode
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 webclient = eventlet.import_patched('pyghmi.util.webclient')
@@ -54,9 +50,10 @@ class NodeHandler(generic.NodeHandler):
             'username': self.DEFAULT_USER,
             'password': self.DEFAULT_PASS,
         }
-        if not self.trieddefault:
-            wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
-            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+        wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        wc.set_header('Content-Type', 'application/json')
+        if not self.trieddefault:    
+            rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
             if status > 400:
                 rsp = util.stringify(rsp)
                 self.trieddefault = True
@@ -68,9 +65,9 @@ class NodeHandler(generic.NodeHandler):
                         'default_password': self.DEFAULT_PASS,
                         'username': self.DEFAULT_USER
                         }
-                    rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
+                    rsp, status = wc.grab_json_response_with_status('/api/reset-pass', passchange)
                     authdata['password'] = self.targpass
-                    rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+                    rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
                     self.csrftok = rsp['CSRFToken']
                     self.channel = rsp['channel']
                     self.curruser = self.DEFAULT_USER
@@ -85,7 +82,7 @@ class NodeHandler(generic.NodeHandler):
         if self.curruser:
             authdata['username'] = self.curruser
             authdata['password'] = self.currpass
-            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+            rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
             if rsp.status != 200:
                 return None
             self.csrftok = rsp['CSRFToken']
@@ -93,7 +90,7 @@ class NodeHandler(generic.NodeHandler):
             return wc
         authdata['username'] = self.targuser
         authdata['password'] = self.targpass
-        rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+        rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
         if status != 200:
             return None
         self.curruser = self.targuser
