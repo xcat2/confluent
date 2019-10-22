@@ -170,6 +170,10 @@ class NodeHandler(immhandler.NodeHandler):
                 pwdchanged = True
             if '_csrf_token' in wc.cookies:
                 wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            if pwdchanged:
+                # Remove the minimum change interval, to allow sane 
+                # password changes after provisional changes
+                self.set_password_policy('')
             return (wc, pwdchanged)
 
     @property
@@ -226,9 +230,9 @@ class NodeHandler(immhandler.NodeHandler):
         if wc:
             return wc
 
-    def set_password_policy(self):
+    def set_password_policy(self, strruleset):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
-        for rule in self.ruleset.split(','):
+        for rule in strruleset.split(','):
             if '=' not in rule:
                 continue
             name, value = rule.split('=')
@@ -350,14 +354,14 @@ class NodeHandler(immhandler.NodeHandler):
         # between hypothetical secure path and today.
         dpp = self.configmanager.get_node_attributes(
             nodename, 'discovery.passwordrules')
-        self.ruleset = dpp.get(nodename, {}).get(
+        strruleset = dpp.get(nodename, {}).get(
             'discovery.passwordrules', {}).get('value', '')
         wc = self.wc
         creds = self.configmanager.get_node_attributes(
             self.nodename, ['secret.hardwaremanagementuser',
             'secret.hardwaremanagementpassword'], decrypt=True)
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
-        self.set_password_policy()
+        self.set_password_policy(strruleset)
         if self._atdefaultcreds:
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
