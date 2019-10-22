@@ -584,9 +584,13 @@ class IpmiHandler(object):
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
+    def get_diags(self, savefile, progress):
+        return self.ipmicmd.get_diagnostic_data(
+            savefile, progress=progress, autosuffix=True)
+
     def handle_servicedata_fetch(self):
         u = firmwaremanager.Updater(
-            self.node, self.ipmicmd.get_diagnostic_data,
+            self.node, self.get_diags,
             self.inputdata.nodefile(self.node), self.tenant, type='ffdc',
             owner=self.current_user)
         self.output.put(msg.CreatedResource(

@@ -43,7 +43,7 @@ def execupdate(handler, filename, updateobj, type, owner, node):
                                    'detail': errstr})
         return
     if type == 'ffdc' and os.path.isdir(filename):
-        filename += '/' + node + '.svcdata'
+        filename += '/' + node
     try:
         if type == 'firmware':
             completion = handler(filename, progress=updateobj.handle_progress,
