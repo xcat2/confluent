@@ -50,11 +50,11 @@ except IndexError:
     sys.exit(1)
 client.check_globbing(noderange)
 deletemode = False
-if len(sys.argv) > 3:
+if len(args) > 2:
     argparser.print_help()
     sys.exit(1)
-if len(sys.argv) == 3:
-    if sys.argv[2] == 'clear':
+if len(args) == 2:
+    if args[1] == 'clear':
         deletemode = True
     else:
         argparser.print_help()

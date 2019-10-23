@@ -45,7 +45,7 @@ session = client.Command()
 exitcode = 0
 
 errorNodes = set([])
-
+session.stop_if_noderange_over(noderange, options.maxnodes)
 success = session.simple_noderange_command(noderange, 'configuration/management_controller/reset', 'reset', key='state', errnodes=errorNodes)   # = 0 if successful
 
 # Determine which nodes were successful and print them

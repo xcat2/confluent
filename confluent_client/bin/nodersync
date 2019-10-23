@@ -104,7 +104,7 @@ def run():
                     if desc['type'] == 'stdout':
                         if node not in pernodeout:
                             pernodeout[node] = ''
-                        pernodeout[node] += stringify(data)
+                        pernodeout[node] += client.stringify(data)
                         if '\n' in pernodeout[node]:
                             currout, pernodeout[node] = pernodeout[node].split('\n', 1)
                             if currout:
