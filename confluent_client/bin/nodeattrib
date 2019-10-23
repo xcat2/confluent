@@ -90,7 +90,7 @@ if len(args) > 1:
                     if oneval != twoval:
                         print('Values did not match.')
                 argassign[arg] = twoval
-        client.stop_if_noderange_over(noderange, options.maxnodes)
+        session.stop_if_noderange_over(noderange, options.maxnodes)
         exitcode=client.updateattrib(session,args,nodetype, noderange, options, argassign)
     try:
         # setting user output to what the user inputs
