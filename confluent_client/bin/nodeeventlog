@@ -38,6 +38,10 @@ if sys.version_info[0] < 3:
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] noderange [clear]")
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to clear if clearing log, '
+                          'prompting if over the threshold')            
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -51,6 +55,7 @@ if len(sys.argv) > 3:
     sys.exit(1)
 if len(sys.argv) == 3:
     if sys.argv[2] == 'clear':
+        session.stop_if_noderange_over(noderange, options.maxnodes)
         deletemode = True
     else:
         argparser.print_help()

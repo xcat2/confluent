@@ -68,6 +68,10 @@ argparser.add_option('-r', '--restoredefault', default=False,
                      help='Restore the configuration of the node '
                           'to factory default for given component. '
                           'Currently only uefi is supported')
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to configure, '
+                          'prompting if over the threshold')                            
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -205,6 +209,7 @@ else:
 session = client.Command()
 rcode = 0
 if options.restoredefault:
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     if options.restoredefault.lower() in (
         'sys', 'system', 'uefi', 'bios'):
         for fr in session.update(
@@ -225,6 +230,7 @@ if options.restoredefault:
                 options.restoredefault))
         sys.exit(1)
 if setmode:
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     if options.exclude:
         sys.stderr.write('Cannot use exclude and assign at the same time\n')
         sys.exit(1)

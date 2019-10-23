@@ -108,6 +108,7 @@ def createstorage(noderange, options, args):
         sys.stderr.write('-r and -d are required arguments to create array\n')
         sys.exit(1)
     session = client.Command()
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     names = options.name
     if names is None:
         names = ''.join(args)
@@ -132,6 +133,7 @@ def deletestorage(noderange, options, args):
     else:
         names = options.name
     session = client.Command()
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     for rsp in session.delete(
             '/noderange/{0}/configuration/storage/volumes/{1}'.format(
                 noderange, names)):
@@ -162,6 +164,7 @@ def setdisk(noderange, options, args):
         sys.stderr.write('diskset requires valid state as argument (hotspare, jbod, unconfigured)\n')
         sys.exit(1)
     session = client.Command()
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     scfg = session.update('/noderange/{0}/configuration/storage/disks/{1}'.format(noderange, names), {'state': args[0]})
     _print_cfg(scfg)
 
@@ -202,6 +205,10 @@ def main():
                          help='Comma separated list of stripsizes to use when creating volumes. '
                             'This value is in kilobytes.  The default behavior is to allow the '
                             'storage controller to decide.')
+    argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to configure storage on, '
+                          'prompting if over the threshold') 
     (options, args) = argparser.parse_args()
     if len(args) == 1:
         args.append('show')

@@ -46,6 +46,10 @@ def run():
                          help='Number of commands to run at a time')
     argparser.add_option('-n', '--nonodeprefix', action='store_true',
                          help='Do not prefix output with node names')
+    argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to run the command with, '
+                          'prompting if over the threshold')                           
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
     # processes can be unkind for the unaware on memory pressure and such...
     argparser.disable_interspersed_args()
@@ -63,7 +67,7 @@ def run():
     pipedesc = {}
     pendingexecs = deque()
     exitcode = 0
-
+    c.stop_if_noderange_over(args[0], options.maxnodes)
     for exp in c.create('/noderange/{0}/attributes/expression'.format(args[0]),
                         {'expression': cmdstr}):
         if 'error' in exp:

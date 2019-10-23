@@ -239,8 +239,7 @@ class Command(object):
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res, errnodes)
             else:
-                if promptover is not None:
-                    self.stop_if_noderange_over(noderange, promptover)
+                self.stop_if_noderange_over(noderange, promptover)
                 kwargs[ikey] = input
                 for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
@@ -252,9 +251,16 @@ class Command(object):
             return 0
     
     def stop_if_noderange_over(self, noderange, maxnodes):
+        if maxnodes is None:
+            return
         nsize = self.get_noderange_size(noderange)
         if nsize > maxnodes:
-            p = input('Command is about to affect {0} nodes, continue (y/n)?'.format(nsize))
+            if nsize == 1:
+                nodename = list(self.read(
+                    '/noderange/{0}/nodes/'.format(noderange)))[0].get('item', {}).get('href', None)
+                p = input('Command is about to affect node {0}, continue (y/n)? '.format(nodename))
+            else:
+                p = input('Command is about to affect {0} nodes, continue (y/n)? '.format(nsize))
             if p.lower() != 'y':
                 raise Exception("Aborting at user request")
         
