@@ -258,6 +258,7 @@ class Command(object):
             if nsize == 1:
                 nodename = list(self.read(
                     '/noderange/{0}/nodes/'.format(noderange)))[0].get('item', {}).get('href', None)
+                nodename = nodename[:-1]
                 p = input('Command is about to affect node {0}, continue (y/n)? '.format(nodename))
             else:
                 p = input('Command is about to affect {0} nodes, continue (y/n)? '.format(nsize))
