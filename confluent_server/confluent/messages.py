@@ -1489,12 +1489,14 @@ class Volume(ConfluentMessage):
 
 class Disk(ConfluentMessage):
     valid_states = set([
+        'fault',
         'jbod',
         'unconfigured',
         'hotspare',
         'online',
     ])
     state_aliases = {
+        'unconfigured bad': 'fault',
         'unconfigured good': 'unconfigured',
         'global hot spare': 'hotspare',
         'dedicated hot spare': 'hotspare',
