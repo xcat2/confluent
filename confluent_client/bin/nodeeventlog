@@ -55,7 +55,6 @@ if len(sys.argv) > 3:
     sys.exit(1)
 if len(sys.argv) == 3:
     if sys.argv[2] == 'clear':
-        session.stop_if_noderange_over(noderange, options.maxnodes)
         deletemode = True
     else:
         argparser.print_help()
@@ -93,6 +92,7 @@ def format_event(evt):
 
 if deletemode:
     func = session.delete
+    session.stop_if_noderange_over(noderange, options.maxnodes)
 else:
     func = session.read
 for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
