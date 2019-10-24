@@ -1137,6 +1137,8 @@ class ConfigManager(object):
             attribute, match = expression.split('=')
         else:
             raise Exception('Invalid Expression')
+        if attribute.startswith('secret.'):
+            raise Exception('Filter by secret attributes is not supported')
         for node in nodes:
             try:
                 currvals = [self._cfgstore['nodes'][node][attribute]['value']]
