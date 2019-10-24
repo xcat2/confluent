@@ -42,7 +42,10 @@ python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUI
 for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
     rm $RPM_BUILD_ROOT/$file
 done
-grep -v confluent/__init__.py INSTALLED_FILES.bare > INSTALLED_FILES
+grep -v confluent/__init__.py INSTALLED_FILES.bare | grep -v etc/init.d/confluent > INSTALLED_FILES
+rm $RPM_BUILD_ROOT/etc/init.d/confluent
+rmdir $RPM_BUILD_ROOT/etc/init.d
+rmdir $RPM_BUILD_ROOT/etc
 cat INSTALLED_FILES
 
 %triggerin -- python-pyghmi
