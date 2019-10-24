@@ -109,10 +109,10 @@ class NodeHandler(generic.NodeHandler):
             authdata['password'] = self.currpass
             if authmode != 1:
                 rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
-            if authmode == 1 or rsp.status == 403:
+            if authmode == 1 or status == 403:
                 wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
                 rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
-            if rsp.status != 200:
+            if status != 200:
                 return None
             self.csrftok = rsp['CSRFToken']
             self.channel = rsp['channel']
@@ -121,7 +121,7 @@ class NodeHandler(generic.NodeHandler):
         authdata['password'] = self.targpass
         if authmode != 1:
             rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
-        if authmode == 1 or rsp.status == 403:
+        if authmode == 1 or status == 403:
             wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
             rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
         if status != 200:
