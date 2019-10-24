@@ -44,6 +44,13 @@ class NodeHandler(generic.NodeHandler):
         self.atdefault = True
         super(NodeHandler, self).__init__(info, configmanager)
 
+    def scan(self):
+        c = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        i = c.grab_json_response('/redfish/v1/')
+        uuid = i.get('UUID', None)
+        if uuid:
+            self.info['uuid'] = uuid
+
     def validate_cert(self, certificate):
         # broadly speaking, merely checks consistency moment to moment,
         # but if https_cert gets stricter, this check means something
