@@ -84,7 +84,6 @@ class WrappedWebSocket(websocket.WebSocket):
                      raise Exception('Redirect limit hit')
                 url = self.handshake_response.headers['location']
                 self.sock.close()
-                print(repr(options))
                 return self.connect(url, **options)
             self.connected = True
         except:
