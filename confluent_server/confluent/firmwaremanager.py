@@ -50,6 +50,9 @@ def execupdate(handler, filename, updateobj, type, owner, node):
                                  bank=updateobj.bank)
         else:
             completion = handler(filename, progress=updateobj.handle_progress)
+        if type == 'ffdc' and completion:
+            filename = completion
+            completion = None
         if completion is None:
             completion = 'complete'
         if owner:
