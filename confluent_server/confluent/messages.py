@@ -1493,6 +1493,7 @@ class Disk(ConfluentMessage):
         'jbod',
         'unconfigured',
         'hotspare',
+        'rebuilding',
         'online',
     ])
     state_aliases = {
