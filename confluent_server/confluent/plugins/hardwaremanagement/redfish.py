@@ -175,7 +175,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
                     raise exc.TargetEndpointUnreachable(se.strerror)
                 else:
                     raise exc.TargetEndpointUnreachable(str(se))
-            if isinstance(se, socket.timeout) or (len(se) > 1 and se[1] == 'EHOSTUNREACH'):
+            if isinstance(se, socket.timeout):
                 raise exc.TargetEndpointUnreachable('timeout')
             raise
         except pygexc.PyghmiException as pe:
