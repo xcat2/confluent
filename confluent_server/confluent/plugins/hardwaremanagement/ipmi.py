@@ -278,6 +278,7 @@ def _donothing(data):
 
 class IpmiConsole(conapi.Console):
     configattributes = frozenset(_configattributes)
+    bmctonodemapping = {}
 
     def __init__(self, node, config):
         self.error = None
@@ -295,10 +296,18 @@ class IpmiConsole(conapi.Console):
         self.bmc = connparams['bmc']
         self.port = connparams['port']
         self.connected = False
+        # ok, is self.bmc unique among nodes already
         # Cannot actually create console until 'connect', when we get callback
+        if (self.bmc in self.bmctonodemapping and
+                self.bmctonodemapping[self.bmc] != node):
+            raise Exception(
+                "Duplicate hardwaremanagement.manager attribute for {0} and {1}".format(
+                    node, self.bmctonodemapping[self.bmc]))
+        self.bmctonodemapping[self.bmc] = node
 
     def __del__(self):
         self.solconnection = None
+        del self.bmctonodemapping[self.bmc]
 
     def handle_data(self, data):
         if type(data) == dict:
