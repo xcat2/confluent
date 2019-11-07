@@ -362,13 +362,17 @@ class ConsoleHandler(object):
         if self.reconnect:
             self.reconnect.cancel()
             self.reconnect = None
+        strerror = ('The console.method attribute for this node is '
+                'not configured,\r\nset it to a valid value for console '
+                'function')
         try:
             self._console = list(plugin.handle_path(
                 self._plugin_path.format(self.node),
                 "create", self.cfgmgr))[0]
         except (exc.NotImplementedException, exc.NotFoundException):
             self._console = None
-        except:
+        except Exception as e:
+            strerror = str(e)
             if _tracelog:
                 _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                               event=log.Events.stacktrace)
@@ -381,13 +385,9 @@ class ConsoleHandler(object):
             self._send_rcpts({'connectstate': self.connectstate,
                               'error': self.error})
             self.feedbuffer(
-                '\x1bc\x1b[2J\x1b[1;1H[The console.method attribute for this node is '
-                'not configured,\r\nset it to a valid value for console '
-                'function]')
+                '\x1bc\x1b[2J\x1b[1;1H[{0}]'.format(strerror))
             self._send_rcpts(
-                '\x1bc\x1b[2J\x1b[1;1H[The console.method attribute for this node is '
-                'not configured,\r\nset it to a valid value for console '
-                'function]')
+                '\x1bc\x1b[2J\x1b[1;1H[{0}]'.format(strerror))
             self.clearerror = True
             return
         if self.clearerror:
