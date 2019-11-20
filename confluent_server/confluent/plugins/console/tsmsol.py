@@ -27,7 +27,11 @@ import pyghmi.exceptions as pygexc
 import pyghmi.redfish.command as rcmd
 import eventlet
 import eventlet.green.ssl as ssl
-websocket = eventlet.import_patched('websocket')
+try:
+    websocket = eventlet.import_patched('websocket')
+    wso = websocket.WebSocket
+except Exception:
+    wso = object
 
 def get_conn_params(node, configdata):
     if 'secret.hardwaremanagementuser' in configdata:
@@ -51,7 +55,7 @@ _configattributes = ('secret.hardwaremanagementuser',
                      'secret.hardwaremanagementpassword',
                      'hardwaremanagement.manager')
 
-class WrappedWebSocket(websocket.WebSocket):
+class WrappedWebSocket(wso):
 
     def set_verify_callback(self, callback):
         self._certverify = callback
