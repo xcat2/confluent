@@ -7,7 +7,7 @@ nodesupport(8) -- Utilities for interacting with vendor support
 
 ## DESCRIPTION
 
-`nodesupport` provides capabilities associated with interactiong with support.
+`nodesupport` provides capabilities associated with interacting with support.
 Currently it only has the `servicedata` subcommand.  `servicedata` takes
 an argument that is either a directory name (that can be used for a single node
 or multiple nodes) or a file name (only to be used with single node noderange).
@@ -15,6 +15,9 @@ Note that the file will be downloaded to the confluent server that actually
 connects to the managed system, so it will download to the remote system if running
 remotely and will download to the collective.manager indicated system if
 running in collective mode.
+
+Note that due to vendor filename requirements, any filename may have vendor
+specific suffixes added to any file produced.
 
 ## EXAMPLES
 
