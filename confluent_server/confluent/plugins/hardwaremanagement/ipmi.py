@@ -42,6 +42,11 @@ import traceback
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 pci_cache = {}
 
 def get_dns_txt(qstring):
@@ -131,7 +136,7 @@ def hex2bin(hexstring):
     if len(hexvals) < 2:
         hexvals = hexstring.split(' ')
     if len(hexvals) < 2:
-        hexvals = [hexstring[i:i+2] for i in xrange(0, len(hexstring), 2)]
+        hexvals = [hexstring[i:i+2] for i in range(0, len(hexstring), 2)]
     bytedata = [int(i, 16) for i in hexvals]
     return bytearray(bytedata)
 
@@ -671,7 +676,7 @@ class IpmiHandler(object):
             if len(self.element) == 4:
                 # A list of destinations
                 maxdest = self.ipmicmd.get_alert_destination_count()
-                for alertidx in xrange(0, maxdest + 1):
+                for alertidx in range(0, maxdest + 1):
                     self.output.put(msg.ChildCollection(alertidx))
                 return
             elif len(self.element) == 5:
