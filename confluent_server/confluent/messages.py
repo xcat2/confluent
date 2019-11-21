@@ -1379,6 +1379,8 @@ class InputAlertDestination(ConfluentMessage):
         self.alertcfg = {}
         if multinode:  # keys are node names
             for node in inputdata:
+                if not isinstance(inputdata[node], dict):
+                    break
                 self.alertcfg[node] = inputdata[node]
                 for key in inputdata[node]:
                     if key not in self.valid_alert_params:
@@ -1391,7 +1393,8 @@ class InputAlertDestination(ConfluentMessage):
                     else:
                         self.alertcfg[node][key] = \
                             self.valid_alert_params[key](inputdata[node][key])
-        else:
+            else:
+                return
             for key in inputdata:
                 if key not in self.valid_alert_params:
                     raise exc.InvalidArgumentException(
