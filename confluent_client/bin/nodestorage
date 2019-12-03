@@ -63,10 +63,16 @@ def _print_cfg(scfg):
             sys.stderr.write(e['error'] + '\n')
             exitcode = e.get('errorcode', 1)
         for node in e.get('databynode', {}):
+            curr = e['databynode'][node]
+            if 'error' in curr:
+                if 'no available drives' in curr['error']:
+                    curr['error'] += ' (drives must be in unconfigured state to be available, they must not be in jbod or online state)'
+                sys.stderr.write('{0}: {1}\n'.format(node, curr['error']))
+                exitcode = curr.get('errorcode', 1)
+                continue
             if node not in storagebynode:
                 storagebynode[node] = {'disks': [], 'arrays': [],
                                        'volumes': []}
-            curr = e['databynode'][node]
             storagebynode[node][curr['type'] + 's'].append(curr)
     for node in storagebynode:
         for disk in sorted(storagebynode[node]['disks'],
