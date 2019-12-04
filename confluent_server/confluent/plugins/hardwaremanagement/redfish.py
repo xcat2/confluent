@@ -181,6 +181,9 @@ class IpmiCommandWrapper(ipmicommand.Command):
         except pygexc.PyghmiException as pe:
             if 'Access Denied' in str(pe):
                 raise exc.TargetEndpointBadCredentials()
+            if 'Redfish not ready' in str(pe):
+                raise exc.TargetEndpointUnreachable('Redfish not yet ready')
+            raise
 
     def close_confluent(self):
         if self._attribwatcher:
