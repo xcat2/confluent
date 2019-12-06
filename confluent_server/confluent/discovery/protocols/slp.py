@@ -84,6 +84,8 @@ def _parse_SrvRply(parsed):
     :return:
     """
     payload = parsed['payload']
+    if len(payload) < 4:
+        return
     ecode, ucount = struct.unpack('!HH', bytes(payload[0:4]))
     if ecode:
         parsed['errorcode'] = ecode
@@ -234,13 +236,20 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
 
 
 def _grab_rsps(socks, rsps, interval, xidmap):
-    r, _, _ = select.select(socks, (), (), interval)
+    r = None
+    res = select.select(socks, (), (), interval)
+    if res:
+        r = res[0]
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
             neighutil.refresh_neigh()
             _parse_slp_packet(rsp, peer, rsps, xidmap)
-            r, _, _ = select.select(socks, (), (), interval)
+            res = select.select(socks, (), (), interval)
+            if not res:
+                r = None
+            else:
+                r = res[0]
 
 
 
@@ -560,7 +569,7 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     # now to analyze and flesh out the responses
     for id in rsps:
         if 'service:ipmi' in rsps[id]['services']:
-            if 'service:ipmi://Athena:623' in rsps[id]['urls']:
+            if 'service:ipmi://Athena:623' in rsps[id].get('urls', ''):
                 rsps[id]['services'] = ['service:thinkagile-storage']
             else:
                 continue
