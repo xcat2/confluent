@@ -312,7 +312,10 @@ class IpmiConsole(conapi.Console):
 
     def __del__(self):
         self.solconnection = None
-        del self.bmctonodemapping[self.bmc]
+        try:
+            del self.bmctonodemapping[self.bmc]
+        except KeyError:
+            pass
 
     def handle_data(self, data):
         if type(data) == dict:
