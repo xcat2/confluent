@@ -107,11 +107,14 @@ class PubkeyInvalid(ConfluentException):
         self.fingerprint = fingerprint
         self.attrname = attribname
         self.message = text
+        certtxt = base64.b64encode(certificate)
+        if not isinstance(certtxt, str):
+            certtxt = certtxt.decode('utf8')
         bodydata = {'message': text,
                     'event': event,
                     'fingerprint': fingerprint,
                     'fingerprintfield': attribname,
-                    'certificate': base64.b64encode(certificate)}
+                    'certificate': certtxt}
         self.errorbody = json.dumps(bodydata)
 
     def get_error_body(self):

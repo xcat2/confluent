@@ -208,7 +208,7 @@ class NodeHandler(immhandler.NodeHandler):
                 # however the target *will* demand a new password... if it's currently
                 # PASSW0RD
                 # use TempW0rd42 to avoid divulging a real password on the line
-                # This is replacing one well known password (PASSW0RD) with another 
+                # This is replacing one well known password (PASSW0RD) with another
                 # (TempW0rd42)
                 passwd = 'TempW0rd42'
             wc, pwdchanged = self.get_webclient('USERID', 'PASSW0RD', passwd)
@@ -363,6 +363,9 @@ class NodeHandler(immhandler.NodeHandler):
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
         self.set_password_policy(strruleset)
         if self._atdefaultcreds:
+            if isdefault and self.tmppasswd:
+                raise Exception(
+                    'Request to use default credentials, but refused by target after it has been changed to {0}'.format(self.tmppasswd))
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
         self._convert_sha256account(user, passwd, wc)

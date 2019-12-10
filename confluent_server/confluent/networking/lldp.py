@@ -125,7 +125,8 @@ def _dump_neighbordatum(info):
 
 def b64tohex(b64str):
     bd = base64.b64decode(b64str)
-    return ''.join(['{0:02x}'.format(ord(x)) for x in bd])
+    bd = bytearray(bd)
+    return ''.join(['{0:02x}'.format(x) for x in bd])
 
 def get_fingerprint(switch, port, configmanager, portmatch):
     update_switch_data(switch, configmanager)
