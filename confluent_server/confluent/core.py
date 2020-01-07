@@ -224,7 +224,7 @@ def _init_core():
                     'advanced': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
-                    }),                    
+                    }),
                 },
             },
             'storage': {

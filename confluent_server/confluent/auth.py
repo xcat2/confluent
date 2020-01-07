@@ -58,9 +58,9 @@ _allowedbyrole = {
             '/node*/configuration/*',
         ],
         'update': [
-            '/discovery/*', 
+            '/discovery/*',
             '/networking/macs/rescan',
-            '/node*/power/state', 
+            '/node*/power/state',
             '/node*/power/reseat',
             '/node*/attributes/*',
             '/node*/media/*tach',
