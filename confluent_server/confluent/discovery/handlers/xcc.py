@@ -175,6 +175,7 @@ class NodeHandler(immhandler.NodeHandler):
                 # password changes after provisional changes
                 self.set_password_policy('')
             return (wc, pwdchanged)
+        return (None, None)
 
     @property
     def wc(self):
