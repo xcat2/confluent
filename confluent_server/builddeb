@@ -3,8 +3,12 @@ cd `dirname $0`
 PKGNAME=$(basename $(pwd))
 DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
 OPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
+PYEXEC=python3
+DSCARGS="--with-python3=True --with-python2=False"
 if grep wheezy /etc/os-release; then
     DPKGNAME=python-$DPKGNAME
+    PYEXEC=python
+    DSCARGS="--with-python3=False --with-python2=True"
 fi
 cd ..
 mkdir -p /tmp/confluent # $DPKGNAME
@@ -24,15 +28,15 @@ install-scripts=/opt/confluent/bin
 package=$DPKGNAME
 EOF
 
-python setup.py sdist > /dev/null 2>&1
-py2dsc dist/*.tar.gz
+$PYEXEC setup.py sdist > /dev/null 2>&1
+py2dsc $DSCARGS dist/*.tar.gz
 shopt -s extglob
 cd deb_dist/!(*.orig)/
 if [ "$OPKGNAME" = "confluent-server" ]; then
     if grep wheezy /etc/os-release; then
         sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex, python-dateutil, python-pyopenssl/' debian/control
     else
-        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python-lxml, python-eficompressor, python-pycryptodome, python-dateutil, python-websocket/' debian/control
+        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket/' debian/control
     fi
     if grep wheezy /etc/os-release; then
         echo 'confluent_client python-confluent-client' >> debian/pydist-overrides
