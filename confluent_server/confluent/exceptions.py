@@ -17,7 +17,15 @@
 
 import base64
 import json
+import msgpack
 
+def deserilaize_exc(msg):
+    excd = msgpack.unpackb(msg)
+    if excd[0] not in globals():
+        return False
+    if not issubclass(excd[0], ConfluentException):
+        return False
+    return globals(excd[0])(*excd[1])
 
 class ConfluentException(Exception):
     apierrorcode = 500
@@ -26,6 +34,9 @@ class ConfluentException(Exception):
     def get_error_body(self):
         errstr = ' - '.join((self._apierrorstr, str(self)))
         return json.dumps({'error': errstr })
+
+    def serialize(self):
+        return msgpack.packb([self.__class__.__name__, [str(self)]])
 
     @property
     def apierrorstr(self):
@@ -104,6 +115,7 @@ class PubkeyInvalid(ConfluentException):
 
     def __init__(self, text, certificate, fingerprint, attribname, event):
         super(PubkeyInvalid, self).__init__(self, text)
+        self.myargs = (text, certificate, fingerprint, attribname, event)
         self.fingerprint = fingerprint
         self.attrname = attribname
         self.message = text
@@ -116,6 +128,9 @@ class PubkeyInvalid(ConfluentException):
                     'fingerprintfield': attribname,
                     'certificate': certtxt}
         self.errorbody = json.dumps(bodydata)
+
+    def serialize(self):
+        return msgpack.packb([self.__class__.__name__, self.myargs])
 
     def get_error_body(self):
         return self.errorbody
