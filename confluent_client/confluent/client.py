@@ -429,6 +429,10 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
     path = '/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)
     return print_attrib_path(path, session, requestargs, options)
 
+def _sort_attrib(k):
+    if isinstance(k[1], dict) and k[1].get('sortid', None) is not None:
+        return k[1]['sortid']
+    return k[0]
 
 def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
     exitcode = 0
@@ -439,9 +443,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
             exitcode = 1
             continue
         for node in sorted(res['databynode']):
-            for attr, val in sorted(
-                    res['databynode'][node].items(),
-                    key=lambda k: k[1].get('sortid', k[0]) if isinstance(k[1], dict) else k[0]):
+            for attr, val in sorted(res['databynode'][node].items(), key=_sort_attrib):
                 if attr == 'error':
                     sys.stderr.write('{0}: Error: {1}\n'.format(node, val))
                     continue
