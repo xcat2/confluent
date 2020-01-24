@@ -86,7 +86,7 @@ def _htmlify_structure(indict):
 
 
 def msg_deserialize(packed):
-    m = msgpack.unpackb(packed)
+    m = msgpack.unpackb(packed, raw=False)
     cls = globals()[m[0]]
     if issubclass(cls, ConfluentMessage) or issubclass(cls, ConfluentNodeError):
         return cls(*m[1:])
@@ -116,7 +116,7 @@ class ConfluentMessage(object):
     def serialize(self):
         msg = [self.__class__.__name__]
         msg.extend(self.myargs)
-        return msgpack.packb(msg)
+        return msgpack.packb(msg, use_bin_type=True)
 
     @classmethod
     def deserialize(cls, data):
@@ -230,7 +230,8 @@ class ConfluentNodeError(object):
 
     def serialize(self):
         return msgpack.packb(
-            [self.__class__.__name__, self.node, self.error])
+            [self.__class__.__name__, self.node, self.error],
+            use_bin_type=True)
 
     @classmethod
     def deserialize(cls, data):

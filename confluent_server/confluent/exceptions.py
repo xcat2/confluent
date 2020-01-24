@@ -19,8 +19,8 @@ import base64
 import json
 import msgpack
 
-def deserilaize_exc(msg):
-    excd = msgpack.unpackb(msg)
+def deserialize_exc(msg):
+    excd = msgpack.unpackb(msg, raw=False)
     if excd[0] not in globals():
         return False
     if not issubclass(excd[0], ConfluentException):
@@ -36,7 +36,8 @@ class ConfluentException(Exception):
         return json.dumps({'error': errstr })
 
     def serialize(self):
-        return msgpack.packb([self.__class__.__name__, [str(self)]])
+        return msgpack.packb([self.__class__.__name__, [str(self)]],
+                             use_bin_type=True)
 
     @property
     def apierrorstr(self):
@@ -130,7 +131,8 @@ class PubkeyInvalid(ConfluentException):
         self.errorbody = json.dumps(bodydata)
 
     def serialize(self):
-        return msgpack.packb([self.__class__.__name__, self.myargs])
+        return msgpack.packb([self.__class__.__name__, self.myargs],
+                             use_bin_type=True)
 
     def get_error_body(self):
         return self.errorbody

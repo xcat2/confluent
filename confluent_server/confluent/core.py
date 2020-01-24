@@ -690,7 +690,7 @@ def handle_dispatch(connection, cert, dispatch, peername):
         # under 0x20 or so.
         connection.close()
         return
-    dispatch = msgpack.unpackb(dispatch[2:])
+    dispatch = msgpack.unpackb(dispatch[2:], raw=False)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
     inputdata = dispatch['inputdata']
@@ -726,24 +726,26 @@ def handle_dispatch(connection, cert, dispatch, peername):
                 configmanager=configmanager,
                 inputdata=inputdata))
         for res in itertools.chain(*passvalues):
-            _forward_rsp(connection, res, pversion)
+            _forward_rsp(connection, res)
     except Exception as res:
-        _forward_rsp(connection, res, pversion)
+        _forward_rsp(connection, res)
     connection.sendall('\x00\x00\x00\x00\x00\x00\x00\x00')
 
 
-def _forward_rsp(connection, res, pversion):
+def _forward_rsp(connection, res):
     try:
        r = res.serialize()
     except AttributeError:
         if isinstance(res, Exception):
-            r = msgpack.packb(['Exception', str(res)])
+            r = msgpack.packb(['Exception', str(res)], use_bin_type=True)
         else:
             r = msgpack.packb(
-                ['Exception', 'Unable to serialize response ' + repr(res)])
+                ['Exception', 'Unable to serialize response ' + repr(res)],
+                use_bin_type=True)
     except Exception:
         r = msgpack.packb(
-                ['Exception', 'Unable to serialize response ' + repr(res)])
+                ['Exception', 'Unable to serialize response ' + repr(res)],
+                use_bin_type=True)
     rlen = len(r)
     if not rlen:
         return
@@ -985,7 +987,7 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     dreq =  b'\x01\x03' + msgpack.packb(
         {'name': myname, 'nodes': list(nodes),
         'path': element,'tenant': configmanager.tenant,
-        'operation': operation, 'inputdata': inputdata})
+        'operation': operation, 'inputdata': inputdata}, use_bin_type=True)
     tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
     remote.sendall(dreq)
     while True:
