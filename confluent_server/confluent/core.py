@@ -67,7 +67,7 @@ import struct
 import sys
 
 pluginmap = {}
-dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish')
+dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol')
 
 
 def seek_element(currplace, currkey):
