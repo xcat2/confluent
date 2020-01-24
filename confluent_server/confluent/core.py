@@ -737,15 +737,15 @@ def _forward_rsp(connection, res):
        r = res.serialize()
     except AttributeError:
         if isinstance(res, Exception):
-            r = msgpack.packb(['Exception', str(res)], use_bin_type=True)
+            r = msgpack.packb(['Exception', str(res)], use_bin_type=False)
         else:
             r = msgpack.packb(
                 ['Exception', 'Unable to serialize response ' + repr(res)],
-                use_bin_type=True)
+                use_bin_type=False)
     except Exception:
         r = msgpack.packb(
                 ['Exception', 'Unable to serialize response ' + repr(res)],
-                use_bin_type=True)
+                use_bin_type=False)
     rlen = len(r)
     if not rlen:
         return
@@ -987,7 +987,7 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
     dreq =  b'\x01\x03' + msgpack.packb(
         {'name': myname, 'nodes': list(nodes),
         'path': element,'tenant': configmanager.tenant,
-        'operation': operation, 'inputdata': inputdata}, use_bin_type=True)
+        'operation': operation, 'inputdata': inputdata}, use_bin_type=False)
     tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
     remote.sendall(dreq)
     while True:

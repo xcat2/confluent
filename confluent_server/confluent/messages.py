@@ -116,7 +116,7 @@ class ConfluentMessage(object):
     def serialize(self):
         msg = [self.__class__.__name__]
         msg.extend(self.myargs)
-        return msgpack.packb(msg, use_bin_type=True)
+        return msgpack.packb(msg, use_bin_type=False)
 
     @classmethod
     def deserialize(cls, data):
@@ -231,7 +231,7 @@ class ConfluentNodeError(object):
     def serialize(self):
         return msgpack.packb(
             [self.__class__.__name__, self.node, self.error],
-            use_bin_type=True)
+            use_bin_type=False)
 
     @classmethod
     def deserialize(cls, data):

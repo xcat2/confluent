@@ -37,7 +37,7 @@ class ConfluentException(Exception):
 
     def serialize(self):
         return msgpack.packb([self.__class__.__name__, [str(self)]],
-                             use_bin_type=True)
+                             use_bin_type=False)
 
     @property
     def apierrorstr(self):
@@ -132,7 +132,7 @@ class PubkeyInvalid(ConfluentException):
 
     def serialize(self):
         return msgpack.packb([self.__class__.__name__, self.myargs],
-                             use_bin_type=True)
+                             use_bin_type=False)
 
     def get_error_body(self):
         return self.errorbody
