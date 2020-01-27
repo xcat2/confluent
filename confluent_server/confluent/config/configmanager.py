@@ -609,6 +609,8 @@ def relay_slaved_requests(name, listener):
                         rpc += nrpc
                     rpc = msgpack.unpackb(rpc)
                     exc = None
+                    if not (rpc['function'].startswith('_rpc_') or rpc['function'].endswith('_collective_member')):
+                        raise Exception('Unsupported function {0} called'.format(rpc['function']))
                     try:
                         globals()[rpc['function']](*rpc['args'])
                     except Exception as e:
@@ -765,6 +767,8 @@ def follow_channel(channel):
                 if 'txcount' in rpc:
                     _txcount = rpc['txcount']
                 if 'function' in rpc:
+                    if not (rpc['function'].startswith('_true') or rpc['function'].startswith('_rpc')):
+                        raise Exception("Received unsupported function call: {0}".format(rpc['function']))
                     try:
                         globals()[rpc['function']](*rpc['args'])
                     except Exception as e:
