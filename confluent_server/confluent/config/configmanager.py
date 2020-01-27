@@ -71,6 +71,7 @@ import eventlet.green.select as select
 import eventlet.green.threading as gthread
 import fnmatch
 import json
+import msgpack
 import operator
 import os
 import random
@@ -101,10 +102,6 @@ _cfgstore = None
 _pendingchangesets = {}
 _txcount = 0
 _hasquorum = True
-if sys.version_info[0] >= 3:
-    lowestver = 4
-else:
-    lowestver = 2
 
 _attraliases = {
     'bmc': 'hardwaremanagement.manager',
@@ -317,8 +314,8 @@ def exec_on_leader(function, *args):
     while xid in _pendingchangesets:
         xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     _pendingchangesets[xid] = event.Event()
-    rpcpayload = cPickle.dumps({'function': function, 'args': args,
-                                'xid': xid}, protocol=cfgproto)
+    rpcpayload = msgpack.packb({'function': function, 'args': args,
+                                'xid': xid}, use_bin_type=False)
     rpclen = len(rpcpayload)
     cfgleader.sendall(struct.pack('!Q', rpclen))
     cfgleader.sendall(rpcpayload)
@@ -343,8 +340,8 @@ def exec_on_followers_unconditional(fnname, *args):
     global _txcount
     pushes = eventlet.GreenPool()
     _txcount += 1
-    payload = cPickle.dumps({'function': fnname, 'args': args,
-                             'txcount': _txcount}, protocol=lowestver)
+    payload = msgpack.packb({'function': fnname, 'args': args,
+                             'txcount': _txcount}, use_bin_type=False)
     for _ in pushes.starmap(
             _push_rpc, [(cfgstreams[s], payload) for s in cfgstreams]):
         pass
@@ -565,14 +562,9 @@ def set_global(globalname, value, sync=True):
         ConfigManager._bg_sync_to_file()
 
 cfgstreams = {}
-def relay_slaved_requests(name, listener, vers):
+def relay_slaved_requests(name, listener):
     global cfgleader
     global _hasquorum
-    global lowestver
-    if vers > 2 and sys.version_info[0] < 3:
-        vers = 2
-    if vers < lowestver:
-        lowestver = vers    
     pushes = eventlet.GreenPool()
     if name not in _followerlocks:
         _followerlocks[name] = gthread.RLock()
@@ -593,7 +585,7 @@ def relay_slaved_requests(name, listener, vers):
             while _hasquorum != _newquorum:
                 if _newquorum is not None:
                     _hasquorum = _newquorum
-                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
+                payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
                 for _ in pushes.starmap(
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -615,15 +607,15 @@ def relay_slaved_requests(name, listener, vers):
                         if not nrpc:
                             raise Exception('Truncated client error')
                         rpc += nrpc
-                    rpc = cPickle.loads(rpc)
+                    rpc = msgpack.unpackb(rpc)
                     exc = None
                     try:
                         globals()[rpc['function']](*rpc['args'])
                     except Exception as e:
                         exc = e
                     if 'xid' in rpc:
-                        res = _push_rpc(listener, cPickle.dumps({'xid': rpc['xid'],
-                                                           'exc': exc}, protocol=vers))
+                        res = _push_rpc(listener, msgpack.packb({'xid': rpc['xid'],
+                                                           'exc': exc}, use_bin_type=False))
                         if not res:
                             break
                 try:
@@ -642,7 +634,7 @@ def relay_slaved_requests(name, listener, vers):
             if cfgstreams:
                 _hasquorum = len(cfgstreams) >= (
                         len(_cfgstore['collective']) // 2)
-                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
+                payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
                 for _ in pushes.starmap(
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -684,19 +676,15 @@ class StreamHandler(object):
         self.sock = None
 
 
-def stop_following(replacement=None, proto=2):
+def stop_following(replacement=None):
     with _leaderlock:
         global cfgleader
-        global cfgproto
         if cfgleader and not isinstance(cfgleader, bool):
             try:
                 cfgleader.close()
             except Exception:
                 pass
         cfgleader = replacement
-        if proto > 2 and sys.version_info[0] < 3:
-            proto = 2
-        cfgproto = proto
 
 def stop_leading():
     for stream in list(cfgstreams):
@@ -754,15 +742,14 @@ def commit_clear():
     ConfigManager._bg_sync_to_file()
 
 cfgleader = None
-cfgproto = 2
 
 
-def follow_channel(channel, proto=2):
+def follow_channel(channel):
     global _txcount
     global _hasquorum
     try:
         stop_leading()
-        stop_following(channel, proto)
+        stop_following(channel)
         lh = StreamHandler(channel)
         msg = lh.get_next_msg()
         while msg:
@@ -774,7 +761,7 @@ def follow_channel(channel, proto=2):
                     if not nrpc:
                         raise Exception('Truncated message error')
                     rpc += nrpc
-                rpc = cPickle.loads(rpc)
+                rpc = msgpack.unpackb(rpc)
                 if 'txcount' in rpc:
                     _txcount = rpc['txcount']
                 if 'function' in rpc:

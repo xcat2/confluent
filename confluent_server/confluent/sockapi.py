@@ -123,8 +123,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         if authdata:
             cfm = authdata[1]
             authenticated = True
-    # version 0 == original, version 1 == pickle3 allowed
-    send_data(connection, "Confluent -- v{0} --".format(sys.version_info[0] - 2))
+    # version 0 == original, version 1 == pickle3 allowed, 2 = pickle forbidden, msgpack allowed
+    send_data(connection, "Confluent -- v2 --")
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
