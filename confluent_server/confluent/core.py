@@ -412,18 +412,22 @@ def create_user(inputdata, configmanager):
     try:
         username = inputdata['name']
         del inputdata['name']
+        role = inputdata['role']
+        del inputdata['role']
     except (KeyError, ValueError):
-        raise exc.InvalidArgumentException()
-    configmanager.create_user(username, attributemap=inputdata)
+        raise exc.InvalidArgumentException('Missing user name or role')
+    configmanager.create_user(username, role, attributemap=inputdata)
 
 
 def create_usergroup(inputdata, configmanager):
     try:
         groupname = inputdata['name']
+        role = inputdata['role']
         del inputdata['name']
+        del inputdata['role']
     except (KeyError, ValueError):
-        raise exc.InvalidArgumentException()
-    configmanager.create_usergroup(groupname)
+        raise exc.InvalidArgumentException("Missing user name or role")
+    configmanager.create_usergroup(groupname, role)
 
 
 def update_usergroup(groupname, attribmap, configmanager):

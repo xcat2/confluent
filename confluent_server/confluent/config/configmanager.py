@@ -1349,7 +1349,7 @@ class ConfigManager(object):
         _mark_dirtykey('usergroups', groupname, self.tenant)
         self._bg_sync_to_file()
 
-    def create_usergroup(self, groupname, role="Administrator"):
+    def create_usergroup(self, groupname, role):
         """Create a new user
 
         :param groupname: The name of the user group
@@ -1365,7 +1365,7 @@ class ConfigManager(object):
                               role)
         self._true_create_usergroup(groupname, role)
 
-    def _true_create_usergroup(self, groupname, role="Administrator"):
+    def _true_create_usergroup(self, groupname, role):
         if 'usergroups' not in self._cfgstore:
             self._cfgstore['usergroups'] = {}
         groupname = confluent.util.stringify(groupname)
@@ -1440,7 +1440,7 @@ class ConfigManager(object):
         self._bg_sync_to_file()
 
     def create_user(self, name,
-                    role="Administrator", uid=None, displayname=None,
+                    role, uid=None, displayname=None,
                     attributemap=None):
         """Create a new user
 
@@ -1459,7 +1459,7 @@ class ConfigManager(object):
                               role, uid, displayname, attributemap)
         self._true_create_user(name, role, uid, displayname, attributemap)
 
-    def _true_create_user(self, name, role="Administrator", uid=None,
+    def _true_create_user(self, name, role, uid=None,
                           displayname=None, attributemap=None):
         if 'idmap' not in _cfgstore['main']:
             _cfgstore['main']['idmap'] = {}
@@ -1478,9 +1478,10 @@ class ConfigManager(object):
             self._cfgstore['users'][name]['displayname'] = displayname
         _cfgstore['main']['idmap'][uid] = {
             'tenant': self.tenant,
-            'username': name
+            'username': name,
+            'role': role,
         }
-        if attributemap is not None:
+        if attributemap:
             self._true_set_user(name, attributemap)
         _mark_dirtykey('users', name, self.tenant)
         _mark_dirtykey('idmap', uid)
