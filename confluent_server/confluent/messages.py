@@ -247,7 +247,7 @@ class ConfluentNodeError(object):
     def strip_node(self, node):
         # NOTE(jjohnson2): For single node errors, raise exception to
         # trigger what a developer of that medium would expect
-        raise Exception(self.error)
+        raise Exception('{0}: {1}'.format(self.node, self.error))
 
 
 class ConfluentResourceUnavailable(ConfluentNodeError):
