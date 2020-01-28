@@ -286,9 +286,9 @@ class ConfluentTargetNotFound(ConfluentNodeError):
 
 class ConfluentTargetInvalidCredentials(ConfluentNodeError):
     apicode = 502
-    def __init__(self, node):
+    def __init__(self, node, errstr='bad credentials'):
         self.node = node
-        self.error = 'bad credentials'
+        self.error = errstr
 
     def strip_node(self, node):
         raise exc.TargetEndpointBadCredentials
