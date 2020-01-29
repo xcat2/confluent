@@ -1417,9 +1417,11 @@ class IpmiHandler(object):
     def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:
             try:
-                self.output.put(msg.ConfigSet(
-                    self.node,
-                    self.ipmicmd.get_bmc_configuration(extended=extended)))
+                if extended:
+                    bmccfg = self.ipmicmd.get_extended_bmc_configuration()
+                else:
+                    bmccfg = self.ipmicmd.get_bmc_configuration()
+                self.output.put(msg.ConfigSet(self.node, bmccfg))
             except Exception as e:
                 self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
