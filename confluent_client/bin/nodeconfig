@@ -54,6 +54,12 @@ argparser.add_option('-d', '--detail', dest='detail',
                      action='store_true', default=False,
                      help='Provide verbose information as available, such as '
                           'help text and possible valid values')
+argparser.add_option('-e', '--extra', dest='extra',
+                     action='store_true', default=False,
+                     help='Access extra configuration.  Extra configuration is generally '
+                           'reserved for unpopular or redundant options that may be slow to '
+                           'read.  Notably the IMM category on Lenovo settings is considered '
+                           'to be extra configuration')
 argparser.add_option('-x', '--exclude', dest='exclude',
                      action='store_true', default=False,
                      help='Treat positional arguments as items to not '
@@ -71,7 +77,7 @@ argparser.add_option('-r', '--restoredefault', default=False,
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to configure, '
-                          'prompting if over the threshold')                            
+                          'prompting if over the threshold')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -279,6 +285,10 @@ else:
         rcode = client.print_attrib_path(
                     '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
                     session, printbmc, options, attrprefix='bmc.')
+        if options.extra:
+            rcode |= client.print_attrib_path(
+                    '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
+                    session, printbmc, options)
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
@@ -287,7 +297,6 @@ else:
         else:
             path = '/noderange/{0}/configuration/system/advanced'.format(
                 noderange)
-        
         rcode = client.print_attrib_path(path, session, printsys,
                                          options)
 sys.exit(rcode)

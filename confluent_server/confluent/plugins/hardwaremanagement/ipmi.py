@@ -646,8 +646,10 @@ class IpmiHandler(object):
             return self.handle_ntp()
         elif self.element[1:4] == ['management_controller', 'extended', 'all']:
             return self.handle_bmcconfig()
-        elif self.element[1:4] == ['management_controller', 'extended', 'all']:
+        elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
             return self.handle_bmcconfig(True)
+        elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
+            return self.handle_bmcconfig(True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
@@ -1412,12 +1414,12 @@ class IpmiHandler(object):
                 'Cannot read the "clear" resource')
         self.ipmicmd.clear_system_configuration()
 
-    def handle_bmcconfig(self, advanced=False):
+    def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:
             try:
                 self.output.put(msg.ConfigSet(
                     self.node,
-                    self.ipmicmd.get_bmc_configuration()))
+                    self.ipmicmd.get_bmc_configuration(extended=extended)))
             except Exception as e:
                 self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
