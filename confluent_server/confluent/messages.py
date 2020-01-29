@@ -1505,8 +1505,8 @@ class Firmware(ConfluentMessage):
             for component in datum:
                 for field in datum[component]:
                     tdatum = datum[component]
-                if isinstance(tdatum[field], datetime):
-                    tdatum[field] = tdatum[field].strftime('%Y-%m-%dT%H:%M:%S')
+                    if isinstance(tdatum[field], datetime):
+                        tdatum[field] = tdatum[field].strftime('%Y-%m-%dT%H:%M:%S')
         self.myargs = (data, name)
         self.notnode = name is None
         self.desc = 'Firmware information'
