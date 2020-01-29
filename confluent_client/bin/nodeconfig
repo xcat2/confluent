@@ -109,6 +109,7 @@ assignment = {}
 queryparms = {}
 printsys = []
 printbmc = []
+printextbmc = []
 printallbmc = False
 setsys = {}
 forceset = False
@@ -183,11 +184,17 @@ def parse_config_line(arguments):
                                 del queryparms[path]
                             except KeyError:
                                 pass
-                if not matchedparms:
+                if param.lower() == 'imm':
+                    printextbmc.append(param)
+                    options.extra = True
+                elif not matchedparms:
                     printsys.append(param)
             elif param not in cfgpaths:
                 if param.startswith('bmc.'):
                     printbmc.append(param.replace('bmc.', ''))
+                elif param.lower().startswith('imm'):
+                    options.extra = True
+                    printextbmc.append(param)
                 else:
                     printsys.append(param)
             else:
@@ -281,14 +288,15 @@ else:
                                       NullOpt(), queryparms[path])
         if rc:
             sys.exit(rc)
-    if printbmc or printallbmc:
-        rcode = client.print_attrib_path(
-                    '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
-                    session, printbmc, options, attrprefix='bmc.')
+    if printsys == 'all' or printextbmc or printbmc or printallbmc:
+        if printbmc or not printextbmc:
+         rcode = client.print_attrib_path(
+                        '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
+                        session, printbmc, options, attrprefix='bmc.')
         if options.extra:
             rcode |= client.print_attrib_path(
                     '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
-                    session, printbmc, options)
+                    session, printextbmc, options)
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
