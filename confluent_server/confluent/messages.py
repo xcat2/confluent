@@ -1501,6 +1501,12 @@ class Firmware(ConfluentMessage):
     readonly = True
 
     def __init__(self, data, name):
+        for datum in data:
+            for component in datum:
+                for field in datum[component]:
+                    tdatum = datum[component]
+                if isinstance(tdatum[field], datetime):
+                    tdatum[field] = tdatum[field].strftime('%Y-%m-%dT%H:%M:%S')
         self.myargs = (data, name)
         self.notnode = name is None
         self.desc = 'Firmware information'
