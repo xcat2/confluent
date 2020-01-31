@@ -55,25 +55,23 @@ true
 %pre
 getent group confluent > /dev/null || /usr/sbin/groupadd -r confluent
 getent passwd confluent > /dev/null || /usr/sbin/useradd -r -g confluent -d /var/lib/confluent -s /sbin/nologin confluent
-mkdir -p /etc/confluent
-mkdir -p /var/lib/confluent
-mkdir -p /var/run/confluent
-mkdir -p /var/log/confluent
-chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent
+mkdir -p /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent /var/cache/confluent
+chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent /var/cache/confluent
 
 %post
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
 NEEDCHOWN=0
 NEEDSTART=0
-find /etc/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
-find /var/log/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
-find /var/run/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
+find /etc/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /var/log/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /var/run/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /var/cache/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
 if [ $NEEDCHOWN = 1 ]; then
     if systemctl is-active confluent > /dev/null; then
         NEEDSTART=1
         systemctl stop confluent
     fi
-    chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent
+    chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent /var/cache/confluent
 fi
 systemctl daemon-reload
 if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then /usr/bin/systemctl restart confluent >& /dev/null; fi
