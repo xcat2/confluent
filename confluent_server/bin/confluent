@@ -32,7 +32,7 @@ import confluent.main
 import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    confluent.main.run()
+    confluent.main.run(sys.argv)
 #except:
 #   pass
 #p.disable()
