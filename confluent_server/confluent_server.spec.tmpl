@@ -69,12 +69,13 @@ find /etc/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
 find /var/log/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
 find /var/run/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
 if [ $NEEDCHOWN = 1 ]; then
-    if systemctl is-active confluent > /dev/null;
+    if systemctl is-active confluent > /dev/null; then
         NEEDSTART=1
         systemctl stop confluent
     fi
     chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent
 fi
+systemctl daemon-reload
 if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then /usr/bin/systemctl restart confluent >& /dev/null; fi
 if [ ! -e /etc/pam.d/confluent ]; then
     ln -s /etc/pam.d/sshd /etc/pam.d/confluent
