@@ -48,7 +48,7 @@ rmdir $RPM_BUILD_ROOT/etc/init.d
 rmdir $RPM_BUILD_ROOT/etc
 cat INSTALLED_FILES
 
-%triggerin -- python-pyghmi
+%triggerin -- python-pyghmi, python3-pyghmi, python2-pyghmi
 if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
 true
 
@@ -63,7 +63,19 @@ chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluen
 
 %post
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
-if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
+NEEDCHOWN=0
+NEEDSTART=0
+find /etc/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
+find /var/log/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
+find /var/run/confluent -uid 0 | egrep '.*' && NEEDCHOWN=1
+if [ $NEEDCHOWN = 1 ]; then
+    if systemctl is-active confluent > /dev/null;
+        NEEDSTART=1
+        systemctl stop confluent
+    fi
+    chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent
+fi
+if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then /usr/bin/systemctl restart confluent >& /dev/null; fi
 if [ ! -e /etc/pam.d/confluent ]; then
     ln -s /etc/pam.d/sshd /etc/pam.d/confluent
 fi
