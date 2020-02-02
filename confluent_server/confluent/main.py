@@ -77,13 +77,16 @@ def _daemonize():
         print('confluent server starting as pid {0}'.format(thispid))
         os._exit(0)
     os.closerange(0, 2)
-    os.umask(63)
     os.open(os.devnull, os.O_RDWR)
     os.dup2(0, 1)
     os.dup2(0, 2)
+    log.daemonized = True
+
+
+def _redirectoutput():
+    os.umask(63)
     sys.stdout = log.Logger('stdout', buffered=False)
     sys.stderr = log.Logger('stderr', buffered=False)
-    log.daemonized = True
 
 
 def _updatepidfile():
@@ -206,7 +209,7 @@ def setlimits():
         pass
 
 
-def run():
+def run(args):
     setlimits()
     try:
         signal.signal(signal.SIGUSR1, dumptrace)
@@ -232,7 +235,10 @@ def run():
     except (OSError, IOError) as e:
         print(repr(e))
         sys.exit(1)
-    _daemonize()
+    if '-f' not in args:
+        _daemonize()
+    if '-o' not in args:
+        _redirectoutput()
     if havefcntl:
         _updatepidfile()
     signal.signal(signal.SIGINT, terminate)

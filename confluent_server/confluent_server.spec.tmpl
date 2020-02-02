@@ -13,9 +13,9 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 %if "%{dist}" == ".el8"
-Requires: python3-pyghmi >= 1.0.34, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client, python3-pyparsing, python3-paramiko, python3-dns, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-pyte, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-enum34, python3-asn1crypto, python3-cffi, python3-pyOpenSSL, python3-monotonic, python3-websocket-client
+Requires: python3-pyghmi >= 1.0.34, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client, python3-pyparsing, python3-paramiko, python3-dns, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-pyte, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-enum34, python3-asn1crypto, python3-cffi, python3-pyOpenSSL, python3-monotonic, python3-websocket-client python3-msgpack
 %else
-Requires: python-pyghmi >= 1.0.34, python-eventlet, python-greenlet, python-pycryptodomex >= 3.4.7, confluent_client, python-pyparsing, python-paramiko, python-dns, python-netifaces, python2-pyasn1 >= 0.2.3, python-pysnmp >= 4.3.4, python-pyte, python-lxml, python-eficompressor, python-setuptools, python-dateutil, python2-websocket-client
+Requires: python-pyghmi >= 1.0.34, python-eventlet, python-greenlet, python-pycryptodomex >= 3.4.7, confluent_client, python-pyparsing, python-paramiko, python-dns, python-netifaces, python2-pyasn1 >= 0.2.3, python-pysnmp >= 4.3.4, python-pyte, python-lxml, python-eficompressor, python-setuptools, python-dateutil, python2-websocket-client python2-msgpack
 %endif
 Vendor: Jarrod Johnson <jjohnson2@lenovo.com>
 Url: http://xcat.sf.net/
@@ -48,13 +48,33 @@ rmdir $RPM_BUILD_ROOT/etc/init.d
 rmdir $RPM_BUILD_ROOT/etc
 cat INSTALLED_FILES
 
-%triggerin -- python-pyghmi
+%triggerin -- python-pyghmi, python3-pyghmi, python2-pyghmi
 if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
 true
 
+%pre
+getent group confluent > /dev/null || /usr/sbin/groupadd -r confluent
+getent passwd confluent > /dev/null || /usr/sbin/useradd -r -g confluent -d /var/lib/confluent -s /sbin/nologin confluent
+mkdir -p /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent /var/cache/confluent
+chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent /var/cache/confluent
+
 %post
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
-if [ -x /usr/bin/systemctl ]; then /usr/bin/systemctl try-restart confluent >& /dev/null; fi
+NEEDCHOWN=0
+NEEDSTART=0
+find /etc/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /var/log/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /var/run/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /var/cache/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+if [ $NEEDCHOWN = 1 ]; then
+    if systemctl is-active confluent > /dev/null; then
+        NEEDSTART=1
+        systemctl stop confluent
+    fi
+    chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/run/confluent /var/log/confluent /var/cache/confluent
+fi
+systemctl daemon-reload
+if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then /usr/bin/systemctl restart confluent >& /dev/null; fi
 if [ ! -e /etc/pam.d/confluent ]; then
     ln -s /etc/pam.d/sshd /etc/pam.d/confluent
 fi
