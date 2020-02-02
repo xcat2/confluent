@@ -269,7 +269,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             return authorize(user, element, tenant, operation)
     if pam:
         pammy = pam.pam()
-        usergood = pammy.authenticate(user, passphrase)
+        usergood = pammy.authenticate(user, passphrase, service='confluent')
         del pammy
         if usergood:
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
