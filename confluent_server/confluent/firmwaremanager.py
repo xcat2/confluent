@@ -36,13 +36,13 @@ _tracelog = None
 
 def execupdate(handler, filename, updateobj, type, owner, node):
     global _tracelog
-    if type != 'ffdc:
+    if type != 'ffdc':
         errstr = False
         if not os.path.exists(filename):
             errstr =  '{0} does not appear to exist on {1}'.format(
                 filename, socket.gethostname())
         elif not os.access(filename, os.R_OK):
-            errstr =  '{0} is not readable by confluent on {1} (ensure confluent user or group can access file and parent directories')'.format(
+            errstr =  '{0} is not readable by confluent on {1} (ensure confluent user or group can access file and parent directories)'.format(
                 filename, socket.gethostname())
         if errstr:
             updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
