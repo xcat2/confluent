@@ -36,14 +36,31 @@ _tracelog = None
 
 def execupdate(handler, filename, updateobj, type, owner, node):
     global _tracelog
-    if type != 'ffdc' and not os.path.exists(filename):
-        errstr =  '{0} does not appear to exist on {1}'.format(
-            filename, socket.gethostname())
-        updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
-                                   'detail': errstr})
-        return
+    if type != 'ffdc:
+        errstr = False
+        if not os.path.exists(filename):
+            errstr =  '{0} does not appear to exist on {1}'.format(
+                filename, socket.gethostname())
+        elif not os.access(filename, os.R_OK):
+            errstr =  '{0} is not readable by confluent on {1} (ensure confluent user or group can access file and parent directories')'.format(
+                filename, socket.gethostname())
+        if errstr:
+            updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
+                                    'detail': errstr})
+            return
     if type == 'ffdc' and os.path.isdir(filename):
         filename += '/' + node
+    if 'type' == 'ffdc':
+        errstr = False
+        if os.path.exists(filename):
+            errstr = '{0} already exists on {1}, cannot overwrite'.format(
+                filename, socket.gethostname())
+        elif not os.access(os.path.dirname(filename), os.W_OK):
+            errstr = '{0} directory not writable by confluent user/group on {1}, check the directory and parent directory ownership and permissions'.format(filename, socket.gethostname())
+        if errstr:
+            updateobj.handle_progress({'phase': 'error', 'progress': 0.0,
+                                    'detail': errstr})
+            return
     try:
         if type == 'firmware':
             completion = handler(filename, progress=updateobj.handle_progress,

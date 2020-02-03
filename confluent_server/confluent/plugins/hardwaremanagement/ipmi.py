@@ -1494,6 +1494,11 @@ class IpmiHandler(object):
 
     def save_licenses(self):
         directory = self.inputdata.nodefile(self.node)
+        if not os.access(os.path.dirname(directory), os.W_OK):
+            raise exc.InvalidArgumentException(
+                'The onfluent system user/group is unable to write to '
+                'directory {0}, check ownership and permissions'.format(
+                    os.path.dirname(directory)))
         for saved in self.ipmicmd.save_licenses(directory):
             self.output.put(msg.SavedFile(self.node, saved))
 
