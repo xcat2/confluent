@@ -613,8 +613,10 @@ def relay_slaved_requests(name, listener):
                         raise Exception('Unsupported function {0} called'.format(rpc['function']))
                     try:
                         globals()[rpc['function']](*rpc['args'])
+                    except ValueError as ve:
+                        exc = ['ValueError', str(ve)]
                     except Exception as e:
-                        exc = e
+                        exc = ['Exception', str(e)]
                     if 'xid' in rpc:
                         res = _push_rpc(listener, msgpack.packb({'xid': rpc['xid'],
                                                            'exc': exc}, use_bin_type=False))
@@ -775,7 +777,12 @@ def follow_channel(channel):
                         print(repr(e))
                 if 'xid' in rpc and rpc['xid']:
                     if rpc.get('exc', None):
-                        _pendingchangesets[rpc['xid']].send_exception(rpc['exc'])
+                        exctype, excstr = rpc['exc']
+                        if exctype == 'ValueError':
+                            exc = ValueError(excstr)
+                        else:
+                            exc = Exception(excstr)
+                        _pendingchangesets[rpc['xid']].send_exception(exc)
                     else:
                         _pendingchangesets[rpc['xid']].send()
                 if 'quorum' in rpc:
