@@ -1405,7 +1405,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_set_user', self.tenant, name,
                                   attributemap)
         if cfgstreams:
-            exec_on_followers('_rpc_set_user', self.tenant, name)
+            exec_on_followers('_rpc_set_user', self.tenant, name, attributemap)
         self._true_set_user(name, attributemap)
 
     def _true_set_user(self, name, attributemap):
