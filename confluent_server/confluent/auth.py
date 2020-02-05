@@ -27,6 +27,7 @@ from fnmatch import fnmatch
 import hashlib
 import hmac
 import multiprocessing
+import os
 import confluent.userutil as userutil
 import confluent.util as util
 pam = None
@@ -268,10 +269,14 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
             return authorize(user, element, tenant, operation)
     if pam:
-        pammy = pam.pam()
-        usergood = pammy.authenticate(user, passphrase, service=_pamservice)
-        del pammy
-        if usergood:
+        pid = os.fork()
+        if not pid:
+            os.setuid(0)
+            pammy = pam.pam()
+            usergood = pammy.authenticate(user, passphrase, service=_pamservice)
+            os._exit(0 if usergood else 1)
+        usergood = os.waitpid(pid, 0)[1]
+        if usergood == 0:
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
             return authorize(user, element, tenant, operation, skipuserobj=False)    
     eventlet.sleep(0.05)  # stall even on test for existence of a username
