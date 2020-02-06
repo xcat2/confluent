@@ -6,6 +6,11 @@ Description=Confluent hardware manager
 [Service]
 Type=forking
 #PIDFile=/var/run/confluent/pid
+RuntimeDirectory=confluent
+StateDirectory=confluent
+CacheDirectory=confluent
+LogsDirectory=confluent
+ConfigurationDirectory=confluent
 ExecStart=/opt/confluent/bin/confluent
 ExecStop=/opt/confluent/bin/confetty shutdown /
 Restart=on-failure
