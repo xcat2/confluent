@@ -181,7 +181,6 @@ def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata):
     neighdata = wc.grab_json_response('/affluent/lldp/all')
     chassisid = neighdata['chassis']['id']
     _chassisidbyswitch[switch] = chassisid,
-    print(repr(neighdata))
     for record in neighdata['neighbors']:
         localport = record['localport']
         peerid = '{0}.{1}'.format(
