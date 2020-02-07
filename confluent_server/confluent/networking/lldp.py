@@ -44,7 +44,7 @@ import eventlet
 from eventlet.greenpool import GreenPool
 import eventlet.semaphore
 import re
-
+webclient = eventlet.import_patched('pyghmi.util.webclient')
 # The interesting OIDs are:
 # lldpLocChassisId - to cross reference (1.0.8802.1.1.2.1.3.2.0)
 # lldpLocPortId - for cross referencing.. (1.0.8802.1.1.2.1.3.7.1.3)
@@ -85,6 +85,7 @@ _neighdata = {}
 _neighbypeerid = {}
 _updatelocks = {}
 _chassisidbyswitch = {}
+_noaffluent = set([])
 
 def lenovoname(idx, desc):
     if desc.isdigit():
@@ -171,21 +172,59 @@ def _init_lldp(data, iname, idx, idxtoportid, switch):
         data[iname] = {'port': iname, 'portid': str(idxtoportid[idx]),
                        'chassisid': _chassisidbyswitch[switch]}
 
+def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata):
+    kv = util.TLSCertVerifier(cfm, switch,
+                                  'pubkeys.tls_hardwaremanager').verify_cert
+    wc =  webclient.SecureHTTPConnection(
+                switch, 443, verifycallback=kv, timeout=5)
+    wc.set_basic_credentials(user, password)
+    neighdata = wc.grab_json_response('/affluent/lldp/all')
+    chassisid = neighdata['chassis']['id']
+    _chassisidbyswitch[switch] = chassisid,
+    print(repr(neighdata))
+    for record in neighdata['neighbors']:
+        localport = record['localport']
+        peerid = '{0}.{1}'.format(
+            record.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
+            record.get('peerportid', '').replace(':', '-').replace('/', '-'),
+        )
+        portdata = {
+            'verified': True,  # It is over TLS after all
+            'peerdescription': record.get('peerdescription', None),
+            'peerchassisid': record['peerchassisid'],
+            'peername': record['peername'],
+            'switch': switch,
+            'chassisid': chassisid,
+            'portid': record['localport'],
+            'peerportid': record['peerportid'],
+            'port': record['localport'],
+            'peerid': peerid,
+        }
+        _neighbypeerid[peerid] = portdata
+        lldpdata[localport] = portdata
+    neighdata[switch] = lldpdata
+
+
 def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
 
     args are carried as a tuple, because of eventlet convenience
     """
-    switch, password, user, force = args[:4]
+    switch, password, user, cfm, force = args[:5]
     vintage = _neighdata.get(switch, {}).get('!!vintage', 0)
     now = util.monotonic_time()
     if vintage > (now - 60) and not force:
         return
+    lldpdata = {'!!vintage': now}
+    try:
+        return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata)
+    except Exception:
+        pass
     conn = snmp.Session(switch, password, user)
     sid = None
-    lldpdata = {'!!vintage': now}
     for sysid in conn.walk('1.3.6.1.2.1.1.2'):
         sid = str(sysid[1][6:])
+    _noaffluent.add(switch)
     idxtoifname = {}
     idxtoportid = {}
     _chassisidbyswitch[switch] = sanitize(list(
@@ -268,8 +307,8 @@ def _extract_neighbor_data(args):
             return _extract_neighbor_data_b(args)
     except Exception as e:
         yieldexc = False
-        if len(args) >= 5:
-            yieldexc = args[4]
+        if len(args) >= 6:
+            yieldexc = args[5]
         if yieldexc:
             return e
         else:
@@ -358,10 +397,3 @@ def _handle_neighbor_query(pathcomponents, configmanager):
                 raise x
     return list_info(parms, listrequested)
 
-
-def _list_interfaces(switchname, configmanager):
-    switchcreds = get_switchcreds(configmanager, (switchname,))
-    switchcreds = switchcreds[0]
-    conn = snmp.Session(*switchcreds)
-    ifnames = netutil.get_portnamemap(conn)
-    return util.natural_sort(ifnames.values())
