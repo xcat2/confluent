@@ -1506,7 +1506,15 @@ class IpmiHandler(object):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if self.op in ('create', 'update'):
-            self.ipmicmd.apply_license(self.inputdata.nodefile(self.node))
+            filename = self.inputdata.nodefile(self.node)
+            if not os.access(filename, os.R_OK):
+                errstr =  ('{0} is not readable by confluent on {1} '
+                           '(ensure confluent user or group can access file '
+                           'and parent directories)').format(
+                               filename, socket.gethostname())
+                self.output.put(msg.ConfluentNodeError(self.node, errstr))
+                return
+            self.ipmicmd.apply_license(filename)
         if len(self.element) == 3:
             self.output.put(msg.ChildCollection('all'))
             i = 1
