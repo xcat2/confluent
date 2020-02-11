@@ -578,9 +578,11 @@ class DetachMedia(ConfluentMessage):
 
 
 class Media(ConfluentMessage):
-    def __init__(self, node, media):
-        self.myargs = (node, media)
-        self.kvpairs = {node: {'name': media.name, 'url': media.url}}
+    def __init__(self, node, media=None, rawmedia=None):
+        if media:
+            rawmedia = {'name': media.name, 'url': media.url}
+        self.myargs = (node, None, rawmedia)
+        self.kvpairs = {node: rawmedia}
 
 class SavedFile(ConfluentMessage):
     def __init__(self, node, file):
