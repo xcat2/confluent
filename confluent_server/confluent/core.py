@@ -753,9 +753,9 @@ def _forward_rsp(connection, res):
             r = msgpack.packb(
                 ['Exception', 'Unable to serialize response ' + repr(res)],
                 use_bin_type=False)
-    except Exception:
+    except Exception as e:
         r = msgpack.packb(
-                ['Exception', 'Unable to serialize response ' + repr(res)],
+                ['Exception', 'Unable to serialize response ' + repr(res) + ' due to ' + str(e)],
                 use_bin_type=False)
     rlen = len(r)
     if not rlen:

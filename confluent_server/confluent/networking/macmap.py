@@ -45,13 +45,16 @@ from eventlet.greenpool import GreenPool
 import eventlet
 import eventlet.semaphore
 import re
+webclient = eventlet.import_patched('pyghmi.util.webclient')
+
+
+noaffluent = set([])
 
 _macmap = {}
 _apimacmap = {}
 _macsbyswitch = {}
 _nodesbymac = {}
 _switchportmap = {}
-_neighdata = {}
 vintage = None
 
 
@@ -127,6 +130,36 @@ def _nodelookup(switch, ifname):
     return None
 
 
+def _affluent_map_switch(args):
+    switch, password, user, cfm = args
+    kv = util.TLSCertVerifier(cfm, switch,
+                                  'pubkeys.tls_hardwaremanager').verify_cert
+    wc =  webclient.SecureHTTPConnection(
+                switch, 443, verifycallback=kv, timeout=5)
+    wc.set_basic_credentials(user, password)
+    macs = wc.grab_json_response('/affluent/macs/by-port')
+    _macsbyswitch[switch] = macs
+
+    for iface in macs:
+        nummacs = len(macs[iface])
+        for mac in macs[iface]:
+            if mac in _macmap:
+                _macmap[mac].append((switch, iface, nummacs))
+            else:
+                _macmap[mac] = [(switch, iface, nummacs)]
+            nodename = _nodelookup(switch, iface)
+            if nodename is not None:
+                if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
+                    # For example, listed on both a real edge port
+                    # and by accident a trunk port
+                    log.log({'error': '{0} and {1} described by ambiguous'
+                                    ' switch topology values'.format(
+                                        nodename, _nodesbymac[mac][0])})
+                    _nodesbymac[mac] = (None, None)
+                else:
+                    _nodesbymac[mac] = (nodename, nummacs)
+
+
 def _map_switch_backend(args):
     """Manipulate portions of mac address map relevant to a given switch
     """
@@ -144,13 +177,18 @@ def _map_switch_backend(args):
     #   fallback if ifName is empty
     #
     global _macmap
-    if len(args) == 3:
-        switch, password, user = args
+    if len(args) == 4:
+        switch, password, user, cfm = args
         if not user:
             user = None
     else:
         switch, password = args
         user = None
+    if switch not in noaffluent:
+        try:
+            return _affluent_map_switch(args)
+        except Exception:
+            pass
     haveqbridge = False
     mactobridge = {}
     conn = snmp.Session(switch, password, user)
@@ -164,6 +202,7 @@ def _map_switch_backend(args):
             *([int(x) for x in oid[-6:]])
         )
         mactobridge[macaddr] = int(bridgeport)
+    noaffluent.add(switch)
     if not haveqbridge:
         for vb in conn.walk('1.3.6.1.2.1.17.4.3.1.2'):
             oid, bridgeport = vb
