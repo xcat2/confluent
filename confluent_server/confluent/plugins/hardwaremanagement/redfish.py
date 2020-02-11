@@ -1358,7 +1358,7 @@ class IpmiHandler(object):
             if not os.access(filename, os.R_OK):
                 errstr =  ('{0} is not readable by confluent on {1} '
                            '(ensure confluent user or group can access file '
-                           'and parent directories)'.format(
+                           'and parent directories)').format(
                                filename, socket.gethostname())
                 self.output.put(msg.ConfluentNodeError(self.node, errstr))
                 return
