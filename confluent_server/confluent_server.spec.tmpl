@@ -46,6 +46,8 @@ grep -v confluent/__init__.py INSTALLED_FILES.bare | grep -v etc/init.d/confluen
 rm $RPM_BUILD_ROOT/etc/init.d/confluent
 rmdir $RPM_BUILD_ROOT/etc/init.d
 rmdir $RPM_BUILD_ROOT/etc
+# Only do non-root confluent if systemd of the platform supports it
+systemd-analyze verify $RPM_BUILD_ROOT/usr/lib/systemd/system/confluent.service 2>&1 | grep "'AmbientCapabilities'" > /dev/null && sed -e 's/User=.*//' -e 's/Group=.*//' -e 's/AmbientCapabilities=.*//' -i $RPM_BUILD_ROOT/usr/lib/systemd/system/confluent.service
 cat INSTALLED_FILES
 
 %triggerin -- python-pyghmi, python3-pyghmi, python2-pyghmi
