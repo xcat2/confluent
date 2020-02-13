@@ -28,6 +28,7 @@ import hashlib
 import hmac
 import multiprocessing
 import os
+import pwd
 import confluent.userutil as userutil
 import confluent.util as util
 pam = None
@@ -258,6 +259,13 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
             return authorize(user, element, tenant, operation)
     if pam:
+        pwe = None
+        try:
+            pwe = pwd.getpwnam(user)
+        except KeyError:
+            #pam won't work if the user doesn't exist, don't go further
+            eventlet.sleep(0.05)  # stall even on test for existence of a username
+            return None
         if os.getuid() != 0:
             # confluent is running with reduced privilege, however, pam_unix refuses
             # to let a non-0 user check anothers password.
@@ -267,7 +275,9 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             if not pid:
                 usergood = False
                 try:
-                    os.setuid(0)
+                    # we change to the uid we are trying to authenticate as, because
+                    # pam_unix uses unix_chkpwd which reque
+                    os.setuid(pwe.pw_uid)
                     usergood = pam.authenticate(user, passphrase, service=_pamservice)
                 finally:
                     os._exit(0 if usergood else 1)
