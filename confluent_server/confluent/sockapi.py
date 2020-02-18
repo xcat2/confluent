@@ -154,20 +154,25 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
-    if request and 'collective' in request and skipauth:
-        if not libssl:
+    if request and 'collective' in request:
+        if skipauth:
+            if not libssl:
+                tlvdata.send(
+                    connection,
+                    {'collective': {'error': 'Server either does not have '
+                                            'python-pyopenssl installed or has an '
+                                            'incorrect version installed '
+                                            '(e.g. pyOpenSSL would need to be '
+                                            'replaced with python-pyopenssl). '
+                                            'Restart confluent after updating '
+                                            'the dependency.'}})
+                return
+            return collective.handle_connection(connection, None, request['collective'],
+                                        local=True)
+        else:
             tlvdata.send(
-                connection,
-                {'collective': {'error': 'Server either does not have '
-                                         'python-pyopenssl installed or has an '
-                                         'incorrect version installed '
-                                         '(e.g. pyOpenSSL would need to be '
-                                         'replaced with python-pyopenssl). '
-                                         'Restart confluent after updating '
-                                         'the dependency.'}})
-            return
-        return collective.handle_connection(connection, None, request['collective'],
-                                     local=True)
+                    connection,
+                    {'collective': {'error': 'collective management commands may only be used by root'}})
     while request is not None:
         try:
             process_request(
