@@ -48,7 +48,7 @@ def decode_uuid(rawguid):
 
 def _decode_ocp_vivso(rq, idx, size):
     end = idx + size
-    vivso = {}
+    vivso = {'service-type': 'onie-switch'}
     while idx < end:
         if rq[idx] == 3:
             vivso['machine'] = stringify(rq[idx + 2:idx + 2 + rq[idx + 1]])
@@ -59,12 +59,13 @@ def _decode_ocp_vivso(rq, idx, size):
         idx += rq[idx + 1] + 2
     return '', None, vivso
 
-    
 
 def find_info_in_options(rq, optidx):
     uuid = None
     arch = None
     vivso = None
+    ztpurlrequested = False
+    iscumulus = False
     try:
         while uuid is None or arch is None:
             if rq[optidx] == 53:  # DHCP message type
@@ -72,6 +73,16 @@ def find_info_in_options(rq, optidx):
                 if rq[optidx + 1] != 1 or rq[optidx + 2] != 1:
                     return uuid, arch, vivso
                 optidx += 3
+            elif rq[optidx] == 55:
+                if 239 in rq[optidx + 2:optidx + 2 + rq[optidx + 1]]:
+                    ztpurlrequested = True
+                optidx += rq[optidx + 1] + 2
+            elif rq[optidx] == 60:
+                vci = stringify(rq[optidx + 2:optidx + 2 + rq[optidx + 1]])
+                if vci.startswith('cumulus-linux'):
+                    iscumulus = True
+                    arch = vci.replace('cumulus-linux', '').strip()
+                optidx += rq[optidx + 1] + 2
             elif rq[optidx] == 97:
                 if rq[optidx + 1] != 17:
                     # 16 bytes of uuid and one reserved byte
@@ -96,7 +107,11 @@ def find_info_in_options(rq, optidx):
             else:
                 optidx += rq[optidx + 1] + 2
     except IndexError:
-        return uuid, arch, vivso
+        pass
+    if not vivso and iscumulus and ztpurlrequested:
+        if not uuid:
+            uuid = ''
+        vivso = {'service-type': 'cumulus-switch', 'arch': arch}
     return uuid, arch, vivso
 
 def snoop(handler, protocol=None):
@@ -133,8 +148,9 @@ def snoop(handler, protocol=None):
                 # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
                 handler({'hwaddr': netaddr, 'uuid': uuid,
                          'architecture': vivso.get('arch', ''),
-                         'services': ('onie-switch',),
+                         'services': (vivso['service-type'],),
                          'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}})
+                continue
             if uuid is None:
                 continue
             # We will fill out service to have something to byte into,
