@@ -33,6 +33,12 @@ pxearchs = {
 }
 
 
+def stringify(value):
+    string = bytes(value)
+    if not isinstance(string, str):
+        string = string.decode('utf8')
+    return string
+
 def decode_uuid(rawguid):
     lebytes = struct.unpack_from('<IHH', rawguid[:8])
     bebytes = struct.unpack_from('>HHI', rawguid[8:])
@@ -40,23 +46,39 @@ def decode_uuid(rawguid):
         lebytes[0], lebytes[1], lebytes[2], bebytes[0], bebytes[1], bebytes[2]).lower()
 
 
+def _decode_ocp_vivso(rq, idx, size):
+    end = idx + size
+    vivso = {}
+    while idx < end:
+        if rq[idx] == 3:
+            vivso['machine'] = stringify(rq[idx + 2:idx + 2 + rq[idx + 1]])
+        elif rq[idx] == 4:
+            vivso['arch'] = stringify(rq[idx + 2:idx + 2 + rq[idx + 1]])
+        elif rq[idx] == 5:
+            vivso['revision'] = stringify(rq[idx + 2:idx + 2 + rq[idx + 1]])
+        idx += rq[idx + 1] + 2
+    return '', None, vivso
+
+    
+
 def find_info_in_options(rq, optidx):
     uuid = None
     arch = None
+    vivso = None
     try:
         while uuid is None or arch is None:
             if rq[optidx] == 53:  # DHCP message type
                 # we want only length 1 and only discover (type 1)
                 if rq[optidx + 1] != 1 or rq[optidx + 2] != 1:
-                    return uuid, arch
+                    return uuid, arch, vivso
                 optidx += 3
             elif rq[optidx] == 97:
                 if rq[optidx + 1] != 17:
                     # 16 bytes of uuid and one reserved byte
-                    return uuid, arch
+                    return uuid, arch, vivso
                 if rq[optidx + 2] != 0:  # the reserved byte should be zero,
                     # anything else would be a new spec that we don't know yet
-                    return uuid, arch
+                    return uuid, arch, vivso
                 uuid = decode_uuid(rq[optidx + 3:optidx + 19])
                 optidx += 19
             elif rq[optidx] == 93:
@@ -66,11 +88,16 @@ def find_info_in_options(rq, optidx):
                 if archraw in pxearchs:
                     arch = pxearchs[archraw]
                 optidx += 4
+            elif rq[optidx] == 125:
+                #vivso = rq[optidx + 2:optidx + 2 + rq[optidx + 1]]
+                if rq[optidx + 2:optidx + 6] == b'\x00\x00\xa6\x7f':  # OCP
+                    return _decode_ocp_vivso(rq, optidx + 7, rq[optidx + 6])
+                optidx += rq[optidx + 1] + 2
             else:
                 optidx += rq[optidx + 1] + 2
     except IndexError:
-        return uuid, arch
-    return uuid, arch
+        return uuid, arch, vivso
+    return uuid, arch, vivso
 
 def snoop(handler, protocol=None):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
@@ -101,7 +128,13 @@ def snoop(handler, protocol=None):
                 optidx = rq.index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
-            uuid, arch = find_info_in_options(rq, optidx)
+            uuid, arch, vivso = find_info_in_options(rq, optidx)
+            if vivso:
+                # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
+                handler({'hwaddr': netaddr, 'uuid': uuid,
+                         'architecture': vivso.get('arch', ''),
+                         'services': ('onie-switch',),
+                         'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}})
             if uuid is None:
                 continue
             # We will fill out service to have something to byte into,

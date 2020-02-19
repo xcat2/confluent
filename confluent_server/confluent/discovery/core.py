@@ -107,6 +107,7 @@ nodehandlers = {
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
+    'onie-switch': None,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,
     'service:lenovo-tsm': tsm,
@@ -114,6 +115,7 @@ nodehandlers = {
 
 servicenames = {
     'pxe-client': 'pxe-client',
+    'onie-switch': 'onie-switch',
     'service:lenovo-smm': 'lenovo-smm',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
@@ -124,6 +126,7 @@ servicenames = {
 
 servicebyname = {
     'pxe-client': 'pxe-client',
+    'onie-switch': 'onie-switch',
     'lenovo-smm': 'service:lenovo-smm',
     'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
