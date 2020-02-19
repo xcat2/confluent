@@ -58,8 +58,8 @@ except IndexError:
     sys.exit(1)
 client.check_globbing(noderange)
 bootdev = None
-if len(sys.argv) > 2:
-    bootdev = sys.argv[2]
+if len(args) > 1:
+    bootdev = args[1]
     if bootdev in ('net', 'pxe'):
         bootdev = 'network'
 session = client.Command()
