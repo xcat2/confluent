@@ -117,7 +117,7 @@ nodehandlers = {
 servicenames = {
     'pxe-client': 'pxe-client',
     'onie-switch': 'onie-switch',
-    'cumulus-switch': 'cumuls-switch',
+    'cumulus-switch': 'cumulus-switch',
     'service:lenovo-smm': 'lenovo-smm',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
