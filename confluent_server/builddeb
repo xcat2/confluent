@@ -8,7 +8,7 @@ DSCARGS="--with-python3=True --with-python2=False"
 if grep wheezy /etc/os-release; then
     DPKGNAME=python-$DPKGNAME
     PYEXEC=python
-    DSCARGS="--with-python3=False --with-python2=True"
+    DSCARGS=""
 fi
 cd ..
 mkdir -p /tmp/confluent # $DPKGNAME
