@@ -54,6 +54,12 @@ argparser.add_option('-d', '--detail', dest='detail',
                      action='store_true', default=False,
                      help='Provide verbose information as available, such as '
                           'help text and possible valid values')
+argparser.add_option('-e', '--extra', dest='extra',
+                     action='store_true', default=False,
+                     help='Access extra configuration.  Extra configuration is generally '
+                           'reserved for unpopular or redundant options that may be slow to '
+                           'read.  Notably the IMM category on Lenovo settings is considered '
+                           'to be extra configuration')
 argparser.add_option('-x', '--exclude', dest='exclude',
                      action='store_true', default=False,
                      help='Treat positional arguments as items to not '
@@ -68,6 +74,10 @@ argparser.add_option('-r', '--restoredefault', default=False,
                      help='Restore the configuration of the node '
                           'to factory default for given component. '
                           'Currently only uefi is supported')
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to configure, '
+                          'prompting if over the threshold')
 (options, args) = argparser.parse_args()
 
 cfgpaths = {
@@ -99,6 +109,7 @@ assignment = {}
 queryparms = {}
 printsys = []
 printbmc = []
+printextbmc = []
 printallbmc = False
 setsys = {}
 forceset = False
@@ -173,11 +184,17 @@ def parse_config_line(arguments):
                                 del queryparms[path]
                             except KeyError:
                                 pass
-                if not matchedparms:
+                if param.lower() == 'imm':
+                    printextbmc.append(param)
+                    options.extra = True
+                elif not matchedparms:
                     printsys.append(param)
             elif param not in cfgpaths:
                 if param.startswith('bmc.'):
                     printbmc.append(param.replace('bmc.', ''))
+                elif param.lower().startswith('imm'):
+                    options.extra = True
+                    printextbmc.append(param)
                 else:
                     printsys.append(param)
             else:
@@ -205,6 +222,7 @@ else:
 session = client.Command()
 rcode = 0
 if options.restoredefault:
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     if options.restoredefault.lower() in (
         'sys', 'system', 'uefi', 'bios'):
         for fr in session.update(
@@ -225,6 +243,7 @@ if options.restoredefault:
                 options.restoredefault))
         sys.exit(1)
 if setmode:
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     if options.exclude:
         sys.stderr.write('Cannot use exclude and assign at the same time\n')
         sys.exit(1)
@@ -269,10 +288,15 @@ else:
                                       NullOpt(), queryparms[path])
         if rc:
             sys.exit(rc)
-    if printbmc or printallbmc:
-        rcode = client.print_attrib_path(
-                    '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
-                    session, printbmc, options, attrprefix='bmc.')
+    if printsys == 'all' or printextbmc or printbmc or printallbmc:
+        if printbmc or not printextbmc:
+         rcode = client.print_attrib_path(
+                        '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
+                        session, printbmc, options, attrprefix='bmc.')
+        if options.extra:
+            rcode |= client.print_attrib_path(
+                    '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
+                    session, printextbmc, options)
     if printsys or options.exclude:
         if printsys == 'all':
             printsys = []
@@ -281,7 +305,6 @@ else:
         else:
             path = '/noderange/{0}/configuration/system/advanced'.format(
                 noderange)
-        
         rcode = client.print_attrib_path(path, session, printsys,
                                          options)
 sys.exit(rcode)

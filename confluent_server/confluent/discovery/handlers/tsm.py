@@ -22,6 +22,7 @@ try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
+
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 webclient = eventlet.import_patched('pyghmi.util.webclient')
@@ -43,6 +44,13 @@ class NodeHandler(generic.NodeHandler):
         self.atdefault = True
         super(NodeHandler, self).__init__(info, configmanager)
 
+    def scan(self):
+        c = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        i = c.grab_json_response('/redfish/v1/')
+        uuid = i.get('UUID', None)
+        if uuid:
+            self.info['uuid'] = uuid
+
     def validate_cert(self, certificate):
         # broadly speaking, merely checks consistency moment to moment,
         # but if https_cert gets stricter, this check means something
@@ -54,9 +62,17 @@ class NodeHandler(generic.NodeHandler):
             'username': self.DEFAULT_USER,
             'password': self.DEFAULT_PASS,
         }
+        wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        wc.set_header('Content-Type', 'application/json')
+        authmode = 0
         if not self.trieddefault:
-            wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
-            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+            rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+            if status == 403:
+                wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
+                authmode = 1
+                rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+            else:
+                authmode = 2
             if status > 400:
                 rsp = util.stringify(rsp)
                 self.trieddefault = True
@@ -68,9 +84,15 @@ class NodeHandler(generic.NodeHandler):
                         'default_password': self.DEFAULT_PASS,
                         'username': self.DEFAULT_USER
                         }
-                    rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
+                    if authmode == 2:
+                        rsp, status = wc.grab_json_response_with_status('/api/reset-pass', passchange)
+                    else:
+                        rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
                     authdata['password'] = self.targpass
-                    rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+                    if authmode == 2:
+                        rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+                    else:
+                        rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
                     self.csrftok = rsp['CSRFToken']
                     self.channel = rsp['channel']
                     self.curruser = self.DEFAULT_USER
@@ -85,15 +107,23 @@ class NodeHandler(generic.NodeHandler):
         if self.curruser:
             authdata['username'] = self.curruser
             authdata['password'] = self.currpass
-            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
-            if rsp.status != 200:
+            if authmode != 1:
+                rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+            if authmode == 1 or status == 403:
+                wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
+                rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+            if status != 200:
                 return None
             self.csrftok = rsp['CSRFToken']
             self.channel = rsp['channel']
             return wc
         authdata['username'] = self.targuser
         authdata['password'] = self.targpass
-        rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+        if authmode != 1:
+            rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+        if authmode == 1 or status == 403:
+            wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
+            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
         if status != 200:
             return None
         self.curruser = self.targuser

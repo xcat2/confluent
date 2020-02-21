@@ -32,6 +32,8 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(usage="Usage: %prog <noderange>")
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Number of nodes to affect before prompting for confirmation')
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -43,8 +45,10 @@ session = client.Command()
 exitcode = 0
 
 errorNodes = set([])
-
+session.stop_if_noderange_over(noderange, options.maxnodes)
 success = session.simple_noderange_command(noderange, 'configuration/management_controller/reset', 'reset', key='state', errnodes=errorNodes)   # = 0 if successful
+if success != 0:
+    sys.exit(success)
 
 # Determine which nodes were successful and print them
 

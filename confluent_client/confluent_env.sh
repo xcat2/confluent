@@ -46,9 +46,8 @@ alias nodelicense='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export 
 _confluent_get_args()
 {
     CMPARGS=($COMP_LINE)
-    NUMARGS=${#CMPARGS[@]}
-    if [ "${COMP_WORDS[-1]}" == '' ]; then
-        NUMARGS=$((NUMARGS+1))
+    NUMARGS=$((COMP_CWORD+1))
+    if [ "${COMP_WORDS[COMP_CWORD]}" == '' ]; then
         CMPARGS+=("")
     fi
     GENNED=""
@@ -75,7 +74,7 @@ function _confluent_generic_completion()
 {
     _confluent_get_args
     if [ $NUMARGS -ge 3 ] && [ ! -z "$GENNED" ]; then
-        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[COMP_CWORD]}))
     fi
     if [ $NUMARGS -lt 3 ]; then
         _confluent_nr_completion
@@ -111,7 +110,7 @@ _confluent_nodemedia_completion()
         return
     fi
     if [ $NUMARGS -ge 3 ] && [ ! -z "$GENNED" ]; then
-        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[COMP_CWORD]}))
         return;
     fi
     if [ $NUMARGS -lt 3 ]; then
@@ -124,7 +123,7 @@ _confluent_nodefirmware_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "list update" -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -W "list update" -- ${COMP_WORDS[COMP_CWORD]}))
         return;
     fi
     if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[2]} == 'update' ]; then
@@ -142,7 +141,7 @@ _confluent_nodeshell_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -c -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -c -- ${COMP_WORDS[COMP_CWORD]}))
         return
     fi
     if [ $NUMARGS -gt 3 ]; then
@@ -160,7 +159,7 @@ _confluent_nodelicense_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "install list save delete" -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -W "install list save delete" -- ${COMP_WORDS[COMP_CWORD]}))
         return;
     fi
     if [ $NUMARGS == 4 ] && [ ${CMPARGS[2]} == 'install' ]; then
@@ -183,7 +182,7 @@ _confluent_nodesupport_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 3 ]; then
-        COMPREPLY=($(compgen -W "servicedata" -- ${COMP_WORDS[-1]}))
+        COMPREPLY=($(compgen -W "servicedata" -- ${COMP_WORDS[COMP_CWORD]}))
         return;
     fi
     if [ $NUMARGS == 4 ] && [ ${CMPARGS[2]} == 'servicedata' ]; then
@@ -210,41 +209,36 @@ _confluent_nn_completion()
     if [ $NUMARGS -gt 2 ]; then
         return;
     fi
-    INPUT=${COMP_WORDS[-1]}
+    INPUT=${COMP_WORDS[COMP_CWORD]}
     INPUT=${INPUT##*,-}
     INPUT=${INPUT##*,}
     INPUT=${INPUT##*@}
     PREFIX=""
-    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
-        PREFIX=${COMP_WORDS[-1]}
+    if [ "$INPUT" != "${COMP_WORDS[COMP_CWORD]}" ]; then
+        PREFIX=${COMP_WORDS[COMP_CWORD]}
         PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
     fi
 
-    COMPREPLY=($(compgen -W "$(nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+    COMPREPLY=($(compgen -W "$(nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
 _confluent_nr_completion()
 {
     CMPARGS=($COMP_LINE)
-    NUMARGS=${#CMPARGS[@]}
-    if [ "${COMP_WORDS[-1]}" == '' ]; then
-        NUMARGS=$((NUMARGS+1))
-    fi
     _confluent_get_args
     if [ $NUMARGS -gt 2 ]; then
         return;
     fi
-    INPUT=${COMP_WORDS[-1]}
+    INPUT=${COMP_WORDS[COMP_CWORD]}
     INPUT=${INPUT##*,-}
     INPUT=${INPUT##*,}
     INPUT=${INPUT##*@}
     PREFIX=""
-    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
-        PREFIX=${COMP_WORDS[-1]}
+    if [ "$INPUT" != "${COMP_WORDS[COMP_CWORD]}" ]; then
+        PREFIX=${COMP_WORDS[COMP_CWORD]}
         PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
     fi
 
-    #COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
-    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/;nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
 _confluent_ng_completion()
 {
@@ -252,17 +246,17 @@ _confluent_ng_completion()
     if [ $NUMARGS -gt 2 ]; then
         return;
     fi
-    INPUT=${COMP_WORDS[-1]}
+    INPUT=${COMP_WORDS[COMP_CWORD]}
     INPUT=${INPUT##*,-}
     INPUT=${INPUT##*,}
     INPUT=${INPUT##*@}
     PREFIX=""
-    if [ "$INPUT" != "${COMP_WORDS[-1]}" ]; then
-        PREFIX=${COMP_WORDS[-1]}
+    if [ "$INPUT" != "${COMP_WORDS[COMP_CWORD]}" ]; then
+        PREFIX=${COMP_WORDS[COMP_CWORD]}
         PREFIX=$(echo $PREFIX | sed -e 's/,[^,@-]*$/,/' -e 's/,-[^,@]*$/,-/' -e 's/@[^,@]*/@/')
     fi
 
-    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/)" -- "${COMP_WORDS[-1]}"))
+    COMPREPLY=($(compgen -W "$(confetty show /nodegroups|sed -e 's/\///' -e s/^/$PREFIX/)" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
 complete -F _confluent_nodeattrib_completion nodeattrib
 complete -F _confluent_nodeattrib_completion nodegroupattrib

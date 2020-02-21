@@ -78,6 +78,18 @@ def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
             workers.add(eventlet.spawn(retrieve_health, configmanager, creds,
                                        node, results))
+    elif element[:3] == ['inventory', 'hardware', 'all']:
+        creds = configmanager.get_node_attributes(
+                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
+        for node in nodes:
+            workers.add(eventlet.spawn(retrieve_inventory, configmanager,
+                                       creds, node, results, element))
+    elif element[:3] == ['inventory', 'firmware', 'all']:
+        creds = configmanager.get_node_attributes(
+                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
+        for node in nodes:
+            workers.add(eventlet.spawn(retrieve_firmware, configmanager,
+                                       creds, node, results, element))
     else:
         for node in nodes:
             yield msg.ConfluentNodeError(node, 'Not Implemented')
@@ -104,6 +116,44 @@ def retrieve(nodes, element, configmanager, inputdata):
     except queue.Empty:
         pass
 
+
+def retrieve_inventory(configmanager, creds, node, results, element):
+    if len(element) == 3:
+        results.put(msg.ChildCollection('all'))
+        results.put(msg.ChildCollection('system'))
+        return
+    wc = cnos_login(node, configmanager, creds)
+    sysinfo = wc.grab_json_response('/nos/api/sysinfo/inventory')
+    invinfo = {
+        'inventory': [{
+            'name': 'System',
+            'present': True,
+            'information': {
+                'Product name': sysinfo['Model'],
+                'Serial Number': sysinfo['Electronic Serial Number'],
+                'Board Serial Number': sysinfo['Serial Number'],
+                'Manufacturer': 'Lenovo',
+                'Model': sysinfo['Machine Type Model'],
+                'FRU Number': sysinfo['FRU'].strip(),
+            }
+        }]
+    }
+    results.put(msg.KeyValueData(invinfo, node))
+
+
+def retrieve_firmware(configmanager, creds, node, results, element):
+    if len(element) == 3:
+        results.put(msg.ChildCollection('all'))
+        return
+    wc = cnos_login(node, configmanager, creds)
+    sysinfo = wc.grab_json_response('/nos/api/sysinfo/inventory')
+    items = [{
+        'Software': {'version': sysinfo['Software Revision']},
+        },
+        {
+        'BIOS': {'version': sysinfo['BIOS Revision']},
+        }]
+    results.put(msg.Firmware(items, node))
 
 def retrieve_health(configmanager, creds, node, results):
     wc = cnos_login(node, configmanager, creds)

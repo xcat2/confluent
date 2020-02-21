@@ -59,6 +59,10 @@ argparser = optparse.OptionParser(
           "%prog <noderange> [list][update [--backup <file>]]|[<components>]")
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='When updating, prompt if more than the specified '
+                          'number of servers will be affected')
+             
 (options, args) = argparser.parse_args()
 upfile = None
 try:
@@ -95,6 +99,7 @@ def get_update_progress(session, url):
 
 def update_firmware(session, filename):
     global exitcode
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     output = sq.ScreenPrinter(noderange, session)
     nodeurls = {}
     filename = os.path.abspath(filename)

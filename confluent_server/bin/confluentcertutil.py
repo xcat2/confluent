@@ -7,7 +7,7 @@ import tempfile
 def get_openssl_conf_location():
     if exists('/etc/pki/tls/openssl.cnf'):
         return '/etc/pki/tls/openssl.cnf'
-    elif exists('/etc/ssl/openssl.cnf');
+    elif exists('/etc/ssl/openssl.cnf'):
         return '/etc/ssl/openssl.cnf'
     else:
         raise Exception("Cannot find openssl config file")

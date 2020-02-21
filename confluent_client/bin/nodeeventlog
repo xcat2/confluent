@@ -38,6 +38,10 @@ if sys.version_info[0] < 3:
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] noderange [clear]")
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to clear if clearing log, '
+                          'prompting if over the threshold')            
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -46,11 +50,11 @@ except IndexError:
     sys.exit(1)
 client.check_globbing(noderange)
 deletemode = False
-if len(sys.argv) > 3:
+if len(args) > 2:
     argparser.print_help()
     sys.exit(1)
-if len(sys.argv) == 3:
-    if sys.argv[2] == 'clear':
+if len(args) == 2:
+    if args[1] == 'clear':
         deletemode = True
     else:
         argparser.print_help()
@@ -88,6 +92,7 @@ def format_event(evt):
 
 if deletemode:
     func = session.delete
+    session.stop_if_noderange_over(noderange, options.maxnodes)
 else:
     func = session.read
 for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):

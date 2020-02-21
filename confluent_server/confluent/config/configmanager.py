@@ -71,6 +71,7 @@ import eventlet.green.select as select
 import eventlet.green.threading as gthread
 import fnmatch
 import json
+import msgpack
 import operator
 import os
 import random
@@ -101,10 +102,6 @@ _cfgstore = None
 _pendingchangesets = {}
 _txcount = 0
 _hasquorum = True
-if sys.version_info[0] >= 3:
-    lowestver = 4
-else:
-    lowestver = 2
 
 _attraliases = {
     'bmc': 'hardwaremanagement.manager',
@@ -317,8 +314,8 @@ def exec_on_leader(function, *args):
     while xid in _pendingchangesets:
         xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     _pendingchangesets[xid] = event.Event()
-    rpcpayload = cPickle.dumps({'function': function, 'args': args,
-                                'xid': xid}, protocol=cfgproto)
+    rpcpayload = msgpack.packb({'function': function, 'args': args,
+                                'xid': xid}, use_bin_type=False)
     rpclen = len(rpcpayload)
     cfgleader.sendall(struct.pack('!Q', rpclen))
     cfgleader.sendall(rpcpayload)
@@ -328,6 +325,11 @@ def exec_on_leader(function, *args):
 
 
 def exec_on_followers(fnname, *args):
+    pushes = eventlet.GreenPool()
+    # Check health of collective prior to attempting
+    for _ in pushes.starmap(
+        _push_rpc, [(cfgstreams[s], b'') for s in cfgstreams]):
+        pass
     if len(cfgstreams) < (len(_cfgstore['collective']) // 2):
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
@@ -338,8 +340,8 @@ def exec_on_followers_unconditional(fnname, *args):
     global _txcount
     pushes = eventlet.GreenPool()
     _txcount += 1
-    payload = cPickle.dumps({'function': fnname, 'args': args,
-                             'txcount': _txcount}, protocol=lowestver)
+    payload = msgpack.packb({'function': fnname, 'args': args,
+                             'txcount': _txcount}, use_bin_type=False)
     for _ in pushes.starmap(
             _push_rpc, [(cfgstreams[s], payload) for s in cfgstreams]):
         pass
@@ -386,9 +388,15 @@ def init_masterkey(password=None, autogen=True):
 
 def _push_rpc(stream, payload):
     with _rpclock:
-        stream.sendall(struct.pack('!Q', len(payload)))
-        if len(payload):
-            stream.sendall(payload)
+        try:
+            stream.sendall(struct.pack('!Q', len(payload)))
+            if len(payload):
+                stream.sendall(payload)
+            return True
+        except Exception:
+            logException()
+            del cfgstreams[stream]
+            stream.close()
 
 
 def decrypt_value(cryptvalue,
@@ -554,14 +562,9 @@ def set_global(globalname, value, sync=True):
         ConfigManager._bg_sync_to_file()
 
 cfgstreams = {}
-def relay_slaved_requests(name, listener, vers):
+def relay_slaved_requests(name, listener):
     global cfgleader
     global _hasquorum
-    global lowestver
-    if vers > 2 and sys.version_info[0] < 3:
-        vers = 2
-    if vers < lowestver:
-        lowestver = vers    
     pushes = eventlet.GreenPool()
     if name not in _followerlocks:
         _followerlocks[name] = gthread.RLock()
@@ -578,11 +581,18 @@ def relay_slaved_requests(name, listener, vers):
             lh = StreamHandler(listener)
             _hasquorum = len(cfgstreams) >= (
                     len(_cfgstore['collective']) // 2)
-            payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
-            for _ in pushes.starmap(
-                    _push_rpc,
-                    [(cfgstreams[s], payload) for s in cfgstreams]):
-                pass
+            _newquorum = None
+            while _hasquorum != _newquorum:
+                if _newquorum is not None:
+                    _hasquorum = _newquorum
+                payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
+                for _ in pushes.starmap(
+                        _push_rpc,
+                        [(cfgstreams[s], payload) for s in cfgstreams]):
+                    pass
+                _newquorum = len(cfgstreams) >= (
+                        len(_cfgstore['collective']) // 2)
+            _hasquorum = _newquorum
             if _hasquorum and _pending_collective_updates:
                 apply_pending_collective_updates()
             msg = lh.get_next_msg()
@@ -597,15 +607,21 @@ def relay_slaved_requests(name, listener, vers):
                         if not nrpc:
                             raise Exception('Truncated client error')
                         rpc += nrpc
-                    rpc = cPickle.loads(rpc)
+                    rpc = msgpack.unpackb(rpc, raw=False)
                     exc = None
+                    if not (rpc['function'].startswith('_rpc_') or rpc['function'].endswith('_collective_member')):
+                        raise Exception('Unsupported function {0} called'.format(rpc['function']))
                     try:
                         globals()[rpc['function']](*rpc['args'])
+                    except ValueError as ve:
+                        exc = ['ValueError', str(ve)]
                     except Exception as e:
-                        exc = e
+                        exc = ['Exception', str(e)]
                     if 'xid' in rpc:
-                        _push_rpc(listener, cPickle.dumps({'xid': rpc['xid'],
-                                                           'exc': exc}, protocol=vers))
+                        res = _push_rpc(listener, msgpack.packb({'xid': rpc['xid'],
+                                                           'exc': exc}, use_bin_type=False))
+                        if not res:
+                            break
                 try:
                     msg = lh.get_next_msg()
                 except Exception:
@@ -622,7 +638,7 @@ def relay_slaved_requests(name, listener, vers):
             if cfgstreams:
                 _hasquorum = len(cfgstreams) >= (
                         len(_cfgstore['collective']) // 2)
-                payload = cPickle.dumps({'quorum': _hasquorum}, protocol=lowestver)
+                payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
                 for _ in pushes.starmap(
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
@@ -650,7 +666,9 @@ class StreamHandler(object):
                 if confluent.util.monotonic_time() > self.expiry:
                     return None
                 if confluent.util.monotonic_time() > self.keepalive:
-                    _push_rpc(self.sock, b'')  # nulls are a keepalive
+                    res = _push_rpc(self.sock, b'')  # nulls are a keepalive
+                    if not res:
+                        return None
                     self.keepalive = confluent.util.monotonic_time() + 20
             self.expiry = confluent.util.monotonic_time() + 60
             msg = self.sock.recv(8)
@@ -662,19 +680,15 @@ class StreamHandler(object):
         self.sock = None
 
 
-def stop_following(replacement=None, proto=2):
+def stop_following(replacement=None):
     with _leaderlock:
         global cfgleader
-        global cfgproto
         if cfgleader and not isinstance(cfgleader, bool):
             try:
                 cfgleader.close()
             except Exception:
                 pass
         cfgleader = replacement
-        if proto > 2 and sys.version_info[0] < 3:
-            proto = 2
-        cfgproto = proto
 
 def stop_leading():
     for stream in list(cfgstreams):
@@ -732,15 +746,14 @@ def commit_clear():
     ConfigManager._bg_sync_to_file()
 
 cfgleader = None
-cfgproto = 2
 
 
-def follow_channel(channel, proto=2):
+def follow_channel(channel):
     global _txcount
     global _hasquorum
     try:
         stop_leading()
-        stop_following(channel, proto)
+        stop_following(channel)
         lh = StreamHandler(channel)
         msg = lh.get_next_msg()
         while msg:
@@ -752,22 +765,31 @@ def follow_channel(channel, proto=2):
                     if not nrpc:
                         raise Exception('Truncated message error')
                     rpc += nrpc
-                rpc = cPickle.loads(rpc)
+                rpc = msgpack.unpackb(rpc, raw=False)
                 if 'txcount' in rpc:
                     _txcount = rpc['txcount']
                 if 'function' in rpc:
+                    if not (rpc['function'].startswith('_true') or rpc['function'].startswith('_rpc')):
+                        raise Exception("Received unsupported function call: {0}".format(rpc['function']))
                     try:
                         globals()[rpc['function']](*rpc['args'])
                     except Exception as e:
                         print(repr(e))
                 if 'xid' in rpc and rpc['xid']:
                     if rpc.get('exc', None):
-                        _pendingchangesets[rpc['xid']].send_exception(rpc['exc'])
+                        exctype, excstr = rpc['exc']
+                        if exctype == 'ValueError':
+                            exc = ValueError(excstr)
+                        else:
+                            exc = Exception(excstr)
+                        _pendingchangesets[rpc['xid']].send_exception(exc)
                     else:
                         _pendingchangesets[rpc['xid']].send()
                 if 'quorum' in rpc:
                     _hasquorum = rpc['quorum']
-                _push_rpc(channel, b'')  # use null as ACK
+                res = _push_rpc(channel, b'')  # use null as ACK
+                if not res:
+                    break
             msg = lh.get_next_msg()
     finally:
         # mark the connection as broken
@@ -1137,6 +1159,8 @@ class ConfigManager(object):
             attribute, match = expression.split('=')
         else:
             raise Exception('Invalid Expression')
+        if attribute.startswith('secret.'):
+            raise Exception('Filter by secret attributes is not supported')
         for node in nodes:
             try:
                 currvals = [self._cfgstore['nodes'][node][attribute]['value']]
@@ -1381,7 +1405,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_set_user', self.tenant, name,
                                   attributemap)
         if cfgstreams:
-            exec_on_followers('_rpc_set_user', self.tenant, name)
+            exec_on_followers('_rpc_set_user', self.tenant, name, attributemap)
         self._true_set_user(name, attributemap)
 
     def _true_set_user(self, name, attributemap):
@@ -1461,9 +1485,10 @@ class ConfigManager(object):
             self._cfgstore['users'][name]['displayname'] = displayname
         _cfgstore['main']['idmap'][uid] = {
             'tenant': self.tenant,
-            'username': name
+            'username': name,
+            'role': role,
         }
-        if attributemap is not None:
+        if attributemap:
             self._true_set_user(name, attributemap)
         _mark_dirtykey('users', name, self.tenant)
         _mark_dirtykey('idmap', uid)
@@ -1626,6 +1651,7 @@ class ConfigManager(object):
                 if group in self._cfgstore['nodes'][node]['groups']:
                     self._cfgstore['nodes'][node]['groups'].remove(group)
                     self._node_removed_from_group(node, group, changeset)
+                    _mark_dirtykey('nodes', node, self.tenant)
         for node in nodes:
             if node not in self._cfgstore['nodes']:
                 self._cfgstore['nodes'][node] = {'groups': [group]}
@@ -1867,6 +1893,8 @@ class ConfigManager(object):
             eventlet.spawn_n(_do_notifier, self, watcher, callback)
 
     def del_nodes(self, nodes):
+        if isinstance(nodes, set):
+            nodes = list(nodes)  # msgpack can't handle set
         if cfgleader:  # slaved to a collective
             return exec_on_leader('_rpc_master_del_nodes', self.tenant,
                                   nodes)

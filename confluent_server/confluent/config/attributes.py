@@ -280,7 +280,7 @@ node = {
     'console.method': {
         'description': ('Indicate the method used to access the console of '
                         'the managed node.'),
-        'validvalues': ('ssh', 'ipmi'),
+        'validvalues': ('ssh', 'ipmi', 'tsmsol'),
     },
 #    'virtualization.host': {
 #        'description': ('Hypervisor where this node does/should reside'),

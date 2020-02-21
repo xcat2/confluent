@@ -98,7 +98,7 @@ class NodeHandler(bmchandler.NodeHandler):
                 setdata += ',v4Gateway:{0}'.format(gateway)
             wc.request('POST', '/data', setdata)
             rsp = wc.getresponse()
-            rspdata = rsp.read()
+            rspdata = util.stringify(rsp.read())
             if '<statusCode>0' not in rspdata:
                 raise Exception("Error configuring SMM Network")
             return
@@ -145,7 +145,7 @@ class NodeHandler(bmchandler.NodeHandler):
             authdata['password'] = password
             wc.request('POST', '/data/login', urlencode(authdata), headers)
             rsp = wc.getresponse()
-            rspdata = rsp.read()
+            rspdata = util.stringify(rsp.read())
         if 'authResult>0' in rspdata:
             tokens = fromstring(rspdata)
             st2 = tokens.findall('st2')[0].text
@@ -181,6 +181,10 @@ class NodeHandler(bmchandler.NodeHandler):
             'secret.hardwaremanagementuser', {}).get('value', 'USERID')
         passwd = creds.get(nodename, {}).get(
             'secret.hardwaremanagementpassword', {}).get('value', 'PASSW0RD')
+        if not isinstance(username, str):
+            username = username.decode('utf8')
+        if not isinstance(passwd, str):
+            passwd = passwd.decode('utf8')
         if passwd == 'PASSW0RD' and self.ruleset:
             raise Exception('Cannot support default password and setting password rules at same time')
         if passwd == 'PASSW0RD':

@@ -15,6 +15,7 @@
 import base64
 import codecs
 import confluent.discovery.handlers.imm as immhandler
+import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
 import errno
@@ -95,7 +96,8 @@ class NodeHandler(immhandler.NodeHandler):
             ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
         except pygexc.IpmiException as e:
             if (e.ipmicode != 193 and 'Unauthorized name' not in str(e) and
-                    'Incorrect password' not in str(e)):
+                    'Incorrect password' not in str(e) and 
+                    str(e) != 'Session no longer connected'):
                 # raise an issue if anything other than to be expected
                 if disableipmi:
                     _, _ = wc.grab_json_response_with_status(
@@ -170,7 +172,12 @@ class NodeHandler(immhandler.NodeHandler):
                 pwdchanged = True
             if '_csrf_token' in wc.cookies:
                 wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            if pwdchanged:
+                # Remove the minimum change interval, to allow sane 
+                # password changes after provisional changes
+                self.set_password_policy('')
             return (wc, pwdchanged)
+        return (None, None)
 
     @property
     def wc(self):
@@ -204,7 +211,7 @@ class NodeHandler(immhandler.NodeHandler):
                 # however the target *will* demand a new password... if it's currently
                 # PASSW0RD
                 # use TempW0rd42 to avoid divulging a real password on the line
-                # This is replacing one well known password (PASSW0RD) with another 
+                # This is replacing one well known password (PASSW0RD) with another
                 # (TempW0rd42)
                 passwd = 'TempW0rd42'
             wc, pwdchanged = self.get_webclient('USERID', 'PASSW0RD', passwd)
@@ -226,9 +233,9 @@ class NodeHandler(immhandler.NodeHandler):
         if wc:
             return wc
 
-    def set_password_policy(self):
+    def set_password_policy(self, strruleset):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
-        for rule in self.ruleset.split(','):
+        for rule in strruleset.split(','):
             if '=' not in rule:
                 continue
             name, value = rule.split('=')
@@ -350,15 +357,18 @@ class NodeHandler(immhandler.NodeHandler):
         # between hypothetical secure path and today.
         dpp = self.configmanager.get_node_attributes(
             nodename, 'discovery.passwordrules')
-        self.ruleset = dpp.get(nodename, {}).get(
+        strruleset = dpp.get(nodename, {}).get(
             'discovery.passwordrules', {}).get('value', '')
         wc = self.wc
         creds = self.configmanager.get_node_attributes(
             self.nodename, ['secret.hardwaremanagementuser',
             'secret.hardwaremanagementpassword'], decrypt=True)
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
-        self.set_password_policy()
+        self.set_password_policy(strruleset)
         if self._atdefaultcreds:
+            if isdefault and self.tmppasswd:
+                raise Exception(
+                    'Request to use default credentials, but refused by target after it has been changed to {0}'.format(self.tmppasswd))
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
         self._convert_sha256account(user, passwd, wc)

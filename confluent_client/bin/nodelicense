@@ -37,6 +37,10 @@ exitcode = 0
 argparser = optparse.OptionParser(
     usage="Usage: "
           "%prog <noderange> [list][install <file>|save <directory>|delete <name>]")
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to delete licenses from, '
+                          'prompting if over the threshold')                  
 (options, args) = argparser.parse_args()
 upfile = None
 downdir = None
@@ -52,7 +56,7 @@ try:
             delete = args[2]
         elif args[1] != 'list':
             argparser.print_help()
-            sys.exit(1)
+            sys.exit(1)        
 except IndexError:
     argparser.print_help()
     sys.exit(1)
@@ -138,6 +142,7 @@ try:
     elif downdir:
         save_licenses(session, downdir)
     elif delete:
+        session.stop_if_noderange_over(noderange, options.maxnodes)
         delete_license(session, delete)
     else:
         show_licenses(session)

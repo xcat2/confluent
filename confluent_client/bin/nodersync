@@ -42,6 +42,10 @@ def run():
     argparser = optparse.OptionParser(
         usage="Usage: %prog location noderange:location",
     )
+    argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to run rsync to, '
+                          'prompting if over the threshold')   
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of nodes to concurrently rsync')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
@@ -64,7 +68,7 @@ def run():
     pipedesc = {}
     pendingexecs = deque()
     exitcode = 0
-
+    c.stop_if_noderange_over(noderange, options.maxnodes)
     for exp in c.create('/noderange/{0}/attributes/expression'.format(noderange),
             {'expression': cmdstr}):
         if 'error' in exp:
@@ -100,7 +104,7 @@ def run():
                     if desc['type'] == 'stdout':
                         if node not in pernodeout:
                             pernodeout[node] = ''
-                        pernodeout[node] += stringify(data)
+                        pernodeout[node] += client.stringify(data)
                         if '\n' in pernodeout[node]:
                             currout, pernodeout[node] = pernodeout[node].split('\n', 1)
                             if currout:

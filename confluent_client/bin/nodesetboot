@@ -43,7 +43,10 @@ argparser.add_option('-p', '--persist', dest='persist', action='store_true',
 argparser.add_option('-u', '--uefi', dest='uefi', action='store_true',
                      default=True,
                      help='Request UEFI style boot (rather than BIOS)')
-
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to modify next boot device, '
+                          'prompting if over the threshold')                        
 (options, args) = argparser.parse_args()
 
 try:
@@ -63,6 +66,7 @@ if options.biosmode:
     bootmode = 'bios'
 else:
     bootmode = 'uefi'
+session.stop_if_noderange_over(noderange, options.maxnodes)
 sys.exit(session.simple_noderange_command(noderange, '/boot/nextdevice', bootdev,
                                      bootmode=bootmode,
                                      persistent=options.persist))

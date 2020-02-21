@@ -63,10 +63,16 @@ def _print_cfg(scfg):
             sys.stderr.write(e['error'] + '\n')
             exitcode = e.get('errorcode', 1)
         for node in e.get('databynode', {}):
+            curr = e['databynode'][node]
+            if 'error' in curr:
+                if 'no available drives' in curr['error']:
+                    curr['error'] += ' (drives must be in unconfigured state to be available, they must not be in jbod or online state)'
+                sys.stderr.write('{0}: {1}\n'.format(node, curr['error']))
+                exitcode = curr.get('errorcode', 1)
+                continue
             if node not in storagebynode:
                 storagebynode[node] = {'disks': [], 'arrays': [],
                                        'volumes': []}
-            curr = e['databynode'][node]
             storagebynode[node][curr['type'] + 's'].append(curr)
     for node in storagebynode:
         for disk in sorted(storagebynode[node]['disks'],
@@ -108,6 +114,7 @@ def createstorage(noderange, options, args):
         sys.stderr.write('-r and -d are required arguments to create array\n')
         sys.exit(1)
     session = client.Command()
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     names = options.name
     if names is None:
         names = ''.join(args)
@@ -132,6 +139,7 @@ def deletestorage(noderange, options, args):
     else:
         names = options.name
     session = client.Command()
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     for rsp in session.delete(
             '/noderange/{0}/configuration/storage/volumes/{1}'.format(
                 noderange, names)):
@@ -162,6 +170,7 @@ def setdisk(noderange, options, args):
         sys.stderr.write('diskset requires valid state as argument (hotspare, jbod, unconfigured)\n')
         sys.exit(1)
     session = client.Command()
+    session.stop_if_noderange_over(noderange, options.maxnodes)
     scfg = session.update('/noderange/{0}/configuration/storage/disks/{1}'.format(noderange, names), {'state': args[0]})
     _print_cfg(scfg)
 
@@ -202,6 +211,10 @@ def main():
                          help='Comma separated list of stripsizes to use when creating volumes. '
                             'This value is in kilobytes.  The default behavior is to allow the '
                             'storage controller to decide.')
+    argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Specify a maximum number of '
+                          'nodes to configure storage on, '
+                          'prompting if over the threshold') 
     (options, args) = argparser.parse_args()
     if len(args) == 1:
         args.append('show')

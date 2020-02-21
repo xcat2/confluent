@@ -22,6 +22,11 @@ given as a node expression, as documented in the man page for nodeattribexpressi
   If combined with `-x`, will show all differing values except those indicated
   by `-x`
 
+* `-e`, `--extra`:
+   Read settings that are generally not needed, but may be slow to retrieve.
+   Notably this includes the IMM category of Lenovo systems.  The most popular
+   IMM settings are available through faster 'bmc' attributes.
+
 * `-x`, `--exclude`:
   Rather than listing only the specified configuration parameters, list all
   attributes except for the specified ones

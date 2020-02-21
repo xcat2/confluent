@@ -50,6 +50,9 @@ argparser.add_option('-c', '--clear', action='store_true',
                      help='Clear attributes')
 argparser.add_option('-p', '--prompt', action='store_true',
                      help='Prompt for attribute values interactively')
+argparser.add_option('-m', '--maxnodes', type='int',
+                     help='Prompt if trying to set attributes on more '
+                          'than specified number of nodes')
 (options, args) = argparser.parse_args()
 
 
@@ -87,6 +90,7 @@ if len(args) > 1:
                     if oneval != twoval:
                         print('Values did not match.')
                 argassign[arg] = twoval
+        session.stop_if_noderange_over(noderange, options.maxnodes)
         exitcode=client.updateattrib(session,args,nodetype, noderange, options, argassign)
     try:
         # setting user output to what the user inputs

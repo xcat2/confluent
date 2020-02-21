@@ -27,6 +27,8 @@ from fnmatch import fnmatch
 import hashlib
 import hmac
 import multiprocessing
+import os
+import pwd
 import confluent.userutil as userutil
 import confluent.util as util
 pam = None
@@ -58,9 +60,9 @@ _allowedbyrole = {
             '/node*/configuration/*',
         ],
         'update': [
-            '/discovery/*', 
+            '/discovery/*',
             '/networking/macs/rescan',
-            '/node*/power/state', 
+            '/node*/power/state',
             '/node*/power/reseat',
             '/node*/attributes/*',
             '/node*/media/*tach',
@@ -96,17 +98,6 @@ _deniedbyrole = {
         ]
     }
 }
-
-
-def _prune_passcache():
-    # This function makes sure we don't remember a passphrase in memory more
-    # than 10 seconds
-    while True:
-        curtime = time.time()
-        for passent in _passcache.iterkeys():
-            if passent[2] < curtime - 90:
-                del _passcache[passent]
-        eventlet.sleep(90)
 
 
 def _get_usertenant(name, tenant=False):
@@ -268,12 +259,36 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
             return authorize(user, element, tenant, operation)
     if pam:
-        pammy = pam.pam()
-        usergood = pammy.authenticate(user, passphrase)
-        del pammy
+        pwe = None
+        try:
+            pwe = pwd.getpwnam(user)
+        except KeyError:
+            #pam won't work if the user doesn't exist, don't go further
+            eventlet.sleep(0.05)  # stall even on test for existence of a username
+            return None
+        if os.getuid() != 0:
+            # confluent is running with reduced privilege, however, pam_unix refuses
+            # to let a non-0 user check anothers password.
+            # We will fork and the child will assume elevated privilege to
+            # get unix_chkpwd helper to enable checking /etc/shadow
+            pid = os.fork()
+            if not pid:
+                usergood = False
+                try:
+                    # we change to the uid we are trying to authenticate as, because
+                    # pam_unix uses unix_chkpwd which reque
+                    os.setuid(pwe.pw_uid)
+                    usergood = pam.authenticate(user, passphrase, service=_pamservice)
+                finally:
+                    os._exit(0 if usergood else 1)
+            usergood = os.waitpid(pid, 0)[1] == 0
+        else:
+            # We are running as root, we don't need to fork in order to authenticate the
+            # user
+            usergood = pam.authenticate(user, passphrase, service=_pamservice)
         if usergood:
             _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
-            return authorize(user, element, tenant, operation, skipuserobj=False)    
+            return authorize(user, element, tenant, operation, skipuserobj=False)
     eventlet.sleep(0.05)  # stall even on test for existence of a username
     return None
 

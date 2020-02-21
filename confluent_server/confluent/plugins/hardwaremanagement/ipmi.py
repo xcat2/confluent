@@ -42,6 +42,11 @@ import traceback
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
 
+try:
+    range = xrange
+except NameError:
+    pass
+
 pci_cache = {}
 
 def get_dns_txt(qstring):
@@ -131,7 +136,7 @@ def hex2bin(hexstring):
     if len(hexvals) < 2:
         hexvals = hexstring.split(' ')
     if len(hexvals) < 2:
-        hexvals = [hexstring[i:i+2] for i in xrange(0, len(hexstring), 2)]
+        hexvals = [hexstring[i:i+2] for i in range(0, len(hexstring), 2)]
     bytedata = [int(i, 16) for i in hexvals]
     return bytearray(bytedata)
 
@@ -278,6 +283,7 @@ def _donothing(data):
 
 class IpmiConsole(conapi.Console):
     configattributes = frozenset(_configattributes)
+    bmctonodemapping = {}
 
     def __init__(self, node, config):
         self.error = None
@@ -295,10 +301,21 @@ class IpmiConsole(conapi.Console):
         self.bmc = connparams['bmc']
         self.port = connparams['port']
         self.connected = False
+        # ok, is self.bmc unique among nodes already
         # Cannot actually create console until 'connect', when we get callback
+        if (self.bmc in self.bmctonodemapping and
+                self.bmctonodemapping[self.bmc] != node):
+            raise Exception(
+                "Duplicate hardwaremanagement.manager attribute for {0} and {1}".format(
+                    node, self.bmctonodemapping[self.bmc]))
+        self.bmctonodemapping[self.bmc] = node
 
     def __del__(self):
         self.solconnection = None
+        try:
+            del self.bmctonodemapping[self.bmc]
+        except KeyError:
+            pass
 
     def handle_data(self, data):
         if type(data) == dict:
@@ -584,9 +601,13 @@ class IpmiHandler(object):
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
+    def get_diags(self, savefile, progress):
+        return self.ipmicmd.get_diagnostic_data(
+            savefile, progress=progress, autosuffix=True)
+
     def handle_servicedata_fetch(self):
         u = firmwaremanager.Updater(
-            self.node, self.ipmicmd.get_diagnostic_data,
+            self.node, self.get_diags,
             self.inputdata.nodefile(self.node), self.tenant, type='ffdc',
             owner=self.current_user)
         self.output.put(msg.CreatedResource(
@@ -625,8 +646,10 @@ class IpmiHandler(object):
             return self.handle_ntp()
         elif self.element[1:4] == ['management_controller', 'extended', 'all']:
             return self.handle_bmcconfig()
-        elif self.element[1:4] == ['management_controller', 'extended', 'all']:
+        elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
             return self.handle_bmcconfig(True)
+        elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
+            return self.handle_bmcconfig(True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
@@ -658,7 +681,7 @@ class IpmiHandler(object):
             if len(self.element) == 4:
                 # A list of destinations
                 maxdest = self.ipmicmd.get_alert_destination_count()
-                for alertidx in xrange(0, maxdest + 1):
+                for alertidx in range(0, maxdest + 1):
                     self.output.put(msg.ChildCollection(alertidx))
                 return
             elif len(self.element) == 5:
@@ -1391,12 +1414,14 @@ class IpmiHandler(object):
                 'Cannot read the "clear" resource')
         self.ipmicmd.clear_system_configuration()
 
-    def handle_bmcconfig(self, advanced=False):
+    def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:
             try:
-                self.output.put(msg.ConfigSet(
-                    self.node,
-                    self.ipmicmd.get_bmc_configuration()))
+                if extended:
+                    bmccfg = self.ipmicmd.get_extended_bmc_configuration()
+                else:
+                    bmccfg = self.ipmicmd.get_bmc_configuration()
+                self.output.put(msg.ConfigSet(self.node, bmccfg))
             except Exception as e:
                 self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
@@ -1469,6 +1494,11 @@ class IpmiHandler(object):
 
     def save_licenses(self):
         directory = self.inputdata.nodefile(self.node)
+        if not os.access(os.path.dirname(directory), os.W_OK):
+            raise exc.InvalidArgumentException(
+                'The onfluent system user/group is unable to write to '
+                'directory {0}, check ownership and permissions'.format(
+                    os.path.dirname(directory)))
         for saved in self.ipmicmd.save_licenses(directory):
             self.output.put(msg.SavedFile(self.node, saved))
 
@@ -1476,7 +1506,15 @@ class IpmiHandler(object):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if self.op in ('create', 'update'):
-            self.ipmicmd.apply_license(self.inputdata.nodefile(self.node))
+            filename = self.inputdata.nodefile(self.node)
+            if not os.access(filename, os.R_OK):
+                errstr =  ('{0} is not readable by confluent on {1} '
+                           '(ensure confluent user or group can access file '
+                           'and parent directories)').format(
+                               filename, socket.gethostname())
+                self.output.put(msg.ConfluentNodeError(self.node, errstr))
+                return
+            self.ipmicmd.apply_license(filename)
         if len(self.element) == 3:
             self.output.put(msg.ChildCollection('all'))
             i = 1

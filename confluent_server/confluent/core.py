@@ -60,19 +60,14 @@ import eventlet.greenpool as greenpool
 import eventlet.green.ssl as ssl
 import eventlet.queue as queue
 import itertools
+import msgpack
 import os
-try:
-    import cPickle as pickle
-    pargs = {}
-except ImportError:
-    import pickle
-    pargs = {'encoding': 'utf-8'}
 import socket
 import struct
 import sys
 
 pluginmap = {}
-dispatch_plugins = (b'ipmi', u'ipmi')
+dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol')
 
 
 def seek_element(currplace, currkey):
@@ -221,10 +216,14 @@ def _init_core():
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
                     }),
+                    'extra': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
                     'advanced': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
-                    }),                    
+                    }),
                 },
             },
             'storage': {
@@ -417,18 +416,22 @@ def create_user(inputdata, configmanager):
     try:
         username = inputdata['name']
         del inputdata['name']
+        role = inputdata['role']
+        del inputdata['role']
     except (KeyError, ValueError):
-        raise exc.InvalidArgumentException()
-    configmanager.create_user(username, attributemap=inputdata)
+        raise exc.InvalidArgumentException('Missing user name or role')
+    configmanager.create_user(username, role, attributemap=inputdata)
 
 
 def create_usergroup(inputdata, configmanager):
     try:
         groupname = inputdata['name']
+        role = inputdata['role']
         del inputdata['name']
+        del inputdata['role']
     except (KeyError, ValueError):
-        raise exc.InvalidArgumentException()
-    configmanager.create_usergroup(groupname)
+        raise exc.InvalidArgumentException("Missing user name or role")
+    configmanager.create_usergroup(groupname, role)
 
 
 def update_usergroup(groupname, attribmap, configmanager):
@@ -689,16 +692,22 @@ def handle_dispatch(connection, cert, dispatch, peername):
             cfm.get_collective_member(peername)['fingerprint'], cert):
         connection.close()
         return
-    pversion = 0
-    if bytearray(dispatch)[0] == 0x80:
-        pversion = bytearray(dispatch)[1]
-    dispatch = pickle.loads(dispatch, **pargs)
+    if dispatch[0:2] != b'\x01\x03':  # magic value to indicate msgpack
+        # We only support msgpack now
+        # The magic should preclude any pickle, as the first byte can never be
+        # under 0x20 or so.
+        connection.close()
+        return
+    dispatch = msgpack.unpackb(dispatch[2:], raw=False)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
     inputdata = dispatch['inputdata']
     operation = dispatch['operation']
     pathcomponents = dispatch['path']
     routespec = nested_lookup(noderesources, pathcomponents)
+    inputdata = msg.get_input_message(
+        pathcomponents, operation, inputdata, nodes, dispatch['isnoderange'],
+        configmanager)
     plugroute = routespec.routeinfo
     plugpath = None
     nodesbyhandler = {}
@@ -728,18 +737,26 @@ def handle_dispatch(connection, cert, dispatch, peername):
                 configmanager=configmanager,
                 inputdata=inputdata))
         for res in itertools.chain(*passvalues):
-            _forward_rsp(connection, res, pversion)
+            _forward_rsp(connection, res)
     except Exception as res:
-        _forward_rsp(connection, res, pversion)
+        _forward_rsp(connection, res)
     connection.sendall('\x00\x00\x00\x00\x00\x00\x00\x00')
 
 
-def _forward_rsp(connection, res, pversion):
+def _forward_rsp(connection, res):
     try:
-        r = pickle.dumps(res, protocol=pversion)
-    except TypeError:
-        r = pickle.dumps(Exception(
-            'Cannot serialize error, check collective.manager error logs for details' + str(res)), protocol=pversion)
+       r = res.serialize()
+    except AttributeError:
+        if isinstance(res, Exception):
+            r = msgpack.packb(['Exception', str(res)], use_bin_type=False)
+        else:
+            r = msgpack.packb(
+                ['Exception', 'Unable to serialize response ' + repr(res)],
+                use_bin_type=False)
+    except Exception as e:
+        r = msgpack.packb(
+                ['Exception', 'Unable to serialize response ' + repr(res) + ' due to ' + str(e)],
+                use_bin_type=False)
     rlen = len(r)
     if not rlen:
         return
@@ -830,7 +847,7 @@ def handle_node_request(configmanager, inputdata, operation,
     del pathcomponents[0:2]
     passvalues = queue.Queue()
     plugroute = routespec.routeinfo
-    inputdata = msg.get_input_message(
+    msginputdata = msg.get_input_message(
         pathcomponents, operation, inputdata, nodes, isnoderange,
         configmanager)
     if 'handler' in plugroute:  # fixed handler definition, easy enough
@@ -841,7 +858,7 @@ def handle_node_request(configmanager, inputdata, operation,
         passvalue = hfunc(
             nodes=nodes, element=pathcomponents,
             configmanager=configmanager,
-            inputdata=inputdata)
+            inputdata=msginputdata)
         if isnoderange:
             return passvalue
         elif isinstance(passvalue, console.Console):
@@ -894,13 +911,13 @@ def handle_node_request(configmanager, inputdata, operation,
             workers.spawn(addtoqueue, passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
                                            'element': pathcomponents,
                 'configmanager': configmanager,
-                'inputdata': inputdata})
+                'inputdata': msginputdata})
         for manager in nodesbymanager:
             numworkers += 1
             workers.spawn(addtoqueue, passvalues, dispatch_request, {
                 'nodes': nodesbymanager[manager], 'manager': manager,
                 'element': pathcomponents, 'configmanager': configmanager,
-                'inputdata': inputdata, 'operation': operation})
+                'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange})
         if isnoderange or not autostrip:
             return iterate_queue(numworkers, passvalues)
         else:
@@ -944,7 +961,7 @@ def addtoqueue(theq, fun, kwargs):
 
 
 def dispatch_request(nodes, manager, element, configmanager, inputdata,
-                     operation):
+                     operation, isnoderange):
     a = configmanager.get_collective_member(manager)
     try:
         remote = socket.create_connection((a['address'], 13001))
@@ -978,10 +995,10 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
         pvers = 2
     tlvdata.recv(remote)
     myname = collective.get_myname()
-    dreq = pickle.dumps({'name': myname, 'nodes': list(nodes),
-                         'path': element,'tenant': configmanager.tenant,
-                         'operation': operation, 'inputdata': inputdata},
-                         protocol=pvers)
+    dreq =  b'\x01\x03' + msgpack.packb(
+        {'name': myname, 'nodes': list(nodes),
+        'path': element,'tenant': configmanager.tenant,
+        'operation': operation, 'inputdata': inputdata, 'isnoderange': isnoderange}, use_bin_type=False)
     tlvdata.send(remote, {'dispatch': {'name': myname, 'length': len(dreq)}})
     remote.sendall(dreq)
     while True:
@@ -1029,11 +1046,13 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
                 return
             rsp += nrsp
         try:
-            rsp = pickle.loads(rsp, **pargs)
-        except UnicodeDecodeError:
-            rsp = pickle.loads(rsp, encoding='latin1')
+            rsp = msg.msg_deserialize(rsp)
+        except Exception:
+            rsp = exc.deserialize_exc(rsp)
         if isinstance(rsp, Exception):
             raise rsp
+        if not rsp:
+            raise Exception('Error in cross-collective serialize/deserialze, see remote logs')
         yield rsp
 
 

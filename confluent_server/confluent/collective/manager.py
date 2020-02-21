@@ -73,20 +73,12 @@ def connect_to_leader(cert=None, name=None, leader=None):
         with cfm._initlock:
             banner = tlvdata.recv(remote)  # the banner
             vers = banner.split()[2]
-            pvers = 0
-            reqver = 4
-            if vers == b'v0':
-                pvers = 2
-            elif vers == b'v1':
-                pvers = 4
-            if sys.version_info[0] < 3:
-                pvers = 2
-                reqver = 2
+            if vers != b'v2':
+                raise Exception('This instance only supports protocol 2, synchronize versions between collective members')
             tlvdata.recv(remote)  # authpassed... 0..
             if name is None:
                 name = get_myname()
             tlvdata.send(remote, {'collective': {'operation': 'connect',
-                                                 'protover': reqver,
                                                  'name': name,
                                                  'txcount': cfm._txcount}})
             keydata = tlvdata.recv(remote)
@@ -160,15 +152,15 @@ def connect_to_leader(cert=None, name=None, leader=None):
                 raise
             currentleader = leader
         #spawn this as a thread...
-        follower = eventlet.spawn(follow_leader, remote, pvers)
+        follower = eventlet.spawn(follow_leader, remote, leader)
     return True
 
 
-def follow_leader(remote, proto):
+def follow_leader(remote, leader):
     global currentleader
     cleanexit = False
     try:
-        cfm.follow_channel(remote, proto)
+        cfm.follow_channel(remote)
     except greenlet.GreenletExit:
         cleanexit = True
     finally:
@@ -176,8 +168,8 @@ def follow_leader(remote, proto):
             log.log({'info': 'Previous following cleanly closed',
                      'subsystem': 'collective'})
             return
-        log.log({'info': 'Current leader has disappeared, restarting '
-                         'collective membership', 'subsystem': 'collective'})
+        log.log({'info': 'Current leader ({0}) has disappeared, restarting '
+                         'collective membership'.format(leader), 'subsystem': 'collective'})
         # The leader has folded, time to startup again...
         cfm.stop_following()
         currentleader = None
@@ -430,7 +422,6 @@ def handle_connection(connection, cert, request, local=False):
         tlvdata.send(connection, collinfo)
     if 'connect' == operation:
         drone = request['name']
-        folver = request.get('protover', 2)
         droneinfo = cfm.get_collective_member(drone)
         if not (droneinfo and util.cert_matches(droneinfo['fingerprint'],
                                                 cert)):
@@ -479,7 +470,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
-        if not cfm.relay_slaved_requests(drone, connection, folver):
+        if not cfm.relay_slaved_requests(drone, connection):
             if not retrythread:  # start a recovery if everyone else seems
                 # to have disappeared
                 retrythread = eventlet.spawn_after(30 + random.random(),

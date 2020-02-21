@@ -123,8 +123,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         if authdata:
             cfm = authdata[1]
             authenticated = True
-    # version 0 == original, version 1 == pickle3 allowed
-    send_data(connection, "Confluent -- v{0} --".format(sys.version_info[0] - 2))
+    # version 0 == original, version 1 == pickle3 allowed, 2 = pickle forbidden, msgpack allowed
+    send_data(connection, "Confluent -- v2 --")
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
@@ -154,20 +154,25 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
-    if request and 'collective' in request and skipauth:
-        if not libssl:
+    if request and 'collective' in request:
+        if skipauth:
+            if not libssl:
+                tlvdata.send(
+                    connection,
+                    {'collective': {'error': 'Server either does not have '
+                                            'python-pyopenssl installed or has an '
+                                            'incorrect version installed '
+                                            '(e.g. pyOpenSSL would need to be '
+                                            'replaced with python-pyopenssl). '
+                                            'Restart confluent after updating '
+                                            'the dependency.'}})
+                return
+            return collective.handle_connection(connection, None, request['collective'],
+                                        local=True)
+        else:
             tlvdata.send(
-                connection,
-                {'collective': {'error': 'Server either does not have '
-                                         'python-pyopenssl installed or has an '
-                                         'incorrect version installed '
-                                         '(e.g. pyOpenSSL would need to be '
-                                         'replaced with python-pyopenssl). '
-                                         'Restart confluent after updating '
-                                         'the dependency.'}})
-            return
-        return collective.handle_connection(connection, None, request['collective'],
-                                     local=True)
+                    connection,
+                    {'collective': {'error': 'collective management commands may only be used by root'}})
     while request is not None:
         try:
             process_request(

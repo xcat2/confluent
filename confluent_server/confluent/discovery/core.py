@@ -107,6 +107,8 @@ nodehandlers = {
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
+    'onie-switch': None,
+    'cumulus-switch': None,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,
     'service:lenovo-tsm': tsm,
@@ -114,6 +116,8 @@ nodehandlers = {
 
 servicenames = {
     'pxe-client': 'pxe-client',
+    'onie-switch': 'onie-switch',
+    'cumulus-switch': 'cumulus-switch',
     'service:lenovo-smm': 'lenovo-smm',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
@@ -124,6 +128,8 @@ servicenames = {
 
 servicebyname = {
     'pxe-client': 'pxe-client',
+    'onie-switch': 'onie-switch',
+    'cumulus-switch': 'cumulus-switch',
     'lenovo-smm': 'service:lenovo-smm',
     'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
@@ -951,9 +957,9 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                     #     raise exc.InvalidArgumentException(errorstr)
                     # log.log({'error': errorstr})
                     if encuuid in pending_by_uuid:
-                        pending_by_uuid[encuuid].add(info)
+                        pending_by_uuid[encuuid].append(info)
                     else:
-                        pending_by_uuid[encuuid] = set([info])
+                        pending_by_uuid[encuuid] = [info]
                     return
                 # We found the real smm, replace the list with the actual smm
                 # to continue
@@ -1096,6 +1102,10 @@ def discover_node(cfg, handler, info, nodename, manual):
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):
             eventlet.spawn_n(_recheck_single_unknown_info, cfg, i)
+        try:
+            del pending_by_uuid[curruuid]
+        except KeyError:
+            pass
         return True
     log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                      'value allowing discovery (open or permissive)'.format(

@@ -76,6 +76,11 @@ import confluent.termhandler as termhandler
 import confluent.tlvdata as tlvdata
 import confluent.client as client
 
+try:
+    unicode
+except NameError:
+    unicode = str
+
 conserversequence = '\x05c'  # ctrl-e, c
 clearpowermessage = False
 
@@ -299,8 +304,11 @@ currchildren = None
 
 
 def print_result(res):
+    global exitcode
     if 'errorcode' in res or 'error' in res:
         print(res['error'])
+        if 'errorcode' in res:
+            exitcode |= res['errorcode']
         return
     if 'databynode' in res:
         print_result(res['databynode'])

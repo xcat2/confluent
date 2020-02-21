@@ -88,6 +88,9 @@ def show_collective():
     s = client.Command().connection
     tlvdata.send(s, {'collective': {'operation': 'show'}})
     res = tlvdata.recv(s)
+    if 'error' in res:
+        print(res['error'])
+        return
     if 'error' in res['collective']:
         print(res['collective']['error'])
         return
