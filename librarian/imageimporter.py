@@ -98,10 +98,10 @@ def scan_iso(filename):
     return filelist, filecontents
 
 def fingerprint(filename):
-    with open(sys.argv[1]) as archive:
+    with open(sys.argv[1], 'rb') as archive:
         header = archive.read(32768)
         archive.seek(32769)
-        if archive.read(6) == 'CD001\x01':
+        if archive.read(6) == b'CD001\x01':
             # ISO image
             isoinfo = scan_iso(filename)
             name = None
