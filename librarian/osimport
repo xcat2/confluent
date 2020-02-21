@@ -164,7 +164,7 @@ def fingerprint(filename):
                     chunk = archive.read(32768)
                 imginfo = HASHPRINTS.get(sum.hexdigest(), None)
                 if imginfo:
-                    return imginfo, isoinfo[0]
+                    return imginfo, None
 
 
 def printit(info):
