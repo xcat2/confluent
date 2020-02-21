@@ -30,6 +30,7 @@ pxearchs = {
     '\x00\x07': 'uefi-x64',
     '\x00\x09': 'uefi-x64',
     '\x00\x0b': 'uefi-aarch64',
+    '\x00\x10': 'uefi-httpboot',
 }
 
 
