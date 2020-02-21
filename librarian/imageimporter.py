@@ -1,3 +1,5 @@
+import logging
+logging.getLogger('libarchive').addHandler(logging.NullHandler())
 import libarchive
 import hashlib
 import sys
