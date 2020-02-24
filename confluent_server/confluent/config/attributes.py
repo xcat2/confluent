@@ -97,6 +97,15 @@ node = {
         'description': ('Classification of node as server or switch'),
         'validvalues': ('switch', 'server'),
     },
+    'api.key': {
+        'description': ('Crypt of api key for self api requests by node'),
+    },
+    'api.armed': {
+        'description': ('Indicates whether an insecure api key request is allowed. '
+                        'The format is an expiration time in ISO8601 format. When '
+                        'the indicated time passes or the first time a node claims '
+                        'the key, key grants will not be allowed.'),
+    },
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},

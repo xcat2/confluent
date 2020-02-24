@@ -68,7 +68,11 @@ int main(int argc, char* argv[]) {
     struct sockaddr_in6 addr, dst;
     struct sockaddr_in addr4, dst4;
     char msg[1024];
+    char *nodenameidx;
+    char nodename[1024];
+    char lastnodename[1024];
     char lastmsg[1024];
+    char last6msg[1024];
     int ifidx, offset;
     fd_set rfds;
     struct timeval tv;
@@ -80,6 +84,10 @@ int main(int argc, char* argv[]) {
     memset(&addr, 0, sizeof(addr));
     memset(&dst, 0, sizeof(dst));
     memset(&dst4, 0, sizeof(dst4));
+    memset(nodename, 0, 1024);
+    memset(lastnodename, 0, 1024);
+    memset(lastmsg, 0, 1024);
+    memset(last6msg, 0, 1024);
     addr.sin6_family = AF_INET6;
     addr.sin6_addr = in6addr_any;
     addr.sin6_port = htons(190);
@@ -141,20 +149,52 @@ int main(int argc, char* argv[]) {
         if (ifidx == -1) perror("Unable to select");
         if (ifidx) {
             if (FD_ISSET(n4, &rfds)) {
-                recvfrom(n4, msg, 1024, 0, (struct sockaddr *)&dst4, &dst4size);
+                memset(msg, 0, 1024);
+                /* Deny packet access to the last 24 bytes to assure null */
+                recvfrom(n4, msg, 1000, 0, (struct sockaddr *)&dst4, &dst4size);
+                if  (nodenameidx = strstr(msg, "NODENAME: ")) {
+                        nodenameidx += 10;
+                        strncpy(nodename, nodenameidx, 1024); 
+                        nodenameidx = strstr(nodenameidx, "\r");
+                        if (nodenameidx) { nodenameidx[0] = 0; }
+                        if (strncmp(lastnodename, nodename, 1024) != 0) {
+                            printf("NODENAME: %s\n", nodename);
+                            strncpy(lastnodename, nodename, 1024);
+                        }
+                }
+                memset(msg, 0, 1024);           
                 inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
                 /* Take measure from printing out the same ip twice in a row */
                 if (strncmp(lastmsg, msg, 1024) != 0) {
-                    printf("%s\n", msg);
+                    sendto(n4, "PING", 4, 0, (const struct sockaddr *)&dst4, dst4size);
+                    printf("MANAGER: %s\n", msg);
                     strncpy(lastmsg, msg, 1024);
                 }
             }
             if (FD_ISSET(ns, &rfds)) {
-                recvfrom(ns, msg, 1024, 0, (struct sockaddr *)&dst, &dstsize);
+                memset(msg, 0, 1024);
+                /* Deny packet access to the last 24 bytes to assure null */
+                recvfrom(ns, msg, 1000, 0, (struct sockaddr *)&dst, &dstsize);
+                if  (nodenameidx = strstr(msg, "NODENAME: ")) {
+                        nodenameidx += 10;
+                        strncpy(nodename, nodenameidx, 1024); 
+                        nodenameidx = strstr(nodenameidx, "\r");
+                        if (nodenameidx) { nodenameidx[0] = 0; }
+                        if (strncmp(lastnodename, nodename, 1024) != 0) {
+                            printf("NODENAME: %s\n", nodename);
+                            strncpy(lastnodename, nodename, 1024);
+                        }
+                }
+                memset(msg, 0, 1024);
                 inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
-                if (strncmp(lastmsg, msg, 1024) != 0) {
-                    printf("%s\n", msg);
-                    strncpy(lastmsg, msg, 1024);
+                if (strncmp(last6msg, msg, 1024) != 0) {
+                    sendto(ns, "PING", 4, 0, (const struct sockaddr *)&dst, dstsize);
+                    printf("MANAGER: %s", msg);
+                    if (strncmp(msg, "fe80::", 6) == 0) {
+                        printf("%%%u", dst.sin6_scope_id);
+                    }
+                    printf("\n");
+                    strncpy(last6msg, msg, 1024);
                 }
             }
         }

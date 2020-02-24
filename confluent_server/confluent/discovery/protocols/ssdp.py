@@ -30,9 +30,11 @@
 
 import confluent.neighutil as neighutil
 import confluent.util as util
+import confluent.log as log
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import struct
+import traceback
 
 mcastv4addr = '239.255.255.250'
 mcastv6addr = 'ff02::c'
@@ -51,7 +53,7 @@ def scan(services, target=None):
             yield rply
 
 
-def snoop(handler, byehandler=None):
+def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for SSDP notify messages
 
     The handler shall be called on any service coming online.
@@ -67,6 +69,7 @@ def snoop(handler, byehandler=None):
     # Normally, I like using v6/v4 agnostic socket. However, since we are
     # dabbling in multicast wizardry here, such sockets can cause big problems,
     # so we will have two distinct sockets
+    tracelog = log.Logger('trace')
     known_peers = set([])
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -90,50 +93,73 @@ def snoop(handler, byehandler=None):
     net6.bind(('', 1900))
     peerbymacaddress = {}
     while True:
-        newmacs = set([])
-        machandlers = {}
-        r, _, _ = select.select((net4, net6), (), (), 60)
-        neighutil.update_neigh()
-        while r:
-            for s in r:
-                (rsp, peer) = s.recvfrom(9000)
-                rsp = rsp.split('\r\n')
-                method, _, _ = rsp[0].split(' ', 2)
-                if method == 'NOTIFY':
-                    ip = peer[0].partition('%')[0]
-                    if ip not in neighutil.neightable:
-                        continue
-                    if peer in known_peers:
-                        continue
-                    mac = neighutil.neightable[ip]
-                    known_peers.add(peer)
-                    newmacs.add(mac)
-                    if mac in peerbymacaddress:
-                        peerbymacaddress[mac]['peers'].append(peer)
-                    else:
-                        peerbymacaddress[mac] = {
-                            'hwaddr': mac,
-                            'peers': [peer],
-                        }
-                        peerdata = peerbymacaddress[mac]
+        try:
+            newmacs = set([])
+            machandlers = {}
+            r, _, _ = select.select((net4, net6), (), (), 60)
+            neighutil.update_neigh()
+            while r:
+                for s in r:
+                    (rsp, peer) = s.recvfrom(9000)
+                    rsp = rsp.split('\r\n')
+                    method, _, _ = rsp[0].split(' ', 2)
+                    if method == 'NOTIFY':
+                        ip = peer[0].partition('%')[0]
+                        if ip not in neighutil.neightable:
+                            continue
+                        if peer in known_peers:
+                            continue
+                        mac = neighutil.neightable[ip]
+                        known_peers.add(peer)
+                        newmacs.add(mac)
+                        if mac in peerbymacaddress:
+                            peerbymacaddress[mac]['peers'].append(peer)
+                        else:
+                            peerbymacaddress[mac] = {
+                                'hwaddr': mac,
+                                'peers': [peer],
+                            }
+                            peerdata = peerbymacaddress[mac]
+                            for headline in rsp[1:]:
+                                if not headline:
+                                    continue
+                                header, _, value = headline.partition(':')
+                                header = header.strip()
+                                value = value.strip()
+                                if header == 'NT':
+                                    peerdata['service'] = value
+                                elif header == 'NTS':
+                                    if value == 'ssdp:byebye':
+                                        machandlers[mac] = byehandler
+                                    elif value == 'ssdp:alive':
+                                        machandlers[mac] = None # handler
+                    elif method == 'M-SEARCH':
+                        if not uuidlookup:
+                            continue
+                        #ip = peer[0].partition('%')[0]
                         for headline in rsp[1:]:
                             if not headline:
                                 continue
-                            header, _, value = headline.partition(':')
-                            header = header.strip()
-                            value = value.strip()
-                            if header == 'NT':
-                                peerdata['service'] = value
-                            elif header == 'NTS':
-                                if value == 'ssdp:byebye':
-                                    machandlers[mac] = byehandler
-                                elif value == 'ssdp:alive':
-                                    machandlers[mac] = handler
-            r, _, _ = select.select((net4, net6), (), (), 0.1)
-        for mac in newmacs:
-            thehandler = machandlers.get(mac, None)
-            if thehandler:
-                thehandler(peerbymacaddress[mac])
+                            headline = headline.partition(':')
+                            if len(headline) < 3:
+                                continue
+                            if  headline[0] == 'ST' and headline[-1].startswith(' urn:xcat.org:service:confluent:'):
+                                for query in headline[-1].split('/'):
+                                    if query.startswith('uuid='):
+                                        curruuid = query.split('=', 1)[1].lower()
+                                        node = uuidlookup(curruuid)
+                                        if not node:
+                                            break
+                                        reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}'.format(node)
+                                        s.sendto(reply, peer)
+                r, _, _ = select.select((net4, net6), (), (), 0.2)
+            for mac in newmacs:
+                thehandler = machandlers.get(mac, None)
+                if thehandler:
+                    thehandler(peerbymacaddress[mac])
+        except Exception:
+                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                             event=log.Events.stacktrace)
 
 
 def _find_service(service, target):

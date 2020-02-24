@@ -65,7 +65,7 @@ import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
-#import confluent.discovery.protocols.ssdp as ssdp
+import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
 import confluent.discovery.handlers.cpstorage as cpstorage
@@ -877,6 +877,8 @@ def get_nodename_from_chained_smms(cfg, handler, info):
                 nodename = newnodename
     return nodename
 
+def get_node_by_uuid(uuid):
+    return nodes_by_uuid.get(uuid, None)
 
 def get_nodename_from_enclosures(cfg, info):
     nodename = None
@@ -1238,8 +1240,7 @@ def start_detection():
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
         rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
-
-    # eventlet.spawn_n(ssdp.snoop, safe_detected)
+    eventlet.spawn_n(ssdp.snoop, None, None, ssdp, get_node_by_uuid)
 
 def stop_autosense():
     for watcher in list(autosensors):
