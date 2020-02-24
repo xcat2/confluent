@@ -44,7 +44,7 @@ def create_certificate():
     tmpconfig = tempfile.mktemp()
     shutil.copy2(sslcfg, tmpconfig)
     with open(tmpconfig, 'a') as cfgfile:
-        cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
+        cfgfile.write('\n[SAN]\nbasicConstraints = CA:true\nsubjectAltName={0}'.format(san))
     subprocess.check_call(
         'openssl req -new -x509 -key privkey.pem -days 7300 -out cert.pem '
         '-subj /CN={0} -extensions SAN '
