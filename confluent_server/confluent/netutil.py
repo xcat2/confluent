@@ -59,6 +59,8 @@ def ip_on_same_subnet(first, second, prefix):
 
 
 def address_is_local(address):
+    if '.' in address and address.startswith('::ffff:'):
+        address = address.replace('::ffff:', '')
     for iface in netifaces.interfaces():
         for i4 in netifaces.ifaddresses(iface).get(2, []):
             cidr = mask_to_cidr(i4['netmask'])
