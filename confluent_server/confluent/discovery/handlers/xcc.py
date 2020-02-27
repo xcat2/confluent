@@ -175,7 +175,8 @@ class NodeHandler(immhandler.NodeHandler):
             if pwdchanged:
                 # Remove the minimum change interval, to allow sane 
                 # password changes after provisional changes
-                self.set_password_policy('')
+                wc = self.wc
+                self.set_password_policy('', wc)
             return (wc, pwdchanged)
         return (None, None)
 
@@ -233,7 +234,7 @@ class NodeHandler(immhandler.NodeHandler):
         if wc:
             return wc
 
-    def set_password_policy(self, strruleset):
+    def set_password_policy(self, strruleset, wc):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
         for rule in strruleset.split(','):
             if '=' not in rule:
@@ -254,9 +255,7 @@ class NodeHandler(immhandler.NodeHandler):
             if name.lower() == 'reuse':
                 ruleset['USER_GlobalMinPassReuseCycle'] = value
         try:
-            wc = self.wc
             wc.grab_json_response('/api/dataset', ruleset)
-            wc.grab_json_response('/api/providers/logout')
         except Exception as e:
             print(repr(e))
             pass
@@ -364,7 +363,7 @@ class NodeHandler(immhandler.NodeHandler):
             self.nodename, ['secret.hardwaremanagementuser',
             'secret.hardwaremanagementpassword'], decrypt=True)
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
-        self.set_password_policy(strruleset)
+        self.set_password_policy(strruleset, wc)
         if self._atdefaultcreds:
             if isdefault and self.tmppasswd:
                 raise Exception(
