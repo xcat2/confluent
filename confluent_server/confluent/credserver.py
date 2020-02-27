@@ -39,7 +39,7 @@ class CredServer(object):
                 client.close()
                 continue
             self.gpool.spawn_n(self.handle_client, client)
-    
+
     def handle_client(self, client):
             client.send('\xc2\xd1-\xa8\x80\xd8j\xba')
             tlv = bytearray(client.recv(2))
@@ -53,12 +53,13 @@ class CredServer(object):
             if not apiarmed:
                 client.close()
                 return
-            now = datetime.datetime.utcnow()
-            expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
-            if now > expiry:
-                self.cfm.set_node_attributes({nodename: {'api.armed': ''}})
-                client.close()
-                return
+            if apiarmed not in ('armed', 'continuous'):
+                now = datetime.datetime.utcnow()
+                expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
+                if now > expiry:
+                    self.cfm.set_node_attributes({nodename: {'api.armed': ''}})
+                    client.close()
+                    return
             client.send(b'\x02\x20')
             rttoken = os.urandom(32)
             client.send(rttoken)
@@ -76,9 +77,10 @@ class CredServer(object):
                 client.close()
                 return
             echotoken = client.recv(tlv[1])
-            self.cfm.set_node_attributes({nodename: {'api.key': echotoken, 'api.armed': ''}})
+            if apiarmed != 'continuous':
+                self.cfm.set_node_attributes({nodename: {'api.key': echotoken, 'api.armed': ''}})
             client.recv(2)  # drain end of message
-            client.send('\x05\x00') # report success     
+            client.send('\x05\x00') # report success
             client.close()
 
 if __name__ == '__main__':
