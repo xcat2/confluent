@@ -35,6 +35,8 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None):
     sizedone = 0
     with libarchive.extract.new_archive_write_disk(flags) as write_p:
         for entry in entries:
+            if str(entry).endswith('TRANS.TBL'):
+                continue
             write_header(write_p, entry._entry_p)
             read_p = entry._archive_p
             while 1:
@@ -133,6 +135,8 @@ def scan_iso(filename):
     filecontents = {}
     with libarchive.file_reader(filename) as reader:
         for ent in reader:
+            if str(ent).endswith('TRANS.TBL'):
+                continue
             filesizes[str(ent)] = ent.size
             if str(ent) in READFILES:
                 filecontents[str(ent)] = b''
