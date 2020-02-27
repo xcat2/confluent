@@ -39,6 +39,10 @@ def cidr_to_mask(cidr):
         socket.AF_INET, struct.pack('!I', (2**32 - 1) ^ (2**(32 - cidr) - 1)))
 
 def ip_on_same_subnet(first, second, prefix):
+    if first.startswith('::ffff:') and '.' in first:
+        first = first.replace('::ffff:', '')
+    if second.startswith('::ffff:') and '.' in second:
+        second = second.replace('::ffff:', '')
     addrinf = socket.getaddrinfo(first, None, 0, socket.SOCK_STREAM)[0]
     fam = addrinf[0]
     ip = socket.inet_pton(fam, addrinf[-1][0])
@@ -59,8 +63,6 @@ def ip_on_same_subnet(first, second, prefix):
 
 
 def address_is_local(address):
-    if '.' in address and address.startswith('::ffff:'):
-        address = address.replace('::ffff:', '')
     for iface in netifaces.interfaces():
         for i4 in netifaces.ifaddresses(iface).get(2, []):
             cidr = mask_to_cidr(i4['netmask'])
