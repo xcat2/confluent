@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import confluent.config.configmanager as cfm
+import confluent.netutil as netutil
 import datetime
 import eventlet
 import eventlet.green.socket as socket
@@ -22,66 +23,56 @@ import eventlet.greenpool
 import os
 
 class CredServer(object):
-    def __init__(self, bindhost='::', bindport=301, ttl=1):
-        self.srv = socket.socket(socket.AF_INET6)
-        self.srv.setsockopt(socket.SOL_IP, socket.IP_TTL, ttl)
-        self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.srv.bind((bindhost, bindport))
-        self.srv.listen(32)
-        self.gpool = eventlet.greenpool.GreenPool(256)
+    def __init__(self):
         self.cfm = cfm.ConfigManager(None)
-        self.runtime = eventlet.spawn(self.listen)
 
-    def listen(self):
-        while True:
-            client, info = self.srv.accept()
-            if info[1] > 1023:
-                client.close()
-                continue
-            self.gpool.spawn_n(self.handle_client, client)
-
-    def handle_client(self, client):
-            client.send('\xc2\xd1-\xa8\x80\xd8j\xba')
-            tlv = bytearray(client.recv(2))
-            if tlv[0] != 1:
-                client.close()
-                return
-            nodename = client.recv(tlv[1])
-            tlv = bytearray(client.recv(2))
-            apiarmed = self.cfm.get_node_attributes(nodename, 'api.armed')
-            apiarmed = apiarmed.get(nodename, {}).get('api.armed', {}).get('value', None)
-            if not apiarmed:
-                client.close()
-                return
-            if apiarmed not in ('armed', 'continuous'):
-                now = datetime.datetime.utcnow()
-                expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
-                if now > expiry:
-                    self.cfm.set_node_attributes({nodename: {'api.armed': ''}})
-                    client.close()
-                    return
-            client.send(b'\x02\x20')
-            rttoken = os.urandom(32)
-            client.send(rttoken)
-            client.send('\x00\x00')
-            tlv = bytearray(client.recv(2))
-            if tlv[0] != 3:
-                client.close()
-                return
-            echotoken = client.recv(tlv[1])
-            if echotoken != rttoken:
-                client.close()
-                return
-            tlv = bytearray(client.recv(2))
-            if tlv[0] != 4:
-                client.close()
-                return
-            echotoken = client.recv(tlv[1])
-            if apiarmed != 'continuous':
-                self.cfm.set_node_attributes({nodename: {'api.key': echotoken, 'api.armed': ''}})
-            client.recv(2)  # drain end of message
-            client.send('\x05\x00') # report success
+    def handle_client(self, client, peer):
+        if not netutil.address_is_local(peer[0]):
             client.close()
+            return
+        client.send('\xc2\xd1-\xa8\x80\xd8j\xba')
+        tlv = bytearray(client.recv(2))
+        if tlv[0] != 1:
+            client.close()
+            return
+        nodename = client.recv(tlv[1])
+        tlv = bytearray(client.recv(2))
+        apiarmed = self.cfm.get_node_attributes(nodename, 'api.armed')
+        apiarmed = apiarmed.get(nodename, {}).get('api.armed', {}).get('value', None)
+        if not apiarmed:
+            client.close()
+            return
+        if apiarmed not in ('once', 'continuous'):
+            now = datetime.datetime.utcnow()
+            expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
+            if now > expiry:
+                self.cfm.set_node_attributes({nodename: {'api.armed': ''}})
+                client.close()
+                return
+        client.send(b'\x02\x20')
+        rttoken = os.urandom(32)
+        client.send(rttoken)
+        client.send('\x00\x00')
+        tlv = bytearray(client.recv(2))
+        if tlv[0] != 3:
+            client.close()
+            return
+        echotoken = client.recv(tlv[1])
+        if echotoken != rttoken:
+            client.close()
+            return
+        tlv = bytearray(client.recv(2))
+        if tlv[0] != 4:
+            client.close()
+            return
+        echotoken = client.recv(tlv[1])
+        cfgupdate = {nodename: {'api.key': echotoken, 'api.armed': ''}}
+        if apiarmed == 'continuous':
+            del cfgupdate[nodename]['api.armed']
+        self.cfm.set_node_attributes(cfgupdate)
+        client.recv(2)  # drain end of message
+        client.send('\x05\x00') # report success
+        client.close()
 
 if __name__ == '__main__':
     a = CredServer()

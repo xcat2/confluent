@@ -64,11 +64,11 @@ int main(int argc, char* argv[]) {
         strncpy(buffer + 3, cryptedpass, 8);
         free(cryptedpass);
         cryptedpass = crypt(passwd, buffer);
-        if (argc < 3) { 
+        if (argc < 3) {
             fprintf(stderr, "Missing node name and manager\n");
             exit(1);
         }
-        sock = getaddrinfo(argv[2], "301", &hints, &addrs);
+        sock = getaddrinfo(argv[2], "13001", &hints, &addrs);
         if (sock != 0) {
                 fprintf(stderr, "Error trying to resolve %s\n", argv[2]);
                 exit(1);

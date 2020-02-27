@@ -18,6 +18,7 @@
 
 import confluent.exceptions as exc
 import codecs
+import netifaces
 import struct
 import eventlet.green.socket as socket
 import eventlet.support.greendns
@@ -57,6 +58,20 @@ def ip_on_same_subnet(first, second, prefix):
     return ip & mask == oip & mask
 
 
+def address_is_local(address):
+    for iface in netifaces.interfaces():
+        for i4 in netifaces.ifaddresses(iface).get(2, []):
+            cidr = mask_to_cidr(i4['netmask'])
+            if ip_on_same_subnet(i4['addr'], address, cidr):
+                return True
+        for i6 in netifaces.ifaddresses(iface).get(10, []):
+            cidr = int(i6['netmask'].split('/')[1])
+            laddr = i6['addr'].split('%')[0]
+            if ip_on_same_subnet(laddr, address, cidr):
+                return True
+    return False
+
+
 # TODO(jjohnson2): have a method to arbitrate setting methods, to aid
 # in correct matching of net.* based on parameters, mainly for pxe
 # The scheme for pxe:
@@ -68,17 +83,17 @@ def ip_on_same_subnet(first, second, prefix):
 # if switch and port available, that should match.
 def get_nic_config(configmanager, node, ip=None, mac=None):
     """Fetch network configuration parameters for a nic
-    
+
     For a given node and interface, find and retrieve the pertinent network
     configuration data.  The desired configuration can be searched
     either by ip or by mac.
-    
-    :param configmanager: The relevant confluent.config.ConfigManager 
+
+    :param configmanager: The relevant confluent.config.ConfigManager
         instance.
     :param node:  The name of the node
     :param ip:  An IP address on the intended subnet
     :param mac: The mac address of the interface
-    
+
     :returns: A dict of parameters, 'ipv4_gateway', ....
     """
     # ip parameter *could* be the result of recvmsg with cmsg to tell

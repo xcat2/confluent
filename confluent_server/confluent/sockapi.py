@@ -37,6 +37,7 @@ import eventlet.green.ssl as ssl
 import eventlet
 
 import confluent.auth as auth
+import confluent.credserver as credserver
 import confluent.tlvdata as tlvdata
 import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
@@ -352,9 +353,13 @@ def _tlshandler(bind_host, bind_port):
     # Enable TCP_FASTOPEN
     plainsocket.setsockopt(socket.SOL_TCP, 23, 5)
     plainsocket.listen(5)
+    cs = credserver.CredServer()
     while (1):  # TODO: exithook
         cnn, addr = plainsocket.accept()
-        eventlet.spawn_n(_tlsstartup, cnn)
+        if addr[1] < 1000:
+            eventlet.spawn_n(cs.handle_client, cnn, addr)
+        else:
+            eventlet.spawn_n(_tlsstartup, cnn)
 
 
 if ffi:
