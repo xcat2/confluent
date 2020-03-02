@@ -43,6 +43,8 @@ argparser.add_option('-d', '--diff', action='store_true',
                           'output group and others')
 argparser.add_option('-w', '--watch', action='store_true',
                      help='Show intermediate results while running')
+argparser.add_option('-g', '--groupcount', action='store_true',
+                     help='Show count of output groups rather than the actual output')                     
 argparser.add_option('-s', '--skipcommon', action='store_true',
                      help='Do not print most common result, only non modal '
                           'groups, useful when combined with -d')
@@ -69,6 +71,9 @@ def print_current():
     if options.diff:
         grouped.print_deviants(skipmodal=options.skipcommon, count=options.count,
                           reverse=options.reverse, basenode=options.base)
+    elif options.groupcount:
+        grouped.generate_byoutput()
+        print(len(grouped.byoutput))
     else:
         grouped.print_all(skipmodal=options.skipcommon,
                                count=options.count,
