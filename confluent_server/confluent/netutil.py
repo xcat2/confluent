@@ -51,7 +51,7 @@ def ip_on_same_subnet(first, second, prefix):
     if fam != addrinf[0]:
         return False
     txtaddr = addrinf[-1][0].split('%')[0]
-    oip = socket.inet_pton(fam, addrinf[-1][0])
+    oip = socket.inet_pton(fam, txtaddr)
     oip = int(codecs.encode(bytes(oip), 'hex'), 16)
     if fam == socket.AF_INET:
         addrlen = 32
