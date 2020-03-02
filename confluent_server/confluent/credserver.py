@@ -68,7 +68,7 @@ class CredServer(object):
             if tlv[0] != 4:
                 client.close()
                 return
-            echotoken = client.recv(tlv[1])
+            echotoken = util.stringify(client.recv(tlv[1]))
             cfgupdate = {nodename: {'api.key': echotoken, 'api.armed': ''}}
             if apiarmed == 'continuous':
                 del cfgupdate[nodename]['api.armed']
