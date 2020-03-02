@@ -101,9 +101,11 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
-                    rsp = rsp.split('\r\n')
-                    method, _, _ = rsp[0].split(' ', 2)
-                    if method == 'NOTIFY':
+                    if rsp[:4] == b'PING':
+                        continue
+                    rsp = rsp.split(b'\r\n')
+                    method, _, _ = rsp[0].split(b' ', 2)
+                    if method == b'NOTIFY':
                         ip = peer[0].partition('%')[0]
                         if ip not in neighutil.neightable:
                             continue
@@ -123,6 +125,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                             for headline in rsp[1:]:
                                 if not headline:
                                     continue
+                                headline = util.stringify(headline)
                                 header, _, value = headline.partition(':')
                                 header = header.strip()
                                 value = value.strip()
@@ -133,13 +136,14 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         machandlers[mac] = byehandler
                                     elif value == 'ssdp:alive':
                                         machandlers[mac] = None # handler
-                    elif method == 'M-SEARCH':
+                    elif method == b'M-SEARCH':
                         if not uuidlookup:
                             continue
                         #ip = peer[0].partition('%')[0]
                         for headline in rsp[1:]:
                             if not headline:
                                 continue
+                            headline = util.stringify(headline)
                             headline = headline.partition(':')
                             if len(headline) < 3:
                                 continue
@@ -151,6 +155,8 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         if not node:
                                             break
                                         reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}'.format(node)
+                                        if not isinstance(reply, bytes):
+                                            reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
                 r, _, _ = select.select((net4, net6), (), (), 0.2)
             for mac in newmacs:
