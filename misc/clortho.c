@@ -44,16 +44,17 @@ int main(int argc, char* argv[]) {
         struct addrinfo *addrs;
         struct addrinfo *curr;
         struct sockaddr_in net4bind;
-        struct sockaddr_in net6bind;
+        struct sockaddr_in6 net6bind;
         unsigned char buffer[MAXPACKET];
         memset(&hints, 0, sizeof(struct addrinfo));
         memset(&net4bind, 0, sizeof(struct sockaddr_in));
-        memset(&net6bind, 0, sizeof(struct sockaddr_in));
+        memset(&net6bind, 0, sizeof(struct sockaddr_in6));
         memset(&buffer, 0, MAXPACKET);
         memset(&timeout, 0, sizeof(struct timeval));
         timeout.tv_sec = 10;
         net4bind.sin_port = htons(302);
-        net6bind.sin_port = htons(302);
+        net6bind.sin6_port = htons(302);
+        net6bind.sin6_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP;
 

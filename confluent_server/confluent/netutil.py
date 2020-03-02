@@ -50,6 +50,7 @@ def ip_on_same_subnet(first, second, prefix):
     addrinf = socket.getaddrinfo(second, None, 0, socket.SOCK_STREAM)[0]
     if fam != addrinf[0]:
         return False
+    txtaddr = addrinf[-1][0].split('%')[0]
     oip = socket.inet_pton(fam, addrinf[-1][0])
     oip = int(codecs.encode(bytes(oip), 'hex'), 16)
     if fam == socket.AF_INET:
