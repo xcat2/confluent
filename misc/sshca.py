@@ -4,6 +4,8 @@ import confluent.collective.manager as collective
 import eventlet.green.subprocess as subprocess
 import glob
 import os
+import shutil
+import tempfile
 
 def normalize_uid():
     curruid = os.getuid()
@@ -43,6 +45,21 @@ def initialize_ca():
     with open('/var/lib/confluent/ssh/ssh_known_hosts', 'w') as skh:
         for ckh in currknownhosts:
             skh.write(ckh)
+
+def sign_host_key(pubkey, nodename):
+    tmpdir = tempfile.mkdtemp()
+    try:
+        pkeyname = os.path.join(tmpdir, 'hostkey.pub')
+        with open(pkeyname, 'w') as pubfile:
+            pubfile.write(pubkey)
+        subprocess.check_call(
+            ['ssh-keygen', '-s', '/etc/confluent/ssh/ca', '-I', nodename,
+             '-n', nodename, '-h', pkeyname])
+        certname = pkeyname.replace('.pub', '-cert.pub')
+        with open(certname) as cert:
+            return cert.read()
+    finally:
+        shutil.rmtree(tmpdir)
 
 def initialize_root_key():
     authorized = []
@@ -89,3 +106,4 @@ if __name__ == '__main__':
     initialize_root_key()
     if not ca_exists():
         initialize_ca()
+    print(repr(sign_host_key(open('/etc/ssh/ssh_host_ed25519_key.pub').read(), collective.get_myname())))
