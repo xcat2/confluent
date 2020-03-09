@@ -22,8 +22,63 @@
 
 # option 97 = UUID (wireformat)
 
+import ctypes
+import ctypes.util
 import eventlet.green.socket as socket
+import eventlet.green.select as select
 import struct
+
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
+
+class iovec(ctypes.Structure):   # from uio.h
+    _fields_ = [('iov_base', ctypes.c_void_p),
+                ('iov_len', ctypes.c_size_t)]
+
+class msghdr(ctypes.Structure):  # from bits/socket.h
+    _fields_ = [('msg_name', ctypes.c_void_p),
+                ('msg_namelen', ctypes.c_uint),
+                ('msg_iov', ctypes.POINTER(iovec)),
+                ('msg_iovlen', ctypes.c_size_t),
+                ('msg_control', ctypes.c_void_p),
+                ('msg_controllen', ctypes.c_size_t),
+                ('msg_flags', ctypes.c_int)]
+
+class cmsghdr(ctypes.Structure):  # also from bits/socket.h
+    _fields_ = [('cmsg_len', ctypes.c_size_t),
+                ('cmsg_level', ctypes.c_int),
+                ('cmsg_type', ctypes.c_int)]
+                # ignore the __extension__
+
+class in_addr(ctypes.Structure):
+    _fields_ = [('s_addr', ctypes.c_uint32)]
+
+class in_pktinfo(ctypes.Structure):  # from bits/in.h
+    _fields_ = [('ipi_ifindex', ctypes.c_int),
+                ('ipi_spec_dst', in_addr),
+                ('ipi_addr', in_addr)]
+
+recvmsg = libc.recvmsg
+recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
+recvmsg.restype = ctypes.c_size_t
+
+pkttype = ctypes.c_char * 2048
+
+
+IP_PKTINFO = 8
+
+
+def CMSG_ALIGN(length):  # bits/socket.h
+    ret = (length + ctypes.sizeof(ctypes.c_size_t) - 1
+           & ~(ctypes.sizeof(ctypes.c_size_t) - 1))
+    return ctypes.c_size_t(ret)
+
+
+def CMSG_SPACE(length):  # bits/socket.h
+    ret = CMSG_ALIGN(length).value + CMSG_ALIGN(ctypes.sizeof(cmsghdr)).value
+    return ctypes.c_size_t(ret)
+
+
+cmsgtype = ctypes.c_char * CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
 
 pxearchs = {
     '\x00\x00': 'bios-x86',
@@ -122,15 +177,33 @@ def snoop(handler, protocol=None):
     #proxydhcp.c from xCAT
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
     net4.bind(('', 67))
     while True:
         # Just need some delay, picked a prime number so that overlap with other
         # timers might be reduced, though it really is probably nothing
-        (rq, peer) = net4.recvfrom(9000)
+        ready = select.select([net4], [], [], None)
+        if not ready or not ready[0]:
+            continue
+        rawbuffer = bytearray(2048)
+        data = pkttype.from_buffer(rawbuffer)
+        msg = msghdr()
+        cmsg = cmsgtype()
+        iov = iovec()
+        iov.iov_base = ctypes.addressof(data)
+        iov.iov_len = 2048
+        msg.msg_iov = ctypes.pointer(iov)
+        msg.msg_iovlen = 1
+        msg.msg_control = ctypes.addressof(cmsg)
+        msg.msg_controllen = ctypes.sizeof(cmsg)
+        # We'll leave name and namelen blank for now
+        i = recvmsg(net4.fileno(), ctypes.pointer(msg), 0)
+        rq = memoryview(rawbuffer)
+        rq = rq[:i]
         # if we have a small packet, just skip, it can't possible hold enough
         # data and avoids some downstream IndexErrors that would be messy
         # with try/except
-        if len(rq) < 64:
+        if i < 64:
             continue
         rq = bytearray(rq)
         if rq[0] == 1:  # Boot request
