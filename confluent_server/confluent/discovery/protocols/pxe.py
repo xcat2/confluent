@@ -183,8 +183,8 @@ def ipfromint(numb):
 def snoop(handler, protocol=None):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
-    #TODO(jjohnson2): IP_PKTINFO, recvmsg to get the destination ip, per
-    #proxydhcp.c from xCAT
+    #TODO(jjohnson2): enable unicast replies. This would suggest either
+    # injection into the neigh table before OFFER or using SOCK_RAW.
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
