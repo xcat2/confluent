@@ -57,6 +57,12 @@ class in_pktinfo(ctypes.Structure):  # from bits/in.h
                 ('ipi_spec_dst', in_addr),
                 ('ipi_addr', in_addr)]
 
+class sockaddr_in(ctypes.Structure):
+    _fields_ = [('sin_family', ctypes.c_ushort),  # per bits/sockaddr.h
+                ('sin_port', ctypes.c_uint16),  # per netinet/in.h
+                ('sin_addr', in_addr)]
+
+
 recvmsg = libc.recvmsg
 recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
 recvmsg.restype = ctypes.c_size_t
@@ -79,6 +85,7 @@ def CMSG_SPACE(length):  # bits/socket.h
 
 
 cmsgtype = ctypes.c_char * CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
+cmsgsize = CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
 
 pxearchs = {
     '\x00\x00': 'bios-x86',
@@ -170,6 +177,9 @@ def find_info_in_options(rq, optidx):
         vivso = {'service-type': 'cumulus-switch', 'arch': arch}
     return uuid, arch, vivso
 
+def ipfromint(numb):
+    return socket.inet_ntoa(struct.pack('I', numb))
+
 def snoop(handler, protocol=None):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
@@ -185,10 +195,12 @@ def snoop(handler, protocol=None):
         ready = select.select([net4], [], [], None)
         if not ready or not ready[0]:
             continue
+        clientaddr = sockaddr_in()
         rawbuffer = bytearray(2048)
         data = pkttype.from_buffer(rawbuffer)
         msg = msghdr()
-        cmsg = cmsgtype()
+        cmsgarr = bytearray(cmsgsize)
+        cmsg = cmsgtype.from_buffer(cmsgarr)
         iov = iovec()
         iov.iov_base = ctypes.addressof(data)
         iov.iov_len = 2048
@@ -196,16 +208,32 @@ def snoop(handler, protocol=None):
         msg.msg_iovlen = 1
         msg.msg_control = ctypes.addressof(cmsg)
         msg.msg_controllen = ctypes.sizeof(cmsg)
+        msg.msg_name = ctypes.addressof(clientaddr)
+        msg.msg_namelen = ctypes.sizeof(clientaddr)
         # We'll leave name and namelen blank for now
         i = recvmsg(net4.fileno(), ctypes.pointer(msg), 0)
-        rq = memoryview(rawbuffer)
-        rq = rq[:i]
         # if we have a small packet, just skip, it can't possible hold enough
         # data and avoids some downstream IndexErrors that would be messy
         # with try/except
         if i < 64:
             continue
-        rq = bytearray(rq)
+        peer = ipfromint(clientaddr.sin_addr.s_addr)
+        _, level, typ = struct.unpack('QII', cmsgarr[:16])
+        if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
+            idx, recv, targ = struct.unpack('III', cmsgarr[16:28])
+            recv = ipfromint(recv)
+            targ = ipfromint(targ)
+        # peer is the source ip (in dhcpdiscover, 0.0.0.0)
+        # recv is the 'ip' that recevied the packet, regardless of target
+        # targ is the ip in the destination ip of the header.
+        # idx is the ip link number of the receiving nic
+        # For example, a DHCPDISCOVER will probably have:
+        # peer of 0.0.0.0
+        # targ of 255.255.255.255
+        # recv of <actual ip address that could reply>
+        # idx correlated to the nic
+        rq = memoryview(rawbuffer)
+        rq = bytearray(rq[:i])
         if rq[0] == 1:  # Boot request
             addrlen = rq[2]
             if addrlen > 16 or addrlen == 0:
