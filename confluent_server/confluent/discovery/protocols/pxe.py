@@ -246,13 +246,14 @@ def snoop(handler, protocol=None):
                 optidx = rq.index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
+            txid = struct.unpack('!I', rq[4:8])[0]
             uuid, arch, vivso = find_info_in_options(rq, optidx)
             if vivso:
                 # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
                 handler({'hwaddr': netaddr, 'uuid': uuid,
                          'architecture': vivso.get('arch', ''),
                          'services': (vivso['service-type'],),
-                         'netinfo': {'ifidx': idx, 'recvip': recv},
+                         'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                          'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}})
                 continue
             if uuid is None:
@@ -261,7 +262,7 @@ def snoop(handler, protocol=None):
             # but the nature of the beast is that we do not have peers,
             # so that will not be present for a pxe snoop
             handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
-                     'netinfo': {'ifidx': idx, 'recvip': recv},
+                     'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                      'services': ('pxe-client',)})
 
 if __name__ == '__main__':
