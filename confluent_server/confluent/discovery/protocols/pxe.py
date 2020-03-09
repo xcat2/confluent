@@ -217,7 +217,8 @@ def snoop(handler, protocol=None):
         # with try/except
         if i < 64:
             continue
-        peer = ipfromint(clientaddr.sin_addr.s_addr)
+        #peer = ipfromint(clientaddr.sin_addr.s_addr)
+        # We don't need peer yet, generally it's 0.0.0.0
         _, level, typ = struct.unpack('QII', cmsgarr[:16])
         if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
             idx, recv, targ = struct.unpack('III', cmsgarr[16:28])
@@ -251,6 +252,7 @@ def snoop(handler, protocol=None):
                 handler({'hwaddr': netaddr, 'uuid': uuid,
                          'architecture': vivso.get('arch', ''),
                          'services': (vivso['service-type'],),
+                         'netinfo': {'ifidx': idx, 'recvip': recv},
                          'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}})
                 continue
             if uuid is None:
@@ -259,6 +261,7 @@ def snoop(handler, protocol=None):
             # but the nature of the beast is that we do not have peers,
             # so that will not be present for a pxe snoop
             handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
+                     'netinfo': {'ifidx': idx, 'recvip': recv},
                      'services': ('pxe-client',)})
 
 if __name__ == '__main__':
