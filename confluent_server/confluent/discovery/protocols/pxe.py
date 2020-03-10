@@ -22,6 +22,7 @@
 
 # option 97 = UUID (wireformat)
 
+import confluent.config.configmanager as cfm
 import ctypes
 import ctypes.util
 import eventlet.green.socket as socket
@@ -95,6 +96,10 @@ pxearchs = {
     '\x00\x10': 'uefi-httpboot',
 }
 
+
+uuidmap = {}
+macmap = {}
+attribwatcher = None
 
 def stringify(value):
     string = bytes(value)
@@ -185,6 +190,11 @@ def snoop(handler, protocol=None):
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
     # injection into the neigh table before OFFER or using SOCK_RAW.
+    global attribwatcher
+    cfg = cfm.ConfigManager(None)
+    remap_nodes(cfg.list_nodes(), cfg)
+    attribwatcher = cfg.watch_attributes(cfg.list_nodes(), ('id.uuid', 'net.*hwaddr'), remap_nodes)
+    cfg.watch_nodecollection(new_nodes)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
@@ -250,21 +260,69 @@ def snoop(handler, protocol=None):
             uuid, arch, vivso = find_info_in_options(rq, optidx)
             if vivso:
                 # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
-                handler({'hwaddr': netaddr, 'uuid': uuid,
+                info = {'hwaddr': netaddr, 'uuid': uuid,
                          'architecture': vivso.get('arch', ''),
                          'services': (vivso['service-type'],),
                          'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
-                         'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}})
+                         'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
+                handler(info)
+                consider_discover(info, rq, net4)
                 continue
             if uuid is None:
                 continue
             # We will fill out service to have something to byte into,
             # but the nature of the beast is that we do not have peers,
             # so that will not be present for a pxe snoop
-            handler({'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
+            info = {'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
                      'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
-                     'services': ('pxe-client',)})
+                     'services': ('pxe-client',)}
+            handler(info)
+            consider_discover(info, rq, net4)
 
+
+def clear_nodes(nodes):
+    for nodename in nodes:
+        for ent in list(macmap):
+            if macmap[ent] == nodename:
+                del macmap[ent]
+        for ent in list(uuidmap):
+            if uuidmap[ent] == nodename:
+                del uuidmap[ent]
+
+
+def new_nodes(added, deleting, renamed, configmanager):
+    global attribwatcher
+    configmanager.remove_watcher(attribwatcher)
+    alldeleting = set(deleting) | set(renamed)
+    clear_nodes(alldeleting)
+    attribwatcher = configmanager.watch_attributes(configmanager.list_nodes(),
+                                                   ('id.uuid', 'net.*hwaddr'), remap_nodes)
+
+
+def remap_nodes(nodeattribs, configmanager):
+    global macmap
+    global uuidmap
+    updates = configmanager.get_node_attributes(nodeattribs, ('id.uuid', 'net.*hwaddr'))
+    clear_nodes(nodeattribs)
+    for node in updates:
+        for attrib in updates[node]:
+            if attrib == 'id.uuid':
+                uuidmap[updates[node][attrib]['value']] = node
+            elif 'hwaddr' in attrib:
+                macmap[updates[node][attrib]['value']] = node
+
+
+def check_reply(node, info, packet, sock):
+    print('Thinking about reply to {0}'.format(node))
+
+
+def consider_discover(info, packet, sock):
+    if info.get('hwaddr', None) in macmap:
+        check_reply(macmap[info['hwaddr']], info, packet, sock)
+    elif info.get('uuid', None) in uuidmap:
+        check_reply(uuidmap[info['uuid']], info, packet, sock)
+
+    
 if __name__ == '__main__':
     def testsnoop(info):
         print(repr(info))
