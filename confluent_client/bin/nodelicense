@@ -98,7 +98,7 @@ def save_licenses(session, dirname):
             if fname:
                 print('{0}: Saved license to {1}'.format(node, fname))
             else:
-                sys.stderr.write('{0}: {1}', node, repr(res['databynode'][node]))
+                sys.stderr.write('{0}: {1}'.format(node, repr(res['databynode'][node])))
 
 
 def show_licenses(session):
