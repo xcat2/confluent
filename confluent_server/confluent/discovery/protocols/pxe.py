@@ -135,6 +135,7 @@ def opts_to_dict(rq, optidx):
             optnum = rq[optidx]
             optlen = rq[optidx + 1]
             reqdict[optnum] = rq[optidx + 2:optidx + 2 + optlen]
+            optidx += optlen + 2
     except IndexError:
         pass
     if reqdict.get(53, [0])[0] != 1:
