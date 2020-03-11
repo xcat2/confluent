@@ -1347,6 +1347,14 @@ class IpmiHandler(object):
 
     def save_licenses(self):
         directory = self.inputdata.nodefile(self.node)
+        checkdir = directory
+        if not os.path.isdir(checkdir):
+            checkdir = os.path.dirname(checkdir)
+        if not os.access(checkdir, os.W_OK):
+            raise exc.InvalidArgumentException(
+                'The confluent system user/group is unable to write to '
+                'directory {0}, check ownership and permissions'.format(
+                    checkdir))
         for saved in self.ipmicmd.save_licenses(directory):
             self.output.put(msg.SavedFile(self.node, saved))
 
