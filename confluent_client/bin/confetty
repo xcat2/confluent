@@ -965,7 +965,7 @@ def main():
                             try:
                                 server_connect()
                                 connected = True
-                            except (socket.gaierror, socket.error):
+                            except Exception:
                                 pass
                             if not connected:
                                 time.sleep(1)
