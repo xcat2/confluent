@@ -89,11 +89,11 @@ cmsgtype = ctypes.c_char * CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
 cmsgsize = CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
 
 pxearchs = {
-    '\x00\x00': 'bios-x86',
-    '\x00\x07': 'uefi-x64',
-    '\x00\x09': 'uefi-x64',
-    '\x00\x0b': 'uefi-aarch64',
-    '\x00\x10': 'uefi-httpboot',
+    b'\x00\x00': 'bios-x86',
+    b'\x00\x07': 'uefi-x64',
+    b'\x00\x09': 'uefi-x64',
+    b'\x00\x0b': 'uefi-aarch64',
+    b'\x00\x10': 'uefi-httpboot',
 }
 
 
@@ -127,60 +127,46 @@ def _decode_ocp_vivso(rq, idx, size):
         idx += rq[idx + 1] + 2
     return '', None, vivso
 
-
-def find_info_in_options(rq, optidx):
-    uuid = None
-    arch = None
-    vivso = None
-    ztpurlrequested = False
-    iscumulus = False
+def opts_to_dict(rq, optidx):
+    reqdict = {}
+    disco = {'uuid':None, 'arch': None, 'vivso': None}
     try:
-        while uuid is None or arch is None:
-            if rq[optidx] == 53:  # DHCP message type
-                # we want only length 1 and only discover (type 1)
-                if rq[optidx + 1] != 1 or rq[optidx + 2] != 1:
-                    return uuid, arch, vivso
-                optidx += 3
-            elif rq[optidx] == 55:
-                if 239 in rq[optidx + 2:optidx + 2 + rq[optidx + 1]]:
-                    ztpurlrequested = True
-                optidx += rq[optidx + 1] + 2
-            elif rq[optidx] == 60:
-                vci = stringify(rq[optidx + 2:optidx + 2 + rq[optidx + 1]])
-                if vci.startswith('cumulus-linux'):
-                    iscumulus = True
-                    arch = vci.replace('cumulus-linux', '').strip()
-                optidx += rq[optidx + 1] + 2
-            elif rq[optidx] == 97:
-                if rq[optidx + 1] != 17:
-                    # 16 bytes of uuid and one reserved byte
-                    return uuid, arch, vivso
-                if rq[optidx + 2] != 0:  # the reserved byte should be zero,
-                    # anything else would be a new spec that we don't know yet
-                    return uuid, arch, vivso
-                uuid = decode_uuid(rq[optidx + 3:optidx + 19])
-                optidx += 19
-            elif rq[optidx] == 93:
-                if rq[optidx + 1] != 2:
-                    return uuid, arch
-                archraw = bytes(rq[optidx + 2:optidx + 4])
-                if archraw in pxearchs:
-                    arch = pxearchs[archraw]
-                optidx += 4
-            elif rq[optidx] == 125:
-                #vivso = rq[optidx + 2:optidx + 2 + rq[optidx + 1]]
-                if rq[optidx + 2:optidx + 6] == b'\x00\x00\xa6\x7f':  # OCP
-                    return _decode_ocp_vivso(rq, optidx + 7, rq[optidx + 6])
-                optidx += rq[optidx + 1] + 2
-            else:
-                optidx += rq[optidx + 1] + 2
+        while optidx < len(rq):
+            optnum = rq[optidx]
+            optlen = rq[optidx + 1]
+            reqdict[optnum] = rq[optidx + 2:optidx + 2 + optlen]
     except IndexError:
         pass
-    if not vivso and iscumulus and ztpurlrequested:
-        if not uuid:
-            uuid = ''
-        vivso = {'service-type': 'cumulus-switch', 'arch': arch}
-    return uuid, arch, vivso
+    if reqdict.get(53, [0])[0] != 1:
+        return reqdict, disco
+    # It is a discover packet..
+    iscumulus = False
+    maybeztp = False
+    if 239 in reqdict.get(55, []):
+        maybeztp = True
+    vci = stringify(reqdict.get(60, ''))
+    if vci.startswith('cumulus-linux'):
+        disco['arch'] = vci.replace('cumulus-linux', '').strip()
+        iscumulus = True
+    if reqdict.get(93, None):
+        disco['arch'] = pxearchs.get(bytes(reqdict[93]), None)
+    if reqdict.get(97, None):
+        uuidcandidate = reqdict[97]
+        if uuidcandidate[0] != 0:
+            return reqdict, disco
+        disco['uuid'] = decode_uuid(uuidcandidate[1:])
+    if reqdict.get(125, None):
+        if reqdict[125][:4] == b'\x00\x00\xa6\x7f':  # OCP
+            disco['vivso'] = _decode_ocp_vivso(
+                reqdict[125], 5, reqdict[125][4])[-1]
+            return reqdict, disco
+    if not disco['vivso'] and iscumulus and maybeztp:
+        if not disco['uuid']:
+            disco['uuid'] = ''
+        disco['vivso'] = {'service-type': 'cumulus-switch',
+                          'arch': disco['arch']}
+    return reqdict, disco
+
 
 def ipfromint(numb):
     return socket.inet_ntoa(struct.pack('I', numb))
@@ -257,27 +243,28 @@ def snoop(handler, protocol=None):
             except ValueError:
                 continue
             txid = struct.unpack('!I', rq[4:8])[0]
-            uuid, arch, vivso = find_info_in_options(rq, optidx)
+            rqinfo, disco = opts_to_dict(rq, optidx)            
+            vivso = disco.get('vivso', None)
             if vivso:
                 # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
-                info = {'hwaddr': netaddr, 'uuid': uuid,
+                info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
                          'architecture': vivso.get('arch', ''),
                          'services': (vivso['service-type'],),
                          'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                          'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
                 handler(info)
-                consider_discover(info, rq, net4)
-                continue
-            if uuid is None:
+                consider_discover(info, rq, net4, cfg)
                 continue
             # We will fill out service to have something to byte into,
             # but the nature of the beast is that we do not have peers,
             # so that will not be present for a pxe snoop
-            info = {'hwaddr': netaddr, 'uuid': uuid, 'architecture': arch,
+            info = {'hwaddr': netaddr, 'uuid': disco['uuid'], 'architecture': disco['arch'],
                      'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                      'services': ('pxe-client',)}
-            handler(info)
-            consider_discover(info, rq, net4)
+            if disco['uuid']:
+                handler(info)
+            consider_discover(info, rq, net4, cfg)
+
 
 
 def clear_nodes(nodes):
@@ -312,20 +299,24 @@ def remap_nodes(nodeattribs, configmanager):
                 macmap[updates[node][attrib]['value']] = node
 
 
-def check_reply(node, info, packet, sock):
+def check_reply(node, info, packet, sock, cfg):
+    cfd = cfg.get_node_attributes(node, ('deployment.*'))
+    insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols', 'never')
+    if insecuremode == 'never' and info['architecture'] != 'uefi-httpboot':
+        print('Ignoring request')
+        return
     print('Thinking about reply to {0}'.format(node))
 
 
-def consider_discover(info, packet, sock):
+def consider_discover(info, packet, sock, cfg):
     if info.get('hwaddr', None) in macmap:
-        check_reply(macmap[info['hwaddr']], info, packet, sock)
+        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg)
     elif info.get('uuid', None) in uuidmap:
-        check_reply(uuidmap[info['uuid']], info, packet, sock)
+        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg)
 
     
 if __name__ == '__main__':
     def testsnoop(info):
         print(repr(info))
     snoop(testsnoop)
-
 

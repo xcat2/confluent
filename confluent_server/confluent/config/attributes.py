@@ -166,6 +166,23 @@ node = {
                         'indicates candidate managers, either for '
                         'high availability or load balancing purposes.')
     },
+    'deployment.pendingprofile': {
+        'description': ('An OS profile that is pending deployment.  This indicates to '
+                        'the network boot subsystem what should be offered when a potential '
+                        'network boot request comes in')
+    },
+    'deployment.useinsecureprotocols': {
+        'description': ('What phase(s) of boot are permitted to use insecure protocols '
+                        '(TFTP and HTTP without TLS.  By default, HTTPS is allowed.  However '
+                        'this is not compatible with most firmware in most scenarios.  Using '
+                        '"firmware" as the setting will still use HTTPS after the initial download, '
+                        'though be aware that a successful compromise during the firmware phase '
+                        'will negate future TLS protections.  The value "always" will result in '
+                        'tftp/http being used for entire deployment.  Note that ONIE does not '
+                        'support secure protocols, and in that case this setting must be "always" '
+                        'or "firmware"'),
+        'validlist': ('always', 'firmware', 'never'),
+    },
     'discovery.passwordrules': {
         'description':  'Any specified rules shall be configured on the BMC '
                         'upon discovery.  "expiration=no,loginfailures=no,complexity=no,reuse=no" '
