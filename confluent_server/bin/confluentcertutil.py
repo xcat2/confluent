@@ -1,3 +1,4 @@
+import os
 from os.path import exists
 import shutil
 import socket
@@ -37,19 +38,25 @@ def create_certificate():
     subprocess.check_call(
         'openssl ecparam -name secp384r1 -genkey -out privkey.pem'.split(' '))
     san = ['IP:{0}'.format(x) for x in get_ip_addresses()]
+    # It is incorrect to put IP addresses as DNS type.  However
+    # there exists non-compliant clients that fail with them as IP
+    san.extend(['DNS:{0}'.format(x) for x in get_ip_addresses()])
     san.append('DNS:{0}'.format(shortname))
     san.append('DNS:{0}'.format(longname))
     san = ','.join(san)
     sslcfg = get_openssl_conf_location()
     tmpconfig = tempfile.mktemp()
     shutil.copy2(sslcfg, tmpconfig)
-    with open(tmpconfig, 'a') as cfgfile:
-        cfgfile.write('\n[SAN]\nbasicConstraints = CA:true\nsubjectAltName={0}'.format(san))
-    subprocess.check_call(
-        'openssl req -new -x509 -key privkey.pem -days 7300 -out cert.pem '
-        '-subj /CN={0} -extensions SAN '
-        '-config {1}'.format(longname, tmpconfig).split(' ')
-    )
+    try:
+        with open(tmpconfig, 'a') as cfgfile:
+            cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
+        subprocess.check_call(
+            'openssl req -new -x509 -key privkey.pem -days 7300 -out cert.pem '
+            '-subj /CN={0} -extensions SAN '
+            '-config {1}'.format(longname, tmpconfig).split(' ')
+        )
+    finally:
+        os.remove(tmpconfig)
 
 if __name__ == '__main__':
     create_certificate()
