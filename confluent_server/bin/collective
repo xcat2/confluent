@@ -40,6 +40,12 @@ def make_certificate():
                               '/etc/confluent/srvcert.pem -subj /CN='
                               '{0}'.format(socket.gethostname()).split(' ')):
         raise Exception('Error generating certificate')
+    try:
+        uid = pwd.getpwnam('confluent').pw_uid
+        os.chown('/etc/confluent/privkey.pem', uid, -1)
+        os.chown('/etc/confluent/srvcert.pem', uid, -1)
+    except KeyError:
+        pass
     print('Certificate generated successfully')
     os.umask(umask)
 
