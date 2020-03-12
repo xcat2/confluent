@@ -255,7 +255,7 @@ def snoop(handler, protocol=None):
                          'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                          'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
                 handler(info)
-                consider_discover(info, rq, net4, cfg)
+                consider_discover(info, rqinfo, net4, cfg)
                 continue
             # We will fill out service to have something to byte into,
             # but the nature of the beast is that we do not have peers,
@@ -265,7 +265,7 @@ def snoop(handler, protocol=None):
                      'services': ('pxe-client',)}
             if disco['uuid']:
                 handler(info)
-            consider_discover(info, rq, net4, cfg)
+            consider_discover(info, rqinfo, net4, cfg)
 
 
 
@@ -308,18 +308,19 @@ def check_reply(node, info, packet, sock, cfg):
         return
     insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols', 'never')
     if insecuremode == 'never' and info['architecture'] != 'uefi-httpboot':
-        log.log(
-            {'info': 'Boot attempt by {0} detected in insecure mode, but '
-                     'insecure mode is disabled.  Set the attribute '
-                     '`deployment.useinsecureprotocols` to `firmware` or '
-                     '`always` to enable support, or use UEFI HTTP boot '
-                     'with HTTPS.'.format(node)})
-        return
+        if packet[53][0] == 1 and info['architecture']:
+            log.log(
+                {'info': 'Boot attempt by {0} detected in insecure mode, but '
+                        'insecure mode is disabled.  Set the attribute '
+                        '`deployment.useinsecureprotocols` to `firmware` or '
+                        '`always` to enable support, or use UEFI HTTP boot '
+                        'with HTTPS.'.format(node)})
+        return  
     print('Thinking about reply to {0}'.format(node))
 
 
 def consider_discover(info, packet, sock, cfg):
-    if info.get('hwaddr', None) in macmap:
+    if info.get('hwaddr', None) in macmap and info.get('uuid', None):
         check_reply(macmap[info['hwaddr']], info, packet, sock, cfg)
     elif info.get('uuid', None) in uuidmap:
         check_reply(uuidmap[info['uuid']], info, packet, sock, cfg)
@@ -329,4 +330,3 @@ if __name__ == '__main__':
     def testsnoop(info):
         print(repr(info))
     snoop(testsnoop)
-
