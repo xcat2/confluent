@@ -23,6 +23,7 @@
 # option 97 = UUID (wireformat)
 
 import confluent.config.configmanager as cfm
+import confluent.log as log
 import ctypes
 import ctypes.util
 import eventlet.green.socket as socket
@@ -302,9 +303,17 @@ def remap_nodes(nodeattribs, configmanager):
 
 def check_reply(node, info, packet, sock, cfg):
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
+    profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
+    if not profile:
+        return
     insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols', 'never')
     if insecuremode == 'never' and info['architecture'] != 'uefi-httpboot':
-        print('Ignoring request')
+        log.log(
+            {'info': 'Boot attempt by {0} detected in insecure mode, but '
+                     'insecure mode is disabled.  Set the attribute '
+                     '`deployment.useinsecureprotocols` to `firmware` or '
+                     '`always` to enable support, or use UEFI HTTP boot '
+                     'with HTTPS.'.format(node)})
         return
     print('Thinking about reply to {0}'.format(node))
 
