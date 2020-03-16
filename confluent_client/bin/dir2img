@@ -17,13 +17,13 @@ def create_image(directory, image):
             filename = os.path.join(dir[0], filen)
             currsz = os.path.getsize(filename)
             # assuming up to 65k cluster
-            currsz = (currsz // 65536 +1) * 65536
+            currsz = (currsz // 512 +1) * 512
             datasz += currsz
     datasz += ents * 32768
+    datasz = datasz // 512 + 1
     with open(image, 'wb') as imgfile:
-        imgfile.seek(datasz)
+        imgfile.seek(datasz * 512 - 1)
         imgfile.write(b'\x00')
-    datasz = datasz // 512
     subprocess.check_call(['mformat', '-i', image, '-d', '1', '-t',
                             str(datasz), '-s', '1','-h', '1', '::'])
     cpycmd = ['mcopy', '-i', image, '-s']
