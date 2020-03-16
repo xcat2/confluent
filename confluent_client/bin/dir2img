@@ -1,19 +1,40 @@
-#!/bin/sh
+#!/usr/bin/python
 # This will take a given directory and make a 'big floppy image'
 # out of it, suitable for nodemedia upload.
 
-if [ -z "$1" -o -z "$2" ]; then
-        echo "Usage: $0 <directory> <imagefile>"
-        exit 1
-fi
-# Get the needed payload side
-SIZE=$(du -sB 512 $1|awk '{print $1}')
-ENTRIES=$(find $1 |wc -l)
-# Also, each file and directory has overhead, pad size by 32kb per file,
-# which should be overkill but other values proved to be inadequate
-# A deeper understanding of VFAT would probably allow for more precise value
-SIZE=$((SIZE + ENTRIES * 64))
-dd if=/dev/zero of=$2 bs=512 count=$SIZE
-# Make a big single sided floppy with many many tracks, saves on complex math
-mformat -i $2 -d 1 -t $SIZE -s 1 -h 1 ::
-mcopy -i $2 -s $1/* ::
+import glob
+import os
+import subprocess
+import sys
+
+def create_image(directory, image):
+    ents = 0
+    datasz = 512
+    for dir in os.walk(sys.argv[1]):
+        ents += 1
+        for filen in dir[2]:
+            ents += 1
+            filename = os.path.join(dir[0], filen)
+            currsz = os.path.getsize(filename)
+            # assuming up to 65k cluster
+            currsz = (currsz // 65536 +1) * 65536
+            datasz += currsz
+    datasz += ents * 32768
+    with open(image, 'wb') as imgfile:
+        imgfile.seek(datasz)
+        imgfile.write(b'\x00')
+    datasz = datasz // 512
+    subprocess.check_call(['mformat', '-i', image, '-d', '1', '-t',
+                            str(datasz), '-s', '1','-h', '1', '::'])
+    cpycmd = ['mcopy', '-i', image, '-s']
+    cpycmd.extend(glob.glob('{0}/*'.format(directory)))
+    cpycmd.append('::')
+    subprocess.check_call(cpycmd)
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        sys.stderr.write("Usage: {0} <directory> <imagefile>".format(
+            sys.argv[0]))
+        sys.exit(1)
+    create_image(sys.argv[1], sys.argv[2])
