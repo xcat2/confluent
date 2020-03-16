@@ -15,6 +15,8 @@ def get_openssl_conf_location():
 
 def get_ip_addresses():
     lines = subprocess.check_output('ip addr'.split(' '))
+    if not isinstance(lines, str):
+        lines = lines.decode('utf8')
     for line in lines.split('\n'):
         if line.startswith('    inet6 '):
             line = line.replace('    inet6 ', '').split('/')[0]
