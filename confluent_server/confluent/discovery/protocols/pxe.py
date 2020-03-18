@@ -185,6 +185,7 @@ def snoop(handler, protocol=None):
     cfg.watch_nodecollection(new_nodes)
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     net4.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
     net4.bind(('', 67))
     while True:
@@ -231,41 +232,42 @@ def snoop(handler, protocol=None):
         # targ of 255.255.255.255
         # recv of <actual ip address that could reply>
         # idx correlated to the nic
-        rq = memoryview(rawbuffer)
-        rq = bytearray(rq[:i])
+        rqv = memoryview(rawbuffer)
+        rq = bytearray(rqv[:i])
         if rq[0] == 1:  # Boot request
             addrlen = rq[2]
             if addrlen > 16 or addrlen == 0:
                 continue
-            netaddr = rq[28:28+addrlen]
-            netaddr = ':'.join(['{0:02x}'.format(x) for x in netaddr])
+            rawnetaddr = rq[28:28+addrlen]
+            netaddr = ':'.join(['{0:02x}'.format(x) for x in rawnetaddr])
             optidx = 0
             try:
                 optidx = rq.index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
-            txid = struct.unpack('!I', rq[4:8])[0]
-            rqinfo, disco = opts_to_dict(rq, optidx)            
+            txid = rq[4:8] # struct.unpack('!I', rq[4:8])[0]
+            rqinfo, disco = opts_to_dict(rq, optidx)
             vivso = disco.get('vivso', None)
             if vivso:
                 # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
                 info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
-                         'architecture': vivso.get('arch', ''),
-                         'services': (vivso['service-type'],),
-                         'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
-                         'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
+                        'architecture': vivso.get('arch', ''),
+                        'services': (vivso['service-type'],),
+                        'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
+                        'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
                 handler(info)
-                consider_discover(info, rqinfo, net4, cfg)
+                consider_discover(info, rqinfo, net4, cfg, rqv)
                 continue
             # We will fill out service to have something to byte into,
             # but the nature of the beast is that we do not have peers,
             # so that will not be present for a pxe snoop
-            info = {'hwaddr': netaddr, 'uuid': disco['uuid'], 'architecture': disco['arch'],
-                     'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
-                     'services': ('pxe-client',)}
+            info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
+                    'architecture': disco['arch'],
+                    'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
+                    'services': ('pxe-client',)}
             if disco['uuid']:
                 handler(info)
-            consider_discover(info, rqinfo, net4, cfg)
+            consider_discover(info, rqinfo, net4, cfg, rqv)
 
 
 
@@ -301,31 +303,56 @@ def remap_nodes(nodeattribs, configmanager):
                 macmap[updates[node][attrib]['value']] = node
 
 
-def check_reply(node, info, packet, sock, cfg):
+def check_reply(node, info, packet, sock, cfg, reqview):
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
+    myipn = info['netinfo']['recvip']
+    myipn = socket.inet_aton(myipn)
     if not profile:
         return
+    rqtype = packet[53][0]
     insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols', 'never')
     if insecuremode == 'never' and info['architecture'] != 'uefi-httpboot':
-        if packet[53][0] == 1 and info['architecture']:
+        if rqtype == 1 and info['architecture']:
             log.log(
                 {'info': 'Boot attempt by {0} detected in insecure mode, but '
                         'insecure mode is disabled.  Set the attribute '
                         '`deployment.useinsecureprotocols` to `firmware` or '
                         '`always` to enable support, or use UEFI HTTP boot '
                         'with HTTPS.'.format(node)})
-        return  
+        return
+    reply = bytearray(1024)
+    repview = memoryview(reply)
+    repview[0] = 2
+    repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
+    repview[10] = 0x80  # always set broadcast
+    repview[28:44] = reqview[28:44]  # copy chaddr field
+    repview[20:24] = myipn
+    if info['architecture'] == 'uefi-x64':
+        bootfile = b'confluent/x86_64/ipxe.efi'
+    repview[108:108 + len(bootfile)] = bootfile
+    repview[236:240] = b'\x63\x82\x53\x63'
+    repview[240:242] = b'\x35\x01'
+    if rqtype == 1:  # if discover, then offer
+        repview[242] = 2
+    elif rqtype == 3: # if request, then ack
+        repview[242] = 5
+    repview[243:245] = b'\x36\x04' # DHCP service identifier
+    repview[245:249] = myipn
+    repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'
+    repview[255] = 0xff  # end of options, should always be last byte
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, myipn)
+    sock.sendto(repview[:255], ('255.255.255.255', 68))
     print('Thinking about reply to {0}'.format(node))
 
 
-def consider_discover(info, packet, sock, cfg):
+def consider_discover(info, packet, sock, cfg, reqview):
     if info.get('hwaddr', None) in macmap and info.get('uuid', None):
-        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg)
+        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview)
     elif info.get('uuid', None) in uuidmap:
-        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg)
+        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview)
 
-    
+
 if __name__ == '__main__':
     def testsnoop(info):
         print(repr(info))
