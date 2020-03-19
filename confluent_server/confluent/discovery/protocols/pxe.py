@@ -32,6 +32,19 @@ import struct
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
+iphdr = b'\x45\x00\x00\x00\x00\x00\x00\x00\x40\x11\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff'
+constiphdrsum = b'\x85\x11'
+udphdr = b'\x00\x43\x00\x44\x00\x00\x00\x00'
+
+def _ipsum(data):
+    currsum = 0
+    for datum in struct.unpack('!' + 'H' * (len(data) // 2), data):
+        currsum += datum
+        if currsum >> 16:
+            currsum &= 0xffff
+            currsum += 1
+    return currsum
+
 class sockaddr_ll(ctypes.Structure):
     _fields_ = [('sll_family', ctypes.c_ushort),
                 ('sll_protocol', ctypes.c_ushort),
@@ -337,6 +350,10 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         return
     reply = bytearray(1024)
     repview = memoryview(reply)
+    repview[:20] = iphdr
+    repview[12:16] = myipn
+    repview[20:28] = udphdr
+    repview = repview[28:]
     repview[0] = 2
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     repview[10] = 0x80  # always set broadcast
@@ -355,6 +372,12 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[245:249] = myipn
     repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'
     repview[255] = 0xff  # end of options, should always be last byte
+    repview = memoryview(reply)
+    pktlen = struct.pack('!H', 256 + 28)  # ip+udp = 28
+    repview[2:4] = pktlen
+    curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
+    repview[10:12] = struct.pack('!H', curripsum)
+    repview[24:26] = struct.pack('!H', 256 + 8)
     tsock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM,
                           socket.htons(0x800))
     targ = sockaddr_ll()
@@ -365,8 +388,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     targ.sll_halen = reqview[2]
     targ.sll_protocol = socket.htons(0x800)
     targ.sll_ifindex = info['netinfo']['ifidx']
-    pkt = ctypes.byref((ctypes.c_char * 256).from_buffer(repview))
-    sendto(tsock.fileno(), pkt, 256, 0, ctypes.byref(targ),
+    pkt = ctypes.byref((ctypes.c_char * 284).from_buffer(repview))
+
+    sendto(tsock.fileno(), pkt, 284, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
     print('Thinking about reply to {0}'.format(node))
 
