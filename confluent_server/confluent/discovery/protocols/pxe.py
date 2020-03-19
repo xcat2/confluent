@@ -32,6 +32,15 @@ import struct
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
+class sockaddr_ll(ctypes.Structure):
+    _fields_ = [('sll_family', ctypes.c_ushort),
+                ('sll_protocol', ctypes.c_ushort),
+                ('sll_ifindex', ctypes.c_int),
+                ('sll_hatype', ctypes.c_ushort),
+                ('sll_pkttype', ctypes.c_ubyte),
+                ('sll_halen', ctypes.c_ubyte),
+                ('sll_addr', ctypes.c_ubyte * 8)]
+
 class iovec(ctypes.Structure):   # from uio.h
     _fields_ = [('iov_base', ctypes.c_void_p),
                 ('iov_len', ctypes.c_size_t)]
@@ -65,6 +74,11 @@ class sockaddr_in(ctypes.Structure):
                 ('sin_addr', in_addr)]
 
 
+sendto = libc.sendto
+sendto.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t,
+                   ctypes.c_int, ctypes.POINTER(sockaddr_ll),
+                   ctypes.c_size_t]
+sendto.restype = ctypes.c_size_t
 recvmsg = libc.recvmsg
 recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
 recvmsg.restype = ctypes.c_size_t
@@ -341,8 +355,19 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[245:249] = myipn
     repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'
     repview[255] = 0xff  # end of options, should always be last byte
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, myipn)
-    sock.sendto(repview[:255], ('255.255.255.255', 68))
+    tsock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM,
+                          socket.htons(0x800))
+    targ = sockaddr_ll()
+    bcastaddr = bytearray(8)
+    bcastaddr[:reqview[2]] = b'\xff' * reqview[2]
+    targ.sll_addr = (ctypes.c_ubyte * 8).from_buffer(bcastaddr)
+    targ.sll_family = socket.AF_PACKET
+    targ.sll_halen = reqview[2]
+    targ.sll_protocol = socket.htons(0x800)
+    targ.sll_ifindex = info['netinfo']['ifidx']
+    pkt = ctypes.byref((ctypes.c_char * 256).from_buffer(repview))
+    sendto(tsock.fileno(), pkt, 256, 0, ctypes.byref(targ),
+           ctypes.sizeof(targ))
     print('Thinking about reply to {0}'.format(node))
 
 
