@@ -374,17 +374,18 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         repview[242] = 2
     elif rqtype == 3: # if request, then ack
         repview[242] = 5
-    repview[243:245] = b'\x36\x04' # DHCP service identifier
+    repview[243:245] = b'\x36\x04' # DHCP server identifier
     repview[245:249] = myipn
-    repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'
-    repview[255] = 0xff  # end of options, should always be last byte
+    repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
+    repview[255:257] = b'\x61\x11'
+    repview[257:274] = packet[97]
+    repview[274] = 0xff  # end of options, should always be last byte
     repview = memoryview(reply)
-    pktlen = struct.pack('!H', 256 + 28)  # ip+udp = 28
+    pktlen = struct.pack('!H', 275 + 28)  # ip+udp = 28
     repview[2:4] = pktlen
     curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
     repview[10:12] = struct.pack('!H', curripsum)
-    repview[24:26] = struct.pack('!H', 256 + 8)
-    sumdata = repview[28:]
+    repview[24:26] = struct.pack('!H', 275 + 8)
     datasum = _ipsum(bytes(repview[12:]) + b'\x00\x11' + bytes(
         repview[24:26]))
     datasum = ~datasum & 0xffff
@@ -400,8 +401,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     targ.sll_protocol = socket.htons(0x800)
     targ.sll_ifindex = info['netinfo']['ifidx']
     pkt = ctypes.byref((ctypes.c_char * 284).from_buffer(repview))
-
-    sendto(tsock.fileno(), pkt, 284, 0, ctypes.byref(targ),
+    sendto(tsock.fileno(), pkt, 275 + 28, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
     print('Thinking about reply to {0}'.format(node))
 
