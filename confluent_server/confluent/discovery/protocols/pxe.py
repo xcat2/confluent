@@ -38,6 +38,12 @@ udphdr = b'\x00\x43\x00\x44\x00\x00\x00\x00'
 
 def _ipsum(data):
     currsum = 0
+    if len(data) % 2:
+        append = bytearray(2)
+        append[0] = data[-1]
+        currsum = struct.unpack('!H', append)
+        data = memoryview(data)
+        data = data[:-1]
     for datum in struct.unpack('!' + 'H' * (len(data) // 2), data):
         currsum += datum
         if currsum >> 16:
@@ -378,6 +384,11 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
     repview[10:12] = struct.pack('!H', curripsum)
     repview[24:26] = struct.pack('!H', 256 + 8)
+    sumdata = repview[28:]
+    datasum = _ipsum(bytes(repview[12:]) + b'\x00\x11' + bytes(
+        repview[24:26]))
+    datasum = ~datasum & 0xffff
+    repview[26:28] = struct.pack('!H', datasum)
     tsock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM,
                           socket.htons(0x800))
     targ = sockaddr_ll()
