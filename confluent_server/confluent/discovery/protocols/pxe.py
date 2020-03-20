@@ -298,7 +298,10 @@ def snoop(handler, protocol=None):
                     'architecture': disco['arch'],
                     'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                     'services': ('pxe-client',)}
-            if disco['uuid']:
+            if disco['uuid']:  #TODO(jjohnson2): need to explictly check for
+                               # discover, so that the parser can go ahead and
+                               # parse the options including uuid to enable
+                               # ACK
                 handler(info)
             consider_discover(info, rqinfo, net4, cfg, rqv)
 
@@ -365,9 +368,6 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[10] = 0x80  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
     repview[20:24] = myipn
-    if info['architecture'] == 'uefi-x64':
-        bootfile = b'confluent/x86_64/ipxe.efi'
-    repview[108:108 + len(bootfile)] = bootfile
     repview[236:240] = b'\x63\x82\x53\x63'
     repview[240:242] = b'\x35\x01'
     if rqtype == 1:  # if discover, then offer
@@ -379,6 +379,10 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
     repview[255:257] = b'\x61\x11'
     repview[257:274] = packet[97]
+    # Note that sending PXEClient kicks off the proxyDHCP procedure, ignoring
+    # boot filename and such in the DHCP packet
+    # we will simply always do it to provide the boot payload in a consistent
+    # matter to both dhcp-elsewhere and fixed ip clients
     repview[274:285] = b'\x3c\x09PXEClient'
     repview[285] = 0xff  # end of options, should always be last byte
     repview = memoryview(reply)
