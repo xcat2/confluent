@@ -22,6 +22,7 @@ import netifaces
 import struct
 import eventlet.green.socket as socket
 import eventlet.support.greendns
+import os
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
@@ -77,6 +78,28 @@ def address_is_local(address):
     return False
 
 
+_idxtoifnamemap = {}
+def _rebuildidxmap():
+    _idxtoifnamemap.clear()
+    for iname in os.listdir('/sys/class/net'):
+        ci = int(open('/sys/class/net/{0}/ifindex'.format(iname)).read())
+        _idxtoifnamemap[ci] = iname
+
+def idxtonets(ifidx):
+    _rebuildidxmap()
+    iname = _idxtoifnamemap.get(ifidx, None)
+    addrs = netifaces.ifaddresses(iname)
+    try:
+        addrs = addrs[netifaces.AF_INET]
+    except KeyError:
+        return
+    for addr in addrs:
+        ip = struct.unpack('!I', socket.inet_aton(addr['addr']))[0]
+        mask = struct.unpack('!I', socket.inet_aton(addr['netmask']))[0]
+        net = ip & mask
+        net = socket.inet_ntoa(struct.pack('!I', net))
+        yield (net, mask_to_cidr(addr['netmask']))
+
 # TODO(jjohnson2): have a method to arbitrate setting methods, to aid
 # in correct matching of net.* based on parameters, mainly for pxe
 # The scheme for pxe:
@@ -86,7 +109,7 @@ def address_is_local(address):
 # that mac address
 # the ip as reported by recvmsg to match the subnet of that net.* interface
 # if switch and port available, that should match.
-def get_nic_config(configmanager, node, ip=None, mac=None):
+def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
     """Fetch network configuration parameters for a nic
 
     For a given node and interface, find and retrieve the pertinent network
@@ -98,6 +121,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None):
     :param node:  The name of the node
     :param ip:  An IP address on the intended subnet
     :param mac: The mac address of the interface
+    :param ifidx: The local index relevant to the network.
 
     :returns: A dict of parameters, 'ipv4_gateway', ....
     """
@@ -107,15 +131,74 @@ def get_nic_config(configmanager, node, ip=None, mac=None):
     # join a bond/bridge, vlan configs, etc.
     # also other nic criteria, physical location, driver and index...
     nodenetattribs = configmanager.get_node_attributes(
-        node, 'net*.ipv4_gateway').get(node, {})
+        node, 'net*').get(node, {})
+    cfgbyname = {}
+    for attrib in nodenetattribs:
+        segs = attrib.split('.')
+        if len(segs) == 2:
+            name = None
+        else:
+            name = segs[1]
+        if name not in cfgbyname:
+            cfgbyname[name] = {}
+        cfgbyname[name][segs[-1]] = nodenetattribs[attrib].get('value',
+                                                                None)
     cfgdata = {
         'ipv4_gateway': None,
+        'ipv4_address': None,
+        'ipv4_method': None,
         'prefix': None,
     }
+    if ifidx is not None:
+        dhcprequested = False
+        nets = idxtonets(ifidx)
+        candgws = []
+        for net in nets:
+            net, prefix = net
+            for candidate in cfgbyname:
+                if cfgbyname.get('ipv4_method', None) == 'dhcp':
+                    dhcprequested = True
+                    continue
+                candip = cfgbyname[candidate].get('ipv4_address', None)
+                if candip and '/' in candip:
+                    candip, candprefix = candip.split('/')
+                    if int(candprefix) != prefix:
+                        continue
+                candgw = cfgbyname[candidate].get('ipv4_gateway', None)
+                if candip:
+                    if ip_on_same_subnet(net, candip, prefix):
+                        cfgdata['ipv4_address'] = candip
+                        cfgdata['ipv4_method'] = 'static'
+                        cfgdata['ipv4_gateway'] = cfgbyname[candidate].get(
+                            'ipv4_gateway', None)
+                        cfgdata['prefix'] = prefix
+                        return cfgdata
+                elif candgw:
+                    if ip_on_same_subnet(net, candgw, prefix):
+                        candgws.append(candgw)
+        if dhcprequested:
+            return cfgdata
+        ipbynodename = None
+        try:
+            ipbynodename = socket.getaddrinfo(
+                node, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            return cfgdata
+        if ip_on_same_subnet(net, ipbynodename, prefix):
+            cfgdata['ipv4_address'] = ipbynodename
+            cfgdata['ipv4_method'] = 'static'
+            cfgdata['prefix']
+            for gw in candgws:
+                if ip_on_same_subnet(gw, ipbynodename, prefix):
+                    cfgdata['ipv4_gateway'] = gw
+                    break
+        return cfgdata
     if ip is not None:
         prefixlen = get_prefix_len_for_ip(ip)
         cfgdata['prefix'] = prefixlen
         for setting in nodenetattribs:
+            if 'ipv4_gateway' not in setting:
+                continue
             gw = nodenetattribs[setting].get('value', None)
             if gw is None or not gw:
                 continue
