@@ -151,7 +151,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
     }
     if ifidx is not None:
         dhcprequested = False
-        nets = idxtonets(ifidx)
+        nets = list(idxtonets(ifidx))
         candgws = []
         for net in nets:
             net, prefix = net
@@ -184,14 +184,17 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
                 node, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
         except Exception:
             return cfgdata
-        if ip_on_same_subnet(net, ipbynodename, prefix):
-            cfgdata['ipv4_address'] = ipbynodename
-            cfgdata['ipv4_method'] = 'static'
-            cfgdata['prefix']
-            for gw in candgws:
-                if ip_on_same_subnet(gw, ipbynodename, prefix):
-                    cfgdata['ipv4_gateway'] = gw
-                    break
+        for net in nets:
+            net, prefix = net
+            if ip_on_same_subnet(net, ipbynodename, prefix):
+                cfgdata['ipv4_address'] = ipbynodename
+                cfgdata['ipv4_method'] = 'static'
+                cfgdata['prefix'] = prefix
+                break
+        for gw in candgws:
+            if ip_on_same_subnet(gw, ipbynodename, prefix):
+                cfgdata['ipv4_gateway'] = gw
+                break
         return cfgdata
     if ip is not None:
         prefixlen = get_prefix_len_for_ip(ip)

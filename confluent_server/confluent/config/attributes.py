@@ -371,6 +371,19 @@ node = {
         'description': 'Whether or not the indicated network interface is to be used for booting.  This is used by '
                        'the discovery process to decide where to place the mac address of a detected PXE nic.',
     },
+    'net.ipv4_address': {
+        'description': 'When configuring static, use this address.  If '
+                       'unspecified, it will check if the node name resolves '
+                       'to an IP address.  Additionally, the subnet prefix '
+                       'may be specified with a suffix, e.g. "/16".  If not '
+                       'specified, it will attempt to autodetect based on '
+                       'current network configuration.'
+    },
+    'net.ipv4_method': {
+        'description': 'Whether to use static or dhcp when configuring this '
+                       'interface for IPv4.',
+        'validvalues': ('dhcp', 'static', 'none')
+    },
     'net.ipv4_gateway': {
         'description':  'The IPv4 gateway to use if applicable.  As is the '
                         'case for other net attributes, net.eth0.ipv4_gateway '
