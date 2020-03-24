@@ -156,7 +156,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
         for net in nets:
             net, prefix = net
             for candidate in cfgbyname:
-                if cfgbyname.get('ipv4_method', None) == 'dhcp':
+                if cfgbyname[candidate].get('ipv4_method', None) == 'dhcp':
                     dhcprequested = True
                     continue
                 candip = cfgbyname[candidate].get('ipv4_address', None)

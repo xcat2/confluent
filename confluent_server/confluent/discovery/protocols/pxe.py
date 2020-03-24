@@ -24,6 +24,7 @@
 
 import confluent.config.configmanager as cfm
 import confluent.log as log
+import confluent.netutil as netutil
 import ctypes
 import ctypes.util
 import eventlet.green.socket as socket
@@ -339,7 +340,9 @@ def remap_nodes(nodeattribs, configmanager):
                 macmap[updates[node][attrib]['value']] = node
 
 
+staticassigns = {}
 def check_reply(node, info, packet, sock, cfg, reqview):
+    replen = 286  # default is going to be 286
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
     myipn = info['netinfo']['recvip']
@@ -357,7 +360,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
                         '`always` to enable support, or use UEFI HTTP boot '
                         'with HTTPS.'.format(node)})
         return
-    reply = bytearray(1024)
+    reply = bytearray(512)
     repview = memoryview(reply)
     repview[:20] = iphdr
     repview[12:16] = myipn
@@ -366,8 +369,20 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[0] = 2
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     repview[10] = 0x80  # always set broadcast
+    hwaddr = bytes(reqview[28:44])
     repview[28:44] = reqview[28:44]  # copy chaddr field
     repview[20:24] = myipn
+    gateway = None
+    netmask = None
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'])
+    clipn = None
+    if niccfg['ipv4_address']:
+        clipn = socket.inet_aton(niccfg['ipv4_address'])
+        repview[16:20] = clipn
+        gateway = niccfg['ipv4_gateway']
+        netmask = niccfg['prefix']
+        netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
+        netmask = struct.pack('!I', netmask)
     repview[236:240] = b'\x63\x82\x53\x63'
     repview[240:242] = b'\x35\x01'
     if rqtype == 1:  # if discover, then offer
@@ -384,13 +399,26 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     # we will simply always do it to provide the boot payload in a consistent
     # matter to both dhcp-elsewhere and fixed ip clients
     repview[274:285] = b'\x3c\x09PXEClient'
-    repview[285] = 0xff  # end of options, should always be last byte
+    if netmask:
+        repview[replen - 1:replen + 1] = b'\x01\x04'
+        repview[replen + 1:replen + 5] = netmask
+        replen += 6
+    if gateway:
+        repview[replen - 1:replen + 1] = b'\x03\x04'
+        repview[replen + 1:replen + 5] = gateway
+        replen += 6
+    if clipn:
+        staticassigns[bytes(repview[28:44])] = (clipn,
+                                                bytes(repview[285:replen - 1]))
+    elif hwaddr in staticassigns:
+        del staticassigns[hwaddr]
+    repview[replen - 1] = 0xff  # end of options, should always be last byte
     repview = memoryview(reply)
-    pktlen = struct.pack('!H', 286 + 28)  # ip+udp = 28
+    pktlen = struct.pack('!H', replen + 28)  # ip+udp = 28
     repview[2:4] = pktlen
     curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
     repview[10:12] = struct.pack('!H', curripsum)
-    repview[24:26] = struct.pack('!H', 286 + 8)
+    repview[24:26] = struct.pack('!H', replen + 8)
     datasum = _ipsum(bytes(repview[12:]) + b'\x00\x11' + bytes(
         repview[24:26]))
     datasum = ~datasum & 0xffff
@@ -406,7 +434,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     targ.sll_protocol = socket.htons(0x800)
     targ.sll_ifindex = info['netinfo']['ifidx']
     pkt = ctypes.byref((ctypes.c_char * 284).from_buffer(repview))
-    sendto(tsock.fileno(), pkt, 286 + 28, 0, ctypes.byref(targ),
+    sendto(tsock.fileno(), pkt, replen + 28, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
     print('Thinking about reply to {0}'.format(node))
 
