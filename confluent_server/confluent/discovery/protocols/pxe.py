@@ -366,9 +366,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[12:16] = myipn
     repview[20:28] = udphdr
     repview = repview[28:]
-    repview[0] = 2
+    repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
-    repview[10] = 0x80  # always set broadcast
+    repview[10:11] = '\x80'  # always set broadcast
     hwaddr = bytes(reqview[28:44])
     repview[28:44] = reqview[28:44]  # copy chaddr field
     repview[20:24] = myipn
@@ -386,9 +386,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[236:240] = b'\x63\x82\x53\x63'
     repview[240:242] = b'\x35\x01'
     if rqtype == 1:  # if discover, then offer
-        repview[242] = 2
+        repview[242:243] = b'\x02'
     elif rqtype == 3: # if request, then ack
-        repview[242] = 5
+        repview[242:243] = b'\x05'
     repview[243:245] = b'\x36\x04' # DHCP server identifier
     repview[245:249] = myipn
     repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
@@ -412,28 +412,37 @@ def check_reply(node, info, packet, sock, cfg, reqview):
                                                 bytes(repview[285:replen - 1]))
     elif hwaddr in staticassigns:
         del staticassigns[hwaddr]
-    repview[replen - 1] = 0xff  # end of options, should always be last byte
+    repview[replen - 1:replen] = b'\xff'  # end of options, should always be last byte
     repview = memoryview(reply)
     pktlen = struct.pack('!H', replen + 28)  # ip+udp = 28
     repview[2:4] = pktlen
     curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
     repview[10:12] = struct.pack('!H', curripsum)
     repview[24:26] = struct.pack('!H', replen + 8)
-    datasum = _ipsum(bytes(repview[12:]) + b'\x00\x11' + bytes(
-        repview[24:26]))
+    datasum = _ipsum(repview[12:replen + 28].tobytes() + b'\x00\x11' +
+        repview[24:26].tobytes())
     datasum = ~datasum & 0xffff
     repview[26:28] = struct.pack('!H', datasum)
     tsock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM,
                           socket.htons(0x800))
     targ = sockaddr_ll()
     bcastaddr = bytearray(8)
-    bcastaddr[:reqview[2]] = b'\xff' * reqview[2]
+    hwlen = reqview[2]
+    if not isinstance(hwlen, int):
+        # python 2 is different than python 3...
+        hwlen = bytearray(hwlen)[0]
+    bcastaddr[:hwlen] = b'\xff' * hwlen
     targ.sll_addr = (ctypes.c_ubyte * 8).from_buffer(bcastaddr)
     targ.sll_family = socket.AF_PACKET
-    targ.sll_halen = reqview[2]
+    targ.sll_halen = hwlen
     targ.sll_protocol = socket.htons(0x800)
     targ.sll_ifindex = info['netinfo']['ifidx']
-    pkt = ctypes.byref((ctypes.c_char * 284).from_buffer(repview))
+    try:
+        pkt = ctypes.byref((ctypes.c_char * (replen + 28)).from_buffer(repview))
+    except TypeError:
+        # Python 2....
+        pkt = ctypes.byref((ctypes.c_char * (replen + 28)).from_buffer_copy(
+            repview[:replen + 28].tobytes()))
     sendto(tsock.fileno(), pkt, replen + 28, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
     print('Thinking about reply to {0}'.format(node))
