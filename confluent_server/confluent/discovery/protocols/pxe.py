@@ -368,7 +368,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview = repview[28:]
     repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
-    repview[10:11] = '\x80'  # always set broadcast
+    repview[10:11] = b'\x80'  # always set broadcast
     hwaddr = bytes(reqview[28:44])
     repview[28:44] = reqview[28:44]  # copy chaddr field
     repview[20:24] = myipn
