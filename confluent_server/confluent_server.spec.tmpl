@@ -58,7 +58,7 @@ true
 getent group confluent > /dev/null || /usr/sbin/groupadd -r confluent
 getent passwd confluent > /dev/null || /usr/sbin/useradd -r -g confluent -d /var/lib/confluent -s /sbin/nologin confluent
 mkdir -p /etc/confluent /var/lib/confluent /var/log/confluent /var/cache/confluent
-chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/log/confluent /var/cache/confluent
+chown confluent:confluent /etc/confluent /var/lib/confluent /var/log/confluent /var/cache/confluent
 
 %post
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
@@ -73,7 +73,7 @@ if [ $NEEDCHOWN = 1 ]; then
         NEEDSTART=1
         systemctl stop confluent
     fi
-    chown -R confluent:confluent /etc/confluent /var/lib/confluent /var/log/confluent /var/cache/confluent
+    chown -R confluent:confluent /etc/confluent /var/log/confluent /var/cache/confluent
 fi
 systemctl daemon-reload
 if systemctl is-active confluent > /dev/null || [ $NEEDSTART = 1 ]; then /usr/bin/systemctl restart confluent >& /dev/null; fi
