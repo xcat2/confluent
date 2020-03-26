@@ -40,9 +40,7 @@ udphdr = b'\x00\x43\x00\x44\x00\x00\x00\x00'
 def _ipsum(data):
     currsum = 0
     if len(data) % 2:
-        append = bytearray(2)
-        append[0] = data[-1]
-        currsum = struct.unpack('!H', append)
+        currsum = struct.unpack('!B', data[-1:])[0] << 8
         data = memoryview(data)
         data = data[:-1]
     for datum in struct.unpack('!' + 'H' * (len(data) // 2), data):
@@ -50,6 +48,8 @@ def _ipsum(data):
         if currsum >> 16:
             currsum &= 0xffff
             currsum += 1
+    if currsum == 0:
+        currsum = 0xffff
     return currsum
 
 class sockaddr_ll(ctypes.Structure):
@@ -342,7 +342,7 @@ def remap_nodes(nodeattribs, configmanager):
 
 staticassigns = {}
 def check_reply(node, info, packet, sock, cfg, reqview):
-    replen = 286  # default is going to be 286
+    replen = 275  # default is going to be 286
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
     myipn = info['netinfo']['recvip']
@@ -398,7 +398,12 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     # boot filename and such in the DHCP packet
     # we will simply always do it to provide the boot payload in a consistent
     # matter to both dhcp-elsewhere and fixed ip clients
-    repview[274:285] = b'\x3c\x09PXEClient'
+    if info['architecture'] == 'uefi-httpboot':
+        repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
+        replen += 12
+    else:
+        repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
+        replen += 11
     if netmask:
         repview[replen - 1:replen + 1] = b'\x01\x04'
         repview[replen + 1:replen + 5] = netmask
@@ -419,8 +424,8 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
     repview[10:12] = struct.pack('!H', curripsum)
     repview[24:26] = struct.pack('!H', replen + 8)
-    datasum = _ipsum(repview[12:replen + 28].tobytes() + b'\x00\x11' +
-        repview[24:26].tobytes())
+    datasum = _ipsum(b'\x00\x11' + repview[24:26].tobytes() + 
+                     repview[12:replen + 28].tobytes())
     datasum = ~datasum & 0xffff
     repview[26:28] = struct.pack('!H', datasum)
     tsock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM,
