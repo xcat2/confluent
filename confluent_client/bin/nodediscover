@@ -241,6 +241,8 @@ def list_matching_macs(options, session, node=None):
     path = '/discovery/'
     if node:
         path += 'by-node/{0}/'.format(node)
+    elif options.node:
+        path += 'by-node/{0}/'.format(options.node)
     if options.model:
         path += 'by-model/{0}/'.format(options.model)
     if options.serial:
