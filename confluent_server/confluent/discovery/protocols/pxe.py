@@ -342,6 +342,7 @@ def remap_nodes(nodeattribs, configmanager):
 
 staticassigns = {}
 def check_reply(node, info, packet, sock, cfg, reqview):
+    httpboot = info['architecture'] == 'uefi-httpboot'
     replen = 275  # default is going to be 286
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
@@ -350,8 +351,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     if not profile:
         return
     rqtype = packet[53][0]
-    insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols', 'never')
-    if insecuremode == 'never' and info['architecture'] != 'uefi-httpboot':
+    insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
+        'never')
+    if insecuremode == 'never' and not httpboot:
         if rqtype == 1 and info['architecture']:
             log.log(
                 {'info': 'Boot attempt by {0} detected in insecure mode, but '
@@ -371,6 +373,11 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[10:11] = b'\x80'  # always set broadcast
     hwaddr = bytes(reqview[28:44])
     repview[28:44] = reqview[28:44]  # copy chaddr field
+    if httpboot:
+        proto = 'https' if insecuremode == 'never' else 'http'
+        bootfile = '{0}://{1}/confluent-public/os/{2}/boot/boot.img'.format(
+            proto, info['netinfo']['recvip'], profile
+        )
     repview[20:24] = myipn
     gateway = None
     netmask = None
