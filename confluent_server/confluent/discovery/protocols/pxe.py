@@ -378,6 +378,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot/boot.img'.format(
             proto, info['netinfo']['recvip'], profile
         )
+        if not isintstance(bootfile, bytes):
+            bootfile = bootfile.encode('utf8')
+        repview[108:108 + len(bootfile)] = bootfile
     repview[20:24] = myipn
     gateway = None
     netmask = None
