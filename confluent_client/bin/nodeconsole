@@ -51,27 +51,28 @@ if options.tile:
         nodes.append(node)
     initial = True
     pane = 0
+    sessname = 'nodeconsole_{0}'.format(os.getpid())
     for node in sortutil.natural_sort(nodes):
+        panename = '{0}:{1}'.format(sessname, pane)
         if initial:
             initial = False
             subprocess.call(
                 ['tmux', 'new-session', '-d', '-s',
-                 'nodeconsole_{0}'.format(os.getpid()), '-x', '800', '-y',
+                 sessname, '-x', '800', '-y',
                  '800', '{0} -m 5 start /nodes/{1}/console/session'.format(
                     confettypath, node)])
         else:
-            subprocess.call(['tmux', 'select-pane', '-t', str(pane)])
-            subprocess.call(['tmux', 'set-option', 'pane-border-status', 'top'], stderr=null)
-            pane += 1
+            subprocess.call(['tmux', 'select-pane', '-t', sessname])
+            subprocess.call(['tmux', 'set-option', '-t', panename, 'pane-border-status', 'top'], stderr=null)
             subprocess.call(
-                ['tmux', 'split', '-h',
+                    ['tmux', 'split', '-h', '-t', sessname,
                  '{0} -m 5 start /nodes/{1}/console/session'.format(
                      confettypath, node)])
-            subprocess.call(['tmux', 'select-layout', 'tiled'], stdout=null)
-    subprocess.call(['tmux', 'select-pane', '-t', '0'])
-    subprocess.call(['tmux', 'set-option', 'pane-border-status', 'top'], stderr=null)
-    os.execlp('tmux', 'tmux', 'attach', '-t', 'nodeconsole_{0}'.format(
-        os.getpid()))
+            subprocess.call(['tmux', 'select-layout', '-t', sessname, 'tiled'], stdout=null)
+            pane += 1
+    subprocess.call(['tmux', 'select-pane', '-t', sessname])
+    subprocess.call(['tmux', 'set-option', '-t', panename, 'pane-border-status', 'top'], stderr=null)
+    os.execlp('tmux', 'tmux', 'attach', '-t', sessname)
 else:
     os.execl(confettypath, confettypath, 'start',
              '/nodes/{0}/console/session'.format(args[0]))
