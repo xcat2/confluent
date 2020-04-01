@@ -704,11 +704,11 @@ def detected(info):
     if nodename and handler:
         eval_node(cfg, handler, info, nodename)
     elif handler:
-        log.log(
-            {'info': 'Detected unknown {0} with hwaddr {1} at '
-                     'address {2}'.format(
-                        handler.devname, info['hwaddr'], handler.ipaddr
-                      )})
+        #log.log(
+        #    {'info': 'Detected unknown {0} with hwaddr {1} at '
+        #             'address {2}'.format(
+        #                handler.devname, info['hwaddr'], handler.ipaddr
+        #              )})
         info['discostatus'] = 'unidentified'
         unknown_info[info['hwaddr']] = info
 
@@ -1142,8 +1142,8 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
         return True
     if uuid_is_valid(info['uuid']):
         known_pxe_uuids[info['uuid']] = nodename
-    log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
-        nodename, handler.devname, info['hwaddr'])})
+    #log.log({'info': 'Detected {0} ({1} with mac {2})'.format(
+    #    nodename, handler.devname, info['hwaddr'])})
     return True
 
 
