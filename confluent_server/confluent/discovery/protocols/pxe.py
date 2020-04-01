@@ -247,7 +247,8 @@ def proxydhcp():
         rpv[108:108 + len(bootfile)] = bootfile
         rpv[240:243] = b'\x35\x01\x05'
         rpv[243:249] = b'\x36\x04' + myipn
-        rpv[249:268] = b'\x61\x11' + bytes(opts[97])
+        rpv[20:24] = myipn
+        rpv[249:268] = b'\x61\x11' + opts[97]
         rpv[268:280] = b'\x3c\x09PXEClient\xff'
         net4011.sendto(rpv[:281], client)
 
