@@ -34,6 +34,7 @@ import confluent.core as confluentcore
 import confluent.httpapi as httpapi
 import confluent.log as log
 import confluent.collective.manager as collective
+import confluent.discovery.protocols.pxe as pxe
 try:
     import confluent.sockapi as sockapi
 except ImportError:
@@ -262,6 +263,7 @@ def run(args):
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
     disco.start_detection()
+    pxe.start_proxydhcp()
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
         sockservice.start()

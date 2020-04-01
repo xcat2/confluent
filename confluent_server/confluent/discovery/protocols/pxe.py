@@ -27,6 +27,7 @@ import confluent.log as log
 import confluent.netutil as netutil
 import ctypes
 import ctypes.util
+import eventlet
 import eventlet.green.socket as socket
 import eventlet.green.select as select
 import struct
@@ -162,7 +163,7 @@ def _decode_ocp_vivso(rq, idx, size):
         idx += rq[idx + 1] + 2
     return '', None, vivso
 
-def opts_to_dict(rq, optidx):
+def opts_to_dict(rq, optidx, expectype=1):
     reqdict = {}
     disco = {'uuid':None, 'arch': None, 'vivso': None}
     try:
@@ -173,7 +174,7 @@ def opts_to_dict(rq, optidx):
             optidx += optlen + 2
     except IndexError:
         pass
-    if reqdict.get(53, [0])[0] != 1:
+    if reqdict.get(53, [0])[0] != expectype:
         return reqdict, disco
     # It is a discover packet..
     iscumulus = False
@@ -206,6 +207,54 @@ def opts_to_dict(rq, optidx):
 
 def ipfromint(numb):
     return socket.inet_ntoa(struct.pack('I', numb))
+
+def proxydhcp():
+    net4011 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    net4011.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4011.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
+    net4011.bind(('', 4011))
+    cfg = cfm.ConfigManager(None)
+    while True:
+        ready = select.select([net4011], [], [], None)
+        if not ready or not ready[0]:
+            continue
+        rq = bytearray(1024)
+        rqv = memoryview(rq)
+        nb, client = net4011.recvfrom_into(rq)
+        if nb < 240:
+            continue
+        rp = bytearray(1024)
+        rpv = memoryview(rp)
+        try:
+            optidx = rq.index(b'\x63\x82\x53\x63') + 4
+        except ValueError:
+            continue
+        opts, disco = opts_to_dict(rq, optidx, 3)
+        disco['uuid']
+        node = None
+        if disco.get('hwaddr', None) in macmap:
+            node = macmap[disco['hwaddr']]
+        elif disco.get('uuid', None) in uuidmap:
+            node = uuidmap[disco['uuid']]
+        if not node:
+            continue
+        myipn = myipbypeer.get(bytes(rq[28:44]), None)
+        if not myipn:
+            continue
+        rpv[:240] = bytes(rqv[:240])
+        rpv[0:1] = b'\x02'
+        bootfile = b'confluent/x86_64/ipxe.efi'
+        rpv[108:108 + len(bootfile)] = bootfile
+        rpv[240:243] = b'\x35\x01\x05'
+        rpv[243:249] = b'\x36\x04' + myipn
+        rpv[249:268] = b'\x61\x11' + bytes(opts[97])
+        rpv[268:280] = b'\x3c\x09PXEClient\xff'
+        net4011.sendto(rpv[:281], client)
+
+
+def start_proxydhcp():
+    eventlet.spawn_n(proxydhcp)
+
 
 def snoop(handler, protocol=None):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
@@ -290,7 +339,7 @@ def snoop(handler, protocol=None):
                         'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                         'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
                 handler(info)
-                consider_discover(info, rqinfo, net4, cfg, rqv)
+                #consider_discover(info, rqinfo, net4, cfg, rqv)
                 continue
             # We will fill out service to have something to byte into,
             # but the nature of the beast is that we do not have peers,
@@ -341,6 +390,7 @@ def remap_nodes(nodeattribs, configmanager):
 
 
 staticassigns = {}
+myipbypeer = {}
 def check_reply(node, info, packet, sock, cfg, reqview):
     httpboot = info['architecture'] == 'uefi-httpboot'
     replen = 275  # default is going to be 286
@@ -412,6 +462,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
         replen += 12
     else:
+        myipbypeer[bytes(repview[28:44])] = myipn
         repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
         replen += 11
     if netmask:
@@ -460,7 +511,6 @@ def check_reply(node, info, packet, sock, cfg, reqview):
             repview[:replen + 28].tobytes()))
     sendto(tsock.fileno(), pkt, replen + 28, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
-    print('Thinking about reply to {0}'.format(node))
 
 
 def consider_discover(info, packet, sock, cfg, reqview):
