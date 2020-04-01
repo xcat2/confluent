@@ -241,9 +241,18 @@ def proxydhcp():
         myipn = myipbypeer.get(bytes(rq[28:44]), None)
         if not myipn:
             continue
+        if opts.get(77, None) == b'iPXE':
+            cfd = cfg.get_node_attributes(node, ('deployment.*'))
+            profile = cfd.get(node, {}).get(
+                'deployment.pendingprofile', {}).get('value', None)
+            if not profile:
+                continue
+            myip = socket.inet_ntoa(myipn)
+            bootfile = 'http://{0}/confluent-public/os/{1}/boot/boot.ipxe'.format(myip, profile).encode('utf8')
+        else:
+            bootfile = b'confluent/x86_64/ipxe.efi'
         rpv[:240] = bytes(rqv[:240])
         rpv[0:1] = b'\x02'
-        bootfile = b'confluent/x86_64/ipxe.efi'
         rpv[108:108 + len(bootfile)] = bootfile
         rpv[240:243] = b'\x35\x01\x05'
         rpv[243:249] = b'\x36\x04' + myipn
