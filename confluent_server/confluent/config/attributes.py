@@ -270,7 +270,8 @@ node = {
     },
     'console.method': {
         'description': ('Indicate the method used to access the console of '
-                        'the managed node.'),
+                        'the managed node.  If not specified, then console '
+                        'is disabled'),
         'validvalues': ('ssh', 'ipmi', 'tsmsol'),
     },
 #    'virtualization.host': {
@@ -301,6 +302,7 @@ node = {
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
+                       'ipmi is used if not specified.'
     },
     'enclosure.bay': {
          'description': 'The bay in the enclosure, if any',
