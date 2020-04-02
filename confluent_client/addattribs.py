@@ -2,8 +2,11 @@
 import os
 import sys
 path = os.path.dirname(os.path.realpath(__file__))
+try:
+    sys.path.remove(path)
+except Exception:
+    pass
 path = os.path.realpath(os.path.join(path, '..', 'confluent_server'))
-print(repr(path))
 sys.path.append(path)
 
 import confluent.config.attributes as attr
