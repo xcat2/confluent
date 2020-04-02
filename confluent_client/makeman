@@ -1,4 +1,6 @@
 #!/bin/sh
+cd `dirname $0`
+python3 addattribs.py || python2 addattribs.py
 cd `dirname $0`/doc/man
 mkdir -p ../../man/man1
 mkdir -p ../../man/man5
