@@ -251,7 +251,7 @@ def proxydhcp():
             bootfile = 'http://{0}/confluent-public/os/{1}/boot/boot.ipxe'.format(myip, profile).encode('utf8')
         elif disco['arch'] == 'uefi-x64':
             bootfile = b'confluent/x86_64/ipxe.efi'
-        elif disco['arch'] == 'bios-x86'
+        elif disco['arch'] == 'bios-x86':
             bootfile = b'confluent/x86_64/ipxe.kkpxe'
         rpv[:240] = bytes(rqv[:240])
         rpv[0:1] = b'\x02'
