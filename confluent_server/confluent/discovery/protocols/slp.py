@@ -493,11 +493,13 @@ def snoop(handler, protocol=None):
                 _add_attributes(peerbymacaddress[mac])
                 peerbymacaddress[mac]['hwaddr'] = mac
                 peerbymacaddress[mac]['protocol'] = protocol
-                if 'service:ipmi' in peerbymacaddress[mac]['services']:
-                    if 'service:ipmi//Athena:623' in peerbymacaddress[mac].get('urls', ()):
+                for srvurl in peerbymacaddress[mac].get('urls', ()):
+                    if len(srvurl) > 4:
+                        srvurl = srvurl[:-3]
+                    if srvurl.endswith('://Athena:'):
                         peerbymacaddress[mac]['services'] = ['service:thinkagile-storage']
-                    else:
-                        continue
+                if 'service:ipmi' in peerbymacaddress[mac]['services']:
+                    continue
                 if 'service:lightttpd' in peerbymacaddress[mac]['services']:
                     currinf = peerbymacaddress[mac]
                     curratt = currinf.get('attributes', {})
@@ -568,11 +570,13 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     _grab_rsps((net, net4), rsps, 1, xidmap)
     # now to analyze and flesh out the responses
     for id in rsps:
-        if 'service:ipmi' in rsps[id]['services']:
-            if 'service:ipmi://Athena:623' in rsps[id].get('urls', ''):
+        for srvurl in rsps[id].get('urls', ()):
+            if len(srvurl) > 4:
+                srvurl = srvurl[:-3]
+            if srvurl.endswith('://Athena:'):
                 rsps[id]['services'] = ['service:thinkagile-storage']
-            else:
-                continue
+        if 'service:ipmi' in rsps[id]['services']:
+            continue
         if localonly:
             for addr in rsps[id]['addresses']:
                 if 'fe80' in addr[0]:
