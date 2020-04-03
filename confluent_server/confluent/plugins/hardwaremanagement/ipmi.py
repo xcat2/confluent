@@ -855,6 +855,10 @@ class IpmiHandler(object):
                     raise
                 if hasattr(reading, 'health'):
                     reading.health = _str_health(reading.health)
+                if hasattr(reading, 'unavailable') and reading.unavailable:
+                    self.output.put(msg.SensorReadings([EmptySensor(
+                        reading.name)], name=self.node))
+                    continue
                 readings.append(reading)
             self.output.put(msg.SensorReadings(readings, name=self.node))
         else:
@@ -870,9 +874,13 @@ class IpmiHandler(object):
                     self.ipmicmd.sensormap[sensorname])
                 if hasattr(reading, 'health'):
                     reading.health = _str_health(reading.health)
-                self.output.put(
-                    msg.SensorReadings([reading],
-                                       name=self.node))
+                if hasattr(reading, 'unavailable') and reading.unavailable:
+                    self.output.put(msg.SensorReadings([EmptySensor(
+                        reading.name)], name=self.node))
+                else:
+                    self.output.put(
+                        msg.SensorReadings([reading],
+                                           name=self.node))
             except pygexc.IpmiException as ie:
                 if ie.ipmicode == 203:
                     self.output.put(msg.ConfluentResourceUnavailable(
