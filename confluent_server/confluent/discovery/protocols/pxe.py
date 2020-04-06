@@ -181,7 +181,7 @@ def opts_to_dict(rq, optidx, expectype=1):
     maybeztp = False
     if 239 in reqdict.get(55, []):
         maybeztp = True
-    vci = stringify(reqdict.get(60, ''))
+    vci = stringify(reqdict.get(60, b''))
     if vci.startswith('cumulus-linux'):
         disco['arch'] = vci.replace('cumulus-linux', '').strip()
         iscumulus = True
@@ -440,7 +440,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot/boot.img'.format(
             proto, info['netinfo']['recvip'], profile
         )
-        if not isintstance(bootfile, bytes):
+        if not isinstance(bootfile, bytes):
             bootfile = bootfile.encode('utf8')
         repview[108:108 + len(bootfile)] = bootfile
     repview[20:24] = myipn
