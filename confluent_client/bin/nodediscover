@@ -237,11 +237,11 @@ def clear_discovery(options, session):
             else:
                 print(repr(res))
 
-def list_matching_macs(options, session, node=None):
+def list_matching_macs(options, session, node=None, checknode=True):
     path = '/discovery/'
     if node:
         path += 'by-node/{0}/'.format(node)
-    elif options.node:
+    elif checknode and options.node:
         path += 'by-node/{0}/'.format(options.node)
     if options.model:
         path += 'by-model/{0}/'.format(options.model)
@@ -279,11 +279,11 @@ def assign_discovery(options, session, needid=True):
         abort = True
     if abort:
         sys.exit(1)
-    matches = list_matching_macs(options, session, None if needid else options.node)
+    matches = list_matching_macs(options, session, None if needid else options.node, False)
     if not matches:
         # Do a rescan to catch missing requested data
         blocking_scan(session)
-        matches = list_matching_macs(options, session, None if needid else options.node)
+        matches = list_matching_macs(options, session, None if needid else options.node, False)
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")
         sys.exit(1)
