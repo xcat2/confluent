@@ -65,7 +65,7 @@ import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
-#import confluent.discovery.protocols.ssdp as ssdp
+import confluent.discovery.protocols.ssdp as ssdp
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
 import confluent.discovery.handlers.cpstorage as cpstorage
@@ -1217,8 +1217,16 @@ def rescan():
     if scanner:
         return
     else:
-        scanner = eventlet.spawn(slp.active_scan, safe_detected, slp)
+        scanner = eventlet.spawn(blocking_scan)
 
+
+def blocking_scan():
+    global scanner
+    slpscan = eventlet.spawn(slp.active_scan, safe_detected, slp)
+    ssdpscan = eventlet.spawn(ssdp.active_scan, safe_detected, ssdp)
+    slpscan.wait()
+    ssdpscan.wait()
+    scanner = None
 
 def start_detection():
     global attribwatcher
