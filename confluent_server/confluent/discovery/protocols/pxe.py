@@ -541,10 +541,11 @@ def ack_request(pkt, rq, info):
     repview = memoryview(reply)
     repview[:len(rply)] = rply
     repview[270:271] = b'\x05'
+    repview[26:28] = struct.pack('!H', 0) # TODO: use datasum, it was incorrect)
     datasum = _ipsum(b'\x00\x11' + repview[24:26].tobytes() +
                      repview[12:len(rply)].tobytes())
     datasum = ~datasum & 0xffff
-    repview[26:28] = struct.pack('!H', 0) # TODO: use datasum, it was incorrect)
+    repview[26:28] = struct.pack('!H', datasum)
     send_raw_packet(repview, len(rply), rq, info)
 
 def consider_discover(info, packet, sock, cfg, reqview):
