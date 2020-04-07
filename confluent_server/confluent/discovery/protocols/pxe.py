@@ -474,9 +474,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
         replen += 12
     else:
-        myipbypeer[bytes(repview[28:44])] = myipn
         repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
         replen += 11
+    myipbypeer[bytes(repview[28:44])] = myipn
     if netmask:
         repview[replen - 1:replen + 1] = b'\x01\x04'
         repview[replen + 1:replen + 5] = netmask
@@ -485,11 +485,6 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         repview[replen - 1:replen + 1] = b'\x03\x04'
         repview[replen + 1:replen + 5] = gateway
         replen += 6
-    if clipn:
-        staticassigns[bytes(repview[28:44])] = (clipn,
-                                                bytes(repview[285:replen - 1]))
-    elif hwaddr in staticassigns:
-        del staticassigns[hwaddr]
     repview[replen - 1:replen] = b'\xff'  # end of options, should always be last byte
     repview = memoryview(reply)
     pktlen = struct.pack('!H', replen + 28)  # ip+udp = 28
@@ -497,10 +492,17 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     curripsum = ~(_ipsum(constiphdrsum + pktlen + myipn)) & 0xffff
     repview[10:12] = struct.pack('!H', curripsum)
     repview[24:26] = struct.pack('!H', replen + 8)
-    datasum = _ipsum(b'\x00\x11' + repview[24:26].tobytes() + 
+    datasum = _ipsum(b'\x00\x11' + repview[24:26].tobytes() +
                      repview[12:replen + 28].tobytes())
     datasum = ~datasum & 0xffff
     repview[26:28] = struct.pack('!H', datasum)
+    if clipn:
+        staticassigns[hwaddr] = (clipn, repview[:replen + 28].tobytes())
+    elif hwaddr in staticassigns:
+        del staticassigns[hwaddr]
+    send_raw_packet(repview, replen + 28, reqview, info)
+
+def send_raw_packet(repview, replen, reqview, info):
     tsock = socket.socket(socket.AF_PACKET, socket.SOCK_DGRAM,
                           socket.htons(0x800))
     targ = sockaddr_ll()
@@ -516,20 +518,42 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     targ.sll_protocol = socket.htons(0x800)
     targ.sll_ifindex = info['netinfo']['ifidx']
     try:
-        pkt = ctypes.byref((ctypes.c_char * (replen + 28)).from_buffer(repview))
+        pkt = ctypes.byref((ctypes.c_char * (replen)).from_buffer(repview))
     except TypeError:
         # Python 2....
-        pkt = ctypes.byref((ctypes.c_char * (replen + 28)).from_buffer_copy(
-            repview[:replen + 28].tobytes()))
-    sendto(tsock.fileno(), pkt, replen + 28, 0, ctypes.byref(targ),
+        pkt = ctypes.byref((ctypes.c_char * (replen)).from_buffer_copy(
+            repview[:replen].tobytes()))
+    sendto(tsock.fileno(), pkt, replen, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
 
+def ack_request(pkt, rq, info):
+    hwaddr = rq[28:44].tobytes()
+    myipn = myipbypeer.get(bytes(rq[28:44]), None)
+    if not myipn or pkt.get(54, None) != myipn:
+        return
+    assigninfo = staticassigns.get(hwaddr, None)
+    if assigninfo == None:
+        return
+    if pkt.get(50, None) != assigninfo[0]:
+        return
+    rply = assigninfo[1]
+    reply = bytearray(512)
+    repview = memoryview(reply)
+    repview[:len(rply)] = rply
+    repview[270:271] = b'\x05'
+    datasum = _ipsum(b'\x00\x11' + repview[24:26].tobytes() +
+                     repview[12:len(rply)].tobytes())
+    datasum = ~datasum & 0xffff
+    repview[26:28] = struct.pack('!H', 0) # TODO: use datasum, it was incorrect)
+    send_raw_packet(repview, len(rply), rq, info)
 
 def consider_discover(info, packet, sock, cfg, reqview):
     if info.get('hwaddr', None) in macmap and info.get('uuid', None):
         check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview)
     elif info.get('uuid', None) in uuidmap:
         check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview)
+    elif packet[53] == b'\x03':
+        ack_request(packet, reqview, info)
 
 
 if __name__ == '__main__':
