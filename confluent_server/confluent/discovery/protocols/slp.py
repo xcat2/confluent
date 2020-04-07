@@ -497,7 +497,7 @@ def snoop(handler, protocol=None):
                     if len(srvurl) > 4:
                         srvurl = srvurl[:-3]
                     if srvurl.endswith('://Athena:'):
-                        peerbymacaddress[mac]['services'] = ['service:thinkagile-storage']
+                        continue
                 if 'service:ipmi' in peerbymacaddress[mac]['services']:
                     continue
                 if 'service:lightttpd' in peerbymacaddress[mac]['services']:
@@ -574,7 +574,7 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
             if len(srvurl) > 4:
                 srvurl = srvurl[:-3]
             if srvurl.endswith('://Athena:'):
-                rsps[id]['services'] = ['service:thinkagile-storage']
+                continue
         if 'service:ipmi' in rsps[id]['services']:
             continue
         if localonly:

@@ -33,6 +33,10 @@ import confluent.util as util
 import confluent.log as log
 import eventlet.green.select as select
 import eventlet.green.socket as socket
+try:
+    from eventlet.green.urllib.request import urlopen
+except (ImportError, AssertionError):
+    from eventlet.green.urllib2 import urlopen
 import struct
 import traceback
 
@@ -46,6 +50,20 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
         'ST: {1}\r\n'
         'MX: 3\r\n\r\n')
 
+
+def active_scan(handler, protocol=None):
+    known_peers = set([])
+    for scanned in scan(['urn:dmtf-org:service:redfish-rest:1']):
+        for addr in scanned['addresses']:
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            if ip not in neighutil.neightable:
+                continue
+            if addr in known_peers:
+                break
+            known_peers.add(addr)
+        else:
+            scanned['protocol'] = protocol
+            handler(scanned)
 
 def scan(services, target=None):
     for service in services:
@@ -115,11 +133,11 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                         known_peers.add(peer)
                         newmacs.add(mac)
                         if mac in peerbymacaddress:
-                            peerbymacaddress[mac]['peers'].append(peer)
+                            peerbymacaddress[mac]['addresses'].append(peer)
                         else:
                             peerbymacaddress[mac] = {
                                 'hwaddr': mac,
-                                'peers': [peer],
+                                'addresses': [peer],
                             }
                             peerdata = peerbymacaddress[mac]
                             for headline in rsp[1:]:
@@ -217,7 +235,12 @@ def _find_service(service, target):
             timeout = 0
         r, _, _ = select.select((net4, net6), (), (), timeout)
     for nid in peerdata:
-        yield peerdata[nid]
+        for url in peerdata[nid].get('urls', ()):
+            if url.endswith('/desc.tmpl'):
+                info = urlopen(url).read()
+                if '<friendlyName>Athena</friendlyName>' in info:
+                    peerdata[nid]['services'] = ['service:thinkagile-storage']
+                    yield peerdata[nid]
 
 
 def _parse_ssdp(peer, rsp, peerdata):
@@ -235,11 +258,11 @@ def _parse_ssdp(peer, rsp, peerdata):
     if code == '200':
         if nid in peerdata:
             peerdatum = peerdata[nid]
-            if peer not in peerdatum['peers']:
-                peerdatum['peers'].append(peer)
+            if peer not in peerdatum['addresses']:
+                peerdatum['addresses'].append(peer)
         else:
             peerdatum = {
-                'peers': [peer],
+                'addresses': [peer],
                 'hwaddr': mac,
             }
             peerdata[nid] = peerdatum

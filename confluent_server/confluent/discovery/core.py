@@ -1219,8 +1219,16 @@ def rescan():
     if scanner:
         return
     else:
-        scanner = eventlet.spawn(slp.active_scan, safe_detected, slp)
+        scanner = eventlet.spawn(blocking_scan)
 
+
+def blocking_scan():
+    global scanner
+    slpscan = eventlet.spawn(slp.active_scan, safe_detected, slp)
+    ssdpscan = eventlet.spawn(ssdp.active_scan, safe_detected, ssdp)
+    slpscan.wait()
+    ssdpscan.wait()
+    scanner = None
 
 def start_detection():
     global attribwatcher
