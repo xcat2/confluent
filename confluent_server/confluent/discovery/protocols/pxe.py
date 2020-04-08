@@ -238,7 +238,7 @@ def proxydhcp():
             node = uuidmap[disco['uuid']]
         if not node:
             continue
-        myipn = myipbypeer.get(bytes(rq[28:44]), None)
+        myipn = myipbypeer.get(rq[28:44].tobytes(), None)
         if not myipn:
             continue
         if opts.get(77, None) == b'iPXE':
@@ -253,7 +253,7 @@ def proxydhcp():
             bootfile = b'confluent/x86_64/ipxe.efi'
         elif disco['arch'] == 'bios-x86':
             bootfile = b'confluent/x86_64/ipxe.kkpxe'
-        rpv[:240] = bytes(rqv[:240])
+        rpv[:240] = rqv[:240].tobytes()
         rpv[0:1] = b'\x02'
         rpv[108:108 + len(bootfile)] = bootfile
         rpv[240:243] = b'\x35\x01\x05'
@@ -433,7 +433,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     repview[10:11] = b'\x80'  # always set broadcast
-    hwaddr = bytes(reqview[28:44])
+    hwaddr = reqview[28:44].tobytes()
     repview[28:44] = reqview[28:44]  # copy chaddr field
     if httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
@@ -476,7 +476,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     else:
         repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
         replen += 11
-    myipbypeer[bytes(repview[28:44])] = myipn
+    myipbypeer[repview[28:44].tobytes()] = myipn
     if netmask:
         repview[replen - 1:replen + 1] = b'\x01\x04'
         repview[replen + 1:replen + 5] = netmask
@@ -528,7 +528,7 @@ def send_raw_packet(repview, replen, reqview, info):
 
 def ack_request(pkt, rq, info):
     hwaddr = rq[28:44].tobytes()
-    myipn = myipbypeer.get(bytes(rq[28:44]), None)
+    myipn = myipbypeer.get(hwaddr, None)
     if not myipn or pkt.get(54, None) != myipn:
         return
     assigninfo = staticassigns.get(hwaddr, None)
