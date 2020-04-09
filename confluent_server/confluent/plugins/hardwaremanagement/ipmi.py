@@ -29,6 +29,7 @@ import eventlet.queue as queue
 import eventlet.support.greendns
 from fnmatch import fnmatch
 import os
+import pwd
 import pyghmi.constants as pygconstants
 import pyghmi.exceptions as pygexc
 import pyghmi.storage as storage
@@ -1503,14 +1504,17 @@ class IpmiHandler(object):
     def save_licenses(self):
         directory = self.inputdata.nodefile(self.node)
         checkdir = directory
-        if not os.path.isdir(checkdir):
-            checkdir = os.path.dirname(checkdir)
-        if not os.access(checkdir, os.W_OK):
+        if not os.access(directory, os.W_OK):
             raise exc.InvalidArgumentException(
                 'The confluent system user/group is unable to write to '
                 'directory {0}, check ownership and permissions'.format(
                     checkdir))
         for saved in self.ipmicmd.save_licenses(directory):
+            try:
+                pwent = pwd.getpwnam(self.current_user)
+                os.chown(saved, pwent.pw_uid, pwent.pw_gid)
+            except KeyError:
+                pass
             self.output.put(msg.SavedFile(self.node, saved))
 
     def handle_licenses(self):
