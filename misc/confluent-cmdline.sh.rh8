@@ -1,3 +1,4 @@
 #!/bin/bash
 echo -n "" >> /tmp/net.ifaces
+cat /tls/*.pem >> /etc/pki/tls/certs/ca-bundle.certs
 
