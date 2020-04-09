@@ -1,0 +1,19 @@
+#!/bin/sh
+cd /sys/class/net
+for currif in *; do
+    ip link set $currif up
+done
+cd -
+while ! grep MANAGER /tmp/confluent.info >& /dev/null; do
+    /opt/confluent/bin/copernicus > /tmp/confluent.out
+done
+read ifidx <<EOF
+$(grep MANAGER confluent.info|grep fe80|sed -e s/.*%//)
+EOF
+ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+ifname=${ifname%:}
+echo $ifname > /tmp/net.ifaces
+# Need to construct the following:
+# echo ip=172.30.203.31::172.30.0.254:255.255.0.0:r4u31:enp65s0f0:none >> /etc/cmdline.d/01-confluent.conf
+# echo inst.repo=http://172.30.0.254/confluent-public/os/centos-8.1-x86_64-compute/distribution >> /etc/cmdline.d/01-confluent.conf
+
