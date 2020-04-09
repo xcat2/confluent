@@ -238,7 +238,7 @@ def proxydhcp():
             node = uuidmap[disco['uuid']]
         if not node:
             continue
-        myipn = myipbypeer.get(rq[28:44].tobytes(), None)
+        myipn = myipbypeer.get(rqv[28:44].tobytes(), None)
         if not myipn:
             continue
         if opts.get(77, None) == b'iPXE':
