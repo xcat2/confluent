@@ -64,8 +64,8 @@ class AsyncTermRelation(object):
     # Need to keep an association of term object to async
     # This allows the async handler to know the context of
     # outgoing data to provide to calling code
-    def __init__(self, termid, async):
-        self.async = async
+    def __init__(self, termid, asynchdl):
+        self.async = asynchdl
         self.termid = termid
 
     def got_data(self, data):
