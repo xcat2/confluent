@@ -511,10 +511,10 @@ def resourcehandler_backend(env, start_response):
             width = querydict.get('width', 80)
             height = querydict.get('height', 24)
             datacallback = None
-            async = None
+            asynchdl = None
             if 'HTTP_CONFLUENTASYNCID' in env:
-                async = confluent.asynchttp.get_async(env, querydict)
-                termrel = async.set_term_relation(env)
+                asynchdl = confluent.asynchttp.get_async(env, querydict)
+                termrel = asynchdl.set_term_relation(env)
                 datacallback = termrel.got_data
             try:
                 if shellsession:
@@ -537,8 +537,8 @@ def resourcehandler_backend(env, start_response):
                 start_response("500 Internal Server Error", headers)
                 return
             sessid = _assign_consessionid(consession)
-            if async:
-                async.add_console_session(sessid)
+            if asynchdl:
+                asynchdl.add_console_session(sessid)
             start_response('200 OK', headers)
             yield '{"session":"%s","data":""}' % sessid
             return
