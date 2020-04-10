@@ -65,11 +65,11 @@ class AsyncTermRelation(object):
     # This allows the async handler to know the context of
     # outgoing data to provide to calling code
     def __init__(self, termid, asynchdl):
-        self.async = asynchdl
+        self.asynchdl = asynchdl
         self.termid = termid
 
     def got_data(self, data):
-        self.async.add(self.termid, data)
+        self.asynchdl.add(self.termid, data)
 
 
 class AsyncSession(object):
