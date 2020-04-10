@@ -76,6 +76,7 @@ int main(int argc, char* argv[]) {
     int ifidx, offset;
     fd_set rfds;
     struct timeval tv;
+    int settime = 0;
     socklen_t dstsize, dst4size;
     dstsize = sizeof(dst);
     dst4size = sizeof(dst4);
@@ -102,10 +103,6 @@ int main(int argc, char* argv[]) {
     inet_pton(AF_INET, "239.255.255.250", &dst4.sin_addr);
     strncpy(msg,  "M-SEARCH * HTTP/1.1\r\nST: urn:xcat.org:service:confluent:", 1024);
     offset = strnlen(msg, 1024);
-    if (argc > 1) {
-        snprintf(msg + offset, 1024 - offset, "/node=%s", argv[1]);
-        offset = strnlen(msg, 1024);
-    }
     add_uuid(msg + offset, 1024 - offset);
     offset = strnlen(msg, 1024);
     add_macs(msg + offset, 1024 - offset);
@@ -142,8 +139,8 @@ int main(int argc, char* argv[]) {
     FD_ZERO(&rfds);
     FD_SET(n4, &rfds);
     FD_SET(ns, &rfds);
-    tv.tv_sec = 10;
-    tv.tv_usec = 0;
+    tv.tv_sec = 2;
+    tv.tv_usec = 500000;
     ifidx = select(FD_SETSIZE, &rfds, NULL, NULL, &tv);
     while (ifidx) {
         if (ifidx == -1) perror("Unable to select");
@@ -154,15 +151,23 @@ int main(int argc, char* argv[]) {
                 recvfrom(n4, msg, 1000, 0, (struct sockaddr *)&dst4, &dst4size);
                 if  (nodenameidx = strstr(msg, "NODENAME: ")) {
                         nodenameidx += 10;
-                        strncpy(nodename, nodenameidx, 1024); 
-                        nodenameidx = strstr(nodenameidx, "\r");
+                        strncpy(nodename, nodenameidx, 1024);
+                        nodenameidx = strstr(nodename, "\r");
                         if (nodenameidx) { nodenameidx[0] = 0; }
                         if (strncmp(lastnodename, nodename, 1024) != 0) {
                             printf("NODENAME: %s\n", nodename);
                             strncpy(lastnodename, nodename, 1024);
                         }
                 }
-                memset(msg, 0, 1024);           
+                if (nodenameidx = strstr(msg, "CURRTIME: ")) {
+                    nodenameidx += 10;
+                    strncpy(nodename, nodenameidx, 1024);
+                    if (nodenameidx = strstr(nodename, "\r")) {
+                        nodenameidx[0] = 0;
+                    }
+                    settime = strtol(nodename, NULL, 10);
+                }
+                memset(msg, 0, 1024);
                 inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
                 /* Take measure from printing out the same ip twice in a row */
                 if (strncmp(lastmsg, msg, 1024) != 0) {
@@ -177,13 +182,21 @@ int main(int argc, char* argv[]) {
                 recvfrom(ns, msg, 1000, 0, (struct sockaddr *)&dst, &dstsize);
                 if  (nodenameidx = strstr(msg, "NODENAME: ")) {
                         nodenameidx += 10;
-                        strncpy(nodename, nodenameidx, 1024); 
-                        nodenameidx = strstr(nodenameidx, "\r");
+                        strncpy(nodename, nodenameidx, 1024);
+                        nodenameidx = strstr(nodename, "\r");
                         if (nodenameidx) { nodenameidx[0] = 0; }
                         if (strncmp(lastnodename, nodename, 1024) != 0) {
                             printf("NODENAME: %s\n", nodename);
                             strncpy(lastnodename, nodename, 1024);
                         }
+                }
+                if (nodenameidx = strstr(msg, "CURRTIME: ")) {
+                    nodenameidx += 10;
+                    strncpy(nodename, nodenameidx, 1024);
+                    if (nodenameidx = strstr(nodename, "\r")) {
+                        nodenameidx[0] = 0;
+                    }
+                    settime = strtol(nodename, NULL, 10);
                 }
                 memset(msg, 0, 1024);
                 inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
@@ -198,8 +211,12 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
+        if (settime && argc > 1 && strcmp(argv[1], "-t") == 0) {
+            tv.tv_sec = settime;
+            settimeofday(&tv, NULL);
+            settime = 0;
+        }
         tv.tv_sec = 0;
-        tv.tv_usec = 500000;
         FD_SET(n4, &rfds);
         FD_SET(ns, &rfds);
         ifidx = select(FD_SETSIZE, &rfds, NULL, NULL, &tv);

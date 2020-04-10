@@ -33,6 +33,7 @@ import confluent.util as util
 import confluent.log as log
 import eventlet.green.select as select
 import eventlet.green.socket as socket
+import time
 try:
     from eventlet.green.urllib.request import urlopen
 except (ImportError, AssertionError):
@@ -172,7 +173,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         node = uuidlookup(curruuid)
                                         if not node:
                                             break
-                                        reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}'.format(node)
+                                        reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\n'.format(node, int(time.time()))
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
