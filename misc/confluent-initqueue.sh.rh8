@@ -27,14 +27,6 @@ fi
 
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
-ipv4_address: 172.30.203.31
-ipv4_gateway: null
-ipv4_method: static
-ipv4_netmask: 255.255.0.0
-ipv4_server: 172.30.254.2
-prefix: 16
-profile: centos-8.1-x86_64-compute
-
 mgr=$(grep ^ipv4_server: /tmp/confluent.deploycfg)
 mgr=${mgr#ipv4_server: }
 profilename=$(grep ^profile: /tmp/confluent.deploycfg)
