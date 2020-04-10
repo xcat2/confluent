@@ -30,6 +30,7 @@ import confluent.log as log
 import confluent.messages
 import confluent.core as pluginapi
 import confluent.asynchttp
+import confluent.selfservice as selfservice
 import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
@@ -419,6 +420,10 @@ def resourcehandler_backend(env, start_response):
     if 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
+    if env.get('PATH_INFO', '').startswith('/self/'):
+        for res in selfservice.handle_request(env, operation, start_response):
+            yield res
+        return
     authorized = _authorize_request(env, operation)
     if 'logout' in authorized:
         start_response('200 Successful logout', headers)

@@ -5,15 +5,60 @@ for currif in *; do
 done
 cd -
 while ! grep MANAGER /tmp/confluent.info >& /dev/null; do
-    /opt/confluent/bin/copernicus > /tmp/confluent.out
+    /opt/confluent/bin/copernicus -t > /tmp/confluent.info
 done
 read ifidx <<EOF
-$(grep MANAGER confluent.info|grep fe80|sed -e s/.*%//)
+$(grep ^MANAGER /tmp/confluent.info|grep fe80|sed -e s/.*%//)
 EOF
+read mgr << EOF
+$(grep ^MANAGER /tmp/confluent.info|grep fe80|awk '{print $2}')
+EOF
+mgridx=${mgr#*%}
+mgr="[$mgr]"
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
 echo $ifname > /tmp/net.ifaces
-# Need to construct the following:
-# echo ip=172.30.203.31::172.30.0.254:255.255.0.0:r4u31:enp65s0f0:none >> /etc/cmdline.d/01-confluent.conf
-# echo inst.repo=http://172.30.0.254/confluent-public/os/centos-8.1-x86_64-compute/distribution >> /etc/cmdline.d/01-confluent.conf
+nodename=$grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
+#TODO: blkid --label <whatever> to find mounted api
+
+if [ -z "$apikey" ]; then
+    apikey=$(/opt/confluent/bin/clortho $nodename $mgr)
+fi
+
+curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+
+ipv4_address: 172.30.203.31
+ipv4_gateway: null
+ipv4_method: static
+ipv4_netmask: 255.255.0.0
+ipv4_server: 172.30.254.2
+prefix: 16
+profile: centos-8.1-x86_64-compute
+
+mgr=$(grep ^ipv4_server: /tmp/confluent.deploycfg)
+mgr=${mgr#ipv4_server: }
+profilename=$(grep ^profile: /tmp/confluent.deploycfg)
+profilename=${profilename#profile: }
+proto=$(grep ^protocol: /tmp/confluent.deploycfg)
+proto=${proto#protocol: }
+echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
+echo inst.ks=$proto://$mgr/confluent-public/os/$profilename/kickstart >> /etc/cmdline.d/01-confluent.conf
+
+autoconfigmethod=$(grep ipv4_method /tmp/confluent.deploycfg)
+autoconfigmethod=${autoconfigmethod#ipv4_method}
+if [ "$autoconfigmethod" = "dhcp" ]; then
+    echo ip=$ifname:dhcp
+else
+    v4addr=$(grep ^ipv4_address: /tmp/confluent.deploycfg)
+    v4addr=${v4addr#ipv4_address: }
+    v4gw=$(grep ^ipv4_gateway: /tmp/confluent.deploycfg)
+    v4gw=${v4gw#ipv4_gateway: }
+    if [ "$v4gw" = "null" ]; then
+        v4gw=""
+    fi
+    v4nm=$(grep ipv4_netmask: /tmp/confluent.deploycfg)
+    v4nm=${v4nm#ipv4_netmask: }
+    echo ip=$v4addr::$vpgw:$v4nm:$nodename:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+fi
+
 

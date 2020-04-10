@@ -85,9 +85,31 @@ def _rebuildidxmap():
         ci = int(open('/sys/class/net/{0}/ifindex'.format(iname)).read())
         _idxtoifnamemap[ci] = iname
 
+
+def myiptonets(svrip):
+    fam = netifaces.AF_INET
+    if ':' in svrip:
+        fam = netifaces.AF_INET6
+    relevantnic = None
+    for iface in netifaces.interfaces():
+        for addr in netifaces.ifaddresses(iface).get(fam, []):
+            addr = addr.get('addr', '')
+            addr = addr.split('%')[0]
+            if addresses_match(addr, svrip):
+                relevantnic = iface
+                break
+        else:
+            continue
+        break
+    return inametonets(relevantnic)
+
+
 def idxtonets(ifidx):
     _rebuildidxmap()
     iname = _idxtoifnamemap.get(ifidx, None)
+    return inametonets(iname)
+
+def inametonets(iname):
     addrs = netifaces.ifaddresses(iname)
     try:
         addrs = addrs[netifaces.AF_INET]
@@ -98,7 +120,7 @@ def idxtonets(ifidx):
         mask = struct.unpack('!I', socket.inet_aton(addr['netmask']))[0]
         net = ip & mask
         net = socket.inet_ntoa(struct.pack('!I', net))
-        yield (net, mask_to_cidr(addr['netmask']))
+        yield (net, mask_to_cidr(addr['netmask']), addr['addr'])
 
 # TODO(jjohnson2): have a method to arbitrate setting methods, to aid
 # in correct matching of net.* based on parameters, mainly for pxe
@@ -109,7 +131,8 @@ def idxtonets(ifidx):
 # that mac address
 # the ip as reported by recvmsg to match the subnet of that net.* interface
 # if switch and port available, that should match.
-def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
+def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
+                   serverip=None):
     """Fetch network configuration parameters for a nic
 
     For a given node and interface, find and retrieve the pertinent network
@@ -148,13 +171,24 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
         'ipv4_address': None,
         'ipv4_method': None,
         'prefix': None,
+        'ipv4_server': None,
     }
+    nets = None
+    needsvrip = False
     if ifidx is not None:
         dhcprequested = False
         nets = list(idxtonets(ifidx))
+    if serverip is not None:
+        needsvrip = True
+        dhcprequested = False
+        nets = list(myiptonets(serverip))
+    if nets is not None:
         candgws = []
+        candsrvs = []
         for net in nets:
-            net, prefix = net
+            net, prefix, svrip = net
+            candsrvs.append(svrip)
+            cfgdata['ipv4_server'] = svrip
             for candidate in cfgbyname:
                 if cfgbyname[candidate].get('ipv4_method', None) == 'dhcp':
                     dhcprequested = True
@@ -185,11 +219,15 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None):
         except Exception:
             return cfgdata
         for net in nets:
-            net, prefix = net
+            net, prefix, svrip = net
             if ip_on_same_subnet(net, ipbynodename, prefix):
                 cfgdata['ipv4_address'] = ipbynodename
                 cfgdata['ipv4_method'] = 'static'
                 cfgdata['prefix'] = prefix
+                break
+        for svr in candsrvs:
+            if ip_on_same_subnet(svr, ipbynodename, prefix):
+                cfgdata['ipv4_server'] = svr
                 break
         for gw in candgws:
             if ip_on_same_subnet(gw, ipbynodename, prefix):
