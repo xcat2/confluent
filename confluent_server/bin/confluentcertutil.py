@@ -20,8 +20,6 @@ def get_ip_addresses():
     for line in lines.split('\n'):
         if line.startswith('    inet6 '):
             line = line.replace('    inet6 ', '').split('/')[0]
-            if line.startswith('fe80::'):
-                continue
             if line == '::1':
                 continue
         elif line.startswith('    inet '):
