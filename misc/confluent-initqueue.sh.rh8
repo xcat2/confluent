@@ -1,4 +1,6 @@
 #!/bin/sh
+[ -e /tmp/confluent.initq ] && return 0
+echo -n "" > /tmp/confluent.initq
 cd /sys/class/net
 for currif in *; do
     ip link set $currif up
@@ -14,17 +16,16 @@ read mgr << EOF
 $(grep ^MANAGER /tmp/confluent.info|grep fe80|awk '{print $2}')
 EOF
 mgridx=${mgr#*%}
-mgr="[$mgr]"
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
 echo $ifname > /tmp/net.ifaces
-nodename=$grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
+nodename=$(grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
 if [ -z "$apikey" ]; then
     apikey=$(/opt/confluent/bin/clortho $nodename $mgr)
 fi
-
+mgr="[$mgr]"
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
 mgr=$(grep ^ipv4_server: /tmp/confluent.deploycfg)
@@ -35,7 +36,10 @@ proto=$(grep ^protocol: /tmp/confluent.deploycfg)
 proto=${proto#protocol: }
 echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
 echo inst.ks=$proto://$mgr/confluent-public/os/$profilename/kickstart >> /etc/cmdline.d/01-confluent.conf
-
+kickstart=$proto://$mgr/confluent-public/os/$profilename/kickstart
+root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
+export kickstart
+export root
 autoconfigmethod=$(grep ipv4_method /tmp/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method}
 if [ "$autoconfigmethod" = "dhcp" ]; then
@@ -52,5 +56,4 @@ else
     v4nm=${v4nm#ipv4_netmask: }
     echo ip=$v4addr::$vpgw:$v4nm:$nodename:$ifname:none >> /etc/cmdline.d/01-confluent.conf
 fi
-
 

@@ -1,4 +1,5 @@
 #!/bin/bash
 echo -n "" >> /tmp/net.ifaces
-cat /tls/*.pem >> /etc/pki/tls/certs/ca-bundle.certs
-
+cat /tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
+. /lib/anaconda-lib.sh
+wait_for_kickstart

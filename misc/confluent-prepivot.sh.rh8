@@ -1,2 +1,2 @@
 #!/bin/bash
-cat /etc/pki/tls/certs/ca-bundle.crt > /sysroot/etc/pki/tls/certs/
+cat /etc/pki/tls/certs/ca-bundle.crt > /sysroot/etc/pki/tls/certs/ca-bundle.crt

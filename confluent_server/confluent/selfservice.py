@@ -6,7 +6,7 @@ import yaml
 
 
 def yamldump(input):
-    return yaml.dump(input, default_flow_style=False)
+    return yaml.safe_dump(input, default_flow_style=False)
 
 
 def handle_request(env, operation, start_response):
