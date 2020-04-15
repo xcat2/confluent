@@ -1802,6 +1802,9 @@ class CryptedAttributes(Attributes):
                 if kv[key] is not None and kv[key]['cryptvalue'] != '':
                     nkv[key] = {'isset': True}
                     nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
+                elif kv[key] is not None and kv[key]['hashvalue'] != '':
+                    nkv[key] = {'isset': True}
+                    nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
             except KeyError:
                 pass
         self.notnode = name is None

@@ -57,7 +57,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                 val['desc'] = 'The noderange this group is expanded ' \
                     'to when used in noderange, exclusive with static ' \
                     'nodes'
-            if attribute.startswith('secret.'):
+            if attribute.startswith('secret.') or attribute.startswith('crypted.'):
                 yield msg.CryptedAttributes(
                     kv={attribute: val},
                     desc=allattributes.node[attribute]['description'])
@@ -117,7 +117,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                     val = []
                 else:  # no setting, provide a blank
                     val = {'value': None}
-                if attribute.startswith('secret.'):
+                if attribute.startswith('secret.') or attribute.startswith('crypted.'):
                     yield msg.CryptedAttributes(
                         node, {attribute: val},
                         allattributes.node.get(
