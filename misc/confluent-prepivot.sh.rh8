@@ -1,2 +1,7 @@
 #!/bin/bash
-cat /etc/pki/tls/certs/ca-bundle.crt > /sysroot/etc/pki/tls/certs/ca-bundle.crt
+BUNDLENAME=/sysroot/etc/pki/tls/certs/ca-bundle.crt
+while [ -h $BUNDLENAME ]; do
+    BUNDLENAME=/sysroot/$(readlink $BUNDLENAME)
+done
+
+cat /etc/pki/tls/certs/ca-bundle.crt > $BUNDLENAME
