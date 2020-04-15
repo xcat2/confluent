@@ -1,5 +1,9 @@
 #!/bin/bash
 echo -n "" >> /tmp/net.ifaces
 cat /tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
+autocons=$(/opt/confluent/bin/autocons)
+if [ -n "$autocons" ]; then
+    echo console=$autocons >> /etc/cmdline.d/01-autocons
+fi
 . /lib/anaconda-lib.sh
 wait_for_kickstart

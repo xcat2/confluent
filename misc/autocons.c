@@ -25,6 +25,7 @@ int main(int argc, char* argv[]) {
     int currspeed;
     speed_t cspeed;
     char buff[128];
+    char* offset;
     uint64_t address;
     spcr = open("/sys/firmware/acpi/tables/SPCR", O_RDONLY);
     if (spcr < 0) {
@@ -38,6 +39,7 @@ int main(int argc, char* argv[]) {
     if (buff[40] != 1) exit(0); //IO only
     address = *(uint64_t *)(buff + 44);
     currspeed = buff[58];
+    offset = buff + 10;
     if (address == COM1) {
         strncpy(buff, "/dev/ttyS0", 128);
     } else if (address == COM2) {
@@ -51,14 +53,16 @@ int main(int argc, char* argv[]) {
     }
     if (currspeed == SPEED9600) {
         cspeed = B9600;
+        strcpy(offset, ",9600");
     } else if (currspeed == SPEED19200) {
         cspeed = B19200;
+        strcpy(offset, ",19200");
     } else if (currspeed == SPEED57600) {
         cspeed = B57600;
+        strcpy(offset, ",57600");
     } else if (currspeed == SPEED115200) {
         cspeed = B115200;
-    } else if (currspeed == SPEED115200) {
-        cspeed = 0;
+        strcpy(offset, ",115200");
     } else {
         exit(0);
     }
