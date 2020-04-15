@@ -17,8 +17,8 @@ def handle_request(env, operation, start_response):
         yield 'Unauthorized'
         return
     cfg = configmanager.ConfigManager(None)
-    eak = cfg.get_node_attributes(nodename, 'api.key').get(
-        nodename, {}).get('api.key', {}).get('value', None)
+    eak = cfg.get_node_attributes(nodename, 'deployment.apikey').get(
+        nodename, {}).get('deployment.apikey', {}).get('value', None)
     if not eak:
         start_response('401 Unauthorized', [])
         yield 'Unauthorized'

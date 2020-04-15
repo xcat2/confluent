@@ -97,10 +97,10 @@ node = {
         'description': ('Classification of node as server or switch'),
         'validvalues': ('switch', 'server'),
     },
-    'api.key': {
+    'deployment.apikey': {
         'description': ('Crypt of api key for self api requests by node'),
     },
-    'api.armed': {
+    'deployment.apiarmed': {
         'description': ('Indicates whether the node authentication token interface '
                         'is armed.  If set to once, it will grant only the next '
                         'request. If set to continuous, will allow many requests.'

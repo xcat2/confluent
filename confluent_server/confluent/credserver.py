@@ -39,8 +39,8 @@ class CredServer(object):
                 return
             nodename = util.stringify(client.recv(tlv[1]))
             tlv = bytearray(client.recv(2))
-            apiarmed = self.cfm.get_node_attributes(nodename, 'api.armed')
-            apiarmed = apiarmed.get(nodename, {}).get('api.armed', {}).get(
+            apiarmed = self.cfm.get_node_attributes(nodename, 'deployment.apiarmed')
+            apiarmed = apiarmed.get(nodename, {}).get('deployment.apiarmed', {}).get(
                 'value', None)
             if not apiarmed:
                 client.close()
@@ -49,7 +49,7 @@ class CredServer(object):
                 now = datetime.datetime.utcnow()
                 expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
                 if now > expiry:
-                    self.cfm.set_node_attributes({nodename: {'api.armed': ''}})
+                    self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
                     client.close()
                     return
             client.send(b'\x02\x20')
@@ -69,9 +69,9 @@ class CredServer(object):
                 client.close()
                 return
             echotoken = util.stringify(client.recv(tlv[1]))
-            cfgupdate = {nodename: {'api.key': echotoken, 'api.armed': ''}}
+            cfgupdate = {nodename: {'deployment.apikey': echotoken, 'deployment.apiarmed': ''}}
             if apiarmed == 'continuous':
-                del cfgupdate[nodename]['api.armed']
+                del cfgupdate[nodename]['deployment.apiarmed']
             self.cfm.set_node_attributes(cfgupdate)
             client.recv(2)  # drain end of message
             client.send(b'\x05\x00') # report success
