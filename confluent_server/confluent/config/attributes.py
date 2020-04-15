@@ -97,6 +97,10 @@ node = {
         'description': ('Classification of node as server or switch'),
         'validvalues': ('switch', 'server'),
     },
+    'crypted.rootpassword': {
+        'description': 'The password of the local root password. '
+                       'This is stored as a non-recoverable hash.',
+    },
     'deployment.apikey': {
         'description': ('Crypt of api key for self api requests by node'),
     },

@@ -60,6 +60,7 @@ import confluent.util
 import confluent.netutil as netutil
 import confluent.exceptions as exc
 import copy
+import crypt
 try:
     import cPickle
 except ModuleNotFoundError:
@@ -473,6 +474,12 @@ def _get_valid_attrname(attrname):
         netattrparts = attrname.split('.')
         attrname = netattrparts[0] + '.' + netattrparts[-1]
     return attrname
+
+
+def hashcrypt_value(value):
+    salt = confluent.util.stringify(base64.b64encode(os.urandom(12)))
+    salt = '$6${0}'.format(salt)
+    return crypt.crypt(value, salt)
 
 
 def crypt_value(value,
@@ -1760,6 +1767,9 @@ class ConfigManager(object):
                 if 'value' in newdict and attr.startswith("secret."):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
+                if 'value' in newdict and attr.startswith("crypted."):
+                    newdict['hashvalue'] = hashcrypt_value(newdict['value'])
+                    del newdict['value']
                 cfgobj[attr] = newdict
                 if attr == 'nodes':
                     self._sync_nodes_to_group(group=group,
@@ -2161,6 +2171,9 @@ class ConfigManager(object):
                     newdict = attribmap[node][attrname]
                 if 'value' in newdict and attrname.startswith("secret."):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
+                    del newdict['value']
+                if 'value' in newdict and attrname.startswith("crypted."):
+                    newdict['hashvalue'] = hashcrypt_value(newdict['value'])
                     del newdict['value']
                 cfgobj[attrname] = newdict
                 if attrname == 'groups':
