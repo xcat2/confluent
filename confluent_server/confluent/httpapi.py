@@ -416,7 +416,7 @@ def resourcehandler_backend(env, start_response):
         reqtype = env['CONTENT_TYPE']
     operation = opmap[env['REQUEST_METHOD']]
     querydict = _get_query_dict(env, reqbody, reqtype)
-    if 'restexplorerop' in querydict:
+    if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
     authorized = _authorize_request(env, operation)
