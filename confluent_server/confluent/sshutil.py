@@ -11,7 +11,7 @@ def normalize_uid():
     curruid = os.getuid()
     neededuid = os.stat('/etc/confluent').st_uid
     if curruid != neededuid:
-        os.setuid(neededuid)    
+        os.setuid(neededuid)
     if os.getuid() != neededuid:
         raise Exception('Need to run as root or owner of /etc/confluent')
 
@@ -96,7 +96,7 @@ def initialize_root_key():
         with open('/var/lib/confluent/ssh/authorized_keys', 'w') as ak:
             for auth in authed:
                 ak.write(auth)
-        
+
 
 def ca_exists():
     return os.path.exists('/etc/confluent/ssh/ca')
