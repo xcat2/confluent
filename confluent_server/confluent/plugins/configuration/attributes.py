@@ -142,7 +142,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                     desc = ''
                 if 'value' in currattr or 'expression' in currattr:
                     yield msg.Attributes(node, {attribute: currattr}, desc)
-                elif 'cryptvalue' in currattr:
+                elif 'cryptvalue' in currattr or 'hashvalue' in currattr:
                     yield msg.CryptedAttributes(
                         node, {attribute: currattr}, desc)
                 elif isinstance(currattr, list):

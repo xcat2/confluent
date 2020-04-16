@@ -1798,11 +1798,12 @@ class CryptedAttributes(Attributes):
         nkv = {}
         for key in kv:
             nkv[key] = {'isset': False}
+            if 'hashvalue' in kv[key]:
+                targkey = 'hashvalue'
+            else:
+                targkey = 'cryptvalue'
             try:
-                if kv[key] is not None and kv[key]['cryptvalue'] != '':
-                    nkv[key] = {'isset': True}
-                    nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
-                elif kv[key] is not None and kv[key]['hashvalue'] != '':
+                if kv[key] is not None and kv[key][targkey] != '':
                     nkv[key] = {'isset': True}
                     nkv[key]['inheritedfrom'] = kv[key]['inheritedfrom']
             except KeyError:
