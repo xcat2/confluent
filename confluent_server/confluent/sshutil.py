@@ -40,7 +40,7 @@ def sign_host_key(pubkey, nodename):
     tmpdir = tempfile.mkdtemp()
     try:
         pkeyname = os.path.join(tmpdir, 'hostkey.pub')
-        with open(pkeyname, 'w') as pubfile:
+        with open(pkeyname, 'wb') as pubfile:
             pubfile.write(pubkey)
         subprocess.check_call(
             ['ssh-keygen', '-s', '/etc/confluent/ssh/ca', '-I', nodename,

@@ -412,6 +412,10 @@ def resourcehandler_backend(env, start_response):
                ('X-Permitted-Cross-Domain-Policies', 'none')]
     reqbody = None
     reqtype = None
+    if env.get('PATH_INFO', '').startswith('/self/'):
+        for res in selfservice.handle_request(env, start_response):
+            yield res
+        return
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
@@ -420,10 +424,6 @@ def resourcehandler_backend(env, start_response):
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
-    if env.get('PATH_INFO', '').startswith('/self/'):
-        for res in selfservice.handle_request(env, operation, start_response):
-            yield res
-        return
     authorized = _authorize_request(env, operation)
     if 'logout' in authorized:
         start_response('200 Successful logout', headers)

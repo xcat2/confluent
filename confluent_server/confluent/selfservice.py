@@ -1,5 +1,6 @@
 import confluent.config.configmanager as configmanager
 import confluent.netutil as netutil
+import confluent.sshutil as sshutil
 import crypt
 import json
 import yaml
@@ -9,7 +10,7 @@ def yamldump(input):
     return yaml.safe_dump(input, default_flow_style=False)
 
 
-def handle_request(env, operation, start_response):
+def handle_request(env, start_response):
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
     apikey = env.get('HTTP_CONFLUENT_APIKEY', None)
     if not (nodename and apikey):
@@ -39,6 +40,8 @@ def handle_request(env, operation, start_response):
         start_response('406 Not supported', [])
         yield 'Unsupported content type in ACCEPT: ' + retype
         return
+    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
+        reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     if env['PATH_INFO'] == '/self/deploycfg':
         myip = env.get('HTTP_X_FORWARDED_HOST', None)
         myip = myip.replace('[', '').replace(']', '')
@@ -58,6 +61,14 @@ def handle_request(env, operation, start_response):
             ncfg['protocol'] = 'https'
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
+    elif env['PATH_INFO'] == '/self/sshcert':
+        if not sshutil.ca_exists():
+            start_response('500 Unconfigured', ())
+            yield 'CA is not configured on this system (run ...)'
+            return
+        cert = sshutil.sign_host_key(reqbody, nodename)
+        start_response('200 OK', (('Content-Type', 'text/plain'),))
+        yield cert
     else:
         start_response('404 Not Found', ())
         yield 'Not found'
