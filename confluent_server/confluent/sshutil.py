@@ -15,6 +15,7 @@ def normalize_uid():
     if os.getuid() != neededuid:
         raise Exception('Need to run as root or owner of /etc/confluent')
 
+
 def initialize_ca():
     normalize_uid()
     try:
@@ -22,29 +23,18 @@ def initialize_ca():
     except OSError as e:
         if e.errno != 17:
             raise
-    caname = '{0} SSH CA'.format(collective.get_myname())
+    myname = collective.get_myname()
+    caname = '{0} SSH CA'.format(myname)
     subprocess.check_call(['ssh-keygen', '-C', caname, '-t', 'ed25519', '-f', '/etc/confluent/ssh/ca', '-N', ''])
     try:
-        os.makedirs('/var/lib/confluent/ssh', mode=0o755)
+        os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
     except OSError as e:
         if e.errno != 17:
             raise
-    currknownhosts = []
-    try:
-        with open('/var/lib/confluent/ssh/ssh_known_hosts', 'r') as skh:
-            for ent in skh:
-                descr = ent.split(' ', 4)[-1].strip()
-                if descr != caname:
-                    currknownhosts.append(ent)
-    except OSError as e:
-        if e.errno != 2:
-            raise
-    with open('/etc/confluent/ssh/ca.pub', 'r') as capub:
-        newent = '@cert-authority * ' + capub.read()
-        currknownhosts.append(newent)
-    with open('/var/lib/confluent/ssh/ssh_known_hosts', 'w') as skh:
-        for ckh in currknownhosts:
-            skh.write(ckh)
+    cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
+    shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
+    #    newent = '@cert-authority * ' + capub.read()
+
 
 def sign_host_key(pubkey, nodename):
     tmpdir = tempfile.mkdtemp()
