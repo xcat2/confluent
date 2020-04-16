@@ -40,7 +40,7 @@ def handle_request(env, start_response):
         start_response('406 Not supported', [])
         yield 'Unsupported content type in ACCEPT: ' + retype
         return
-    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
+    if env['REQUEST_METHOD'] not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     if env['PATH_INFO'] == '/self/deploycfg':
         myip = env.get('HTTP_X_FORWARDED_HOST', None)
@@ -48,7 +48,7 @@ def handle_request(env, start_response):
         ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
-        deployinfo = cfg.get_node_attributes(nodename, 'deployment.*')
+        deployinfo = cfg.get_node_attributes(nodename, ('deployment.*', 'crypted.rootpassword'))
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
@@ -59,6 +59,8 @@ def handle_request(env, start_response):
             ncfg['protocol'] = 'http'
         else:
             ncfg['protocol'] = 'https'
+        ncfg['rootpassword'] = deployinfo.get('crypted.rootpassword', {}).get(
+            'hashvalue', None)
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
     elif env['PATH_INFO'] == '/self/sshcert':
