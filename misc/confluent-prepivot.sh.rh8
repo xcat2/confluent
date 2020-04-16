@@ -11,3 +11,4 @@ mkdir -p /sysroot/root/.ssh
 chmod 700 /sysroot/root/.ssh
 cp /ssh/authorized_keys /sysroot/root/.ssh
 chmod 600 /sysroot/root/.ssh/authorized_keys
+cp /etc/confluent.apikey /sysroot/etc/

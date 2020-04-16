@@ -25,6 +25,10 @@ nodename=$(grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
 if [ -z "$apikey" ]; then
     apikey=$(/opt/confluent/bin/clortho $nodename $mgr)
 fi
+oum=$(umask)
+umask 0077
+echo $apikey > /etc/confluent.apikey
+umask $oum
 mgr="[$mgr]"
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
