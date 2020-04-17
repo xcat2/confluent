@@ -77,6 +77,7 @@ int main(int argc, char* argv[]) {
     fd_set rfds;
     struct timeval tv;
     int settime = 0;
+    int setusec = 500000;
     socklen_t dstsize, dst4size;
     dstsize = sizeof(dst);
     dst4size = sizeof(dst4);
@@ -167,6 +168,14 @@ int main(int argc, char* argv[]) {
                     }
                     settime = strtol(nodename, NULL, 10);
                 }
+                if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
+                    nodenameidx += 10;
+                    strncpy(nodename, nodenameidx, 1024);
+                    if (nodenameidx = strstr(nodename, "\r")) {
+                        nodenameidx[0] = 0;
+                    }
+                    setusec = strtol(nodename, NULL, 10) * 1000;
+                }
                 memset(msg, 0, 1024);
                 inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
                 /* Take measure from printing out the same ip twice in a row */
@@ -198,6 +207,14 @@ int main(int argc, char* argv[]) {
                     }
                     settime = strtol(nodename, NULL, 10);
                 }
+                if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
+                    nodenameidx += 10;
+                    strncpy(nodename, nodenameidx, 1024);
+                    if (nodenameidx = strstr(nodename, "\r")) {
+                        nodenameidx[0] = 0;
+                    }
+                    setusec = strtol(nodename, NULL, 10) * 1000;
+                }
                 memset(msg, 0, 1024);
                 inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
                 if (strncmp(last6msg, msg, 1024) != 0) {
@@ -213,10 +230,12 @@ int main(int argc, char* argv[]) {
         }
         if (settime && argc > 1 && strcmp(argv[1], "-t") == 0) {
             tv.tv_sec = settime;
+            tv.tv_usec = setusec;
             settimeofday(&tv, NULL);
             settime = 0;
         }
         tv.tv_sec = 0;
+        tv.tv_usec = 500000;
         FD_SET(n4, &rfds);
         FD_SET(ns, &rfds);
         ifidx = select(FD_SETSIZE, &rfds, NULL, NULL, &tv);

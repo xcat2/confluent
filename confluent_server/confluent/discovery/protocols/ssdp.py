@@ -173,7 +173,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         node = uuidlookup(curruuid)
                                         if not node:
                                             break
-                                        reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\n'.format(node, int(time.time()))
+                                        currtime = time.time()
+                                        seconds = int(currtime)
+                                        msecs = int(currtime * 1000 % 1000)
+                                        reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
