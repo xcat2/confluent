@@ -1,9 +1,14 @@
 import confluent.config.configmanager as configmanager
 import confluent.netutil as netutil
 import confluent.sshutil as sshutil
+import eventlet.green.subprocess as subprocess
 import crypt
 import json
+import time
 import yaml
+
+currtz = None
+currtzvintage = None
 
 
 def yamldump(input):
@@ -11,6 +16,8 @@ def yamldump(input):
 
 
 def handle_request(env, start_response):
+    global currtz
+    global currtzvintage
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
     apikey = env.get('HTTP_CONFLUENT_APIKEY', None)
     if not (nodename and apikey):
@@ -61,6 +68,19 @@ def handle_request(env, start_response):
             ncfg['protocol'] = 'https'
         ncfg['rootpassword'] = deployinfo.get('crypted.rootpassword', {}).get(
             'hashvalue', None)
+        if currtzvintage and currtzvintage > (time.time() - 30.0):
+            ncfg['timezone'] = currtz
+        else:
+            tdc = subprocess.check_output(['timedatectl']).split(b'\n')
+            for ent in tdc:
+                ent = ent.strip()
+                if ent.startswith(b'Time zone:'):
+                    currtz = ent.split(b': ', 1)[1].split(b'(', 1)[0].strip()
+                    if not isinstance(currtz, str):
+                        currtz = currtz.decode('utf8')
+                    currtzvintage = time.time()
+                    ncfg['timezone'] = currtz
+                    break
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
     elif env['PATH_INFO'] == '/self/sshcert':
