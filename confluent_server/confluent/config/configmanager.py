@@ -1,4 +1,4 @@
-7# vim: tabstop=4 shiftwidth=4 softtabstop=4
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
 # Copyright 2015-2019 Lenovo
@@ -477,7 +477,8 @@ def _get_valid_attrname(attrname):
 
 
 def hashcrypt_value(value):
-    salt = confluent.util.stringify(base64.b64encode(os.urandom(12)))
+    salt = confluent.util.stringify(base64.b64encode(os.urandom(12),
+                                    altchars=b'./'))
     salt = '$6${0}'.format(salt)
     return crypt.crypt(value, salt)
 
