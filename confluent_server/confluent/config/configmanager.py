@@ -1675,6 +1675,17 @@ class ConfigManager(object):
         self.set_group_attributes(attribmap, autocreate=True)
 
     def set_group_attributes(self, attribmap, autocreate=False):
+        for group in attribmap:
+            curr = attribmap[group]
+            for attrib in curr:
+                if attrib.startswith('crypted.'):
+                    if not isinstance(curr[attrib], dict):
+                        curr[attrib] = {'value': curr[attrib]}
+                    if 'hashvalue' not in curr[attrib]:
+                        curr[attrib]['hashvalue'] = hashcrypt_value(
+                            curr[attrib]['value'])
+                    if 'value' in curr[attrib]:
+                        del curr[attrib]['value']
         if cfgleader:  # currently config slave to another
             return exec_on_leader('_rpc_master_set_group_attributes',
                                   self.tenant, attribmap, autocreate)
@@ -2083,6 +2094,17 @@ class ConfigManager(object):
 
 
     def set_node_attributes(self, attribmap, autocreate=False):
+        for node in attribmap:
+            curr = attribmap[node]
+            for attrib in curr:
+                if attrib.startswith('crypted.'):
+                    if not isinstance(curr[attrib], dict):
+                        curr[attrib] = {'value': curr[attrib]}
+                    if 'hashvalue' not in curr[attrib]:
+                        curr[attrib]['hashvalue'] = hashcrypt_value(
+                            curr[attrib]['value'])
+                    if 'value' in curr[attrib]:
+                        del curr[attrib]['value']
         if cfgleader:  # currently config slave to another
             return exec_on_leader('_rpc_master_set_node_attributes',
                                         self.tenant, attribmap, autocreate)
