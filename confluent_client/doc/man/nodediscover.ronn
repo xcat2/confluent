@@ -23,6 +23,9 @@ data may be filtered by various parameters, as denoted in the options below.
 **nodediscover assign** performs manual discovery, assigning an entry to a node
 identity or, using `-i`, using a csv file to assign nodes all at once.  For
 example, a spreadsheet of serial numbers to desired node names could be used.
+Note that if you see that the host is unreachable, it may be due to the IP
+address on the endpoint having changed since last detected. In such a case, it
+may help to **clear** and try **assign** again.
 
 **nodediscover rescan** requests the server to do an active sweep for new
 devices.  Generally every effort is made to passively detect devices as they
