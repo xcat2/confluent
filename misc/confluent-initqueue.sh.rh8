@@ -60,4 +60,18 @@ else
     v4nm=${v4nm#ipv4_netmask: }
     echo ip=$v4addr::$v4gw:$v4nm:$nodename:$ifname:none >> /etc/cmdline.d/01-confluent.conf
 fi
+nameserversec=0
+while read -r entry; do
+    if [ $nameserversec = 1 ]; then
+        if [[ $entry == "-"* ]]; then
+            echo nameserver=${entry#- } >> /etc/cmdline.d/01-confluent.conf
+            continue
+        fi
+    fi
+    nameserversec=0
+    if [ ${entry%:*} = "nameservers" ]; then
+        nameserversec=1
+        continue
+    fi
+done < /tmp/confluent.deploycfg
 

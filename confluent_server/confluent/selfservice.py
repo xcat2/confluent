@@ -59,7 +59,8 @@ def handle_request(env, start_response):
         ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
-        deployinfo = cfg.get_node_attributes(nodename, ('deployment.*', 'crypted.rootpassword'))
+        deployinfo = cfg.get_node_attributes(
+            nodename, ('deployment.*', 'crypted.rootpassword', 'services.*'))
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
@@ -85,6 +86,10 @@ def handle_request(env, start_response):
                     currtzvintage = time.time()
                     ncfg['timezone'] = currtz
                     break
+        ncfg['nameservers'] = []
+        for dns in deployinfo.get(
+                'services.dns', {}).get('value', '').split(','):
+            ncfg['nameservers'].append(dns)
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
     elif env['PATH_INFO'] == '/self/sshcert':
