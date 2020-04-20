@@ -1,6 +1,8 @@
 import confluent.config.configmanager as configmanager
+import confluent.collective.manager as collective
 import confluent.netutil as netutil
 import confluent.sshutil as sshutil
+import confluent.util as util
 import eventlet.green.subprocess as subprocess
 import crypt
 import json
@@ -37,7 +39,9 @@ def handle_request(env, start_response):
         yield 'Unauthorized'
         return
     retype = env.get('HTTP_ACCEPT', 'application/yaml')
+    isgeneric = False
     if retype == '*/*':
+        isgeneric = True
         retype = 'application/yaml'
     if retype == 'application/yaml':
         dumper = yamldump
@@ -91,6 +95,19 @@ def handle_request(env, start_response):
         cert = sshutil.sign_host_key(reqbody, nodename)
         start_response('200 OK', (('Content-Type', 'text/plain'),))
         yield cert
+    elif env['PATH_INFO'] == '/self/nodelist':
+        nodes = set(cfg.list_nodes())
+        for mgr in configmanager.list_collective():
+            nodes.add(mgr)
+        nodes.add(collective.get_myname())
+        if isgeneric:
+            start_response('200 OK', (('Contennt-Type', 'text/plain'),))
+            for node in util.natural_sort(nodes):
+                yield node + '\n'
+        else:
+            start_response('200 OK', (('Content-Type', retype),))
+            yield dumper(sorted(nodes))
+
     else:
         start_response('404 Not Found', ())
         yield 'Not found'
