@@ -452,6 +452,8 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         clipn = socket.inet_aton(niccfg['ipv4_address'])
         repview[16:20] = clipn
         gateway = niccfg['ipv4_gateway']
+        if gateway:
+            gateway = socket.inet_aton(gateway)
         netmask = niccfg['prefix']
         netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
         netmask = struct.pack('!I', netmask)
