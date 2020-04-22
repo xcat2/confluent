@@ -45,7 +45,7 @@ root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
 export kickstart
 export root
 autoconfigmethod=$(grep ipv4_method /tmp/confluent.deploycfg)
-autoconfigmethod=${autoconfigmethod#ipv4_method}
+autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo ip=$ifname:dhcp
 else
