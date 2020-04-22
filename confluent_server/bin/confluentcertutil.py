@@ -1,8 +1,9 @@
 import os
+import confluent.collective.manager as collective
 from os.path import exists
 import shutil
 import socket
-import subprocess
+import eventlet.green.subprocess as subprocess
 import tempfile
 
 def get_openssl_conf_location():
@@ -32,11 +33,14 @@ def get_ip_addresses():
             continue
         yield line
 
-def create_certificate():
+def create_certificate(outdir):
+    keyout = os.path.join(outdir, 'key.pem')
+    certout = os.path.join(outdir, 'cert.pem')
     shortname = socket.gethostname().split('.')[0]
     longname = socket.getfqdn()
     subprocess.check_call(
-        'openssl ecparam -name secp384r1 -genkey -out privkey.pem'.split(' '))
+        ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
+         keyout])
     san = ['IP:{0}'.format(x) for x in get_ip_addresses()]
     # It is incorrect to put IP addresses as DNS type.  However
     # there exists non-compliant clients that fail with them as IP
@@ -50,13 +54,33 @@ def create_certificate():
     try:
         with open(tmpconfig, 'a') as cfgfile:
             cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
-        subprocess.check_call(
-            'openssl req -new -x509 -key privkey.pem -days 7300 -out cert.pem '
-            '-subj /CN={0} -extensions SAN '
-            '-config {1}'.format(longname, tmpconfig).split(' ')
-        )
+        subprocess.check_call([
+            'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
+            '7300', '-out', certout, '-subj', '/CN={0}'.format(longname),
+            '-extensions', 'SAN', '-config', tmpconfig
+        ])
     finally:
         os.remove(tmpconfig)
+    fname = '/var/lib/confluent/public/site/tls/{0}.cert'.format(
+        collective.get_myname())
+    shutil.copy2(certout, fname)
+    hv = subprocess.check_output(
+        ['openssl', 'x509', '-in', certout, '-hash', '-noout'])
+    if not isinstance(hv, str):
+        hv = hv.decode('utf8')
+    hv = hv.strip()
+    hashname = '/var/lib/confluent/public/site/tls/{0}.0'.format(hv)
+    certname = '{0}.cert'.format(collective.get_myname())
+    for currname in os.listdir('/var/lib/confluent/public/site/tls/'):
+        currname = os.path.join('/var/lib/confluent/public/site/tls/', currname)
+        if currname.endswith('.0'):
+            try:
+                realname = os.readlink(currname)
+                if realname == certname:
+                    os.unlink(currname)
+            except OSError:
+                pass
+    os.symlink(certname, hashname)
 
 if __name__ == '__main__':
-    create_certificate()
+    create_certificate(os.getcwd())
