@@ -702,7 +702,7 @@ class InputAttributes(ConfluentMessage):
             return {}
         nodeattr = deepcopy(self.nodeattribs[node])
         for attr in nodeattr:
-            if type(nodeattr[attr]) in (bytes, unicode):
+            if type(nodeattr[attr]) in (bytes, unicode) and cfm.attrib_supports_expression(attr):
                 try:
                     # as above, use format() to see if string follows
                     # expression, store value back in case of escapes
