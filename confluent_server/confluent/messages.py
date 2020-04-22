@@ -674,6 +674,8 @@ class InputAttributes(ConfluentMessage):
         if nodes is None:
             self.attribs = inputdata
             for attrib in self.attribs:
+                if not cfm.attrib_supports_expression(attrib):
+                    continue
                 if type(self.attribs[attrib]) in (bytes, unicode):
                     try:
                         # ok, try to use format against the string

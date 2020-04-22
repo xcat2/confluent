@@ -112,6 +112,13 @@ _attraliases = {
 }
 _validroles = ('Administrator', 'Operator', 'Monitor')
 
+
+def attrib_supports_expression(attrib):
+    attrib = _attraliases.get(attrib, attrib)
+    if attrib.startswith('secret.') or attrib.startswith('crypted.'):
+        return False
+
+
 def _mkpath(pathname):
     try:
         os.makedirs(pathname)
