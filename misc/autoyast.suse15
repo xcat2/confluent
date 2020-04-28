@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<!DOCTYPE profile SYSTEM "/usr/share/YaST2/include/autoinstall/profile.dtd">
+<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <general>
+      <clock>
+        <hwclock>UTC</hwclock>
+        <xi:include href="file:///tmp/timezone"/>
+      </clock>
+      <mode>
+	      <confirm config:type="boolean">false</confirm>
+      </mode>
+    </general>
+    <add-on>
+        <add_on_products config:type="list">
+            <listentry><xi:include href="file:///tmp/pkgurl"/><product>sle-module-basesystem</product><product_dir>/Module-Basesystem</product_dir></listentry>
+	    <listentry><xi:include href="file:///tmp/pkgurl"/><product>sle-module-hpc</product><product_dir>/Module-HPC</product_dir></listentry>
+	    <listentry><xi:include href="file:///tmp/pkgurl"/><product>sle-module-server-applications</product><product_dir>/Module-Server-Applications</product_dir></listentry>
+	    <listentry><xi:include href="file:///tmp/pkgurl"/><product>sle-module-containers</product><product_dir>/Module-Containers</product_dir></listentry>
+	    <listentry><xi:include href="file:///tmp/pkgurl"/><product>SLE_HPC</product><product_dir>/Product-HPC</product_dir></listentry>
+	    <listentry><xi:include href="file:///tmp/pkgurl"/><product>Legacy-Module</product><product_dir>/Module-Legacy</product_dir></listentry>
+        </add_on_products>
+</add-on>
+    <software>
+       <products config:type="list">
+          <product>SLE_HPC</product>
+      </products>
+      <patterns config:type="list">
+        <pattern>base</pattern>
+      </patterns>
+      <packages config:type="list">
+        <package>openssl</package>
+        <package>chrony</package>
+        <package>rsync</package>
+        <package>screen</package>
+        <package>vim</package>
+        <package>binutils</package>
+        <package>pciutils</package>
+        <package>usbutils</package>
+        <package>nfs-client</package>
+        <package>ethtool</package>
+      </packages>
+    </software>
+  <partitioning config:type="list">
+	  <drive>
+		  <device>%%INSTDISK%%</device>
+		  <initialize config:type="boolean">true</initialize>
+		  <use>all</use>
+		  <type config:type="symbol">CT_LVM</type>
+          </drive>
+ </partitioning>
+    <users config:type="list">
+      <user>
+        <username>root</username>
+        <user_password>%%ROOTPASSWORD%%</user_password>
+        <encrypted config:type="boolean">true</encrypted>
+	<xi:include href="file:///tmp/rootkeys.xml"/>
+      </user>
+    </users>
+    <networking>
+	    <dns>
+		    <hostname>%%NODENAME%%</hostname>
+            </dns>
+	    <keep_install_network config:type="boolean">true</keep_install_network>
+    </networking>
+    <services-manager>
+	    <services>
+		    <enable config:type="list">
+			    <service>sshd</service>
+			</enable>
+		</services>
+	</services-manager>
+    <scripts>
+         <pre-scripts config:type="list">
+        <script>
+          <filename>pre.sh</filename>
+          <interpreter>shell</interpreter>
+          <source>
+<![CDATA[
+#!/bin/sh
+nodename=$(grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
+mgr=$(grep ^ipv._server /tmp/confluent.deploycfg|awk '{print $2}')
+proto=$(grep ^protocol /tmp/confluent.deploycfg |awk '{print $2}')
+rootpw=$(grep rootpassword /tmp/confluent.deploycfg|sed -e 's/^rootpassword: //')
+curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
+if [ "$rootpw" = "null" ]; then
+    rootpw="!"
+fi
+
+mkdir ~/.ssh
+cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
+ssh-keygen -A
+for i in  /etc/ssh/ssh_host*key.pub; do
+    certname=${i/.pub/-cert.pub}
+    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" -d @$i https://$mgr/confluent-api/self/sshcert > $certname
+    echo HostKey ${i%.pub} >> /etc/ssh/sshd_config
+    echo HostCertificate $certname >> /etc/ssh/sshd_config
+done
+/usr/sbin/sshd
+curl -f ${proto}://$mgr/confluent-public/confluent/util/getinstalldisk > /tmp/getinstalldisk
+python3 /tmp/getinstalldisk
+sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
+]]>
+          </source>
+        </script>
+      </pre-scripts>
+         <chroot-scripts config:type="list">
+        <script>
+          <filename>chroot.sh</filename>
+          <interpreter>shell</interpreter>
+          <source>
+<![CDATA[
+#!/bin/sh
+mkdir -p /mnt/root/.ssh/
+chmod 700 /mnt/root/.ssh/
+cp /root/.ssh/authorized_keys /mnt/root/.ssh/
+chmd 600 /mnt/root/.ssh/authorized_keys
+cp /etc/ssh/*key* /mnt/etc/ssh/
+for i in /etc/ssh/*-cert.pub; do
+    echo HostCertificate $i >> /mnt/etc/ssh/sshd_config
+done
+for i in /ssh/*.ca; do
+    echo '@cert-authority *' $(cat $i) >> /mnt/etc/ssh/ssh_known_hosts
+done
+echo IgnoreRhosts no >> /mnt/etc/ssh/sshd_config
+echo HostbasedAuthentication yes >> /mnt/etc/ssh/sshd_config
+echo HostbasedUsesNameFromPacketOnly yes >> /mnt/etc/ssh/sshd_config
+echo Host '*' >> /mnt/etc/ssh/ssh_config
+echo "    HostbasedAuthentication yes" >> /mnt/etc/ssh/ssh_config
+echo "    EnableSSHKeysign yes" >> /mnt/etc/ssh/ssh_config
+echo "    HostbasedKeyTypes *ed25519*" >> /mnt/etc/ssh/ssh_config
+echo /usr/lib/ssh/ssh-keysign root:root 4711 >> /mnt/etc/permissions.local
+chmod 4711 /mnt/usr/lib/ssh/ssh-keysign
+cp /tmp/allnodes /mnt/root/.shosts
+cp /tmp/allnodes /mnt/etc/ssh/shosts.equiv
+]]>
+          </source>
+        </script>
+      </chroot-scripts>
+      <!--         <post-scripts config:type="list">
+        <script>
+          <filename>post.sh</filename>
+          <interpreter>shell</interpreter>
+          <source>
+<![CDATA[
+mkdir -p /var/log/xcat/
+]]>
+          </source>
+        </script>
+</post-scripts> -->
+
+    </scripts>
+</profile>
