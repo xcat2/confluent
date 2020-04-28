@@ -44,6 +44,9 @@ if [ "$OPKGNAME" = "confluent-server" ]; then
         echo 'confluent_client confluent-client' >> debian/pydist-overrides
     fi
 fi
+if ! grep wheezy /etc/os-release; then
+    sed -i 's/^Package: python3-/Package: /' debian/control
+fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
 echo 'export PYBUILD_INSTALL_ARGS=--install-lib=/opt/confluent/lib/python' >> debian/rules
