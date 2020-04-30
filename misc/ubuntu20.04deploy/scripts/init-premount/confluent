@@ -1,0 +1,19 @@
+cd /sys/class/net
+for nic in *; do
+    ip link set $nic up
+done
+mkdir -p /custom-installation
+cp -a /opt/confluent /custom-installation
+touch /custom-installation/confluent/confluent.info
+while ! grep NODENAME /custom-installation/confluent/confluent.info; do
+    /opt/confluent/bin/copernicus -t > /custom-installation/confluent/confluent.info
+done
+MGR="[$(grep MANAGER: /custom-installation/confluent/confluent.info | head -n 1 | awk '{print $2}')]"
+osprofile=$(sed -e 's/.*osprofile=//' -e 's/ .*//' /proc/cmdline)
+echo "Deploying $osprofile from $MGR"
+echo $osprofile > /custom-installation/confluent/osprofile
+echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/live.iso >> /conf/param.conf
+echo "url=http://${MGR}/confluent-public/os/$osprofile/distribution/live.iso" > /custom-installation/confluent/fakecmdline
+mount -o bind /custom-installation/confluent/fakecmdline /proc/cmdline
+
+
