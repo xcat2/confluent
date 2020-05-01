@@ -1,0 +1,12 @@
+#cloud-config
+autoinstall:
+  version: 1
+  early-commands:
+    - /custom-installation/pre.sh
+  late-commands:
+    - /custom-installation/post.sh
+  ssh:
+    install-server: true
+  user-data:
+    runcmd:
+      - /etc/confluent/firstboot.sh
