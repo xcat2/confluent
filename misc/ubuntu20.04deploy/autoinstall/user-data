@@ -7,6 +7,11 @@ autoinstall:
     - /custom-installation/post.sh
   ssh:
     install-server: true
+  storage:
+    layout:
+      name: lvm
+      match:
+        path: "%%INSTALLDISK%%"
   user-data:
     runcmd:
       - /etc/confluent/firstboot.sh
