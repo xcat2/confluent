@@ -10,7 +10,9 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
 done
 MGR="[$(grep MANAGER: /custom-installation/confluent/confluent.info | head -n 1 | awk '{print $2}')]"
 osprofile=$(sed -e 's/.*osprofile=//' -e 's/ .*//' /proc/cmdline)
-cons=$(cat /custom-installation/autocons.info)
+if [ -f /custom-installation/autocons.info ]; then
+    cons=$(cat /custom-installation/autocons.info)
+fi
 if [ ! -z "$cons" ]; then
     echo "Preparing to deploy $osprofile from $MGR" > ${cons%,*}
 fi
@@ -18,7 +20,6 @@ echo "Preparing to deploy $osprofile from $MGR"
 echo $osprofile > /custom-installation/confluent/osprofile
 echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/live.iso >> /conf/param.conf
 fcmdline="url=http://${MGR}/confluent-public/os/$osprofile/distribution/live.iso"
-cons=$(cat /custom-installation/autocons.info)
 if [ ! -z "$cons" ]; then
     fcmdline="$fcmdline console=${console#/dev/}"
 elif grep console= /proc/cmdline; then

@@ -4,10 +4,13 @@ mkdir -p /root/custom-installation/ssh
 cp /ssh/* /root/custom-installation/ssh
 NODENAME=$(grep ^NODENAME: /custom-installation/confluent/confluent.info|awk '{print $2}')
 MGR=$(grep ^MANAGER: /custom-installation/confluent/confluent.info|head -n 1| awk '{print $2}')
+oum=$(umask)
+umask 077
 chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
 MGR=[$MGR]
 deploycfg=/root/custom-installation/confluent/confluent.deploycfg
 chroot . usr/bin/curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
+umask $oum
 nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
 nic=$(ip link |grep ^$nic:|awk '{print $2}')
 DEVICE=${nic%:}
@@ -35,7 +38,7 @@ else
 fi
 ipv4s=$(grep ^ipv4_server $deploycfg|awk '{print $2}')
 osprofile=$(cat /custom-installation/confluent/osprofile)
-fcmdline='ds=nocloud-net;s=https://'${ipv4s}'/confluent-public/os/'${osprofile}'/autoinstall/'
+fcmdline='quiet autoinstall ds=nocloud-net;s=https://'${ipv4s}'/confluent-public/os/'${osprofile}'/autoinstall/'
 cons=$(cat /custom-installation/autocons.info)
 if [ ! -z "$cons" ]; then
     echo "Installation will proceed on graphics console, autoconsole cannot work during install for Ubuntu" > ${cons%,*}
