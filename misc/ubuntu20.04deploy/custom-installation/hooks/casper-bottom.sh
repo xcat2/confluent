@@ -38,8 +38,10 @@ else
 fi
 ipv4s=$(grep ^ipv4_server $deploycfg|awk '{print $2}')
 osprofile=$(cat /custom-installation/confluent/osprofile)
-fcmdline='quiet autoinstall ds=nocloud-net;s=https://'${ipv4s}'/confluent-public/os/'${osprofile}'/autoinstall/'
-cons=$(cat /custom-installation/autocons.info)
+fcmdline="$(cat /custom-installation/confluent/cmdline.orig) autoinstall ds=nocloud-net;s=https://${ipv4s}/confluent-public/os/${osprofile}/autoinstall/"
+if [ -f /custom-installation/autocons.info ]; then
+    cons=$(cat /custom-installation/autocons.info)
+fi
 if [ ! -z "$cons" ]; then
     echo "Installation will proceed on graphics console, autoconsole cannot work during install for Ubuntu" > ${cons%,*}
     #fcmdline="$fcmdline console=${cons#/dev/}"

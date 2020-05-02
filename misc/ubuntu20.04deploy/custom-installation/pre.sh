@@ -12,3 +12,6 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.d/confluent.conf
 done
 systemctl restart sshd
+curl https://$mgr/confluent-public/confluent/util/getinstalldisk > /custom-installation/getinstalldisk
+python3 /custom-installation/getinstalldisk
+sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
