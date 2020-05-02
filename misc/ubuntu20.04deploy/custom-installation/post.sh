@@ -7,4 +7,15 @@ done
 
 cp -a /etc/ssh/ssh_host* /target/etc/confluent/ssh/
 cp -a /etc/ssh/sshd_config.d/confluent.conf /target/etc/confluent/ssh/sshd_config.d/
+sshconf=/target/etc/ssh/ssh_config
+if [ -d /target/etc/ssh/ssh_config.d/ ]; then
+    sshconf=/target/etc/ssh/ssh_config.d/01-confluent.conf
+fi
+echo 'Host *' >> $sshconf
+echo '    HostbasedAuthentication yes' >> $sshconf
+echo '    EnableSSHKeysign yes' >> $sshconf
+echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
+
 cp /custom-installation/firstboot.sh /target/etc/confluent/firstboot.sh
+cp /tmp/allnodes /target/root/.shosts
+cp /tmp/allnodes /target/etc/ssh/shosts.equiv
