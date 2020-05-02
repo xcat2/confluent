@@ -45,8 +45,6 @@ fi
 if [ ! -z "$cons" ]; then
     echo "Installation will proceed on graphics console, autoconsole cannot work during install for Ubuntu" > ${cons%,*}
     #fcmdline="$fcmdline console=${cons#/dev/}"
-elif grep console= /proc/cmdline; then
-    fcmdline=$fcmdline" "$(sed -e s/.*console=/console=/ -e 's/ .*//' /proc/cmdline)
 fi
 echo $fcmdline > /custom-installation/confluent/fakecmdline
 /scripts/casper-bottom/58server_network

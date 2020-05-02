@@ -7,3 +7,5 @@ if [ ! -z "$rootpw" -a "$rootpw" != "null" ]; then
 	echo root:$rootpw | chpasswd -e
 fi
 hostnamectl set-hostname $(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
+touch /etc/cloud/cloud-init.disabled
+rm -rf /etc/confluent/
