@@ -1,12 +1,12 @@
 Name: confluent_deploy-x86_64
 Version: 3.0
-Release 1%{?dist}
+Release: 1
 Summary: OS Deployment support for confluent
 
 License: Apache2
 URL: http://hpc.lenovo.com/
 Source0: confluent-deploy.tar.xz
-BulidArch: noarch
+BuildArch: noarch
 Requires: confluent_ipxe
 BuildRoot: /tmp
 
@@ -25,24 +25,22 @@ cd utils
 make all
 cp copernicus clortho autocons ../opt/confluent/bin
 cd ..
-mkdir el8out suse15out ubuntu20.04out
-cd el8out
-cp -a ../opt .
-mkdir -p usr/lib/dracut/hooks/
-cp -a ../el8/dracut-hooks/* usr/lib/dracut/hooks/
-find . | cpio -H newc > addons.cpio
-cd ../suse15out
-cp -a ../opt .
-cp -a ../suse15/opt ../suse15/etc .
-find . | cpio -H newc > addons.cpio
-cd ../ubuntu20.04out
-cp -a ../opt .
-cp -a ../ubuntu20.04/initramfs/* .
-find . | cpio -H newc > addons.cpio
+for os in el8 suse15 ubuntu20.04; do
+    mkdir ${os}out
+    cd ${os}out
+    cp -a ../opt .
+    cp -a ../{os}/initramfs/* .
+    find . | cpio -H newc -o > addons.cpio
+    cd ..
+done
 
 %install
-pwd
-ls
+for os in el8 suse15 ubuntu20.04; do
+    mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
+    mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
+    cp ${os}out/addons.cpio %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
+    cp -a $os/profiles/* /opt/confluent/lib/osdeploy/$os/profiles
+done
 
-
-
+%files
+/opt/confluent/lib/osdeploy
