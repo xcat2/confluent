@@ -35,6 +35,7 @@ unsigned char* genpasswd(int len) {
 
 int main(int argc, char* argv[]) {
         int sock, ret;
+        char slen;
         unsigned char currlen, currtype;
         unsigned char* passwd;
         unsigned char* cryptedpass;
@@ -98,7 +99,8 @@ int main(int argc, char* argv[]) {
                 fprintf(stderr, "Unrecognized server\n");
                 exit(1);
         }
-        dprintf(sock, "\x01%lu%s", strlen(argv[1]), argv[1]);
+        slen = strlen(argv[1]) & 0xff;
+        dprintf(sock, "\x01%c%s", slen, argv[1]);
         ret = write(sock, "\x00\x00", 2);
         memset(buffer, 0, MAXPACKET);
         ret = read(sock, buffer, 2);
@@ -112,7 +114,8 @@ int main(int argc, char* argv[]) {
             if (currtype == 2) {
                 dprintf(sock, "\x03%c", currlen);
                 ret = write(sock, buffer, currlen);
-                dprintf(sock, "\x04%lu%s", strlen(cryptedpass), cryptedpass);
+                slen = strlen(cryptedpass) & 0xff;
+                dprintf(sock, "\x04%c%s", slen, cryptedpass);
                 ret = write(sock, "\x00\x00", 2);
             } else if (currtype == 5) {
                 printf("%s", passwd);
