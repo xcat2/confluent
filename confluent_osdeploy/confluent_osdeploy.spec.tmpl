@@ -39,7 +39,7 @@ for os in el8 suse15 ubuntu20.04; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.cpio %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
-    cp -a $os/profiles/* /opt/confluent/lib/osdeploy/$os/profiles
+    cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
 done
 
 %files
