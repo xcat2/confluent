@@ -1,0 +1,7 @@
+export VERSION=$(git describe --tags)
+sed -e "s/#VERSION#/$VERSION/" confluent_osdeploy.spec.tmpl > confluent_osdeploy.spec
+cd ..
+tar Jcvf confluent_osdeploy.tar.xz confluent_osdeploy
+mv $confluent_osdeploy.tar.xz ~/rpmbuild/SOURCES/
+cd -
+rpmbuild -ba confluent_osdeploy.spec
