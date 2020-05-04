@@ -29,7 +29,7 @@ for os in el8 suse15 ubuntu20.04; do
     mkdir ${os}out
     cd ${os}out
     cp -a ../opt .
-    cp -a ../{os}/initramfs/* .
+    cp -a ../${os}/initramfs/* .
     find . | cpio -H newc -o > addons.cpio
     cd ..
 done
