@@ -20,10 +20,10 @@ static const char cryptalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrst
 
 unsigned char* genpasswd(int len) {
         unsigned char * passwd;
-        int urandom;
+        int urandom, ret;
         passwd = calloc(len + 1, sizeof(char));
         urandom = open("/dev/urandom", O_RDONLY);
-        read(urandom, passwd, len);
+        ret = read(urandom, passwd, len);
         close(urandom);
         for (urandom = 0; urandom < len; urandom++) {
                 passwd[urandom] = cryptalpha[passwd[urandom] >> 2];
@@ -34,7 +34,7 @@ unsigned char* genpasswd(int len) {
 
 
 int main(int argc, char* argv[]) {
-        int sock;
+        int sock, ret;
         unsigned char currlen, currtype;
         unsigned char* passwd;
         unsigned char* cryptedpass;
@@ -93,34 +93,34 @@ int main(int argc, char* argv[]) {
         }
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
         freeaddrinfo(addrs);
-        read(sock, buffer, 8);
+        ret = read(sock, buffer, 8);
         if (memcmp(buffer, "\xc2\xd1-\xa8\x80\xd8j\xba", 8) != 0) {
                 fprintf(stderr, "Unrecognized server\n");
                 exit(1);
         }
-        dprintf(sock, "\x01%c%s", strlen(argv[1]), argv[1]);
-        write(sock, "\x00\x00", 2);
+        dprintf(sock, "\x01%lu%s", strlen(argv[1]), argv[1]);
+        ret = write(sock, "\x00\x00", 2);
         memset(buffer, 0, MAXPACKET);
-        read(sock, buffer, 2);
+        ret = read(sock, buffer, 2);
         while (buffer[0] != 255) {
             currtype = buffer[0];
             currlen = buffer[1];
             memset(buffer, 0, MAXPACKET);
             if (currlen) {
-                read(sock, buffer, currlen);  // Max is 255, well under MAX_PACKET
+                ret = read(sock, buffer, currlen);  // Max is 255, well under MAX_PACKET
             }
             if (currtype == 2) {
                 dprintf(sock, "\x03%c", currlen);
-                write(sock, buffer, currlen);
-                dprintf(sock, "\x04%c%s", strlen(cryptedpass), cryptedpass);
-                write(sock, "\x00\x00", 2);
+                ret = write(sock, buffer, currlen);
+                dprintf(sock, "\x04%lu%s", strlen(cryptedpass), cryptedpass);
+                ret = write(sock, "\x00\x00", 2);
             } else if (currtype == 5) {
-                printf(passwd);
+                printf("%s", passwd);
                 printf("\n");
                 exit(0);
             }
             buffer[0] = 255;
-            read(sock, buffer, 2);
+            ret = read(sock, buffer, 2);
         }
         fprintf(stderr, "Password was not accepted\n");
         exit(1);
