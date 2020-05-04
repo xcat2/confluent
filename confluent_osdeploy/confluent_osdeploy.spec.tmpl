@@ -17,7 +17,7 @@ This contains support utilities for enabling deployment of x86_64 architecture s
 %define debug_package %{nil}
 
 %prep
-%setup
+%setup -n confluent_osdeploy
 
 %build
 mkdir -p opt/confluent/bin
