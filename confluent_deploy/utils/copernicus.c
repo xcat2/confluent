@@ -48,8 +48,7 @@ int add_macs(char* destination, int maxsize) {
         } else if (lla->sll_hatype == ARPHRD_ETHER) {
             snprintf(macaddr, 32, "/mac=%02x:%02x:%02x:%02x:%02x:%02x",
                 lla->sll_addr[0], lla->sll_addr[1], lla->sll_addr[2],
-                lla->sll_addr[3], lla->sll_addr[4], lla->sll_addr[5],
-                lla->sll_addr[6]
+                lla->sll_addr[3], lla->sll_addr[4], lla->sll_addr[5]
             );
         } else {
             continue;

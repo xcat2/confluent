@@ -11,3 +11,6 @@ clortho: clortho.c
 $(TARGETS): % : %.c
 	$(CC) $(CFLAGS) -o $@ $^
 	strip -s $@
+
+clean:
+	rm $(TARGETS) clortho
