@@ -93,6 +93,8 @@ def check_ubuntu(isoinfo):
         val = val.strip()
         if key == b'ARCH':
             arch = val
+            if arch == b'amd64':
+                arch = b'x86_64'
         elif key == b'DISKNAME':
             variant, ver, _ = val.split(b' ', 2)
             if variant != b'Ubuntu-Server':
