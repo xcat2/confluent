@@ -19,8 +19,8 @@ if [ ! -z "$cons" ]; then
 fi
 echo "Preparing to deploy $osprofile from $MGR"
 echo $osprofile > /custom-installation/confluent/osprofile
-echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/live.iso >> /conf/param.conf
-fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/live.iso"
+echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
+fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso"
 if [ ! -z "$cons" ]; then
     fcmdline="$fcmdline console=${cons#/dev/}"
 fi
