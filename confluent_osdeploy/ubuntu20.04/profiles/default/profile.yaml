@@ -1,0 +1,2 @@
+label: %%DISTRO%% %%VERSION%% %%ARCH%% (Default Profile)
+kernelargs: quiet
