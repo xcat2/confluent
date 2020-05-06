@@ -141,7 +141,10 @@ def check_sles(isoinfo):
     ver = hline[-1].split('-')[0]
     major = ver.split('.', 2)[0]
     if hline[-1].startswith('15'):
-        distro = 'sle'
+        if hline[1] == 'openSUSE-Leap':
+            distro = 'opensuse_leap'
+        else:
+            distro = 'sle'
         if hline[0] == '/':
             disk = '1'
         elif hline[0].startswith('/Module'):
