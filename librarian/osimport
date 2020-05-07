@@ -2,6 +2,7 @@
 import eventlet
 import eventlet.green.select as select
 import eventlet.green.subprocess as subprocess
+import glob
 import logging
 logging.getLogger('libarchive').addHandler(logging.NullHandler())
 import libarchive
@@ -10,6 +11,7 @@ import os
 import shutil
 import sys
 import time
+import yaml
 
 COPY = 1
 EXTRACT = 2
@@ -31,6 +33,47 @@ from libarchive.ffi import (
     write_disk_new, write_disk_set_options, write_free, write_header,
     read_data_block, write_data_block, write_finish_entry, ARCHIVE_EOF
 )
+
+def update_boot(profiledir):
+    profile = {}
+    if profiledir.endswith('/'):
+        profiledir = profiledir[:-1]
+    profname = os.path.basename(profiledir)
+    with open('{0}/profile.yaml'.format(profiledir)) as profileinfo:
+        profile = yaml.safe_load(profileinfo)
+    label = profile.get('label', profname)
+    kernelargs = profile.get('kernelargs', '')
+    grubcfg = "set timeout=5\nmenuentry '"
+    grubcfg += label
+    grubcfg += "' {\n    linuxefi /kernel " + kernelargs + "\n"
+    initrds = []
+    for initramfs in glob.glob(profiledir + '/boot/initramfs/*.cpio'):
+        initramfs = os.path.basename(initramfs)
+        initrds.append(initramfs)
+    for initramfs in os.listdir(profiledir + '/boot/initramfs'):
+        if initramfs not in initrds:
+            initrds.append(initramfs)
+    grubcfg += "    initrdefi "
+    for initramfs in initrds:
+        grubcfg += "initramfs/{0}".format(initramfs)
+    grubcfg += "\n}\n"
+    with open(profiledir + '/boot/efi/boot/grub.cfg', 'w') as grubout:
+        grubout.write(grubcfg)
+    ipxeargs = kernelargs
+    for initramfs in initrds:
+        ipxeargs += " initrd=" + initramfs
+    with open(profiledir + '/boot/boot.ipxe', 'w') as ipxeout:
+        ipxeout.write('#!ipxe\n')
+        ipxeout.write('imgfetch kernel ' + ipxeargs + '\n')
+        for initramfs in initrds:
+            ipxeout.write('imgfetch initramfs/{0}\n'.format(initramfs))
+        ipxeout.write('imgload kernel\nimgexec kernel\n')
+    subprocess.check_call(
+        ['dir2img', '{0}/boot'.format(profiledir),
+         '{0}/boot.img'.format(profiledir)])
+
+
+
 
 def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist=None):
     """Extracts the given archive entries into the current directory.
@@ -181,6 +224,7 @@ def check_rhel(isoinfo):
     major = ver.split('.', 1)[0]
     return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
 
+
 def scan_iso(filename):
     filesizes = {}
     filecontents = {}
@@ -195,6 +239,7 @@ def scan_iso(filename):
                 for block in ent.get_blocks():
                     filecontents[str(ent)] += bytes(block)
     return filesizes, filecontents
+
 
 def fingerprint(filename):
     with open(filename, 'rb') as archive:
@@ -302,6 +347,7 @@ class MediaImporter(object):
                     self.percent = float(val)
             currline = b''
             a = wkr.stdout.read(1)
+        bootupdates = []
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(
                 self.oscategory)
@@ -334,8 +380,10 @@ class MediaImporter(object):
                 subprocess.check_call(
                     ['sh', '{0}/initprofile.sh'.format(dirname),
                     self.targpath, dirname])
+                bootupdates.append(eventlet.spawn(update_boot, dirname))
                 self.profiles.append(profname)
-
+        for upd in bootupdates:
+            upd.wait()
 
 
 if __name__ == '__main__':
