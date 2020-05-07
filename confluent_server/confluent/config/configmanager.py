@@ -495,7 +495,8 @@ def crypt_value(value,
         key = _masterkey
     iv = os.urandom(12)
     crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
-    value = confluent.util.stringify(value).encode('utf-8')
+    if not isinstance(value, bytes):
+        value = value.encode('utf-8')
     cryptval, hmac = crypter.encrypt_and_digest(value)
     return iv, cryptval, hmac, b'\x02'
 

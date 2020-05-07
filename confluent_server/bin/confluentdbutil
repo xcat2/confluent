@@ -62,8 +62,11 @@ if args[0] == 'restore':
     if pid is not None:
         print("Confluent is running, must shut down to restore db")
         sys.exit(1)
+    password = options.password
+    if options.interactivepassword:
+        password = getpass.getpass('Enter password to restore backup: ')
     try:
-        cfm.restore_db_from_directory(dumpdir, options.password)
+        cfm.restore_db_from_directory(dumpdir, password)
     except Exception as e:
         print(str(e))
         sys.exit(1)
@@ -86,7 +89,7 @@ elif args[0] == 'dump':
     main._initsecurity(conf.get_config())
     if not os.path.exists(dumpdir):
         os.makedirs(dumpdir)
-    cfm.dump_db_to_directory(dumpdir, options.password, options.redact,
+    cfm.dump_db_to_directory(dumpdir, password, options.redact,
                              options.skipkeys)
 
 
