@@ -51,7 +51,7 @@ def run():
     argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to run remote ssh command to, '
-                          'prompting if over the threshold')   
+                          'prompting if over the threshold')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
     # processes can be unkind for the unaware on memory pressure and such...
     argparser.disable_interspersed_args()
