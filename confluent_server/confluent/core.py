@@ -155,7 +155,7 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
     if pathcomponents[1] == 'profiles':
         if len(pathcomponents) == 2:
             for prof in osimage.list_profiles():
-                yield msg.ChildCollection(dist)
+                yield msg.ChildCollection(prof)
             return
     raise exc.NotFoundException('Unrecognized request')
 
@@ -1077,10 +1077,6 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
             raise Exception('Error in cross-collective serialize/deserialze, see remote logs')
         yield rsp
 
-
-def handle_discovery(pathcomponents, operation, configmanager, inputdata):
-    if pathcomponents[0] == 'detected':
-        pass
 
 def handle_discovery(pathcomponents, operation, configmanager, inputdata):
     if pathcomponents[0] == 'detected':
