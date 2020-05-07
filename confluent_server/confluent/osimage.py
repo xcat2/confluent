@@ -34,6 +34,7 @@ from libarchive.ffi import (
     read_data_block, write_data_block, write_finish_entry, ARCHIVE_EOF
 )
 
+
 def update_boot(profiledir):
     profile = {}
     if profiledir.endswith('/'):
@@ -73,8 +74,6 @@ def update_boot(profiledir):
          '{0}/boot.img'.format(profiledir)])
 
 
-
-
 def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist=None):
     """Extracts the given archive entries into the current directory.
     """
@@ -103,6 +102,7 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
     if callback:
         callback({'progress': float(sizedone) / float(totalsize)})
 
+
 def extract_file(filepath, flags=0, callback=lambda x: None, imginfo=(), extractlist=None):
     """Extracts an archive from a file into the current directory."""
     totalsize = 0
@@ -112,6 +112,7 @@ def extract_file(filepath, flags=0, callback=lambda x: None, imginfo=(), extract
         totalsize += imginfo[img]
     with libarchive.file_reader(filepath) as archive:
         extract_entries(archive, flags, callback, totalsize, extractlist)
+
 
 def check_centos(isoinfo):
     ver = None
@@ -129,6 +130,7 @@ def check_centos(isoinfo):
     else:
         return None
     return {'name': 'centos-{0}-{1}'.format(ver, arch), 'method': EXTRACT}
+
 
 def check_ubuntu(isoinfo):
     if 'README.diskdefines' not in isoinfo[1]:
@@ -301,6 +303,17 @@ def printit(info):
     sys.stdout.flush()
 
 
+def list_distros():
+    return os.listdir('/var/lib/confluent/distributions')
+
+def list_profiles():
+    return os.listdir('/var/lib/confluent/public/os/')
+
+def get_profile_label(profile):
+    with open('/var/lib/confluent/public/os/{0}/profile.yaml') as metadata:
+        prof = yaml.safe_load(metadata)
+    return prof.get('label', profile)
+
 importing = {}
 class MediaImporter(object):
 
@@ -312,6 +325,7 @@ class MediaImporter(object):
         importkey = ','.join((identity['name'], identity.get('subname', '')))
         if importkey in importing:
             raise Exception('Media import already in progress for this media')
+        self.importkey = importkey
         importing[importkey] = self
         self.osname = identity['name']
         self.oscategory = identity.get('category', None)
@@ -385,6 +399,7 @@ class MediaImporter(object):
                 self.profiles.append(profname)
         for upd in bootupdates:
             upd.wait()
+        del importing[self.updatekey]
 
 
 if __name__ == '__main__':
