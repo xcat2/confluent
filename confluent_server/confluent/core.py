@@ -46,6 +46,7 @@ import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
+import confluent.osimage as osimage
 try:
     import confluent.shellmodule as shellmodule
 except ImportError:
@@ -125,8 +126,9 @@ def load_plugins():
         sys.path.pop(1)
 
 
-rootcollections = ['discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'usergroups/' , 'users/', 'version']
+rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
+                   'noderange/', 'nodes/', 'nodegroups/', 'usergroups/' ,
+                   'users/', 'version']
 
 
 class PluginRoute(object):
@@ -137,6 +139,26 @@ class PluginRoute(object):
 class PluginCollection(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
+
+
+def handle_deployment(configmanager, inputdata, pathcomponents,
+                      operation):
+    if len(pathcomponents) == 1:
+        yield msg.ChildCollection('distributions')
+        yield msg.ChildCollection('profiles')
+        return
+    if pathcomponents[1] == 'distributions':
+        if len(pathcomponents) == 2:
+            for dist in osimage.list_distros():
+                yield msg.ChildCollection(dist)
+            return
+    if pathcomponents[1] == 'profiles':
+        if len(pathcomponents) == 2:
+            for prof in osimage.list_profiles():
+                yield msg.ChildCollection(dist)
+            return
+    raise exc.NotFoundException('Unrecognized request')
+
 
 def _init_core():
     global noderesources
@@ -1080,6 +1102,9 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     elif pathcomponents[0] == 'noderange':
         return handle_node_request(configmanager, inputdata, operation,
                                    pathcomponents, autostrip)
+    elif pathcomponents[0] == 'deployment':
+        return handle_deployment(configmanager, inputdata, pathcomponents,
+                                 operation)
     elif pathcomponents[0] == 'nodegroups':
         return handle_nodegroup_request(configmanager, inputdata,
                                         pathcomponents,
