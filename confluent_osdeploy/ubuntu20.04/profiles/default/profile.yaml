@@ -1,2 +1,2 @@
 label: %%DISTRO%% %%VERSION%% %%ARCH%% (Default Profile)
-kernelargs: quiet
+kernelargs: quiet osprofile=%%PROFILE%%
