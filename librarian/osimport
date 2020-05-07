@@ -336,7 +336,6 @@ class MediaImporter(object):
         while wkr.poll() is None:
             currline += wkr.stdout.read(1)
             if b'\r' in currline:
-                print(repr(currline))
                 currline = b''
         a = wkr.stdout.read(1)
         while a:
@@ -368,7 +367,7 @@ class MediaImporter(object):
                     profdata = profdata.replace('%%DISTRO%%', osd)
                     profdata = profdata.replace('%%VERSION%%', osversion)
                     profdata = profdata.replace('%%ARCH%%', arch)
-                    profdata = profdata.replacey('%%PROFILE%%', profname)
+                    profdata = profdata.replace('%%PROFILE%%', profname)
                 if profdata:
                     with open('{0}/profile.yaml'.format(dirname), 'w') as yout:
                         yout.write(profdata)
