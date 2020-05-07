@@ -437,7 +437,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     repview[28:44] = reqview[28:44]  # copy chaddr field
     if httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
-        bootfile = '{0}://{1}/confluent-public/os/{2}/boot/boot.img'.format(
+        bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
             proto, info['netinfo']['recvip'], profile
         )
         if not isinstance(bootfile, bytes):
