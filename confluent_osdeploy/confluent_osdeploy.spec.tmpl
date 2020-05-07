@@ -30,7 +30,8 @@ for os in el8 suse15 ubuntu20.04; do
     cd ${os}out
     cp -a ../opt .
     cp -a ../${os}/initramfs/* .
-    find . | cpio -H newc -o > addons.cpio
+    find . | cpio -H newc -o > ../addons.cpio
+    mv ../addons.cpio .
     cd ..
 done
 
