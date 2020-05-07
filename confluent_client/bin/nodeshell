@@ -46,6 +46,8 @@ def run():
                          help='Number of commands to run at a time')
     argparser.add_option('-n', '--nonodeprefix', action='store_true',
                          help='Do not prefix output with node names')
+    argparser.add_option('-p', '--port', type='int', default=0,
+                         help='Specify a custom port for ssh')
     argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to run remote ssh command to, '
@@ -59,7 +61,7 @@ def run():
         sys.exit(1)
     client.check_globbing(args[0])
     concurrentprocs = options.count
-    c = client.Command()    
+    c = client.Command()
     cmdstr = " ".join(args[1:])
 
     currprocs = 0
@@ -79,7 +81,10 @@ def run():
             cmd = ex[node]['value']
             if not isinstance(cmd, str) and not isinstance(cmd, bytes):
                 cmd = cmd.encode('utf-8')
-            cmdv = ['ssh', node, cmd]
+            if options.port:
+                cmdv = ['ssh', '-p', '{0}'.format(options.port), node, cmd]
+            else:
+                cmdv = ['ssh', node, cmd]
             if currprocs < concurrentprocs:
                 currprocs += 1
                 run_cmdv(node, cmdv, all, pipedesc)
