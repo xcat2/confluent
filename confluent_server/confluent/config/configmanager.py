@@ -117,6 +117,7 @@ def attrib_supports_expression(attrib):
     attrib = _attraliases.get(attrib, attrib)
     if attrib.startswith('secret.') or attrib.startswith('crypted.'):
         return False
+    return True
 
 
 def _mkpath(pathname):
