@@ -335,11 +335,8 @@ class MediaImporter(object):
         if identity.get('subname', None):
             targpath += '/' + identity['subname']
         self.targpath = '/var/lib/confluent/distributions/' + targpath
-        try:
-            os.makedirs(self.targpath)
-        except OSError as e:
-            if e.errno != 17:
-                raise
+        if os.path.exists(self.targpath):
+            raise Exception('{0} already exists'.format(self.targpath))
         self.filename = os.path.abspath(media)
         self.importer = eventlet.spawn(self.importmedia)
         self.profiles = []
