@@ -146,6 +146,7 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
     if len(pathcomponents) == 1:
         yield msg.ChildCollection('distributions')
         yield msg.ChildCollection('profiles')
+        yield msg.ChildCollection('importing')
         return
     if pathcomponents[1] == 'distributions':
         if len(pathcomponents) == 2:
@@ -157,6 +158,25 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
             for prof in osimage.list_profiles():
                 yield msg.ChildCollection(prof)
             return
+    if pathcomponents[1] == 'importing':
+        if len(pathcomponents) == 2 or not pathcomponents[-1]:
+            if operation == 'retrieve':
+                for imp in osimage.list_importing():
+                    yield imp
+                return
+            elif operation == 'create':
+                importer = osimage.MediaImporter(inputdata['filename'])
+                yield msg.KeyValueData({'target': importer.targpath})
+                return
+        elif len(pathcomponents) == 3:
+            if operation == 'retrieve':
+                for res in osimage.get_importing_status(pathcomponents[-1]):
+                    yield res
+                return
+            elif operation == 'delete':
+                for res in osimage.remove_importing(pathcomponents[-1]):
+                    yield res
+                return
     raise exc.NotFoundException('Unrecognized request')
 
 

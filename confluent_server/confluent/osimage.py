@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import confluent.messages as msg
 import eventlet
 import eventlet.green.select as select
 import eventlet.green.subprocess as subprocess
@@ -70,7 +71,7 @@ def update_boot(profiledir):
             ipxeout.write('imgfetch initramfs/{0}\n'.format(initramfs))
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     subprocess.check_call(
-        ['dir2img', '{0}/boot'.format(profiledir),
+        ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
          '{0}/boot.img'.format(profiledir)])
 
 
@@ -279,11 +280,7 @@ def import_image(filename, callback, backend=False):
     if identity.get('subname', None):
         targpath += '/' + identity['subname']
     targpath = '/var/lib/confluent/distributions/' + targpath
-    try:
-        os.makedirs(targpath)
-    except OSError as e:
-        if e.errno != 17:
-            raise
+    os.makedirs(targpath)
     filename = os.path.abspath(filename)
     os.chdir(targpath)
     if not backend:
@@ -319,10 +316,15 @@ class MediaImporter(object):
 
     def __init__(self, media):
         identity = fingerprint(media)
-        identity, imginfo = identity
+        self.percent = 0.0
+        identity, _ = identity
+        self.phase = 'copying'
         if not identity:
             raise Exception('Unrecognized OS Media')
-        importkey = ','.join((identity['name'], identity.get('subname', '')))
+        if 'subname' in identity:
+            importkey = '{0}-{1}'.format(identity['name'], identity['subname'])
+        else:
+            importkey = identity['name']
         if importkey in importing:
             raise Exception('Media import already in progress for this media')
         self.importkey = importkey
@@ -342,20 +344,33 @@ class MediaImporter(object):
         self.importer = eventlet.spawn(self.importmedia)
         self.profiles = []
 
+    def stop(self):
+        if self.worker.poll() is None:
+            self.worker.kill()
+
+    @property
+    def progress(self):
+        return {'phase': self.phase, 'progress': self.percent}
+
     def importmedia(self):
-        wkr = subprocess.Popen(
+        os.environ['PYTHONPATH'] = ':'.join(sys.path)
+        self.worker = subprocess.Popen(
             [sys.executable, __file__, self.filename, '-b'],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        wkr = self.worker
         currline = b''
         while wkr.poll() is None:
             currline += wkr.stdout.read(1)
             if b'\r' in currline:
+                val = currline.split(b'%')[0].strip()
+                if val:
+                    self.percent = float(val)
                 currline = b''
         a = wkr.stdout.read(1)
         while a:
             currline += a
             if b'\r' in currline:
-                val = currline.split(b'%')[0]
+                val = currline.split(b'%')[0].strip()
                 if val:
                     self.percent = float(val)
             currline = b''
@@ -369,6 +384,8 @@ class MediaImporter(object):
                 srcname = '{0}/profiles/{1}'.format(defprofile, prof)
                 profname = '{0}-{1}'.format(self.osname, prof)
                 dirname = '/var/lib/confluent/public/os/{0}'.format(profname)
+                if os.path.exists(dirname):
+                    continue
                 shutil.copytree(srcname, dirname)
                 profdata = None
                 try:
@@ -399,7 +416,22 @@ class MediaImporter(object):
                 self.profiles.append(profname)
         for upd in bootupdates:
             upd.wait()
-        del importing[self.updatekey]
+        self.phase = 'complete'
+        self.percent = 100.0
+
+
+def list_importing():
+    return [msg.ChildCollection(x) for x in importing]
+
+
+def remove_importing(importkey):
+    importing[importkey].stop()
+    del importing[importkey]
+    yield msg.DeletedResource('deployment/importing/{0}'.format(importkey))
+
+
+def get_importing_status(importkey):
+    yield msg.KeyValueData(importing[importkey].progress)
 
 
 if __name__ == '__main__':
