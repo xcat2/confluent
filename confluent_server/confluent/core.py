@@ -144,19 +144,19 @@ class PluginCollection(object):
 def handle_deployment(configmanager, inputdata, pathcomponents,
                       operation):
     if len(pathcomponents) == 1:
-        yield msg.ChildCollection('distributions')
-        yield msg.ChildCollection('profiles')
-        yield msg.ChildCollection('importing')
+        yield msg.ChildCollection('distributions/')
+        yield msg.ChildCollection('profiles/')
+        yield msg.ChildCollection('importing/')
         return
     if pathcomponents[1] == 'distributions':
         if len(pathcomponents) == 2:
             for dist in osimage.list_distros():
-                yield msg.ChildCollection(dist)
+                yield msg.ChildCollection(dist + '/')
             return
     if pathcomponents[1] == 'profiles':
         if len(pathcomponents) == 2:
             for prof in osimage.list_profiles():
-                yield msg.ChildCollection(prof)
+                yield msg.ChildCollection(prof + '/')
             return
     if pathcomponents[1] == 'importing':
         if len(pathcomponents) == 2 or not pathcomponents[-1]:

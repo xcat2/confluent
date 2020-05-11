@@ -315,6 +315,7 @@ importing = {}
 class MediaImporter(object):
 
     def __init__(self, media):
+        self.worker = None
         identity = fingerprint(media)
         self.percent = 0.0
         identity, _ = identity
@@ -342,7 +343,7 @@ class MediaImporter(object):
         self.profiles = []
 
     def stop(self):
-        if self.worker.poll() is None:
+        if self.worker and self.worker.poll() is None:
             self.worker.kill()
 
     @property
