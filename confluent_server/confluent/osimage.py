@@ -130,7 +130,7 @@ def check_centos(isoinfo):
             break
     else:
         return None
-    return {'name': 'centos-{0}-{1}'.format(ver, arch), 'method': EXTRACT}
+    return {'name': 'centos-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
 
 
 def check_ubuntu(isoinfo):
