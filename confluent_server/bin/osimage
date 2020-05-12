@@ -1,9 +1,16 @@
 #!/usr/bin/python2
 
 import argparse
-import confluent.client as client
+import os.path
 import sys
 import time
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
 
 def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
@@ -16,6 +23,7 @@ def main(args):
 
 def osimport(imagefile):
     c = client.Command()
+    imagefile = os.path.abspath(imagefile)
     importing = False
     shortname = None
     for rsp in c.create('/deployment/importing/', {'filename': imagefile}):
