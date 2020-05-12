@@ -343,6 +343,7 @@ class MediaImporter(object):
         self.osname = identity['name']
         self.oscategory = identity.get('category', None)
         targpath = identity['name']
+        self.distpath = '/var/lib/confluent/distributions/' + targpath
         if identity.get('subname', None):
             targpath += '/' + identity['subname']
         self.targpath = '/var/lib/confluent/distributions/' + targpath
@@ -418,7 +419,7 @@ class MediaImporter(object):
                 os.symlink(
                     '/var/lib/confluent/public/site/initramfs.cpio',
                     '{0}/boot/initramfs/site.cpio'.format(dirname))
-                os.symlink(self.targpath, '{0}/distribution'.format(dirname))
+                os.symlink(self.distpath, '{0}/distribution'.format(dirname))
                 subprocess.check_call(
                     ['sh', '{0}/initprofile.sh'.format(dirname),
                     self.targpath, dirname])
