@@ -35,6 +35,8 @@ from libarchive.ffi import (
     read_data_block, write_data_block, write_finish_entry, ARCHIVE_EOF
 )
 
+def relax_umask():
+    os.umask(0o22)
 
 def update_boot(profiledir):
     profile = {}
@@ -64,7 +66,10 @@ def update_boot(profiledir):
     ipxeargs = kernelargs
     for initramfs in initrds:
         ipxeargs += " initrd=" + initramfs
-    with open(profiledir + '/boot/boot.ipxe', 'w') as ipxeout:
+    oum = os.umask(0o22)
+    ipout = os.open(profiledir + '/boot/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
+    os.umask(oum)
+    with open(ipout, 'w') as ipxeout:
         ipxeout.write('#!ipxe\n')
         ipxeout.write('imgfetch kernel ' + ipxeargs + '\n')
         for initramfs in initrds:
@@ -72,7 +77,7 @@ def update_boot(profiledir):
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     subprocess.check_call(
         ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
-         '{0}/boot.img'.format(profiledir)])
+         '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)
 
 
 def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist=None):
@@ -283,7 +288,7 @@ def import_image(filename, callback, backend=False):
     if identity.get('subname', None):
         targpath += '/' + identity['subname']
     targpath = '/var/lib/confluent/distributions/' + targpath
-    os.makedirs(targpath)
+    os.makedirs(targpath, 0o755)
     filename = os.path.abspath(filename)
     os.chdir(targpath)
     if not backend:
@@ -389,11 +394,14 @@ class MediaImporter(object):
                     continue
                 shutil.copytree(srcname, dirname)
                 profdata = None
+                oumask = os.umask(0o22)
                 try:
-                    os.makedirs('{0}/boot/initramfs'.format(dirname))
+                    os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
                 except OSError as e:
                     if e.errno != 17:
                         raise
+                finally:
+                    os.umask(oumask)
                 with open('{0}/profile.yaml'.format(dirname)) as yin:
                     profdata = yin.read()
                     profdata = profdata.replace('%%DISTRO%%', osd)
@@ -436,6 +444,7 @@ def get_importing_status(importkey):
 
 
 if __name__ == '__main__':
+    os.umask(0o022)
     if len(sys.argv) > 2:
         sys.exit(import_image(sys.argv[1], callback=printit, backend=True))
     else:
