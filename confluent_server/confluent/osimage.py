@@ -118,19 +118,22 @@ def extract_file(filepath, flags=0, callback=lambda x: None, imginfo=(), extract
 def check_centos(isoinfo):
     ver = None
     arch = None
+    cat = None
     for entry in isoinfo[0]:
         if 'centos-release-7' in entry:
             dotsplit = entry.split('.')
             arch = dotsplit[-2]
             ver = dotsplit[0].split('release-')[-1].replace('-', '.')
+            cat = 'el7'
             break
         elif 'centos-release-8' in entry:
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
+            cat = 'el8'
             break
     else:
         return None
-    return {'name': 'centos-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
+    return {'name': 'centos-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
 
 
 def check_ubuntu(isoinfo):
