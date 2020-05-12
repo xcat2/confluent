@@ -339,6 +339,7 @@ class MediaImporter(object):
             raise Exception('Media import already in progress for this media')
         self.importkey = importkey
         importing[importkey] = self
+        self.importkey = importkey
         self.osname = identity['name']
         self.oscategory = identity.get('category', None)
         targpath = identity['name']

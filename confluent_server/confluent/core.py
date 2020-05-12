@@ -166,7 +166,8 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                 return
             elif operation == 'create':
                 importer = osimage.MediaImporter(inputdata['filename'])
-                yield msg.KeyValueData({'target': importer.targpath})
+                yield msg.KeyValueData({'target': importer.targpath,
+                                        'name': importer.importkey})
                 return
         elif len(pathcomponents) == 3:
             if operation == 'retrieve':

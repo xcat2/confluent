@@ -21,7 +21,7 @@ def osimport(imagefile):
     for rsp in c.create('/deployment/importing/', {'filename': imagefile}):
         if 'target' in rsp:
             importing = True
-            shortname = rsp['target'].split('/')[-1]
+            shortname = rsp['name']
             print('Importing from {0} to {1}'.format(imagefile, rsp['target']))
         else:
             print(repr(rsp))
