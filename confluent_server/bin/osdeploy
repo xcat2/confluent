@@ -1,0 +1,45 @@
+#!/usr/bin/python2
+
+import argparse
+import confluent.client as client
+import sys
+import time
+
+def main(args):
+    ap = argparse.ArgumentParser(description='Manage OS deployment resources')
+    sp = ap.add_subparsers(dest='command')
+    osip = sp.add_parser('osimport')
+    osip.add_argument('imagefile', help='File to use for source of importing')
+    cmdset = ap.parse_args()
+    if cmdset.command == 'osimport':
+        osimport(cmdset.imagefile)
+
+def osimport(imagefile):
+    c = client.Command()
+    importing = False
+    shortname = None
+    for rsp in c.create('/deployment/importing/', {'filename': imagefile}):
+        if 'target' in rsp:
+            importing = True
+            shortname = rsp['target'].split('/')[-1]
+            print('Importing from {0} to {1}'.format(imagefile, rsp['target']))
+        else:
+            print(repr(rsp))
+    while importing:
+        for rsp in c.read('/deployment/importing/{0}'.format(shortname)):
+            if 'progress' in rsp:
+                sys.stdout.write('{0}: {1:.2f}%    \r'.format(rsp['phase'],
+                                                          rsp['progress']))
+                if rsp['phase'] == 'complete':
+                    importing = False
+                    sys.stdout.write('\n')
+                    for profile in rsp['profiles']:
+                        print('Deployment profile created: {0}'.format(profile))
+                sys.stdout.flush()
+            else:
+                print(repr(rsp))
+            time.sleep(0.5)
+    list(c.delete('/deployment/importing/{0}'.format(shortname)))
+
+if __name__ == '__main__':
+    main(sys.argv)

@@ -316,6 +316,7 @@ class MediaImporter(object):
 
     def __init__(self, media):
         self.worker = None
+        self.profiles = []
         identity = fingerprint(media)
         self.percent = 0.0
         identity, _ = identity
@@ -340,7 +341,6 @@ class MediaImporter(object):
             raise Exception('{0} already exists'.format(self.targpath))
         self.filename = os.path.abspath(media)
         self.importer = eventlet.spawn(self.importmedia)
-        self.profiles = []
 
     def stop(self):
         if self.worker and self.worker.poll() is None:
@@ -348,7 +348,7 @@ class MediaImporter(object):
 
     @property
     def progress(self):
-        return {'phase': self.phase, 'progress': self.percent}
+        return {'phase': self.phase, 'progress': self.percent, 'profiles': self.profiles}
 
     def importmedia(self):
         os.environ['PYTHONPATH'] = ':'.join(sys.path)
