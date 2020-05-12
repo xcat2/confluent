@@ -8,10 +8,10 @@ import time
 def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
     sp = ap.add_subparsers(dest='command')
-    osip = sp.add_parser('osimport')
+    osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     cmdset = ap.parse_args()
-    if cmdset.command == 'osimport':
+    if cmdset.command == 'import':
         osimport(cmdset.imagefile)
 
 def osimport(imagefile):
