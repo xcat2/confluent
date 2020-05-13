@@ -106,13 +106,31 @@ def handle_request(env, start_response):
             nodes.add(mgr)
         nodes.add(collective.get_myname())
         if isgeneric:
-            start_response('200 OK', (('Contennt-Type', 'text/plain'),))
+            start_response('200 OK', (('Content-Type', 'text/plain'),))
             for node in util.natural_sort(nodes):
                 yield node + '\n'
         else:
             start_response('200 OK', (('Content-Type', retype),))
             yield dumper(sorted(nodes))
-
+    elif env['PATH_INFO'] == '/self/updatestatus':
+        update = yaml.safe_load(reqbody)
+        if update['status'] != 'complete':
+            raise Exception('Unknown update status request')
+        currattr = cfg.get_node_attributes(nodename, 'deployment.*').get(
+            nodename, {})
+        pending = currattr.get('deployment.pendingprofile', {}).get('value', '')
+        updates = {}
+        if pending:
+            updates['deployment.pendingprofile'] = {'value': ''}
+            currprof = currattr.get('deployment.profile', {}).get('value', '')
+            if currprof != pending:
+                updates['deployment.profile'] = {'value': pending}
+            cfg.set_node_attributes({nodename: updates})
+            start_response('200 OK', ('Content-Type', 'text/plain'))
+            yield 'OK'
+        else:
+            start_response('500 Error', ('Content-Type', 'text/plain'))
+            yield 'No pending profile detected, unable to accept status update'
     else:
         start_response('404 Not Found', ())
         yield 'Not found'

@@ -175,6 +175,13 @@ node = {
                         'the network boot subsystem what should be offered when a potential '
                         'network boot request comes in')
     },
+    'deployment.profile': {
+        'description': ('The profile that has most recently reported '
+                        'completion of deployment. Note that an image may opt '
+                        'to leave itself both current and pending, for example '
+                        'a stateless profile would be both after first boot.')
+
+    },
     'deployment.useinsecureprotocols': {
         'description': ('What phase(s) of boot are permitted to use insecure protocols '
                         '(TFTP and HTTP without TLS.  By default, HTTPS is allowed.  However '
