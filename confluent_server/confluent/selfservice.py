@@ -126,10 +126,10 @@ def handle_request(env, start_response):
             if currprof != pending:
                 updates['deployment.profile'] = {'value': pending}
             cfg.set_node_attributes({nodename: updates})
-            start_response('200 OK', ('Content-Type', 'text/plain'))
+            start_response('200 OK', (('Content-Type', 'text/plain'),))
             yield 'OK'
         else:
-            start_response('500 Error', ('Content-Type', 'text/plain'))
+            start_response('500 Error', (('Content-Type', 'text/plain'),))
             yield 'No pending profile detected, unable to accept status update'
     else:
         start_response('404 Not Found', ())
