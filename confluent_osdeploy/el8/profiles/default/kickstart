@@ -11,63 +11,30 @@ python3
 %end
 
 %pre
-nodename=$(grep ^NODENAME /etc/confluent.info|awk '{print $2}')
+profile=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
 mgr=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
-tz=$(grep ^timezone: /etc/confluent.deploycfg)
-tz=${tz#*: }
-echo timezone $tz --utc > /tmp/timezone
-rootpw=$(grep ^rootpassword /etc/confluent.deploycfg | awk '{print $2}')
-if [ "$rootpw" = null ]; then
-    echo "rootpw --lock" > /tmp/rootpw
-else
-    echo "rootpw --iscrypted $rootpw" > /tmp/rootpw
-fi
-for pubkey in /etc/ssh/ssh_host*key.pub; do
-    certfile=${pubkey/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
-    echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
-done
-/usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
-if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
-    consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
-    tmux a <> $consoledev >&0 2>&1 &
-fi
-curl https://$mgr/confluent-public/confluent/util/getinstalldisk > /tmp/getinstalldisk
-/usr/libexec/platform-python /tmp/getinstalldisk
-if [ -e /tmp/installdisk ]; then
-    echo clearpart --all --initlabel >> /tmp/partitioning
-    echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
-    echo autopart --nohome >> /tmp/partitioning
-fi
-curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent.apikey)" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
+curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.sh
+. /tmp/preinst.sh
 %end
 
 %post --nochroot
-# need to copy over ssh key info
-grep HostCert /etc/ssh/sshd_config.anaconda >> /mnt/sysimage/etc/ssh/sshd_config
-echo HostbasedAuthentication yes >> /mnt/sysimage/etc/ssh/sshd_config
-echo HostbasedUsesNameFromPacketOnly yes >> /mnt/sysimage/etc/ssh/sshd_config
-echo IgnoreRhosts no >> /mnt/sysimage/etc/ssh/sshd_config
-sshconf=/etc/ssh/ssh_config
-if [ -d /mnt/sysimage/etc/ssh/ssh_config.d/ ]; then
-    sshconf=/mnt/sysimage/etc/ssh/ssh_config.d/01-confluent.conf
-fi
-echo 'Host *' >> $sshconf
-echo '    HostbasedAuthentication yes' >> $sshconf
-echo '    EnableSSHKeysign yes' >> $sshconf
-echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
+mkdir -p /mnt/sysimage/etc/confluent
+profile=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
+curl -f https://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/postinst.sh
+. /tmp/postinst.sh
 
-cp /etc/ssh/ssh_host_* /mnt/sysimage/etc/ssh/
-mkdir /mnt/sysimage/root/.ssh/
-chmod 700 /mnt/sysimage/root/.ssh/
-cp /root/.ssh/authorized_keys /mnt/sysimage/root/.ssh/
-chmod 600 /mnt/sysimage/root/.ssh/authorized_keys
-cp /etc/ssh/ssh_known_hosts /mnt/sysimage/etc/ssh/
-cp /tmp/allnodes /mnt/sysimage/etc/ssh/shosts.equiv
-cp /tmp/allnodes /mnt/sysimage/root/.shosts
+# Hook firstboot.sh
+curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.service > /mnt/sysimage/etc/systemd/system/firstboot.service
+curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/sysimage/etc/confuent/firstboot.sh
+chmod +x /mnt/sysimage/etc/confluent/firstboot.sh
+
+chmod 664 /etc/systemd/system/runonce.service
+systemctl enable runonce
 %end
 
 %post
+systemctl enable firstboot
 chgrp ssh_keys /etc/ssh/ssh*key
 restorecon /etc/ssh/ssh*key /root/.shosts /etc/ssh/shosts.equiv /etc/ssh/ssh_config.d/*
 %end

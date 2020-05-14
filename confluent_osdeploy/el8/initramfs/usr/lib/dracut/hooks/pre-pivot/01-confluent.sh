@@ -5,6 +5,8 @@ while [ -h $BUNDLENAME ]; do
 done
 
 cat /etc/pki/tls/certs/ca-bundle.crt > $BUNDLENAME
+mkdir -p /sysroot/etc/confluent/
+cp -a /tls /sysroot/etc/confluent
 sed -i 's/install::/install:*:/' /sysroot/etc/shadow
 sed -i 's/root::/root:*:/' /sysroot/etc/shadow
 mkdir -p /sysroot/root/.ssh
@@ -16,4 +18,6 @@ for i in /ssh/*.ca; do
     echo '@cert-authority *' $(cat $i) >> /sysroot/etc/ssh/ssh_known_hosts
 done
 cp /etc/confluent.apikey /sysroot/etc/
+cp /etc/confluent.apikey /sysroot/etc/confluent/
 cp /tmp/confluent.deploycfg /tmp/confluent.info /sysroot/etc/
+cp /tmp/confluent.deploycfg /tmp/confluent.info /sysroot/etc/confluent
