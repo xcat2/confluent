@@ -41,4 +41,5 @@ mkdir -p /mnt/etc/confluent
 chmod 700 /mnt/etc/confluent
 cp /tmp/confluent.* /mnt/etc/confluent/
 cp -a /tls /mnt/etc/confluent/
+cp -a /tls/*.0 /mnt/var/lib/ca-certificates/openssl
 
