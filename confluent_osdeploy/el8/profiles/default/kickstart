@@ -11,7 +11,7 @@ python3
 %end
 
 %pre
-profile=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
+profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
 mgr=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.sh
 . /tmp/preinst.sh
@@ -19,7 +19,7 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.
 
 %post --nochroot
 mkdir -p /mnt/sysimage/etc/confluent
-profile=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
+profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
 mgr=$(grep ipv4_server /etc/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/postinst.sh
 . /tmp/postinst.sh
