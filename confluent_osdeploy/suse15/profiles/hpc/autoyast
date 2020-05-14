@@ -72,33 +72,16 @@
     <scripts>
          <pre-scripts config:type="list">
         <script>
-          <filename>pre.sh</filename>
+          <filename>preinstall.sh</filename>
           <interpreter>shell</interpreter>
           <source>
 <![CDATA[
 #!/bin/sh
-nodename=$(grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
 mgr=$(grep ^ipv._server /tmp/confluent.deploycfg|awk '{print $2}')
-proto=$(grep ^protocol /tmp/confluent.deploycfg |awk '{print $2}')
-rootpw=$(grep rootpassword /tmp/confluent.deploycfg|sed -e 's/^rootpassword: //')
-curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
-if [ "$rootpw" = "null" ]; then
-    rootpw="!"
-fi
-
-mkdir ~/.ssh
-cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
-ssh-keygen -A
-for i in  /etc/ssh/ssh_host*key.pub; do
-    certname=${i/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" -d @$i https://$mgr/confluent-api/self/sshcert > $certname
-    echo HostKey ${i%.pub} >> /etc/ssh/sshd_config
-    echo HostCertificate $certname >> /etc/ssh/sshd_config
-done
-/usr/sbin/sshd
-curl -f ${proto}://$mgr/confluent-public/confluent/util/getinstalldisk > /tmp/getinstalldisk
-python3 /tmp/getinstalldisk
-sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
+profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^rootpassword: //')
+proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
+curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
+. /tmp/pre.sh
 ]]>
           </source>
         </script>
@@ -110,43 +93,24 @@ sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename!
           <source>
 <![CDATA[
 #!/bin/sh
-mkdir -p /mnt/root/.ssh/
-chmod 700 /mnt/root/.ssh/
-cp /root/.ssh/authorized_keys /mnt/root/.ssh/
-chmd 600 /mnt/root/.ssh/authorized_keys
-cp /etc/ssh/*key* /mnt/etc/ssh/
-for i in /etc/ssh/*-cert.pub; do
-    echo HostCertificate $i >> /mnt/etc/ssh/sshd_config
-done
-for i in /ssh/*.ca; do
-    echo '@cert-authority *' $(cat $i) >> /mnt/etc/ssh/ssh_known_hosts
-done
-echo IgnoreRhosts no >> /mnt/etc/ssh/sshd_config
-echo HostbasedAuthentication yes >> /mnt/etc/ssh/sshd_config
-echo HostbasedUsesNameFromPacketOnly yes >> /mnt/etc/ssh/sshd_config
-echo Host '*' >> /mnt/etc/ssh/ssh_config
-echo "    HostbasedAuthentication yes" >> /mnt/etc/ssh/ssh_config
-echo "    EnableSSHKeysign yes" >> /mnt/etc/ssh/ssh_config
-echo "    HostbasedKeyTypes *ed25519*" >> /mnt/etc/ssh/ssh_config
-echo /usr/lib/ssh/ssh-keysign root:root 4711 >> /mnt/etc/permissions.local
-chmod 4711 /mnt/usr/lib/ssh/ssh-keysign
-cp /tmp/allnodes /mnt/root/.shosts
-cp /tmp/allnodes /mnt/etc/ssh/shosts.equiv
+mgr=$(grep ^ipv._server /tmp/confluent.deploycfg|awk '{print $2}')
+profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^rootpassword: //')
+proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
+curl $proto://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/post.sh
+. /tmp/post.sh
+curl $proto://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
+chmod +x /mnt/etc/confluent/firstboot.sh
 ]]>
           </source>
         </script>
       </chroot-scripts>
-      <!--         <post-scripts config:type="list">
+      <init-scripts config:type="list">
         <script>
           <filename>post.sh</filename>
           <interpreter>shell</interpreter>
-          <source>
-<![CDATA[
-mkdir -p /var/log/xcat/
-]]>
-          </source>
+	  <location>file:///etc/confluent/firstboot.sh</location>
         </script>
-</post-scripts> -->
+     </init-scripts> 
 
     </scripts>
 </profile>
