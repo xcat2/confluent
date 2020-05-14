@@ -26,15 +26,12 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/postins
 
 # Hook firstboot.sh
 curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.service > /mnt/sysimage/etc/systemd/system/firstboot.service
-curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/sysimage/etc/confuent/firstboot.sh
+curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/sysimage/etc/confluent/firstboot.sh
 chmod +x /mnt/sysimage/etc/confluent/firstboot.sh
-
-chmod 664 /etc/systemd/system/runonce.service
-systemctl enable runonce
 %end
 
 %post
 systemctl enable firstboot
 chgrp ssh_keys /etc/ssh/ssh*key
-restorecon /etc/ssh/ssh*key /root/.shosts /etc/ssh/shosts.equiv /etc/ssh/ssh_config.d/*
+restorecon /etc/ssh/ssh*key /root/.shosts /etc/ssh/shosts.equiv /etc/ssh/ssh_config.d/* /etc/confluent/firstboot.sh
 %end
