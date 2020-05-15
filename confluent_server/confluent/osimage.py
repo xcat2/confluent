@@ -199,7 +199,7 @@ def check_sles(isoinfo):
             distro = 'opensuse_leap'
         else:
             distro = 'sle'
-        if hline[0] == '/':
+        if hline[0] == '/' or 'boot' in isoinfo[0]:
             disk = '1'
         elif hline[0].startswith('/Module'):
             disk = '2'

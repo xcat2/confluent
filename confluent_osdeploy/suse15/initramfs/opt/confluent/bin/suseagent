@@ -82,7 +82,7 @@ profilename=${profilename#profile: }
 proto=$(grep ^protocol: /tmp/confluent.deploycfg)
 proto=${proto#protocol: }
 
-echo "<media_url>${proto}://${mgr}/confluent-public/os/${profilename}/distribution/2</media_url>" > /tmp/pkgurl
+echo "<media_url>${proto}://${mgr}/confluent-public/os/${profilename}/product</media_url>" > /tmp/pkgurl
 
 echo "AutoYaST: $proto://$mgr/confluent-public/os/$profilename/autoyast" >> /etc/linuxrc.d/01-confluent
 echo "Install: $proto://$mgr/confluent-public/os/$profilename/distribution/1" >> /etc/linuxrc.d/01-confluent
