@@ -36,7 +36,7 @@ elif [ "$ipv4m" = "static" ]; then
 else
     IP=off
 fi
-ipv4s=$(grep ^ipv4_server $deploycfg|awk '{print $2}')
+ipv4s=$(grep ^deploy_server $deploycfg|awk '{print $2}')
 osprofile=$(cat /custom-installation/confluent/osprofile)
 fcmdline="$(cat /custom-installation/confluent/cmdline.orig) autoinstall ds=nocloud-net;s=https://${ipv4s}/confluent-public/os/${osprofile}/autoinstall/"
 if [ -f /custom-installation/autocons.info ]; then

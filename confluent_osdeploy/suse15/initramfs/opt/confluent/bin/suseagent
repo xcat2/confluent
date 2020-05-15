@@ -75,8 +75,8 @@ else
 	done < /tmp/confluent.deploycfg
 fi
 echo done
-mgr=$(grep ^ipv4_server: /tmp/confluent.deploycfg)
-mgr=${mgr#ipv4_server: }
+mgr=$(grep ^deploy_server: /tmp/confluent.deploycfg)
+mgr=${mgr#deploy_server: }
 profilename=$(grep ^profile: /tmp/confluent.deploycfg)
 profilename=${profilename#profile: }
 proto=$(grep ^protocol: /tmp/confluent.deploycfg)

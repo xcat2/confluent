@@ -171,7 +171,6 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         'ipv4_address': None,
         'ipv4_method': None,
         'prefix': None,
-        'ipv4_server': None,
     }
     nets = None
     needsvrip = False
@@ -188,8 +187,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         for net in nets:
             net, prefix, svrip = net
             candsrvs.append(svrip)
-            cfgdata['ipv4_server'] = svrip
-            cfgdata['mgt_server'] = svrip
+            cfgdata['deploy_server'] = svrip
             for candidate in cfgbyname:
                 if cfgbyname[candidate].get('ipv4_method', None) == 'dhcp':
                     dhcprequested = True
@@ -228,7 +226,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 break
         for svr in candsrvs:
             if ip_on_same_subnet(svr, ipbynodename, prefix):
-                cfgdata['ipv4_server'] = svr
+                cfgdata['deploy_server'] = svr
                 break
         for gw in candgws:
             if ip_on_same_subnet(gw, ipbynodename, prefix):

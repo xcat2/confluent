@@ -32,8 +32,8 @@ umask $oum
 mgr="[$mgr]"
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
-mgr=$(grep ^ipv4_server: /tmp/confluent.deploycfg)
-mgr=${mgr#ipv4_server: }
+mgr=$(grep ^deploy_server: /tmp/confluent.deploycfg)
+mgr=${mgr#deploy_server: }
 profilename=$(grep ^profile: /tmp/confluent.deploycfg)
 profilename=${profilename#profile: }
 proto=$(grep ^protocol: /tmp/confluent.deploycfg)

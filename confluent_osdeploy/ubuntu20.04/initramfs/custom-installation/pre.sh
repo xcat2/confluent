@@ -1,6 +1,6 @@
 #!/bin/bash
 deploycfg=/custom-installation/confluent/confluent.deploycfg
-mgr=$(grep ^ipv4_server $deploycfg|awk '{print $2}')
+mgr=$(grep ^deploy_server $deploycfg|awk '{print $2}')
 cat /custom-installation/ssh/*.rootpubkey > /root/.ssh/authorized_keys
 nodename=$(grep ^NODENAME: /custom-installation/confluent/confluent.info|awk '{print $2}')
 apikey=$(cat /custom-installation/confluent/confluent.apikey)
