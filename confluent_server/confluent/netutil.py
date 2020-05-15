@@ -189,6 +189,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             net, prefix, svrip = net
             candsrvs.append(svrip)
             cfgdata['ipv4_server'] = svrip
+            cfgdata['mgt_server'] = svrip
             for candidate in cfgbyname:
                 if cfgbyname[candidate].get('ipv4_method', None) == 'dhcp':
                     dhcprequested = True
