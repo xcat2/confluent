@@ -77,7 +77,7 @@
           <source>
 <![CDATA[
 #!/bin/sh
-mgr=$(grep ^ipv._server /tmp/confluent.deploycfg|awk '{print $2}')
+mgr=$(grep ^deploy_server /tmp/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
 curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
@@ -93,7 +93,7 @@ curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
           <source>
 <![CDATA[
 #!/bin/sh
-mgr=$(grep ^ipv._server /tmp/confluent.deploycfg|awk '{print $2}')
+mgr=$(grep ^deploy_server /tmp/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
 curl $proto://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/post.sh
