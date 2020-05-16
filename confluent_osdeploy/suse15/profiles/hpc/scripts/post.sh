@@ -32,6 +32,7 @@ echo /usr/lib/ssh/ssh-keysign root:root 4711 >> /mnt/etc/permissions.local
 chmod 4711 /mnt/usr/lib/ssh/ssh-keysign
 
 # Download list of nodes from confluent, and put it into shosts.equiv (for most users) and .shosts (for root)
+nodename=$(grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
 cp /tmp/allnodes /mnt/root/.shosts
 cp /tmp/allnodes /mnt/etc/ssh/shosts.equiv
