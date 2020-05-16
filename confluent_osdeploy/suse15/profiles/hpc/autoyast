@@ -2,6 +2,7 @@
 <!DOCTYPE profile SYSTEM "/usr/share/YaST2/include/autoinstall/profile.dtd">
 <profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns" xmlns:xi="http://www.w3.org/2001/XInclude">
     <general>
+      <self_update config:type="boolean">false</self_update>
       <clock>
         <hwclock>UTC</hwclock>
         <xi:include href="file:///tmp/timezone"/>
