@@ -22,4 +22,5 @@ cp /etc/ssh/ssh_known_hosts /mnt/sysimage/etc/ssh/
 cp /tmp/allnodes /mnt/sysimage/etc/ssh/shosts.equiv
 cp /tmp/allnodes /mnt/sysimage/root/.shosts
 cp -a /etc/confluent /mnt/sysimage/etc
+nodename=$(grep ^NODENAME /etc/confluent.info|awk '{print $2}')
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent.apikey)" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
