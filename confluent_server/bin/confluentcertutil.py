@@ -53,7 +53,7 @@ def create_certificate(outdir):
     shutil.copy2(sslcfg, tmpconfig)
     try:
         with open(tmpconfig, 'a') as cfgfile:
-            cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
+            cfgfile.write('\n[SAN]i\nbasicConstraints = CA:true\nsubjectAltName={0}'.format(san))
         subprocess.check_call([
             'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
             '7300', '-out', certout, '-subj', '/CN={0}'.format(longname),
