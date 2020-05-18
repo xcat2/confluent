@@ -60,13 +60,16 @@ def handle_request(env, start_response):
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
         deployinfo = cfg.get_node_attributes(
-            nodename, ('deployment.*', 'crypted.rootpassword', 'services.*'))
+            nodename, ('deployment.*', 'console.method', 'crypted.rootpassword',
+                       'services.*'))
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
         ncfg['profile'] = profile
         protocol = deployinfo.get('deployment.useinsecureprotocols', {}).get(
             'value', 'never')
+        ncfg['textconsole'] = bool(deployinfo.get(
+                                  'console.method', {}).get('value', None))
         if protocol == 'always':
             ncfg['protocol'] = 'http'
         else:
