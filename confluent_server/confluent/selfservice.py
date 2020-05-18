@@ -10,6 +10,7 @@ import time
 import yaml
 
 currtz = None
+currlocale = en_US.UTF-8
 currtzvintage = None
 
 
@@ -19,6 +20,7 @@ def yamldump(input):
 
 def handle_request(env, start_response):
     global currtz
+    global currlocale
     global currtzvintage
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
     apikey = env.get('HTTP_CONFLUENT_APIKEY', None)
@@ -79,6 +81,17 @@ def handle_request(env, start_response):
         if currtzvintage and currtzvintage > (time.time() - 30.0):
             ncfg['timezone'] = currtz
         else:
+            langinfo = subprocess.check_output(
+                ['localectl', 'status']).split(b'\n')
+            for line in langinfo:
+                line = line.strip()
+                if line.startswith('System Locale:'):
+                    currlocale = line.split('=')[-1]
+                    if not currlocale:
+                        continue
+                    if not isinstance(currlocale, str):
+                        currlocale = currlocale.decode('utf8')
+                    break
             tdc = subprocess.check_output(['timedatectl']).split(b'\n')
             for ent in tdc:
                 ent = ent.strip()
@@ -89,6 +102,7 @@ def handle_request(env, start_response):
                     currtzvintage = time.time()
                     ncfg['timezone'] = currtz
                     break
+        ncfg['locale'] = currlocale
         ncfg['nameservers'] = []
         for dns in deployinfo.get(
                 'services.dns', {}).get('value', '').split(','):

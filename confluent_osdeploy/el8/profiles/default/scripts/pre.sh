@@ -1,7 +1,10 @@
 #!/bin/sh
 nodename=$(grep ^NODENAME /etc/confluent.info|awk '{print $2}')
+locale=$(grep ^locale: /etc/confluent.deploycfg)
+locale=${locale#locale: }
+echo lang $locale > /tmp/langinfo
 tz=$(grep ^timezone: /etc/confluent.deploycfg)
-tz=${tz#*: }
+tz=${tz#timezone: }
 echo timezone $tz --utc > /tmp/timezone
 rootpw=$(grep ^rootpassword /etc/confluent.deploycfg | awk '{print $2}')
 if [ "$rootpw" = null ]; then

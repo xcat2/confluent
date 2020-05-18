@@ -1,6 +1,7 @@
 %include /tmp/rootpw
 %include /tmp/timezone
 %include /tmp/partitioning
+%include /tmp/langinfo
 reboot
 
 %packages
