@@ -86,7 +86,7 @@ def handle_request(env, start_response):
             for line in langinfo:
                 line = line.strip()
                 if line.startswith(b'System Locale:'):
-                    currlocale = line.split('=')[-1]
+                    currlocale = line.split(b'=')[-1]
                     if not currlocale:
                         continue
                     if not isinstance(currlocale, str):
