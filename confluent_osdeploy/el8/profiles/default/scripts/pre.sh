@@ -2,7 +2,10 @@
 nodename=$(grep ^NODENAME /etc/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent.deploycfg)
 locale=${locale#locale: }
+keymap=$(grep ^keymap: /etc/confluent.deploycfg)
+keymap=${keymap#keymap: }
 echo lang $locale > /tmp/langinfo
+echo keyboard --vckeymap=$keymap >> /tmp/langinfo
 tz=$(grep ^timezone: /etc/confluent.deploycfg)
 tz=${tz#timezone: }
 echo timezone $tz --utc > /tmp/timezone
