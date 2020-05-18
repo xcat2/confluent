@@ -43,7 +43,7 @@ curl -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/conflue
 textconsole=$(grep ^textconsole: /tmp/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
 if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [ ! -z "$autocons" ]; then
-	cat /proc/cmdline |sed -e s'/$/ 'console=${autocons#*/dev/}/ /> /etc/fakecmdline
+	sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
 	mount -o bind /etc/fakecmdline /proc/cmdline
 	echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
 fi
