@@ -10,7 +10,7 @@ import time
 import yaml
 
 currtz = None
-currlocale = en_US.UTF-8
+currlocale = 'en_US.UTF-8'
 currtzvintage = None
 
 
