@@ -10,6 +10,7 @@ import time
 import yaml
 
 currtz = None
+keymap = 'us'
 currlocale = 'en_US.UTF-8'
 currtzvintage = None
 
@@ -86,12 +87,20 @@ def handle_request(env, start_response):
             for line in langinfo:
                 line = line.strip()
                 if line.startswith(b'System Locale:'):
-                    currlocale = line.split(b'=')[-1]
-                    if not currlocale:
+                    ccurrlocale = line.split(b'=')[-1]
+                    if not ccurrlocale:
                         continue
-                    if not isinstance(currlocale, str):
-                        currlocale = currlocale.decode('utf8')
-                    break
+                    if not isinstance(ccurrlocale, str):
+                        ccurrlocale = ccurrlocale.decode('utf8')
+                    currlocale = ccurrlocale
+                elif line.startswith(b'VC Keymap:'):
+                    ckeymap = line.split(b':')[-1]
+                    ckeymap = ckeymap.strip()
+                    if not ckeymap:
+                        continue
+                    if not isinstance(ckeymap, str):
+                        ckeymap = ckeymap.decode('utf8')
+                    keymap = ckeymap
             tdc = subprocess.check_output(['timedatectl']).split(b'\n')
             for ent in tdc:
                 ent = ent.strip()
@@ -103,6 +112,7 @@ def handle_request(env, start_response):
                     ncfg['timezone'] = currtz
                     break
         ncfg['locale'] = currlocale
+        ncfg['keymap'] = keymap
         ncfg['nameservers'] = []
         for dns in deployinfo.get(
                 'services.dns', {}).get('value', '').split(','):
