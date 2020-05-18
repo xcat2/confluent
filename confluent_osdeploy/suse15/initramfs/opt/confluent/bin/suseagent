@@ -12,7 +12,7 @@ autocons=""
 if ! grep console /proc/cmdline > /dev/null; then
 	autocons=$(/opt/confluent/bin/autocons)
 	if [ ! -z "$autocons" ]; then
-		echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
+		echo "Serial console detected from firmmware: $autocons" > ${autocons%,*}
 	fi
 fi
 cd /sys/class/net
@@ -40,6 +40,13 @@ echo "NetDevice: $bootif" >> /etc/linuxrc.d/01-confluent
 /opt/confluent/bin/clortho $nodename $mgr > /tmp/confluent.apikey
 mgr="[$mgr]"
 curl -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+textconsole=$(grep ^textconsole: /tmp/confluent.deploycfg)
+textconsole=${textconsole#textconsole: }
+if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [ ! -z "$autocons" ]; then
+	cat /proc/cmdline |sed -e s'/$/ 'console=${autocons#*/dev/}/ /> /etc/fakecmdline
+	mount -o bind /etc/fakecmdline /proc/cmdline
+	echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
+fi
 
 tz=$(grep timezone: /tmp/confluent.deploycfg | awk '{print $2}')
 echo "<timezone>${tz}</timezone>" > /tmp/timezone

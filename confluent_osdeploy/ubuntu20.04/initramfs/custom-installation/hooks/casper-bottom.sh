@@ -43,7 +43,7 @@ if [ -f /custom-installation/autocons.info ]; then
     cons=$(cat /custom-installation/autocons.info)
 fi
 if [ ! -z "$cons" ]; then
-    echo "Installation will proceed on graphics console, autoconsole cannot work during install for Ubuntu" > ${cons%,*}
+    echo "Installation will proceed on graphics console, autoconsole not supported for Ubuntu" > ${cons%,*}
     #fcmdline="$fcmdline console=${cons#/dev/}"
 fi
 echo $fcmdline > /custom-installation/confluent/fakecmdline
