@@ -38,6 +38,19 @@ profilename=$(grep ^profile: /tmp/confluent.deploycfg)
 profilename=${profilename#profile: }
 proto=$(grep ^protocol: /tmp/confluent.deploycfg)
 proto=${proto#protocol: }
+textconsole=$(grep ^textconsole: /tmp/confluent.deploycfg)
+textconsole=${textconsole#textconsole: }
+if [ $textconsole = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
+	autocons=$(cat /tmp/01-autocons.devnode)
+	if [ ! -z "$autocons" ]; then
+	    echo Auto-configuring installed system to use text console
+	    echo Auto-configuring installed system to use text console > $autocons
+	    cp /tmp/01-autocons.conf /etc/cmdline.d/
+	else
+	    echo "Unable to automatically detect requested text console"
+	fi
+fi
+
 echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
 echo inst.ks=$proto://$mgr/confluent-public/os/$profilename/kickstart >> /etc/cmdline.d/01-confluent.conf
 kickstart=$proto://$mgr/confluent-public/os/$profilename/kickstart
