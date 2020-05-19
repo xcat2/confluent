@@ -43,6 +43,6 @@ chmod 700 /mnt/etc/confluent
 cp /tmp/confluent.* /mnt/etc/confluent/
 cp -a /tls /mnt/etc/confluent/
 cp -a /tls/* /mnt/var/lib/ca-certificates/openssl
-cp -a /tls/* /mnt/etc/ssl/certs
+cp -a /tls/* /mnt/var/lib/ca-certificates/pem
 cp -a /tls/*.cert /mnt/etc/pki/trust/anchors
 
