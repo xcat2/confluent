@@ -1,7 +1,9 @@
 cd /root
 cat /tls/*.0 > /root/etc/ssl/certs/ca-certificates.crt
 mkdir -p /root/custom-installation/ssh
+mkdir -p /root/custom-installation/tls
 cp /ssh/* /root/custom-installation/ssh
+cp /tls/* /root/custom-installation/tls
 NODENAME=$(grep ^NODENAME: /custom-installation/confluent/confluent.info|awk '{print $2}')
 MGR=$(grep ^MANAGER: /custom-installation/confluent/confluent.info|head -n 1| awk '{print $2}')
 oum=$(umask)
@@ -43,7 +45,7 @@ if [ -f /custom-installation/autocons.info ]; then
     cons=$(cat /custom-installation/autocons.info)
 fi
 if [ ! -z "$cons" ]; then
-    echo "Installation will proceed on graphics console, autoconsole not supported for Ubuntu" > ${cons%,*}
+    echo "Installation will proceed on graphics console, autoconsole not supported during autoinstall phase" > ${cons%,*}
     #fcmdline="$fcmdline console=${cons#/dev/}"
 fi
 echo $fcmdline > /custom-installation/confluent/fakecmdline
