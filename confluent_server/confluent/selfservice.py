@@ -21,6 +21,7 @@ def yamldump(input):
 
 def handle_request(env, start_response):
     global currtz
+    global keymap
     global currlocale
     global currtzvintage
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
