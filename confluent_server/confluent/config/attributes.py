@@ -491,6 +491,9 @@ node = {
         'description': ('Fingerprint of the SSH key of the OS running on the '
                         'system.'),
     },
+    'dns.domain': {
+        'description': 'DNS Domain searched by default by the system'
+    },
     'dns.servers': {
         'description': 'DNS Server or servers to provide to node',
     },
