@@ -45,6 +45,7 @@ elif [ "$ipv4m" = "static" ]; then
         echo "IPV4DNS1='$dns'"
         echo "HOSTNAME='$NODENAME'"
         echo "DNSDOMAIN='$dnsdomain'"
+        echo "DOMAINSEARCH='$dnsdomain'"
     } > "/run/net-$DEVICE.conf"
     configure_networking
 else
