@@ -40,6 +40,7 @@ cp /tmp/allnodes /mnt/etc/ssh/shosts.equiv
 # carry over deployment configuration and api key for OS install action
 mkdir -p /mnt/etc/confluent
 chmod 700 /mnt/etc/confluent
+chmod 600 /tmp/confluent.*
 cp /tmp/confluent.* /mnt/etc/confluent/
 cp -a /tls /mnt/etc/confluent/
 cp -a /tls/* /mnt/var/lib/ca-certificates/openssl
