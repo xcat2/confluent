@@ -69,6 +69,10 @@ import sys
 pluginmap = {}
 dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol')
 
+try:
+    unicode
+except NameError:
+    unicode = str
 
 def seek_element(currplace, currkey):
     try:
