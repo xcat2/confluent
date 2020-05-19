@@ -117,7 +117,7 @@ def handle_request(env, start_response):
         for dns in deployinfo.get(
                 'dns.servers', {}).get('value', '').split(','):
             ncfg['nameservers'].append(dns)
-        dnsdomain = dedployinfo.get('dns.domain', {}).get('value', None)
+        dnsdomain = deployinfo.get('dns.domain', {}).get('value', None)
         ncfg['dnsdomain'] = dnsdomain
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
