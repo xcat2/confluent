@@ -31,9 +31,21 @@ elif [ "$ipv4m" = "static" ]; then
     fi
     v4nm=$(grep ipv4_netmask: $deploycfg)
     v4nm=${v4nm#ipv4_netmask: }
+    dnsdomain=$(grep ^dnsdomain: $deploycfg)
+    dnsdomain=${dnsdomain#dnsdomain: }
     dns=$(grep -A1 ^nameservers: $deploycfg|head -n 2|tail -n 1|sed -e 's/^- //'|sed -e "s/''//")
-
-    IP=$v4addr::$v4gw:$v4nm:$nodename:$DEVICE:none:$dns::
+    {
+        echo "DEVICE='$DEVICE'"
+        echo "PROTO='none'"
+        echo "IPV4PROTO='none'"
+        echo "IPV4ADDR='$v4addr'"
+        echo "IPV4NETMASK='$v4nm'"
+        echo "IPV4BROADCAST='$v4nm'"
+        echo "IPV4GATEWAY='$v4gw'"
+        echo "IPV4DNS1='$dns'"
+        echo "HOSTNAME='$NODENAME'"
+        echo "DNSDOMAIN='$dnsdomain'"
+    } > "/run/net-$DEVICE.conf"
     configure_networking
 else
     IP=off
