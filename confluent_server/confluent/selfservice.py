@@ -115,7 +115,7 @@ def handle_request(env, start_response):
         ncfg['keymap'] = keymap
         ncfg['nameservers'] = []
         for dns in deployinfo.get(
-                'services.dns', {}).get('value', '').split(','):
+                'dns.servers', {}).get('value', '').split(','):
             ncfg['nameservers'].append(dns)
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
