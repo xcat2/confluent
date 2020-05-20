@@ -31,8 +31,12 @@ if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
         cons=$(cat /custom-installation/autocons.info)
     fi
     if [ ! -z "$cons" ]; then
-        sed -e 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 console='${cons#/dev/}'"/' /target/etc/default/grub
+        sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 console='${cons#/dev/}'"/' /target/etc/default/grub
+	mount -o bind /dev /target/dev
+	mount -o bind /proc /target/proc
+	mount -o bind /sys /target/sys
 	chroot /target update-grub
+	umount /target/sys /target/dev /target/proc
     fi
 fi
 
