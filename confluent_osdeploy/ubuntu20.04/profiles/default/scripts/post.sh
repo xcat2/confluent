@@ -24,4 +24,15 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /target
 chmod +x /target/etc/confluent/firstboot.sh
 cp /tmp/allnodes /target/root/.shosts
 cp /tmp/allnodes /target/etc/ssh/shosts.equiv
+textcons=$(grep ^textconsole: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
+    cons=""
+    if [ -f /custom-installation/autocons.info ]; then
+        cons=$(cat /custom-installation/autocons.info)
+    fi
+    if [ ! -z "$cons" ]; then
+        sed -e 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 console='${cons#/dev/}'"/' /target/etc/default/grub
+	chroot /target update-grub
+    fi
+fi
 
