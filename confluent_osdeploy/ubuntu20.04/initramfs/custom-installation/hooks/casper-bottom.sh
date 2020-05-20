@@ -33,6 +33,7 @@ elif [ "$ipv4m" = "static" ]; then
     v4nm=${v4nm#ipv4_netmask: }
     dnsdomain=$(grep ^dnsdomain: $deploycfg)
     dnsdomain=${dnsdomain#dnsdomain: }
+    if [ "$dnsdomain" = "null" ]; then dnsdomain=""; fi
     dns=$(grep -A1 ^nameservers: $deploycfg|head -n 2|tail -n 1|sed -e 's/^- //'|sed -e "s/''//")
     {
         echo "DEVICE='$DEVICE'"
