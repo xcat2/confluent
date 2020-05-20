@@ -60,6 +60,7 @@ if [ -f /custom-installation/autocons.info ]; then
 fi
 if [ ! -z "$cons" ]; then
     echo "Installation will proceed on graphics console, autoconsole not supported during autoinstall phase" > ${cons%,*}
+    echo "Progress can be checked by using ssh to access and running the screendump command" > ${cons%,*}
     #fcmdline="$fcmdline console=${cons#/dev/}"
 fi
 echo $fcmdline > /custom-installation/confluent/fakecmdline

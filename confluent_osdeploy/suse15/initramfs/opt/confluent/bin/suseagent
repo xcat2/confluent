@@ -48,6 +48,11 @@ fi
 textconsole=$(grep ^textconsole: /tmp/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
 if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [ ! -z "$autocons" ]; then
+	echo "Serial console autodetected and enabled, will be available upon install completion" > ${autocons%,*}
+	echo "The installer will run in text mode on the graphics console. When ssh is available," > ${autocons%,*}
+	echo "install progress may be checked by using ssh to access and run the screendump command" > ${autocons%,*}
+	echo "Install time serial console would require the profile to have console=${autocons#/dev/}" > ${autocons%,*}
+	echo "specified in the kernel command line arguments" > ${autocons%,*}
 	sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
 	mount -o bind /etc/fakecmdline /proc/cmdline
 	echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
