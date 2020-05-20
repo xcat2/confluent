@@ -24,7 +24,7 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /target
 chmod +x /target/etc/confluent/firstboot.sh
 cp /tmp/allnodes /target/root/.shosts
 cp /tmp/allnodes /target/etc/ssh/shosts.equiv
-textcons=$(grep ^textconsole: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+textcons=$(grep ^textconsole: /target/etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
     cons=""
     if [ -f /custom-installation/autocons.info ]; then
