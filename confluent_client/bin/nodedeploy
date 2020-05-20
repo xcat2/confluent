@@ -1,0 +1,67 @@
+#!/usr/bin/python3
+
+import argparse
+import os
+import sys
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+def armonce(nr, cli):
+    nodes = set([])
+    for rsp in cli.read('/noderange/{0}/attributes/current'.format(nr)):
+        for node in rsp.get('databynode', {}):
+            nodeinfo = rsp['databynode'][node]
+            for attr in nodeinfo:
+                if attr == 'deployment.apiarmed':
+                    curr = nodeinfo[attr].get('value', '')
+                    if curr == 'continuous':
+                        nodes.add(node)
+    noderange = nr
+    if nodes:
+        noderange += ',-({0})'.format(','.join(nodes))
+    for rsp in cli.update('/noderange/{0}/attributes/current'.format(noderange),
+                          {'deployment.apiarmed': 'once'}):
+        pass
+
+def setpending(nr, profile, cli):
+    for rsp in cli.update('/noderange/{0}/attributes/current'.format(nr),
+                          {'deployment.pendingprofile': profile}):
+        pass
+
+
+def main(args):
+    ap = argparse.ArgumentParser(description='Deploy OS to nodes')
+    ap.add_argument('-n', '--network', help='Initiate deployment over PXE', action='store_true')
+    ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
+    ap.add_argument('noderange', help='Set of nodes to deploy')
+    ap.add_argument('profile', help='Profile name to deploy')
+    args = ap.parse_args(args)
+    if not args.network:
+        sys.stderr.write('Currently only network (-n) deployment is supported\n')
+        return 1
+    c = client.Command()
+    c.stop_if_noderange_over(args.noderange, args.maxnodes)
+    armonce(args.noderange, c)
+    setpending(args.noderange, args.profile, c)
+    errnodes = set([])
+    rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
+                                     bootmode='uefi',
+                                     persistent=False,
+                                     errnodes=errnodes)
+    if errnodes:
+        sys.stderr.write(
+            'Unable to set boot device for following nodes: {0}\n'.format(
+                ','.join(errnodes)))
+        return 1
+    rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
+    return rc
+
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

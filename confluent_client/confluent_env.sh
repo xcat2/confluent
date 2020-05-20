@@ -19,6 +19,7 @@ alias nodebmcreset='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export
 alias nodeboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeboot'
 alias nodeconfig='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeconfig'
 alias nodeconsole='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeconsole'
+alias nodedeploy='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodedeploy'
 alias nodedefine='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodedefine'
 alias nodeeventlog='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeeventlog'
 alias nodefirmware='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodefirmware'
@@ -129,6 +130,19 @@ _confluent_nodefirmware_completion()
     if [ $NUMARGS -gt 3 ] && [ ${CMPARGS[2]} == 'update' ]; then
         compopt -o default
         COMPREPLY=()
+        return
+    fi
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return;
+    fi
+}
+
+_confluent_nodedeploy_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS -gt 2 ]; then
+        COMPREPLY=($(compgen -W "-n $(confetty show /deployment/profiles|sed -e 's/\///')" -- "${COMP_WORDS[COMP_CWORD]}"))
         return
     fi
     if [ $NUMARGS -lt 3 ]; then
@@ -266,6 +280,8 @@ complete -F _confluent_nr_completion nodeconfig
 complete -F _confluent_nn_completion nodeconsole
 complete -F _confluent_nr_completion nodeeventlog
 complete -F _confluent_nodefirmware_completion nodefirmware
+complete -F _confluent_nodedeploy_completion nodedeploy
+complete -F _confluent_osimage osimage
 complete -F _confluent_ng_completion nodegroupattrib
 complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
