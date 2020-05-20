@@ -3,7 +3,7 @@ cp -a /root/.ssh /target/root/
 mkdir -p /target/etc/confluent/ssh/sshd_config.d/
 chmod 700 /target/etc/confluent
 cp /custom-installation/confluent/* /target/etc/confluent/
-cp -a /custom-installation/tls /etc/confluent/
+cp -a /custom-installation/tls /target/etc/confluent/
 chmod go-rwx /etc/confluent/*
 for i in /custom-installation/ssh/*.ca; do
     echo '@cert-authority *' $(cat $i) >> /target/etc/ssh/ssh_known_hosts
