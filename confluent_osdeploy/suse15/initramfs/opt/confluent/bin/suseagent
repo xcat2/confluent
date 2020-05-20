@@ -40,6 +40,11 @@ echo "NetDevice: $bootif" >> /etc/linuxrc.d/01-confluent
 /opt/confluent/bin/clortho $nodename $mgr > /tmp/confluent.apikey
 mgr="[$mgr]"
 curl -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
+dnsdomain=${dnsdomain#dnsdomain: }
+if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
+	echo "Domain: $dnsdomain" >> /etc/linuxrc.d/01-confluent
+fi
 textconsole=$(grep ^textconsole: /tmp/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
 if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [ ! -z "$autocons" ]; then
