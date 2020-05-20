@@ -77,7 +77,7 @@ else
     fi
     v4nm=$(grep ipv4_netmask: /tmp/confluent.deploycfg)
     v4nm=${v4nm#ipv4_netmask: }
-    echo ip=$v4addr::$v4gw:$v4nm:$nodename:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+    echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
 fi
 nameserversec=0
 while read -r entry; do
