@@ -32,6 +32,12 @@ umask $oum
 mgr="[$mgr]"
 curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
+dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
+dnsdomain=${dnsdomain#dnsdomain: }
+hostname=$nodename
+if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
+    hostname=$hostname.$dnsdomain
+fi
 mgr=$(grep ^deploy_server: /tmp/confluent.deploycfg)
 mgr=${mgr#deploy_server: }
 profilename=$(grep ^profile: /tmp/confluent.deploycfg)
