@@ -33,9 +33,37 @@ def get_ip_addresses():
             continue
         yield line
 
-def create_certificate(outdir):
-    keyout = os.path.join(outdir, 'key.pem')
-    certout = os.path.join(outdir, 'cert.pem')
+def check_apache_config(path):
+    keypath = None
+    certpath = None
+    with open(path, 'r') as openf:
+        webconf = openf.read()
+    for line in webconf.split('\n'):
+        line = line.strip()
+        line = line.split('#')[0]
+        if line.startswith('SSLCertificateFile'):
+            _, certpath = line.split(None, 1)
+        if line.startswith('SSLCertificateKeyFile'):
+            _, keypath = line.split(None, 1)
+    return keypath, certpath
+
+def get_certificate_paths():
+    keypath = None
+    certpath = None
+    if os.path.exists('/etc/httpd/conf.d/ssl.conf'): # redhat way
+        keypath, certpath = check_apache_config('/etc/httpd/conf.d/ssl.conf')
+    if not keypath and os.path.exists('/etc/apache2'): # suse way
+        for currpath, _, files in os.walk('/etc/apache2'):
+            for fname in files:
+                keypath, certpath = check_apache_config(os.path.join(currpath,
+                                                                     fname))
+    return keypath, certpath
+
+def create_certificate(keyout=None, certout=None):
+    if not keyout:
+        keyout, certout = get_certificate_paths()
+    if not keyout:
+        raise Exception('Unable to locate TLS certificate path automatically')
     shortname = socket.gethostname().split('.')[0]
     longname = socket.getfqdn()
     subprocess.check_call(
@@ -83,4 +111,7 @@ def create_certificate(outdir):
     os.symlink(certname, hashname)
 
 if __name__ == '__main__':
-    create_certificate(os.getcwd())
+    outdir = os.getcwd()
+    keyout = os.path.join(outdir, 'key.pem')
+    certout = os.path.join(outdir, 'cert.pem')
+    create_certificate(keyout, certout)
