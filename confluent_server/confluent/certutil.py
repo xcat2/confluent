@@ -92,7 +92,11 @@ def create_certificate(keyout=None, certout=None):
     # Could restart the webserver now?
     fname = '/var/lib/confluent/public/site/tls/{0}.pem'.format(
         collective.get_myname())
-    os.makedirs(os.path.dirname(fname))
+    try:
+        os.makedirs(os.path.dirname(fname))
+    except OSError as e:
+        if e.errno != 17:
+            raise
     shutil.copy2(certout, fname)
     hv = subprocess.check_output(
         ['openssl', 'x509', '-in', certout, '-hash', '-noout'])

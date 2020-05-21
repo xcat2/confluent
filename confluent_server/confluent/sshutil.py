@@ -67,6 +67,7 @@ def initialize_root_key(generate):
     except OSError as e:
         if e.errno != 17:
             raise
+    neededuid = os.stat('/etc/confluent').st_uid
     for auth in authorized:
         shutil.copy(
             auth,
@@ -76,7 +77,6 @@ def initialize_root_key(generate):
                 myname), 0o644)
         os.chown('/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
                 myname), neededuid, -1)
-
 
 
 def ca_exists():

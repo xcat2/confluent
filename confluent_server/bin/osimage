@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 
 import argparse
+import glob
 import os.path
 import sys
 import time
@@ -11,15 +12,70 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
+import confluent.sshutil as sshutil
+import confluent.certutil as certutil
+try:
+    input = raw_input
+except NameError:
+    pass
 
 def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
     sp = ap.add_subparsers(dest='command')
+    wiz = sp.add_parser('initialize', help='Do OS deployment preparation')
+    wiz.add_argument('-u', help='Pull in root user key for node deployment', action='store_true')
+    wiz.add_argument('-s', help='Set up SSH CA for managing node to node ssh and known hosts', action='store_true')
+    wiz.add_argument('-t', help='Generate new TLS key for HTTPS operation and register with confluent repository', action='store_true')
+    wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     cmdset = ap.parse_args()
     if cmdset.command == 'import':
         osimport(cmdset.imagefile)
+    if cmdset.command == 'initialize':
+        initialize(cmdset)
+
+def initialize(cmdset):
+    if os.getuid() != 0:
+        sys.stderr.write('This command must run as root user\n')
+        sys.exit(1)
+    if cmdset.i:
+        didsomething = True
+        sys.stdout.write('Add root user key to be authorized to log into nodes (-u)? (y/n): ')
+        sys.stdout.flush()
+        cmdset.u = input().strip().lower().startswith('y')
+        sys.stdout.write('Set up an SSH authority to help manage known_hosts and node to node ssh for all users (-s)? (y/n): ')
+        cmdset.s = input().strip().lower().startswith('y')
+        sys.stdout.write('Generate new TLS certificates for HTTP, replacing any existing certificate (-t)? (y/n): ')
+        cmdset.t = input().strip().lower().startswith('y')
+        if not cmdset.t:
+            print(
+                'In order to use your own certificate authority, make sure '
+                'to put the certificate authority into '
+                '/var/lib/confluent/public/site/tls/ directory as a .pem file '
+                'as well as named (hash).0 where (hash) is the hash of the '
+                'subject.')
+    else:
+        didsomething = False
+    if cmdset.u:
+        if not glob.glob('/root/.ssh/*.pub'):
+            didsomething = True
+            sys.stderr.write('No user keys for root detected, it is recommended '
+                            'to run ssh-keygen -t ed25519 to generate a user '
+                            'key. For optimal security, a passphrase should be '
+                            'used. ssh-agent may be used to make use of a '
+                            'passphrase protected ssh key easier.\n')
+            sys.exit(1)
+        sshutil.initialize_root_key(False)
+    if cmdset.s:
+        didsomething = True
+        sshutil.initialize_ca()
+    if cmdset.t:
+        didsomething = True
+        certutil.create_certificate()
+    if not didsomething:
+        sys.stderr.write('Nothing was done, use initialize -i for '
+                        'interactive mode, or see initialize -h for more options\n')
 
 def osimport(imagefile):
     c = client.Command()
