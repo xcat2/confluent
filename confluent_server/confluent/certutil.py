@@ -89,8 +89,10 @@ def create_certificate(keyout=None, certout=None):
         ])
     finally:
         os.remove(tmpconfig)
+    # Could restart the webserver now?
     fname = '/var/lib/confluent/public/site/tls/{0}.pem'.format(
         collective.get_myname())
+    os.makedirs(os.path.dirname(fname))
     shutil.copy2(certout, fname)
     hv = subprocess.check_output(
         ['openssl', 'x509', '-in', certout, '-hash', '-noout'])

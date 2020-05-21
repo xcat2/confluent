@@ -51,41 +51,32 @@ def sign_host_key(pubkey, nodename):
     finally:
         shutil.rmtree(tmpdir)
 
-def initialize_root_key():
+def initialize_root_key(generate):
     authorized = []
+    myname = collective.get_myname()
     for currkey in glob.glob('/root/.ssh/*.pub'):
-        authorized.append(open(currkey).read())
-    if not authorized:
+        authorized.append(currkey)
+    if generate and not authorized:
         subprocess.check_call(['ssh-keygen', '-t', 'ed25519', '-f', '/root/.ssh/id_ed25519', '-N', ''])
         for currkey in glob.glob('/root/.ssh/*.pub'):
-            authorized.append(open(currkey).read())
+            authorized.append(currkey)
     try:
-        os.makedirs('/var/lib/confluent/ssh', mode=0o755)
+        os.makedirs('/var/lib/confluent/public/site/ssh', mode=0o755)
         neededuid = os.stat('/etc/confluent').st_uid
-        os.chown('/var/lib/confluent/ssh', neededuid, -1)
+        os.chown('/var/lib/confluent/public/site/ssh', neededuid, -1)
     except OSError as e:
         if e.errno != 17:
             raise
     for auth in authorized:
-        if 'PRIVATE' in auth:
-            continue
-        currcomment = auth.split(' ', 2)[-1].strip()
-        curralgo = auth.split(' ', 1)[0]
-        authed = []
-        try:
-            with open('/var/lib/confluent/ssh/authorized_keys', 'r') as ak:
-                for keyline in ak:
-                    comment = keyline.split(' ', 2)[-1].strip()
-                    algo = keyline.split(' ', 1)[0]
-                    if currcomment != comment or algo != curralgo:
-                        authed.append(keyline)
-        except OSError as e:
-            if e.errno != 2:
-                raise
-        authed.append(auth)
-        with open('/var/lib/confluent/ssh/authorized_keys', 'w') as ak:
-            for auth in authed:
-                ak.write(auth)
+        shutil.copy(
+            auth,
+            '/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
+                    myname))
+        os.chmod('/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
+                myname), 0o644)
+        os.chown('/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
+                myname), neededuid, -1)
+
 
 
 def ca_exists():
@@ -93,7 +84,7 @@ def ca_exists():
 
 
 if __name__ == '__main__':
-    initialize_root_key()
+    initialize_root_key(True)
     if not ca_exists():
         initialize_ca()
     print(repr(sign_host_key(open('/etc/ssh/ssh_host_ed25519_key.pub').read(), collective.get_myname())))
