@@ -61,7 +61,7 @@ def create_certificate(outdir):
         ])
     finally:
         os.remove(tmpconfig)
-    fname = '/var/lib/confluent/public/site/tls/{0}.cert'.format(
+    fname = '/var/lib/confluent/public/site/tls/{0}.pem'.format(
         collective.get_myname())
     shutil.copy2(certout, fname)
     hv = subprocess.check_output(
@@ -70,7 +70,7 @@ def create_certificate(outdir):
         hv = hv.decode('utf8')
     hv = hv.strip()
     hashname = '/var/lib/confluent/public/site/tls/{0}.0'.format(hv)
-    certname = '{0}.cert'.format(collective.get_myname())
+    certname = '{0}.pem'.format(collective.get_myname())
     for currname in os.listdir('/var/lib/confluent/public/site/tls/'):
         currname = os.path.join('/var/lib/confluent/public/site/tls/', currname)
         if currname.endswith('.0'):

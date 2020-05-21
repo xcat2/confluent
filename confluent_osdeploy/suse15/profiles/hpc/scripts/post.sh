@@ -45,5 +45,5 @@ cp /tmp/confluent.* /mnt/etc/confluent/
 cp -a /tls /mnt/etc/confluent/
 cp -a /tls/* /mnt/var/lib/ca-certificates/openssl
 cp -a /tls/* /mnt/var/lib/ca-certificates/pem
-cp -a /tls/*.cert /mnt/etc/pki/trust/anchors
+cp -a /tls/*.pem /mnt/etc/pki/trust/anchors
 
