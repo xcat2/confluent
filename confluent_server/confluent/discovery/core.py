@@ -1076,7 +1076,7 @@ def discover_node(cfg, handler, info, nodename, manual):
                 traceback.print_exc()
                 return False
             newnodeattribs = {}
-            if cfm.list_collective():
+            if list(cfm.list_collective()):
                 # We are in a collective, check collective.manager
                 cmc = cfg.get_node_attributes(nodename, 'collective.manager')
                 cm = cmc.get(nodename, {}).get('collective.manager', {}).get('value', None)

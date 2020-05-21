@@ -243,7 +243,7 @@ class ConsoleHandler(object):
     def check_collective(self, attrvalue):
         myc = attrvalue.get(self.node, {}).get('collective.manager', {}).get(
             'value', None)
-        if configmodule.list_collective() and not myc:
+        if list(configmodule.list_collective()) and not myc:
             self._is_local = False
             self._detach()
             self._disconnect()
