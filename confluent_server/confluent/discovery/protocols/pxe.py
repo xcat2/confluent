@@ -415,6 +415,8 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     rqtype = packet[53][0]
     insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
         'never')
+    if not insecuremode:
+        insecuremode = 'never'
     if insecuremode == 'never' and not httpboot:
         if rqtype == 1 and info['architecture']:
             log.log(
