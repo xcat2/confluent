@@ -50,7 +50,21 @@
 		  <device>%%INSTDISK%%</device>
 		  <initialize config:type="boolean">true</initialize>
 		  <use>all</use>
-		  <type config:type="symbol">CT_LVM</type>
+                  <partitions config:type="list">
+                         <partition>
+                                 <filesystem config:type="symbol">xfs</filesystem>
+                                 <mount>/</mount>
+                                 <size>max</size>
+                         </partition>
+                         <partition>
+                                 <mount>swap</mount>
+                                 <size>auto</size>
+                         </partition>
+                         <partition>
+                                 <mount>/boot</mount>
+                                 <size>500M</size>
+                         </partition>
+                 </partitions>
           </drive>
  </partitioning>
     <users config:type="list">
