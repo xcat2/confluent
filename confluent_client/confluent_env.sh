@@ -138,6 +138,21 @@ _confluent_nodefirmware_completion()
     fi
 }
 
+_confluent_osimage_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 2 ]; then
+        COMPREPLY=($(compgen -W "initialize import" -- ${COMP_WORDS[COMP_CWORD]}))
+        return
+    elif [ ${CMPARGS[1]} == 'initialize' ]; then
+        COMPREPLY=($(compgen -W "-h -u -s -t -i" -- ${COMP_WORDS[COMP_CWORD]}))
+    elif [ ${CMPARGS[1]} == 'import' ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+}
+
 _confluent_nodedeploy_completion()
 {
     _confluent_get_args
@@ -281,7 +296,7 @@ complete -F _confluent_nn_completion nodeconsole
 complete -F _confluent_nr_completion nodeeventlog
 complete -F _confluent_nodefirmware_completion nodefirmware
 complete -F _confluent_nodedeploy_completion nodedeploy
-complete -F _confluent_osimage osimage
+complete -F _confluent_osimage_completion osimage
 complete -F _confluent_ng_completion nodegroupattrib
 complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
