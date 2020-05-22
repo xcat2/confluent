@@ -86,23 +86,28 @@ def initialize(cmdset):
     for x in bytearray(os.urandom(22)):
         tmpname += fnamechars[x >> 2]
     topack = []
-    for currd, _, files in os.walk('/var/lib/confluent/public/site/tls'):
+    opath = os.getcwd()
+    os.chdir('/var/lib/confluent/public/site')
+    for currd, _, files in os.walk('tls'):
         for fname in files:
             topack.append(os.path.join(currd, fname))
-    for currd, _, files in os.walk('/var/lib/confluent/public/site/ssh'):
+    for currd, _, files in os.walk('ssh'):
         for fname in files:
             topack.append(os.path.join(currd, fname))
     with open(tmpname, 'wb') as initramfs:
         packit = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
                                   stdout=initramfs, stdin=subprocess.PIPE)
         for packfile in topack:
+            if not isinstance(packfile, bytes):
+                packfile = packfile.encode('utf8')
             packit.stdin.write(packfile)
-            packit.stdin.write('\n')
+            packit.stdin.write(b'\n')
         packit.stdin.close()
         res = packit.wait()
         if res:
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
+    os.chdir(opath)
     os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
 
 def osimport(imagefile):
