@@ -394,9 +394,9 @@ class MediaImporter(object):
                 dirname = '/var/lib/confluent/public/os/{0}'.format(profname)
                 if os.path.exists(dirname):
                     continue
+                oumask = os.umask(0o22)
                 shutil.copytree(srcname, dirname)
                 profdata = None
-                oumask = os.umask(0o22)
                 try:
                     os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
                 except OSError as e:
