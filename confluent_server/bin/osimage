@@ -28,7 +28,9 @@ def main(args):
     wiz = sp.add_parser('initialize', help='Do OS deployment preparation')
     wiz.add_argument('-u', help='Pull in root user key for node deployment', action='store_true')
     wiz.add_argument('-s', help='Set up SSH CA for managing node to node ssh and known hosts', action='store_true')
+    wiz.add_argument('-k', help='Update local global known hosts file with confluent CA', action='store_true')
     wiz.add_argument('-t', help='Generate new TLS key for HTTPS operation and register with confluent repository', action='store_true')
+    wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
@@ -38,6 +40,16 @@ def main(args):
     if cmdset.command == 'initialize':
         return initialize(cmdset)
     ap.print_help()
+
+def install_tftp_content():
+    if os.path.isdir('/var/lib/tftpboot'):
+        try:
+            os.makedirs('/var/lib/tftpboot/confluent/x86_64')
+        except OSError as e:
+            if e.errno == 17:
+                raise
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', '/var/lib/tftpboot/confluent/x86_64/ipxe.efi')
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', '/var/lib/tftpboot/confluent/x86_64/ipxe.kkpxe')
 
 def initialize(cmdset):
     if os.getuid() != 0:
@@ -50,6 +62,10 @@ def initialize(cmdset):
         cmdset.u = input().strip().lower().startswith('y')
         sys.stdout.write('Set up an SSH authority to help manage known_hosts and node to node ssh for all users (-s)? (y/n): ')
         cmdset.s = input().strip().lower().startswith('y')
+        sys.stdout.write('Update global known hosts on this server to trust local CA certificates (-k)? (y/n): ')
+        cmdset.k = input().strip().lower().startswith('y')
+        sys.stdout.write('Update tftp directory with binaries to support PXE (-p) (y/n): ')
+        cmdset.p = input().strip().lower().startswith('y')
         sys.stdout.write('Generate new TLS certificates for HTTP, replacing any existing certificate (-t)? (y/n): ')
         cmdset.t = input().strip().lower().startswith('y')
         if not cmdset.t:
@@ -74,6 +90,7 @@ def initialize(cmdset):
     if cmdset.t:
         didsomething = True
         certutil.create_certificate()
+        print('New HTTPS certificates generated, restart the web server')
     if cmdset.s:
         didsomething = True
         sshutil.initialize_ca()
@@ -111,6 +128,18 @@ def initialize(cmdset):
             sys.exit(1)
     os.chdir(opath)
     os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
+    if cmdset.k:
+        with open('/etc/ssh/ssh_known_hosts', 'a+b') as skh:
+            for cafile in glob.glob('/var/lib/confluent/public/site/ssh/*.ca'):
+                cacert = open(cafile, 'rb').read()
+                cacert = b'@cert-authority * ' + cacert
+                skh.write(cacert)
+    if cmdset.p:
+        install_tftp_content()
+    # ok, also need to think on how to handle getinstalldisk
+    if not os.path.exists('/etc/confluent/srvcert.pem'):
+        subprocess.check_call(['collective', 'gencert'])
+    
 
 def osimport(imagefile):
     c = client.Command()
