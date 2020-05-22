@@ -1,7 +1,9 @@
 #!/usr/bin/python2
 
 import argparse
+import eventlet.green.subprocess as subprocess
 import glob
+import os
 import os.path
 import sys
 import time
@@ -19,6 +21,7 @@ try:
 except NameError:
     pass
 
+fnamechars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.^'
 def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
     sp = ap.add_subparsers(dest='command')
@@ -31,9 +34,10 @@ def main(args):
     osip.add_argument('imagefile', help='File to use for source of importing')
     cmdset = ap.parse_args()
     if cmdset.command == 'import':
-        osimport(cmdset.imagefile)
+        return osimport(cmdset.imagefile)
     if cmdset.command == 'initialize':
-        initialize(cmdset)
+        return initialize(cmdset)
+    ap.print_help()
 
 def initialize(cmdset):
     if os.getuid() != 0:
@@ -67,15 +71,39 @@ def initialize(cmdset):
                             'passphrase protected ssh key easier.\n')
             sys.exit(1)
         sshutil.initialize_root_key(False)
-    if cmdset.s:
-        didsomething = True
-        sshutil.initialize_ca()
     if cmdset.t:
         didsomething = True
         certutil.create_certificate()
+    if cmdset.s:
+        didsomething = True
+        sshutil.initialize_ca()
+
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
                         'interactive mode, or see initialize -h for more options\n')
+        sys.exit(1)
+    tmpname = '/var/lib/confluent/public/site/initramfs.cpio.'
+    for x in bytearray(os.urandom(22)):
+        tmpname += fnamechars[x >> 2]
+    topack = []
+    for currd, _, files in os.walk('/var/lib/confluent/public/site/tls'):
+        for fname in files:
+            topack.append(os.path.join(currd, fname))
+    for currd, _, files in os.walk('/var/lib/confluent/public/site/ssh'):
+        for fname in files:
+            topack.append(os.path.join(currd, fname))
+    with open(tmpname, 'wb') as initramfs:
+        packit = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
+                                  stdout=initramfs, stdin=subprocess.PIPE)
+        for packfile in topack:
+            packit.stdin.write(packfile)
+            packit.stdin.write('\n')
+        packit.stdin.close()
+        res = packit.wait()
+        if res:
+            sys.stderr.write('Error occurred while packing site initramfs')
+            sys.exit(1)
+    os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
 
 def osimport(imagefile):
     c = client.Command()
