@@ -8,21 +8,24 @@ import shutil
 import tempfile
 
 def normalize_uid():
-    curruid = os.getuid()
+    curruid = os.geteuid()
     neededuid = os.stat('/etc/confluent').st_uid
     if curruid != neededuid:
-        os.setuid(neededuid)
-    if os.getuid() != neededuid:
+        os.seteuid(neededuid)
+    if os.geteuid() != neededuid:
         raise Exception('Need to run as root or owner of /etc/confluent')
+    return curruid
 
 
 def initialize_ca():
-    normalize_uid()
+    ouid = normalize_uid()
     try:
         os.makedirs('/etc/confluent/ssh', mode=0o700)
     except OSError as e:
         if e.errno != 17:
             raise
+    finally:
+        os.seteuid(ouid)
     myname = collective.get_myname()
     caname = '{0} SSH CA'.format(myname)
     subprocess.check_call(['ssh-keygen', '-C', caname, '-t', 'ed25519', '-f', '/etc/confluent/ssh/ca', '-N', ''])
@@ -63,6 +66,9 @@ def initialize_root_key(generate):
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh', mode=0o755)
         neededuid = os.stat('/etc/confluent').st_uid
+        os.chown('/var/lib/confluent', neededuid, -1)
+        os.chown('/var/lib/confluent/public', neededuid, -1)
+        os.chown('/var/lib/confluent/public/site', neededuid, -1)
         os.chown('/var/lib/confluent/public/site/ssh', neededuid, -1)
     except OSError as e:
         if e.errno != 17:
