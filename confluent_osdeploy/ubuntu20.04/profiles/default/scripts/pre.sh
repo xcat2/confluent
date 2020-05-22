@@ -14,6 +14,6 @@ echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config.d/confluent.con
 echo IgnoreRhosts no >> /etc/ssh/sshd_config.d/confluent.conf
 systemctl restart sshd
 curl -f X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
-curl https://$mgr/confluent-public/confluent/util/getinstalldisk > /custom-installation/getinstalldisk
+curl -f ${proto}://$mgr/confluent-public/os/$profile/scripts/getinstalldisk > /custom-installation/getinstalldisk
 python3 /custom-installation/getinstalldisk
 sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml

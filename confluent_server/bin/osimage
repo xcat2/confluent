@@ -139,7 +139,7 @@ def initialize(cmdset):
     # ok, also need to think on how to handle getinstalldisk
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         subprocess.check_call(['collective', 'gencert'])
-    
+
 
 def osimport(imagefile):
     c = client.Command()
