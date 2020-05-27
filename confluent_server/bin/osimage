@@ -43,14 +43,23 @@ def main(args):
     ap.print_help()
 
 def install_tftp_content():
-    if os.path.isdir('/var/lib/tftpboot'):
-        try:
-            os.makedirs('/var/lib/tftpboot/confluent/x86_64')
-        except OSError as e:
-            if e.errno == 17:
-                raise
-        shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', '/var/lib/tftpboot/confluent/x86_64/ipxe.efi')
-        shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', '/var/lib/tftpboot/confluent/x86_64/ipxe.kkpxe')
+    tftplocation = None
+    candidates = ('/var/lib/tftpboot', '/srv/tftpboot', '/srv/tftp')
+    for cand in candidates:
+        if os.path.isdir(cand):
+            tftplocation = cand
+            break
+    if not tftplocation:
+        raise Exception('Unable to detect an installed tftp location')
+    tftplocation = '{0}/confluent/x86_64'.format(tftplocation)
+    try:
+        os.makedirs(tftplocation)
+    except OSError as e:
+        if e.errno == 17:
+            raise
+    shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
+    shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
+
 
 def initialize(cmdset):
     if os.getuid() != 0:
