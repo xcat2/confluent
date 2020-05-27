@@ -5,6 +5,7 @@ import eventlet.green.subprocess as subprocess
 import glob
 import os
 import os.path
+import shutil
 import sys
 import time
 
@@ -139,6 +140,9 @@ def initialize(cmdset):
     # ok, also need to think on how to handle getinstalldisk
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         subprocess.check_call(['collective', 'gencert'])
+    # TODO: check selinux and segetbool for httpd_can_network_connect 
+    # tftp-server available and enabled?
+    # httpd available and enabled?
 
 
 def osimport(imagefile):
