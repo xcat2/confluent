@@ -28,7 +28,9 @@ def initialize_ca():
         os.seteuid(ouid)
     myname = collective.get_myname()
     caname = '{0} SSH CA'.format(myname)
-    subprocess.check_call(['ssh-keygen', '-C', caname, '-t', 'ed25519', '-f', '/etc/confluent/ssh/ca', '-N', ''])
+    subprocess.check_call(
+        ['ssh-keygen', '-C', caname, '-t', 'ed25519', '-f',
+         '/etc/confluent/ssh/ca', '-N', ''], preexec_fn=normalize_uid)
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
     except OSError as e:
