@@ -93,6 +93,8 @@ def handle_request(env, start_response):
                         continue
                     if not isinstance(ccurrlocale, str):
                         ccurrlocale = ccurrlocale.decode('utf8')
+                    if ccurrlocale == 'n/a':
+                        continue
                     currlocale = ccurrlocale
                 elif line.startswith(b'VC Keymap:'):
                     ckeymap = line.split(b':')[-1]
@@ -101,6 +103,8 @@ def handle_request(env, start_response):
                         continue
                     if not isinstance(ckeymap, str):
                         ckeymap = ckeymap.decode('utf8')
+                    if ckeymap == 'n/a':
+                        continue
                     keymap = ckeymap
             tdc = subprocess.check_output(['timedatectl']).split(b'\n')
             for ent in tdc:
