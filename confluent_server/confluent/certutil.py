@@ -55,8 +55,15 @@ def get_certificate_paths():
     if not keypath and os.path.exists('/etc/apache2'): # suse way
         for currpath, _, files in os.walk('/etc/apache2'):
             for fname in files:
-                keypath, certpath = check_apache_config(os.path.join(currpath,
-                                                                     fname))
+                if fname.endswith('.template'):
+                    continue
+                kploc = check_apache_config(os.path.join(currpath,
+                                                                       fname))
+                if keypath and kploc[0]:
+                    return None, None # Ambiguous...
+                if kploc[0]:
+                    keypath, certpath = kploc
+
     return keypath, certpath
 
 def create_certificate(keyout=None, certout=None):
