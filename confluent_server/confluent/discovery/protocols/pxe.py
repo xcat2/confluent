@@ -537,7 +537,9 @@ def send_raw_packet(repview, replen, reqview, info):
     targ = sockaddr_ll()
     bcastaddr = get_bcastaddr(ifidx)
     hwlen = len(bcastaddr)
-    targ.sll_addr = (ctypes.c_ubyte * 20).from_buffer(bcastaddr)
+    bcastaddr20 = bytearray(20)
+    bcastaddr20[:hwlen] = bcastaddr
+    targ.sll_addr = (ctypes.c_ubyte * 20).from_buffer(bcastaddr20)
     targ.sll_family = socket.AF_PACKET
     targ.sll_halen = hwlen
     targ.sll_protocol = socket.htons(0x800)
