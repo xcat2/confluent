@@ -68,13 +68,16 @@ def update_boot(profiledir):
         ipxeargs += " initrd=" + initramfs
     oum = os.umask(0o22)
     ipout = os.open(profiledir + '/boot/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
-    os.umask(oum)
-    with open(ipout, 'w') as ipxeout:
+    ipxeout = os.fdopen(ipout, 'w')
+    try:
+        os.umask(oum)
         ipxeout.write('#!ipxe\n')
         ipxeout.write('imgfetch kernel ' + ipxeargs + '\n')
         for initramfs in initrds:
             ipxeout.write('imgfetch initramfs/{0}\n'.format(initramfs))
         ipxeout.write('imgload kernel\nimgexec kernel\n')
+    finally:
+        ipxeout.close()
     subprocess.check_call(
         ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
          '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)
@@ -362,9 +365,10 @@ class MediaImporter(object):
 
     def importmedia(self):
         os.environ['PYTHONPATH'] = ':'.join(sys.path)
-        self.worker = subprocess.Popen(
-            [sys.executable, __file__, self.filename, '-b'],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        with open(os.devnull, 'w') as devnull:
+            self.worker = subprocess.Popen(
+                [sys.executable, __file__, self.filename, '-b'],
+                stdin=devnull, stdout=subprocess.PIPE)
         wkr = self.worker
         currline = b''
         while wkr.poll() is None:
