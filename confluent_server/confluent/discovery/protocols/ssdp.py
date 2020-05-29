@@ -199,18 +199,26 @@ def _find_service(service, target):
         for addr in addrs:
             host = addr[4][0]
             if addr[0] == socket.AF_INET:
-                net4.sendto(smsg.format(host, service), addr[4])
+                msg = smsg.format(host, service)
+                if not isinstance(msg, bytes):
+                    msg = msg.encode('utf8')
+                net4.sendto(msg, addr[4])
             elif addr[0] == socket.AF_INET6:
                 host = '[{0}]'.format(host)
-                net6.sendto(smsg.format(host, service), addr[4])
+                msg = smsg.format(host, service)
+                if not isinstance(msg, bytes):
+                    msg = msg.encode('utf8')               
+                net6.sendto(msg, addr[4])
     else:
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         for idx in util.list_interface_indexes():
             net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF,
                             idx)
             try:
-                net6.sendto(smsg.format('[{0}]'.format(mcastv6addr), service
-                                        ), (mcastv6addr, 1900, 0, 0))
+                msg = smsg.format('[{0}]'.format(mcastv6addr), service)
+                if not isinstance(msg, bytes):
+                    msg = msg.encode('utf8')
+                net6.sendto(msg, (mcastv6addr, 1900, 0, 0))
             except socket.error:
                 # ignore interfaces without ipv6 multicast causing error
                 pass
@@ -221,9 +229,14 @@ def _find_service(service, target):
             bcast = i4['broadcast']
             net4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
                             socket.inet_aton(addr))
-            net4.sendto(smsg.format(mcastv4addr, service),
-                        (mcastv4addr, 1900))
-            net4.sendto(smsg.format(bcast, service), (bcast, 1900))
+            msg = smsg.format(mcastv4addr, service)
+            if not isinstance(msg, bytes):
+                msg = msg.encode('utf8')
+            net4.sendto(msg, (mcastv4addr, 1900))
+            msg = smsg.format(bcast, service)
+            if not isinstance(msg, bytes):
+                msg = msg.encode('utf8')
+            net4.sendto(msg, (bcast, 1900))
     # SSDP by spec encourages responses to spread out over a 3 second interval
     # hence we must be a bit more patient
     deadline = util.monotonic_time() + 4
