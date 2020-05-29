@@ -82,7 +82,7 @@ fi
 nameserversec=0
 while read -r entry; do
     if [ $nameserversec = 1 ]; then
-        if [[ $entry == "-"* ]]; then
+        if [[ $entry == "-"* ]] && [[ $entry != "- ''" ]]; then
             echo nameserver=${entry#- } >> /etc/cmdline.d/01-confluent.conf
             continue
         fi
