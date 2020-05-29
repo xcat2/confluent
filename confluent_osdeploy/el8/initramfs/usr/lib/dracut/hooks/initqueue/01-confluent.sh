@@ -88,7 +88,7 @@ while read -r entry; do
         fi
     fi
     nameserversec=0
-    if [ ${entry%:*} = "nameservers" ]; then
+    if [ "${entry%:*}" = "nameservers" ]; then
         nameserversec=1
         continue
     fi
