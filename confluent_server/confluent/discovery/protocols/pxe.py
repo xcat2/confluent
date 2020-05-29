@@ -115,7 +115,7 @@ def idxtoname(idx):
     _idxtoname(idx, name)
     ret = name.value.strip()
     if not isinstance(ret, str):
-        ret = ret.deecode('utf8')
+        ret = ret.decode('utf8')
     return ret
 
 _idxtobcast = {}
