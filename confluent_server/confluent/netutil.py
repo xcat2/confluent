@@ -177,6 +177,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     if ifidx is not None:
         dhcprequested = False
         nets = list(idxtonets(ifidx))
+        if not nets:
+            cfgdata['ipv4_broken'] = True
     if serverip is not None:
         needsvrip = True
         dhcprequested = False
