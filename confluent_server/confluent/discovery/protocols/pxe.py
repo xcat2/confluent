@@ -113,7 +113,10 @@ _idxtoname.argtypes = [ctypes.c_uint, ctypes.c_char_p]
 def idxtoname(idx):
     name = (ctypes.c_char * 16)()
     _idxtoname(idx, name)
-    return name.value.strip()
+    ret = name.value.strip()
+    if not isinstance(ret, str):
+        ret = ret.deecode('utf8')
+    return ret
 
 _idxtobcast = {}
 def get_bcastaddr(idx):
