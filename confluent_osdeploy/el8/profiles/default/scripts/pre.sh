@@ -25,8 +25,10 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
     tmux a <> $consoledev >&0 2>&1 &
 fi
-curl -f https://$mgr/confluent-public/os/$profile/scripts/getinstalldisk > /tmp/getinstalldisk
-/usr/libexec/platform-python /tmp/getinstalldisk
+export mgr profile nodename
+curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
+. /tmp/functions
+run_remote_python getinstalldisk
 if [ -e /tmp/installdisk ]; then
     echo clearpart --all --initlabel >> /tmp/partitioning
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
