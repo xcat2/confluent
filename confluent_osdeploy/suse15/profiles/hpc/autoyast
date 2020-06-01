@@ -115,19 +115,27 @@ curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
 mgr=$(grep ^deploy_server /tmp/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
-curl $proto://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/post.sh
-. /tmp/post.sh
-curl $proto://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
+curl $proto://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/prechroot.sh
+. /tmp/prechroot.sh
+curl -f $proto://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
+curl -f $proto://$mgr/confluent-public/os/$profile/scripts/post.sh > /mnt/etc/confluent/post.sh
 chmod +x /mnt/etc/confluent/firstboot.sh
+chmod +x /mnt/etc/confluent/post.sh
 ]]>
           </source>
+        </script>
+        <script>
+          <chrooted config:type="boolean">true</chrooted>
+          <filename>post.sh</filename>
+          <interpreter>shell</interpreter>
+          <location>file:///etc/confluent/post.sh</location>
         </script>
       </chroot-scripts>
       <init-scripts config:type="list">
         <script>
-          <filename>post.sh</filename>
+          <filename>firstboot.sh</filename>
           <interpreter>shell</interpreter>
-	  <location>file:///etc/confluent/firstboot.sh</location>
+          <location>file:///etc/confluent/firstboot.sh</location>
         </script>
      </init-scripts> 
 

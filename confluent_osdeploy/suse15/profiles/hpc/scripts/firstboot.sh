@@ -8,3 +8,8 @@ profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassw
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 apikey=$(cat /etc/confluent/confluent.apikey)
 curl --capath /etc/confluent/tls -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" -f -X POST -d "status: complete" https://$mgr/confluent-api/self/updatestatus
+. /etc/confluent/functions
+
+# Custom scripts may go here
+# run_remote example.sh
+# run_remote_python example.py

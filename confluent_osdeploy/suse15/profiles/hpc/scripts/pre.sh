@@ -19,6 +19,7 @@ for i in  /etc/ssh/ssh_host*key.pub; do
     echo HostCertificate $certname >> /etc/ssh/sshd_config
 done
 /usr/sbin/sshd
-curl -f https://$mgr/confluent-public/os/$profile/scripts/getinstalldisk > /tmp/getinstalldisk
-python3 /tmp/getinstalldisk
+curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
+. /tmp/functions
+run_remote_python getinstalldisk
 sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
