@@ -1,4 +1,13 @@
 #!/bin/sh
+
+# This runs prior to the installer beginning. This is used to rewrite the 
+# scripted install file, merging data from confluennt and identifying
+# the most appropriate install source.
+
+# If you want to use a more custom partition plan, the easiest
+# method is to edit the kicktstart file and comment out or
+# delete %include /tmp/partitioning
+
 nodename=$(grep ^NODENAME /etc/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent.deploycfg)
 locale=${locale#locale: }

@@ -1,7 +1,30 @@
+# In this OS profile, data is largely filled in during the %pre
+# phase, rather than the kickstart actually having the content.
+# None of the files shall be replaced during an upgrade in
+# /var/lib/confluent/public/os/<profile>, so customization should
+# be done by modifying files in /var/lib/confluent/public/os/<profile>
+
+# /tmp/rootpw will provide a 'rootpw' line, either locking password if not configured
+# or the crypted form.
 %include /tmp/rootpw
+
+# timezone is fetched from confluent server, which provides the
+# timezone that the management server itself is in by default.
 %include /tmp/timezone
-%include /tmp/partitioning
+
+# similar to timezone, confluent is asked to provide the
+# deployment servers language info and replicate that
+# to the deployment target.
 %include /tmp/langinfo
+
+# The default partition scheme is applied to a single drive, using
+# the getinstalldisk script to make a best guess as to the most
+# appropriate device. See pre.sh and getinstalldisk to customize
+# the automatic behavior, or comment out/delete the 
+# following line and provide your own manual partition plan
+# instead
+%include /tmp/partitioning
+
 reboot
 
 %packages
