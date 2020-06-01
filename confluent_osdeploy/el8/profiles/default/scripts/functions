@@ -6,7 +6,7 @@ run_remote() {
     cd -
 }
 
-run_remote_python {
+run_remote_python() {
     cd $(mktemp -d)
     curl -f https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     /usr/libexec/platform-python $1
