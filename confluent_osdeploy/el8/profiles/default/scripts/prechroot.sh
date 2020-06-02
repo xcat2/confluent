@@ -12,6 +12,7 @@ export mgr profile nodename
 cp -a /etc/confluent /mnt/sysimage/etc
 cp /tmp/functions /mnt/sysimage/etc/confluent/
 . /tmp/functions
+cp /tmp/cryptboot /mnt/sysimage/tmp/
 
 # Preserve the ssh setup work done for the installer
 # by copying into the target system and setting up

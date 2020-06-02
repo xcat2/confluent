@@ -4,6 +4,9 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 export mgr profile nodename
 . /etc/confluent/functions
 
+if [ -f /tmp/cryptboot ]; then
+    run_remote tpm_luks.sh
+fi
 # This script will execute in the installed system, but using the installer kernel prior to reboot.
 # This is an appropriate place to run post install activities that do not require the actual installed
 # kernel to run. For example adding drivers that would be needed for first boot to run cleanly.
@@ -14,6 +17,5 @@ export mgr profile nodename
 # run_remote_python will use the appropriate python interpreter path to run the specified script
 
 # Add content as below:
-
 # run_remote example.sh
 # run_remote_python example.py

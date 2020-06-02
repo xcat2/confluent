@@ -107,6 +107,16 @@ node = {
     'crypted.selfapikey': {
         'description': ('Crypt of api key for self api requests by node'),
     },
+    'deployment.encryptboot': {
+        'description': ('Specify a strategy for encrypting the volume. Support '
+                        'This setting is currently only enabled for '
+                        'RedHat 8 and CentOS 8 profiles. If blank or unset, '
+                        'no encryption is done. If set to "bound" then the OS '
+                        'will freely decrypt so long as the same '
+                        'Trusted Platform Module is available to decrypt the '
+                        'volume'),
+        'validvalues': ('bound', 'none', ''),
+    },
     'deployment.apiarmed': {
         'description': ('Indicates whether the node authentication token interface '
                         'is armed.  If set to once, it will grant only the next '

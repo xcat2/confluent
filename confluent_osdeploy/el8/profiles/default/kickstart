@@ -17,6 +17,11 @@
 # to the deployment target.
 %include /tmp/langinfo
 
+# bootloader may be specified if crypted.grubpassword is set on
+# a node. This will become a bootloader line if a password
+# was specified
+%include /tmp/grubpw
+
 # The default partition scheme is applied to a single drive, using
 # the getinstalldisk script to make a best guess as to the most
 # appropriate device. See pre.sh and getinstalldisk to customize
@@ -29,6 +34,7 @@ reboot
 
 %packages
 @^minimal-environment
+clevis-dracut
 chrony
 rsync
 python3

@@ -69,6 +69,10 @@ def handle_request(env, start_response):
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
+        ncfg['encryptboot'] = deployinfo.get('deployment.encryptboot', {}).get(
+            'value', None)
+        if ncfg['encryptboot'] in ('', 'none'):
+            ncfg['encryptboot'] = None
         ncfg['profile'] = profile
         protocol = deployinfo.get('deployment.useinsecureprotocols', {}).get(
             'value', 'never')
