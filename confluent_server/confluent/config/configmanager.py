@@ -490,6 +490,8 @@ def grub_hashcrypt_value(value):
     salt = os.urandom(64)
     algo = 'sha512'
     rounds = 10000
+    if not isinstance(value, bytes):
+        value = value.encode('utf8')
     crypted = hexlify(hashlib.pbkdf2_hmac(algo, value, salt, rounds))
     crypted = crypted.upper()
     salt = hexlify(salt).upper()
@@ -1706,6 +1708,9 @@ class ConfigManager(object):
                     if 'hashvalue' not in curr[attrib]:
                         curr[attrib]['hashvalue'] = hashcrypt_value(
                             curr[attrib]['value'])
+                    if 'grubhashvalue' not in curr[attrib]:
+                        curr[attrib]['grubhashvalue'] = grub_hashcrypt_value(
+                            curr[attrib]['value'])
                     if 'value' in curr[attrib]:
                         del curr[attrib]['value']
         if cfgleader:  # currently config slave to another
@@ -2125,6 +2130,9 @@ class ConfigManager(object):
                     if 'hashvalue' not in curr[attrib]:
                         curr[attrib]['hashvalue'] = hashcrypt_value(
                             curr[attrib]['value'])
+                    if 'grubhashvalue' not in curr[attrib]:
+                        curr[attrib]['grubhashvalue'] = grub_hashcrypt_value(
+                            curr[attrib]['value'])
                     if 'value' in curr[attrib]:
                         del curr[attrib]['value']
         if cfgleader:  # currently config slave to another
@@ -2199,7 +2207,7 @@ class ConfigManager(object):
                             attrname, node)
                         raise ValueError(errstr)
                     attribmap[node][attrname] = attrval
-        for node in attribmap:            
+        for node in attribmap:
             node = confluent.util.stringify(node)
             exprmgr = None
             if node not in self._cfgstore['nodes']:
