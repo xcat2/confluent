@@ -1708,9 +1708,9 @@ class ConfigManager(object):
                     if 'hashvalue' not in curr[attrib]:
                         curr[attrib]['hashvalue'] = hashcrypt_value(
                             curr[attrib]['value'])
-                    if 'grubhashvalue' not in curr[attrib]:
-                        curr[attrib]['grubhashvalue'] = grub_hashcrypt_value(
-                            curr[attrib]['value'])
+                        if 'grubhashvalue' not in curr[attrib]:
+                            curr[attrib]['grubhashvalue'] = grub_hashcrypt_value(
+                                curr[attrib]['value'])
                     if 'value' in curr[attrib]:
                         del curr[attrib]['value']
         if cfgleader:  # currently config slave to another
@@ -2130,9 +2130,9 @@ class ConfigManager(object):
                     if 'hashvalue' not in curr[attrib]:
                         curr[attrib]['hashvalue'] = hashcrypt_value(
                             curr[attrib]['value'])
-                    if 'grubhashvalue' not in curr[attrib]:
-                        curr[attrib]['grubhashvalue'] = grub_hashcrypt_value(
-                            curr[attrib]['value'])
+                        if 'grubhashvalue' not in curr[attrib]:
+                            curr[attrib]['grubhashvalue'] = grub_hashcrypt_value(
+                                curr[attrib]['value'])
                     if 'value' in curr[attrib]:
                         del curr[attrib]['value']
         if cfgleader:  # currently config slave to another
