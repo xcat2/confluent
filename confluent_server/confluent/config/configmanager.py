@@ -486,7 +486,7 @@ def _get_valid_attrname(attrname):
     return attrname
 
 
-def grub_hashcrypt_value(value)
+def grub_hashcrypt_value(value):
     salt = os.urandom(64)
     algo = 'sha512'
     rounds = 10000
