@@ -52,6 +52,7 @@ except ModuleNotFoundError:
     import dbm
 import ast
 import base64
+from binascii import hexlify
 import confluent.config.attributes as allattributes
 import confluent.config.conf as conf
 import confluent.log
@@ -71,6 +72,7 @@ import eventlet.event as event
 import eventlet.green.select as select
 import eventlet.green.threading as gthread
 import fnmatch
+import hashlib
 import json
 import msgpack
 import operator
@@ -482,6 +484,17 @@ def _get_valid_attrname(attrname):
         netattrparts = attrname.split('.')
         attrname = netattrparts[0] + '.' + netattrparts[-1]
     return attrname
+
+
+def grub_hashcrypt_value(value)
+    salt = os.urandom(64)
+    algo = 'sha512'
+    rounds = 10000
+    crypted = hexlify(hashlib.pbkdf2_hmac(algo, value, salt, rounds))
+    crypted = crypted.upper()
+    salt = hexlify(salt).upper()
+    ret = 'grub.pbkdf2.{0}.{1}.{2}.{3}'.format(algo, rounds, salt, crypted)
+    return ret
 
 
 def hashcrypt_value(value):
@@ -2206,6 +2219,8 @@ class ConfigManager(object):
                     del newdict['value']
                 if 'value' in newdict and attrname.startswith("crypted."):
                     newdict['hashvalue'] = hashcrypt_value(newdict['value'])
+                    newdict['grubhashvalue'] = grub_hashcrypt_value(
+                        newdict['value'])
                     del newdict['value']
                 cfgobj[attrname] = newdict
                 if attrname == 'groups':

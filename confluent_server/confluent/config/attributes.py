@@ -101,6 +101,9 @@ node = {
         'description': 'The password of the local root password. '
                        'This is stored as a non-recoverable hash.',
     },
+    'crypted.grubpassword': {
+        'description': 'Password required to modify grub behavior at boot',
+    },
     'crypted.selfapikey': {
         'description': ('Crypt of api key for self api requests by node'),
     },

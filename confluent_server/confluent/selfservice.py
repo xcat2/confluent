@@ -64,7 +64,7 @@ def handle_request(env, start_response):
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
         deployinfo = cfg.get_node_attributes(
-            nodename, ('deployment.*', 'console.method', 'crypted.rootpassword',
+            nodename, ('deployment.*', 'console.method', 'crypted.*',
                        'dns.*'))
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
@@ -80,6 +80,8 @@ def handle_request(env, start_response):
             ncfg['protocol'] = 'https'
         ncfg['rootpassword'] = deployinfo.get('crypted.rootpassword', {}).get(
             'hashvalue', None)
+        ncfg['grubpassword'] = deployinfo.get('crypted.grubpassword', {}).get(
+            'grubhashvalue', None)
         if currtzvintage and currtzvintage > (time.time() - 30.0):
             ncfg['timezone'] = currtz
         else:
