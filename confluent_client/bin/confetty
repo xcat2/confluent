@@ -292,6 +292,8 @@ def rcompleter(text, state):
 
 
 def parse_command(command):
+    if isinstance(command, list):
+        return command
     try:
         args = shlex.split(command, posix=True)
     except ValueError as ve:
@@ -912,8 +914,7 @@ def main():
         do_command("start /nodes/%s/console/session" % session_node, netserver)
         doexit = True
     elif shellargs:
-        command = shlex.join(shellargs)
-        do_command(command, netserver)
+        do_command(shellargs, netserver)
         quitconfetty(fullexit=True, fixterm=False)
 
     powerstate = None
