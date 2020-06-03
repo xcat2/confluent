@@ -53,6 +53,7 @@ if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [
 	echo "install progress may be checked by using ssh to access and run the screendump command" > ${autocons%,*}
 	echo "Install time serial console would require the profile to have console=${autocons#/dev/}" > ${autocons%,*}
 	echo "specified in the kernel command line arguments" > ${autocons%,*}
+	echo ${autocons%,*} > /tmp/autoconsdev
 	sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
 	mount -o bind /etc/fakecmdline /proc/cmdline
 	echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent

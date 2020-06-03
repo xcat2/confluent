@@ -8,6 +8,12 @@ rootpw=$(grep rootpassword: /tmp/confluent.deploycfg|sed -e 's/^rootpassword: //
 if [ "$rootpw" = "null" ]; then
     rootpw="!"
 fi
+cryptboot=$(grep encryptboot: /tmp/confluent.deploycfg|sed -e 's/^encryptboot: //')
+if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
+	echo "Encrypted boot requested, but not implemented for this OS" > /dev/console
+	if [ -f '/tmp/autoconsdev' ]; then echo "Encryptod boot requested, but not implemented for this OS" >> $(cat /tmp/autoconsdev)
+	while :; do sleep 86400; done
+fi
 
 mkdir ~/.ssh
 cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
