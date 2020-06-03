@@ -277,7 +277,7 @@ def _parse_ssdp(peer, rsp, peerdata):
     if ip in neighutil.neightable:
         nid = neighutil.neightable[ip]
         mac = nid
-    headlines = rsp.split('\r\n')
+    headlines = rsp.split(b'\r\n')
     try:
         _, code, _ = headlines[0].split(' ', 2)
     except ValueError:
