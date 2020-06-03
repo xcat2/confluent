@@ -28,6 +28,7 @@
 # NTS: ssdp:alive
 
 
+import confluent.config.configmanager as cfm
 import confluent.neighutil as neighutil
 import confluent.util as util
 import confluent.log as log
@@ -172,6 +173,15 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         curruuid = query.split('=', 1)[1].lower()
                                         node = uuidlookup(curruuid)
                                         if not node:
+                                            break
+                                        # Do not bother replying to a node that
+                                        # we have no deployment activity
+                                        # planned for
+                                        cfg = cfm.ConfigManager(None)
+                                        cfd = cfg.get_node_attributes(
+                                            node, 'deployment.pendingprofile')
+                                        if not cfd.get(node, {}).get(
+                                                'deployment.pendingprofile', {}).get('value', None):
                                             break
                                         currtime = time.time()
                                         seconds = int(currtime)
