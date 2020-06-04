@@ -20,6 +20,7 @@ READFILES = set([
     'README.diskdefines',
     'media.1/products',
     'media.2/products',
+    '.DISCINFO',
     '.discinfo',
 ])
 
@@ -143,6 +144,24 @@ def check_centos(isoinfo):
         return None
     return {'name': 'centos-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
 
+def check_esxi(isoinfo):
+    if '.DISCINFO' not in isoinfo[1]:
+        return
+    isesxi = False
+    version = None
+    for line in isoinfo[1]['.DISCINFO'].split(b'\n'):
+        if b'ESXi' == line:
+            isesxi = True
+        if line.startswith(b'Version: '):
+            _, version = line.split(b' ', 1)
+            if not isinstance(version, str):
+                version = version.decode('utf8')
+    if isesxi and version:
+        return {
+            'name': 'esxi-{0}'.format(version),
+            'method': EXTRACT,
+            'category': 'esxi{0}'.format(version.split('.', 1)[0])
+        }
 
 def check_ubuntu(isoinfo):
     if 'README.diskdefines' not in isoinfo[1]:
