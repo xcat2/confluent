@@ -495,6 +495,10 @@ def grub_hashcrypt_value(value):
     crypted = hexlify(hashlib.pbkdf2_hmac(algo, value, salt, rounds))
     crypted = crypted.upper()
     salt = hexlify(salt).upper()
+    if not isinstance(salt, str):
+        salt = salt.decode('utf8')
+    if not isinstance(crypted, str):
+        crypted = crypted.decode('utf8')
     ret = 'grub.pbkdf2.{0}.{1}.{2}.{3}'.format(algo, rounds, salt, crypted)
     return ret
 
