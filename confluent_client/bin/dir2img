@@ -24,7 +24,7 @@ def create_image(directory, image):
     with open(image, 'wb') as imgfile:
         imgfile.seek(datasz * 512 - 1)
         imgfile.write(b'\x00')
-    subprocess.check_call(['mformat', '-i', image, '-d', '1', '-t',
+    subprocess.check_call(['mformat', '-i', image, '-r', '16', '-d', '1', '-t',
                             str(datasz), '-s', '1','-h', '1', '::'])
     cpycmd = ['mcopy', '-i', image, '-s']
     cpycmd.extend(glob.glob('{0}/*'.format(directory)))
