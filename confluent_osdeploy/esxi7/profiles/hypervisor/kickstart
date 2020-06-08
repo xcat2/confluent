@@ -1,0 +1,5 @@
+accepteula
+install --firstdisk
+%include /tmp/ksnet
+%include /tmp/rootuser
+reboot

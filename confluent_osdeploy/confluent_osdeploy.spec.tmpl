@@ -34,12 +34,19 @@ for os in el8 suse15 ubuntu20.04; do
     mv ../addons.cpio .
     cd ..
 done
+mkdir esix7out
+cd esxi7out
+cp -a .//opt .
+cp -a ../esx7/initramfs/* .
+tar zcvf ../addons.tgz .
+mv ../addons.tgz .
+cd ..
 
 %install
-for os in el8 suse15 ubuntu20.04; do
+for os in el8 suse15 ubuntu20.04 esxi7; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
-    cp ${os}out/addons.cpio %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
+    cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
 done
 
