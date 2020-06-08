@@ -59,6 +59,10 @@ def handle_request(env, start_response):
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     if env['PATH_INFO'] == '/self/deploycfg':
         myip = env.get('HTTP_X_FORWARDED_HOST', None)
+        if ']' in myip:
+            myip = myip.split(']', 1)[0]
+        else:
+            myip = myip.split(':', 1)[0]
         myip = myip.replace('[', '').replace(']', '')
         ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
         if ncfg['prefix']:
