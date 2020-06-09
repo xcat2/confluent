@@ -36,8 +36,8 @@ for os in el8 suse15 ubuntu20.04; do
 done
 mkdir esxi7out
 cd esxi7out
-cp -a .//opt .
-cp -a ../esx7/initramfs/* .
+cp -a ../opt .
+cp -a ../esxi7/initramfs/* .
 tar zcvf ../addons.tgz .
 mv ../addons.tgz .
 cd ..
