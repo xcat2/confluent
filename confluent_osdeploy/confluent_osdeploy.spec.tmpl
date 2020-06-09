@@ -38,7 +38,8 @@ mkdir esxi7out
 cd esxi7out
 cp -a ../opt .
 cp -a ../esxi7/initramfs/* .
-tar zcvf ../addons.tgz .
+chmod +x bin/* opt/confluent/bin/*
+tar zcvf ../addons.tgz *
 mv ../addons.tgz .
 cd ..
 

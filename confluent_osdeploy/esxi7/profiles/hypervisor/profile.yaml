@@ -1,1 +1,2 @@
 label: VMware ESXi %%VERSION%% Hypervisor
+ostype: esxi

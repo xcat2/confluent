@@ -47,6 +47,53 @@ def update_boot(profiledir):
     with open('{0}/profile.yaml'.format(profiledir)) as profileinfo:
         profile = yaml.safe_load(profileinfo)
     label = profile.get('label', profname)
+    ostype = profile.get('ostype', 'linux')
+    if ostype == 'linux':
+        update_boot_linux(profiledir, profile, label)
+    elif ostype == 'esxi':
+        update_boot_esxi(profiledir, profile, label)
+
+def update_boot_esxi(profiledir, profile, label):
+    kernelargs = profile.get('kernelargs', '')
+    bootcfg = open('{0}/distribution/BOOT.CFG'.format(profiledir), 'r').read()
+    bootcfg = bootcfg.split('\n')
+    newbootcfg = ''
+    filesneeded = []
+    for cfgline in bootcfg:
+        if cfgline.startswith('title='):
+            newbootcfg += 'title={0}\n'.format(label)
+        elif cfgline.startswith('kernelopt='):
+            newbootcfg += 'kernelopt={0}\n'.format(kernelargs)
+        elif cfgline.startswith('kernel='):
+            newbootcfg += cfgline + '\n'
+            kern = cfgline.split('=', 1)[1]
+            filesneeded.append(kern)
+        elif cfgline.startswith('modules='):
+            modlist = cfgline.split('=', 1)[1]
+            filesneeded.extend(modlist.split(' --- '))
+            newbootcfg += cfgline + ' --- /initramfs/addons.tgz --- /site.tgz\n'
+        else:
+            newbootcfg += cfgline + '\n'
+    os.makedirs('{0}/boot/efi/boot/'.format(profiledir))
+    with open('{0}/boot/efi/boot/BOOT.CFG'.format(profiledir), 'w+') as bcfg:
+        bcfg.write(newbootcfg)
+    os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
+               '{0}/boot/site.tgz'.format(profiledir))
+    for fn in filesneeded:
+        if fn.startswith('/'):
+            fn = fn[1:]
+        sourcefile = '{0}/distribution/{1}'.format(profiledir, fn)
+        if not os.path.exists(sourcefile):
+            sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
+        os.symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
+    os.symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
+    os.symlink('{0}/distribution/EFI/BOOT/SAFEBOOT.EFI'.format(profiledir), '{0}/boot/efi/boot/safe.efi'.format(profiledir))
+    subprocess.check_call(
+        ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
+         '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)
+
+
+def update_boot_linux(profiledir, profile, label):
     kernelargs = profile.get('kernelargs', '')
     grubcfg = "set timeout=5\nmenuentry '"
     grubcfg += label

@@ -30,7 +30,7 @@ class HTTPSClient(client.HTTPConnection, object):
         host = self.host.split('%', 1)[0]
         if '[' not in host and ':' in host:
             self.stdheaders['Host'] = '[{0}]'.format(host)
-        else
+        else:
             self.stdheaders['Host'] = '{0}'.format(host)
         ctx.verify_mode = ssl.CERT_REQUIRED
         ctx.check_hostname = True
