@@ -137,7 +137,7 @@ def initialize(cmdset):
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
     tmptarname = tmpname.replace('cpio', 'tgz')
-    tarcmd = ['tar', 'czf', tmptarname] + topack
+    tarcmd = ['tar', '--transform=s|^|etc/', '-czf', tmptarname] + topack
     subprocess.check_call(tarcmd)
     os.chdir(opath)
     os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
