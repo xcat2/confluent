@@ -39,8 +39,8 @@ cd esxi7out
 cp -a ../opt .
 cp -a ../esxi7/initramfs/* .
 chmod +x bin/* opt/confluent/bin/*
-tar zcvf ../addons.tgz *
-mv ../addons.tgz .
+tar cf ../addons.tar *
+mv ../addons.tar .
 cd ..
 
 %install
