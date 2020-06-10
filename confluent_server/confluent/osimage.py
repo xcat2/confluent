@@ -71,14 +71,14 @@ def update_boot_esxi(profiledir, profile, label):
         elif cfgline.startswith('modules='):
             modlist = cfgline.split('=', 1)[1]
             filesneeded.extend(modlist.split(' --- '))
-            newbootcfg += cfgline + ' --- /initramfs/addons.tar --- /site.tar\n'
+            newbootcfg += cfgline + ' --- /initramfs/addons.tgz --- /site.tgz\n'
         else:
             newbootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir))
     with open('{0}/boot/efi/boot/BOOT.CFG'.format(profiledir), 'w+') as bcfg:
         bcfg.write(newbootcfg)
-    os.symlink('/var/lib/confluent/public/site/initramfs.tar',
-               '{0}/boot/site.tar'.format(profiledir))
+    os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
+               '{0}/boot/site.tgz'.format(profiledir))
     for fn in filesneeded:
         if fn.startswith('/'):
             fn = fn[1:]
