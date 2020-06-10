@@ -1,3 +1,4 @@
+#!/bin/sh
 # copernicus is hard coded, easier to script a fake sysfs
 uuid=$(vsish -e get /hardware/bios/dmiInfo|grep -A15 UUID|sed -e 's/.*://'|sed -e ':a;N;$!ba;s/\n//g' | sed -e 's/ *0x//g')
 uuid=${uuid:0:8}-${uuid:8:4}-${uuid:12:4}-${uuid:16:4}-${uuid:20:12}
@@ -11,7 +12,9 @@ while ! grep NODENAME /etc/confluent/confluent.info; do
 done
 node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
-/opt/confluent/bin/clortho $node $mgr > /etc/confluent/confluent.apikey
+cp /opt/confluent/bin/clortho /clortho
+/clortho $node $mgr > /etc/confluent/confluent.apikey
+cat /tls/*.pem > /etc/confluent/ca.pem
 /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/^profile: //')
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/kickstart > /etc/confluent/ks.cfg
@@ -22,4 +25,3 @@ rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootp
 echo rootpw --iscrypted $rootpw > /tmp/rootpw
 export BOOT_OPTIONS=ks=/etc/confluent/ks.cfg
 exec /bin/install
-

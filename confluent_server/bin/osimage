@@ -138,7 +138,7 @@ def initialize(cmdset):
             sys.exit(1)
     os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
     tmptarname = tmpname.replace('cpio', 'tgz')
-    tarcmd = ['tar', '--transform=s|^|etc/|', '-czf', tmptarname] + topack
+    tarcmd = ['tar', '-czf', tmptarname] + topack
     subprocess.check_call(tarcmd)
     os.chdir(opath)
     os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
