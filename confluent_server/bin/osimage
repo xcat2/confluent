@@ -136,11 +136,11 @@ def initialize(cmdset):
         if res:
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
+    os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
     tmptarname = tmpname.replace('cpio', 'tgz')
-    tarcmd = ['tar', '--transform=s|^|etc/', '-czf', tmptarname] + topack
+    tarcmd = ['tar', '--transform=s|^|etc/|', '-czf', tmptarname] + topack
     subprocess.check_call(tarcmd)
     os.chdir(opath)
-    os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
     os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
     if cmdset.k:
         with open('/etc/ssh/ssh_known_hosts', 'a+b') as skh:
