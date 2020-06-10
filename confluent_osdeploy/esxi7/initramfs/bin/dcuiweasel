@@ -24,4 +24,4 @@ chmod +x /tmp/makeksnet
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 echo rootpw --iscrypted $rootpw > /tmp/rootuser
 export BOOT_CMDLINE=ks=/etc/confluent/ks.cfg
-exec /bin/install
+/bin/install

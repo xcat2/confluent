@@ -1,5 +1,5 @@
 accepteula
-install --firstdisk
+install --firstdisk --preservevmfs
 %include /tmp/ksnet
 %include /tmp/rootuser
 reboot
