@@ -22,6 +22,6 @@ profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/^profile
 chmod +x /tmp/makeksnet
 /tmp/makeksnet > /tmp/ksnet
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
-echo rootpw --iscrypted $rootpw > /tmp/rootpw
-export BOOT_OPTIONS=ks=/etc/confluent/ks.cfg
+echo rootpw --iscrypted $rootpw > /tmp/rootuser
+export BOOT_CMDLINE=ks=/etc/confluent/ks.cfg
 exec /bin/install

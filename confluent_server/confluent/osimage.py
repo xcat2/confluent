@@ -75,7 +75,7 @@ def update_boot_esxi(profiledir, profile, label):
         else:
             newbootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir))
-    with open('{0}/boot/efi/boot/BOOT.CFG'.format(profiledir), 'w+') as bcfg:
+    with open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), 'w+') as bcfg:
         bcfg.write(newbootcfg)
     os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
                '{0}/boot/site.tgz'.format(profiledir))
