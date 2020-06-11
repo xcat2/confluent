@@ -87,7 +87,6 @@ def update_boot_esxi(profiledir, profile, label):
             sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
         os.symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
     os.symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
-    os.symlink('{0}/distribution/EFI/BOOT/SAFEBOOT.EFI'.format(profiledir), '{0}/boot/efi/boot/safe.efi'.format(profiledir))
     subprocess.check_call(
         ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
          '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)

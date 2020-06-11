@@ -1,5 +1,4 @@
 accepteula
+clearpart --firstdisk --preservevmfs
 install --firstdisk --preservevmfs
-%include /tmp/ksnet
-%include /tmp/rootuser
 reboot
