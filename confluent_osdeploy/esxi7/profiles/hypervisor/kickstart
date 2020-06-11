@@ -1,4 +1,4 @@
 accepteula
-clearpart --firstdisk --preservevmfs
-install --firstdisk --preservevmfs
+clearpart --firstdisk --overwritevmfs
+install --firstdisk --overwritevmfs
 reboot
