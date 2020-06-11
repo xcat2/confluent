@@ -70,8 +70,10 @@ def update_boot_esxi(profiledir, profile, label):
             filesneeded.append(kern)
         elif cfgline.startswith('modules='):
             modlist = cfgline.split('=', 1)[1]
-            filesneeded.extend(modlist.split(' --- '))
-            newbootcfg += cfgline + ' --- /initramfs/addons.tgz --- /site.tgz\n'
+            mods = modlist.split(' --- ')
+            mods = [x.replace('/', '') for x in mods]
+            filesneeded.extend(mods)
+            newbootcfg += cfgline + ' --- initramfs/addons.tgz --- site.tgz\n'
         else:
             newbootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir))
@@ -79,6 +81,7 @@ def update_boot_esxi(profiledir, profile, label):
         bcfg.write(newbootcfg)
     os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
                '{0}/boot/site.tgz'.format(profiledir))
+    os.symlink('{0}/boot/efi/boot/boot.cfg'.format(profiledir), '{0}/boot/boot.cfg'.format(profiledir))
     for fn in filesneeded:
         if fn.startswith('/'):
             fn = fn[1:]
@@ -87,6 +90,17 @@ def update_boot_esxi(profiledir, profile, label):
             sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
         os.symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
     os.symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
+    oum = os.umask(0o22)
+    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
+    ipxeout = os.fdopen(ipout, 'w')
+    try:
+        os.umask(oum)
+        ipxeout.write('#!ipxe\n')
+        pname = os.path.split(profiledir)[-1]
+        ipxeout.write(
+            'chain boot/efi/boot/bootx64.efi -c /confluent-public/os/{0}/boot/boot.cfg'.format(pname))
+    finally:
+        ipxeout.close()
     subprocess.check_call(
         ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
          '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)
