@@ -1,0 +1,7 @@
+#!/bin/sh
+/opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/makeksnet >> /tmp/makeksnet
+chmod +x /tmp/makeksnet
+/tmp/makeksnet >> /etc/confluent/ks.cfg
+rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
+echo rootpw --iscrypted $rootpw >> /etc/confluent/ks.cfg
+export BOOT_CMDLINE=ks=/etc/confluent/ks.cfg

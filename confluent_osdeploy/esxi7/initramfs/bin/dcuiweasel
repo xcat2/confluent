@@ -18,10 +18,7 @@ cat /tls/*.pem > /etc/confluent/ca.pem
 /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/^profile: //')
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/kickstart > /etc/confluent/ks.cfg
-/opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/makeksnet >> /tmp/makeksnet
-chmod +x /tmp/makeksnet
-/tmp/makeksnet >> /etc/confluent/ks.cfg
-rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
-echo rootpw --iscrypted $rootpw >> /etc/confluent/ks.cfg
-export BOOT_CMDLINE=ks=/etc/confluent/ks.cfg
-/bin/install
+/opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/modinstall > /tmp/modinstall
+export node mgr profile
+. /tmp/modinstall
+exec /bin/install
