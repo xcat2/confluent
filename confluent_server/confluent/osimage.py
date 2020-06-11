@@ -114,14 +114,14 @@ def update_boot_linux(profiledir, profile, label):
     for initramfs in initrds:
         ipxeargs += " initrd=" + initramfs
     oum = os.umask(0o22)
-    ipout = os.open(profiledir + '/boot/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
+    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
         os.umask(oum)
         ipxeout.write('#!ipxe\n')
-        ipxeout.write('imgfetch kernel ' + ipxeargs + '\n')
+        ipxeout.write('imgfetch boot/kernel ' + ipxeargs + '\n')
         for initramfs in initrds:
-            ipxeout.write('imgfetch initramfs/{0}\n'.format(initramfs))
+            ipxeout.write('imgfetch boot/initramfs/{0}\n'.format(initramfs))
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     finally:
         ipxeout.close()

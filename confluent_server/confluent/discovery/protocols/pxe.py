@@ -269,7 +269,7 @@ def proxydhcp():
             if not profile:
                 continue
             myip = socket.inet_ntoa(myipn)
-            bootfile = 'http://{0}/confluent-public/os/{1}/boot/boot.ipxe'.format(myip, profile).encode('utf8')
+            bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
         elif disco['arch'] == 'uefi-x64':
             bootfile = b'confluent/x86_64/ipxe.efi'
         elif disco['arch'] == 'bios-x86':
