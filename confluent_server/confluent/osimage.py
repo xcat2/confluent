@@ -75,7 +75,7 @@ def update_boot_esxi(profiledir, profile, label):
             mods = [x.replace('/', '') for x in mods]
             filesneeded.extend(mods)
 
-            newbootcfg += 'modules= + ' --- '.join(mods) + ' --- initramfs/addons.tgz --- site.tgz\n'
+            newbootcfg += 'modules=' + ' --- '.join(mods) + ' --- initramfs/addons.tgz --- site.tgz\n'
         else:
             newbootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir), 0o755)
