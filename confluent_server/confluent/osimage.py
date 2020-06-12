@@ -59,28 +59,39 @@ def update_boot_esxi(profiledir, profile, label):
     bootcfg = open('{0}/distribution/BOOT.CFG'.format(profiledir), 'r').read()
     bootcfg = bootcfg.split('\n')
     newbootcfg = ''
+    efibootcfg = ''
     filesneeded = []
     for cfgline in bootcfg:
         if cfgline.startswith('title='):
             newbootcfg += 'title={0}\n'.format(label)
+            efibootcfg += 'title={0}\n'.format(label)
         elif cfgline.startswith('kernelopt='):
             newbootcfg += 'kernelopt={0}\n'.format(kernelargs)
+            efibootcfg += 'kernelopt={0}\n'.format(kernelargs)
         elif cfgline.startswith('kernel='):
             kern = cfgline.split('=', 1)[1]
             kern = kern.replace('/', '')
             newbootcfg += 'kernel={0}\n'.format(kern)
+            efibootcfg += cfgiline + '\n'
             filesneeded.append(kern)
         elif cfgline.startswith('modules='):
             modlist = cfgline.split('=', 1)[1]
             mods = modlist.split(' --- ')
+            efibootcfg += 'modules=' + ' --- '.join(mods) + ' --- /initramfs/addons.tgz --- /site.tgz\n'
             mods = [x.replace('/', '') for x in mods]
             filesneeded.extend(mods)
-
             newbootcfg += 'modules=' + ' --- '.join(mods) + ' --- initramfs/addons.tgz --- site.tgz\n'
         else:
             newbootcfg += cfgline + '\n'
+            efibootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir), 0o755)
     bcfgout = os.open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT, 0o644)
+    bcfg = os.fdopen(bcfgout, 'w')
+    try:
+        bcfg.write(efibootcfg)
+    finally:
+        bcfg.close()
+    bcfgout = os.open('{0}/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT, 0o644)
     bcfg = os.fdopen(bcfgout, 'w')
     try:
         bcfg.write(newbootcfg)
@@ -88,7 +99,6 @@ def update_boot_esxi(profiledir, profile, label):
         bcfg.close()
     os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
                '{0}/boot/site.tgz'.format(profiledir))
-    os.symlink('{0}/boot/efi/boot/boot.cfg'.format(profiledir), '{0}/boot/boot.cfg'.format(profiledir))
     for fn in filesneeded:
         if fn.startswith('/'):
             fn = fn[1:]
