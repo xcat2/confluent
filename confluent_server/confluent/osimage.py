@@ -55,6 +55,7 @@ def update_boot(profiledir):
 
 def update_boot_esxi(profiledir, profile, label):
     kernelargs = profile.get('kernelargs', '')
+    oum = os.umask(0o22)
     bootcfg = open('{0}/distribution/BOOT.CFG'.format(profiledir), 'r').read()
     bootcfg = bootcfg.split('\n')
     newbootcfg = ''
@@ -73,7 +74,8 @@ def update_boot_esxi(profiledir, profile, label):
             mods = modlist.split(' --- ')
             mods = [x.replace('/', '') for x in mods]
             filesneeded.extend(mods)
-            newbootcfg += cfgline + ' --- initramfs/addons.tgz --- site.tgz\n'
+
+            newbootcfg += 'modules= + ' --- '.join(mods) + ' --- initramfs/addons.tgz --- site.tgz\n'
         else:
             newbootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir))
@@ -90,7 +92,6 @@ def update_boot_esxi(profiledir, profile, label):
             sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
         os.symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
     os.symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
-    oum = os.umask(0o22)
     ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
