@@ -66,8 +66,9 @@ def update_boot_esxi(profiledir, profile, label):
         elif cfgline.startswith('kernelopt='):
             newbootcfg += 'kernelopt={0}\n'.format(kernelargs)
         elif cfgline.startswith('kernel='):
-            newbootcfg += cfgline + '\n'
             kern = cfgline.split('=', 1)[1]
+            kern = kern.replace('/', '')
+            newbootcfg += 'kernel={0}\n'.format(kern)
             filesneeded.append(kern)
         elif cfgline.startswith('modules='):
             modlist = cfgline.split('=', 1)[1]
