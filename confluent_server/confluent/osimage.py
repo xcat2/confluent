@@ -78,9 +78,13 @@ def update_boot_esxi(profiledir, profile, label):
             newbootcfg += 'modules= + ' --- '.join(mods) + ' --- initramfs/addons.tgz --- site.tgz\n'
         else:
             newbootcfg += cfgline + '\n'
-    os.makedirs('{0}/boot/efi/boot/'.format(profiledir))
-    with open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), 'w+') as bcfg:
+    os.makedirs('{0}/boot/efi/boot/'.format(profiledir), 0o755)
+    bcfgout = os.open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT, 0o644)
+    bcfg = os.fdopen(bcfgout, 'w')
+    try:
         bcfg.write(newbootcfg)
+    finally:
+        bcfg.close()
     os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
                '{0}/boot/site.tgz'.format(profiledir))
     os.symlink('{0}/boot/efi/boot/boot.cfg'.format(profiledir), '{0}/boot/boot.cfg'.format(profiledir))
