@@ -2,6 +2,7 @@
 # This will take a given directory and make a 'big floppy image'
 # out of it, suitable for nodemedia upload.
 
+import fcntl
 import glob
 import os
 import subprocess
@@ -26,10 +27,22 @@ def create_image(directory, image):
         imgfile.write(b'\x00')
     subprocess.check_call(['mformat', '-i', image, '-r', '16', '-d', '1', '-t',
                             str(datasz), '-s', '1','-h', '1', '::'])
+    # Some clustered filesystems will have the lock from mformat
+    # linger after close (mformat doesn't unlock)
+    # do a blocking wait for shared lock and then explicitly
+    # unlock between calls to mtools
+    with open(image, 'rb') as imgfile:
+        fcntl.flock(imgfile.fileno(), fcntl.LOCK_SH)
+        fcntl.flock(imgfile.fileno(), fcntl.LOCK_UN)
     cpycmd = ['mcopy', '-i', image, '-s']
     cpycmd.extend(glob.glob('{0}/*'.format(directory)))
     cpycmd.append('::')
     subprocess.check_call(cpycmd)
+    # though not necessary for us, make sure dir2img doesn't have a lingering
+    # flock from mcopy for any subsequent commands
+    with open(image, 'rb') as imgfile:
+        fcntl.flock(imgfile.fileno(), fcntl.LOCK_SH)
+        fcntl.flock(imgfile.fileno(), fcntl.LOCK_UN)
 
 
 if __name__ == '__main__':
