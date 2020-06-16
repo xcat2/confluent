@@ -7,7 +7,6 @@ Description=Confluent hardware manager
 Type=forking
 #PIDFile=/var/run/confluent/pid
 RuntimeDirectory=confluent
-StateDirectory=confluent
 CacheDirectory=confluent
 LogsDirectory=confluent
 ConfigurationDirectory=confluent
