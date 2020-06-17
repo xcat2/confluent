@@ -24,6 +24,7 @@ def handle_request(env, start_response):
     global keymap
     global currlocale
     global currtzvintage
+    configmanager.check_quorum()
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
     apikey = env.get('HTTP_CONFLUENT_APIKEY', None)
     if not (nodename and apikey):
