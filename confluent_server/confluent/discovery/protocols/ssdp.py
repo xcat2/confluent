@@ -168,6 +168,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                             if len(headline) < 3:
                                 continue
                             if  headline[0] == 'ST' and headline[-1].startswith(' urn:xcat.org:service:confluent:'):
+                                try:
+                                    cfm.check_quorum()
+                                except Exception:
+                                    continue
                                 for query in headline[-1].split('/'):
                                     if query.startswith('uuid='):
                                         curruuid = query.split('=', 1)[1].lower()
