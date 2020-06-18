@@ -30,6 +30,7 @@ if [ "$grubpw" = "null" ]; then
 else
     echo "bootloader --iscrypted --password=$grubpw" > /tmp/grubpw
 fi
+ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
