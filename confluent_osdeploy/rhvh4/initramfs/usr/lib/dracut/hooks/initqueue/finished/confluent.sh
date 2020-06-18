@@ -1,0 +1,1 @@
+[ -e /tmp/confluent.initq ]
