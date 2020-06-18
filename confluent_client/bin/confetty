@@ -958,7 +958,13 @@ def main():
                             # don't bother churning if minute does not change
                             laststate['showtime'] = now
                             updatestatus()
-                        sys.stdout.flush()
+                        try:
+                            sys.stdout.flush()
+                        except Exception:
+                            # EWOULDBLOCK causes this to raise, ignore
+                            # this scenario comfortable that it
+                            # will come out soon enough
+                            pass
                     else:
                         deadline = 5
                         connected = False
