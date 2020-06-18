@@ -1,12 +1,12 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
 echo -n "" > /tmp/confluent.initq
-cd /sys/class/net
-for currif in *; do
-    ip link set $currif up
-done
-cd -
 while ! grep MANAGER /tmp/confluent.info >& /dev/null; do
+    cd /sys/class/net
+    for currif in *; do
+        ip link set $currif up
+    done
+    cd -
     /opt/confluent/bin/copernicus -t > /tmp/confluent.info
 done
 read ifidx <<EOF

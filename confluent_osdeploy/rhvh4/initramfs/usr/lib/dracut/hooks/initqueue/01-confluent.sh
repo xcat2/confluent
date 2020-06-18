@@ -3,12 +3,12 @@
 mkdir -p /etc/confluent
 cat /tls/*.pem > /etc/confluent/ca.pem
 echo -n "" > /tmp/confluent.initq
-cd /sys/class/net
-for currif in *; do
-    ip link set $currif up
-done
-cd -
 while ! grep MANAGER /etc/confluent/confluent.info >& /dev/null; do
+    cd /sys/class/net
+    for currif in *; do
+        ip link set $currif up
+    done
+    cd -
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 read ifidx <<EOF
