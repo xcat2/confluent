@@ -184,7 +184,8 @@ def osimport(imagefile):
             else:
                 print(repr(rsp))
             time.sleep(0.5)
-    list(c.delete('/deployment/importing/{0}'.format(shortname)))
+    if shortname:
+        list(c.delete('/deployment/importing/{0}'.format(shortname)))
 
 if __name__ == '__main__':
     main(sys.argv)

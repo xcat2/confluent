@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import confluent.exceptions as exc
 import confluent.messages as msg
 import eventlet
 import eventlet.green.select as select
@@ -428,6 +429,8 @@ class MediaImporter(object):
         self.worker = None
         self.profiles = []
         identity = fingerprint(media)
+        if not identity:
+            raise exc.InvalidArgumentException('Unsupported Media')
         self.percent = 0.0
         identity, _ = identity
         self.phase = 'copying'
