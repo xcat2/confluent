@@ -334,6 +334,21 @@ def check_rhel(isoinfo):
             arch = entry.split('.')[-2]
             break
     else:
+        if '.discinfo' in isoinfo[1]:
+            prodinfo = isoinfo[1]['.discinfo']
+            if not isinstance(prodinfo, str):
+                prodinfo = prodinfo.decode('utf8')
+                prodinfo = prodinfo.split('\n')
+                if len(prodinfo) < 3:
+                    return None
+                arch = prodinfo[2]
+                prodinfo = prodinfo[1].split(' ')
+                if len(prodinfo) < 2 or prodinfo[0] != 'RHVH':
+                    return None
+                major = prodinfo[1].split('.')[0]
+                cat = 'rhvh{0}'.format(major)
+                return {'name': 'rhvh-{0}-{1}'.format(prodinfo[1], arch),
+                        'method': EXTRACT, 'category': cat}
         return None
     major = ver.split('.', 1)[0]
     return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}

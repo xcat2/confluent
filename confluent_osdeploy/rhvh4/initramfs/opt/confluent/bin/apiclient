@@ -1,0 +1,55 @@
+#!/usr/bin/python
+import httplib as client
+import socket
+import ssl
+import sys
+
+class HTTPSClient(client.HTTPConnection, object):
+    def __init__(self, port=443):
+        self.stdheaders = {}
+        info = open('/etc/confluent/confluent.info').read().split('\n')
+        for line in info:
+            if line.startswith('NODENAME:'):
+                node = line.split(' ')[1]
+                self.stdheaders['CONFLUENT_NODENAME'] = node
+            if line.startswith('MANAGER:'):
+                host = line.split(' ')[1]
+        self.stdheaders['CONFLUENT_APIKEY'] = open('/etc/confluent/confluent.apikey').read().strip()
+        client.HTTPConnection.__init__(self, host, port)
+        self.connect()
+
+    def set_header(self, key, val):
+        self.stdheaders[key] = val
+
+    def connect(self):
+        addrinf = socket.getaddrinfo(self.host, self.port)[0]
+        psock = socket.socket(addrinf[0])
+        psock.connect(addrinf[4])
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx.load_verify_locations('/etc/confluent/ca.pem')
+        host = self.host.split('%', 1)[0]
+        if '[' not in host and ':' in host:
+            self.stdheaders['Host'] = '[{0}]'.format(host)
+        else:
+            self.stdheaders['Host'] = '{0}'.format(host)
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        ctx.check_hostname = True
+        self.sock = ctx.wrap_socket(psock, server_hostname=host)
+
+    def grab_url(self, url, data=None):
+        if data:
+            method = 'POST'
+        else:
+            method = 'GET'
+        self.request(method, url, headers=self.stdheaders)
+        rsp = self.getresponse()
+        body = rsp.read()
+        if rsp.status >= 200 and rsp.status < 300:
+            return body
+        raise Exception(body)
+
+if __name__ == '__main__':
+    data = None
+    if len(sys.argv) == 3:
+        data = open(sys.argv[2]).read()
+    print(HTTPSClient().grab_url(sys.argv[1], data).decode())

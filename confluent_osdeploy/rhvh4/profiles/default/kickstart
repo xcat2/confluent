@@ -1,0 +1,72 @@
+# In this OS profile, data is largely filled in during the %pre
+# phase, rather than the kickstart actually having the content.
+# None of the files shall be replaced during an upgrade in
+# /var/lib/confluent/public/os/<profile>, so customization should
+# be done by modifying files in /var/lib/confluent/public/os/<profile>
+
+# /tmp/rootpw will provide a 'rootpw' line, either locking password if not configured
+# or the crypted form.
+%include /tmp/rootpw
+
+# timezone is fetched from confluent server, which provides the
+# timezone that the management server itself is in by default.
+%include /tmp/timezone
+
+# similar to timezone, confluent is asked to provide the
+# deployment servers language info and replicate that
+# to the deployment target.
+%include /tmp/langinfo
+
+# bootloader may be specified if crypted.grubpassword is set on
+# a node. This will become a bootloader line if a password
+# was specified
+%include /tmp/grubpw
+
+# The default partition scheme is applied to a single drive, using
+# the getinstalldisk script to make a best guess as to the most
+# appropriate device. See pre.sh and getinstalldisk to customize
+# the automatic behavior, or comment out/delete the 
+# following line and provide your own manual partition plan
+# instead
+%include /tmp/partitioning
+
+reboot
+
+%packages
+@^minimal-environment
+clevis-dracut
+chrony
+rsync
+python3
+%end
+
+%pre
+profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep deploy_server /etc/confluent.deploycfg |awk '{print $2}')
+curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.sh
+. /tmp/preinst.sh
+%end
+
+%post --nochroot
+mkdir -p /mnt/sysimage/etc/confluent
+profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep deploy_server /etc/confluent.deploycfg |awk '{print $2}')
+curl -f https://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/postinst.sh
+. /tmp/postinst.sh
+
+# Hook firstboot.sh
+curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.service > /mnt/sysimage/etc/systemd/system/firstboot.service
+curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/sysimage/etc/confluent/firstboot.sh
+chmod +x /mnt/sysimage/etc/confluent/firstboot.sh
+%end
+
+%post
+cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
+systemctl enable firstboot
+chgrp ssh_keys /etc/ssh/ssh*key
+restorecon /etc/ssh/ssh*key /root/.shosts /etc/ssh/shosts.equiv /etc/ssh/ssh_config.d/* /etc/confluent/firstboot.sh
+profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
+curl -f https://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/postinst.sh
+. /tmp/postinst.sh
+%end
