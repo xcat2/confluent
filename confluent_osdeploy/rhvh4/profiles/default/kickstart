@@ -30,15 +30,9 @@
 # instead
 %include /tmp/partitioning
 
-reboot
+%include /etc/confluent/rhv.path
 
-%packages
-@^minimal-environment
-clevis-dracut
-chrony
-rsync
-python3
-%end
+reboot
 
 %pre
 profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
@@ -48,6 +42,7 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.
 %end
 
 %post --nochroot
+nodectl init
 mkdir -p /mnt/sysimage/etc/confluent
 profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
 mgr=$(grep deploy_server /etc/confluent.deploycfg |awk '{print $2}')

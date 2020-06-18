@@ -58,7 +58,9 @@ if [ $textconsole = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
 	fi
 fi
 
-echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
+# RHV must not have a repo
+#echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
+echo liveimg --url=$proto://$mgr/confluent-public/os/$profilename/distribution/LiveOS/squashfs.img >> /etc/confluent/rhv.path
 echo inst.ks=$proto://$mgr/confluent-public/os/$profilename/kickstart >> /etc/cmdline.d/01-confluent.conf
 kickstart=$proto://$mgr/confluent-public/os/$profilename/kickstart
 root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
