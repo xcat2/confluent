@@ -1,5 +1,8 @@
 #!/usr/bin/python
-import http.client as client
+try:
+    import http.client as client
+except ImportError:
+    import httplib as client
 import socket
 import ssl
 import sys
@@ -37,20 +40,30 @@ class HTTPSClient(client.HTTPConnection, object):
         ctx.check_hostname = True
         self.sock = ctx.wrap_socket(psock, server_hostname=host)
 
-    def grab_url(self, url, data=None):
+    def grab_url(self, url, data=None, returnrsp=False):
         if data:
             method = 'POST'
         else:
             method = 'GET'
         self.request(method, url, headers=self.stdheaders)
         rsp = self.getresponse()
-        body = rsp.read()
         if rsp.status >= 200 and rsp.status < 300:
-            return body
-        raise Exception(body)
+            if returnrsp:
+                return rsp
+            else:
+                return rsp.read()
+        raise Exception(rsp.read())
 
 if __name__ == '__main__':
     data = None
+    if len(sys.argv) == 4:
+        with open(sys.argv[3], 'wb') as outf:
+            reader = HTTPSClient().grab_url(sys.argv[1], data, returnrsp=True)
+            chunk = reader.read(16384)
+            while chunk:
+                outf.write(chunk)
+                chunk = reader.read(16384)
+        sys.exit(0)
     if len(sys.argv) == 3:
         data = open(sys.argv[2]).read()
     print(HTTPSClient().grab_url(sys.argv[1], data).decode())
