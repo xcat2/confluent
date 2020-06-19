@@ -30,7 +30,7 @@
 # instead
 %include /tmp/partitioning
 
-%include /etc/confluent/rhv.path
+liveimg --url=file:///tmp/install.img
 
 reboot
 

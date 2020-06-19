@@ -58,3 +58,8 @@ if [ -e /tmp/installdisk ]; then
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --type=thinp --nohome $LUKSPARTY >> /tmp/partitioning
 fi
+cd $(mktemp -d)
+/etc/confluent/apiclient /confluent-public/os/$profile/image.rpm -o image.rpm
+rpm2cpio image.rpm | cpio -dumi
+ln -s $(find . -name *img) /tmp/install.img
+
