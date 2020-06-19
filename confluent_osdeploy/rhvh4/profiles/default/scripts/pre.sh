@@ -39,7 +39,7 @@ done
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
 if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
-    tmux a <> $consoledev >&0 2>&1 &
+    TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
 cryptboot=$(grep ^encryptboot: /etc/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''

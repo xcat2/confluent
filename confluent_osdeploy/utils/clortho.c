@@ -54,6 +54,7 @@ int main(int argc, char* argv[]) {
         memset(&timeout, 0, sizeof(struct timeval));
         timeout.tv_sec = 10;
         net4bind.sin_port = htons(302);
+        net4bind.sin_family = AF_INET;
         net6bind.sin6_port = htons(302);
         net6bind.sin6_family = AF_INET6;
         hints.ai_socktype = SOCK_STREAM;
