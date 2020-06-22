@@ -29,6 +29,10 @@ interval of 1 second is used.
   Perform the specified number of readings, waiting `-i` indicated interval or 1 second if not
   otherwise indicated.
 
+* `-s`, `--skipnumberless`:
+  Return only sensors that provide numeric data (e.g. temperature, fanspeed),
+  ignoring sensors that do not provide numeric data.
+
 ## EXAMPLES
 * Retrieving all temperature related sensors from one system  
   `# nodesensors n1 temperature`  
