@@ -1146,6 +1146,7 @@ class BootDevice(ConfluentChoiceMessage):
         'setup',
         'default',
         'cd',
+        'floppy',
     ])
 
     valid_bootmodes = set([
