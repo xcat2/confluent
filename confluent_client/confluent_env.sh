@@ -296,7 +296,7 @@ complete -F _confluent_nn_completion nodeconsole
 complete -F _confluent_nr_completion nodeeventlog
 complete -F _confluent_nodefirmware_completion nodefirmware
 complete -F _confluent_nodedeploy_completion nodedeploy
-complete -F _confluent_osimage_completion osimage
+complete -F _confluent_osimage_completion osdeploy
 complete -F _confluent_ng_completion nodegroupattrib
 complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
