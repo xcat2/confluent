@@ -88,8 +88,8 @@ def initialize(cmdset):
     else:
         didsomething = False
     if cmdset.u:
+        didsomething = True
         if not glob.glob('/root/.ssh/*.pub'):
-            didsomething = True
             sys.stderr.write('No user keys for root detected, it is recommended '
                             'to run ssh-keygen -t ed25519 to generate a user '
                             'key. For optimal security, a passphrase should be '
