@@ -104,10 +104,11 @@ def myiptonets(svrip):
     return inametonets(relevantnic)
 
 
-def idxtonets(ifidx):
-    _rebuildidxmap()
-    iname = _idxtoifnamemap.get(ifidx, None)
-    return inametonets(iname)
+def _iftonets(ifidx):
+    if isinstance(ifidx, int):
+        _rebuildidxmap()
+        ifidx = _idxtoifnamemap.get(ifidx, None)
+    return inametonets(ifidx)
 
 def inametonets(iname):
     addrs = netifaces.ifaddresses(iname)
@@ -176,7 +177,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     needsvrip = False
     if ifidx is not None:
         dhcprequested = False
-        nets = list(idxtonets(ifidx))
+        nets = list(_iftonets(ifidx))
         if not nets:
             cfgdata['ipv4_broken'] = True
     if serverip is not None:
@@ -222,6 +223,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         for net in nets:
             net, prefix, svrip = net
             if ip_on_same_subnet(net, ipbynodename, prefix):
+                cfgdata['isnodename'] = True
                 cfgdata['ipv4_address'] = ipbynodename
                 cfgdata['ipv4_method'] = 'static'
                 cfgdata['prefix'] = prefix

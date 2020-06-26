@@ -32,6 +32,7 @@ import confluent.config.configmanager as cfm
 import confluent.neighutil as neighutil
 import confluent.util as util
 import confluent.log as log
+import confluent.netutil as netutil
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import time
@@ -191,6 +192,14 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         seconds = int(currtime)
                                         msecs = int(currtime * 1000 % 1000)
                                         reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
+                                        if '%' in peer[0]:
+                                            iface = peer[0].split('%', 1)[1]
+                                            reply += 'MGTIFACE: {0}\r\n'.format(
+                                                peer[0].split('%', 1)[1])
+                                            ncfg = netutil.get_nic_config(
+                                                cfg, node, ifidx=iface)
+                                            if ncfg.get('matchesnodename', None):
+                                                reply += 'DEFAULTNET: 1\r\n'
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
