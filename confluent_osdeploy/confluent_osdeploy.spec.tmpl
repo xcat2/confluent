@@ -30,6 +30,7 @@ for os in rhvh4 el8 suse15 ubuntu20.04; do
     cd ${os}out
     cp -a ../opt .
     cp -a ../${os}/initramfs/* .
+    cp -a ../common/* .
     find . | cpio -H newc -o > ../addons.cpio
     mv ../addons.cpio .
     cd ..
@@ -38,6 +39,7 @@ mkdir esxi7out
 cd esxi7out
 cp -a ../opt .
 cp -a ../esxi7/initramfs/* .
+cp -a ../common/* .
 chmod +x bin/* opt/confluent/bin/*
 tar zcvf ../addons.tgz *
 mv ../addons.tgz .
