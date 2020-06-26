@@ -223,7 +223,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         for net in nets:
             net, prefix, svrip = net
             if ip_on_same_subnet(net, ipbynodename, prefix):
-                cfgdata['isnodename'] = True
+                cfgdata['matchesnodename'] = True
                 cfgdata['ipv4_address'] = ipbynodename
                 cfgdata['ipv4_method'] = 'static'
                 cfgdata['prefix'] = prefix
