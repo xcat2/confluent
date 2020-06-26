@@ -27,7 +27,7 @@ int add_uuid(char* destination, int maxsize) {
     return  uuidsize + 6;
 }
 
-int add_macs(char* destination, int maxsize) {
+void add_macs(char* destination, int maxsize) {
     struct ifaddrs *ifc, *ifa;
     struct sockaddr_ll *lla;
     int offset;
@@ -72,7 +72,8 @@ int main(int argc, char* argv[]) {
     char lastnodename[1024];
     char lastmsg[1024];
     char last6msg[1024];
-    int ifidx, offset;
+    char mgtifname[1024];
+    int ifidx, offset, isdefault;
     fd_set rfds;
     struct timeval tv;
     int settime = 0;
@@ -119,7 +120,7 @@ int main(int argc, char* argv[]) {
     for (ifc = ifa; ifc != NULL; ifc = ifc->ifa_next) {
         if (!ifc->ifa_addr) continue;
         if (ifc->ifa_flags & IFF_LOOPBACK) continue;
-        if (ifc->ifa_flags & IFF_MULTICAST != IFF_MULTICAST) continue;
+        if ((ifc->ifa_flags & IFF_MULTICAST) != IFF_MULTICAST) continue;
         if (ifc->ifa_addr->sa_family == AF_INET6) {
             in6 = (struct sockaddr_in6 *)ifc->ifa_addr;
             if (in6->sin6_scope_id == 0)
@@ -145,6 +146,8 @@ int main(int argc, char* argv[]) {
     while (ifidx) {
         if (ifidx == -1) perror("Unable to select");
         if (ifidx) {
+            mgtifname[0] = 0;
+            isdefault = 0;
             if (FD_ISSET(n4, &rfds)) {
                 memset(msg, 0, 1024);
                 /* Deny packet access to the last 24 bytes to assure null */
@@ -206,6 +209,16 @@ int main(int argc, char* argv[]) {
                     }
                     settime = strtol(nodename, NULL, 10);
                 }
+                if (nodenameidx = strstr(msg, "DEFAULTNET: 1")) {
+                    isdefault = 1;
+                }
+                if (nodenameidx = strstr(msg, "MGTIFACE: ")) {
+                    nodenameidx += 10;
+                    strncpy(mgtifname, nodenameidx, 1024);
+                    if (nodenameidx = strstr(mgtifname, "\r")) {
+                        nodenameidx[0] = 0;
+                    }
+                }
                 if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
                     nodenameidx += 10;
                     strncpy(nodename, nodenameidx, 1024);
@@ -223,6 +236,11 @@ int main(int argc, char* argv[]) {
                         printf("%%%u", dst.sin6_scope_id);
                     }
                     printf("\n");
+                    printf("EXTMGRINFO: %s", msg);
+                    if (strncmp(msg, "fe80::", 6) == 0) {
+                        printf("%%%u", dst.sin6_scope_id);
+                    }
+                    printf("|%s|%d\n", mgtifname, isdefault);
                     strncpy(last6msg, msg, 1024);
                 }
             }
