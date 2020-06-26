@@ -22,6 +22,12 @@ try:
 except NameError:
     pass
 
+def emprint(txt):
+    if sys.stdout.isatty():
+        print('\x1b[1m\x1b[4m' + txt + '\x1b[0m')
+    else:
+        print(txt)
+
 fnamechars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.^'
 def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
@@ -100,7 +106,7 @@ def initialize(cmdset):
     if cmdset.t:
         didsomething = True
         certutil.create_certificate()
-        print('New HTTPS certificates generated, restart the web server')
+        emprint('New HTTPS certificates generated, restart the web server')
     if cmdset.s:
         didsomething = True
         sshutil.initialize_ca()
