@@ -1,0 +1,80 @@
+#!/usr/bin/python
+try:
+    import http.client as client
+except ImportError:
+    import httplib as client
+import socket
+import ssl
+import sys
+
+class HTTPSClient(client.HTTPConnection, object):
+    def __init__(self, port=443):
+        self.stdheaders = {}
+        info = open('/etc/confluent/confluent.info').read().split('\n')
+        host = None
+        mgtiface = None
+        havedefault = '0'
+        for line in info:
+            if line.startswith('NODENAME:'):
+                node = line.split(' ')[1]
+                self.stdheaders['CONFLUENT_NODENAME'] = node
+            if line.startswith('MANAGER:') and not host:
+                host = line.split(' ')[1]
+            if line.startswith('EXTMGRINFO:'):
+                extinfo = line.split(' ')[1]
+                extinfo = extinfo.split('|')
+                if not mgtiface:
+                    host, mgtiface, havedefault = extinfo[:3]
+                if havedefault == '0' and extinfo[2] == '1':
+                    host, mgtiface, havedefault = extinfo[:3]
+        self.stdheaders['CONFLUENT_APIKEY'] = open('/etc/confluent/confluent.apikey').read().strip()
+        if mgtiface:
+            self.stdheaders['CONFLUENT_MGTIFACE'] = mgtiface
+        client.HTTPConnection.__init__(self, host, port)
+        self.connect()
+
+    def set_header(self, key, val):
+        self.stdheaders[key] = val
+
+    def connect(self):
+        addrinf = socket.getaddrinfo(self.host, self.port)[0]
+        psock = socket.socket(addrinf[0])
+        psock.connect(addrinf[4])
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx.load_verify_locations('/etc/confluent/ca.pem')
+        host = self.host.split('%', 1)[0]
+        if '[' not in host and ':' in host:
+            self.stdheaders['Host'] = '[{0}]'.format(host)
+        else:
+            self.stdheaders['Host'] = '{0}'.format(host)
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        ctx.check_hostname = True
+        self.sock = ctx.wrap_socket(psock, server_hostname=host)
+
+    def grab_url(self, url, data=None, returnrsp=False):
+        if data:
+            method = 'POST'
+        else:
+            method = 'GET'
+        self.request(method, url, headers=self.stdheaders)
+        rsp = self.getresponse()
+        if rsp.status >= 200 and rsp.status < 300:
+            if returnrsp:
+                return rsp
+            else:
+                return rsp.read()
+        raise Exception(rsp.read())
+
+if __name__ == '__main__':
+    data = None
+    if len(sys.argv) == 4:
+        with open(sys.argv[3], 'wb') as outf:
+            reader = HTTPSClient().grab_url(sys.argv[1], data, returnrsp=True)
+            chunk = reader.read(16384)
+            while chunk:
+                outf.write(chunk)
+                chunk = reader.read(16384)
+        sys.exit(0)
+    if len(sys.argv) == 3:
+        data = open(sys.argv[2]).read()
+    print(HTTPSClient().grab_url(sys.argv[1], data).decode())
