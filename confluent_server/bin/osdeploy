@@ -142,6 +142,7 @@ def initialize(cmdset):
     subprocess.check_call(tarcmd)
     os.chdir(opath)
     os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
+    print('Site initramfs content packed successfully')
     if cmdset.k:
         with open('/etc/ssh/ssh_known_hosts', 'a+b') as skh:
             for cafile in glob.glob('/var/lib/confluent/public/site/ssh/*.ca'):
