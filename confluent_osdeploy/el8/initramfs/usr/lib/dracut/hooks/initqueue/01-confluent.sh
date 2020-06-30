@@ -2,7 +2,7 @@
 [ -e /tmp/confluent.initq ] && return 0
 echo -n "" > /tmp/confluent.initq
 TRIES=0
-while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+while ! grep ^EXTMGRINFO: /tmp/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
     TRIES=$((TRIES + 1))
     cd /sys/class/net
     for currif in *; do
@@ -11,13 +11,18 @@ while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 1 >& /dev/null && [ "$T
     cd /
     /opt/confluent/bin/copernicus -t > /tmp/confluent.info
 done
+
+read ifidx <<EOF
+$(grep ^EXTMGRINFO: /tmp/confluent.info  | awk -F'|' '{print $1 " " $3'} | grep 1$ | awk '{print $2}' | sed -e s/.*%//)
+EOF
+if [ -z "$ifdx" ]; then
 read ifidx <<EOF
 $(grep ^MANAGER /tmp/confluent.info|grep fe80|sed -e s/.*%//)
 EOF
+fi
 read mgr << EOF
 $(grep ^MANAGER /tmp/confluent.info|grep fe80|awk '{print $2}')
 EOF
-mgridx=${mgr#*%}
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
 echo $ifname > /tmp/net.ifaces
