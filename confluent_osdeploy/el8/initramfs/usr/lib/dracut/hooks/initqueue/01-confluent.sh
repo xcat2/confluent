@@ -15,7 +15,7 @@ done
 read ifidx <<EOF
 $(grep ^EXTMGRINFO: /tmp/confluent.info  | awk -F'|' '{print $1 " " $3'} | grep 1$ | awk '{print $2}' | sed -e s/.*%//)
 EOF
-if [ -z "$ifdx" ]; then
+if [ -z "$ifidx" ]; then
 read ifidx <<EOF
 $(grep ^MANAGER /tmp/confluent.info|grep fe80|sed -e s/.*%//)
 EOF
@@ -37,7 +37,6 @@ umask 0077
 mkdir /etc/confluent
 echo $apikey > /etc/confluent.apikey
 umask $oum
-mgr="[$mgr]"
 cp /tmp/confluent.info /etc/confluent.apikey /etc/confluent/
 cat /tls/*.pem > /etc/confluent/ca.pem
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /tmp/confluent.deploycfg
