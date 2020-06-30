@@ -64,6 +64,7 @@ int main(int argc, char* argv[]) {
     struct sockaddr_in6 *in6;
     struct sockaddr_in *in, *bin;
     int ns, n4;
+    unsigned int lastidx = 2147483648;
     struct sockaddr_in6 addr, dst;
     struct sockaddr_in addr4, dst4;
     char msg[1024];
@@ -229,7 +230,8 @@ int main(int argc, char* argv[]) {
                 }
                 memset(msg, 0, 1024);
                 inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
-                if (strncmp(last6msg, msg, 1024) != 0) {
+                if (strncmp(last6msg, msg, 1024) != 0 || lastidx != dst.sin6_scope_id) {
+		    lastidx = dst.sin6_scope_id;
                     sendto(ns, "PING", 4, 0, (const struct sockaddr *)&dst, dstsize);
                     printf("MANAGER: %s", msg);
                     if (strncmp(msg, "fe80::", 6) == 0) {
