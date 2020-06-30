@@ -27,11 +27,11 @@ if [ -z "$apikey" ]; then
 fi
 oum=$(umask)
 umask 0077
+mkdir /etc/confluent
 echo $apikey > /etc/confluent.apikey
 umask $oum
 mgr="[$mgr]"
-mkdir /etc/confluent
-cp /tmp/confluent.info /etc/confluent/
+cp /tmp/confluent.info /etc/confluent.apikey /etc/confluent/
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
 dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
