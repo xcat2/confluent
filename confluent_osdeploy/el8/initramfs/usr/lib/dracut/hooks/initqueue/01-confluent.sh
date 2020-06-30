@@ -30,7 +30,7 @@ umask 0077
 echo $apikey > /etc/confluent.apikey
 umask $oum
 mgr="[$mgr]"
-curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
 dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }

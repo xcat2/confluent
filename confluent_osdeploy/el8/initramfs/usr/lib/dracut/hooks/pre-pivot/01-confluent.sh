@@ -19,5 +19,6 @@ for i in /ssh/*.ca; do
 done
 cp /etc/confluent.apikey /sysroot/etc/
 cp /etc/confluent.apikey /sysroot/etc/confluent/
+cp /opt/confluent/bin/apiclient /sysroot/etc/confluent
 cp /tmp/confluent.deploycfg /tmp/confluent.info /sysroot/etc/
 cp /tmp/confluent.deploycfg /tmp/confluent.info /sysroot/etc/confluent
