@@ -32,6 +32,7 @@ echo $apikey > /etc/confluent.apikey
 umask $oum
 mgr="[$mgr]"
 cp /tmp/confluent.info /etc/confluent.apikey /etc/confluent/
+cat /tls/*.pem > /etc/confluent/ca.pem
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /tmp/confluent.deploycfg
 
 dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
