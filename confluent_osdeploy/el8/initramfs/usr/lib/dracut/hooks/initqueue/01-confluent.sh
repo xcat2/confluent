@@ -2,7 +2,7 @@
 [ -e /tmp/confluent.initq ] && return 0
 echo -n "" > /tmp/confluent.initq
 TRIES=0
-while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 2 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
     TRIES=$((TRIES + 1))
     cd /sys/class/net
     for currif in *; do

@@ -21,7 +21,10 @@ for nic in *; do
 done
 echo -n "Discovering confluent..."
 /opt/confluent/bin/copernicus -t > /tmp/confluent.info
-while ! grep MANAGER: /tmp/confluent.info > /dev/null; do
+TRIES=0
+while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+	TRIES=$((TRIES + 1))
+
 	/opt/confluent/bin/copernicus -t > /tmp/confluent.info
 done
 nodename=$(grep ^NODENAME: /tmp/confluent.info | head -n 1 | sed -e 's/NODENAME: //')
