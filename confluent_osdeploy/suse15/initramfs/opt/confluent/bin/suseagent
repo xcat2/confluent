@@ -27,7 +27,11 @@ done
 nodename=$(grep ^NODENAME: /tmp/confluent.info | head -n 1 | sed -e 's/NODENAME: //')
 echo "done ($nodename)"
 echo "Hostname: $nodename" >> /etc/linuxrc.d/01-confluent
-mgr=$(grep ^MANAGER: /tmp/confluent.info | head -n 1 | sed -e 's/MANAGER: //')
+mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | awk '{print $2}')
+if [ -z "$mgr" ]; then
+    mgr=$(grep ^MANAGER: /tmp/confluent.info | head -n 1 | sed -e 's/MANAGER: //')
+fi
+mgtiface=$(grep $mgr /tmp/confluent.info | grep EXTMGRINFO | head -n 1 | awk -F'|' '{print $2}')
 echo -n "Acquiring configuration from $mgr..."
 bootifidx=${mgr#*%}
 for nic in *; do
@@ -39,7 +43,11 @@ cd -
 echo "NetDevice: $bootif" >> /etc/linuxrc.d/01-confluent
 /opt/confluent/bin/clortho $nodename $mgr > /tmp/confluent.apikey
 mgr="[$mgr]"
-curl -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+if [ -z "$mgtiface" ]; then
+    curl -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+else
+    curl -H "CONFLUENT_MGTIFACE: $mgtiface" -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+fi
 dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
