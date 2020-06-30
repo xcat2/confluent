@@ -1,12 +1,14 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
 echo -n "" > /tmp/confluent.initq
-while ! grep MANAGER /tmp/confluent.info >& /dev/null; do
+TRIES=0
+while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 2 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+    TRIES=$((TRIES + 1))
     cd /sys/class/net
     for currif in *; do
         ip link set $currif up
     done
-    cd -
+    cd /
     /opt/confluent/bin/copernicus -t > /tmp/confluent.info
 done
 read ifidx <<EOF
