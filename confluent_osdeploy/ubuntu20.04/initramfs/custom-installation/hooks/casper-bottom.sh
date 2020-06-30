@@ -5,13 +5,19 @@ mkdir -p /root/custom-installation/tls
 cp /ssh/* /root/custom-installation/ssh
 cp /tls/* /root/custom-installation/tls
 NODENAME=$(grep ^NODENAME: /custom-installation/confluent/confluent.info|awk '{print $2}')
+MGR=$(grep ^EXTMGRINFO: /custom-installation/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | head -n 1 | awk '{print $2}')
 MGR=$(grep ^MANAGER: /custom-installation/confluent/confluent.info|head -n 1| awk '{print $2}')
+MGTIFACE=$(grep $MGR /custom-installation/confluent/confluent.info | grep ^EXTMGRINFO: | head -n 1 | awk -F'|' '{print $2}')
 oum=$(umask)
 umask 077
 chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
 MGR=[$MGR]
 deploycfg=/root/custom-installation/confluent/confluent.deploycfg
-chroot . usr/bin/curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
+if [ -z "$MGTIFACE" ]; then
+	chroot . usr/bin/curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
+else
+	chroot . usr/bin/curl -f -H "ONFLUENT_MGTIFACE: $MGTIFACE" -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
+fi
 umask $oum
 nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
 nic=$(ip link |grep ^$nic:|awk '{print $2}')

@@ -27,11 +27,11 @@ done
 nodename=$(grep ^NODENAME: /tmp/confluent.info | head -n 1 | sed -e 's/NODENAME: //')
 echo "done ($nodename)"
 echo "Hostname: $nodename" >> /etc/linuxrc.d/01-confluent
-mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | awk '{print $2}')
+mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk -F'|' '{print $1 " " $3}'|grep " 1$" | head -n 1 | awk '{print $2}')
 if [ -z "$mgr" ]; then
     mgr=$(grep ^MANAGER: /tmp/confluent.info | head -n 1 | sed -e 's/MANAGER: //')
 fi
-mgtiface=$(grep $mgr /tmp/confluent.info | grep EXTMGRINFO | head -n 1 | awk -F'|' '{print $2}')
+mgtiface=$(grep $mgr /tmp/confluent.info | grep EXTMGRINFO: | head -n 1 | awk -F'|' '{print $2}')
 echo -n "Acquiring configuration from $mgr..."
 bootifidx=${mgr#*%}
 for nic in *; do
