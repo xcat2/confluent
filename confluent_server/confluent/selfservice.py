@@ -59,13 +59,16 @@ def handle_request(env, start_response):
     if env['REQUEST_METHOD'] not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     if env['PATH_INFO'] == '/self/deploycfg':
-        myip = env.get('HTTP_X_FORWARDED_HOST', None)
-        if ']' in myip:
-            myip = myip.split(']', 1)[0]
+        if 'HTTP_CONFLUENT_MGTIFACE' in env:
+            ncfg = netutil.get_nic_config(cfg, nodename, ifidx=env['HTTP_CONFLUENT_MGTIFACE'])
         else:
-            myip = myip.split(':', 1)[0]
-        myip = myip.replace('[', '').replace(']', '')
-        ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
+            myip = env.get('HTTP_X_FORWARDED_HOST', None)
+            if ']' in myip:
+                myip = myip.split(']', 1)[0]
+            else:
+                myip = myip.split(':', 1)[0]
+            myip = myip.replace('[', '').replace(']', '')
+            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
         deployinfo = cfg.get_node_attributes(
