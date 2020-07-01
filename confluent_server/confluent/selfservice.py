@@ -162,17 +162,25 @@ def handle_request(env, start_response):
             yield dumper(sorted(nodes))
     elif env['PATH_INFO'] == '/self/updatestatus':
         update = yaml.safe_load(reqbody)
-        if update['status'] != 'complete':
+        if update['status'] == 'staged':
+            targattr = 'deployment.stagedprofile'
+        elif update['status'] == 'complete':
+            targattr = 'deployment.profile'
+        else
             raise Exception('Unknown update status request')
         currattr = cfg.get_node_attributes(nodename, 'deployment.*').get(
             nodename, {})
-        pending = currattr.get('deployment.pendingprofile', {}).get('value', '')
+        pending = None
+        if targattr == 'deployment.profile':
+            pending = currattr.get('deployment.stagedprofile', {}).get('value', '')
+        if not pending:
+            pending = currattr.get('deployment.pendingprofile', {}).get('value', '')
         updates = {}
         if pending:
             updates['deployment.pendingprofile'] = {'value': ''}
-            currprof = currattr.get('deployment.profile', {}).get('value', '')
+            currprof = currattr.get(targattr, {}).get('value', '')
             if currprof != pending:
-                updates['deployment.profile'] = {'value': pending}
+                updates[targattr] = {'value': pending}
             cfg.set_node_attributes({nodename: updates})
             start_response('200 OK', (('Content-Type', 'text/plain'),))
             yield 'OK'

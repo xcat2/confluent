@@ -188,6 +188,12 @@ node = {
                         'the network boot subsystem what should be offered when a potential '
                         'network boot request comes in')
     },
+    'deployment.stagedprofile': {
+        'description': ('A profile that has been staged, but is awaiting final '
+                        'boot to be activated. This allows an OS profile to '
+                        'remove itself from netboot without indicating '
+                        'completion to any watcher.')
+    },
     'deployment.profile': {
         'description': ('The profile that has most recently reported '
                         'completion of deployment. Note that an image may opt '

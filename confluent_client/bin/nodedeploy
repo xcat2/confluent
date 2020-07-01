@@ -29,38 +29,38 @@ def armonce(nr, cli):
 
 def setpending(nr, profile, cli):
     for rsp in cli.update('/noderange/{0}/attributes/current'.format(nr),
-                          {'deployment.pendingprofile': profile}):
+                          {'deployment.pendingprofile': profile, 'deployment.stagedprofile': None}):
         pass
 
 
 def main(args):
     ap = argparse.ArgumentParser(description='Deploy OS to nodes')
-    ap.add_argument('-n', '--network', help='Initiate deployment over PXE', action='store_true')
+    ap.add_argument('-n', '--network', help='Initiate deployment over PXE/HTTP', action='store_true')
+    ap.add_argument('-p', '--prepare', help='Configure for deployment without setting boot device or rebooting', action='store_true')
     ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
     ap.add_argument('noderange', help='Set of nodes to deploy')
     ap.add_argument('profile', help='Profile name to deploy')
     args = ap.parse_args(args)
-    if not args.network:
-        sys.stderr.write('Currently only network (-n) deployment is supported\n')
+    if not args.network and not args.prepare:
+        sys.stderr.write('-n or -p is a required argument currently)
         return 1
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
     armonce(args.noderange, c)
     setpending(args.noderange, args.profile, c)
     errnodes = set([])
-    rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
-                                     bootmode='uefi',
-                                     persistent=False,
-                                     errnodes=errnodes)
-    if errnodes:
-        sys.stderr.write(
-            'Unable to set boot device for following nodes: {0}\n'.format(
-                ','.join(errnodes)))
-        return 1
-    rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
-    return rc
-
-
+    if args.network:
+        rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
+                                        bootmode='uefi',
+                                        persistent=False,
+                                        errnodes=errnodes)
+        if errnodes:
+            sys.stderr.write(
+                'Unable to set boot device for following nodes: {0}\n'.format(
+                    ','.join(errnodes)))
+            return 1
+        rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
+        return rc
     return 0
 
 if __name__ == '__main__':
