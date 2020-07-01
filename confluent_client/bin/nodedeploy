@@ -29,7 +29,9 @@ def armonce(nr, cli):
 
 def setpending(nr, profile, cli):
     for rsp in cli.update('/noderange/{0}/attributes/current'.format(nr),
-                          {'deployment.pendingprofile': profile, 'deployment.stagedprofile': None}):
+                          {'deployment.pendingprofile': profile,
+                          'deployment.stagedprofile': '',
+                          'deployment.profile': ''}):
         pass
 
 
