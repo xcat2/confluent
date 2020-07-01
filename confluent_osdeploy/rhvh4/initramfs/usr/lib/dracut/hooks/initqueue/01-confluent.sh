@@ -4,9 +4,9 @@ mkdir -p /etc/confluent
 cat /tls/*.pem > /etc/confluent/ca.pem
 echo -n "" > /tmp/confluent.initq
 TRIES=0
-touch /etc/confluent/confluent.info
+echo -n > /etc/confluent/confluent.info
 cd /sys/class/net
-while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 2 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
     TRIES=$((TRIES + 1))
     for currif in *; do
         ip link set $currif up
