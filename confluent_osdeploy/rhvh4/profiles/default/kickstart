@@ -35,8 +35,8 @@ liveimg --url=file:///tmp/install.img
 reboot
 
 %pre
-profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
-mgr=$(grep deploy_server /etc/confluent.deploycfg |awk '{print $2}')
+profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.sh
 . /tmp/preinst.sh
 %end
@@ -44,8 +44,8 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.
 %post --nochroot
 nodectl init
 mkdir -p /mnt/sysimage/etc/confluent
-profile=$(grep ^profile: /etc/confluent.deploycfg |awk '{print $2}')
-mgr=$(grep deploy_server /etc/confluent.deploycfg |awk '{print $2}')
+profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/postinst.sh
 . /tmp/postinst.sh
 

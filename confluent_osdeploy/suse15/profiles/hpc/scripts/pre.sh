@@ -3,12 +3,12 @@
 # This script runs before the installer executes, and sets up ssh during install as well
 # as rewriting the autoyast file with any substitutions prior to it being evaluated for real
 
-nodename=$(grep ^NODENAME /tmp/confluent.info|awk '{print $2}')
-rootpw=$(grep rootpassword: /tmp/confluent.deploycfg|sed -e 's/^rootpassword: //')
+nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
+rootpw=$(grep rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 if [ "$rootpw" = "null" ]; then
     rootpw="!"
 fi
-cryptboot=$(grep encryptboot: /tmp/confluent.deploycfg|sed -e 's/^encryptboot: //')
+cryptboot=$(grep encryptboot: /etc/confluent/confluent.deploycfg|sed -e 's/^encryptboot: //')
 if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
    echo "****Encrypted boot requested, but not implemented for this OS, halting install" > /dev/console
    [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but not implemented for this OS,halting install" >> $(cat /tmp/autoconsdev))
@@ -20,7 +20,7 @@ cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
 ssh-keygen -A
 for i in  /etc/ssh/ssh_host*key.pub; do
     certname=${i/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /tmp/confluent.apikey)" -d @$i https://$mgr/confluent-api/self/sshcert > $certname
+    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$i https://$mgr/confluent-api/self/sshcert > $certname
     echo HostKey ${i%.pub} >> /etc/ssh/sshd_config
     echo HostCertificate $certname >> /etc/ssh/sshd_config
 done

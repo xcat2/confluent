@@ -3,35 +3,26 @@
 mkdir -p /etc/confluent
 cat /tls/*.pem > /etc/confluent/ca.pem
 echo -n "" > /tmp/confluent.initq
-while ! grep MANAGER /etc/confluent/confluent.info >& /dev/null; do
-    cd /sys/class/net
+TRIES=0
+touch /tmp/confluent.info
+cd /sys/class/net
+while ! awk -F'|' '{print $3}' /tmp/confluent.info |grep 2 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+    TRIES=$((TRIES + 1))
     for currif in *; do
         ip link set $currif up
     done
-    cd -
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
-read ifidx <<EOF
-$(grep ^MANAGER /etc/confluent/confluent.info|grep fe80|sed -e s/.*%//)
-EOF
-read mgr << EOF
-$(grep ^MANAGER /etc/confluent/confluent.info|grep fe80|awk '{print $2}')
-EOF
-mgridx=${mgr#*%}
-ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
-ifname=${ifname%:}
-echo $ifname > /tmp/net.ifaces
+cd /
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
-if [ -z "$apikey" ]; then
-    apikey=$(/opt/confluent/bin/clortho $nodename $mgr)
-fi
 oum=$(umask)
-umask 0077
-echo $apikey > /etc/confluent/confluent.apikey
-umask $oum
 python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /tmp/confluent.deploycfg
+mgridx=$(cat /tmp/confluent.ifidx)
+ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+ifname=${ifname%:}
+echo $ifname > /tmp/net.ifaces
 
 dnsdomain=$(grep ^dnsdomain: /tmp/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }

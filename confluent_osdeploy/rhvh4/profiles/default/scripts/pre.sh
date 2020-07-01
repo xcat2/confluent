@@ -8,23 +8,23 @@
 # method is to edit the kicktstart file and comment out or
 # delete %include /tmp/partitioning
 
-nodename=$(grep ^NODENAME /etc/confluent.info|awk '{print $2}')
-locale=$(grep ^locale: /etc/confluent.deploycfg)
+nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
+locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
-keymap=$(grep ^keymap: /etc/confluent.deploycfg)
+keymap=$(grep ^keymap: /etc/confluent/confluent.deploycfg)
 keymap=${keymap#keymap: }
 echo lang $locale > /tmp/langinfo
 echo keyboard --vckeymap=$keymap >> /tmp/langinfo
-tz=$(grep ^timezone: /etc/confluent.deploycfg)
+tz=$(grep ^timezone: /etc/confluent/confluent.deploycfg)
 tz=${tz#timezone: }
 echo timezone $tz --utc > /tmp/timezone
-rootpw=$(grep ^rootpassword /etc/confluent.deploycfg | awk '{print $2}')
+rootpw=$(grep ^rootpassword /etc/confluent/confluent.deploycfg | awk '{print $2}')
 if [ "$rootpw" = null ]; then
     echo "rootpw --lock" > /tmp/rootpw
 else
     echo "rootpw --iscrypted $rootpw" > /tmp/rootpw
 fi
-grubpw=$(grep ^grubpassword /etc/confluent.deploycfg | awk '{print $2}')
+grubpw=$(grep ^grubpassword /etc/confluent/confluent.deploycfg | awk '{print $2}')
 if [ "$grubpw" = "null" ]; then
     touch /tmp/grubpw
 else
@@ -33,7 +33,7 @@ fi
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
+    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
 done
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
@@ -41,10 +41,10 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
     TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
-cryptboot=$(grep ^encryptboot: /etc/confluent.deploycfg | awk '{print $2}')
+cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
 if [ "$cryptboot" == "bound" ]; then
-	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent.apikey)"
+	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
 	echo $cryptboot >> /tmp/cryptboot
 fi
 

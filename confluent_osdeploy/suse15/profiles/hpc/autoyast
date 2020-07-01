@@ -101,9 +101,9 @@ dynamic behavior and replace with static configuration.
           <source>
 <![CDATA[
 #!/bin/sh
-mgr=$(grep ^deploy_server /tmp/confluent.deploycfg|awk '{print $2}')
-profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^profile: //')
-proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
 . /tmp/pre.sh
 ]]>
@@ -117,9 +117,9 @@ curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
           <source>
 <![CDATA[
 #!/bin/sh
-mgr=$(grep ^deploy_server /tmp/confluent.deploycfg|awk '{print $2}')
-profile=$(grep ^profile: /tmp/confluent.deploycfg|sed -e 's/^profile: //')
-proto=$(grep ^protocol: /tmp/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl $proto://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/prechroot.sh
 . /tmp/prechroot.sh
 curl -f $proto://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
