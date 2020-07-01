@@ -4,7 +4,7 @@ echo -n "" > /tmp/confluent.initq
 TRIES=0
 oum=$(umask)
 umask 0077
-mkdir -p /etc/confluennt
+mkdir -p /etc/confluent
 umask $oum
 cd /sys/class/net
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do

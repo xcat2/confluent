@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # This runs prior to the installer beginning. This is used to rewrite the 
-# scripted install file, merging data from confluennt and identifying
+# scripted install file, merging data from confluent and identifying
 # the most appropriate install source.
 
 # If you want to use a more custom partition plan, the easiest

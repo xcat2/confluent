@@ -41,7 +41,7 @@ class HTTPSClient(client.HTTPConnection, object):
         if not os.path.exists('/tmp/confluent.ifidx') and '%' in host:
             ifidx = host.split('%', 1)[1]
             with open('/tmp/confluent.ifidx', 'w+') as ifout:
-                ifout.write(ifdx)
+                ifout.write(ifidx)
         self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(node, host)
         if mgtiface:
             self.stdheaders['CONFLUENT_MGTIFACE'] = mgtiface

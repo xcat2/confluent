@@ -13,7 +13,7 @@ mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 export mgr profile nodename
-. /etc/confluennt/functions
+. /etc/confluent/functions
 
 # Customizations may go here
 
