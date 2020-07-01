@@ -42,7 +42,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
 fi
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
-if [ "$cryptboot" == "bound" ]; then
+if [ "$cryptboot" == "tpm2" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
 	echo $cryptboot >> /tmp/cryptboot
 fi
