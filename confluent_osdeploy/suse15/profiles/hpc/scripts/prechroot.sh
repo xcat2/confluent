@@ -12,7 +12,7 @@ mkdir -p /mnt/etc/confluent
 chmod 700 /mnt/etc/confluent
 cp /tmp/functions /mnt/etc/confluent/
 . /tmp/functions
-cp /tmp/confluent.* /mnt/etc/confluent/
+cp -a /etc/confluent/* /mnt/etc/confluent/
 cp -a /tls /mnt/etc/confluent/
 cp -a /tls/* /mnt/var/lib/ca-certificates/openssl
 cp -a /tls/* /mnt/var/lib/ca-certificates/pem
