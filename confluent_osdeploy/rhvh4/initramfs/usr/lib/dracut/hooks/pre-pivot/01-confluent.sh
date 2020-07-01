@@ -6,7 +6,6 @@ done
 
 cat /etc/pki/tls/certs/ca-bundle.crt > $BUNDLENAME
 mkdir -p /sysroot/etc/confluent/
-chmod 700 /sysroot/etc/confluent
 cp -a /tls /sysroot/etc/confluent
 cp -a /etc/confluent/* /sysroot/etc/confluent/
 sed -i 's/install::/install:*:/' /sysroot/etc/shadow
