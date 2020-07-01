@@ -178,6 +178,8 @@ def handle_request(env, start_response):
         updates = {}
         if pending:
             updates['deployment.pendingprofile'] = {'value': ''}
+            if targattr == 'deployment.profile':
+                updates['deployment.stagedprofile'] = {'value': ''}
             currprof = currattr.get(targattr, {}).get('value', '')
             if currprof != pending:
                 updates[targattr] = {'value': pending}
