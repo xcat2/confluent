@@ -12,8 +12,16 @@
 mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
+apikey=$(cat /etc/confluent/confluent.apikey)
+
+chmod 700 /etc/confluent
+chmod og-rwx /etc/confluent/*
+
+
 export mgr profile nodename
 . /etc/confluent/functions
+
+curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
 
 # Customizations may go here
 

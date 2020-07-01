@@ -1,8 +1,16 @@
 #!/bin/sh
 # need to copy over ssh key info
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
+apikey=$(cat /etc/confluent/confluent.apikey)
+
+chmod 700 /etc/confluent
+chmod og-rwx /etc/confluent/*
+
 export mgr profile nodename
 . /etc/confluent/functions
+
+curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
+
 
 if [ -f /tmp/cryptboot ]; then
     run_remote tpm_luks.sh
