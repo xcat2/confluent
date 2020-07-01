@@ -166,7 +166,7 @@ def handle_request(env, start_response):
             targattr = 'deployment.stagedprofile'
         elif update['status'] == 'complete':
             targattr = 'deployment.profile'
-        else
+        else:
             raise Exception('Unknown update status request')
         currattr = cfg.get_node_attributes(nodename, 'deployment.*').get(
             nodename, {})
