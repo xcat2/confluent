@@ -42,6 +42,10 @@ control.
   remote media mounted as CD/DVD, and detachable hard disks drives such as usb
   key devices.
   
+* `floppy`:
+  Request boot from floppy.  Generally speaking firmware uses this to mean a USB
+  flash drive or similar (whether virtual or physical).
+
 * `network`:
   Request boot to network
   

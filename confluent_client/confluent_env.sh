@@ -91,7 +91,7 @@ _confluent_nodeidentify_completion()
 
 _confluent_nodesetboot_completion()
 {
-    COMP_CANDIDATES=("default,cd,network,setup,hd -h -b -p")
+    COMP_CANDIDATES=("default,cd,network,setup,hd,floppy -h -b -p")
     _confluent_generic_completion
 }
 
