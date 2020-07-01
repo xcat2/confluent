@@ -14,9 +14,10 @@ def get_apikey(nodename, mgr):
         return open('/etc/confluent/confluent.apikey').read().strip()
     apikey = subprocess.check_output(['/opt/confluent/bin/clortho', nodename, mgr])
     if not isinstance(apikey, str):
-        apikey = apikey.decode('utf8').strip()
+        apikey = apikey.decode('utf8')
     with open('/etc/confluent/confluent.apikey', 'w+') as apiout:
         apiout.write(apikey)
+    apikey = apikey.strip()
     os.chmod('/etc/confluent/confluent.apikey', 0o600)
     return apikey
 
