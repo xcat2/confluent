@@ -19,7 +19,7 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 
 oum=$(umask)
 python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
-mgridx=$(cat /tmp/confluent.ifidx)
+ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
 echo $ifname > /tmp/net.ifaces
