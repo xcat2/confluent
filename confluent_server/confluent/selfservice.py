@@ -145,14 +145,30 @@ def handle_request(env, start_response):
             start_response('500 Unconfigured', ())
             yield 'CA is not configured on this system (run ...)'
             return
-        cert = sshutil.sign_host_key(reqbody, nodename)
+        dnsinfo = cfg.get_node_attributes(nodename, ('dns.*'))
+        dnsinfo = dnsinfo.get(nodename, {}).get('dns.domain', {}).get('value',
+                  None)
+        if dnsinfo in nodename:
+            dnsinfo = ''
+        cert = sshutil.sign_host_key(reqbody, nodename, [dnsinfo])
         start_response('200 OK', (('Content-Type', 'text/plain'),))
         yield cert
     elif env['PATH_INFO'] == '/self/nodelist':
         nodes = set(cfg.list_nodes())
+        domaininfo = cfg.get_node_attributes(nodes, 'dns.domain')
+        for node in list(util.natural_sort(nodes)):
+            domain = domaininfo.get(node, {}).get('dns.domain', {}).get(
+                'value', None)
+            if domain and domain not in node:
+                nodes.add('{0}.{1}'.format(node, domain))
         for mgr in configmanager.list_collective():
             nodes.add(mgr)
-        nodes.add(collective.get_myname())
+            if domain and domain not in mgr:
+                nodes.add('{0}.{1}'.format(mgr, domain))
+        myname = collective.get_myname()
+        nodes.add(myname)
+        if domain and domain not in myname:
+            nodes.add('{0}.{1}'.format(myname, domain))
         if isgeneric:
             start_response('200 OK', (('Content-Type', 'text/plain'),))
             for node in util.natural_sort(nodes):
