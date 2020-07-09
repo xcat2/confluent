@@ -475,6 +475,9 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     gateway = None
     netmask = None
     niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'])
+    nicerr = niccfg.get('error_msg', False)
+    if nicerr:
+        log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
         return

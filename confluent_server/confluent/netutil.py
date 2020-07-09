@@ -202,13 +202,16 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                         continue
                 candgw = cfgbyname[candidate].get('ipv4_gateway', None)
                 if candip:
-                    if ip_on_same_subnet(net, candip, prefix):
-                        cfgdata['ipv4_address'] = candip
-                        cfgdata['ipv4_method'] = 'static'
-                        cfgdata['ipv4_gateway'] = cfgbyname[candidate].get(
-                            'ipv4_gateway', None)
-                        cfgdata['prefix'] = prefix
-                        return cfgdata
+                    try:
+                        if ip_on_same_subnet(net, candip, prefix):
+                            cfgdata['ipv4_address'] = candip
+                            cfgdata['ipv4_method'] = 'static'
+                            cfgdata['ipv4_gateway'] = cfgbyname[candidate].get(
+                                'ipv4_gateway', None)
+                            cfgdata['prefix'] = prefix
+                            return cfgdata
+                    except Exception as e:
+                        cfgdata['error_msg'] = 'Error trying to evaluate "{0}" for {1}: {2}'.format(candip, node, str(e))
                 elif candgw:
                     if ip_on_same_subnet(net, candgw, prefix):
                         candgws.append(candgw)
