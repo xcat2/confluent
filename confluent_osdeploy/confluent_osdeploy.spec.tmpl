@@ -7,7 +7,13 @@ License: Apache2
 URL: http://hpc.lenovo.com/
 Source0: confluent_osdeploy.tar.xz
 BuildArch: noarch
-Requires: confluent_ipxe mtools
+
+%define is_rh 0%{?el6:1}%{?el7:1}%{?el8:1}
+%if %is_rh
+Requires: confluent_ipxe mtools httpd mod_ssl
+%else
+Requires: confluent_ipxe mtools apache2
+%endif
 BuildRoot: /tmp
 
 %description
@@ -54,6 +60,20 @@ for os in rhvh4 el8 suse15 ubuntu20.04 esxi6 esxi7; do
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
 done
+%if %is_rh
+mkdir -p %{buildroot}/etc/httpd/conf.d
+mv confluent-osdeploy.conf  %{buildroot}/etc/httpd/conf.d/
+%else
+mkdir -p %{buildroot}/etc/apache2/conf.d
+mv confluent-osdeploy.conf.sles %{buildroot}/etc/apache2/conf.d/confluent-osdeploy.conf
+%endif
+
 
 %files
 /opt/confluent/lib/osdeploy
+%if %is_rh
+/etc/httpd/conf.d/confluent-osdeploy.conf
+%else
+/etc/apache2/conf.d/confluent-osdeploy.conf
+%endif
+
