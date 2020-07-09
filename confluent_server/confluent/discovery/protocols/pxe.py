@@ -388,9 +388,9 @@ def snoop(handler, protocol=None):
                                 # ACK
                     handler(info)
                 consider_discover(info, rqinfo, net4, cfg, rqv)
-            except Exception as e:
-                tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                             event=log.Events.stacktrace)
+        except Exception as e:
+            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                            event=log.Events.stacktrace)
 
 
 
