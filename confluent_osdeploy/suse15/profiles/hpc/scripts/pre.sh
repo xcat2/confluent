@@ -35,4 +35,4 @@ if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
     ntpcfg='<xi:include href="file:///tmp/ntp.cfg"/>'
 fi
 run_remote_python getinstalldisk
-sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e s!%%NTPCFG%%!$ntpcfg! -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
+sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e "s!%%NTPCFG%%!$ntpcfg!" -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
