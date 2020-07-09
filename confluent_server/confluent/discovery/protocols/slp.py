@@ -344,14 +344,19 @@ def _add_attributes(parsed):
     else:
         net = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        net.settimeout(1.0)
+        net.settimeout(2.0)
         net.connect(target)
     except socket.error:
         return
-    net.sendall(attrq)
-    rsp = net.recv(8192)
-    net.close()
-    _parse_attrs(rsp, parsed, xid)
+    try:
+        net.sendall(attrq)
+        rsp = net.recv(8192)
+        net.close()
+        _parse_attrs(rsp, parsed, xid)
+    except Exception as e:
+        # this can be a messy area, just degrade the quality of rsp
+        # in a bad situation
+        return
 
 
 def query_srvtypes(target):
@@ -415,7 +420,11 @@ def snoop(handler, protocol=None):
     :return:
     """
     tracelog = log.Logger('trace')
-    active_scan(handler, protocol)
+    try:
+        active_scan(handler, protocol)
+    except Exception as e:
+            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                         event=log.Events.stacktrace)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
