@@ -769,6 +769,14 @@ def clear_configuration():
 def commit_clear():
     global _oldtxcount
     global _oldcfgstore
+    # first, copy over old non-key globals, as those are
+    # currently defined as local to each collective member
+    # currently just 'autosense' which is intended to be active
+    # per collective member
+    for globvar in _oldcfgstore['globals']:
+        if globvar.endswith('_key'):
+            continue
+        _cfgstore['globals'][globvar] = _oldcfgstore['globals'][globvar]
     _oldcfgstore = None
     _oldtxcount = 0
     with _synclock:

@@ -120,6 +120,7 @@ def connect_to_leader(cert=None, name=None, leader=None):
             log.log({'info': 'Following leader {0}'.format(leader),
                      'subsystem': 'collective'})
             colldata = tlvdata.recv(remote)
+            # the protocol transmits global data, but for now we ignore it
             globaldata = tlvdata.recv(remote)
             dbi = tlvdata.recv(remote)
             dbsize = dbi['dbsize']
@@ -140,8 +141,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
                     cfm._true_add_collective_member(c, colldata[c]['address'],
                                                     colldata[c]['fingerprint'],
                                                     sync=False)
-                for globvar in globaldata:
-                    cfm.set_global(globvar, globaldata[globvar], False)
+                #for globvar in globaldata:
+                #    cfm.set_global(globvar, globaldata[globvar], False)
                 cfm._txcount = dbi.get('txcount', 0)
                 cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
                                                                sync=False)
@@ -463,7 +464,7 @@ def handle_connection(connection, cert, request, local=False):
                                           connection.getpeername()[0])
             tlvdata.send(connection, cfm._dump_keys(None, False))
             tlvdata.send(connection, cfm._cfgstore['collective'])
-            tlvdata.send(connection, cfm.get_globals())
+            tlvdata.send(connection, {}) # cfm.get_globals())
             cfgdata = cfm.ConfigManager(None)._dump_to_json()
             tlvdata.send(connection, {'txcount': cfm._txcount,
                                       'dbsize': len(cfgdata)})
