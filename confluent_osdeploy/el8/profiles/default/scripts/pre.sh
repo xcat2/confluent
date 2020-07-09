@@ -17,7 +17,11 @@ echo lang $locale > /tmp/langinfo
 echo keyboard --vckeymap=$keymap >> /tmp/langinfo
 tz=$(grep ^timezone: /etc/confluent/confluent.deploycfg)
 tz=${tz#timezone: }
-echo timezone $tz --utc > /tmp/timezone
+ntpsrvs=""
+if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
+    ntpsrvs="--ntpservers="$(sed -n '/^ntpservers:/,/^- /p' /etc/confluent/confluent.deploycfg|sed 1d|sed -e 's/^- //' | paste -d,)
+fi
+echo timezone $ntpsrvs $tz --utc > /tmp/timezone
 rootpw=$(grep ^rootpassword /etc/confluent/confluent.deploycfg | awk '{print $2}')
 if [ "$rootpw" = null ]; then
     echo "rootpw --lock" > /tmp/rootpw
