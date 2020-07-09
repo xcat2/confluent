@@ -16,7 +16,6 @@ dynamic behavior and replace with static configuration.
 	      <confirm config:type="boolean">false</confirm>
       </mode>
     </general>
-    %%NTPCFG%%
     %%IFSLE%%
     <add-on>
         <add_on_products config:type="list">

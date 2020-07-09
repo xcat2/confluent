@@ -32,7 +32,7 @@ if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
     echo '<ntp-client><ntp_servers config:type="list">' > /tmp/ntp.cfg
     sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg | sed 1d|sed '$d'| sed -e 's/^- /<ntp_server><address>/' -e 's!$!</address></ntp_server>!' >> /tmp/ntp.cfg
     echo '</ntp_servers></ntp-client>' >> /tmp/ntp.cfg
-    ntpcfg='<xi:include href="file:///tmp/ntp.cfg"/>'
+    ntpcfg=$(paste -sd '' /tmp/ntp.cfg)
 fi
 run_remote_python getinstalldisk
-sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e "s!%%NTPCFG%%!$ntpcfg!" -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
+sed -e s!%%INSTDISK%%!/dev/$(cat /tmp/installdisk)! -e s!%%NODENAME%%!$nodename! -e "s!<networking>!$ntpcfg<networking>!" -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
