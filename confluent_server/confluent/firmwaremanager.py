@@ -39,7 +39,7 @@ def execupdate(handler, filename, updateobj, type, owner, node):
     if type != 'ffdc':
         errstr = False
         if not os.path.exists(filename):
-            errstr =  '{0} does not appear to exist on {1}'.format(
+            errstr =  '{0} does not appear to exist on {1}, or is in a directory with permissions forbidding confluent user/group access'.format(
                 filename, socket.gethostname())
         elif not os.access(filename, os.R_OK):
             errstr =  '{0} is not readable by confluent on {1} (ensure confluent user or group can access file and parent directories)'.format(
