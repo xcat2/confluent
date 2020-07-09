@@ -73,7 +73,7 @@ def handle_request(env, start_response):
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
         deployinfo = cfg.get_node_attributes(
             nodename, ('deployment.*', 'console.method', 'crypted.*',
-                       'dns.*'))
+                       'dns.*', 'ntp.*'))
         deployinfo = deployinfo.get(nodename, {})
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
@@ -136,6 +136,13 @@ def handle_request(env, start_response):
         for dns in deployinfo.get(
                 'dns.servers', {}).get('value', '').split(','):
             ncfg['nameservers'].append(dns)
+        ntpsrvs = deployinfo.get('ntp.servers', {}).get('value', '')
+        if ntpsrvs:
+            ntpsrvs = ntpsrvs.split(',')
+        if ntpsrvs:
+            ncfg['ntpservers'] = []
+            for ntpsrv in ntpsrvs:
+                ncfg['ntpservers'].append(ntpsrv)
         dnsdomain = deployinfo.get('dns.domain', {}).get('value', None)
         ncfg['dnsdomain'] = dnsdomain
         start_response('200 OK', (('Content-Type', retype),))

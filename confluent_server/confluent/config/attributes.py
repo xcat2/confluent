@@ -443,6 +443,12 @@ node = {
                        'See information on net.switch for more on the '
                        'flexibility of net.* attributes.'
     },
+    'ntp.servers': {
+        'description': 'NTP server or servers to provide to node during '
+                       'deployment. An OS profile may default to internet NTP, '
+                       'depending on default configuration of the respective '
+                       'operating system',
+    },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
 #    },
