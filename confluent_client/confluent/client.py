@@ -473,7 +473,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                             attrout = '{0}: {1}: ********'.format(node,
                                                                   printattr)
                         else:
-                            attrout = '{0}: {1}:'.format(node, printattr)
+                            attrout = '{0}: {1}: '.format(node, printattr)
                     elif 'broken' in currattr:
                         attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                                   '{2}'.format(node, printattr,
