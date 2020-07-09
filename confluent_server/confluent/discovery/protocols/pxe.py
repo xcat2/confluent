@@ -294,6 +294,7 @@ def snoop(handler, protocol=None):
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
     # injection into the neigh table before OFFER or using SOCK_RAW.
+    tracelog = log.Logger('trace')
     global attribwatcher
     cfg = cfm.ConfigManager(None)
     remap_nodes(cfg.list_nodes(), cfg)
