@@ -211,7 +211,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                             cfgdata['prefix'] = prefix
                             return cfgdata
                     except Exception as e:
-                        cfgdata['error_msg'] = 'Error trying to evaluate "{0}" for {1}: {2}'.format(candip, node, str(e))
+                        cfgdata['error_msg'] = "Error trying to evaluate net.*ipv4_address attribute value '{0}' on {1}: {2}".format(candip, node, str(e))
                 elif candgw:
                     if ip_on_same_subnet(net, candgw, prefix):
                         candgws.append(candgw)
