@@ -32,6 +32,7 @@ import eventlet.green.socket as socket
 import eventlet.green.select as select
 import netifaces
 import struct
+import traceback
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
