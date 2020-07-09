@@ -25,8 +25,8 @@ chmod +x /target/etc/confluent/firstboot.sh
 cp /tmp/allnodes /target/root/.shosts
 cp /tmp/allnodes /target/etc/ssh/shosts.equiv
 if grep ^ntpservers: /target/etc/confluent/confluent.deploycfg > /dev/null; then
-    ntps=$(sed -n '/^ntpservers:/,/^[^-]/p' /target/etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //' | paste -sd ' '
-    sed -e "s/#NTP=/NTP=$ntps/" /target/etc/systemd/timesyncd.conf
+    ntps=$(sed -n '/^ntpservers:/,/^[^-]/p' /target/etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //' | paste -sd ' ')
+    sed -i "s/#NTP=/NTP=$ntps/" /target/etc/systemd/timesyncd.conf
 fi
 textcons=$(grep ^textconsole: /target/etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
