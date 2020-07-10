@@ -88,15 +88,18 @@ while fullline:
     for line in fullline.split('\n'):
         if not line:
             continue
-        if ': ' not in line:
+        if ':' not in line:
             line = 'UNKNOWN: ' + line
         if options.log:
-            node, output = line.split(': ', 1)
+            node, output = line.split(':', 1)
+            output = output.lstrip()
             currlog = options.log.format(node=node, nodename=node)
             with open(currlog, mode='a')  as log:
                 log.write(output + '\n')
             continue
-        grouped.add_line(*line.split(': ', 1))
+        node, output = line.split(':', 1)
+        output = output.lstrip()
+        grouped.add_line(node, output)
         if options.watch:
             if not holdoff:
                 holdoff = os.times()[4] + 0.250
