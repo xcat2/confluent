@@ -212,6 +212,7 @@ dracut_install /usr/lib64/python3.6/ctypes/__init__.py
 dracut_install /usr/lib64/python3.6/ctypes/_endian.py
 dracut_install /usr/lib64/python3.6/ctypes/util.py
 dracut_install /usr/lib64/python3.6/ssl.py
+dracut_install /usr/lib64/python3.6/ipaddress.py
 dracut_install /usr/lib/locale/en_US.utf8/LC_ADDRESS
 dracut_install /usr/lib/locale/en_US.utf8/LC_IDENTIFICATION
 dracut_install /usr/lib/locale/en_US.utf8/LC_MEASUREMENT
