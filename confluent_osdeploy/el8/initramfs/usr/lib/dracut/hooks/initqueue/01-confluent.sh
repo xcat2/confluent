@@ -1,6 +1,5 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
-echo -n "" > /tmp/confluent.initq
 TRIES=0
 oum=$(umask)
 umask 0077
@@ -16,6 +15,8 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 cd /
+grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0
+echo -n "" > /tmp/confluent.initq
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
