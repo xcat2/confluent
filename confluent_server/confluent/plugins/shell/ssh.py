@@ -169,11 +169,11 @@ class SshShell(conapi.Console):
             self.datacallback(conapi.ConsoleEvent.Disconnect)
             return
         elif self.inputmode == -1:
-            while len(data) and data[0] == b'\x7f' and len(self.keyaction):
+            while len(data) and data[0:1] == b'\x7f' and len(self.keyaction):
                 self.datacallback('\b \b')  # erase previously echoed value
                 self.keyaction = self.keyaction[:-1]
                 data = data[1:]
-            while len(data) and data[0] == b'\x7f':
+            while len(data) and data[0:1] == b'\x7f':
                 data = data[1:]
             while b'\x7f' in data:
                 delidx = data.index(b'\x7f')
@@ -195,11 +195,11 @@ class SshShell(conapi.Console):
             elif len(data) > 0:
                 self.datacallback(data)
         elif self.inputmode == 0:
-            while len(data) and data[0] == b'\x7f' and len(self.username):
+            while len(data) and data[0:1] == b'\x7f' and len(self.username):
                 self.datacallback('\b \b')  # erase previously echoed value
                 self.username = self.username[:-1]
                 data = data[1:]
-            while len(data) and data[0] == b'\x7f':
+            while len(data) and data[0:1] == b'\x7f':
                 data = data[1:]
             while b'\x7f' in data:
                 delidx = data.index(b'\x7f')
@@ -216,7 +216,7 @@ class SshShell(conapi.Console):
                 # echo back typed data
                 self.datacallback(data)
         elif self.inputmode == 1:
-            while len(data) > 0 and data[0] == b'\x7f':
+            while len(data) > 0 and data[0:1] == b'\x7f':
                 self.password = self.password[:-1]
                 data = data[1:]
             while b'\x7f' in data:
