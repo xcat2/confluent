@@ -34,10 +34,10 @@ reboot
 
 %packages
 @^minimal-environment
-clevis-dracut
 chrony
 rsync
 python3
+%include /tmp/cryptpkglist
 %end
 
 %pre
