@@ -2,7 +2,6 @@
 [ -e /tmp/confluent.initq ] && return 0
 mkdir -p /etc/confluent
 cat /tls/*.pem > /etc/confluent/ca.pem
-echo -n "" > /tmp/confluent.initq
 TRIES=0
 echo -n > /etc/confluent/confluent.info
 cd /sys/class/net
@@ -14,6 +13,10 @@ while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/nul
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 cd /
+grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && echo -n "" > /tmp/confluent.initq
+grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
+if [ -f /tmp/confluent.fellback ] && [ ! -f /tmp/confluent.initq ]; return 0; fi
+echo -n "" > /tmp/confluent.fellback
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
