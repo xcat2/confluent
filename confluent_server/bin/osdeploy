@@ -50,7 +50,7 @@ def main(args):
 
 def install_tftp_content():
     tftplocation = None
-    candidates = ('/var/lib/tftpboot', '/srv/tftpboot', '/srv/tftp')
+    candidates = ('/tftpboot', '/var/lib/tftpboot', '/srv/tftpboot', '/srv/tftp')
     for cand in candidates:
         if os.path.isdir(cand):
             tftplocation = cand
@@ -63,8 +63,8 @@ def install_tftp_content():
     except OSError as e:
         if e.errno == 17:
             raise
-    shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
-    shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
+    os.symlink('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation + '/ipxe.efi')
+    os.symlink('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation + '/ipxe.kkpxe')
 
 
 def initialize(cmdset):
