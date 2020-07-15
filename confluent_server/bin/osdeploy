@@ -63,8 +63,8 @@ def install_tftp_content():
     except OSError as e:
         if e.errno == 17:
             raise
-    os.symlink('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation + '/ipxe.efi')
-    os.symlink('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation + '/ipxe.kkpxe')
+    shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
+    shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
 
 
 def initialize(cmdset):
