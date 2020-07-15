@@ -15,7 +15,7 @@ done
 cd /
 grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && echo -n "" > /tmp/confluent.initq
 grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
-if [ -f /tmp/confluent.fellback ] && [ ! -f /tmp/confluent.initq ]; return 0; fi
+if [ -f /tmp/confluent.fellback ] && [ ! -f /tmp/confluent.initq ]; then return 0; fi
 echo -n "" > /tmp/confluent.fellback
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
@@ -41,7 +41,7 @@ proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
 proto=${proto#protocol: }
 textconsole=$(grep ^textconsole: /etc/confluent/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
-if [ $textconsole = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
+if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
 	autocons=$(cat /tmp/01-autocons.devnode)
 	if [ ! -z "$autocons" ]; then
 	    echo Auto-configuring installed system to use text console
