@@ -278,7 +278,7 @@ def _find_service(service, target):
         for url in peerdata[nid].get('urls', ()):
             if url.endswith('/desc.tmpl'):
                 info = urlopen(url).read()
-                if '<friendlyName>Athena</friendlyName>' in info:
+                if b'<friendlyName>Athena</friendlyName>' in info:
                     peerdata[nid]['services'] = ['service:thinkagile-storage']
                     yield peerdata[nid]
 
@@ -292,10 +292,10 @@ def _parse_ssdp(peer, rsp, peerdata):
         mac = nid
     headlines = rsp.split(b'\r\n')
     try:
-        _, code, _ = headlines[0].split(' ', 2)
+        _, code, _ = headlines[0].split(b' ', 2)
     except ValueError:
         return
-    if code == '200':
+    if code == b'200':
         if nid in peerdata:
             peerdatum = peerdata[nid]
             if peer not in peerdatum['addresses']:
