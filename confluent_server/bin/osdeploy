@@ -117,7 +117,9 @@ def initialize(cmdset):
     if cmdset.s:
         didsomething = True
         sshutil.initialize_ca()
-
+    if cmdset.p:
+        didsomething = True
+        install_tftp_content()
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
                         'interactive mode, or see initialize -h for more options\n')
@@ -162,8 +164,6 @@ def initialize(cmdset):
                 cacert = open(cafile, 'rb').read()
                 cacert = b'@cert-authority * ' + cacert
                 skh.write(cacert)
-    if cmdset.p:
-        install_tftp_content()
     # ok, also need to think on how to handle getinstalldisk
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         subprocess.check_call(['collective', 'gencert'])
