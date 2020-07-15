@@ -7,7 +7,7 @@ mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
 cd /sys/class/net
-while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 5 ]; do
     TRIES=$((TRIES + 1))
     for currif in *; do
         ip link set $currif up
