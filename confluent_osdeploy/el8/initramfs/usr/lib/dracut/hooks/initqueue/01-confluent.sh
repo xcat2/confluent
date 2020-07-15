@@ -19,6 +19,8 @@ grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 
 grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
 if [ -f /tmp/confluent.fellback ] && [ ! -f /tmp/confluent.initq ]; then return 0; fi
 echo -n "" > /tmp/confluent.fellback
+# restart cmdline
+echo -n "" > /etc/cmdline.d/01-confluent.conf
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
