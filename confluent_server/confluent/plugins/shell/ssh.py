@@ -99,7 +99,7 @@ class SshShell(conapi.Console):
     def recvdata(self):
         while self.connected:
             pendingdata = self.shell.recv(8192)
-            if pendingdata == '':
+            if not pendingdata:
                 self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
             self.datacallback(pendingdata)
