@@ -1,5 +1,12 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
+if [ -f /tmp/dd_disk ]; then
+    for dd in $(cat /tmp/dd_disk); do
+        if [ -e $dd ]; then
+            driver-updates --disk $dd $dd
+        fi
+    done
+fi
 TRIES=0
 oum=$(umask)
 umask 0077
@@ -7,7 +14,7 @@ mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
 cd /sys/class/net
-while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 5 ]; do
+while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
     TRIES=$((TRIES + 1))
     for currif in *; do
         ip link set $currif up
@@ -15,10 +22,8 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 cd /
-grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && echo -n "" > /tmp/confluent.initq
 grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
-if [ -f /tmp/confluent.fellback ] && [ ! -f /tmp/confluent.initq ]; then return 0; fi
-echo -n "" > /tmp/confluent.fellback
+echo -n "" > /tmp/confluent.initq
 # restart cmdline
 echo -n "" > /etc/cmdline.d/01-confluent.conf
 
