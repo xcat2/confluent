@@ -1,5 +1,12 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
+if [ -f /tmp/dd_disk ]; then
+    for dd in $(cat /tmp/dd_disk); do
+        if [ -e $dd ]; then
+            driver-updates --disk $dd $dd
+        fi
+    done
+fi
 mkdir -p /etc/confluent
 cat /tls/*.pem > /etc/confluent/ca.pem
 TRIES=0
@@ -13,10 +20,8 @@ while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/nul
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 cd /
-grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && echo -n "" > /tmp/confluent.initq
 grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
-if [ -f /tmp/confluent.fellback ] && [ ! -f /tmp/confluent.initq ]; then return 0; fi
-echo -n "" > /tmp/confluent.fellback
+echo -n "" > /tmp/confluent.initq
 # restart cmdline
 echo -n "" > /etc/cmdline.d/01-confluent.conf
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
