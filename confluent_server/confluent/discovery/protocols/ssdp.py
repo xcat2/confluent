@@ -309,7 +309,7 @@ def _parse_ssdp(peer, rsp, peerdata):
         for headline in headlines[1:]:
             if not headline:
                 continue
-            header, _, value = headline.partition(':')
+            header, _, value = headline.partition(b':')
             header = header.strip()
             value = value.strip()
             if header == 'AL' or header == 'LOCATION':
