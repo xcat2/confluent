@@ -1628,7 +1628,7 @@ class ConfigManager(object):
             nodecfg = self._cfgstore['nodes'][node]
         except KeyError:  # node did not exist, nothing to do
             return
-        for attrib in nodecfg.keys():
+        for attrib in list(nodecfg.keys()):
             if attrib.startswith("_"):
                 continue
             if attrib == 'groups':
