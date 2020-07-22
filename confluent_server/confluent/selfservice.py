@@ -155,7 +155,7 @@ def handle_request(env, start_response):
         dnsinfo = cfg.get_node_attributes(nodename, ('dns.*'))
         dnsinfo = dnsinfo.get(nodename, {}).get('dns.domain', {}).get('value',
                   None)
-        if dnsinfo in nodename:
+        if dnsinfo and dnsinfo in nodename:
             dnsinfo = ''
         cert = sshutil.sign_host_key(reqbody, nodename, [dnsinfo])
         start_response('200 OK', (('Content-Type', 'text/plain'),))
