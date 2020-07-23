@@ -33,11 +33,9 @@
 reboot
 
 %packages
-@^minimal-environment
 chrony
 rsync
-python3
-%include /tmp/cryptpkglist
+python
 %end
 
 
