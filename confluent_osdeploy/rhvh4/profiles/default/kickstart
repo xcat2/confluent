@@ -42,7 +42,6 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.
 %end
 
 %post --nochroot
-nodectl init
 mkdir -p /mnt/sysimage/etc/confluent
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
