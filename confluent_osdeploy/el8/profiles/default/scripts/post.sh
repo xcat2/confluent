@@ -27,5 +27,3 @@ fi
 # run_remote example.sh
 # run_remote_python example.py
 run_remote post.custom
-
-
