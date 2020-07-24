@@ -67,3 +67,5 @@ python /etc/confluent/apiclient /confluent-public/os/$profile/image.rpm -o image
 rpm2cpio image.rpm | cpio -dumi
 ln -s $(find $(pwd) -name *img) /tmp/install.img
 cd -
+python /etc/confluent/apiclient /confluent-public/os/$profile/kickstart.custom -o /tmp/kickstart.custom
+run_remote pre.custom

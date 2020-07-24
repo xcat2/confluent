@@ -14,9 +14,7 @@ export nodename mgr profile
 . /etc/confluent/functions
 
 
-# Here is the most appropriate place to customize, for example:
-#run_remote script.sh
-#run_remote_python script.py
+run_remote firstboot.custom
 
 
 curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
