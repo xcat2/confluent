@@ -3,7 +3,7 @@ grep HostCert /etc/ssh/sshd_config.anaconda >> /mnt/sysimage/etc/ssh/sshd_config
 echo HostbasedAuthentication yes >> /mnt/sysimage/etc/ssh/sshd_config
 echo HostbasedUsesNameFromPacketOnly yes >> /mnt/sysimage/etc/ssh/sshd_config
 echo IgnoreRhosts no >> /mnt/sysimage/etc/ssh/sshd_config
-sshconf=/etc/ssh/ssh_config
+sshconf=/mnt/sysimage/etc/ssh/ssh_config
 if [ -d /mnt/sysimage/etc/ssh/ssh_config.d/ ]; then
     sshconf=/mnt/sysimage/etc/ssh/ssh_config.d/01-confluent.conf
 fi
