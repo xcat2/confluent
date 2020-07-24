@@ -1,0 +1,4 @@
+# Any custom kickstart additions may go here.  It may be required to
+# modify base kickstart file to change certain portions, but adding
+# custom content to this file allows for most convenient way to 
+# refresh to a newer base profile if desired.
