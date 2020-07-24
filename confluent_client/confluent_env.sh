@@ -255,6 +255,8 @@ _confluent_nr_completion()
     CMPARGS=($COMP_LINE)
     _confluent_get_args
     if [ $NUMARGS -gt 2 ]; then
+        compopt -o default
+        COMPREPLY=()
         return;
     fi
     INPUT=${COMP_WORDS[COMP_CWORD]}
