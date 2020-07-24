@@ -63,3 +63,5 @@ if [ -e /tmp/installdisk ]; then
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
+curl -f https://$mgr/confluent-public/os/$profile/kickstart.custom > /tmp/kickstart.custom
+run_remote pre.custom

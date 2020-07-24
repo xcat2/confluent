@@ -40,6 +40,13 @@ python3
 %include /tmp/cryptpkglist
 %end
 
+# A kickstart.custom file is provided to enable easily adding
+# kickstart content without modifying the stock file.
+# While the stock file may be safely modified, using the .custom
+# files may allow for more easily rebasing custom profiles to newer
+# stock profiles
+%include /tmp/kickstart.custom
+
 %pre
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
