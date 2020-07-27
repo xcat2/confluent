@@ -250,6 +250,8 @@ class NodeRange(object):
                 return nodes
         if ':' in element:  # : range for less ambiguity
             return self.expandrange(element, ':')
+        elif '..' in element:
+            return self.expandrange(element, '..')
         elif '-' in element:
             return self.expandrange(element, '-')
         elif '+' in element:
