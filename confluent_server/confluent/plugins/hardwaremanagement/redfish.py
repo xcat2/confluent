@@ -894,6 +894,8 @@ class IpmiHandler(object):
             return self._create_storage(storelem)
 
     def _delete_storage(self, storelem):
+        if len(storelem) < 2:
+            storelem.append('')
         if len(storelem) < 2 or storelem[0] != 'volumes':
             raise exc.InvalidArgumentException('Must target a specific volume')
         volname = storelem[-1]
