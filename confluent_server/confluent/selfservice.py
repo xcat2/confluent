@@ -24,14 +24,14 @@ def get_extra_names(nodename, cfg):
     dnsinfo = dnsinfo.get(nodename, {})
     domain = dnsinfo.get('dns.domain', {}).get('value', None)
     if domain and domain not in nodename:
-        names.add('{0}.{1}'.formatdomain)
+        names.add('{0}.{1}'.format(nodename, domain))
     for keyname in dnsinfo:
         if keyname.endswith('hostname'):
             currnames = dnsinfo[keyname].get('value', None)
             if currnames:
                 currnames = currnames.split(',')
                 for currname in currnames:
-                    pals.add(currname)
+                    names.add(currname)
                     if domain not in currname:
                         names.add('{0}.{1}'.format(currname, domain))
     return names
