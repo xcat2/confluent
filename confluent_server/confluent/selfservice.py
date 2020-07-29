@@ -175,7 +175,12 @@ def handle_request(env, start_response):
         yield cert
     elif env['PATH_INFO'] == '/self/nodelist':
         nodes = set(cfg.list_nodes())
+        domain = None
         for node in list(util.natural_sort(nodes)):
+            if domain is None:
+                 domaininfo = cfg.get_node_attributes(node, 'dns.domain')
+                 domain = domaininfo.get(node, {}).get('dns.domain', {}).get(
+                     'value', None)
             for extraname in get_extra_names(node, cfg):
                 nodes.add(extraname)
         for mgr in configmanager.list_collective():
