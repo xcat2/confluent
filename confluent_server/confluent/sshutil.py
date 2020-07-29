@@ -41,16 +41,15 @@ def initialize_ca():
     #    newent = '@cert-authority * ' + capub.read()
 
 
-def sign_host_key(pubkey, nodename, domains=()):
+def sign_host_key(pubkey, nodename, principals=()):
     tmpdir = tempfile.mkdtemp()
     try:
         pkeyname = os.path.join(tmpdir, 'hostkey.pub')
         with open(pkeyname, 'wb') as pubfile:
             pubfile.write(pubkey)
-        principals = [nodename]
-        for domain in domains:
-            principals.append('{0}.{1}'.format(nodename, domain))
-        principals = ','.join(principals)
+        principals = set(principals)
+        principals.add(nodename)
+        principals = ','.join(sorted(principals))
         subprocess.check_call(
             ['ssh-keygen', '-s', '/etc/confluent/ssh/ca', '-I', nodename,
              '-n', principals, '-h', pkeyname])

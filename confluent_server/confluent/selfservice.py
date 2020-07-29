@@ -18,6 +18,23 @@ currtzvintage = None
 def yamldump(input):
     return yaml.safe_dump(input, default_flow_style=False)
 
+def get_extra_names(nodename, cfg):
+    names = set([])
+    dnsinfo = cfg.get_node_attributes(nodename, ('dns.*', 'net.*hostname'))
+    dnsinfo = dnsinfo.get(nodename, {})
+    domain = dnsinfo.get('dns.domain', {}).get('value', None)
+    if domain and domain not in nodename:
+        names.add('{0}.{1}'.formatdomain)
+    for keyname in dnsinfo:
+        if keyname.endswith('hostname'):
+            currnames = dnsinfo[keyname].get('value', None)
+            if currnames:
+                currnames = currnames.split(',')
+                for currname in currnames:
+                    pals.add(currname)
+                    if domain not in currname:
+                        names.add('{0}.{1}'.format(currname, domain))
+    return names
 
 def handle_request(env, start_response):
     global currtz
@@ -152,22 +169,15 @@ def handle_request(env, start_response):
             start_response('500 Unconfigured', ())
             yield 'CA is not configured on this system (run ...)'
             return
-        dnsinfo = cfg.get_node_attributes(nodename, ('dns.*'))
-        dnsinfo = dnsinfo.get(nodename, {}).get('dns.domain', {}).get('value',
-                  None)
-        if dnsinfo and dnsinfo in nodename:
-            dnsinfo = ''
-        cert = sshutil.sign_host_key(reqbody, nodename, [dnsinfo])
+        pals = get_extra_names(nodename, cfg)
+        cert = sshutil.sign_host_key(reqbody, nodename, pals)
         start_response('200 OK', (('Content-Type', 'text/plain'),))
         yield cert
     elif env['PATH_INFO'] == '/self/nodelist':
         nodes = set(cfg.list_nodes())
-        domaininfo = cfg.get_node_attributes(nodes, 'dns.domain')
         for node in list(util.natural_sort(nodes)):
-            domain = domaininfo.get(node, {}).get('dns.domain', {}).get(
-                'value', None)
-            if domain and domain not in node:
-                nodes.add('{0}.{1}'.format(node, domain))
+            for extraname in get_extra_names(node, cfg):
+                nodes.add(extraname)
         for mgr in configmanager.list_collective():
             nodes.add(mgr)
             if domain and domain not in mgr:

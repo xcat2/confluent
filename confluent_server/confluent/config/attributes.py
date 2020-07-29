@@ -425,6 +425,10 @@ node = {
         'description': 'The hardware address, aka MAC address of the interface indicated, generally populated by the '
                        'PXE discovery mechanism'
     },
+    'net.hostname': {
+        'description': 'Used to specify hostnames per interface. Can be a '
+                       'comma delimited list to indicate aliases'
+    },
     # 'net.pxe': { 'description': 'Whether pxe will be used on this interface'
     # TODO(jjohnson2):  Above being 'true' will control whether mac addresses
     # are stored in this nics attribute on pxe-client discovery, since
