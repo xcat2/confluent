@@ -2,3 +2,6 @@
 # modify base kickstart file to change certain portions, but adding
 # custom content to this file allows for most convenient way to 
 # refresh to a newer base profile if desired.
+# Two common example customizations are provided:
+#firewall --disabled
+#selinux --disabled
