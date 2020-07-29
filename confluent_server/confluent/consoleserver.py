@@ -419,7 +419,7 @@ class ConsoleHandler(object):
             if not self.reconnect:
                 self.reconnect = eventlet.spawn_after(retrytime, self._connect)
             return
-        except exc.TargetEndpointUnreachable:
+        except (exc.TargetEndpointUnreachable, socket.gaierror) as se:
             self.clearbuffer()
             self.error = 'unreachable'
             self.connectstate = 'unconnected'
