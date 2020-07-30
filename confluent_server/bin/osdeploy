@@ -56,7 +56,12 @@ def install_tftp_content():
             tftplocation = cand
             break
     if not tftplocation:
-        raise Exception('Unable to detect an installed tftp location')
+        raise Exception('Unable to detect an installed tftp location (check that tftp server is installed)')
+    if os.path.exists('/usr/lib/systemd/system/tftp.socket'):
+        subprocess.check_call(['systemctl', 'enable', 'tftp.socket', '--now'])
+    else:
+        print(
+            'Unable to automatically enable TFTP server, please enable manually')
     tftplocation = '{0}/confluent/x86_64'.format(tftplocation)
     try:
         os.makedirs(tftplocation)
