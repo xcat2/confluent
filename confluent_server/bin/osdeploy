@@ -56,6 +56,7 @@ def local_node_trust_setup():
     allnodes, domain = selfservice.get_cluster_list()
     myname = collective.get_myname()
     myprincipals = set([myname])
+    restorecon = os.path.exists('/usr/sbin/restorecon')
     neededlines = set([
         'HostbasedAuthentication yes', 'HostbasedUsesNameFromPacketOnly yes',
         'IgnoreRhosts no'])
@@ -70,6 +71,8 @@ def local_node_trust_setup():
             os.unlink(certfile)
         with open(certfile, 'w') as certout:
             certout.write(cert)
+        if restorecon:
+            subprocess.check_call(['/usr/sbin/restorecon', certfile])
     with open('/etc/ssh/sshd_config', 'r') as sshconf:
         currconfig = sshconf.read().split('\n')
     for conline in currconfig:
@@ -86,6 +89,10 @@ def local_node_trust_setup():
     with open('/root/.shosts', 'w') as equivout:
         for node in util.natural_sort(allnodes):
             equivout.write(node + '\n')
+    if restorecon:
+        subprocess.check_call(
+            ['/usr/sbin/restorecon',
+            '/etc/ssh/shosts.equiv', '/root/.shosts'])
 
 
 def install_tftp_content():
