@@ -1,7 +1,11 @@
 #!/usr/bin/python2
 
 import argparse
+import conlfuent.collective as collective
 import eventlet.green.subprocess as subprocess
+import confluent.selfservice as selfservice
+import confluent.util as util
+import confluent.sshutil as sshutil
 import glob
 import os
 import os.path
@@ -39,6 +43,7 @@ def main(args):
     wiz.add_argument('-t', help='Generate new TLS key for HTTPS operation and register with confluent repository', action='store_true')
     wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
+    wiz.add_argument('-l', help='Set local management node to have SSH certificates and hosts.equiv/.shosts')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     cmdset = ap.parse_args()
@@ -47,6 +52,43 @@ def main(args):
     if cmdset.command == 'initialize':
         return initialize(cmdset)
     ap.print_help()
+
+
+def local_node_trust_setup():
+    allnodes, domain = selfservice.get_cluster_list()
+    myname = collective.get_myname()
+    myprincipals = set([myname])
+    neededlines = set([
+        'HostbasedAuthentication yes', 'HostbasedUsesNameFromPacketOnly yes',
+        'IgnoreRhosts no'])
+    if not myname.endswith(domain):
+        myprincipals.add('{0}.{1}'.format(myname, domain))
+    for pubkey in glob.glob('/etc/ssh/ssh_host_*key.pub'):
+        currpubkey = open(pubkey, 'r').read()
+        cert = sshutil.sign_host_key(currpubkey, myname, principals)
+        certfile = currpubkey.replace('key.pub', 'key-cert.pub')
+        neededlines.add('HostCertificate {0}'.format(certfile))
+        if os.path.exists(certfile):
+            os.unlink(certfile)
+        with open(certfile) as certout:
+            certout.write(cert)
+    with open('/etc/ssh/sshd_config', 'r') as sshconf:
+        currconfig = sshconf.read().split()
+    for conline in currconfig:
+        conline = conline.strip()
+        neededlines.discard(conline)
+    if neededlines:
+        with open('/etc/ssh/sshd_config', 'a') as cfgout:
+            for currline in neededlines:
+                cfgout.write(currline)
+                cfgout.write('\n')
+    with open('/etc/ssh/shosts.equiv', 'w') as equivout:
+        for node in util.natural_sort(allnodes):
+            equivout.write(node + '\n')
+    with open('/root/.shosts', 'w') as equivout:
+        for node in util.natural_sort(allnodes):
+            equivout.write(node + '\n')
+
 
 def install_tftp_content():
     tftplocation = None

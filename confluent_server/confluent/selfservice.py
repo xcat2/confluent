@@ -174,23 +174,7 @@ def handle_request(env, start_response):
         start_response('200 OK', (('Content-Type', 'text/plain'),))
         yield cert
     elif env['PATH_INFO'] == '/self/nodelist':
-        nodes = set(cfg.list_nodes())
-        domain = None
-        for node in list(util.natural_sort(nodes)):
-            if domain is None:
-                 domaininfo = cfg.get_node_attributes(node, 'dns.domain')
-                 domain = domaininfo.get(node, {}).get('dns.domain', {}).get(
-                     'value', None)
-            for extraname in get_extra_names(node, cfg):
-                nodes.add(extraname)
-        for mgr in configmanager.list_collective():
-            nodes.add(mgr)
-            if domain and domain not in mgr:
-                nodes.add('{0}.{1}'.format(mgr, domain))
-        myname = collective.get_myname()
-        nodes.add(myname)
-        if domain and domain not in myname:
-            nodes.add('{0}.{1}'.format(myname, domain))
+        nodes, _ = get_cluster_list(cfg)
         if isgeneric:
             start_response('200 OK', (('Content-Type', 'text/plain'),))
             for node in util.natural_sort(nodes):
@@ -230,3 +214,26 @@ def handle_request(env, start_response):
     else:
         start_response('404 Not Found', ())
         yield 'Not found'
+
+
+def get_cluster_list(cfg=None):
+    if cfg is None:
+        cfg = configmanager.ConfigManager(None)
+    nodes = set(cfg.list_nodes())
+    domain = None
+    for node in list(util.natural_sort(nodes)):
+        if domain is None:
+            domaininfo = cfg.get_node_attributes(node, 'dns.domain')
+            domain = domaininfo.get(node, {}).get('dns.domain', {}).get(
+                'value', None)
+        for extraname in get_extra_names(node, cfg):
+            nodes.add(extraname)
+    for mgr in configmanager.list_collective():
+        nodes.add(mgr)
+        if domain and domain not in mgr:
+            nodes.add('{0}.{1}'.format(mgr, domain))
+    myname = collective.get_myname()
+    nodes.add(myname)
+    if domain and domain not in myname:
+        nodes.add('{0}.{1}'.format(myname, domain))
+    return nodes, domain
