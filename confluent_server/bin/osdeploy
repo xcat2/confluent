@@ -1,11 +1,6 @@
 #!/usr/bin/python2
 
 import argparse
-import conlfuent.collective as collective
-import eventlet.green.subprocess as subprocess
-import confluent.selfservice as selfservice
-import confluent.util as util
-import confluent.sshutil as sshutil
 import glob
 import os
 import os.path
@@ -17,7 +12,10 @@ path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
-
+import confluent.collective.manager as collective
+import eventlet.green.subprocess as subprocess
+import confluent.selfservice as selfservice
+import confluent.util as util
 import confluent.client as client
 import confluent.sshutil as sshutil
 import confluent.certutil as certutil
@@ -43,7 +41,7 @@ def main(args):
     wiz.add_argument('-t', help='Generate new TLS key for HTTPS operation and register with confluent repository', action='store_true')
     wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
-    wiz.add_argument('-l', help='Set local management node to have SSH certificates and hosts.equiv/.shosts')
+    wiz.add_argument('-l', help='Set local management node to have SSH certificates and hosts.equiv/.shosts', action='store_true')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     cmdset = ap.parse_args()
@@ -64,13 +62,13 @@ def local_node_trust_setup():
     if not myname.endswith(domain):
         myprincipals.add('{0}.{1}'.format(myname, domain))
     for pubkey in glob.glob('/etc/ssh/ssh_host_*key.pub'):
-        currpubkey = open(pubkey, 'r').read()
-        cert = sshutil.sign_host_key(currpubkey, myname, principals)
-        certfile = currpubkey.replace('key.pub', 'key-cert.pub')
+        currpubkey = open(pubkey, 'rb').read()
+        cert = sshutil.sign_host_key(currpubkey, myname, myprincipals)
+        certfile = pubkey.replace('key.pub', 'key-cert.pub')
         neededlines.add('HostCertificate {0}'.format(certfile))
         if os.path.exists(certfile):
             os.unlink(certfile)
-        with open(certfile) as certout:
+        with open(certfile, 'w') as certout:
             certout.write(cert)
     with open('/etc/ssh/sshd_config', 'r') as sshconf:
         currconfig = sshconf.read().split()
@@ -167,6 +165,9 @@ def initialize(cmdset):
     if cmdset.p:
         didsomething = True
         install_tftp_content()
+    if cmdset.l:
+        didsomething = True
+        local_node_trust_setup()
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
                         'interactive mode, or see initialize -h for more options\n')
