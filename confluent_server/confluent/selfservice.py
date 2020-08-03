@@ -88,6 +88,8 @@ def handle_request(env, start_response):
             ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
+        if ncfg['ipv4_method'] == 'firmwaredhcp':
+            ncfg['ipv4_method'] = 'static'
         deployinfo = cfg.get_node_attributes(
             nodename, ('deployment.*', 'console.method', 'crypted.*',
                        'dns.*', 'ntp.*'))
