@@ -132,6 +132,8 @@ def initialize(cmdset):
         cmdset.s = input().strip().lower().startswith('y')
         sys.stdout.write('Update global known hosts on this server to trust local CA certificates (-k)? (y/n): ')
         cmdset.k = input().strip().lower().startswith('y')
+        sys.stdout.write('Allow nodes to ssh to this management node without a password (-l)? (y/n): ')
+        cmdset.l = input().strip().lower().startswith('y')
         sys.stdout.write('Update tftp directory with binaries to support PXE (-p) (y/n): ')
         cmdset.p = input().strip().lower().startswith('y')
         sys.stdout.write('Generate new TLS certificates for HTTP, replacing any existing certificate (-t)? (y/n): ')
