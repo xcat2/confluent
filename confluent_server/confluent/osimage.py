@@ -418,6 +418,8 @@ def import_image(filename, callback, backend=False):
         basename = identity.get('copyto', os.path.basename(filename))
         targpath = os.path.join(targpath, basename)
         shutil.copyfile(filename, targpath)
+    with open(targpath + '/distinfo.yaml', 'w') as distinfo:
+        distinfo.write(yaml.dump(identity, default_flow_style=False))
     printit({'progress': 1.0})
     sys.stdout.write('\n')
 
