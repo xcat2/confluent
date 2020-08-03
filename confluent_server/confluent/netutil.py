@@ -184,17 +184,21 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         needsvrip = True
         dhcprequested = False
         nets = list(myiptonets(serverip))
+    genericmethod = 'static'
     if nets is not None:
         candgws = []
         candsrvs = []
         for net in nets:
             net, prefix, svrip = net
+            ipmethod = cfgbyname[candidate].get('ipv4_method', 'static')
             candsrvs.append(svrip)
             cfgdata['deploy_server'] = svrip
             for candidate in cfgbyname:
-                if cfgbyname[candidate].get('ipv4_method', None) == 'dhcp':
+                if ipmethod == 'dhcp':
                     dhcprequested = True
                     continue
+                if ipmethod == 'firmwaredhcp':
+                    genericmethod = ipmethod
                 candip = cfgbyname[candidate].get('ipv4_address', None)
                 if candip and '/' in candip:
                     candip, candprefix = candip.split('/')
@@ -205,7 +209,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     try:
                         if ip_on_same_subnet(net, candip, prefix):
                             cfgdata['ipv4_address'] = candip
-                            cfgdata['ipv4_method'] = 'static'
+                            cfgdata['ipv4_method'] = ipmethod
                             cfgdata['ipv4_gateway'] = cfgbyname[candidate].get(
                                 'ipv4_gateway', None)
                             cfgdata['prefix'] = prefix
@@ -228,7 +232,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             if ip_on_same_subnet(net, ipbynodename, prefix):
                 cfgdata['matchesnodename'] = True
                 cfgdata['ipv4_address'] = ipbynodename
-                cfgdata['ipv4_method'] = 'static'
+                cfgdata['ipv4_method'] = genericmethod
                 cfgdata['prefix'] = prefix
                 break
         for svr in candsrvs:

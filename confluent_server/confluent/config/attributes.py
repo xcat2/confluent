@@ -413,8 +413,10 @@ node = {
     },
     'net.ipv4_method': {
         'description': 'Whether to use static or dhcp when configuring this '
-                       'interface for IPv4.',
-        'validvalues': ('dhcp', 'static', 'none')
+                       'interface for IPv4. "firmwaredhcp" means to defer to '
+                       'external DHCP server during firmware execution, but '
+                       'use static for OS',
+        'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'none')
     },
     'net.ipv4_gateway': {
         'description':  'The IPv4 gateway to use if applicable.  As is the '

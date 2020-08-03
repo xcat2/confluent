@@ -482,7 +482,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         # Received a request over a nic with no ipv4 configured, ignore it
         return
     clipn = None
-    if niccfg['ipv4_address']:
+    if niccfg['ipv4_address'] and niccfg['ipv4_method'] != 'firmwaredhcp':
         clipn = socket.inet_aton(niccfg['ipv4_address'])
         repview[16:20] = clipn
         gateway = niccfg['ipv4_gateway']
