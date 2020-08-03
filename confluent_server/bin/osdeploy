@@ -176,8 +176,14 @@ def initialize(cmdset):
         install_tftp_content()
     if cmdset.l:
         local_node_trust_setup()
-        if not didsomething:
-            sys.exit(0)
+    if cmdset.k:
+        with open('/etc/ssh/ssh_known_hosts', 'a+b') as skh:
+            for cafile in glob.glob('/var/lib/confluent/public/site/ssh/*.ca'):
+                cacert = open(cafile, 'rb').read()
+                cacert = b'@cert-authority * ' + cacert
+                skh.write(cacert)
+    if not didsomething and (cmdset.k or cmdset.l):
+        sys.exit(0)
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
                         'interactive mode, or see initialize -h for more options\n')
@@ -216,17 +222,10 @@ def initialize(cmdset):
     os.chdir(opath)
     os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
     print('Site initramfs content packed successfully')
-    if cmdset.k:
-        with open('/etc/ssh/ssh_known_hosts', 'a+b') as skh:
-            for cafile in glob.glob('/var/lib/confluent/public/site/ssh/*.ca'):
-                cacert = open(cafile, 'rb').read()
-                cacert = b'@cert-authority * ' + cacert
-                skh.write(cacert)
-    # ok, also need to think on how to handle getinstalldisk
+
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         subprocess.check_call(['collective', 'gencert'])
     # TODO: check selinux and segetbool for httpd_can_network_connect
-    # tftp-server available and enabled?
     # httpd available and enabled?
 
 
