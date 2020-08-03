@@ -190,10 +190,10 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         candsrvs = []
         for net in nets:
             net, prefix, svrip = net
-            ipmethod = cfgbyname[candidate].get('ipv4_method', 'static')
             candsrvs.append(svrip)
             cfgdata['deploy_server'] = svrip
             for candidate in cfgbyname:
+                ipmethod = cfgbyname[candidate].get('ipv4_method', 'static')
                 if ipmethod == 'dhcp':
                     dhcprequested = True
                     continue
