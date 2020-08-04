@@ -153,15 +153,24 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
         yield msg.ChildCollection('importing/')
         return
     if pathcomponents[1] == 'distributions':
-        if len(pathcomponents) == 2:
+        if len(pathcomponents) == 2 and operation == 'retrieve':
             for dist in osimage.list_distros():
                 yield msg.ChildCollection(dist + '/')
             return
+        if len(pathcomponents) == 3:
+            distname = pathcomponents[-1]
+            if 'operation' == 'update':
+                if inputdata.get('rescan', False):
+                    osimage.rescan_dist(distname)
     if pathcomponents[1] == 'profiles':
-        if len(pathcomponents) == 2:
+        if len(pathcomponents) == 2 and operation == 'retrieve':
             for prof in osimage.list_profiles():
                 yield msg.ChildCollection(prof + '/')
             return
+        if len(pathcomponents) == 3:
+            profname = pathcomponents[-1]
+            if 'operation' == 'update':
+                osimage.update_boot(profname)
     if pathcomponents[1] == 'importing':
         if len(pathcomponents) == 2 or not pathcomponents[-1]:
             if operation == 'retrieve':

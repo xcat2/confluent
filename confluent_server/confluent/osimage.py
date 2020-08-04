@@ -40,7 +40,11 @@ from libarchive.ffi import (
 def relax_umask():
     os.umask(0o22)
 
-def update_boot(profiledir):
+def update_boot(profilename):
+    if profilename.startswith('/var/lib/confluent/public'):
+        profiledir = profilename
+    else:
+        profiledir = '/var/lib/confluent/public/os/{0}'.format(profilename)
     profile = {}
     if profiledir.endswith('/'):
         profiledir = profiledir[:-1]
@@ -403,6 +407,7 @@ def import_image(filename, callback, backend=False):
         return -1
     identity, imginfo = identity
     targpath = identity['name']
+    distpath = targpath
     if identity.get('subname', None):
         targpath += '/' + identity['subname']
     targpath = '/var/lib/confluent/distributions/' + targpath
@@ -418,7 +423,7 @@ def import_image(filename, callback, backend=False):
         basename = identity.get('copyto', os.path.basename(filename))
         targpath = os.path.join(targpath, basename)
         shutil.copyfile(filename, targpath)
-    with open(targpath + '/distinfo.yaml', 'w') as distinfo:
+    with open(distpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
     printit({'progress': 1.0})
     sys.stdout.write('\n')
@@ -440,6 +445,54 @@ def get_profile_label(profile):
     return prof.get('label', profile)
 
 importing = {}
+
+
+def generate_stock_profiles(defprofile, distpath, osname,
+                            profilelist):
+    osd, osversion, arch = osname.split('-')
+    bootupdates = []
+    for prof in os.listdir('{0}/profiles'.format(defprofile)):
+        srcname = '{0}/profiles/{1}'.format(defprofile, prof)
+        profname = '{0}-{1}'.format(osname, prof)
+        dirname = '/var/lib/confluent/public/os/{0}'.format(profname)
+        if os.path.exists(dirname):
+            continue
+        oumask = os.umask(0o22)
+        shutil.copytree(srcname, dirname)
+        profdata = None
+        try:
+            os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
+        except OSError as e:
+            if e.errno != 17:
+                raise
+        finally:
+            os.umask(oumask)
+        with open('{0}/profile.yaml'.format(dirname)) as yin:
+            profdata = yin.read()
+            profdata = profdata.replace('%%DISTRO%%', osd)
+            profdata = profdata.replace('%%VERSION%%', osversion)
+            profdata = profdata.replace('%%ARCH%%', arch)
+            profdata = profdata.replace('%%PROFILE%%', profname)
+        if profdata:
+            with open('{0}/profile.yaml'.format(dirname), 'w') as yout:
+                yout.write(profdata)
+        for initrd in os.listdir('{0}/initramfs'.format(defprofile)):
+            fullpath = '{0}/initramfs/{1}'.format(defprofile, initrd)
+            os.symlink(fullpath,
+                       '{0}/boot/initramfs/{1}'.format(dirname, initrd))
+        os.symlink(
+            '/var/lib/confluent/public/site/initramfs.cpio',
+            '{0}/boot/initramfs/site.cpio'.format(dirname))
+        os.symlink(distpath, '{0}/distribution'.format(dirname))
+        subprocess.check_call(
+            ['sh', '{0}/initprofile.sh'.format(dirname),
+             distpath, dirname])
+        bootupdates.append(eventlet.spawn(update_boot, dirname))
+        profilelist.append(profname)
+    for upd in bootupdates:
+        upd.wait()
+
+
 class MediaImporter(object):
 
     def __init__(self, media):
@@ -506,50 +559,14 @@ class MediaImporter(object):
                     self.percent = float(val)
             currline = b''
             a = wkr.stdout.read(1)
-        bootupdates = []
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(
                 self.oscategory)
-            osd, osversion, arch = self.osname.split('-')
-            for prof in os.listdir('{0}/profiles'.format(defprofile)):
-                srcname = '{0}/profiles/{1}'.format(defprofile, prof)
-                profname = '{0}-{1}'.format(self.osname, prof)
-                dirname = '/var/lib/confluent/public/os/{0}'.format(profname)
-                if os.path.exists(dirname):
-                    continue
-                oumask = os.umask(0o22)
-                shutil.copytree(srcname, dirname)
-                profdata = None
-                try:
-                    os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
-                except OSError as e:
-                    if e.errno != 17:
-                        raise
-                finally:
-                    os.umask(oumask)
-                with open('{0}/profile.yaml'.format(dirname)) as yin:
-                    profdata = yin.read()
-                    profdata = profdata.replace('%%DISTRO%%', osd)
-                    profdata = profdata.replace('%%VERSION%%', osversion)
-                    profdata = profdata.replace('%%ARCH%%', arch)
-                    profdata = profdata.replace('%%PROFILE%%', profname)
-                if profdata:
-                    with open('{0}/profile.yaml'.format(dirname), 'w') as yout:
-                        yout.write(profdata)
-                for initrd in os.listdir('{0}/initramfs'.format(defprofile)):
-                    fullpath = '{0}/initramfs/{1}'.format(defprofile, initrd)
-                    os.symlink(fullpath, '{0}/boot/initramfs/{1}'.format(dirname, initrd))
-                os.symlink(
-                    '/var/lib/confluent/public/site/initramfs.cpio',
-                    '{0}/boot/initramfs/site.cpio'.format(dirname))
-                os.symlink(self.distpath, '{0}/distribution'.format(dirname))
-                subprocess.check_call(
-                    ['sh', '{0}/initprofile.sh'.format(dirname),
-                    self.targpath, dirname])
-                bootupdates.append(eventlet.spawn(update_boot, dirname))
-                self.profiles.append(profname)
-        for upd in bootupdates:
-            upd.wait()
+            profilelist = self.profiles
+            distpath = self.distpath
+            osname = self.osname
+            generate_stock_profiles(defprofile, distpath, osname,
+                                         profilelist)
         self.phase = 'complete'
         self.percent = 100.0
 
