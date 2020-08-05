@@ -28,7 +28,25 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
 oum=$(umask)
-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+# 4.3 is rhel7 with useless curl but has python, 4.4 has usable curl but no python..
+if [ -x /usr/bin/python ]; then
+    python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+else
+    mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info| sed -e 's/^EXTMGRINFO: //' | awk -F'|' '{print $1 " " $2 " " $3}' |grep 1$ | awk 'NR < 2')
+    if [ -z "$mgr" ]; then
+        mgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info| sed -e 's/^EXTMGRINFO: //' | awk -F'|' '{print $1 " " $2 " " $3}' | awk 'NR < 2')
+    fi
+    mgtiface=$(echo $mgr | awk '{print $2}')
+    mgr=$(echo $mgr | awk '{print $1}')
+    if [ ! -f /etc/confluent/confluent.apikey ]; then
+        /opt/confluent/bin/clortho $nodename $mgr > /etc/confluent/confluent.apikey
+    fi
+    apikey=$(cat /etc/confluent/confluent.apikey)
+    if echo $mgr | grep ':' > /dev/null; then
+        mgr="[$mgr]"
+    fi
+    curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" -H "CONFLUENT_MGTIFACE: $mgtiface" https://$mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+fi
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
