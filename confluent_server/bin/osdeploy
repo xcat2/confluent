@@ -60,7 +60,7 @@ def local_node_trust_setup():
     neededlines = set([
         'HostbasedAuthentication yes', 'HostbasedUsesNameFromPacketOnly yes',
         'IgnoreRhosts no'])
-    if not myname.endswith(domain):
+    if domain and not myname.endswith(domain):
         myprincipals.add('{0}.{1}'.format(myname, domain))
     for pubkey in glob.glob('/etc/ssh/ssh_host_*key.pub'):
         currpubkey = open(pubkey, 'rb').read()
