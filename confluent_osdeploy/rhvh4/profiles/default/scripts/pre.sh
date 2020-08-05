@@ -8,6 +8,20 @@
 # method is to edit the kicktstart file and comment out or
 # delete %include /tmp/partitioning
 
+mgraw=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info| sed -e 's/^EXTMGRINFO: //' | awk -F'|' '{print $1 " " $2 " " $3}' |grep 1$ | awk 'NR < 2')
+if [ -z "$mgraw" ]; then
+    mgraw=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info| sed -e 's/^EXTMGRINFO: //' | awk -F'|' '{print $1 " " $2 " " $3}' | awk 'NR < 2')
+fi
+mgraw=$(echo $mgraw | awk '{print $1}')
+if echo $mgraw | grep '%' > /dev/null; then
+    echo $mgraw | awk -F% '{print $2}' > /tmp/confluent.ifidx
+fi
+
+iface=$(grep -H $(cat /tmp/confluent.ifidx) /sys/class/net/*/ifindex | awk -F/ '{print $5}')
+nmcli c u $iface
+while ip -6 addr | grep tentative > /dev/null; do
+   sleep 0.5
+done
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
@@ -40,7 +54,9 @@ for pubkey in /etc/ssh/ssh_host_*_key.pub; do
     curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
 done
+cp /etc/ssh/sshd_config.anaconda /etc/ssh/sshd_config
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
+systemctl start sshd
 if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
     TMUX= tmux a <> $consoledev >&0 2>&1 &
