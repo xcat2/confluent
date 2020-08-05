@@ -41,6 +41,9 @@ else
     if [ ! -f /etc/confluent/confluent.apikey ]; then
         /opt/confluent/bin/clortho $nodename $mgr > /etc/confluent/confluent.apikey
     fi
+    if echo $mgr | grep '%' > /dev/null; then
+        echo $mgr | awk -F% '{print $2}' > /tmp/confluent.ifidx
+    fi
     apikey=$(cat /etc/confluent/confluent.apikey)
     if echo $mgr | grep ':' > /dev/null; then
         mgr="[$mgr]"
