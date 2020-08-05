@@ -80,7 +80,7 @@ if [ -e /tmp/installdisk ]; then
 fi
 cd $(mktemp -d)
 if [ -x /usr/bin/python ]; then
-	pythton=/usr/bin/python
+	python=/usr/bin/python
 elif [ -x /usr/libexec/platform-python ]; then
 	python=/usr/libexec/platform-python
 fi
