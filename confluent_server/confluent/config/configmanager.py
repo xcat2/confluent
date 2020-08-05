@@ -1423,6 +1423,14 @@ class ConfigManager(object):
         groupname = confluent.util.stringify(groupname)
         if groupname in self._cfgstore['usergroups']:
             raise Exception("Duplicate groupname requested")
+        for candrole in _validroles:
+            if candrole.lower().startswith(role.lower()):
+                role = candrole
+                break
+        if role not in _validroles:
+            raise ValueError(
+                'Unrecognized role "{0}" (valid roles: {1})'.format(
+                    role, ','.join(_validroles)))
         self._cfgstore['usergroups'][groupname] = {'role': role}
         _mark_dirtykey('usergroups', groupname, self.tenant)
         self._bg_sync_to_file()
@@ -1525,7 +1533,15 @@ class ConfigManager(object):
         name = confluent.util.stringify(name)
         if name in self._cfgstore['users']:
             raise Exception("Duplicate username requested")
-        self._cfgstore['users'][name] = {'id': uid}
+        for candrole in _validroles:
+            if candrole.lower().startswith(role.lower()):
+                role = candrole
+                break
+        if role not in _validroles:
+            raise ValueError(
+                'Unrecognized role "{0}" (valid roles: {1})'.format(
+                    role, ','.join(_validroles)))
+        self._cfgstore['users'][name] = {'id': uid, 'role': role}
         if displayname is not None:
             self._cfgstore['users'][name]['displayname'] = displayname
         _cfgstore['main']['idmap'][uid] = {
