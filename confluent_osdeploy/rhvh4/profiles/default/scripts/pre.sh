@@ -63,9 +63,14 @@ if [ -e /tmp/installdisk ]; then
     echo autopart --type=thinp --nohome $LUKSPARTY >> /tmp/partitioning
 fi
 cd $(mktemp -d)
-python /etc/confluent/apiclient /confluent-public/os/$profile/image.rpm -o image.rpm
+if [ -x /usr/bin/python ]; then
+	pythton=/usr/bin/python
+elif [ -x /usr/libexec/platform-python ]; then
+	python=/usr/libexec/platform-python
+fi
+$python /etc/confluent/apiclient /confluent-public/os/$profile/image.rpm -o image.rpm
 rpm2cpio image.rpm | cpio -dumi
 ln -s $(find $(pwd) -name *img) /tmp/install.img
 cd -
-python /etc/confluent/apiclient /confluent-public/os/$profile/kickstart.custom -o /tmp/kickstart.custom
+$python /etc/confluent/apiclient /confluent-public/os/$profile/kickstart.custom -o /tmp/kickstart.custom
 run_remote pre.custom
