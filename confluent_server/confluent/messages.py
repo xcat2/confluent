@@ -1801,7 +1801,7 @@ class CryptedAttributes(Attributes):
         nkv = {}
         for key in kv:
             nkv[key] = {'isset': False}
-            if 'hashvalue' in kv[key]:
+            if kv[key] and 'hashvalue' in kv[key]:
                 targkey = 'hashvalue'
             else:
                 targkey = 'cryptvalue'
