@@ -206,11 +206,11 @@ def _rpc_del_usergroup(tenant, name):
 
 
 def _rpc_master_set_usergroup(tenant, name, attributemap):
-    ConfigManager(tenant).set_user(name, attributemap)
+    ConfigManager(tenant).set_usergroup(name, attributemap)
 
 
 def _rpc_set_usergroup(tenant, name, attributemap):
-    ConfigManager(tenant)._true_set_user(name, attributemap)
+    ConfigManager(tenant)._true_set_usergroup(name, attributemap)
 
 
 def _rpc_master_set_user(tenant, name, attributemap):
@@ -652,6 +652,7 @@ def relay_slaved_requests(name, listener):
                     except ValueError as ve:
                         exc = ['ValueError', str(ve)]
                     except Exception as e:
+                        logException()
                         exc = ['Exception', str(e)]
                     if 'xid' in rpc:
                         res = _push_rpc(listener, msgpack.packb({'xid': rpc['xid'],
