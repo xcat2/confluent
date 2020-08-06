@@ -8,7 +8,6 @@ profile = None
 with open('/etc/confluent/confluent.deploycfg') as dplcfgfile:
     lines = dplcfgfile.read().split('\n')
     for line in lines:
-        print(repr(line))
         if line.startswith('deploy_server:'):
            _, server = line.split(' ', 1)
         if line.startswith('profile: '):
