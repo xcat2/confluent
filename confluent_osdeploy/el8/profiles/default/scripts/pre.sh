@@ -8,6 +8,7 @@
 # method is to edit the kicktstart file and comment out or
 # delete %include /tmp/partitioning
 
+/usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
 nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
 nmcli c u $nicname
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
