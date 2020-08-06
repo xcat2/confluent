@@ -407,7 +407,7 @@ def import_image(filename, callback, backend=False):
         return -1
     identity, imginfo = identity
     targpath = identity['name']
-    distpath = targpath
+    distpath = '/var/lib/confluent/distributions/' + targpath
     if identity.get('subname', None):
         targpath += '/' + identity['subname']
     targpath = '/var/lib/confluent/distributions/' + targpath
@@ -423,6 +423,10 @@ def import_image(filename, callback, backend=False):
         basename = identity.get('copyto', os.path.basename(filename))
         targpath = os.path.join(targpath, basename)
         shutil.copyfile(filename, targpath)
+    with open(targpath + '/distinfo.yaml', 'w') as distinfo:
+        distinfo.write(yaml.dump(identity, default_flow_style=False))
+    if 'subname' in identity:
+        del identity['subname']
     with open(distpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
     printit({'progress': 1.0})
