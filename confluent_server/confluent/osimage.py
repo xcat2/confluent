@@ -447,7 +447,7 @@ def get_profile_label(profile):
 importing = {}
 
 
-def generate_stock_profiles(defprofile, distpath, osname,
+def generate_stock_profiles(defprofile, distpath, targpath, osname,
                             profilelist):
     osd, osversion, arch = osname.split('-')
     bootupdates = []
@@ -486,7 +486,7 @@ def generate_stock_profiles(defprofile, distpath, osname,
         os.symlink(distpath, '{0}/distribution'.format(dirname))
         subprocess.check_call(
             ['sh', '{0}/initprofile.sh'.format(dirname),
-             distpath, dirname])
+             targpath, dirname])
         bootupdates.append(eventlet.spawn(update_boot, dirname))
         profilelist.append(profname)
     for upd in bootupdates:
@@ -562,11 +562,8 @@ class MediaImporter(object):
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(
                 self.oscategory)
-            profilelist = self.profiles
-            distpath = self.distpath
-            osname = self.osname
-            generate_stock_profiles(defprofile, distpath, osname,
-                                         profilelist)
+            generate_stock_profiles(defprofile, self.distpath, self.targpath,
+                                    self.osname, self.profiles)
         self.phase = 'complete'
         self.percent = 100.0
 
