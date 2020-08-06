@@ -18,7 +18,7 @@ fi
 # By default, the install repository is ignored, change
 # this by manually adding local repositories
 
-rpm --import /etc/pki/rpm-gpg/RPM_GPG_KEY-*
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-*
 run_remote_python add_local_repositories
 # This script will execute in the installed system, but using the installer kernel prior to reboot.
 # This is an appropriate place to run post install activities that do not require the actual installed
