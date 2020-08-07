@@ -333,6 +333,14 @@ def check_rhel(isoinfo):
             arch = dotsplit[-2]
             ver = dotsplit[0].split('release-')[-1].replace('-', '.')
             break
+        elif 'redhat-release-server-7' in entry:
+            dotsplit = entry.split('.')
+            arch = dotsplit[-2]
+            ver = dotsplit[0].split('release-server-')[-1].replace('-', '.')
+            if '.' not in ver:
+                minor = dotsplit[1].split('-', 1)[0]
+                ver = ver + '.' + minor
+            break
         elif 'redhat-release-8' in entry:
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
