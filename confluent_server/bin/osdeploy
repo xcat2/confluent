@@ -44,11 +44,17 @@ def main(args):
     wiz.add_argument('-l', help='Set local management node to have SSH certificates and hosts.equiv/.shosts', action='store_true')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
+    upb = sp.add_parser(
+        'updateboot',
+        help='Push profile.yaml of the named profile data into boot assets as appropriate')
+    upb.add_argument('profile', help='Profile to update boot assets')
     cmdset = ap.parse_args()
     if cmdset.command == 'import':
         return osimport(cmdset.imagefile)
     if cmdset.command == 'initialize':
         return initialize(cmdset)
+    if cmdset.command == 'updateboot':
+        return updateboot(cmdset.profile)
     ap.print_help()
 
 
@@ -227,6 +233,16 @@ def initialize(cmdset):
         subprocess.check_call(['collective', 'gencert'])
     # TODO: check selinux and segetbool for httpd_can_network_connect
     # httpd available and enabled?
+
+
+def updateboot(profilename):
+    c = client.Command()
+    for rsp in c.update('/deployment/profiles/{0}'.format(profilename),
+            {'updateboot': 1}):
+        if 'updated' in rsp:
+            print('Updated: {0}'.format(rsp['updated']))
+        else:
+            print(repr(rsp))
 
 
 def osimport(imagefile):

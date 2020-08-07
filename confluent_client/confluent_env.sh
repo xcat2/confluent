@@ -142,13 +142,16 @@ _confluent_osimage_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 2 ]; then
-        COMPREPLY=($(compgen -W "initialize import" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "initialize import updateboot" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     elif [ ${CMPARGS[1]} == 'initialize' ]; then
         COMPREPLY=($(compgen -W "-h -u -s -t -i" -- ${COMP_WORDS[COMP_CWORD]}))
     elif [ ${CMPARGS[1]} == 'import' ]; then
         compopt -o default
         COMPREPLY=()
+        return
+    elif [ ${CMPARGS[1]} == 'updateboot' ]; then
+        COMPREPLY=($(compgen -W "-n $(confetty show /deployment/profiles|sed -e 's/\///')" -- "${COMP_WORDS[COMP_CWORD]}"))
         return
     fi
 }
