@@ -220,6 +220,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     if ip_on_same_subnet(net, candgw, prefix):
                         candgws.append(candgw)
         if dhcprequested:
+            if not cfgdata.get('ipv4_method', None):
+                cfgdata['ipv4_method'] = 'dhcp'
             return cfgdata
         ipbynodename = None
         try:
