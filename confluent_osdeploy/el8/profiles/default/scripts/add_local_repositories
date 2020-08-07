@@ -27,5 +27,8 @@ for sec in c.sections():
         with open(reponame, 'w') as repout:
             repout.write('[local-{0}]\n'.format(varname.lower()))
             repout.write('name=Local install repository for {0}\n'.format(varname))
+            repopath = c[sec]['repository']
+            if repopath[0] = '.':
+                repopath = repopath[1:]
             repout.write('baseurl=https://{}/confluent-public/os/{}/distribution/{}\n'.format(server, profile, c[sec]['repository']))
             repout.write('enabled=1\n')
