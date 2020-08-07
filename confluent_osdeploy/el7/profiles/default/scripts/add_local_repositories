@@ -1,4 +1,8 @@
-import configparser
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
+    import cStringIO
 import imp
 import sys
 apiclient = imp.load_source('apiclient', '/etc/confluent/apiclient')
@@ -17,18 +21,23 @@ path = '/confluent-public/os/{0}/distribution/'.format(profile)
 clnt = apiclient.HTTPSClient()
 cfgdata = clnt.grab_url(path + '.treeinfo').decode()
 c = configparser.ConfigParser()
-c.read_string(cfgdata)
+try:
+    c.read_string(cfgdata)
+except AttributeError:
+    f = cStringIO.StringIO(cfgdata)
+    c.readfp(f)
 for sec in c.sections():
     if sec.startswith('variant-'):
-        if 'repository' not in c[sec]:
+        try:
+            repopath = c.get(sec, 'repository')
+        except Exception:
             continue
         _, varname = sec.split('-', 1)
         reponame = '/etc/yum.repos.d/local-{0}.repo'.format(varname.lower())
         with open(reponame, 'w') as repout:
             repout.write('[local-{0}]\n'.format(varname.lower()))
             repout.write('name=Local install repository for {0}\n'.format(varname))
-            repopath = c[sec]['repository']
-            if repopath[0] = '.':
+            if repopath[0] == '.':
                 repopath = repopath[1:]
-            repout.write('baseurl=https://{}/confluent-public/os/{}/distribution/{}\n'.format(server, profile, c[sec]['repository']))
+            repout.write('baseurl=https://{}/confluent-public/os/{}/distribution/{}\n'.format(server, profile, repopath))
             repout.write('enabled=1\n')
