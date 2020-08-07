@@ -169,8 +169,10 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
             return
         if len(pathcomponents) == 3:
             profname = pathcomponents[-1]
-            if 'operation' == 'update':
+            if operation == 'update' and 'updateboot' in inputdata:
                 osimage.update_boot(profname)
+                yield msg.KeyValueData({'updated': profname})
+                return
     if pathcomponents[1] == 'importing':
         if len(pathcomponents) == 2 or not pathcomponents[-1]:
             if operation == 'retrieve':

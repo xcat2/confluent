@@ -90,13 +90,13 @@ def update_boot_esxi(profiledir, profile, label):
             newbootcfg += cfgline + '\n'
             efibootcfg += cfgline + '\n'
     os.makedirs('{0}/boot/efi/boot/'.format(profiledir), 0o755)
-    bcfgout = os.open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT, 0o644)
+    bcfgout = os.open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     bcfg = os.fdopen(bcfgout, 'w')
     try:
         bcfg.write(efibootcfg)
     finally:
         bcfg.close()
-    bcfgout = os.open('{0}/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT, 0o644)
+    bcfgout = os.open('{0}/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     bcfg = os.fdopen(bcfgout, 'w')
     try:
         bcfg.write(newbootcfg)
@@ -112,7 +112,7 @@ def update_boot_esxi(profiledir, profile, label):
             sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
         os.symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
     os.symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
-    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
+    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
         os.umask(oum)
@@ -149,7 +149,7 @@ def update_boot_linux(profiledir, profile, label):
     for initramfs in initrds:
         ipxeargs += " initrd=" + initramfs
     oum = os.umask(0o22)
-    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT, 0o644)
+    ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
         os.umask(oum)
