@@ -1,7 +1,7 @@
 cd $(dirname $0)
 cp -a 97genesis /usr/lib/dracut/modules.d/
 cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97genesis/install
-chmod +x /usr/lib/dracut/modules.d/97genesis/install
+chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/97genesis/installkernel
 mkdir -p boot/initramfs
 mkdir -p boot/efi/boot
 dracut --xz -N -m "genesis base" -f boot/initramfs/distribution $(uname -r)
