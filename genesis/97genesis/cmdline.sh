@@ -12,4 +12,6 @@ echo root:x:0:0::/:/bin/bash >> /etc/passwd
 echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
 /usr/lib/systemd/systemd-udevd --daemon
 udevadm trigger
-tmux -L console new-sessiod /bin/rungenesis
+udevadm trigger --type=devices --action=add
+udevadm settle
+tmux -L console new-session /bin/rungenesis
