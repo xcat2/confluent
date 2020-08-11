@@ -74,7 +74,7 @@ class HTTPSClient(client.HTTPConnection, object):
             method = 'POST'
         else:
             method = 'GET'
-        self.request(method, url, headers=self.stdheaders)
+        self.request(method, url, data, headers=self.stdheaders)
         rsp = self.getresponse()
         if rsp.status >= 200 and rsp.status < 300:
             if returnrsp:
