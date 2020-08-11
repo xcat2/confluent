@@ -34,6 +34,9 @@ dracut_install /usr/lib64/python3.6/encodings/__pycache__/aliases.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/encodings/__pycache__/__init__.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/encodings/__pycache__/latin_1.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/encodings/__pycache__/utf_8.cpython-36.pyc
+dracut_install /usr/lib64/python3.6/encodings/__pycache__/ascii.cpython-36.opt-1.pyc
+dracut_install /usr/lib64/python3.6/encodings/__pycache__/ascii.cpython-36.opt-2.pyc
+dracut_install /usr/lib64/python3.6/encodings/__pycache__/ascii.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/http
 dracut_install /usr/lib64/python3.6/http/__pycache__/client.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/http/__pycache__/cookies.cpython-36.pyc
@@ -132,6 +135,7 @@ dracut_install /usr/lib64/python3.6/codecs.py
 dracut_install /usr/lib64/python3.6/encodings/aliases.py
 dracut_install /usr/lib64/python3.6/encodings/utf_8.py
 dracut_install /usr/lib64/python3.6/encodings/latin_1.py
+dracut_install /usr/lib64/python3.6/encodings/ascii.py
 dracut_install /usr/lib64/python3.6/io.py
 dracut_install /usr/lib64/python3.6/abc.py
 dracut_install /usr/lib64/python3.6/_weakrefset.py
