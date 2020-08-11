@@ -28,7 +28,6 @@ if ! grep console= /proc/cmdline >& /dev/null; then
 else
     tmux a <> /dev/tty1 >&0 2>&1 &
 fi
-(ssh-keygen -A; /usr/sbin/sshd) &
 TRIES=0
 touch /etc/confluent/confluent.info
 cd /sys/class/net
@@ -68,6 +67,7 @@ else
         ip route add default via $v4gw
     fi
 fi
+ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
@@ -75,7 +75,6 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     echo HostCertificate $certfile >> /etc/ssh/sshd_config
     echo HostKey $privfile >> /etc/ssh/sshd_config
 done
-killall sshd
 /usr/sbin/sshd
 while :; do
     bash
