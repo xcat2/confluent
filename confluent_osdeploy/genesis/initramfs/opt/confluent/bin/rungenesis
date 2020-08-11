@@ -61,7 +61,7 @@ else
     v4nm=$(grep ^prefix: /etc/confluent/confluent.deploycfg)
     v4nm=${v4nm#prefix: }
     echo "Setting up $ifname as static at $v4addr/$v4nm"
-    ip addr add dev $ifname/$v4nm
+    ip addr add dev $ifname $v4addr/$v4nm
     if [ ! -z "$v4gw" ]; then
         ip route add default via $v4gw
     fi
