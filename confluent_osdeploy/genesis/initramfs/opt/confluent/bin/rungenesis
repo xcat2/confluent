@@ -12,6 +12,9 @@ HostKey /etc/ssh/ssh_host_ed25519_key
 PermitRootLogin yes
 AuthorizedKeysFile      .ssh/authorized_keys
 EOF
+modprobe ib_ipoib
+modprobe hfi1
+modprobe mlx5_ib
 mkdir ~/.ssh
 cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
 cat /tls/*.pem > /etc/confluent/ca.pem
