@@ -1,0 +1,83 @@
+#!/bin/bash
+mkdir -p /etc/confluent
+/usr/lib/systemd/systemd-udevd --daemon
+udevadm trigger
+udevadm trigger --type=devices --action=add
+udevadm settle
+cat > /etc/ssh/sshd_config << EOF
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+PermitRootLogin yes
+AuthorizedKeysFile      .ssh/authorized_keys
+EOF
+if ! grep console= /proc/cmdline >& /dev/null; then
+    autocons=$(/opt/confluent/bin/autocons)
+    echo console=$autocons |sed -e 's!/dev/!!' >> /tmp/01-autocons.conf
+    autocons=${autocons%,*}
+    echo $autocons > /tmp/01-autocons.devnode
+    if [ ! -z "$autocons" ]; then
+        echo "Using console $(cat /tmp/01-autocons.conf)"
+        tmux a <> $autocons >&0 2>&1 &
+    fi
+else
+    tmux a <> /dev/tty1 >&0 2>&1 &
+fi
+(ssh-keygen -A; /usr/sbin/sshd) &
+TRIES=0
+while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 15 ]; do
+    TRIES=$((TRIES + 1))
+    cd /sys/class/net
+    for i in *; do
+        ip link set $i up
+    done
+    /opt/confluent/bin/copernicus -t > /etc/confluent/confuent.info
+done
+ip addr|grep inet |awk '{print $2}' | sed -e 's!/.*!!'
+nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
+hostname $nodename
+cat /tls/*.pem > /etc/confluent/ca.pem
+cat /tls/*.0 >> /etc/pki/tls/certs/ca-bundle.crt
+/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+ifidx=$(cat /tmp/confluent.ifidx)
+ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+ifname=${ifname%:}
+if [ "$autoconfigmethod" = "dhcp" ]; then
+    echo -n "Attempting to use dhcp to bring up $ifname..."
+    dhclient $ifname
+    echo "Complete:"
+    ip addr show dev $ifname
+else
+    v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
+    v4addr=${v4addr#ipv4_address: }
+    v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
+    v4gw=${v4gw#ipv4_gateway: }
+    if [ "$v4gw" = "null" ]; then
+        v4gw=""
+    fi
+    v4nm=$(grep ^prefix: /etc/confluent/confluent.deploycfg)
+    v4nm=${v4nm#prefix: }
+    echo "Setting up $ifname as static at $v4addr/$v4nm"
+    ip addr add dev $ifname/$v4nm
+    if [ ! -z "$v4gw" ]; then
+        ip route add default via $v4gw
+    fi
+fi
+for pubkey in /etc/ssh/ssh_host*key.pub; do
+    certfile=${pubkey/.pub/-cert.pub}
+    /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/sshcert $pubkey > $certfile
+    echo HostCertificate $certfile >> /etc/ssh/sshd_config
+done
+killall sshd
+/usr/sbin/sshd
+while :; do
+    bash
+done
+
+    
+
+
+
+
+cd -
+
