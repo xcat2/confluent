@@ -15,7 +15,6 @@ EOF
 mkdir ~/.ssh
 cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
 cat /tls/*.pem > /etc/confluent/ca.pem
-cat /tls/*.0 >> /etc/pki/tls/certs/ca-bundle.crt
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
     echo console=$autocons |sed -e 's!/dev/!!' >> /tmp/01-autocons.conf

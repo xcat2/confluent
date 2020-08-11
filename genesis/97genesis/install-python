@@ -57,6 +57,7 @@ dracut_install /usr/lib64/python3.6/lib-dynload/_sha3.cpython-36m-x86_64-linux-g
 dracut_install /usr/lib64/python3.6/lib-dynload/_socket.cpython-36m-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.6/lib-dynload/_ssl.cpython-36m-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.6/lib-dynload/_struct.cpython-36m-x86_64-linux-gnu.so
+dracut_install /usr/lib64/python3.6/lib-dynload/unicodedata.cpython-36m-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.6/__pycache__/abc.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/__pycache__/argparse.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/__pycache__/base64.cpython-36.pyc
@@ -136,6 +137,7 @@ dracut_install /usr/lib64/python3.6/encodings/aliases.py
 dracut_install /usr/lib64/python3.6/encodings/utf_8.py
 dracut_install /usr/lib64/python3.6/encodings/latin_1.py
 dracut_install /usr/lib64/python3.6/encodings/ascii.py
+dracut_install /usr/lib64/python3.6/encodings/idna.py
 dracut_install /usr/lib64/python3.6/io.py
 dracut_install /usr/lib64/python3.6/abc.py
 dracut_install /usr/lib64/python3.6/_weakrefset.py
@@ -174,6 +176,7 @@ dracut_install /usr/lib64/python3.6/email/_policybase.py
 dracut_install /usr/lib64/python3.6/email/header.py
 dracut_install /usr/lib64/python3.6/email/quoprimime.py
 dracut_install /usr/lib64/python3.6/string.py
+dracut_install /usr/lib64/python3.6/stringprep.py
 dracut_install /usr/lib64/python3.6/email/base64mime.py
 dracut_install /usr/lib64/python3.6/base64.py
 dracut_install /usr/lib64/python3.6/struct.py
