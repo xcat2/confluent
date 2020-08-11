@@ -20,4 +20,5 @@ inst /bin/bash /bin/sh
 dracut_install killall chown chroot dd expr kill parted rsync shutdown sort blockdev findfs insmod lvm pivot_root
 dracut_install /etc/udev/hwdb.bin
 dracut_install /usr/share/hwdata/pci.ids
+dracut_install ibstat ibstatus
 #dracut_install mstflint This would have mlx update support, but it incurs gigantic dependencies, libicudata
