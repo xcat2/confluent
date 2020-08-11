@@ -22,8 +22,8 @@ dracut_install /etc/udev/hwdb.bin
 dracut_install /usr/share/hwdata/pci.ids
 dracut_install ibstat ibstatus
 dracut_install opainfo
-dracut_install /usr/lib/opa-fm/bin/opafmd
-dracut_install /usr/sbin/opensm /usr/libexec/opensm-launch
+#dracut_install /usr/lib/opa-fm/bin/opafmd
+#dracut_install /usr/sbin/opensm /usr/libexec/opensm-launch
 dracut_install /usr/lib64/libibverbs/libhfi1verbs-rdmav25.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/lib64/libibverbs/libmlx4-rdmav25.so /usr/lib64/libibverbs/libmlx5-rdmav25.so
 
 #dracut_install mstflint This would have mlx update support, but it incurs gigantic dependencies, libicudata
