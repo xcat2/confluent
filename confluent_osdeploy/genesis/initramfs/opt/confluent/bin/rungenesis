@@ -68,7 +68,6 @@ else
         ip route add default via $v4gw
     fi
 fi
-wait
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
