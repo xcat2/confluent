@@ -185,6 +185,12 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         dhcprequested = False
         nets = list(myiptonets(serverip))
     genericmethod = 'static'
+    ipbynodename = None
+    try:
+        ipbynodename = socket.getaddrinfo(
+            node, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+    except Exception:
+        ipbynodename = None
     if nets is not None:
         candgws = []
         candsrvs = []
@@ -213,6 +219,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                             cfgdata['ipv4_gateway'] = cfgbyname[candidate].get(
                                 'ipv4_gateway', None)
                             cfgdata['prefix'] = prefix
+                            if ipbynodename and ipbynodename == candip:
+                                cfgdata['matchesnodename'] = True
                             return cfgdata
                     except Exception as e:
                         cfgdata['error_msg'] = "Error trying to evaluate net.*ipv4_address attribute value '{0}' on {1}: {2}".format(candip, node, str(e))
@@ -223,11 +231,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             if not cfgdata.get('ipv4_method', None):
                 cfgdata['ipv4_method'] = 'dhcp'
             return cfgdata
-        ipbynodename = None
-        try:
-            ipbynodename = socket.getaddrinfo(
-                node, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
-        except Exception:
+        if ipbynodename == None:
             return cfgdata
         for net in nets:
             net, prefix, svrip = net
