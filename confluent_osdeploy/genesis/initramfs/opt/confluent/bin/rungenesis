@@ -12,6 +12,10 @@ HostKey /etc/ssh/ssh_host_ed25519_key
 PermitRootLogin yes
 AuthorizedKeysFile      .ssh/authorized_keys
 EOF
+mkdir ~/.ssh
+cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
+cat /tls/*.pem > /etc/confluent/ca.pem
+cat /tls/*.0 >> /etc/pki/tls/certs/ca-bundle.crt
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
     echo console=$autocons |sed -e 's!/dev/!!' >> /tmp/01-autocons.conf
@@ -33,13 +37,11 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
     for i in *; do
         ip link set $i up
     done
-    /opt/confluent/bin/copernicus -t > /etc/confluent/confuent.info
+    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 ip addr|grep inet |awk '{print $2}' | sed -e 's!/.*!!'
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 hostname $nodename
-cat /tls/*.pem > /etc/confluent/ca.pem
-cat /tls/*.0 >> /etc/pki/tls/certs/ca-bundle.crt
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
