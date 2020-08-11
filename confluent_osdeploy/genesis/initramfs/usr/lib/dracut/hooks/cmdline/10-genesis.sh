@@ -10,4 +10,4 @@ mkdir -p /var/empty/sshd
 sed -i '/^root:x/d' /etc/passwd
 echo root:x:0:0::/:/bin/bash >> /etc/passwd
 echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
-tmux -L console new-sessiod /bin/rungenesis
+tmux -L console new-sessiod /opt/confluent/bin/rungenesis
