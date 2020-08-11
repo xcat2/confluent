@@ -6,9 +6,6 @@ udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
 cat > /etc/ssh/sshd_config << EOF
-HostKey /etc/ssh/ssh_host_rsa_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-HostKey /etc/ssh/ssh_host_ed25519_key
 PermitRootLogin yes
 AuthorizedKeysFile      .ssh/authorized_keys
 EOF
@@ -71,10 +68,13 @@ else
         ip route add default via $v4gw
     fi
 fi
+wait
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
+    privfile=${pubkey%.pub}
     /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/sshcert $pubkey > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config
+    echo HostKey $privfile >> /etc/ssh/sshd_config
 done
 killall sshd
 /usr/sbin/sshd
