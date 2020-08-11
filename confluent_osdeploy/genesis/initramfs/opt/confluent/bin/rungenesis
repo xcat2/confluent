@@ -13,6 +13,7 @@ PermitRootLogin yes
 AuthorizedKeysFile      .ssh/authorized_keys
 EOF
 modprobe ib_ipoib
+modprobe ib_umad
 modprobe hfi1
 modprobe mlx5_ib
 mkdir ~/.ssh
