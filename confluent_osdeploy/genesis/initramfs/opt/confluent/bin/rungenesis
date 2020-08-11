@@ -35,7 +35,7 @@ fi
 TRIES=0
 touch /etc/confluent/confluent.info
 cd /sys/class/net
-while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 15 ]; do
+while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 30 ]; do
     TRIES=$((TRIES + 1))
     for i in *; do
         ip link set $i up
