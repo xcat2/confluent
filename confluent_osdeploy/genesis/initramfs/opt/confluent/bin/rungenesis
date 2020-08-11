@@ -34,14 +34,15 @@ fi
 (ssh-keygen -A; /usr/sbin/sshd) &
 TRIES=0
 touch /etc/confluent/confluent.info
+cd /sys/class/net
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 15 ]; do
     TRIES=$((TRIES + 1))
-    cd /sys/class/net
     for i in *; do
         ip link set $i up
     done
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
+cd /
 ip addr|grep inet |awk '{print $2}' | sed -e 's!/.*!!'
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 hostname $nodename

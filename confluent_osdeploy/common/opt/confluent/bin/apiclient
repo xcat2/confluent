@@ -41,7 +41,7 @@ class HTTPSClient(client.HTTPConnection, object):
                     host, mgtiface, havedefault = extinfo[:3]
                 if havedefault == '0' and extinfo[2] == '1':
                     host, mgtiface, havedefault = extinfo[:3]
-        if not os.path.exists('/tmp/confluent.ifidx') and '%' in host:
+        if '%' in host:
             ifidx = host.split('%', 1)[1]
             with open('/tmp/confluent.ifidx', 'w+') as ifout:
                 ifout.write(ifidx)
