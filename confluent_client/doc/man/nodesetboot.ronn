@@ -4,7 +4,7 @@ nodesetboot(8) -- Check or set next boot device for noderange
 ## SYNOPSIS
 
 `nodesetboot <noderange>`  
-`nodesetboot [options] <noderange> [default|cd|network|setup|hd]`
+`nodesetboot [options] <noderange> [default|cd|network|setup|hd|floppy]`
 
 ## DESCRIPTION
 
