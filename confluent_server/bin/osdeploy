@@ -242,6 +242,8 @@ def initialize(cmdset):
     if cmdset.g:
         initialize_genesis()
     if not didsomething and (cmdset.k or cmdset.l or cmdset.g):
+        if cmdset.g:
+            updateboot('genesis-x86_64')
         sys.exit(0)
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
