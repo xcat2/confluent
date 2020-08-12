@@ -4,6 +4,7 @@ import argparse
 import glob
 import os
 import os.path
+import pwd
 import shutil
 import sys
 import time
@@ -35,6 +36,7 @@ def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
     sp = ap.add_subparsers(dest='command')
     wiz = sp.add_parser('initialize', help='Do OS deployment preparation')
+    wiz.add_argument('-g', help='Initialize a Genesis profile to boot systems into a rescue or staging environment', action='store_true')
     wiz.add_argument('-u', help='Pull in root user key for node deployment', action='store_true')
     wiz.add_argument('-s', help='Set up SSH CA for managing node to node ssh and known hosts', action='store_true')
     wiz.add_argument('-k', help='Update local global known hosts file with confluent CA', action='store_true')
@@ -56,6 +58,53 @@ def main(args):
     if cmdset.command == 'updateboot':
         return updateboot(cmdset.profile)
     ap.print_help()
+
+
+def initialize_genesis():
+    if not os.path.exists('/opt/confluent/genesis/x86_64/boot/kernel'):
+        emprint('Install the confluent-genesis package to have the '
+                         'resources for a genesis profile')
+        return 1
+    hasconfluentuser = None
+    try:
+        hasconfluentuser = pwd.getpwnam('confluent')
+    except KeyError:
+        pass
+    pid = os.fork()
+    if pid:
+        retval = os.waitpid(pid, 0)
+        return retval[1]
+    retcode = 0
+    try:
+        if hasconfluentuser:
+            os.setgid(hasconfluentuser.pw_gid)
+            os.setuid(hasconfluentuser.pw_uid)
+        os.umask(0o22)
+        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/efi', 0o755)
+        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
+        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/scripts', 0o755)
+        os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/BOOTX64.EFI')
+        os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/grubx64.efi')
+        os.symlink('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/distribution')
+        os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/site.cpio')
+        os.symlink('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/addons.cpio')
+        os.symlink('/opt/confluent/genesis/x86_64/boot/kernel',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/kernel')
+        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/onboot.sh',
+                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/onboot.sh')
+        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/functions',
+                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/functions')
+        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
+                       '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
+    except Exception:
+        retcode = 1
+    finally:
+        os._exit(retcode)
 
 
 def local_node_trust_setup():
@@ -134,6 +183,8 @@ def initialize(cmdset):
         sys.stdout.write('Add root user key to be authorized to log into nodes (-u)? (y/n): ')
         sys.stdout.flush()
         cmdset.u = input().strip().lower().startswith('y')
+        sys.stdout.write('Initialize a profile to boot Genesis on target systems (a small Linux environment for rescue and staging use)? (y/n): ')
+        cmdset.g = input().strip().lower().statswith('y')
         sys.stdout.write('Set up an SSH authority to help manage known_hosts and node to node ssh for all users (-s)? (y/n): ')
         cmdset.s = input().strip().lower().startswith('y')
         sys.stdout.write('Update global known hosts on this server to trust local CA certificates (-k)? (y/n): ')
@@ -188,7 +239,9 @@ def initialize(cmdset):
                 cacert = open(cafile, 'rb').read()
                 cacert = b'@cert-authority * ' + cacert
                 skh.write(cacert)
-    if not didsomething and (cmdset.k or cmdset.l):
+    if cmdset.g:
+        initialize_genesis()
+    if not didsomething and (cmdset.k or cmdset.l or cmdset.g):
         sys.exit(0)
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '
@@ -222,6 +275,8 @@ def initialize(cmdset):
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
     os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
+    if cmdset.g:
+        updateboot('genesis-x86_64')
     tmptarname = tmpname.replace('cpio', 'tgz')
     tarcmd = ['tar', '-czf', tmptarname, 'ssh', 'tls']
     subprocess.check_call(tarcmd)
