@@ -80,13 +80,13 @@ def initialize_genesis():
             os.setgid(hasconfluentuser.pw_gid)
             os.setuid(hasconfluentuser.pw_uid)
         os.umask(0o22)
-        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/efi', 0o755)
+        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
         os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
         os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/scripts', 0o755)
         os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/BOOTX64.EFI')
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/BOOTX64.EFI')
         os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
-                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/grubx64.efi')
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/grubx64.efi')
         os.symlink('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/distribution')
         os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
