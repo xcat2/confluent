@@ -11,5 +11,8 @@ if ! grep console= /proc/cmdline >& /dev/null; then
         echo "Initializing auto detected console when installer starts" > $autocons
     fi
 fi
+if grep console=ttyS /proc/cmdline >& /dev/null; then
+    echo "Serial console has been requested in the kernel arguments, the local video may not show progress" > /dev/tty1
+fi
 . /lib/anaconda-lib.sh
 wait_for_kickstart
