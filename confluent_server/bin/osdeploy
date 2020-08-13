@@ -184,7 +184,7 @@ def initialize(cmdset):
         sys.stdout.flush()
         cmdset.u = input().strip().lower().startswith('y')
         sys.stdout.write('Initialize a profile to boot Genesis on target systems (a small Linux environment for rescue and staging use)? (y/n): ')
-        cmdset.g = input().strip().lower().statswith('y')
+        cmdset.g = input().strip().lower().startswith('y')
         sys.stdout.write('Set up an SSH authority to help manage known_hosts and node to node ssh for all users (-s)? (y/n): ')
         cmdset.s = input().strip().lower().startswith('y')
         sys.stdout.write('Update global known hosts on this server to trust local CA certificates (-k)? (y/n): ')
