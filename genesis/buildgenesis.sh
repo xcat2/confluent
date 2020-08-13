@@ -14,5 +14,10 @@ rm -rf /usr/lib/dracut/modules.d/97genesis
 cd -
 # getting src rpms would be nice, but centos isn't consistent..
 # skipcpio | xzcat | cpio -dumiv
-# dnf download --source $(rpm -qf $(find . -type f | sed -e 's/^.//') |sort -u|grep -v 'not owned')
+# rpm -qf $(find . -type f | sed -e 's/^.//') |sort -u|grep -v 'not owned' > rpmlist
+# for i in $(cat rpmlist); do rpm -qi $i|grep Source; done |awk '{print $4}'|sort -u > srcrpmlist
+# for i in $(cat ../srcrpmlist); do wget http://vault.centos.org/8.2.2004/BaseOS/Source/SPackages/$i; done
+# http://vault.centos.org/8.2.2004/AppStream/Source/SPackages/$i
+
+
 
