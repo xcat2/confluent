@@ -78,6 +78,7 @@ def handle_request(env, start_response):
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     if env['PATH_INFO'] == '/self/bmcconfig':
         hmattr = cfg.get_node_attributes(nodename, 'hardwaremanagement.*')
+        hmattr = hmattr.get(nodename, {})
         res = {}
         port = hmattr.get('hardwaremanagement.port', {}).get('value', None)
         if port is not None:
