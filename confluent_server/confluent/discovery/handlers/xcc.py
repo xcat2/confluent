@@ -96,7 +96,7 @@ class NodeHandler(immhandler.NodeHandler):
             ipmicmd.xraw_command(netfn=0x3a, command=0xf1, data=(1,))
         except pygexc.IpmiException as e:
             if (e.ipmicode != 193 and 'Unauthorized name' not in str(e) and
-                    'Incorrect password' not in str(e) and 
+                    'Incorrect password' not in str(e) and
                     str(e) != 'Session no longer connected'):
                 # raise an issue if anything other than to be expected
                 if disableipmi:

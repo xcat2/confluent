@@ -3,6 +3,7 @@ import confluent.collective.manager as collective
 import confluent.netutil as netutil
 import confluent.sshutil as sshutil
 import confluent.util as util
+import eventlet.green.socket as socket
 import eventlet.green.subprocess as subprocess
 import crypt
 import json
@@ -75,7 +76,28 @@ def handle_request(env, start_response):
         return
     if env['REQUEST_METHOD'] not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
-    if env['PATH_INFO'] == '/self/deploycfg':
+    if env['PATH_INFO'] == '/self/bmcconfig':
+        hmattr = cfg.get_node_attributes(nodename, 'hardwaremanagement.*')
+        res = {}
+        port = hmattr.get('hardwaremanagement.port', {}).get('value', None)
+        if port is not None:
+            res['bmcport'] = port
+        vlan = hmattr.get('hardwaremanagement.vlan', {}).get('value', None)
+        if vlan is not None:
+            res['bmcvlan'] = vlan
+        bmcaddr = hmattr.get('hardwaremanagement.manager', {}).get('value',
+                                                                   None)
+        bmcaddr = socket.getaddrinfo(bmcaddr, 0)[0]
+        bmcaddr = bmcaddr[-1][0]
+        if '.' in bmcaddr:  # ipv4 is allowed
+            netconfig = netutil.get_nic_config(cfg, nodename, ip=bmcaddr)
+            res['bmcipv4'] = bmcaddr
+            res['prefixv4'] = netconfig['prefix']
+            res['bmcgw'] = netconfig.get('ipv4_gateway', None)
+        # credential security results in user/password having to be deferred
+        start_response('200 OK', (('Content-Type', retype),))
+        yield dumper(res)
+    elif env['PATH_INFO'] == '/self/deploycfg':
         if 'HTTP_CONFLUENT_MGTIFACE' in env:
             ncfg = netutil.get_nic_config(cfg, nodename, ifidx=env['HTTP_CONFLUENT_MGTIFACE'])
         else:

@@ -360,6 +360,18 @@ node = {
                        'control, get sensor data, get inventory, and so on. '
                        'ipmi is used if not specified.'
     },
+    'hardwaremanagement.port': {
+        'description': 'The port the BMC should be configured to connect to
+                       'network.  This only has effect during deployment and '
+                       'does not apply to out of band discovery. Example values '
+                       'include "ocp", "ml2", "lom" (for on board port '
+                       'shared with operating system), or "dedicated"',
+    },
+    'hardwaremanagement.vlan': {
+        'description': 'The vlan that a BMC should be configured to tag '
+                       'traffic. This only has effect during OS deployment '
+                       'and does not apply to out of band discovery.',
+    },
     'enclosure.bay': {
          'description': 'The bay in the enclosure, if any',
 #        'appliesto': ['system'],
