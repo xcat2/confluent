@@ -42,6 +42,7 @@ dracut_install /usr/lib64/python3.6/http/__pycache__/client.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/http/__pycache__/cookies.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/http/__pycache__/__init__.cpython-36.pyc
 dracut_install /usr/lib64/python3.6/lib-dynload
+dracut_install /usr/lib64/python3.6/lib-dynload/fcntl.cpython-36m-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.6/lib-dynload/binascii.cpython-36m-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.6/lib-dynload/_bisect.cpython-36m-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.6/lib-dynload/_blake2.cpython-36m-x86_64-linux-gnu.so
