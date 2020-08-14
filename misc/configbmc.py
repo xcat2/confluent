@@ -15,7 +15,9 @@
 import argparse
 import ctypes
 import fcntl
+import json
 from select import select
+import socket
 import struct
 import sys
 import time
@@ -142,9 +144,10 @@ def set_port(s, port, vendor, model):
     if vendor not in ('IBM', 'Lenovo'):
         raise Exception('{0} not implemented'.format(vendor))
     if _is_tsm(model):
-        set_port_tsm(s, port, model)
+        return set_port_tsm(s, port, model)
     else:
         set_port_xcc(s, port, model)
+        return 1
 
 
 def set_port_tsm(s, port, model):
@@ -155,16 +158,22 @@ def set_port_tsm(s, port, model):
         s.raw_command(0x32, 0x71, b'\x00\x01\x00')
     elif port == 'dedicated':
         s.raw_command(0x32, 0x71, b'\x00\x00\x00')
+    else:
+        raise Exception("Unsupported port for TSM")
     timer = 15
     while timer:
         time.sleep(1.0)
         sys.stdout.write('.')
         sys.stdout.flush()
     if port == 'ocp':
+        iface = 0
         s.raw_command(0x32, 0x71, b'\x00\x00\x03')
     elif port == 'dedicated':
+        iface = 1
         s.raw_command(0x32, 0x71, b'\x00\x01\x03')
+    rsp = s.raw_command(0x32, 0x72, bytearray(4, iface, 0))
     print('Complete')
+    return int(rsp['data'][0])
 
 
 def set_port_xcc(s, port, model):
@@ -200,7 +209,7 @@ def set_port_xcc(s, port, model):
     sys.stdout.write('Complete\n')
 
 
-def set_vlan(s, vlan):
+def set_vlan(s, vlan, channel):
     ovlan = vlan
     if vlan == 'off':
         vlan = b'\x00\x00'
@@ -209,11 +218,13 @@ def set_vlan(s, vlan):
         if vlan:
             vlan = vlan | 32768
         vlan = struct.pack('<H', vlan)
-    currvlan = bytes(s.raw_command(0xc, 2, b'\x01\x14\x00\x00')['data'][1:])
+    currvlan = bytes(s.raw_command(0xc, 2, bytearray([channel, 0x14 ,0, 0]))['data'][1:])
+    if bytearray(currvlan)[1] & 0b10000000 == 0:
+        currvlan = b'\x00\x00'
     if currvlan == vlan:
         sys.stdout.write('VLAN already configured to "{0}"\n'.format(ovlan))
         return False
-    rsp = s.raw_command(0xc, 1, b'\x01\x14' + vlan)
+    rsp = s.raw_command(0xc, 1, bytearray([channel, 0x14]) + vlan)
     if rsp.get('code', 1) == 0:
         print('VLAN configured to "{}"'.format(ovlan))
     else:
@@ -221,11 +232,79 @@ def set_vlan(s, vlan):
     return
 
 
+def get_lan_channel(s):
+    for chan in range(1, 16):
+        rsp = s.raw_command(6, 0x42, bytearray([chan]))['data']
+        if not rsp:
+            continue
+        medtype = int(rsp[1]) & 0b1111111
+        if medtype not in (4, 6):
+            continue
+        rsp = s.raw_command(0xc, 2, bytearray([2, chan, 5, 0, 0]))
+        if rsp.get('code', 1) == 0:
+            return chan
+    return 1
+
+def set_ipv4(s, ipaddr, channel):
+    oipaddr = ipaddr
+    ipaddr = bytearray(socket.inet_aton(ipaddr))
+    rsp = s.raw_command(0xc, 2, bytearray([channel, 3, 0, 0]))['data'][-4:]
+    if rsp == ipaddr:
+        print('IP Address already set to {}'.format(oipaddr))
+        return
+    rsp = int(s.raw_command(0xc, 2, bytearray([channel, 4, 0, 0]))['data'][1]) & 0b1111
+    if rsp != 1:
+        sys.stdout.print("Changing configuration to static...")
+        sys.stdout.flush()
+        resp = s.raw_command(0xc, 1, bytearray([channel, 4, 1]))
+        tries = 0
+        while rsp != 1 and tries < 30:
+            sys.stdout.write('.')
+            tries += 1
+            time.sleep(0.5)
+            rsp = int(s.raw_command(0xc, 2, bytearray([channel, 4, 0, 0]))['data'][1]) & 0b1111
+        sys.stdout.write('Complete')
+    print('Setting IP to {}'.format(oipaddr))
+    s.raw_command(0xc, 1, bytearray([channel, 3]) + ipaddr)
+
+
+def set_subnet(s, prefix, channel):
+    oprefix = prefix
+    prefix = int(prefix)
+    mask = bytearray(struct.pack('!I', (2**32 - 1) ^ (2**(32 - prefix) - 1)))
+    rsp = s.raw_command(0xc, 2, bytearray([channel, 6, 0, 0]))['data'][-4:]
+    if rsp == mask:
+        print('Subnet Mask already set to /{}'.format(oprefix))
+        return
+    print('Setting subnet mask to /{}'.format(oprefix))
+    s.raw_command(0xc, 1, bytearray([channel, 6]) + mask)
+
+
+def set_gateway(s, gw, channel):
+    ogw = gw
+    gw = bytearray(socket.inet_aton(gw))
+    rsp = s.raw_command(0xc, 2, bytearray([channel, 12, 0, 0]))['data'][-4:]
+    if rsp == gw:
+        print('Gateway already set to {}'.format(ogw))
+        return
+    print('Setting gateway to {}'.format(ogw))
+    s.raw_command(0xc, 1, bytearray([channel, 12]) + gw)
+
 def main():
     a = argparse.ArgumentParser(description='Locally configure a BMC device')
     a.add_argument('-v', help='vlan id or off to disable vlan tagging')
     a.add_argument('-p', help='Which port to use (dedicated, lom, ocp, ml2)')
+    a.add_argument('-i', help='JSON configuration file to read for '
+                   'configuration')
     args = a.parse_args()
+    if args.i:
+        bmccfg = json.load(open(args.i))
+    else:
+        bmccfg = {}
+    if args.p is not None:
+        bmccfg['bmcport'] = args.p
+    if args.v is not None:
+        bmccfg['bmcvlan'] = args.v
     vendor = open('/sys/devices/virtual/dmi/id/sys_vendor').read()
     vendor = vendor.strip()
     try:
@@ -237,10 +316,22 @@ def main():
             model = model.split('[')[1].split(']')[0]
         model = model[:4].lower()
     s = Session('/dev/ipmi0')
-    if args.p is not None:
-        set_port(s, args.p, vendor, model)
-    if args.v is not None:
-        set_vlan(s, args.v)
+    if not bmccfg:
+        print("No configuration requested, exiting...")
+        return
+    if bmccfg.get('bmcport', None) is not None:
+        channel = set_port(s, bmccfg['bmcport'], vendor, model)
+    else:
+        channel = get_lan_channel(s)
+    if bmccfg.get('bmcvlan', None) is not None:
+        set_vlan(s, bmccfg['bmcvlan'], channel)
+    if bmccfg.get('bmcipv4', None):
+        set_ipv4(s, bmccfg['bmcipv4'], channel)
+    if bmccfg.get('prefixv4', None):
+        set_subnet(s, bmccfg['prefixv4'], channel)
+    if bmccfg.get('bmcgw', None):
+        set_gateway(s, bmccfg['bmcgw'], channel)
+    #await_config(s, bmccfg, channel)
 
 
 if __name__ == '__main__':
