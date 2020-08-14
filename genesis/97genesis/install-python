@@ -234,3 +234,4 @@ dracut_install /usr/lib/locale/en_US.utf8/LC_CTYPE
 dracut_install /usr/lib/locale/en_US.utf8/LC_NAME
 dracut_install /usr/lib/locale/en_US.utf8/LC_NUMERIC
 dracut_install /usr/lib/locale/en_US.utf8/LC_PAPER
+dracut_install /usr/lib64/python3.6/json/__init__.py /usr/lib64/python3.6/json/decoder.py /usr/lib64/python3.6/json/encoder.py /usr/lib64/python3.6/json/scanner.py /usr/lib64/python3.6/json/tool.py /usr/lib64/python3.6/lib-dynload/_json.cpython-36m-x86_64-linux-gnu.so
