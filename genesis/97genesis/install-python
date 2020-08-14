@@ -133,6 +133,7 @@ dracut_install /usr/lib/locale/en_US.utf8/LC_PAPER
 dracut_install /usr/lib/locale/en_US.utf8/LC_TELEPHONE
 dracut_install /usr/lib/locale/en_US.utf8/LC_TIME
 dracut_install /usr/lib/python3.6/site-packages
+dracut_install /usr/lib64/python3.6/argparse.py
 dracut_install /usr/lib64/python3.6/codecs.py
 dracut_install /usr/lib64/python3.6/encodings/aliases.py
 dracut_install /usr/lib64/python3.6/encodings/utf_8.py
