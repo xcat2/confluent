@@ -361,7 +361,7 @@ node = {
                        'ipmi is used if not specified.'
     },
     'hardwaremanagement.port': {
-        'description': 'The port the BMC should be configured to connect to
+        'description': 'The port the BMC should be configured to connect to '
                        'network.  This only has effect during deployment and '
                        'does not apply to out of band discovery. Example values '
                        'include "ocp", "ml2", "lom" (for on board port '
