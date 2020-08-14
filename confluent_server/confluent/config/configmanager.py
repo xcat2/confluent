@@ -2674,6 +2674,7 @@ def restore_db_from_directory(location, password):
     with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
         cfgdata = cfgfile.read()
         ConfigManager(tenant=None)._load_from_json(cfgdata)
+    ConfigManager.wait_for_sync(True)
 
 
 def dump_db_to_directory(location, password, redact=None, skipkeys=False):

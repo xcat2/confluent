@@ -62,11 +62,19 @@ if args[0] == 'restore':
     if pid is not None:
         print("Confluent is running, must shut down to restore db")
         sys.exit(1)
+    stinf = os.stat('/etc/confluent')
+    owner = stinf.st_uid
+    group = stinf.st_gid
     password = options.password
     if options.interactivepassword:
         password = getpass.getpass('Enter password to restore backup: ')
     try:
         cfm.restore_db_from_directory(dumpdir, password)
+        if owner != 0:
+            for targdir in os.walk('/etc/confluent'):
+                os.chown(targdir[0], owner, group)
+                for f in targdir[2]:
+                    os.chown(os.patht.join(targdir[0], f), owner, group)
     except Exception as e:
         print(str(e))
         sys.exit(1)
