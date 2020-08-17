@@ -90,6 +90,9 @@ if __name__ == '__main__':
     json = False
     if '-j' in sys.argv:
         json = True
+    if len(sys.argv) == 1:
+        HTTPSClient()
+        sys.exit(0)
     if sys.argv[-2] == '-o':
         with open(sys.argv[3], 'wb') as outf:
             reader = HTTPSClient(json=json).grab_url(
