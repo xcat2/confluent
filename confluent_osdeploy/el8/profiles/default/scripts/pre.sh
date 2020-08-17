@@ -11,6 +11,9 @@
 /usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
 nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
 nmcli c u $nicname
+while ip -6 addr | grep tentative > /dev/null; do
+   sleep 0.5
+done
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
