@@ -2,3 +2,8 @@
 # This is a convenient place to keep customizations separate from modifying the stock scripts
 # While modification of the stock scripts is fine, it may be easier to rebase to a newer
 # stock profile if the '.custom' files are used.
+#
+#Here is an example to locally configure the platform BMC according
+#to confluent configuration so that the BMC would be on the correct
+#network:
+#run_remote_python configbmc -c
