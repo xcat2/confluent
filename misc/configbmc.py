@@ -19,8 +19,15 @@ import json
 from select import select
 import socket
 import struct
+import os
+import subprocess
 import sys
 import time
+
+if os.path.exists('/opt/confluent/bin/apiclient'):
+    apiclient = '/opt/confluent/bin/apiclient'
+elif os.path.exists('/etc/confluent/apiclient'):
+    apiclient = '/etc/confluent/apiclient'
 
 class IpmiMsg(ctypes.Structure):
     _fields_ = [('netfn', ctypes.c_ubyte),
@@ -296,9 +303,15 @@ def main():
     a.add_argument('-p', help='Which port to use (dedicated, lom, ocp, ml2)')
     a.add_argument('-i', help='JSON configuration file to read for '
                    'configuration')
+    a.add_argument('-c', help='Use Confluent API to direct BMC configuration',
+                   action='store_true')
     args = a.parse_args()
     if args.i:
         bmccfg = json.load(open(args.i))
+    elif args.c:
+        bmccfgsrc = subprocess.check_output(
+            [sys.executable, apiclient, '/confluent-api/self/bmcconfig', '-j'])
+        bmccfg = json.loads(bmccfgsrc)
     else:
         bmccfg = {}
     if args.p is not None:
@@ -317,13 +330,13 @@ def main():
         model = model[:4].lower()
     s = Session('/dev/ipmi0')
     if not bmccfg:
-        print("No configuration requested, exiting...")
+        print("No BMC configuration specified, exiting.")
         return
-    if bmccfg.get('bmcport', None) is not None:
+    if bmccfg.get('bmcport', None):
         channel = set_port(s, bmccfg['bmcport'], vendor, model)
     else:
         channel = get_lan_channel(s)
-    if bmccfg.get('bmcvlan', None) is not None:
+    if bmccfg.get('bmcvlan', None):
         set_vlan(s, bmccfg['bmcvlan'], channel)
     if bmccfg.get('bmcipv4', None):
         set_ipv4(s, bmccfg['bmcipv4'], channel)
