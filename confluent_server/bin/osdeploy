@@ -82,7 +82,6 @@ def initialize_genesis():
         os.umask(0o22)
         os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
         os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
-        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/scripts', 0o755)
         os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/BOOTX64.EFI')
         os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
@@ -95,10 +94,8 @@ def initialize_genesis():
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/addons.cpio')
         os.symlink('/opt/confluent/genesis/x86_64/boot/kernel',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/kernel')
-        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/onboot.sh',
-                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/onboot.sh')
-        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/functions',
-                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/functions')
+        shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
+                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
         shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
                        '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
     except Exception:
