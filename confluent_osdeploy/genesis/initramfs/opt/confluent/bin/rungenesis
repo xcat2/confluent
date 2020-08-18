@@ -85,7 +85,7 @@ done
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 export profile mgr
-echo "Running https://$mgr/confluent-public/os/$profile/scripts/boot.sh"
+echo "Running https://$mgr/confluent-public/os/$profile/scripts/onboot.sh"
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/functions > /tmp/functions
 . /tmp/functions
 run_remote onboot.sh
