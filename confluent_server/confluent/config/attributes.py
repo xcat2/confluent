@@ -99,7 +99,10 @@ node = {
     },
     'crypted.rootpassword': {
         'description': 'The password of the local root password. '
-                       'This is stored as a non-recoverable hash.',
+                       'This is stored as a non-recoverable hash. If '
+                       'unspecified and confluent is used to deploy, then '
+                       'login at console using password will be impossible '
+                       'and only key based login can work for root.',
     },
     'crypted.grubpassword': {
         'description': 'Password required to modify grub behavior at boot',
