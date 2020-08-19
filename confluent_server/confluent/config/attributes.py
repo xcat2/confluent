@@ -124,7 +124,9 @@ node = {
         'description': ('Indicates whether the node authentication token interface '
                         'is armed.  If set to once, it will grant only the next '
                         'request. If set to continuous, will allow many requests.'
-                        'Should not be set unless an OS deployment is pending.'),
+                        'Should not be set unless an OS deployment is pending. '
+                        'Generally this is not directly modified, but is modified '
+                        'by the "nodedeploy" command'),
     },
     #'id': {
     #    'description': ('Numeric identifier for node')
