@@ -222,7 +222,11 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         eventlet.sleep(0.05)
         return None
     if (user, tenant) in _passcache:
-        if hashlib.sha256(passphrase).digest() == _passcache[(user, tenant)]:
+        if isinstance(passphrase, bytes):
+            bpassphrase = passphrase
+        else:
+            bpassphrase = passphrase.encode('utf8')
+        if hashlib.sha256(bpassphrase).digest() == _passcache[(user, tenant)]:
             return authorize(user, element, tenant, operation=operation)
         else:
             # In case of someone trying to guess,
@@ -287,7 +291,11 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             # user
             usergood = pam.authenticate(user, passphrase, service=_pamservice)
         if usergood:
-            _passcache[(user, tenant)] = hashlib.sha256(passphrase).digest()
+            if isinstance(passphrase, bytes):
+                bpassphrase = passphrase
+            else:
+                bpassphrase = passphrase.encode('utf8')
+            _passcache[(user, tenant)] = hashlib.sha256(bpassphrase).digest()
             return authorize(user, element, tenant, operation, skipuserobj=False)
     eventlet.sleep(0.05)  # stall even on test for existence of a username
     return None
