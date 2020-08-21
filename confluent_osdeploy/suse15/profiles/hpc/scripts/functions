@@ -3,23 +3,33 @@ run_remote() {
     echo
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$mgr/confluent-public/os/$profile/scripts/
-    cd $(mktemp -d)
+    tmpdir=$(mktemp -d)
+    echo Executing in $tmpdir
+    cd $tmpdir
     curl -f -sS https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    if [ $? != 0 ]; then echo $requestedcmd failed to download; return 1; fi
     chmod +x $1
     cmd=$1
     shift
     ./$cmd $*
-    echo "$requestedcmd exited with code $?"
-    cd -
+    retcode=$?
+    echo "$requestedcmd exited with code $retcode"
+    cd - > /dev/null
+    return $retcode
 }
 
 run_remote_python() {
     echo
     echo '---------------------------------------------------------------------------'
     echo Running python script "'$*'" from https://$mgr/confluent-public/os/$profile/scripts/
-    cd $(mktemp -d)
+    tmpdir=$(mktemp -d)
+    echo Executing in $tmpdir
+    cd $tmpdir
     curl -f -sS https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    if [ $? != 0 ]; then echo "'$*'" failed to download; return 1; fi
     python3 $*
-    echo "'$*' exited with code $?"
-    cd -
+    retcode=$?
+    echo "'$*' exited with code $retcode"
+    cd - > /dev/null
+    return $retcode
 }
