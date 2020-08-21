@@ -1,12 +1,13 @@
 run_remote() {
-    echo Running "'$*' from https://$mgr/confluent-public/os/$profile/scripts/"
+    requestedcmd="'$*'"
+    echo Running $requestedcmd from https://$mgr/confluent-public/os/$profile/scripts/"
     cd $(mktemp -d)
     curl -f https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     chmod +x $1
     cmd=$1
     shift
     ./$cmd $*
-    echo "'$*' exited with code $?"
+    echo "$requestedcmd exited with code $?"
     cd -
 }
 
