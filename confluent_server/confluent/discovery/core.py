@@ -104,6 +104,7 @@ class nesteddict(dict):
 
 nodehandlers = {
     'service:lenovo-smm': smm,
+    'service:lenovo-smm2': smm,
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': xcc,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
@@ -119,6 +120,7 @@ servicenames = {
     'onie-switch': 'onie-switch',
     'cumulus-switch': 'cumulus-switch',
     'service:lenovo-smm': 'lenovo-smm',
+    'service:lenovo-smm2': 'lenovo-smm2',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller': 'lenovo-xcc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
     'service:io-device.Lenovo:management-module': 'lenovo-switch',
@@ -131,6 +133,7 @@ servicebyname = {
     'onie-switch': 'onie-switch',
     'cumulus-switch': 'cumulus-switch',
     'lenovo-smm': 'service:lenovo-smm',
+    'lenovo-smm2': 'service:lenovo-smm2',
     'lenovo-xcc': 'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',

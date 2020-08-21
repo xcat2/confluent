@@ -27,6 +27,7 @@ import traceback
 _slp_services = set([
     'service:management-hardware.IBM:integrated-management-module2',
     'service:lenovo-smm',
+    'service:lenovo-smm2',
     'service:ipmi',
     'service:lighttpd',
     'service:management-hardware.Lenovo:lenovo-xclarity-controller',
