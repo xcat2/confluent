@@ -4,7 +4,7 @@ run_remote() {
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$mgr/confluent-public/os/$profile/scripts/
     cd $(mktemp -d)
-    curl -f https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    curl -f -sS https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     chmod +x $1
     cmd=$1
     shift
@@ -18,7 +18,7 @@ run_remote_python() {
     echo '---------------------------------------------------------------------------'
     echo Running python script "'$*'" from https://$mgr/confluent-public/os/$profile/scripts/
     cd $(mktemp -d)
-    curl -f https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    curl -f -sS https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     python3 $*
     echo "'$*' exited with code $?"
     cd -
