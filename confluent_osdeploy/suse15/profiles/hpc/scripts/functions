@@ -1,6 +1,6 @@
 run_remote() {
     requestedcmd="'$*'"
-    echo Running $requestedcmd from https://$mgr/confluent-public/os/$profile/scripts/"
+    echo Running $requestedcmd from https://$mgr/confluent-public/os/$profile/scripts/
     cd $(mktemp -d)
     curl -f https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     chmod +x $1
