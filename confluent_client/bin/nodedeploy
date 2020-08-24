@@ -10,6 +10,25 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
+
+def cleararm(nr, cli):
+    nodes = set([])
+    for rsp in cli.read('/noderange/{0}/attributes/current'.format(nr)):
+        for node in rsp.get('databynode', {}):
+            nodeinfo = rsp['databynode'][node]
+            for attr in nodeinfo:
+                if attr == 'deployment.apiarmed':
+                    curr = nodeinfo[attr].get('value', '')
+                    if curr == 'continuous':
+                        nodes.add(node)
+    noderange = nr
+    if nodes:
+        noderange += ',-({0})'.format(','.join(nodes))
+    for rsp in cli.update('/noderange/{0}/attributes/current'.format(noderange),
+                          {'deployment.apiarmed': ''}):
+        pass
+
+
 def armonce(nr, cli):
     nodes = set([])
     for rsp in cli.read('/noderange/{0}/attributes/current'.format(nr)):
@@ -27,16 +46,25 @@ def armonce(nr, cli):
                           {'deployment.apiarmed': 'once'}):
         pass
 
+
 def setpending(nr, profile, cli):
+    args = {'deployment.pendingprofile': profile}
+    if not profile.startswith('genesis-'):
+        args['deployment.stagedprofile'] = ''
+        args['deployment.profile'] = ''
     for rsp in cli.update('/noderange/{0}/attributes/current'.format(nr),
-                          {'deployment.pendingprofile': profile,
-                          'deployment.stagedprofile': '',
-                          'deployment.profile': ''}):
+                          args):
         pass
 
 
+def clearpending(nr, profile, cli):
+    for rsp in cli.update('/noderange/{0}/attributes/current'.format(nr),
+                          {'deployment.pendingprofile': ''}):
+        pass
+
 def main(args):
     ap = argparse.ArgumentParser(description='Deploy OS to nodes')
+    ap.add_argument('-c', '--clear', help='Clear any pending deployment action')
     ap.add_argument('-n', '--network', help='Initiate deployment over PXE/HTTP', action='store_true')
     ap.add_argument('-p', '--prepare', help='Configure for deployment without setting boot device or rebooting', action='store_true')
     ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
@@ -44,12 +72,16 @@ def main(args):
     ap.add_argument('profile', help='Profile name to deploy')
     args = ap.parse_args(args)
     if not args.network and not args.prepare:
-        sys.stderr.write('-n or -p is a required argument currently')
+        sys.stderr.write('-n or -p is a required argument currently\n')
         return 1
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
-    armonce(args.noderange, c)
-    setpending(args.noderange, args.profile, c)
+    if args.clear:
+        cleararm(args.noderange, c)
+        clearpending(args.noderange, c)
+    else:
+        armonce(args.noderange, c)
+        setpending(args.noderange, args.profile, c)
     errnodes = set([])
     if args.network:
         rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
