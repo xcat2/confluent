@@ -477,11 +477,14 @@ class SockApi(object):
 
     def watch_for_cert(self):
         libc = ctypes.CDLL(ctypes.util.find_library('c'))
-        watcher = libc.inotify_init()
+        watcher = libc.inotify_init1(os.O_NONBLOCK)
         if libc.inotify_add_watch(watcher, b'/etc/confluent/', 0x100) > -1:
             while True:
                 select.select((watcher,), (), (), 86400)
-                os.read(watcher, 1024)
+                try:
+                    os.read(watcher, 1024)
+                except Exception:
+                    pass
                 if self.should_run_remoteapi():
                     os.close(watcher)
                     self.start_remoteapi()
