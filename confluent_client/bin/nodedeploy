@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+
 import argparse
 import os
 import sys
@@ -9,7 +10,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
-
+import confluent.sortutil as sortutil
 
 def cleararm(nr, cli):
     nodes = set([])
@@ -71,25 +72,43 @@ def main(args):
     ap.add_argument('noderange', help='Set of nodes to deploy')
     ap.add_argument('profile', nargs='?', help='Profile name to deploy')
     args, extra = ap.parse_known_args(args)
-    if not args.network and not args.prepare and not args.clear:
-        sys.stderr.write('-n or -p is a required argument currently\n')
-        return 1
     if args.profile is None and len(extra) == 1:
         args.profile = extra[0]
         extra = extra[1:]
+    if args.profile and (not args.network and not args.prepare):
+        sys.stderr.write('-n or -p is a required argument currently\n')
+        return 1
     if extra:
         sys.stderr.write('Unrecognized arguments: ' + repr(extra) + '\n')
-    if not args.clear and args.profile is None:
-        sys.stderr.write('<profile> is a required argument\n')
-        return 1
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
     if args.clear:
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
-    else:
+    elif args.profile:
         armonce(args.noderange, c)
         setpending(args.noderange, args.profile, c)
+    else:
+        databynode = {}
+        for r in c.read('/noderange/{0}/attributes/current'.format(args.noderange)):
+            dbn = r.get('databynode', {})
+            for node in dbn:
+                if node not in databynode:
+                    databynode[node] = {}
+                for attr in dbn[node]:
+                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed'):
+                        databynode[node][attr] = dbn[node][attr].get('value', '')
+        for node in sortutil.natural_sort(databynode):
+            profile = databynode[node].get('deployment.pendingprofile', '')
+            if not profile:
+                profile = 'none_pending'
+            armed = databynode[node].get('deployment.apiarmed', '')
+            if armed in ('once', 'continuous'):
+                armed = ' (node authentication armed)'
+            else:
+                armed = ''
+            print('{0}: {1}{2}'.format(node, profile, armed))
+        sys.exit(0)
     errnodes = set([])
     if args.network:
         rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
