@@ -96,12 +96,22 @@ def main(args):
                 if node not in databynode:
                     databynode[node] = {}
                 for attr in dbn[node]:
-                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed'):
+                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed', 'deployment.stagedprofile', 'deployment.profile'):
                         databynode[node][attr] = dbn[node][attr].get('value', '')
         for node in sortutil.natural_sort(databynode):
             profile = databynode[node].get('deployment.pendingprofile', '')
-            if not profile:
-                profile = 'none_pending'
+            if profile:
+                profile = 'pending: {}'.format(profile)
+            else:
+                profile = databynode[node].get('deployment.stagedprofile', '')
+                if profile:
+                    profile = 'staged: {}'.format(profile)
+                else:
+                    profile = databynode[node].get('deployment.profile', '')
+                    if profile:
+                        profile = 'completed: {}'.format(profile)
+                    else:
+                        profile= 'No profile pending or applied'
             armed = databynode[node].get('deployment.apiarmed', '')
             if armed in ('once', 'continuous'):
                 armed = ' (node authentication armed)'
