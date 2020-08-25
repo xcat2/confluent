@@ -69,10 +69,13 @@ def main(args):
     ap.add_argument('-p', '--prepare', help='Configure for deployment without setting boot device or rebooting', action='store_true')
     ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
     ap.add_argument('noderange', help='Set of nodes to deploy')
-    ap.add_argument('profile', help='Profile name to deploy')
+    ap.add_argument('profile', nargs='?', help='Profile name to deploy')
     args = ap.parse_args(args)
-    if not args.network and not args.prepare:
+    if not args.network and not args.prepare and not args.clear:
         sys.stderr.write('-n or -p is a required argument currently\n')
+        return 1
+    if not args.clear and args.profile is None:
+        sys.stderr.write('<profile> is a required argument')
         return 1
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
