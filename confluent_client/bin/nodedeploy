@@ -64,7 +64,7 @@ def clearpending(nr, profile, cli):
 
 def main(args):
     ap = argparse.ArgumentParser(description='Deploy OS to nodes')
-    ap.add_argument('-c', '--clear', help='Clear any pending deployment action')
+    ap.add_argument('-c', '--clear', help='Clear any pending deployment action', action='store_true')
     ap.add_argument('-n', '--network', help='Initiate deployment over PXE/HTTP', action='store_true')
     ap.add_argument('-p', '--prepare', help='Configure for deployment without setting boot device or rebooting', action='store_true')
     ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
