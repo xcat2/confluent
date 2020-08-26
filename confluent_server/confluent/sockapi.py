@@ -38,6 +38,7 @@ import eventlet
 
 import confluent.auth as auth
 import confluent.credserver as credserver
+import confluent.config.conf as conf
 import confluent.tlvdata as tlvdata
 import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
@@ -371,15 +372,19 @@ if ffi:
 def _tlsstartup(cnn):
     authname = None
     cert = None
+    conf.init_config()
+    configfile = conf.get_config()
+    if configfile.has_option('security', 'cipher_list'):
+        ciphers = configfile.get('security', 'cipher_list')
+    else:
+        ciphers = 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384'
     if libssl:
         # most fully featured SSL function
         ctx = libssl.Context(libssl.SSLv23_METHOD)
         ctx.set_options(libssl.OP_NO_SSLv2 | libssl.OP_NO_SSLv3 |
                         libssl.OP_NO_TLSv1 | libssl.OP_NO_TLSv1_1 |
                         libssl.OP_CIPHER_SERVER_PREFERENCE)
-        ctx.set_cipher_list(
-            'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
-            'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384')
+        ctx.set_cipher_list(ciphers)
         ctx.set_tmp_ecdh(crypto.get_elliptic_curve('secp384r1'))
         ctx.use_certificate_file('/etc/confluent/srvcert.pem')
         ctx.use_privatekey_file('/etc/confluent/privkey.pem')
@@ -397,18 +402,12 @@ def _tlsstartup(cnn):
             ctx.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3
             ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
             ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
-            ctx.set_ciphers(
-                'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:'
-                'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384')
+            ctx.set_ciphers(ciphers)
             ctx.load_cert_chain('/etc/confluent/srvcert.pem',
                                 '/etc/confluent/privkey.pem')
             cnn = ctx.wrap_socket(cnn, server_side=True)
         except AttributeError:
-            # Python 2.6 era, go with best effort
-            cnn = ssl.wrap_socket(cnn, keyfile="/etc/confluent/privkey.pem",
-                                  certfile="/etc/confluent/srvcert.pem",
-                                  ssl_version=ssl.PROTOCOL_TLSv1,
-                                  server_side=True)
+            raise Exception('Unable to find workable SSL support')
     sessionhdl(cnn, authname, cert=cert)
 
 def removesocket():
