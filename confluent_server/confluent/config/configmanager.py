@@ -311,7 +311,7 @@ def _rpc_set_group_attributes(tenant, attribmap, autocreate):
 def check_quorum():
     if isinstance(cfgleader, bool):
         raise exc.DegradedCollective()
-    if cfgstreams and len(cfgstreams) < (len(_cfgstore['collective']) // 2):
+    if (not cfgleader) and len(cfgstreams) < (len(_cfgstore['collective']) // 2):
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
     if cfgleader and not _hasquorum:
