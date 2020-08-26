@@ -67,7 +67,7 @@ def main(args):
     ap = argparse.ArgumentParser(description='Deploy OS to nodes')
     ap.add_argument('-c', '--clear', help='Clear any pending deployment action', action='store_true')
     ap.add_argument('-n', '--network', help='Initiate deployment over PXE/HTTP', action='store_true')
-    ap.add_argument('-p', '--prepare', help='Configure for deployment without setting boot device or rebooting', action='store_true')
+    ap.add_argument('-p', '--prepareonly', help='Prepare only, skip any interaction with a BMC associated with this deployment action', action='store_true')
     ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
     ap.add_argument('noderange', help='Set of nodes to deploy')
     ap.add_argument('profile', nargs='?', help='Profile name to deploy')
@@ -75,16 +75,13 @@ def main(args):
     if args.profile is None and len(extra) == 1:
         args.profile = extra[0]
         extra = extra[1:]
-    if args.profile and (not args.network and not args.prepare):
-        sys.stderr.write('-n or -p is a required argument currently\n')
+    if args.profile and not args.network:
+        sys.stderr.write('-n is a required argument currently to perform an install, optionally with -p\n')
         return 1
     if extra:
         sys.stderr.write('Unrecognized arguments: ' + repr(extra) + '\n')
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
-    if args.prepare and args.network:
-        sys.stderr.write('-p and -n should not both be specified, -p prepares for a network boot to be manually performed, -n prepares and executes the network boot\n')
-        sys.exit(1)
     if args.clear:
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
@@ -123,7 +120,7 @@ def main(args):
             print('{0}: {1}{2}'.format(node, profile, armed))
         sys.exit(0)
     errnodes = set([])
-    if args.network:
+    if args.network and not args.prepareonly:
         rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
                                         bootmode='uefi',
                                         persistent=False,
