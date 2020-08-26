@@ -82,6 +82,9 @@ def main(args):
         sys.stderr.write('Unrecognized arguments: ' + repr(extra) + '\n')
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
+    if args.prepare and args.network:
+        sys.stderr.write('-p and -n should not both be specified, -p prepares for a network boot to be manually performed, -n prepares and executes the network boot\n')
+        sys.exit(1)
     if args.clear:
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
