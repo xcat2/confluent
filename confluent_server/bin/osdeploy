@@ -43,7 +43,7 @@ def main(args):
     wiz.add_argument('-t', help='Generate new TLS key for HTTPS operation and register with confluent repository', action='store_true')
     wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
-    wiz.add_argument('-l', help='Set local management node to have SSH certificates and hosts.equiv/.shosts', action='store_true')
+    wiz.add_argument('-l', help='Set up local management node to allow login from managed nodes', action='store_true')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     upb = sp.add_parser(
@@ -114,7 +114,9 @@ def local_node_trust_setup():
         'IgnoreRhosts no'])
     if domain and not myname.endswith(domain):
         myprincipals.add('{0}.{1}'.format(myname, domain))
-    for pubkey in glob.glob('/etc/ssh/ssh_host_*key.pub'):
+    if '.' in myname and myname.endswith(domain):
+        myprincipals.add(myname.split('.')[0])
+    for pubkey in glob.glob('/etc/ssh/ssh_host_*_key.pub'):
         currpubkey = open(pubkey, 'rb').read()
         cert = sshutil.sign_host_key(currpubkey, myname, myprincipals)
         certfile = pubkey.replace('key.pub', 'key-cert.pub')
@@ -186,7 +188,7 @@ def initialize(cmdset):
         cmdset.s = input().strip().lower().startswith('y')
         sys.stdout.write('Update global known hosts on this server to trust local CA certificates (-k)? (y/n): ')
         cmdset.k = input().strip().lower().startswith('y')
-        sys.stdout.write('Allow nodes to ssh to this management node without a password (-l)? (y/n): ')
+        sys.stdout.write('Allow managed nodes to ssh to this management node without a password (-l)? (y/n): ')
         cmdset.l = input().strip().lower().startswith('y')
         sys.stdout.write('Update tftp directory with binaries to support PXE (-p) (y/n): ')
         cmdset.p = input().strip().lower().startswith('y')
