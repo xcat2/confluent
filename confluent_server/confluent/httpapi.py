@@ -182,6 +182,8 @@ def _get_query_dict(env, reqbody, reqtype):
             qdict[qkey] = qvalue
     if reqbody is not None:
         if "application/x-www-form-urlencoded" in reqtype:
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
             pbody = urlparse.parse_qs(reqbody, True)
             for ky in pbody:
                 if len(pbody[ky]) > 1:  # e.g. REST explorer
@@ -190,6 +192,8 @@ def _get_query_dict(env, reqbody, reqtype):
                 else:
                     qdict[ky] = pbody[ky][0]
         elif 'application/json' in reqtype:
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
             pbody = json.loads(reqbody)
             for key in pbody:
                 qdict[key] = pbody[key]

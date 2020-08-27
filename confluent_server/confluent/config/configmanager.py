@@ -117,6 +117,8 @@ _validroles = ('Administrator', 'Operator', 'Monitor')
 
 
 def attrib_supports_expression(attrib):
+    if not isinstance(attrib, str):
+        attrib = attrib.decode('utf8')
     attrib = _attraliases.get(attrib, attrib)
     if attrib.startswith('secret.') or attrib.startswith('crypted.'):
         return False
