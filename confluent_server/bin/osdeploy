@@ -228,7 +228,6 @@ def initialize(cmdset):
         didsomething = True
         sshutil.initialize_ca()
     if cmdset.p:
-        didsomething = True
         install_tftp_content()
     if cmdset.l:
         local_node_trust_setup()
@@ -240,7 +239,7 @@ def initialize(cmdset):
                 skh.write(cacert)
     if cmdset.g:
         initialize_genesis()
-    if not didsomething and (cmdset.k or cmdset.l or cmdset.g):
+    if not didsomething and (cmdset.k or cmdset.l or cmdset.g or cmdset.p):
         if cmdset.g:
             updateboot('genesis-x86_64')
         sys.exit(0)
