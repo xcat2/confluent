@@ -167,7 +167,7 @@ def install_tftp_content():
     try:
         os.makedirs(tftplocation)
     except OSError as e:
-        if e.errno == 17:
+        if e.errno != 17:
             raise
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
