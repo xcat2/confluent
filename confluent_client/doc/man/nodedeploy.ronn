@@ -1,0 +1,42 @@
+nodedeploy(8) -- Request preparation and/or initiating a node deployment
+=========================================================================
+
+## SYNOPSIS
+
+`nodedeploy <noderange>`  
+`nodedeploy <noderange> -c`  
+`nodedeploy <noderange> [-n] [-p] <name of profile>`  
+
+## DESCRIPTION
+
+**nodedeploy** configures attributes and interacts with BMC devices as appropriate
+to change the operating system on the noderange to that indicated by `profile`. Tab completion
+is supported under bash to help list and select a profile name. `-n` indicates that it
+will be a network based deployment (either HTTP or PXE) and `-p` suppresses any activity
+that requires the BMC (e.g. setting the next boot device and rebooting the system). Currently
+**nodedeploy** only supports `-n` style deployment flows. Without options it shows the current
+deployment status.
+
+## OPTIONS
+
+* '-c', '--clear`:
+  Remove any pending deployment action
+
+* `-n`, `--network`:
+  Prepare for either an HTTP or PXE based deployment, setting boot device to network and rebooting unless `-p` is specified.
+
+* `-p`, `--prepareonly`:
+  Prepare the network services for deployment, but do not interact with BMCs. This is intended for scenarios where
+  the boot device control and server restart will be handled outside of confluent.
+
+## EXAMPLES
+* Begin the instalalation of a profile of CentOS 8.2:  
+   `# nodedeploy d4 -n centos-8.2-x86_64-default`  
+   `d4: network`  
+   `d4: reset`  
+
+* Check current deployment state of nodes:
+  `# nodedeploy d4`  
+  `d4: pending: centos-8.2-x86_64-default (node authentication armed)`  
+
+
