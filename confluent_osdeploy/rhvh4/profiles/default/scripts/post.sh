@@ -21,7 +21,7 @@ fi
 # If, for example, there is a post script that has a dependency on a driver or filesystem that
 # cannot work until booting into the installer, use firstboot.sh instead
 
-# run_remote will download and execute from /var/lib/confluent/public/<os>/scripts/ directory
+# run_remote will download and execute from /var/lib/confluent/public/os/<profile>/scripts/ directory
 # run_remote_python will use the appropriate python interpreter path to run the specified script
 # A post.custom is provided to more conveniently hold customizations, see the post.custom file.
 
