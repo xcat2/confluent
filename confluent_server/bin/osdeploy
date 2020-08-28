@@ -157,7 +157,8 @@ def install_tftp_content():
             tftplocation = cand
             break
     if not tftplocation:
-        raise Exception('Unable to detect an installed tftp location (check that tftp server is installed)')
+        emprint('Unable to detect a directory for tftp content (check that tftp server is installed)')
+        return 1
     if os.path.exists('/usr/lib/systemd/system/tftp.socket'):
         subprocess.check_call(['systemctl', 'enable', 'tftp.socket', '--now'])
     else:
