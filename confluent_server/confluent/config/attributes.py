@@ -117,7 +117,8 @@ node = {
                         'no encryption is done. If set to "tpm2" then the OS '
                         'will freely decrypt so long as the same '
                         'Trusted Platform Module is available to decrypt the '
-                        'volume'),
+                        'volume. Note that versions earlier than 8.2 may malfunction '
+                        'at boot time if this feature is attempted, depending on configuration.'),
         'validvalues': ('tpm2', 'none', ''),
     },
     'deployment.apiarmed': {
