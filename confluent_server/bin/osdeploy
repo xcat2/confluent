@@ -160,11 +160,14 @@ def install_tftp_content():
         emprint('Unable to detect a directory for tftp content (check that tftp server is installed)')
         return 1
     if os.path.exists('/usr/lib/systemd/system/tftp.socket'):
-        try:
-            subprocess.check_call(['systemctl', 'enable', 'tftp.socket', '--now'])
-            print('Ensured that tftp servicec is enabled')
-        except Exception:
-            emprint('Unable to automatically enable and start tftp.socket, tftp server may already be running outside of systemd control')
+        if tftplocation == `/tftpboot`:
+            emprint('/tftpboot is detected as tftp directory, will not try to automatically enable tftp, as it is presumed to be externally managed')
+        else:
+            try:
+                subprocess.check_call(['systemctl', 'enable', 'tftp.socket', '--now'])
+                print('TFTP service is enabled and running')
+            except Exception:
+                emprint('Unable to automatically enable and start tftp.socket, tftp server may already be running outside of systemd control')
     else:
         emprint(
             'Detected {0} as tftp directory, but unable to determine tftp service, ensure that a tftp server is installed and enabled manually'.format(tftplocation))
