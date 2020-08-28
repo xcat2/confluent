@@ -1,0 +1,17 @@
+osdeploy(8) --- Configure general OS deployment facilities of confluent
+==========================================================================
+
+## SYNOPSIS
+
+`osdeploy import <iso>`  
+`osdeploy updateboot <profile>`
+`osdeploy initialize [-h] [-g] [-u] [-s] [-k] [-t] [-p] [-i] [-l]`
+
+## DESCRIPTION
+
+**osdeploy** manages the facilities and os deployment content of a confluent server. The
+`import` subcommand will generate profiles from an iso image. `updateboot` will take any
+changes in the specified update that need to be pushed into boot configuration and/or images
+and ensure those needed changes are performed. `initialize` provides assistance in setting
+up the most commonly required facilities. Run `osdeploy initialize -h` for more detail
+on the options offered by `osdeploy initialize`
