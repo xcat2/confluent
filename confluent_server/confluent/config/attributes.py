@@ -112,7 +112,7 @@ node = {
     },
     'deployment.encryptboot': {
         'description': ('Specify a strategy for encrypting the volume. Support '
-                        'This setting is currently only enabled for '
+                        'for this setting is currently only enabled for '
                         'RedHat 8 and CentOS 8 profiles. If blank or unset, '
                         'no encryption is done. If set to "tpm2" then the OS '
                         'will freely decrypt so long as the same '
