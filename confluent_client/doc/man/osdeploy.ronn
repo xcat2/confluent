@@ -4,8 +4,8 @@ osdeploy(8) --- Configure general OS deployment facilities of confluent
 ## SYNOPSIS
 
 `osdeploy import <iso>`  
-`osdeploy updateboot <profile>`
-`osdeploy initialize [-h] [-g] [-u] [-s] [-k] [-t] [-p] [-i] [-l]`
+`osdeploy updateboot <profile>`  
+`osdeploy initialize [-h] [-g] [-u] [-s] [-k] [-t] [-p] [-i] [-l]`  
 
 ## DESCRIPTION
 
