@@ -50,6 +50,7 @@ codemappings = {
     'warning': 1,
     'critical': 2,
     'failed': 2,
+    'unknown': 2,
 }
 
 def main():
