@@ -32,6 +32,7 @@
 # This functionality is restricted to the null tenant
 from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
 from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
+import eventlet.green.socket as socket
 
 if __name__ == '__main__':
     import sys
@@ -105,7 +106,7 @@ def _namesmatch(switchdesc, userdesc):
 def _map_switch(args):
     try:
         return _map_switch_backend(args)
-    except UnicodeError:
+    except (UnicodeError, socket.gaierror):
         log.log({'error': "Cannot resolve switch '{0}' to an address".format(
             args[0])})
     except exc.TargetEndpointUnreachable:
