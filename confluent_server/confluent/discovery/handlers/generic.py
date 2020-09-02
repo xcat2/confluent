@@ -14,6 +14,7 @@
 
 import errno
 import eventlet
+import socket
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 class NodeHandler(object):
@@ -38,7 +39,8 @@ class NodeHandler(object):
         else:
             if info.get('addresses', False):
                 targsa = info['addresses'][0]
-        self.ipaddr = targsa[0]
+        self.ipaddr = socket.getnameinfo(
+            targsa, socket.NI_NUMERICHOST|socket.NI_NUMERICSERV)[0]
 
     @classmethod
     def adequate(cls, info):

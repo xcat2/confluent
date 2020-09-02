@@ -81,6 +81,7 @@ import confluent.noderange as noderange
 import confluent.util as util
 import eventlet
 import traceback
+import socket as nsocket
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
@@ -206,13 +207,16 @@ def uuid_is_valid(uuid):
                                 '00112233-4455-6677-8899-aabbccddeeff',
                                 '20202020-2020-2020-2020-202020202020')
 
+def _printable_ip(sa):
+    return nsocket.getnameinfo(
+        sa, nsocket.NI_NUMERICHOST|nsocket.NI_NUMERICSERV)[0]
 
 def send_discovery_datum(info):
     addresses = info.get('addresses', [])
     if info['handler'] == pxeh:
         enrich_pxe_info(info)
     yield msg.KeyValueData({'nodename': info.get('nodename', '')})
-    yield msg.KeyValueData({'ipaddrs': [x[0] for x in addresses]})
+    yield msg.KeyValueData({'ipaddrs': [_printable_ip(x) for x in addresses]})
     sn = info.get('serialnumber', '')
     mn = info.get('modelnumber', '')
     uuid = info.get('uuid', '')
