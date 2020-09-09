@@ -262,16 +262,18 @@ def set_ipv4(s, ipaddr, channel):
         return
     rsp = int(s.raw_command(0xc, 2, bytearray([channel, 4, 0, 0]))['data'][1]) & 0b1111
     if rsp != 1:
-        sys.stdout.print("Changing configuration to static...")
+        sys.stdout.write("Changing configuration to static...")
         sys.stdout.flush()
         resp = s.raw_command(0xc, 1, bytearray([channel, 4, 1]))
         tries = 0
         while rsp != 1 and tries < 30:
             sys.stdout.write('.')
+            sys.stdout.flush()
             tries += 1
             time.sleep(0.5)
             rsp = int(s.raw_command(0xc, 2, bytearray([channel, 4, 0, 0]))['data'][1]) & 0b1111
-        sys.stdout.write('Complete')
+        sys.stdout.write('Complete\n')
+        sys.stdout.flush()
     print('Setting IP to {}'.format(oipaddr))
     s.raw_command(0xc, 1, bytearray([channel, 3]) + ipaddr)
 

@@ -169,6 +169,7 @@ def set_port_tsm(s, port, model):
         raise Exception("Unsupported port for TSM")
     timer = 15
     while timer:
+        timer = timer - 1
         time.sleep(1.0)
         sys.stdout.write('.')
         sys.stdout.flush()
@@ -178,7 +179,7 @@ def set_port_tsm(s, port, model):
     elif port == 'dedicated':
         iface = 1
         s.raw_command(0x32, 0x71, b'\x00\x01\x03')
-    rsp = s.raw_command(0x32, 0x72, bytearray(4, iface, 0))
+    rsp = s.raw_command(0x32, 0x72, bytearray([4, iface, 0]))
     print('Complete')
     return int(rsp['data'][0])
 
@@ -261,16 +262,18 @@ def set_ipv4(s, ipaddr, channel):
         return
     rsp = int(s.raw_command(0xc, 2, bytearray([channel, 4, 0, 0]))['data'][1]) & 0b1111
     if rsp != 1:
-        sys.stdout.print("Changing configuration to static...")
+        sys.stdout.write("Changing configuration to static...")
         sys.stdout.flush()
         resp = s.raw_command(0xc, 1, bytearray([channel, 4, 1]))
         tries = 0
         while rsp != 1 and tries < 30:
             sys.stdout.write('.')
+            sys.stdout.flush()
             tries += 1
             time.sleep(0.5)
             rsp = int(s.raw_command(0xc, 2, bytearray([channel, 4, 0, 0]))['data'][1]) & 0b1111
-        sys.stdout.write('Complete')
+        sys.stdout.write('Complete\n')
+        sys.stdout.flush()
     print('Setting IP to {}'.format(oipaddr))
     s.raw_command(0xc, 1, bytearray([channel, 3]) + ipaddr)
 
@@ -323,7 +326,7 @@ def main():
     try:
         model = open('/sys/devices/virtual/dmi/id/product_sku').read().strip()
         if model == 'none':
-            raise Exception('no sku')
+            raise Exception('No SKU')
     except Exception:
         model = open('/sys/devices/virtual/dmi/id/product_name').read()
     if vendor in ('Lenovo', 'IBM'):
