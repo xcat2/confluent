@@ -321,7 +321,9 @@ def main():
     vendor = open('/sys/devices/virtual/dmi/id/sys_vendor').read()
     vendor = vendor.strip()
     try:
-        model = open('/sys/devices/virtual/dmi/id/product_sku').read()
+        model = open('/sys/devices/virtual/dmi/id/product_sku').read().strip()
+        if model == 'none':
+            raise Exception('no sku')
     except Exception:
         model = open('/sys/devices/virtual/dmi/id/product_name').read()
     if vendor in ('Lenovo', 'IBM'):

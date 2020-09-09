@@ -21,7 +21,7 @@ class NodeHandler(object):
     https_supported = True
     is_enclosure = False
     devname = ''
-    maxmacs = 2  # reasonable default, allowing for common scenario of
+    maxmacs = 3  # reasonable default, allowing for common scenario of
                  # shared nic in theory, but blocking enclosure managers
                  # and uplink ports
 

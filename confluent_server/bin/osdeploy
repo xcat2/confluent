@@ -114,7 +114,7 @@ def local_node_trust_setup():
         'IgnoreRhosts no'])
     if domain and not myname.endswith(domain):
         myprincipals.add('{0}.{1}'.format(myname, domain))
-    if '.' in myname and myname.endswith(domain):
+    if domain and '.' in myname and myname.endswith(domain):
         myprincipals.add(myname.split('.')[0])
     for pubkey in glob.glob('/etc/ssh/ssh_host_*_key.pub'):
         currpubkey = open(pubkey, 'rb').read()

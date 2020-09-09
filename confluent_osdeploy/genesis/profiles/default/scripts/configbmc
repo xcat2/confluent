@@ -169,6 +169,7 @@ def set_port_tsm(s, port, model):
         raise Exception("Unsupported port for TSM")
     timer = 15
     while timer:
+        timer = timer - 1
         time.sleep(1.0)
         sys.stdout.write('.')
         sys.stdout.flush()
@@ -178,7 +179,7 @@ def set_port_tsm(s, port, model):
     elif port == 'dedicated':
         iface = 1
         s.raw_command(0x32, 0x71, b'\x00\x01\x03')
-    rsp = s.raw_command(0x32, 0x72, bytearray(4, iface, 0))
+    rsp = s.raw_command(0x32, 0x72, bytearray([4, iface, 0]))
     print('Complete')
     return int(rsp['data'][0])
 
@@ -321,7 +322,9 @@ def main():
     vendor = open('/sys/devices/virtual/dmi/id/sys_vendor').read()
     vendor = vendor.strip()
     try:
-        model = open('/sys/devices/virtual/dmi/id/product_sku').read()
+        model = open('/sys/devices/virtual/dmi/id/product_sku').read().strip()
+        if model == 'none':
+            raise Exception('No SKU')
     except Exception:
         model = open('/sys/devices/virtual/dmi/id/product_name').read()
     if vendor in ('Lenovo', 'IBM'):
