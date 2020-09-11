@@ -209,14 +209,14 @@ node = {
     },
     'deployment.useinsecureprotocols': {
         'description': ('What phase(s) of boot are permitted to use insecure protocols '
-                        '(TFTP and HTTP without TLS.  By default, HTTPS is allowed.  However '
+                        '(TFTP and HTTP without TLS.  By default, only HTTPS is used.  However '
                         'this is not compatible with most firmware in most scenarios.  Using '
                         '"firmware" as the setting will still use HTTPS after the initial download, '
-                        'though be aware that a successful compromise during the firmware phase '
+                        'though be aware that a successful attack during the firmware phase '
                         'will negate future TLS protections.  The value "always" will result in '
-                        'tftp/http being used for entire deployment.  Note that ONIE does not '
-                        'support secure protocols, and in that case this setting must be "always" '
-                        'or "firmware"'),
+                        'tftp/http being used for most of the deployment.  The value "never" will '
+                        'allow HTTPS only. Note that Ubuntu will still use HTTP without TLS for '
+                        'a phase of the installation process.'),
         'validlist': ('always', 'firmware', 'never'),
     },
     'discovery.passwordrules': {
