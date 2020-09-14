@@ -199,6 +199,7 @@ def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata):
             'port': record['localport'],
             'peerid': peerid,
         }
+        _extract_extended_desc(portdata, portdata['peerdescription'], True)
         _neighbypeerid[peerid] = portdata
         lldpdata[localport] = portdata
     neighdata[switch] = lldpdata

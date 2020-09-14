@@ -1020,9 +1020,13 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 if nl:
                     # The candidate nodename is the head of a chain, we must
                     # validate the smm certificate by the switch
-                    macmap.get_node_fingerprints(nodename, cfg)
-                    util.cert_matches(fprint, handler.https_cert)
-                    return
+                    fprints = macmap.get_node_fingerprints(nodename, cfg)
+                    for fprint in fprints:
+                        if util.cert_matches(fprint[0], handler.https_cert):
+                            if not discover_node(cfg, handler, info,
+                                                 nodename, manual):
+                                pending_nodes[nodename] = info
+                            return
             if (info.get('maccount', False) and
                     not handler.discoverable_by_switch(info['maccount'])):
                 errorstr = 'The detected node {0} was detected using switch, ' \
