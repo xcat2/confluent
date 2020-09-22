@@ -16,6 +16,7 @@ import confluent.discovery.handlers.generic as generic
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
+import eventlet
 import eventlet.support.greendns
 import json
 try:
@@ -85,7 +86,22 @@ class NodeHandler(generic.NodeHandler):
                         'username': self.DEFAULT_USER
                         }
                     if authmode == 2:
-                        rsp, status = wc.grab_json_response_with_status('/api/reset-pass', passchange)
+                        passchange = {
+                            'Password': self.targpass,
+                        }
+                        rwc =  webclient.SecureHTTPConnection(
+                            self.ipaddr, 443,
+                            verifycallback=self.validate_cert)
+                        rwc.set_basic_credentials(authdata['username'],
+                                                     authdata['password'])
+                        rwc.set_header('If-Match', '*')
+                        rwc.set_header('Content-Type', 'application/json')
+                        rsp, status = rwc.grab_json_response_with_status(
+                            '/redfish/v1/AccountService/Accounts/1',
+                            passchange, method='PATCH')
+                        if status >= 200 and status < 300:
+                            authdata['password'] = self.targpass
+                            eventlet.sleep(10)
                     else:
                         rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
                     authdata['password'] = self.targpass
