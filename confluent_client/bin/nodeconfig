@@ -134,9 +134,10 @@ def _assign_value():
     assignment[key] = value
 
 
-def parse_config_line(arguments):
+def parse_config_line(arguments, single=False):
     global setmode, printallbmc, forceset, key, value, needval, candidate, path, attrib
-    for param in arguments:
+    for pidx in range(0, len(arguments)):
+        param = arguments[pidx]
         if param == 'show':
             continue  # forgive muscle memory of pasu users
         if param == 'set':
@@ -146,7 +147,12 @@ def parse_config_line(arguments):
         if needval:
             key = needval
             needval = None
-            value = param
+            if single:
+                value = ' '.join(arguments[pidx:])
+                _assign_value()
+                break
+            else:
+                value = param
             _assign_value()
             continue
         if '=' in param or param[-1] == ':' or forceset:
@@ -215,7 +221,7 @@ if options.batch:
             pass
         argset = argset.strip()
         if argset:
-            parse_config_line(shlex.split(argset))
+            parse_config_line(shlex.split(argset), single=True)
         argset = argfile.readline()
 else:
     parse_config_line(args[1:])
