@@ -102,6 +102,8 @@ class NodeHandler(generic.NodeHandler):
                         if status >= 200 and status < 300:
                             authdata['password'] = self.targpass
                             eventlet.sleep(10)
+                        else:
+                            raise Exception("Redfish may not have been ready yet")
                     else:
                         rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
                     authdata['password'] = self.targpass
