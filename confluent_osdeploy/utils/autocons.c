@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
     } else {
         exit(0);
     }
+    ttyf = open(buff, O_RDWR | O_NOCTTY);
     if (currspeed == SPEED9600) {
         cspeed = B9600;
         strcpy(offset, ",9600");
@@ -66,8 +67,6 @@ int main(int argc, char* argv[]) {
     } else {
         exit(0);
     }
-    printf("%s\n", buff);
-    ttyf = open(buff, O_RDWR | O_NOCTTY);
     tcgetattr(ttyf, &tty);
     if (cspeed) {
         cfsetospeed(&tty, B115200);
@@ -75,6 +74,7 @@ int main(int argc, char* argv[]) {
     }
     tcsetattr(ttyf, TCSANOW, &tty);
     ioctl(ttyf, TIOCCONS, 0);
+    printf("%s\n", buff);
 
 }
 
