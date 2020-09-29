@@ -82,6 +82,14 @@ class NodeHandler(bmchandler.NodeHandler):
 
     def _webconfignet(self, wc, nodename):
         cfg = self.configmanager
+        if 'service:lenovo-smm2' in self.info.get('services', []):
+            # need to enable ipmi for now..
+            wc.request('POST', '/data', 'set=DoCmd(0x06,0x40,0x01,0x82,0x84)')
+            rsp = wc.getresponse()
+            rsp.read()
+            wc.request('POST', '/data', 'set=DoCmd(0x06,0x40,0x01,0x42,0x44)')
+            rsp = wc.getresponse()
+            rsp.read()
         cd = cfg.get_node_attributes(
             nodename, ['hardwaremanagement.manager'])
         smmip = cd.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', None)
