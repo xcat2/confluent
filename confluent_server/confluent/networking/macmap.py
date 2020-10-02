@@ -375,12 +375,19 @@ def _full_updatemacmap(configmanager):
                         continue
                     if curswitch not in _switchportmap:
                         _switchportmap[curswitch] = {}
-                    if portname in _switchportmap[curswitch]:
-                        log.log({'error': 'Duplicate switch topology config '
-                                          'for {0} and {1}'.format(
-                                            node,
+                    if (portname in _switchportmap[curswitch] and
+                            _switchportmap[curswitch][portname] != node):
+                        if _switchportmap[curswitch][portname] is None:
+                            errstr = ('Duplicate switch attributes for {0} and '
+                                      'a previously logged duplicate'.format(
+                                         node))
+                        else:
+                            errstr = ('Duplicate switch topology config '
+                                      'for {0} and {1}'.format(
+                                                node,
                                             _switchportmap[curswitch][
-                                                portname])})
+                                                portname]))
+                        log.log({'error': errstr})
                         _switchportmap[curswitch][portname] = None
                     else:
                         _switchportmap[curswitch][portname] = node
