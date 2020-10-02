@@ -148,11 +148,10 @@ def get_fingerprint(switch, port, configmanager, portmatch):
 def _extract_extended_desc(info, source, integritychecked):
     source = str(source)
     info['verified']  = bool(integritychecked)
-    if source.startswith('Lenovo SMM;'):
-        info['peerdescription'] = 'Lenovo SMM'
-        if ';S2=' in source:
-            info['peersha256fingerprint'] = source.replace('Lenovo SMM;S2=',
-                                                           '')
+    if source.startswith('Lenovo ') and ';S2=' in source:
+        desc, fprint = source.split(';S2=', 1)
+        info['peerdescription'] = desc
+        info['peersha256fingerprint'] = fprint
     else:
         info['peerdescription'] = source
 

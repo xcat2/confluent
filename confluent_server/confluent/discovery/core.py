@@ -772,11 +772,13 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
                                                'extend a single enclosure')
         cd = cfg.get_node_attributes(nodename, ['hardwaremanagement.manager',
                                                 'pubkeys.tls_hardwaremanager'])
-        smmaddr = cd[nodename]['hardwaremanagement.manager']['value']
         pkey = cd[nodename].get('pubkeys.tls_hardwaremanager', {}).get(
             'value', None)
         if not pkey:
             # We cannot continue through a break in the chain
+            return None, False
+        smmaddr = cd.get(nodename, {}).get('hardwaremanagement.manager', {}.get('value', None)
+        if not smmaddr:
             return None, False
         if pkey:
             cv = util.TLSCertVerifier(
@@ -855,6 +857,14 @@ def get_nodename(cfg, handler, info):
                         # while this started by switch, it was disambiguated
                         info['verified'] = v
                         return newnodename, None
+                    else:
+                        errorstr = 'Attempt to discover SMM in chain but '
+                                   'unable to follow chain to the specific '
+                                   'SMM, it may be waiting on an upstream '
+                                   'SMM, 'chain starts with {0}'.format(
+                                       nodename)
+                        log.log({'error': errorstr})
+                        return None, None
         if (nodename and
                 not handler.discoverable_by_switch(macinfo['maccount'])):
             if handler.devname == 'SMM':
