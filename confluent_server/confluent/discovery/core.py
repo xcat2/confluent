@@ -858,11 +858,11 @@ def get_nodename(cfg, handler, info):
                         info['verified'] = v
                         return newnodename, None
                     else:
-                        errorstr = 'Attempt to discover SMM in chain but '
+                        errorstr = ('Attempt to discover SMM in chain but '
                                    'unable to follow chain to the specific '
                                    'SMM, it may be waiting on an upstream '
-                                   'SMM, 'chain starts with {0}'.format(
-                                       nodename)
+                                   'SMM, chain starts with {0}'.format(
+                                       nodename))
                         log.log({'error': errorstr})
                         return None, None
         if (nodename and
