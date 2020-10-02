@@ -777,7 +777,7 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
         if not pkey:
             # We cannot continue through a break in the chain
             return None, False
-        smmaddr = cd.get(nodename, {}).get('hardwaremanagement.manager', {}.get('value', None)
+        smmaddr = cd.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', None)
         if not smmaddr:
             return None, False
         if pkey:
