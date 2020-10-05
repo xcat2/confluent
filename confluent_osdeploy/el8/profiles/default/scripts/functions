@@ -1,12 +1,35 @@
+function set_confluent_vars() {
+    if [ -z "$mgr" ]; then
+        mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg | sed -e 's/[^ ]*: //')
+    fi
+    if [ -z "$profile" ]; then
+        profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/[^ ]*: //')
+    fi
+}
+
+fetch_remote() {
+    if [ -f /etc/confluent/ca.pem ]; then
+        curlargs=" --cacert /etc/confluent/ca.pem"
+    fi
+    set_confluent_vars
+    curl -f -sS $curlargs https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
+}
+
 run_remote() {
     requestedcmd="'$*'"
+    curlargs=""
+    if [ -f /etc/confluent/ca.pem ]; then
+        curlargs=" --cacert /etc/confluent/ca.pem"
+    fi
+    set_confluent_vars
     echo
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$mgr/confluent-public/os/$profile/scripts/
     tmpdir=$(mktemp -d)
     echo Executing in $tmpdir
     cd $tmpdir
-    curl -f -sS https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    curl -f -sS $curlargs https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo $requestedcmd failed to download; return 1; fi
     chmod +x $1
     cmd=$1
@@ -23,12 +46,16 @@ run_remote() {
 
 run_remote_python() {
     echo
+    set_confluent_vars
+    if [ -f /etc/confluent/ca.pem ]; then
+        curlargs=" --cacert /etc/confluent/ca.pem"
+    fi
     echo '---------------------------------------------------------------------------'
     echo Running python script "'$*'" from https://$mgr/confluent-public/os/$profile/scripts/
     tmpdir=$(mktemp -d)
     echo Executing in $tmpdir
     cd $tmpdir
-    curl -f -sS https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
+    curl -f -sS $curlargs https://$mgr/confluent-public/os/$profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo "'$*'" failed to download; return 1; fi
     /usr/libexec/platform-python $*
     retcode=$?
