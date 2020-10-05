@@ -204,7 +204,7 @@ class NodeHandler(bmchandler.NodeHandler):
             raise Exception('Cannot support default password and setting password rules at same time')
         if passwd == 'PASSW0RD':
             # We must avoid hitting the web interface due to forced password change, best effert
-            self._bmcconfig(nodename)
+            raise Exception('Using the default password is no longer supported')
         else:
             # Switch to full web based configuration, to mitigate risks with the SMM
             wc = self._webconfigcreds(username, passwd)
