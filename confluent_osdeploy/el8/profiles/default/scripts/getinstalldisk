@@ -49,7 +49,7 @@ class DiskInfo(object):
 
     @property
     def priority(self):
-        if self.model.lower() in ('thinksystem_m.2_vd', 'thinksystem m.2'):
+        if self.model.lower() in ('thinksystem_m.2_vd', 'thinksystem m.2', 'thinksystem_m.2'):
             return 0
         if 'imsm' in self.mdcontainer:
             return 1
