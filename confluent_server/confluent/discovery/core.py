@@ -1129,11 +1129,13 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
     # use uuid based scheme in lieu of tls cert, ideally only
     # for stateless 'discovery' targets like pxe, where data does not
     # change
-    uuidinfo = cfg.get_node_attributes(nodename, ['id.uuid', 'id.serial', 'id.model', 'net*.bootable'])
+    uuidinfo = cfg.get_node_attributes(nodename, ['id.uuid', 'id.serial', 'id.model', 'net*.hwaddr', 'net*.bootable'])
     if manual or policies & set(('open', 'pxe')):
         enrich_pxe_info(info)
         attribs = {}
         olduuid = uuidinfo.get(nodename, {}).get('id.uuid', None)
+        if isinstance(olduuid, dict):
+            olduuid = olduuid.get('value', None)
         uuid = info.get('uuid', None)
         if uuid and uuid != olduuid:
             attribs['id.uuid'] = info['uuid']
@@ -1146,7 +1148,9 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
         for attrname in uuidinfo.get(nodename, {}):
             if attrname.endswith('.bootable') and uuidinfo[nodename][attrname].get('value', None):
                 newattrname = attrname[:-8] + 'hwaddr'
-                attribs[newattrname] = info['hwaddr']
+                oldhwaddr = uuidinfo.get(nodename, {}).get(newattrname, {}).get('value', None)
+                if info['hwaddr'] != oldhwaddr:
+                    attribs[newattrname] = info['hwaddr']
         if attribs:
             cfg.set_node_attributes({nodename: attribs})
     if info['uuid'] in known_pxe_uuids:
