@@ -1,5 +1,5 @@
 . /etc/confluent/functions
-if lspci -d 15b3::0207 -n |grep 207 > /dev/null; then
+if lspci -d 15b3:: -n |grep 15b3 > /dev/null; then
     # Uncomment the following two lines and comment out the following
     # three lines to use the .iso instead
     #fetch_remote ofed/ofed.tgz
