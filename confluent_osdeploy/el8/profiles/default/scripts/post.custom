@@ -2,3 +2,6 @@
 # This is a convenient place to keep customizations separate from modifying the stock scripts
 # While modification of the stock scripts is fine, it may be easier to rebase to a newer
 # stock profile if the '.custom' files are used.
+
+# An example for installing OFED for infiniband follows (see the file for more detail):
+#run_remote infiniband/mofed.post

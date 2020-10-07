@@ -37,6 +37,9 @@ reboot
 chrony
 rsync
 python3
+tar
+pciutils
+%include /tmp/addonpackages
 %include /tmp/cryptpkglist
 %end
 
