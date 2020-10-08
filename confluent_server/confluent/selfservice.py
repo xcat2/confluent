@@ -33,7 +33,7 @@ def get_extra_names(nodename, cfg):
                 currnames = currnames.split(',')
                 for currname in currnames:
                     names.add(currname)
-                    if domain not in currname:
+                    if domain and domain not in currname:
                         names.add('{0}.{1}'.format(currname, domain))
     return names
 
