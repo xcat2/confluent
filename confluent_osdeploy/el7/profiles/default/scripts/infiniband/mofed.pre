@@ -1,0 +1,10 @@
+# Add needed base packages to the install
+cat << EOF >> /tmp/addonpackages
+perl
+pkgconf-pkg-config
+tcsh
+lsof
+tk
+gcc-gfortran
+tcl
+EOF

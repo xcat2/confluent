@@ -45,6 +45,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
     TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
+touch /tmp/addonpackages
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
 if [ "$cryptboot" == "tpm2" ]; then

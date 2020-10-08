@@ -36,6 +36,8 @@ reboot
 chrony
 rsync
 python
+pciutils
+%include /tmp/addonpackages
 %end
 
 
