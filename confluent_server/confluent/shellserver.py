@@ -111,6 +111,8 @@ class ShellSession(consoleserver.ConsoleSession):
 
     def destroy(self):
         try:
+            activesessions[(self.configmanager.tenant, self.node,
+                            self.username)][self.sessionid].close()
             del activesessions[(self.configmanager.tenant, self.node,
                                 self.username)][self.sessionid]
         except KeyError:
