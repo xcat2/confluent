@@ -100,7 +100,9 @@ class SshShell(conapi.Console):
         while self.connected:
             pendingdata = self.shell.recv(8192)
             if not pendingdata:
-                self.datacallback(conapi.ConsoleEvent.Disconnect)
+                self.ssh.close()
+                if self.datacallback:
+                    self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
             self.datacallback(pendingdata)
 
@@ -110,7 +112,7 @@ class SshShell(conapi.Console):
         # that would rather not use the nodename as anything but an opaque
         # identifier
         self.datacallback = callback
-        if self.username is not '':
+        if self.username is not b'':
             self.logon()
         else:
             self.inputmode = 0
@@ -126,12 +128,14 @@ class SshShell(conapi.Console):
                              password=self.password, allow_agent=False,
                              look_for_keys=False)
         except paramiko.AuthenticationException:
+            self.ssh.close()
             self.inputmode = 0
             self.username = b''
             self.password = b''
             self.datacallback('\r\nlogin as: ')
             return
         except paramiko.ssh_exception.NoValidConnectionsError as e:
+            self.ssh.close()
             self.datacallback(str(e))
             self.inputmode = 0
             self.username = b''
@@ -139,6 +143,7 @@ class SshShell(conapi.Console):
             self.datacallback('\r\nlogin as: ')
             return
         except cexc.PubkeyInvalid as pi:
+            self.ssh.close()
             self.keyaction = ''
             self.candidatefprint = pi.fingerprint
             self.datacallback(pi.message)
@@ -148,6 +153,7 @@ class SshShell(conapi.Console):
             self.datacallback('\r\nEnter "disconnect" or "accept": ')
             return
         except paramiko.SSHException as pi:
+            self.ssh.close()
             self.inputmode = -2
             warn = str(pi)
             if warnhostkey:
