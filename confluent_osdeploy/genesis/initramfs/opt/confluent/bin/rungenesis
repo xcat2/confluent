@@ -9,8 +9,11 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     if [ ! -z "$autocons" ]; then
         echo "Using $(cat /tmp/01-autocons.conf)"
         tmux a <> $autocons >&0 2>&1 &
+    else
+        tmux a <> /dev/console >&0 2>&1 &
     fi
 else
+    tmux a <> /dev/console >&0 2>&1 &
     tmux a <> /dev/tty1 >&0 2>&1 &
 fi
 echo -n "udevd: "

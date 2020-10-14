@@ -10,4 +10,7 @@ mkdir -p /var/empty/sshd
 sed -i '/^root:x/d' /etc/passwd
 echo root:x:0:0::/:/bin/bash >> /etc/passwd
 echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
-tmux new-session sh /opt/confluent/bin/rungenesis
+tmux new-session -d sh /opt/confluent/bin/rungenesis
+while :; do
+	sleep 86400
+done
