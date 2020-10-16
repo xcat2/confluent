@@ -60,11 +60,15 @@ fi
 textconsole=$(grep ^textconsole: /etc/confluent/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
 if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [ ! -z "$autocons" ]; then
-	echo "Serial console autodetected and enabled, will be available upon install completion" > ${autocons%,*}
-	echo "The installer will run in text mode on the graphics console. When ssh is available," > ${autocons%,*}
-	echo "install progress may be checked by using ssh to access and run the screendump command" > ${autocons%,*}
-	echo "Install time serial console would require the profile to have console=${autocons#/dev/}" > ${autocons%,*}
-	echo "specified in the kernel command line arguments" > ${autocons%,*}
+	echo "Serial console has been autodected and enabled read-only for install" > ${autocons%,*}
+	echo "It will be read-write after install" > ${autocons%,*}
+	echo "If a fully functional console is desired over serial, add console=${autocons#/dev/} " > ${autocons%,*}
+	echo "to kerneralgs in the profile.yaml file of the profile and run 'osdeploy updateboot <profile>" > ${autocons%,*}
+	#echo "Serial console autodetected and enabled, will be available upon install completion" > ${autocons%,*}
+	#echo "The installer will run in text mode on the graphics console. When ssh is available," > ${autocons%,*}
+	#echo "install progress may be checked by using ssh to access and run the screendump command" > ${autocons%,*}
+	#echo "Install time serial console would require the profile to have console=${autocons#/dev/}" > ${autocons%,*}
+	#echo "specified in the kernel command line arguments" > ${autocons%,*}
 	echo ${autocons%,*} > /tmp/autoconsdev
 	sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
 	mount -o bind /etc/fakecmdline /proc/cmdline
