@@ -126,6 +126,7 @@ curl -f $proto://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/e
 curl -f $proto://$mgr/confluent-public/os/$profile/scripts/post.sh > /mnt/etc/confluent/post.sh
 chmod +x /mnt/etc/confluent/firstboot.sh
 chmod +x /mnt/etc/confluent/post.sh
+cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/
 ]]>
           </source>
         </script>
