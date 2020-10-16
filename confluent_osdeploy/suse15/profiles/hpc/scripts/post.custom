@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# This script runs at the end of install in the installed system
+# but still under the installer kernel.
+
+# This is a good place to run most customizations that do not have any
+# dependency upon the install target kernel being active.
+
+# If there are dependencies on the kernel (drivers or special filesystems)
+# then firstboot.sh would be the script to customize.
+
+. /etc/confluent/functions
+
+# Examples:
+# run_remote script.sh
+# run_remote_python script.py

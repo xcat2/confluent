@@ -21,10 +21,7 @@ chmod og-rwx /etc/confluent/*
 export mgr profile nodename
 . /etc/confluent/functions
 
+run_remote post.custom
+
 curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
 
-# Customizations may go here
-
-# Examples:
-# run_remote script.sh
-# run_remote_python script.py
