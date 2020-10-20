@@ -229,6 +229,19 @@ class NodeHandler(generic.NodeHandler):
         rsp, status = wc.grab_json_response_with_status('/api/session', method='DELETE')
 
 
+def remote_nodecfg(nodename, cfm):
+    cfg = cfm.get_node_attributes(
+            nodename, 'hardwaremanagement.manager')
+    ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
+        'value', None)
+    ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
+    if not ipaddr:
+        raise Excecption('Cannot remote configure a system without known '
+                         'address')
+    info = {'addresses': [ipaddr]}
+    nh = NodeHandler(info, cfm)
+    nh.config(nodename)
+
 if __name__ == '__main__':
     import confluent.config.configmanager as cfm
     c = cfm.ConfigManager(None)

@@ -360,6 +360,9 @@ def _add_attributes(parsed):
         return
 
 
+def unicast_scan(address):
+    pass
+
 def query_srvtypes(target):
     """Query the srvtypes advertised by the target
 

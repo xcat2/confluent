@@ -165,6 +165,14 @@ def set_port(s, port, vendor, model):
         return 1
 
 
+def get_remote_config_mod(vendor, model):
+    if vendor in ('IBM', 'Lenovo'):
+        if _is_tsm(model):
+            return 'tsm'
+        else:
+            return 'xcc'
+    return None
+
 def set_port_tsm(s, port, model):
     oport = port
     sys.stdout.write('Setting TSM port to "{}"...'.format(oport))
@@ -407,7 +415,16 @@ def main():
         dotwait()
     sys.stdout.write('done\n')
     sys.stdout.flush()
-    #await_config(s, bmccfg, channel)
+    cfgmod = get_remote_config_mod(vendor, model)
+    if cfgmod:
+        with open('configbmc.configmod', 'w+') as cm:
+            cm.write('configmod: {0}\n'.format(cfgmod))
+        sys.stdout.write('Requesting remote configuration of authentication...')
+        sys.stdout.flush()
+        bmccfgsrc = subprocess.check_output(
+            [sys.executable, apiclient, '/confluent-api/self/remoteconfigbmc', 'configbmc.configmod'])
+        sys.stdout.write('done\n')
+        sys.stdout.flush()
 
 
 if __name__ == '__main__':

@@ -5,6 +5,8 @@ import confluent.sshutil as sshutil
 import confluent.util as util
 import eventlet.green.socket as socket
 import eventlet.green.subprocess as subprocess
+import confluent.discovery.handlers.xcc as xcc
+import confluent.discovery.handlers.tsm as tsm
 import crypt
 import json
 import time
@@ -207,6 +209,24 @@ def handle_request(env, start_response):
         else:
             start_response('200 OK', (('Content-Type', retype),))
             yield dumper(sorted(nodes))
+    elif env['PATH_INFO'] == '/self/remoteconfigbmc':
+        if reqbody:
+            try:
+                reqbody = yaml.safe_load(reqbody)
+            except Exception:
+                reqbody = None
+        if not reqbody:
+            start_response('400 bad request', ())
+        cfgmod = reqbody.get('configmod', 'unspecified')
+        if cfgmod == 'xcc':
+            xcc.remote_nodecfg(nodename, cfg)
+        elif cfgmod == 'tsm':
+            tsm.remote_nodecfg(nodename, cfg)
+        else:
+            start_response('500 unsupported configmod', ())
+            yield 'Unsupported configmod "{}"'.format(cfgmod)
+        start_response('200 Ok', ())
+        yield 'complete'
     elif env['PATH_INFO'] == '/self/updatestatus':
         update = yaml.safe_load(reqbody)
         if update['status'] == 'staged':
