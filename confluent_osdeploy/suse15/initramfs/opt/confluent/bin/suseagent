@@ -12,7 +12,7 @@ autocons=""
 if ! grep console /proc/cmdline > /dev/null; then
 	autocons=$(/opt/confluent/bin/autocons)
 	if [ ! -z "$autocons" ]; then
-		echo "Serial console detected from firmmware: $autocons" > ${autocons%,*}
+		echo "Serial console detected from firmware: $autocons" > ${autocons%,*}
 	fi
 fi
 mkdir -p /etc/confluent
