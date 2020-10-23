@@ -609,10 +609,10 @@ class ConsoleHandler(object):
         if self.shiftin is not None:  # detected that terminal requested a
             # shiftin character set, relay that to the terminal that cannected
             retdata += b'\x1b)' + self.shiftin
-        if self.appmodedetected:
-            retdata += b'\x1b[?1h'
-        else:
-            retdata += b'\x1b[?1l'
+        #if self.appmodedetected:
+        #    retdata += b'\x1b[?1h'
+        #else:
+        #    retdata += b'\x1b[?1l'
         return retdata, connstate
 
     def write(self, data):
