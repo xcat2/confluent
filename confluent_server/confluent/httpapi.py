@@ -286,7 +286,8 @@ def _authorize_request(env, operation):
     if 'HTTP_COOKIE' in env:
         #attempt to use the cookie.  If it matches
         cc = RobustCookie()
-        cc.load(env['HTTP_COOKIE'])
+        sanitized = '; '.join([x.strip().replace(' ', '_') for x in env['HTTP_COOKIE'].split(';')])
+        cc.load(sanitized)
         if 'confluentsessionid' in cc:
             sessionid = cc['confluentsessionid'].value
             sessid = sessionid
