@@ -40,6 +40,22 @@ from libarchive.ffi import (
 def relax_umask():
     os.umask(0o22)
 
+
+def makedirs(path, mode):
+    try:
+        os.makedirs(path, 0o755)
+    except OSError as e:
+        if e.errno != 17:
+            raise
+
+def symlink(src, targ):
+    try:
+        os.symlink(src, targ)
+    except OSError as e:
+        if e.errno != 17:
+            raise
+
+
 def update_boot(profilename):
     if profilename.startswith('/var/lib/confluent/public'):
         profiledir = profilename
@@ -89,7 +105,7 @@ def update_boot_esxi(profiledir, profile, label):
         else:
             newbootcfg += cfgline + '\n'
             efibootcfg += cfgline + '\n'
-    os.makedirs('{0}/boot/efi/boot/'.format(profiledir), 0o755)
+    makedirs('{0}/boot/efi/boot/'.format(profiledir), 0o755)
     bcfgout = os.open('{0}/boot/efi/boot/boot.cfg'.format(profiledir), os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     bcfg = os.fdopen(bcfgout, 'w')
     try:
@@ -102,7 +118,7 @@ def update_boot_esxi(profiledir, profile, label):
         bcfg.write(newbootcfg)
     finally:
         bcfg.close()
-    os.symlink('/var/lib/confluent/public/site/initramfs.tgz',
+    symlink('/var/lib/confluent/public/site/initramfs.tgz',
                '{0}/boot/site.tgz'.format(profiledir))
     for fn in filesneeded:
         if fn.startswith('/'):
@@ -110,8 +126,8 @@ def update_boot_esxi(profiledir, profile, label):
         sourcefile = '{0}/distribution/{1}'.format(profiledir, fn)
         if not os.path.exists(sourcefile):
             sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
-        os.symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
-    os.symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
+        symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
+    symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
     ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
