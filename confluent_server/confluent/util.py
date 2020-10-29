@@ -79,7 +79,7 @@ def randomstring(length=20):
     if length % 4 > 0:
         chunksize += 1
     strval = base64.urlsafe_b64encode(os.urandom(chunksize * 3))
-    return stringify(strval[0:length-1])
+    return stringify(strval[0:length])
 
 
 def securerandomnumber(low=0, high=4294967295):
