@@ -1292,11 +1292,11 @@ known_pxe_uuids = {}
 def _map_unique_ids(nodes=None):
     global nodes_by_uuid
     global nodes_by_fprint
-    nodes_by_uuid = {}
-    nodes_by_fprint = {}
     # Map current known ids based on uuid and fingperprints for fast lookup
     cfg = cfm.ConfigManager(None)
     if nodes is None:
+        nodes_by_uuid = {}
+        nodes_by_fprint = {}
         nodes = cfg.list_nodes()
     bigmap = cfg.get_node_attributes(nodes,
                                      ('id.uuid',
