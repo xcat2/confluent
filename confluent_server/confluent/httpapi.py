@@ -65,16 +65,6 @@ opmap = {
 }
 
 
-class RobustCookie(Cookie.SimpleCookie):
-    # this is very bad form, but BaseCookie has a terrible flaw
-    def _BaseCookie__set(self, K, rval, cval):
-        try:
-            super(RobustCookie, self)._BaseCookie__set(K, rval, cval)
-        except Cookie.CookieError:
-            # empty value if SimpleCookie rejects
-            dict.__setitem__(self, K, Cookie.Morsel())
-
-
 def group_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
@@ -284,12 +274,10 @@ def _authorize_request(env, operation):
     if element.startswith('/sessions/current/'):
         element = None
     if 'HTTP_COOKIE' in env:
-        #attempt to use the cookie.  If it matches
-        cc = RobustCookie()
-        sanitized = '; '.join([x.strip().replace(' ', '_') for x in env['HTTP_COOKIE'].split(';')])
-        cc.load(sanitized)
-        if 'confluentsessionid' in cc:
-            sessionid = cc['confluentsessionid'].value
+        cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
+        if cidx >= 0:
+            sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
+            sessid = sessionid
             sessid = sessionid
             if sessionid in httpsessions:
                 if _csrf_valid(env, httpsessions[sessionid]):
