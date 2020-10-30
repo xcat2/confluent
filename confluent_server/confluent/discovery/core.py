@@ -1040,6 +1040,20 @@ def eval_node(cfg, handler, info, nodename, manual=False):
 
 
 def discover_node(cfg, handler, info, nodename, manual):
+    if manual:
+        if not cfg.is_node(nodename):
+            raise exc.InvalidArgumentException(
+                '{0} is not a defined node, must be defined before an '
+                'endpoint may be assigned to it'.format(nodename))
+        if handler.https_supported:
+            currcert = handler.https_cert
+            if currcert:
+                currprint = util.get_fingerprint(currcert, 'sha256')
+                prevnode = nodes_by_fprint.get(currprint, None)
+                if prevnode and prevnode != nodename:
+                    raise exc.InvalidArgumentException(
+                    'Attempt to assign {0} conflicts with existing node {1} '
+                    'based on TLS certificate.'.format(nodename, prevnode))
     known_nodes[nodename][info['hwaddr']] = info
     if info['hwaddr'] in unknown_info:
         del unknown_info[info['hwaddr']]
