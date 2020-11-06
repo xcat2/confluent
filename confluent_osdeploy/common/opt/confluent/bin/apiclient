@@ -10,13 +10,32 @@ import ssl
 import sys
 
 def get_apikey(nodename, mgr):
+    sealnew = True
     if os.path.exists('/etc/confluent/confluent.apikey'):
         return open('/etc/confluent/confluent.apikey').read().strip()
     apikey = subprocess.check_output(['/opt/confluent/bin/clortho', nodename, mgr])
     if not isinstance(apikey, str):
         apikey = apikey.decode('utf8')
+    if apikey.startswith('SEALED:'):
+        sealnew = False
+        with open('/etc/confluent/confluent.sealedapikey', 'w+') as apiout:
+            apiout.write(apikey[7:])
+        with open('/etc/confluent/confluent.sealedapikey') as inp:
+            sp = subprocess.Popen(['/usr/bin/clevis-decrypt-tpm2'],
+                stdin=inp, stdout=subprocess.PIPE)
+            apikey = sp.communicate()[0]
+            if not isinstance(apikey, str):
+                apikey = apikey.decode('utf8')
     with open('/etc/confluent/confluent.apikey', 'w+') as apiout:
         apiout.write(apikey)
+    if sealnew and os.path.exists('/usr/bin/clevis-encrypt-tpm2'):
+        try:
+            with open('/etc/confluent/confluent.apikey') as apin:
+                sealed = subprocess.check_output(
+                    ['/usr/bin/clevis-encrypt-tpm2', '{}'], stdin=apin)
+            print(HTTPSClient().grab_url('/confluent-api/self/saveapikey', sealed).decode())
+        except Exception:
+            sys.stderr.write('Unable to persist API key through TPM2 sealing\n')
     apikey = apikey.strip()
     os.chmod('/etc/confluent/confluent.apikey', 0o600)
     return apikey
