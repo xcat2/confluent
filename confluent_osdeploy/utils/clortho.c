@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
             }
             if (currlen) {
                 ret = read(sock, buffer, currlen);  // Max is 1000, well under MAX_PACKET
+                buffer[currlen] = 0;
             }
             if (currtype == 2) {
                 dprintf(sock, "\x03%c", currlen);
