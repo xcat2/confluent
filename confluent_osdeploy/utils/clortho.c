@@ -109,7 +109,9 @@ int main(int argc, char* argv[]) {
         while (buffer[0] != 255) {
             currtype = buffer[0];
 	    if (currtype & 0b10000000) {
-                currlen = buffer[1] << 8 & buffer[2];
+                currlen = buffer[1] << 8;
+                read(sock, buffer, 1);
+                currlen |= buffer[0];
             } else {
                 currlen = buffer[1];
 	    }

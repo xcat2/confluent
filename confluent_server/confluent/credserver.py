@@ -22,6 +22,7 @@ import eventlet
 import eventlet.green.socket as socket
 import eventlet.greenpool
 import os
+import struct
 
 # cred grant tlvs:
 # 0, 0 - null
@@ -48,16 +49,16 @@ class CredServer(object):
                 return
             nodename = util.stringify(client.recv(tlv[1]))
             tlv = bytearray(client.recv(2))  # should always be null
-            apiarmed = self.cfm.get_node_attributes(nodename,
+            apimats = self.cfm.get_node_attributes(nodename,
                 ['deployment.apiarmed', 'deployment.sealedapikey'])
-            apiarmed = apiarmed.get(nodename, {}).get('deployment.apiarmed', {}).get(
+            apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
                 'value', None)
             if not apiarmed:
-                if apiarmed.get(nodename, {}).get(
+                if apimats.get(nodename, {}).get(
                     'deployment.sealedapikey', {}).get('value', None):
-                    sealed = apiarmed[nodename]['deployment.sealedapikey'][
+                    sealed = apimats[nodename]['deployment.sealedapikey'][
                         'value']
-                    if not isintance(sealed, bytes):
+                    if not isinstance(sealed, bytes):
                         sealed = sealed.encode('utf8')
                     reply = b'\x80' + struct.pack('>H', len(sealed) + 1) + sealed + b'\x00'
                     client.send(reply)
