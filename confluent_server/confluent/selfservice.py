@@ -256,6 +256,8 @@ def handle_request(env, start_response):
         else:
             start_response('500 Error', (('Content-Type', 'text/plain'),))
             yield 'No pending profile detected, unable to accept status update'
+    elif env['PATH_INFO'] == '/self/savetoken':
+        print(repr(reqbody))
     else:
         start_response('404 Not Found', ())
         yield 'Not found'

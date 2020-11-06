@@ -36,7 +36,8 @@ unsigned char* genpasswd(int len) {
 int main(int argc, char* argv[]) {
         int sock, ret;
         char slen;
-        unsigned char currlen, currtype;
+        unsigned char currtype;
+        size_t currlen;
         unsigned char* passwd;
         unsigned char* cryptedpass;
         unsigned char* macaddr;
@@ -107,10 +108,18 @@ int main(int argc, char* argv[]) {
         ret = read(sock, buffer, 2);
         while (buffer[0] != 255) {
             currtype = buffer[0];
-            currlen = buffer[1];
+	    if (currtype & 0b10000000) {
+                currlen = buffer[1] << 8 & buffer[2];
+            } else {
+                currlen = buffer[1];
+	    }
             memset(buffer, 0, MAXPACKET);
+	    if (currlen > 1000) {
+                fprintf(stderr, "Received oversized message\n");
+		exit(1);
+            }
             if (currlen) {
-                ret = read(sock, buffer, currlen);  // Max is 255, well under MAX_PACKET
+                ret = read(sock, buffer, currlen);  // Max is 1000, well under MAX_PACKET
             }
             if (currtype == 2) {
                 dprintf(sock, "\x03%c", currlen);
@@ -118,6 +127,10 @@ int main(int argc, char* argv[]) {
                 slen = strlen(cryptedpass) & 0xff;
                 dprintf(sock, "\x04%c%s", slen, cryptedpass);
                 ret = write(sock, "\x00\x00", 2);
+            } else if (currtype == 128) {
+		printf("SEALED:%s", buffer);
+		printf("\n");
+		exit(0);
             } else if (currtype == 5) {
                 printf("%s", passwd);
                 printf("\n");

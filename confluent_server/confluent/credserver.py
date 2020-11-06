@@ -23,6 +23,15 @@ import eventlet.green.socket as socket
 import eventlet.greenpool
 import os
 
+# cred grant tlvs:
+# 0, 0 - null
+# 1, len, <nodename>
+# 2, len, token - echo request
+# 3, len, token - echo reply
+# 4, len, crypted - crypted apikey
+# 5, 0, accept key
+# 128, len, len, key - sealed key
+
 class CredServer(object):
     def __init__(self):
         self.cfm = cfm.ConfigManager(None)
@@ -38,11 +47,20 @@ class CredServer(object):
                 client.close()
                 return
             nodename = util.stringify(client.recv(tlv[1]))
-            tlv = bytearray(client.recv(2))
-            apiarmed = self.cfm.get_node_attributes(nodename, 'deployment.apiarmed')
+            tlv = bytearray(client.recv(2))  # should always be null
+            apiarmed = self.cfm.get_node_attributes(nodename,
+                ['deployment.apiarmed', 'deployment.sealedapikey'])
             apiarmed = apiarmed.get(nodename, {}).get('deployment.apiarmed', {}).get(
                 'value', None)
             if not apiarmed:
+                if apiarmed.get(nodename, {}).get(
+                    'deployment.sealedapikey', {}).get('value', None):
+                    sealed = apiarmed[nodename]['deployment.sealedapikey'][
+                        'value']
+                    if not isintance(sealed, bytes):
+                        sealed = sealed.encode('utf8')
+                    reply = b'\x80' + struct.pack('>H', len(sealed) + 1) + sealed + b'\x00'
+                    client.send(reply)
                 client.close()
                 return
             if apiarmed not in ('once', 'continuous'):

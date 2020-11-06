@@ -129,6 +129,14 @@ node = {
                         'Generally this is not directly modified, but is modified '
                         'by the "nodedeploy" command'),
     },
+    'deployment.sealedapikey': {
+        'description': 'This attribute is used by some images to save a sealed '
+                       'version of a node apikey, so that a subsequent run with '
+                       'same TPM2 will use the TPM2 to protect the API key rather '
+                       'than local network verification. If this is set, then '
+                       'an api key request will receive this if the api key grant '
+                       'is not armed',
+    },
     #'id': {
     #    'description': ('Numeric identifier for node')
     #},
