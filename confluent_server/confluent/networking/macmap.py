@@ -138,7 +138,9 @@ def _affluent_map_switch(args):
     wc =  webclient.SecureHTTPConnection(
                 switch, 443, verifycallback=kv, timeout=5)
     wc.set_basic_credentials(user, password)
-    macs = wc.grab_json_response('/affluent/macs/by-port')
+    macs, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
+    if retcode != 200:
+        raise Exception("No affluent detected")
     _macsbyswitch[switch] = macs
 
     for iface in macs:
