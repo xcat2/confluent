@@ -75,6 +75,7 @@ def update_boot(profilename):
         update_boot_esxi(profiledir, profile, label)
 
 def update_boot_esxi(profiledir, profile, label):
+    profname = os.path.basename(profiledir)
     kernelargs = profile.get('kernelargs', '')
     oum = os.umask(0o22)
     bootcfg = open('{0}/distribution/BOOT.CFG'.format(profiledir), 'r').read()
@@ -140,10 +141,11 @@ def update_boot_esxi(profiledir, profile, label):
         ipxeout.close()
     subprocess.check_call(
         ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
-         '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)
+         '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
 
 
 def update_boot_linux(profiledir, profile, label):
+    profname = os.path.basename(profiledir)
     kernelargs = profile.get('kernelargs', '')
     grubcfg = "set timeout=5\nmenuentry '"
     grubcfg += label
@@ -178,7 +180,7 @@ def update_boot_linux(profiledir, profile, label):
         ipxeout.close()
     subprocess.check_call(
         ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
-         '{0}/boot.img'.format(profiledir)], preexec_fn=relax_umask)
+         '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
 
 
 def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist=None):
