@@ -118,7 +118,6 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             newmacs = set([])
             machandlers = {}
             r, _, _ = select.select((net4, net6), (), (), 60)
-            neighutil.update_neigh()
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
@@ -128,9 +127,11 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     method, _, _ = rsp[0].split(b' ', 2)
                     if method == b'NOTIFY':
                         ip = peer[0].partition('%')[0]
-                        if ip not in neighutil.neightable:
-                            continue
                         if peer in known_peers:
+                            continue
+                        if ip not in neighutil.neightable:
+                            neighutil.update_neigh()
+                        if ip not in neighutil.neightable:
                             continue
                         mac = neighutil.neightable[ip]
                         known_peers.add(peer)

@@ -468,14 +468,15 @@ def snoop(handler, protocol=None):
             # will now yield dupe info over time
             known_peers = set([])
             peerbymacaddress = {}
-            neighutil.update_neigh()
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
                     ip = peer[0].partition('%')[0]
-                    if ip not in neighutil.neightable:
-                        continue
                     if peer in known_peers:
+                        continue
+                    if ip not in neighutil.neightable:
+                        neighutil.update_neigh()
+                    if ip not in neighutil.neightable:
                         continue
                     known_peers.add(peer)
                     mac = neighutil.neightable[ip]
