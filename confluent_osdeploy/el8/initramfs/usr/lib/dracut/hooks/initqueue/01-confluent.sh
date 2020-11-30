@@ -7,6 +7,13 @@ if [ -f /tmp/dd_disk ]; then
         fi
     done
 fi
+vlaninfo=$(getarg vlan)
+if [ ! -z "$vlaninfo" ]; then
+        vldev=${vlaninfo#*:}
+        vlid=${vlaninfo#*.}
+        vlid=${vlid%:*}
+        ip link add link $vldev name $vldev.$vlid type vlan id $vlid
+fi
 TRIES=0
 oum=$(umask)
 umask 0077
@@ -35,6 +42,7 @@ cat /tls/*.pem > /etc/confluent/ca.pem
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
+ifname=${ifname%@*}
 echo $ifname > /tmp/net.ifaces
 
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
