@@ -42,11 +42,19 @@ if [ "$rootpw" = null ]; then
 else
     echo "rootpw --iscrypted $rootpw" > /tmp/rootpw
 fi
+curl -f https://$mgr/confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
+blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/%installedargs: //')
+if [ ! -z "$blargs" ]; then
+	blargs=' --append="'$blargs'"'
+fi
 grubpw=$(grep ^grubpassword /etc/confluent/confluent.deploycfg | awk '{print $2}')
 if [ "$grubpw" = "null" ]; then
     touch /tmp/grubpw
 else
-    echo "bootloader --iscrypted --password=$grubpw" > /tmp/grubpw
+    blargs=" --iscrypted --password=$grubpw $blargs"
+fi
+if [ ! -z "$blargs" ]; then
+    echo "bootloader $blargs" > /tmp/grubpw
 fi
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host_*_key.pub; do
