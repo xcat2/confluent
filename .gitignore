@@ -1,4 +1,8 @@
 *.pyc
 .*.
 confluent_client/man/man*
+confluent_client/doc/man
+.vscode
 .*.sw*
+.sw*
+.idea/*
