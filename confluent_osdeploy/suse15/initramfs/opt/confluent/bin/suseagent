@@ -116,6 +116,14 @@ profilename=${profilename#profile: }
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
 proto=${proto#protocol: }
 
+curl https://$mgr/confluent-public/os/$profilename/profile.yaml > /tmp/profile.yaml
+append=$(grep ^installedargs: /tmp/profile.yaml | sed -e 's/^installedargs: //' -e 's/#.*//')
+if [ -z "$append" ]; then
+    echo "<bootloader/>" > /tmp/bootloader.xml
+else
+    echo "<bootloader><global><append>$append</append></global></bootloader>" > /tmp/bootloader.xml
+fi
+
 echo "<media_url>${proto}://${mgr}/confluent-public/os/${profilename}/product</media_url>" > /tmp/pkgurl
 
 echo "AutoYaST: $proto://$mgr/confluent-public/os/$profilename/autoyast" >> /etc/linuxrc.d/01-confluent
