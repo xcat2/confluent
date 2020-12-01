@@ -35,7 +35,7 @@ else
     echo "rootpw --iscrypted $rootpw" > /tmp/rootpw
 fi
 curl -f https://$mgr/confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
-blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/%installedargs: //')
+blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/^installedargs: //')
 if [ ! -z "$blargs" ]; then
 	blargs=' --append="'$blargs'"'
 fi
