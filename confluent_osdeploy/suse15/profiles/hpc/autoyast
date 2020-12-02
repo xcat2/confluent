@@ -28,6 +28,7 @@ dynamic behavior and replace with static configuration.
         </add_on_products>
 </add-on>
     %%ENDIFSLE%%
+    <xi:include href="file:///tmp/bootloader.xml"/>
     <software>
        %%IFSLE%%
        <products config:type="list">
