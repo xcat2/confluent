@@ -52,6 +52,9 @@ if [ -z "$mgtiface" ]; then
 else
     curl -H "CONFLUENT_MGTIFACE: $mgtiface" -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 fi
+profilename=$(grep ^profile: /etc/confluent/confluent.deploycfg)
+profilename=${profilename#profile: }
+curl https://$mgr/confluent-public/os/$profilename/profile.yaml > /tmp/profile.yaml
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
@@ -111,12 +114,9 @@ fi
 echo done
 mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
 mgr=${mgr#deploy_server: }
-profilename=$(grep ^profile: /etc/confluent/confluent.deploycfg)
-profilename=${profilename#profile: }
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
 proto=${proto#protocol: }
 
-curl https://$mgr/confluent-public/os/$profilename/profile.yaml > /tmp/profile.yaml
 append=$(grep ^installedargs: /tmp/profile.yaml | sed -e 's/^installedargs: //' -e 's/#.*//')
 if [ -z "$append" ]; then
     echo "<bootloader/>" > /tmp/bootloader.xml
