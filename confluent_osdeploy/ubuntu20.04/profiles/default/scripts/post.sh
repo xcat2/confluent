@@ -29,6 +29,7 @@ if grep ^ntpservers: /target/etc/confluent/confluent.deploycfg > /dev/null; then
     sed -i "s/#NTP=/NTP=$ntps/" /target/etc/systemd/timesyncd.conf
 fi
 textcons=$(grep ^textconsole: /target/etc/confluent/confluent.deploycfg |awk '{print $2}')
+updategrub=0
 if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
     cons=""
     if [ -f /custom-installation/autocons.info ]; then
@@ -36,11 +37,18 @@ if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
     fi
     if [ ! -z "$cons" ]; then
         sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 console='${cons#/dev/}'"/' /target/etc/default/grub
-	mount -o bind /dev /target/dev
-	mount -o bind /proc /target/proc
-	mount -o bind /sys /target/sys
-	chroot /target update-grub
-	umount /target/sys /target/dev /target/proc
+        updategrub=1
     fi
+fi
+kargs=$(curl https://$mgr/confluent-public/os/$profile/profile.yaml | grep ^installedargs: | sed -e 's/#.*//')
+if [ ! -z "$kargs" ]; then
+    sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 '"${kargs}"'"/' /target/etc/default/grub
+fi
+if [ 1 = $updategrub ]; then
+    mount -o bind /dev /target/dev
+    mount -o bind /proc /target/proc
+    mount -o bind /sys /target/sys
+    chroot /target update-grub
+    umount /target/sys /target/dev /target/proc
 fi
 
