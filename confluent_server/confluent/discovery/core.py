@@ -1332,7 +1332,7 @@ def _map_unique_ids(nodes=None):
             del nodes_by_uuid[uuid_by_nodes[node]]
         if node in fprint_by_nodes:
             del nodes_by_fprint[fprint_by_nodes[node]]
-        uuid = bigmap[node].get('id.uuid', {}).get('value', None)
+        uuid = bigmap[node].get('id.uuid', {}).get('value', '').lower()
         if uuid_is_valid(uuid):
             nodes_by_uuid[uuid] = node
         fprint = bigmap[node].get(
