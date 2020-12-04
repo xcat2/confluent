@@ -423,9 +423,9 @@ def remap_nodes(nodeattribs, configmanager):
     for node in updates:
         for attrib in updates[node]:
             if attrib == 'id.uuid':
-                uuidmap[updates[node][attrib]['value']] = node
+                uuidmap[updates[node][attrib]['value'].lower()] = node
             elif 'hwaddr' in attrib:
-                macmap[updates[node][attrib]['value']] = node
+                macmap[updates[node][attrib]['value'].lower()] = node
 
 
 staticassigns = {}
