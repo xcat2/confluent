@@ -35,6 +35,7 @@ import confluent.log as log
 import confluent.netutil as netutil
 import eventlet.green.select as select
 import eventlet.green.socket as socket
+import eventlet.greenpool as gp
 import time
 try:
     from eventlet.green.urllib.request import urlopen
@@ -275,13 +276,26 @@ def _find_service(service, target):
         if timeout < 0:
             timeout = 0
         r, _, _ = select.select((net4, net6), (), (), timeout)
+    querypool = gp.GreenPool()
+    pooltargs = []
     for nid in peerdata:
         for url in peerdata[nid].get('urls', ()):
             if url.endswith('/desc.tmpl'):
-                info = urlopen(url).read()
-                if b'<friendlyName>Athena</friendlyName>' in info:
-                    peerdata[nid]['services'] = ['service:thinkagile-storage']
-                    yield peerdata[nid]
+                pooltargs.append((url, peerdata[nid]))
+    for pi in querypool.imap(check_cpstorage, pooltargs):
+        if pi is not None:
+            yield pi
+
+def check_cpstorage(urldata):
+    url, data = urldata
+    try:
+        info = urlopen(url, timeout=1).read()
+        if b'<friendlyName>Athena</friendlyName>' in info:
+            data['services'] = ['service:thinkagile-storage']
+            return data
+    except Exception:
+        pass
+    return None
 
 
 def _parse_ssdp(peer, rsp, peerdata):
