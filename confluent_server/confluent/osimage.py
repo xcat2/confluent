@@ -342,9 +342,26 @@ def check_sles(isoinfo):
     return None
 
 
+def _priv_check_oraclelinux(isoinfo):
+    ver = None
+    arch = None
+    for entry in isoinfo[0]:
+        if 'oraclelinux-release-8' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            break
+    else:
+        return None
+    major = ver.split('.', 1)[0]
+    return {'name': 'oraclelinux-{0}-{1}'.format(ver, arch), 'method': EXTRACT,
+            'category': 'el{0}'.format(major)}
+
 def check_rhel(isoinfo):
     ver = None
     arch = None
+    isoracle = _priv_check_oraclelinux(isoinfo)
+    if isoracle:
+        return isoracle
     for entry in isoinfo[0]:
         if 'redhat-release-7' in entry:
             dotsplit = entry.split('.')
