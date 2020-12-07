@@ -106,4 +106,8 @@ while read -r entry; do
         continue
     fi
 done < /etc/confluent/confluent.deploycfg
+if [ -e /lib/nm-lib.sh ]; then
+    . /lib/nm-lib.sh
+    nm_generate_connections
+fi
 
