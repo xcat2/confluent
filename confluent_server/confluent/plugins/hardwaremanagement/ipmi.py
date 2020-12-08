@@ -110,7 +110,7 @@ def exithandler():
 
 atexit.register(exithandler)
 
-_ipmiworkers = greenpool.GreenPool()
+_ipmiworkers = greenpool.GreenPool(128)
 
 _ipmithread = None
 _ipmiwaiters = []
