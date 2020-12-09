@@ -9,6 +9,7 @@ import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.tsm as tsm
 import crypt
 import json
+import os
 import time
 import yaml
 
@@ -261,6 +262,34 @@ def handle_request(env, start_response):
             nodename: {'deployment.sealedapikey': {'value': reqbody}}})
         start_response('200 OK', ())
         yield ''
+    elif env['PATH_INFO'].startswith('/self/scriptlist/'):
+        scriptcat = env['PATH_INFO'].replace('/self/scriptlist/', '')
+        if '..' in scriptcat:
+            start_response('400 Bad Requst', ())
+            yield ''
+            return
+        deployinfo = cfg.get_node_attributes(
+            nodename, ('deployment.*',))
+        deployinfo = deployinfo.get(nodename, {})
+        profile = deployinfo.get(
+            'deployment.pendingprofile', {}).get('value', '')
+        if not profile:
+            profile = deployinfo.get(
+            'deployment.stagedprofile', {}).get('value', '')
+        if not profile:
+            profile = deployinfo.get(
+            'deployment.profile', {}).get('value', '')
+        slist = None
+        try:
+            slist = os.listdir('/var/lib/confluent/public/os/{0}/scripts/{1}.d/'.format(profile, scriptcat))
+        except OSError:
+            pass
+        if slist:
+            start_response('200 OK', (('Content-Type', 'application/yaml'),))
+            yield yaml.safe_dump(util.natural_sort(slist), default_flow_style=False)
+        else:
+            start_response('200 OK', ())
+            yield ''
     else:
         start_response('404 Not Found', ())
         yield 'Not found'
