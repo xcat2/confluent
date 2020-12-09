@@ -132,4 +132,4 @@ if __name__ == '__main__':
         sys.exit(0)
     if os.path.exists(sys.argv[-1]):
         data = open(sys.argv[-1]).read()
-    print(HTTPSClient(json=json).grab_url(sys.argv[1], data).decode())
+    sys.stdout.write(HTTPSClient(json=json).grab_url(sys.argv[1], data).decode())
