@@ -336,7 +336,7 @@ node = {
         'description': ('Indicate logging level to apply to console.  Valid '
                         'values are currently "full", "interactive", and '
                         '"none". Defaults to "full".'),
-        'validvalues': ('full', 'interactive', 'none'),
+        'validvalues': ('full', 'memory', 'interactive', 'none'),
     },
     'console.method': {
         'description': ('Indicate the method used to access the console of '

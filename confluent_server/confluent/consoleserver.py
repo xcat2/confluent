@@ -234,7 +234,7 @@ class ConsoleHandler(object):
             self._isondemand = False
         else:
             if (attrvalue[self.node]['console.logging']['value'] not in (
-                'full', '', 'buffer')):
+                'full', '', 'memory')):
                 self._isondemand = True
             if (attrvalue[self.node]['console.logging']['value']) in ('none', 'memory'):
                 self._dologging = False
