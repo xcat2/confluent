@@ -346,7 +346,7 @@ def _priv_check_oraclelinux(isoinfo):
     ver = None
     arch = None
     for entry in isoinfo[0]:
-        if 'oraclelinux-release-8' in entry:
+        if 'oraclelinux-release-' in entry:
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
             break
