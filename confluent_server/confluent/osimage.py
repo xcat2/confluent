@@ -346,7 +346,7 @@ def _priv_check_oraclelinux(isoinfo):
     ver = None
     arch = None
     for entry in isoinfo[0]:
-        if 'oraclelinux-release-' in entry:
+        if 'oraclelinux-release-' in entry and 'release-el7' not in entry:
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
             break
