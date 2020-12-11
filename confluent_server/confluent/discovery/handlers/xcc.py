@@ -223,6 +223,8 @@ class NodeHandler(immhandler.NodeHandler):
                 'secret.hardwaremanagementpassword'], decrypt=True)
             user, passwd, isdefault = self.get_node_credentials(
                 nodename, creds, 'USERID', 'PASSW0RD')
+        if not inpreconfig and isdefault:
+            raise Exception('Default user/password is not supported. Please set "secret.hardwaremanagementuser" and "secret.hardwaremanagementpassword" for {} to a non-default value. If the XCC is currently at defaults, it will automatically change to the specified values'.format(nodename))
         savedexc = None
         if not self.trieddefault:
             if not passwd:
