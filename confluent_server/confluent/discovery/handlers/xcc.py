@@ -39,6 +39,9 @@ def fixup_uuid(uuidprop):
     return '-'.join(uuid).upper()
 
 
+class LockedUserException(Exception):
+    pass
+
 
 
 class NodeHandler(immhandler.NodeHandler):
@@ -136,8 +139,14 @@ class NodeHandler(immhandler.NodeHandler):
                    'Content-Type': 'application/json'}
         wc.request('POST', '/api/login', adata, headers)
         rsp = wc.getresponse()
+        try:
+            rspdata = json.loads(rsp.read())
+        except Exception:
+            rspdata = {}
         if rsp.status != 200 and password == 'PASSW0RD':
-            rsp.read()
+            if rspdata.get('locktime', 0) > 0:
+                raise LockedUserException(
+                    'The user "{0}" has been locked out for too many incorrect password attempts'.format(username))
             adata = json.dumps({
                 'username': username,
                 'password': newpassword,
@@ -146,16 +155,21 @@ class NodeHandler(immhandler.NodeHandler):
                        'Content-Type': 'application/json'}
             wc.request('POST', '/api/login', adata, headers)
             rsp = wc.getresponse()
+            try:
+                rspdata = json.loads(rsp.read())
+            except Exception:
+                rspdata = {}
             if rsp.status == 200:
                 pwdchanged = True
                 password = newpassword
             else:
-                rsp.read()
-                return (None, None)
+                if rspdata.get('locktime', 0) > 0:
+                    raise LockedUserException(
+                        'The user "{0}" has been locked out for too many incorrect password attempts'.format(username))
+                return (None, rspdata)
         if rsp.status == 200:
             self._currcreds = (username, password)
             wc.set_basic_credentials(username, password)
-            rspdata = json.loads(rsp.read())
             wc.set_header('Content-Type', 'application/json')
             wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
             if '_csrf_token' in wc.cookies:
@@ -178,12 +192,16 @@ class NodeHandler(immhandler.NodeHandler):
                 wc = self.wc
                 self.set_password_policy('', wc)
             return (wc, pwdchanged)
-        return (None, None)
+        elif rspdata.get('locktime', 0) > 0:
+            raise LockedUserException(
+                'The user "{0}" has been locked out by too many incorrect password attempts'.format(username))
+        return (None, rspdata)
 
     @property
     def wc(self):
         passwd = None
         isdefault = True
+        errinfo = {}
         if self._wc is None:
             self._wc = webclient.SecureHTTPConnection(
                 self.ipaddr, 443, verifycallback=self.validate_cert)
@@ -205,6 +223,7 @@ class NodeHandler(immhandler.NodeHandler):
                 'secret.hardwaremanagementpassword'], decrypt=True)
             user, passwd, isdefault = self.get_node_credentials(
                 nodename, creds, 'USERID', 'PASSW0RD')
+        savedexc = None
         if not self.trieddefault:
             if not passwd:
                 # So in preconfig context, we don't have admin permission to
@@ -215,7 +234,12 @@ class NodeHandler(immhandler.NodeHandler):
                 # This is replacing one well known password (PASSW0RD) with another
                 # (TempW0rd42)
                 passwd = 'TempW0rd42'
-            wc, pwdchanged = self.get_webclient('USERID', 'PASSW0RD', passwd)
+            try:
+                wc, pwdchanged = self.get_webclient('USERID', 'PASSW0RD', passwd)
+            except LockedUserException as lue:
+                wc = None
+                pwdchanged = 'The user "USERID" has been locked out by too many incorrect password attempts'
+                savedexc = lue
             if wc:
                 if pwdchanged:
                     if inpreconfig:
@@ -223,16 +247,26 @@ class NodeHandler(immhandler.NodeHandler):
                     else:
                         self._needpasswordchange = False
                 return wc
+            else:
+                errinfo = pwdchanged
         self.trieddefault = True
         if isdefault:
             return
         self._atdefaultcreds = False
         if self.tmppasswd:
-            wc, _ = self.get_webclient('USERID', self.tmppasswd, passwd)
+            if savedexc:
+                raise savedexc
+            wc, errinfo = self.get_webclient('USERID', self.tmppasswd, passwd)
         else:
-            wc, _ = self.get_webclient(user, passwd, None)
+            if user == 'USERID' and savedexc:
+                raise savedexc
+            wc, errinfo = self.get_webclient(user, passwd, None)
         if wc:
             return wc
+        else:
+            if errinfo.get('description', '') == 'Invalid credentials':
+                raise Exception('The stored confluent password for user "{}" was not accepted by the XCC'.format(user))
+            raise Exception('Error connecting to webservice: ' + repr(errinfo))
 
     def set_password_policy(self, strruleset, wc):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
@@ -338,6 +372,10 @@ class NodeHandler(immhandler.NodeHandler):
                     nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
                     nwc.grab_json_response('/api/providers/logout')
                     nwc, pwdchanged = self.get_webclient(user, tpass, passwd)
+                    if not nwc:
+                        if not pwdchanged:
+                            pwdchanged = 'Unknown'
+                        raise Exception('Error converting from sha356account: ' + repr(pwdchanged))
                     if not pwdchanged:
                         nwc.grab_json_response(
                             '/api/function',
