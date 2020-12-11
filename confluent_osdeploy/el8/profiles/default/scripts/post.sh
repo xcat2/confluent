@@ -33,3 +33,6 @@ run_remote_python add_local_repositories
 # run_remote example.sh
 # run_remote_python example.py
 run_remote post.custom
+
+# Also, scripts may be placed into 'post.d', e.g. post.d/01-runfirst.sh, post.d/02-runsecond.sh
+run_remote_parts post

@@ -17,6 +17,13 @@ fetch_remote() {
     if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
 }
 
+run_remote_parts() {
+    scriptlist=$(/usr/libexec/platform-python /etc/confluent/apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
+    for script in $scriptlist; do
+        run_remote $1.d/$script
+    done
+}
+
 run_remote() {
     requestedcmd="'$*'"
     curlargs=""

@@ -15,6 +15,8 @@ export nodename mgr profile
 
 
 run_remote firstboot.custom
+# Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
+run_remote_parts firstboot
 
 
 curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
