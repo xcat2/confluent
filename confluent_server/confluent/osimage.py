@@ -246,17 +246,17 @@ def check_centos(isoinfo):
             break
         elif 'centos-stream-release-8' in entry:
             ver = entry.split('-')[3]
-            arch = entry.split('.')[-3]
+            arch = entry.split('.')[-2]
             cat = 'el8'
             isstream = '_stream'
             break
     else:
         return None
     if arch == 'noarch' and '.discinfo' in isoinfo[1]:
-            prodinfo = isoinfo[1]['.discinfo']
-            arch = prodinfo.split(b'\n')[2]
-            if not isinstance(arch, str):
-                arch = arch.decode('utf-8')
+        prodinfo = isoinfo[1]['.discinfo']
+        arch = prodinfo.split(b'\n')[2]
+        if not isinstance(arch, str):
+            arch = arch.decode('utf-8')
     return {'name': 'centos{2}-{0}-{1}'.format(ver, arch, isstream), 'method': EXTRACT, 'category': cat}
 
 def check_esxi(isoinfo):
