@@ -189,6 +189,10 @@ node = {
 #                        'autonode.servername, so that would not need to be '
 #                        'copied ')
 #    },
+#    'collective.allowedmanagers': {
+#        'description': ('Restricted set of deployment and managers in automatic selectien
+#    },
+#    ssh.equivnodes - control the list of nodes that go into equiv...
     'collective.manager': {
         'description': ('When in collective mode, the member of the '
                         'collective currently considered to be responsible '
