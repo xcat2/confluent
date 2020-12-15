@@ -250,6 +250,11 @@ def check_centos(isoinfo):
             cat = 'el8'
             isstream = '_stream'
             break
+        elif 'centos-linux-release-8' in entry:
+            ver = entry.split('-')[3]
+            arch = entry.split('.')[-2]
+            cat = 'el8'
+            break
     else:
         return None
     if arch == 'noarch' and '.discinfo' in isoinfo[1]:
