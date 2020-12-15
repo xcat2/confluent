@@ -67,6 +67,7 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/po
 
 # Hook firstboot.sh
 curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.service > /mnt/sysimage/etc/systemd/system/firstboot.service
+mkdir -p /mnt/sysimage/opt/confluent/bin
 curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/sysimage/opt/confluent/bin/firstboot.sh
 chmod +x /mnt/sysimage/opt/confluent/bin/firstboot.sh
 %end
