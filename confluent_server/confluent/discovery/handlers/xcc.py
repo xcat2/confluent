@@ -322,9 +322,13 @@ class NodeHandler(immhandler.NodeHandler):
             wc.grab_json_response('/api/function',
                                 {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
         if username != 'USERID':
-            wc.grab_json_response(
+            rsp, status = wc.grab_json_response(
                 '/api/function',
                 {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,'.format(uid, username)})
+            if status == 200 and rsp.get('return', 0) == 762:
+                rsp, status = wc.grab_json_response(
+                    '/api/function',
+                    {'USER_UserModify': '{0},{1},,1,Administrator,0,0,0,0,,8,'.format(uid, username)})
             self.tmppasswd = None
         self._currcreds = (username, passwd)
 
