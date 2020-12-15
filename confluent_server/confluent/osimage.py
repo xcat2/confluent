@@ -129,6 +129,8 @@ def update_boot_esxi(profiledir, profile, label):
             sourcefile = '{0}/distribution/{1}'.format(profiledir, fn.upper())
         symlink(sourcefile, '{0}/boot/{1}'.format(profiledir, fn))
     symlink('{0}/distribution/EFI/BOOT/BOOTX64.EFI'.format(profiledir), '{0}/boot/efi/boot/bootx64.efi'.format(profiledir))
+    if os.path.exists('{0}/distribution/EFI/BOOT/CRYPTO64.EFI'.format(profiledir)):
+        symlink('{0}/distribution/EFI/BOOT/CRYPTO64.EFI'.format(profiledir), '{0}/boot/efi/boot/crypto64.efi'.format(profiledir))
     ipout = os.open(profiledir + '/boot.ipxe', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o644)
     ipxeout = os.fdopen(ipout, 'w')
     try:
