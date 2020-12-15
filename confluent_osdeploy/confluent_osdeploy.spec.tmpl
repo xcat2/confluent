@@ -53,6 +53,7 @@ for os in rhvh4 el7 el8 genesis suse15 ubuntu20.04 esxi6 esxi7; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
+    find %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles -name .gitignore -exec rm -f {} +
 done
 
 %files
