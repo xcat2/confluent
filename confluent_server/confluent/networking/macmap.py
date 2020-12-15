@@ -195,6 +195,7 @@ def _map_switch_backend(args):
     haveqbridge = False
     mactobridge = {}
     conn = snmp.Session(switch, password, user)
+    ifnamemap = get_portnamemap(conn)
     for vb in conn.walk('1.3.6.1.2.1.17.7.1.2.2.1.2'):
         haveqbridge = True
         oid, bridgeport = vb
@@ -216,16 +217,32 @@ def _map_switch_backend(args):
                 *([int(x) for x in oid[-6:]])
             )
             mactobridge[macaddr] = int(bridgeport)
+    #ciscoiftovlanmap = {}
+    vlanstocheck = set([])
+    for vb in conn.walk('.1.3.6.1.4.1.9.9.68.1.2.2.1.2'):
+        vlanstocheck.add(vb[1])
+    #ciscotrunktovlanmap = {}
+    for vb in conn.walk('.1.3.6.1.4.1.9.9.46.1.6.1.1.5'):
+        vlanstocheck.add(vb[1])
+    if not vlanstocheck:
+        vlanstocheck.add(None)
     bridgetoifmap = {}
-    for vb in conn.walk('1.3.6.1.2.1.17.1.4.1.2'):
-        bridgeport, ifidx = vb
-        bridgeport = int(str(bridgeport).rsplit('.', 1)[1])
-        try:
-            bridgetoifmap[bridgeport] = int(ifidx)
-        except ValueError:
-            # ifidx might be '', skip in such a case
-            continue
-    ifnamemap = get_portnamemap(conn)
+    for vlan in vlanstocheck:
+        if vlan:
+            if user:
+                conn = snmp.Session(switch, password, user, 'vlan-{}'.format(vlan))
+            else:
+                if not isinstance(password, str):
+                    password = password.decode('utf8')
+                conn = snmp.Session(switch, '{}@{}'.format(password, vlan))
+        for vb in conn.walk('1.3.6.1.2.1.17.1.4.1.2'):
+            bridgeport, ifidx = vb
+            bridgeport = int(str(bridgeport).rsplit('.', 1)[1])
+            try:
+                bridgetoifmap[bridgeport] = int(ifidx)
+            except ValueError:
+                # ifidx might be '', skip in such a case
+                continue
     maccounts = {}
     bridgetoifvalid = False
     for mac in mactobridge:

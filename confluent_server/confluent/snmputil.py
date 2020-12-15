@@ -78,7 +78,7 @@ class Session(object):
         # automatic behavior (e.g. DES is weak, so it's likely to be
         # overriden, but some devices only support DES)
         tp = _get_transport(self.server)
-        ctx = snmp.ContextData(self.context)
+        ctx = snmp.ContextData(contextName=self.context)
         resolvemib = False
         if '::' in oid:
             resolvemib = True
