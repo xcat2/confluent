@@ -202,6 +202,8 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                                 cfg, node, ifidx=iface)
                                             if ncfg.get('matchesnodename', None):
                                                 reply += 'DEFAULTNET: 1\r\n'
+                                        elif not netutil.address_is_local(peer[0]):
+                                            continue
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
