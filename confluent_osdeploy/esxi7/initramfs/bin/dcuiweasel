@@ -15,10 +15,11 @@ mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 cp /opt/confluent/bin/clortho /clortho
 /clortho $node $mgr > /etc/confluent/confluent.apikey
 cat /tls/*.pem > /etc/confluent/ca.pem
-/opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
-profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/^profile: //')
+/opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg.new
+profile=$(grep ^profile: /etc/confluent/confluent.deploycfg.new | sed -e 's/^profile: //')
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/kickstart > /etc/confluent/ks.cfg
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/modinstall > /tmp/modinstall
+mv /etc/confluent/confluent.deploycfg.new /etc/confluent/confluent.deploycfg
 export node mgr profile
 . /tmp/modinstall
 exec /bin/install
