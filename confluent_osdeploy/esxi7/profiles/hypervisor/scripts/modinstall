@@ -1,5 +1,7 @@
 #!/bin/sh
+mv /etc/confluent/confluent.deploycfg /etc/confluent/confluent.newdeploycfg
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/makeksnet >> /tmp/makeksnet
+mv /etc/confluent/confluent.newdeploycfg /etc/confluent/confluent.deploycfg
 chmod +x /tmp/makeksnet
 /tmp/makeksnet > /tmp/ksnet
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
