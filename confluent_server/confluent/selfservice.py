@@ -1,6 +1,7 @@
 import confluent.config.configmanager as configmanager
 import confluent.collective.manager as collective
 import confluent.netutil as netutil
+import confluent.noderange as noderange
 import confluent.sshutil as sshutil
 import confluent.util as util
 import eventlet.green.socket as socket
@@ -202,7 +203,7 @@ def handle_request(env, start_response):
         start_response('200 OK', (('Content-Type', 'text/plain'),))
         yield cert
     elif env['PATH_INFO'] == '/self/nodelist':
-        nodes, _ = get_cluster_list(cfg)
+        nodes, _ = get_cluster_list(nodename, cfg)
         if isgeneric:
             start_response('200 OK', (('Content-Type', 'text/plain'),))
             for node in util.natural_sort(nodes):
@@ -295,10 +296,20 @@ def handle_request(env, start_response):
         yield 'Not found'
 
 
-def get_cluster_list(cfg=None):
+def get_cluster_list(nodename=None, cfg=None):
     if cfg is None:
         cfg = configmanager.ConfigManager(None)
-    nodes = set(cfg.list_nodes())
+    nodes = None
+    if nodename is not None:
+        sshpeers = cfg.get_node_attributes(nodename, 'ssh.peers')
+        sshpeers = sshpeers.get(nodename, {}).get('ssh.peers', {}).get(
+            'value', None)
+        if sshpeers:
+            nodes = noderange.NodeRange(sshpeers, cfg).nodes
+    autonodes = False
+    if nodes is None:
+        autonodes = True
+        nodes = set(cfg.list_nodes())
     domain = None
     for node in list(util.natural_sort(nodes)):
         if domain is None:
@@ -307,12 +318,13 @@ def get_cluster_list(cfg=None):
                 'value', None)
         for extraname in get_extra_names(node, cfg):
             nodes.add(extraname)
-    for mgr in configmanager.list_collective():
-        nodes.add(mgr)
-        if domain and domain not in mgr:
-            nodes.add('{0}.{1}'.format(mgr, domain))
-    myname = collective.get_myname()
-    nodes.add(myname)
-    if domain and domain not in myname:
-        nodes.add('{0}.{1}'.format(myname, domain))
+    if autonodes:
+        for mgr in configmanager.list_collective():
+            nodes.add(mgr)
+            if domain and domain not in mgr:
+                nodes.add('{0}.{1}'.format(mgr, domain))
+        myname = collective.get_myname()
+        nodes.add(myname)
+        if domain and domain not in myname:
+            nodes.add('{0}.{1}'.format(myname, domain))
     return nodes, domain
