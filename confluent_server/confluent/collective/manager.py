@@ -28,6 +28,7 @@ import eventlet.green.ssl as ssl
 import eventlet.green.threading as threading
 import greenlet
 import random
+import time
 import sys
 try:
     import OpenSSL.crypto as crypto
@@ -195,15 +196,21 @@ def connect_to_collective(cert, member):
         raise Exception("Certificate mismatch in the collective")
     return remote
 
-
+mycachedname = [None, 0]
 def get_myname():
+    if mycachedname[1] > time.time() - 15:
+        return mycachedname[0]
     try:
         with open('/etc/confluent/cfg/myname', 'r') as f:
-            return f.read().strip()
+            mycachedname[0] = f.read().strip()
+            mycachedname[1] = time.time()
+            return
     except IOError:
         myname = socket.gethostname()
         with open('/etc/confluent/cfg/myname', 'w') as f:
             f.write(myname)
+        mycachedname[0] = myname
+        mycachedname[1] = time.time()
         return myname
 
 def handle_connection(connection, cert, request, local=False):
