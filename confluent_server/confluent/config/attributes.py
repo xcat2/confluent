@@ -534,6 +534,13 @@ node = {
         'description': ('Password to use when connecting to the hardware '
                         'manager'),
     },
+    'ssh.trustnodes': {
+        'description': ('Nodes that are allowed to ssh into the node, '
+                        'expressed in noderange syntax.  This is used during '
+                        'deployment if the confluent SSH certificate '
+                        'authority is configured.  Default behavior is for '
+                        'all nodes to trust each other.'),
+    },
     'pubkeys.addpolicy': {
         'description': ('Policy to use when encountering unknown public '
                         'keys.  Choices are "automatic" to accept and '

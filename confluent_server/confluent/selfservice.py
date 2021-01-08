@@ -301,8 +301,8 @@ def get_cluster_list(nodename=None, cfg=None):
         cfg = configmanager.ConfigManager(None)
     nodes = None
     if nodename is not None:
-        sshpeers = cfg.get_node_attributes(nodename, 'ssh.peers')
-        sshpeers = sshpeers.get(nodename, {}).get('ssh.peers', {}).get(
+        sshpeers = cfg.get_node_attributes(nodename, 'ssh.trustnodes')
+        sshpeers = sshpeers.get(nodename, {}).get('ssh.trustnodes', {}).get(
             'value', None)
         if sshpeers:
             nodes = noderange.NodeRange(sshpeers, cfg).nodes
