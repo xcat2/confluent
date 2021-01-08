@@ -569,6 +569,7 @@ def become_leader(connection):
         if dronecandidate in skipem or member == myname:
             continue
         eventlet.spawn_n(try_assimilate, dronecandidate)
+    schedule_rebalance()
 
 
 def startup():
