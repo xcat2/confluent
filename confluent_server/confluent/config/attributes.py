@@ -201,6 +201,14 @@ node = {
                         'indicates candidate managers, either for '
                         'high availability or load balancing purposes.')
     },
+    'collective.managercandidates': {
+        'description': ('A noderange of nodes permitted to be a manager for '
+                        'the node. This controls failover and deployment.  If '
+                        'not defined, all managers may deploy and no '
+                        'automatic failover will be performed.
+                        'Using this requires that collective members be '
+                        'defined as nodes for noderange expansion')
+    },
     'deployment.pendingprofile': {
         'description': ('An OS profile that is pending deployment.  This indicates to '
                         'the network boot subsystem what should be offered when a potential '

@@ -115,6 +115,7 @@ _attraliases = {
 }
 _validroles = ('Administrator', 'Operator', 'Monitor')
 
+membership_callback = None
 
 def attrib_supports_expression(attrib):
     if not isinstance(attrib, str):
@@ -409,6 +410,8 @@ def _push_rpc(stream, payload):
         except Exception:
             logException()
             del cfgstreams[stream]
+            if membership_callback:
+                membership_callback()
             stream.close()
 
 
@@ -615,6 +618,8 @@ def relay_slaved_requests(name, listener):
                 except Exception:
                     pass
                 del cfgstreams[name]
+                if membership_callback:
+                    membership_callback()
             cfgstreams[name] = listener
             lh = StreamHandler(listener)
             _hasquorum = len(cfgstreams) >= (
@@ -682,6 +687,8 @@ def relay_slaved_requests(name, listener):
                         _push_rpc,
                         [(cfgstreams[s], payload) for s in cfgstreams]):
                     pass
+            if membership_callback:
+                membership_callback()
             if not cfgstreams and not cfgleader:  # last one out, set cfgleader to boolean to mark dead collective
                 stop_following(True)
                 return False
@@ -739,6 +746,8 @@ def stop_leading():
             del cfgstreams[stream]
         except KeyError:
             pass  # may have already been deleted..
+        if membership_callback:
+            membership_callback()
 
 
 _oldcfgstore = None

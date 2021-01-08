@@ -19,6 +19,7 @@ import confluent.collective.invites as invites
 import confluent.config.configmanager as cfm
 import confluent.exceptions as exc
 import confluent.log as log
+import confluent.noderange as noderange
 import confluent.tlvdata as tlvdata
 import confluent.util as util
 import eventlet
@@ -38,6 +39,7 @@ except ImportError:
 currentleader = None
 follower = None
 retrythread = None
+failovercheck = None
 
 class ContextBool(object):
     def __init__(self):
@@ -576,7 +578,53 @@ def startup():
         return
     eventlet.spawn_n(start_collective)
 
+def check_managers():
+    global failovercheck
+    if not follower:
+        c = cfm.ConfigManager(None)
+        collinfo = {}
+        populate_collinfo(collinfo)
+        availmanagers = {}
+        offlinemgrs = set(collinfo['offline'])
+        offlinemgrs.add('')
+        for offline in collinfo['offline']:
+            nodes = noderange.NodeRange(
+                'collective.manager=={}'.format(offline), c).nodes
+            managercandidates = c.get_node_attributes(
+                nodes, 'collective.managercandidates')
+            expandednoderanges = {}
+            for node in nodes:
+                if node not in managercandidates:
+                    continue
+                targets = managercandidates[node].get('collective.managercandidates', {}).get('value', None)
+                if not targets:
+                    continue
+                if not availmanagers:
+                    for active in collinfo['active']:
+                        availmanagers[active] = len(
+                            noderange.NodeRange(
+                                'collective.manager=={}'.format(active), c).nodes)
+                    availmanagers[collinfo['leader']] = len(
+                            noderange.NodeRange(
+                                'collective.manager=={}'.format(
+                                    collinfo['leader']), c).nodes)
+                if targets not in expandednoderanges:
+                    expandednoderanges[targets] = set(
+                        noderange.NodeRange(targets, c).nodes) - offlinemgrs
+                targets = sorted(expandednoderanges[targets], key=availmanagers.get)
+                if not targets:
+                    continue
+                c.set_node_attributes({node: {'collective.manager': {'value': targets[0]}}})
+                availmanagers[targets[0]] += 1
+    failovercheck = None
+
+def schedule_rebalance():
+    global failovercheck
+    if not failovercheck:
+        failovercheck = eventlet.spawn_after(10, check_managers)
+
 def start_collective():
+    cfm.membership_callback = schedule_rebalance
     global follower
     global retrythread
     if follower:
