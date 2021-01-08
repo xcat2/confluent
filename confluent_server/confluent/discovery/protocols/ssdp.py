@@ -29,7 +29,9 @@
 
 
 import confluent.config.configmanager as cfm
+import confluent.collective.manager as collective
 import confluent.neighutil as neighutil
+import confluent.noderange as noderange
 import confluent.util as util
 import confluent.log as log
 import confluent.netutil as netutil
@@ -186,10 +188,15 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         # planned for
                                         cfg = cfm.ConfigManager(None)
                                         cfd = cfg.get_node_attributes(
-                                            node, 'deployment.pendingprofile')
+                                            node, ['deployment.pendingprofile', 'collective.managercandidates'])
                                         if not cfd.get(node, {}).get(
                                                 'deployment.pendingprofile', {}).get('value', None):
                                             break
+                                        candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
+                                        if candmgrs:
+                                            candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+                                            if collective.get_myname() not in candmgrs:
+                                                break
                                         currtime = time.time()
                                         seconds = int(currtime)
                                         msecs = int(currtime * 1000 % 1000)

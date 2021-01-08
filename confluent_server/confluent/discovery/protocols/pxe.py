@@ -23,6 +23,8 @@
 # option 97 = UUID (wireformat)
 
 import confluent.config.configmanager as cfm
+import confluent.collective.manager as collective
+import confluent.noderange as noderange
 import confluent.log as log
 import confluent.netutil as netutil
 import ctypes
@@ -264,9 +266,7 @@ def proxydhcp():
         if not myipn:
             continue
         if opts.get(77, None) == b'iPXE':
-            cfd = cfg.get_node_attributes(node, ('deployment.*'))
-            profile = cfd.get(node, {}).get(
-                'deployment.pendingprofile', {}).get('value', None)
+            profile = get_deployment_profile(node, cfg)
             if not profile:
                 continue
             myip = socket.inet_ntoa(myipn)
@@ -428,17 +428,29 @@ def remap_nodes(nodeattribs, configmanager):
                 macmap[updates[node][attrib]['value'].lower()] = node
 
 
+def get_deployment_profile(node, cfg):
+    cfd = cfg.get_node_attributes(node, ('deployment.*'))
+    profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
+    if not profile:
+        return None
+    candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
+    if candmgrs:
+        candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+        if collective.get_myname() not in candmgrs:
+            return None
+    return profile
+
 staticassigns = {}
 myipbypeer = {}
 def check_reply(node, info, packet, sock, cfg, reqview):
     httpboot = info['architecture'] == 'uefi-httpboot'
     replen = 275  # default is going to be 286
-    cfd = cfg.get_node_attributes(node, ('deployment.*'))
-    profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
-    myipn = info['netinfo']['recvip']
-    myipn = socket.inet_aton(myipn)
+    profile = get_deployment_profile(node, cfg)
     if not profile:
         return
+    myipn = info['netinfo']['recvip']
+    myipn = socket.inet_aton(myipn)
+
     rqtype = packet[53][0]
     insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
         {}).get('value', 'never')
