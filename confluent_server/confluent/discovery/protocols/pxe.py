@@ -428,8 +428,9 @@ def remap_nodes(nodeattribs, configmanager):
                 macmap[updates[node][attrib]['value'].lower()] = node
 
 
-def get_deployment_profile(node, cfg):
-    cfd = cfg.get_node_attributes(node, ('deployment.*'))
+def get_deployment_profile(node, cfg, cfd=None):
+    if not cfd:
+        cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
     if not profile:
         return None
@@ -445,7 +446,8 @@ myipbypeer = {}
 def check_reply(node, info, packet, sock, cfg, reqview):
     httpboot = info['architecture'] == 'uefi-httpboot'
     replen = 275  # default is going to be 286
-    profile = get_deployment_profile(node, cfg)
+    cfd = cfg.get_node_attributes(node, ('deployment.*'))
+    profile = get_deployment_profile(node, cfg, cfd)
     if not profile:
         return
     myipn = info['netinfo']['recvip']
