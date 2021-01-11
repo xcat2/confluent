@@ -205,7 +205,7 @@ node = {
         'description': ('A noderange of nodes permitted to be a manager for '
                         'the node. This controls failover and deployment.  If '
                         'not defined, all managers may deploy and no '
-                        'automatic failover will be performed.
+                        'automatic failover will be performed. '
                         'Using this requires that collective members be '
                         'defined as nodes for noderange expansion')
     },
