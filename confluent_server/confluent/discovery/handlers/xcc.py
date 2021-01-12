@@ -69,11 +69,13 @@ class NodeHandler(immhandler.NodeHandler):
         if ff not in ('dense-computing', [u'dense-computing']):
             # skip preconfig for non-SD530 servers
             return
+        currfirm = self.info.get('attributes', {}).get('firmware-image-info', [''])[0]
+        if not currfirm.startswith('TEI'):
+            return
         self.trieddefault = None  # Reset state on a preconfig attempt
         # attempt to enable SMM
         #it's normal to get a 'not supported' (193) for systems without an SMM
         # need to branch on 3.00+ firmware
-        currfirm = self.info.get('attributes', {}).get('firmware-image-info', [''])[0]
         currfirm = currfirm.split(':')
         if len(currfirm) > 1:
             currfirm = float(currfirm[1])
@@ -322,11 +324,11 @@ class NodeHandler(immhandler.NodeHandler):
             wc.grab_json_response('/api/function',
                                 {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
         if username != 'USERID':
-            rsp, status = wc.grab_json_response(
+            rsp, status = wc.grab_json_response_with_status(
                 '/api/function',
                 {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,'.format(uid, username)})
             if status == 200 and rsp.get('return', 0) == 762:
-                rsp, status = wc.grab_json_response(
+                rsp, status = wc.grab_json_response_with_status(
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,Administrator,0,0,0,0,,8,'.format(uid, username)})
             self.tmppasswd = None
