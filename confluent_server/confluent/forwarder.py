@@ -34,6 +34,8 @@ def handle_connection(incoming, outgoing):
         for mysock in r:
             data = mysock.recv(32768)
             if not data:
+                incoming.close()
+                outgoing.close()
                 return
             if mysock == incoming:
                 outgoing.sendall(data)
@@ -72,6 +74,7 @@ def forward_video():
             vidclient.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
         except Exception:
             conn.close()
+            vidclient.close()
             continue
         eventlet.spawn_n(handle_connection, conn, vidclient)
 
