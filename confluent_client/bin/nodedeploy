@@ -79,7 +79,7 @@ def main(args):
         sys.stderr.write('-n is a required argument currently to perform an install, optionally with -p\n')
         return 1
     if not args.profile and args.network:
-        sys.stderr.write('profile is a required argument to request a network deployment\n')
+        sys.stderr.write('Both noderange and a profile name are required arguments to request a network deployment\n')
         return 1
     if extra:
         sys.stderr.write('Unrecognized arguments: ' + repr(extra) + '\n')
