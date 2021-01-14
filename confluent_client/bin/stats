@@ -22,13 +22,17 @@ import io
 import numpy as np
 
 import os
-import sixel
 import subprocess
 import sys
 
-class DumbWriter(sixel.SixelWriter):
-    def restore_position(self, output):
-        return
+try:
+    import sixel
+
+    class DumbWriter(sixel.SixelWriter):
+        def restore_position(self, output):
+            return
+except ImportError:
+    pass
 
 
 def plot(gui, output, plotdata, bins):
