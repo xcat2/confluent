@@ -230,6 +230,8 @@ def send_discovery_datum(info):
     yield msg.KeyValueData({'serialnumber': sn})
     yield msg.KeyValueData({'modelnumber': mn})
     yield msg.KeyValueData({'uuid': uuid})
+    if 'enclosure.uuid' in info:
+        yield msg.KeyValueData({'enclosure_uuid': info['enclosure.uuid']})
     if 'enclosure.bay' in info:
         yield msg.KeyValueData({'bay': int(info['enclosure.bay'])})
     yield msg.KeyValueData({'macs': [info.get('hwaddr', '')]})
@@ -240,6 +242,16 @@ def send_discovery_datum(info):
     yield msg.KeyValueData({'types': types})
     if 'otheraddresses' in info:
         yield msg.KeyValueData({'otheripaddrs': list(info['otheraddresses'])})
+    if 'location' in info:
+        yield msg.KeyValueData({'location': info['location']})
+    if 'room' in info:
+        yield msg.KeyValueData({'room': info['room']})
+    if 'rack' in info:
+        yield msg.KeyValueData({'rack': info['rack']})
+    if 'u' in info:
+        yield msg.KeyValueData({'lowest_u': info['u']})
+    if 'hostname' in info:
+        yield msg.KeyValueData({'hostname': info['hostname']})
 
 
 def _info_matches(info, criteria):

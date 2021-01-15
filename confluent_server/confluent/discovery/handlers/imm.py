@@ -47,10 +47,28 @@ class NodeHandler(bmchandler.NodeHandler):
             self.info['uuid'] = uuidprefix + '-' + '-'.join(
                 wronguuid.split('-')[3:])
             self.info['uuid'] = self.info['uuid'].lower()
+        room = slpattrs.get('room-id', [None])[0]
+        if room:
+            self.info['room'] = room
+        rack = slpattrs.get('rack-id', [None])[0]
+        if rack:
+            self.info['rack'] = rack
+        name = slpattrs.get('name', [None])[0]
+        if name:
+            self.info['hostname'] = name
+        unumber = slpattrs.get('lowest-u', [None])[0]
+        if unumber:
+            self.info['u'] = unumber
+        location = slpattrs.get('location', [None])[0]
+        if location:
+            self.info['location'] = location
         if ff not in ('dense-computing', 'BC2'):
             # do not probe unless it's a dense platform
             return
         self.isdense = True
+        encuuid = slpattrs.get('chassis-uuid', [None])[0]
+        if encuuid:
+            self.info['enclosure.uuid'] = encuuid
         slot = int(slpattrs.get('slot', ['0'])[0])
         if slot != 0:
             self.info['enclosure.bay'] = slot
