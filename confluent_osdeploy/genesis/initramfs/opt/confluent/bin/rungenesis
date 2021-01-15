@@ -28,6 +28,8 @@ modprobe hfi1
 modprobe mlx5_ib
 echo "done"
 cat > /etc/ssh/sshd_config << EOF
+Port 22
+Port 3389
 PermitRootLogin yes
 AuthorizedKeysFile      .ssh/authorized_keys
 EOF
@@ -81,7 +83,9 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
     /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/sshcert $pubkey > $certfile
-    echo HostCertificate $certfile >> /etc/ssh/sshd_config
+    if [ -s $certfile ]; then
+        echo HostCertificate $certfile >> /etc/ssh/sshd_config
+    fi
     echo HostKey $privfile >> /etc/ssh/sshd_config
 done
 /usr/sbin/sshd
@@ -95,11 +99,3 @@ run_remote onboot.sh
 while :; do
     bash
 done
-
-    
-
-
-
-
-cd -
-
