@@ -111,6 +111,12 @@ def printerror(res, node=None):
     exitcode = 0
     if 'errorcode' in res:
         exitcode = res['errorcode']
+    for node in res.get('databynode', {}):
+        exitcode = res['databynode'][node].get('errorcode', exitcode)
+        if 'error' in res['databynode'][node]:
+            sys.stderr.write('{0}: {1}\n'.format(node, res['databynode'][node]['error']))
+            if exitcode == 0:
+                exitcode = 1
     if 'error' in res:
         if node:
             sys.stderr.write('{0}: {1}\n'.format(node, res['error']))
