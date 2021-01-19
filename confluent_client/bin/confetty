@@ -1020,6 +1020,13 @@ if __name__ == '__main__':
         main()
     except BailOut as e:
         errcode = e.errorcode
+    except Exception as e:
+        import traceback
+        try:
+            quitconfetty()
+        except Exception:
+            pass
+        traceback.print_exc()
     finally:
         if deadline and os.times()[4] < deadline:
             sys.stderr.write('[Exited early, hit enter to continue]')
