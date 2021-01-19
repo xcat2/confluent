@@ -204,7 +204,7 @@ def get_myname():
         with open('/etc/confluent/cfg/myname', 'r') as f:
             mycachedname[0] = f.read().strip()
             mycachedname[1] = time.time()
-            return
+            return mycachedname[0]
     except IOError:
         myname = socket.gethostname()
         with open('/etc/confluent/cfg/myname', 'w') as f:
