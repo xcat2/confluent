@@ -373,7 +373,7 @@ def do_command(command, server):
     if argv[0] == 'exit':
         if os.environ.get('TERM', '') not in ('linux'):
             sys.stdout.write('\x1b]0;\x07')
-        raise Bailout()
+        raise BailOut()
     elif argv[0] in ('help', '?'):
         return print_help()
     elif argv[0] == 'cd':
