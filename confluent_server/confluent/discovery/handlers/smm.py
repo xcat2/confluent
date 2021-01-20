@@ -41,7 +41,7 @@ def fixuuid(baduuid):
 class NodeHandler(bmchandler.NodeHandler):
     is_enclosure = True
     devname = 'SMM'
-    maxmacs = 6  # support an enclosure, but try to avoid catching daisy chain
+    maxmacs = 14  # support an enclosure, but try to avoid catching daisy chain
 
     def scan(self):
         # the UUID is in a weird order, fix it up to match
