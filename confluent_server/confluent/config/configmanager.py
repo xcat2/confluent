@@ -785,7 +785,7 @@ def commit_clear():
     # currently defined as local to each collective member
     # currently just 'autosense' which is intended to be active
     # per collective member
-    for globvar in _oldcfgstore['globals']:
+    for globvar in _oldcfgstore.get('globals', ()):
         if globvar.endswith('_key'):
             continue
         _cfgstore['globals'][globvar] = _oldcfgstore['globals'][globvar]
