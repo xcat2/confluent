@@ -1,0 +1,49 @@
+stats(8) -- Common basic statistics on typical numeric data in output
+==============================
+
+## SYNOPSIS
+
+`<other command> | stats [-c N] [-d D] [-x|-g|-t|-o image.png] [-s N] [-v] [-b N]
+
+## DESCRIPTION
+
+The **stats** command helps analyze common numerical data such as performance numbers
+or temperatures or any other numerical value.
+
+By default it looks for the last numerical output on the first line to identify the numerical column
+and analyze that number. This can be overriden by **-c COLUMN** to indicate a column. By default,
+whitespace and commas are treated to delimit columns, and **-d DELIMITER** can be used to override.
+
+By default it outputs basic statistics, but a histogram is available either text or through X11 output
+or sixel or output to an image file depending on whether **-x**, **-g**, **-t*, or **-o image.png** is
+used.
+
+## OPTIONS
+
+ * `-c N`:
+   Select column number. Defaults to last column that appears numeric
+
+ * `-d D`:
+   Specify a custom column delimiter
+
+ * `-x`:
+     Output in Sixel format (supported by mlterm and PuTTY, among others)
+
+ * `-g`:
+   Try to open histogram as an X window
+
+ * `-t`:
+   Output histogram as bars rendered by =
+
+ * `-o image.png`:
+   Write graphical histogram to image.png.
+
+ * `-s N`:
+   Ignore specified number of lines as header content before processing numbers
+
+ * `-v`:
+   Treat value before : on each line as a label, and show which labels belong to which histogram buckets.
+
+ * `-b N`:
+   Specify a custom number of buckets for histogram. The default is 10.
+   
