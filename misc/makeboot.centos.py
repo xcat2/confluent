@@ -39,7 +39,7 @@ def makeboot_tree(distribution, profiledir):
     os.link('/var/lib/confluent/public/site/site-initramfs.gz', trginitramfs)
     profileinfo = os.path.join(profiledir, 'profile.yaml')
     with open(profileinfo) as info:
-        profile = yaml.load(info)
+        profile = yaml.safe_load(info)
     cfgfile = os.path.join(efidir, 'grub.cfg')
     with open(cfgfile, 'w') as grubcfg:
         grubcfg.write('set timeout=5\n')
