@@ -27,7 +27,12 @@ import confluent.netutil as netutil
 import confluent.util as util
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
-from xml.etree.ElementTree import fromstring
+from xml.etree.ElementTree import fromstring as rfromstring
+
+def fromstring(inputdata):
+    if '!entity' in inputdata.lower():
+        raise Exception('!ENTITY not supported in this interface')
+    return rfromstring(inputdata)
 
 def fixuuid(baduuid):
     # SMM dumps it out in hex
