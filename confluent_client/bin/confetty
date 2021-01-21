@@ -948,6 +948,8 @@ def main():
                             clearpowermessage = False
                         try:
                             sys.stdout.write(data)
+                        except UnicodeEncodeError:
+                            sys.stdout.buffer.write(data.encode('utf8'))
                         except IOError:  # Some times circumstances are bad
                             # resort to byte at a time...
                             for d in data:
