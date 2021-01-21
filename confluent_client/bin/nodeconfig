@@ -278,7 +278,6 @@ if setmode:
             rcode |= client.printerror(fr)
             for node in fr.get('databynode', []):
                 r = fr['databynode'][node]
-                rcode |= client.printerror(r, node)
                 if 'value' not in r:
                     continue
                 keyval = r['value']

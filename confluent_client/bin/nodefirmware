@@ -149,7 +149,6 @@ def show_firmware(session):
             if 'databynode' not in res:
                 continue
             for node in res['databynode']:
-                exitcode |= client.printerror(res['databynode'][node], node)
                 if 'firmware' not in res['databynode'][node]:
                     continue
                 for inv in res['databynode'][node]['firmware']:
