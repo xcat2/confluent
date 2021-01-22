@@ -30,7 +30,11 @@ getaddrinfo = eventlet.support.greendns.getaddrinfo
 from xml.etree.ElementTree import fromstring as rfromstring
 
 def fromstring(inputdata):
-    if '!entity' in inputdata.lower():
+    if isinstance(inputdata, bytes):
+        cmpstr = b'!entity'
+    else:
+        cmpstr = '!entity'
+    if cmpstr in inputdata.lower():
         raise Exception('!ENTITY not supported in this interface')
     return rfromstring(inputdata)
 
