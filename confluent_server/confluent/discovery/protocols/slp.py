@@ -603,8 +603,13 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
             curratt = currinf.get('attributes', {})
             if curratt.get('System-Manufacturing', [None])[0] == 'Lenovo' and curratt.get('type', [None])[0] == 'LenovoThinkServer':
                currinf['services'] = ['service:lenovo-tsm']
-               curratt['enclosure-serial-number'] = curratt['Product-Serial']
-               curratt['enclosure-machinetype-model'] = curratt['Machine-Type']
+               serialnumber = curratt.get('Product-Serial', curratt.get('SerialNumber', None))
+               if serialnumber:
+                   curratt['enclosure-serial-number'] = serialnumber
+               mtm = curratt.get('Machine-Type', curratt.get('Product-Name', None))
+               if mtm:
+                   mtm[0] = mtm[0].rstrip()
+                   curratt['enclosure-machinetype-model'] = mtm
             else:
                 continue
         del rsps[id]['payload']
