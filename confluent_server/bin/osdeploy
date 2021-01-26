@@ -1,5 +1,7 @@
 #!/usr/bin/python2
 
+__author__ = 'jjohnson2,bfinley'
+
 import argparse
 import glob
 import os
@@ -50,7 +52,11 @@ def main(args):
         'updateboot',
         help='Push profile.yaml of the named profile data into boot assets as appropriate')
     upb.add_argument('profile', help='Profile to update boot assets')
+    osls = sp.add_parser('list', help='List OS images available for deployment')
     cmdset = ap.parse_args()
+
+    if cmdset.command == 'list':
+        return oslist()
     if cmdset.command == 'import':
         return osimport(cmdset.imagefile)
     if cmdset.command == 'initialize':
@@ -306,6 +312,27 @@ def updateboot(profilename):
             print('Updated: {0}'.format(rsp['updated']))
         else:
             print(repr(rsp))
+
+
+def oslist():
+    c = client.Command()
+    print "Distributions:"
+    for rsp in c.read('/deployment/distributions'):
+        if 'error' in rsp:
+            sys.stderr.write(res['error'] + '\n')
+            exitcode = 1
+        else:
+            print("  " + rsp['item']['href'].replace('/', ''))
+    print ""
+
+    print "Profiles:"
+    for rsp in c.read('/deployment/profiles'):
+        if 'error' in rsp:
+            sys.stderr.write(res['error'] + '\n')
+            exitcode = 1
+        else:
+            print("  " + rsp['item']['href'].replace('/', ''))
+    print ""
 
 
 def osimport(imagefile):
