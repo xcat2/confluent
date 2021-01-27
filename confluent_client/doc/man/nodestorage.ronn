@@ -3,12 +3,15 @@ nodestorage(8) -- Examine/Modify storage configuration of a node
 
 ## SYNOPSIS
 
-`nodestorage <noderange> [show|create|delete] [options]`  
+`nodestorage <noderange> [show|create|delete|diskset] [options] [hotspare|jbod|unconfigured]`  
 
 ## DESCRIPTION
 
 `nodestorage` provides access to the remote storage configuration of
-the noderange.
+the noderange. The `show` subcommand will show current storage configuration,
+`create` can be used to create new arrays or volumes, `delete` can be used to
+remove volumes and arrays, and `diskset` can modify the usage of disks
+indicated by `-d` to either be `unconfigured`, `jbod`, or `hotspare`.
 
 ## OPTIONS
 * `-r` **RAIDLEVEL**, `--raidlevel`=**RAIDLEVEL**:
