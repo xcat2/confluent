@@ -316,23 +316,23 @@ def updateboot(profilename):
 
 def oslist():
     c = client.Command()
-    print "Distributions:"
+    print("Distributions:")
     for rsp in c.read('/deployment/distributions'):
         if 'error' in rsp:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
         else:
             print("  " + rsp['item']['href'].replace('/', ''))
-    print ""
+    print("")
 
-    print "Profiles:"
+    print("Profiles:")
     for rsp in c.read('/deployment/profiles'):
         if 'error' in rsp:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
         else:
             print("  " + rsp['item']['href'].replace('/', ''))
-    print ""
+    print("")
 
 
 def osimport(imagefile):
