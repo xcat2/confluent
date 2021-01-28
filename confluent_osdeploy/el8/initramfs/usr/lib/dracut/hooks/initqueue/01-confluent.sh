@@ -109,5 +109,13 @@ done < /etc/confluent/confluent.deploycfg
 if [ -e /lib/nm-lib.sh ]; then
     . /lib/nm-lib.sh
     nm_generate_connections
+    if [[ "$ifname" == ib* ]]; then
+        sed -i s/type=ethernet/type=infiniband/ /run/NetworkManager/system-connections/$ifname.nmconnection
+        if ! grep '\[infiniband\]' /run/NetworkManager/system-connections/$ifname.nmconnection > /dev/null; then
+            echo >> /run/NetworkManager/system-connections/$ifname.nmconnection
+            echo '[infiniband]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
+            echo transport-mode=datagram >> /run/NetworkManager/system-connections/$ifname.nmconnection
+        fi
+    fi
 fi
 
