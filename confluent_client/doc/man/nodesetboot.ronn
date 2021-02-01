@@ -4,7 +4,7 @@ nodesetboot(8) -- Check or set next boot device for noderange
 ## SYNOPSIS
 
 `nodesetboot <noderange>`  
-`nodesetboot [options] <noderange> [default|cd|network|setup|hd|floppy]`
+`nodesetboot [options] <noderange> [default|cd|network|setup|hd|usb|floppy]`
 
 ## DESCRIPTION
 
@@ -44,6 +44,10 @@ control.
   
 * `floppy`:
   Request boot from floppy.  Generally speaking firmware uses this to mean a USB
+  flash drive or similar (whether virtual or physical).
+
+* `usb`:
+  Request boot from usb.  Generally speaking firmware uses this to mean a USB
   flash drive or similar (whether virtual or physical).
 
 * `network`:
