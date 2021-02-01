@@ -154,6 +154,7 @@ class Command(object):
         self._prevkeyname = None
         self.connection = None
         self._currnoderange = None
+        self.unixdomain = False
         if server is None:
             if 'CONFLUENT_HOST' in os.environ:
                 self.serverloc = os.environ['CONFLUENT_HOST']
@@ -163,6 +164,7 @@ class Command(object):
             self.serverloc = server
         if os.path.isabs(self.serverloc) and os.path.exists(self.serverloc):
             self._connect_unix()
+            self.unixdomain = True
         elif self.serverloc == '/var/run/confluent/api.sock':
             raise Exception('Confluent service is not available')
         else:
@@ -177,6 +179,11 @@ class Command(object):
             username = os.environ['CONFLUENT_USER']
             passphrase = os.environ['CONFLUENT_PASSPHRASE']
             self.authenticate(username, passphrase)
+
+    def add_file(self, name, handle):
+        if not self.unixdomain:
+            raise Exception('Can only add a file to a unix domain connection')
+        tlvdata.send(self.connection, {'filename': name}, handle)
 
     def authenticate(self, username, password):
         tlvdata.send(self.connection,

@@ -338,6 +338,9 @@ def oslist():
 def osimport(imagefile):
     c = client.Command()
     imagefile = os.path.abspath(imagefile)
+    if c.unixdomain:
+        ofile = open(imagefile, 'rb')
+        c.add_file(imagefile, ofile.fileno)
     importing = False
     shortname = None
     for rsp in c.create('/deployment/importing/', {'filename': imagefile}):

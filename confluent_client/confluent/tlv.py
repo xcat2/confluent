@@ -17,4 +17,4 @@
 
 
 class Types(object):
-    text, json = range(2)
+    text, json, filehandle = range(3)

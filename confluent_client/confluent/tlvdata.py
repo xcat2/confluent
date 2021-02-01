@@ -30,6 +30,23 @@ try:
 except NameError:
     pass
 
+
+class msghdr(ctypes.Structure):  # from bits/socket.h
+    _fields_ = [('msg_name', ctypes.c_void_p),
+                ('msg_namelen', ctypes.c_uint),
+                ('msg_iov', ctypes.POINTER(iovec)),
+                ('msg_iovlen', ctypes.c_size_t),
+                ('msg_control', ctypes.c_void_p),
+                ('msg_controllen', ctypes.c_size_t),
+                ('msg_flags', ctypes.c_int)]
+
+
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
+recvmsg = libc.recvmsg
+recvmsg.argtypes = [ctypes.c_int, ctypes.POINNTER(msghdr), ctypes.c_int]
+recvmsg.restype = ctypes.c_size_t
+sendmsg = libc.sendmsg
+sendmsg.argtypes = 
 def decodestr(value):
     ret = None
     try:
@@ -65,7 +82,7 @@ def _unicode_list(currlist):
             _unicode_list(currlist[i])
 
 
-def send(handle, data):
+def send(handle, data, handle=None):
     if isinstance(data, unicode):
         try:
             data = data.encode('utf-8')
@@ -93,9 +110,15 @@ def send(handle, data):
         if tl > 16777215:
             raise Exception("JSON data exceeds protocol limits")
         # xor in the type (0b1 << 24)
-        tl |= 16777216
-        handle.sendall(struct.pack("!I", tl))
-        handle.sendall(sdata)
+        if handle is None:
+            tl |= 16777216
+            handle.sendall(struct.pack("!I", tl))
+            handle.sendall(sdata)
+        else:
+            tl |= (2 << 24)
+            handle.sendall(struct.pack("!I", tl))
+            #sendmsg with scm_rights to pass the handle
+
 
 def recvall(handle, size):
     rd = handle.recv(size)

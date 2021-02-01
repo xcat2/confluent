@@ -77,6 +77,20 @@ except ImportError:
 
 plainsocket = None
 
+class msghdr(ctypes.Structure):  # from bits/socket.h
+    _fields_ = [('msg_name', ctypes.c_void_p),
+                ('msg_namelen', ctypes.c_uint),
+                ('msg_iov', ctypes.POINTER(iovec)),
+                ('msg_iovlen', ctypes.c_size_t),
+                ('msg_control', ctypes.c_void_p),
+                ('msg_controllen', ctypes.c_size_t),
+                ('msg_flags', ctypes.c_int)]
+
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
+recvmsg = libc.recvmsg
+recvmsg.argtypes = [ctypes.c_int, ctypes.POINNTER(msghdr), ctypes.c_int]
+recvmsg.restype = ctypes.c_size_t
+
 def _should_authlog(path, operation):
     if (operation == 'retrieve' and
             ('/sensors/' in path or '/health/' in path or
@@ -126,7 +140,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
             authenticated = True
     # version 0 == original, version 1 == pickle3 allowed, 2 = pickle forbidden, msgpack allowed
-    send_data(connection, "Confluent -- v2 --")
+    # v3 - filehandle allowed
+    send_data(connection, "Confluent -- v3 --")
     while not authenticated:  # prompt for name and passphrase
         send_data(connection, {'authpassed': 0})
         response = tlvdata.recv(connection)
@@ -475,7 +490,6 @@ class SockApi(object):
         self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
 
     def watch_for_cert(self):
-        libc = ctypes.CDLL(ctypes.util.find_library('c'))
         watcher = libc.inotify_init1(os.O_NONBLOCK)
         if libc.inotify_add_watch(watcher, b'/etc/confluent/', 0x100) > -1:
             while True:
