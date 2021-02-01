@@ -626,7 +626,9 @@ class MediaImporter(object):
         with open(os.devnull, 'w') as devnull:
             self.worker = subprocess.Popen(
                 [sys.executable, __file__, self.filename, '-b'],
-                stdin=devnull, stdout=subprocess.PIPE)
+                stdin=devnull, stdout=subprocess.PIPE) # pass_fds needed for
+                # passing filehandle, also set environment variable to say
+                # which filehandle it is
         wkr = self.worker
         currline = b''
         while wkr.poll() is None:
