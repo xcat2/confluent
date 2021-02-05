@@ -4,3 +4,8 @@ install --firstdisk --overwritevmfs
 %include /tmp/ksnet
 %include /tmp/rootpw
 reboot
+%post
+localcli network firewall unload
+STATUP=$(mktemp)
+echo '{"status": "complete"}' > $STATUP
+/opt/confluent/bin/apiclient /confluent-api/self/updatestatus $STATUP
