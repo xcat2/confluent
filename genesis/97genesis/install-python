@@ -221,4 +221,4 @@ dracut_install /usr/lib64/python3.6/distutils/util.py
 dracut_install /usr/lib64/python3.6/distutils/version.py
 dracut_install /usr/lib64/python3.6/distutils/versionpredicate.py
 dracut_install /usr/lib64/python3.6/getpass.py
-
+dracut_install /usr/libexec/openssh/sftp-server
