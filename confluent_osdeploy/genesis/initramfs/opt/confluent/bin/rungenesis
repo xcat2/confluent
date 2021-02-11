@@ -30,6 +30,7 @@ echo "done"
 cat > /etc/ssh/sshd_config << EOF
 Port 22
 Port 3389
+Subsystem       sftp    /usr/libexec/openssh/sftp-server
 PermitRootLogin yes
 AuthorizedKeysFile      .ssh/authorized_keys
 EOF
