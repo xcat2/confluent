@@ -7,10 +7,22 @@ echo $uuid > /sys/devices/virtual/dmi/id/product_uuid
 mkdir -p /etc/confluent
 localcli network firewall unload
 touch /etc/confluent/confluent.info
+begin=$(date +%s)
 while ! grep NODENAME /etc/confluent/confluent.info; do
     echo "Searching for deployment service on local network..."
     /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
     esxcfg-nics -l
+    if [ $(date +%s) -gt $((begin + 90)) ]; then 
+        if [ ! -f /var/run/vmware/show-esx-shell-login ]; then
+            chvt 1
+            sleep 1
+            chvt 2
+            /etc/init.d/ESXShell start
+        fi
+        echo "Unable to locate a deployment system on the local network, verify network connectivity"
+        echo "A debug session has been made available on Alt-F1"
+        sleep 30
+    fi
 done
 node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
