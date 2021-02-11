@@ -8,7 +8,9 @@ mkdir -p /etc/confluent
 localcli network firewall unload
 touch /etc/confluent/confluent.info
 while ! grep NODENAME /etc/confluent/confluent.info; do
+    echo "Searching for deployment service on local network..."
     /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
+    esxcfg-nics -l
 done
 node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')

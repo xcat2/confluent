@@ -1,5 +1,8 @@
 #!/usr/bin/python
+import re
+import subprocess
 
+uplinkmatch = re.compile('^\s*Uplinks:\s*(.*)')
 nodename = None
 for inf in open('/etc/confluent/confluent.info', 'r').read().split('\n'):
     if inf.startswith('NODENAME: '):
@@ -24,8 +27,15 @@ for line in deploycfg:
     else:
         nslist=False
 cfg['nameservers'] = ','.join(nameservers)
-
+vswinfo = subprocess.check_output(['localcli', 'network', 'vswitch', 'standard', 'list']).decode('utf8')
+vmnic = None
+for info in vswinfo.split('\n'):
+    upinfo = uplinkmatch.match(info)
+    if upinfo:
+        vmnic = upinfo.group(1)
 netline = 'network --hostname={0} --bootproto={1}'.format(nodename, cfg['ipv4_method'])
+if vmnic:
+    netline += ' --device={0}'.format(vmnic)
 if cfg['ipv4_method'] == 'static':
     netline += ' --ip={0} --netmask={1}'.format(cfg['ipv4_address'], cfg['ipv4_netmask'])
     if cfg.get('ipv4_gateway', 'null') not in (None, '', 'null'):
