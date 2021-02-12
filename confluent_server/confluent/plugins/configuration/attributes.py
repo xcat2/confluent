@@ -87,7 +87,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                     desc = ''
             if 'value' in currattr or 'expression' in currattr:
                 yield msg.Attributes(kv={attribute: currattr}, desc=desc)
-            elif 'cryptvalue' in currattr:
+            elif 'cryptvalue' in currattr or 'hashvalue' in currattr:
                 yield msg.CryptedAttributes(
                     kv={attribute: currattr},
                     desc=desc)
