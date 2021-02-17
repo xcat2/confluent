@@ -77,6 +77,10 @@ except ImportError:
 
 plainsocket = None
 
+class iovec(ctypes.Structure):   # from uio.h
+    _fields_ = [('iov_base', ctypes.c_void_p),
+                ('iov_len', ctypes.c_size_t)]
+
 class msghdr(ctypes.Structure):  # from bits/socket.h
     _fields_ = [('msg_name', ctypes.c_void_p),
                 ('msg_namelen', ctypes.c_uint),
@@ -88,7 +92,7 @@ class msghdr(ctypes.Structure):  # from bits/socket.h
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 recvmsg = libc.recvmsg
-recvmsg.argtypes = [ctypes.c_int, ctypes.POINNTER(msghdr), ctypes.c_int]
+recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
 recvmsg.restype = ctypes.c_size_t
 
 def _should_authlog(path, operation):

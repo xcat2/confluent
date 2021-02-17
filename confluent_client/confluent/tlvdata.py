@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ctypes
+import ctypes.util
 import confluent.tlv as tlv
 from datetime import datetime
 import json
@@ -30,6 +32,9 @@ try:
 except NameError:
     pass
 
+class iovec(ctypes.Structure):   # from uio.h
+    _fields_ = [('iov_base', ctypes.c_void_p),
+                ('iov_len', ctypes.c_size_t)]
 
 class msghdr(ctypes.Structure):  # from bits/socket.h
     _fields_ = [('msg_name', ctypes.c_void_p),
@@ -43,10 +48,12 @@ class msghdr(ctypes.Structure):  # from bits/socket.h
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 recvmsg = libc.recvmsg
-recvmsg.argtypes = [ctypes.c_int, ctypes.POINNTER(msghdr), ctypes.c_int]
+recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
 recvmsg.restype = ctypes.c_size_t
 sendmsg = libc.sendmsg
-sendmsg.argtypes = 
+sendmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
+sendmsg.restype = ctypes.c_size_t
+
 def decodestr(value):
     ret = None
     try:
@@ -82,7 +89,7 @@ def _unicode_list(currlist):
             _unicode_list(currlist[i])
 
 
-def send(handle, data, handle=None):
+def send(handle, data, filehandle=None):
     if isinstance(data, unicode):
         try:
             data = data.encode('utf-8')
@@ -110,7 +117,7 @@ def send(handle, data, handle=None):
         if tl > 16777215:
             raise Exception("JSON data exceeds protocol limits")
         # xor in the type (0b1 << 24)
-        if handle is None:
+        if filehandle is None:
             tl |= 16777216
             handle.sendall(struct.pack("!I", tl))
             handle.sendall(sdata)

@@ -76,8 +76,8 @@ def connect_to_leader(cert=None, name=None, leader=None):
         with cfm._initlock:
             banner = tlvdata.recv(remote)  # the banner
             vers = banner.split()[2]
-            if vers != b'v2':
-                raise Exception('This instance only supports protocol 2, synchronize versions between collective members')
+            if vers not in (b'v2', b'v3'):
+                raise Exception('This instance only supports protocol 2 or 3, synchronize versions between collective members')
             tlvdata.recv(remote)  # authpassed... 0..
             if name is None:
                 name = get_myname()
