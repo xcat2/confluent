@@ -15,9 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import array
 import ctypes
 import ctypes.util
 import confluent.tlv as tlv
+import eventlet.green.socket as socket
 from datetime import datetime
 import json
 import struct
@@ -36,6 +38,13 @@ class iovec(ctypes.Structure):   # from uio.h
     _fields_ = [('iov_base', ctypes.c_void_p),
                 ('iov_len', ctypes.c_size_t)]
 
+
+class cmsghdr(ctypes.Structure):  # also from bits/socket.h
+    _fields_ = [('cmsg_len', ctypes.c_size_t),
+                ('cmsg_level', ctypes.c_int),
+                ('cmsg_type', ctypes.c_int)]
+
+
 class msghdr(ctypes.Structure):  # from bits/socket.h
     _fields_ = [('msg_name', ctypes.c_void_p),
                 ('msg_namelen', ctypes.c_uint),
@@ -44,6 +53,17 @@ class msghdr(ctypes.Structure):  # from bits/socket.h
                 ('msg_control', ctypes.c_void_p),
                 ('msg_controllen', ctypes.c_size_t),
                 ('msg_flags', ctypes.c_int)]
+
+
+def CMSG_ALIGN(length):  # bits/socket.h
+    ret = (length + ctypes.sizeof(ctypes.c_size_t) - 1
+           & ~(ctypes.sizeof(ctypes.c_size_t) - 1))
+    return ctypes.c_size_t(ret)
+
+
+def CMSG_SPACE(length):  # bits/socket.h
+    ret = CMSG_ALIGN(length).value + CMSG_ALIGN(ctypes.sizeof(cmsghdr)).value
+    return ctypes.c_size_t(ret)
 
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
@@ -124,7 +144,7 @@ def send(handle, data, filehandle=None):
         else:
             tl |= (2 << 24)
             handle.sendall(struct.pack("!I", tl))
-            #sendmsg with scm_rights to pass the handle
+            handle.sendmsg([sdata], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", [filehandle]))])
 
 
 def recvall(handle, size):
@@ -155,12 +175,23 @@ def recv(handle):
     datatype = (tl & 2130706432) >> 24  # grab 7 bits from near beginning
     if dlen == 0:
         return None
-    data = handle.recv(dlen)
-    while len(data) < dlen:
-        ndata = handle.recv(dlen - len(data))
-        if not ndata:
-            raise Exception("Error reading data")
-        data += ndata
+    if datatype == tlv.Types.filehandle:
+        filehandles = array.array('i')
+        data, adata, flags, addr = handle.recvmsg(
+            dlen, socket.CMSG_LEN(filehandles.itemsize))
+        for clev, ctype, cdata in adata:
+            if clev == socket.SOL_SOCKET and ctype == socket.SCM_RIGHTS:
+                filehandles.fromstring(
+                    cdata[:len(cdata) - len(cdata) % filehandles.itemsize])
+        print(repr(filehandles))
+        print(repr(data))
+    else:
+        data = handle.recv(dlen)
+        while len(data) < dlen:
+            ndata = handle.recv(dlen - len(data))
+            if not ndata:
+                raise Exception("Error reading data")
+            data += ndata
     if datatype == tlv.Types.text:
         return data
     elif datatype == tlv.Types.json:
