@@ -32,12 +32,12 @@ indicated by `-d` to either be `unconfigured`, `jbod`, or `hotspare`.
   volumes, or selecting a volume for delete.  Default
   behavior is to use implementation provided default
 
-* `-z **STRIPSIZE**`, `--stripsizes=**STRIPSIZE**`:
+* `-z **STRIPSIZE**`, `--stripsizes=`**STRIPSIZE**:
   Comma separated list of stripsizes to use when creating volumes.
   This value is in kilobytes.  The default behavior is to allow the
   storage controller to decide
 
-* `-m **NUMNODES**`, `--maxnodes=**NUMNODES**`:
+* `-m **NUMNODES**`, `--maxnodes`=**NUMNODES**:
   Specify a maximum number of nodes to configure storage on, prompting
   if over the threshold
 
