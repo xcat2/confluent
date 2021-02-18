@@ -1,0 +1,851 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# This is extracting the confluent slp support into
+# a standalone script, for use in environments that
+# can't run full confluent and/or would prefer
+# a utility style approach to SLP
+
+# Copyright 2017-2019 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import random
+import select
+import socket
+import struct
+
+_slp_services = set([
+    'service:management-hardware.IBM:integrated-management-module2',
+    'service:lenovo-smm',
+    'service:lenovo-smm2',
+    'service:ipmi',
+    'service:lighttpd',
+    'service:management-hardware.Lenovo:lenovo-xclarity-controller',
+    'service:management-hardware.IBM:chassis-management-module',
+    'service:management-hardware.Lenovo:chassis-management-module',
+    'service:io-device.Lenovo:management-module',
+])
+
+# SLP has a lot of ambition that was unfulfilled in practice.
+# So we have a static footer here to always use 'DEFAULT' scope, no LDAP
+# predicates, and no authentication for service requests
+srvreqfooter = b'\x00\x07DEFAULT\x00\x00\x00\x00'
+# An empty instance of the attribute list extension
+# which is defined in RFC 3059, used to indicate support for that capability
+attrlistext = b'\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00'
+
+try:
+    IPPROTO_IPV6 = socket.IPPROTO_IPV6
+except AttributeError:
+    IPPROTO_IPV6 = 41  # Assume Windows value if socket is missing it
+
+
+def _parse_slp_header(packet):
+    packet = bytearray(packet)
+    if len(packet) < 16 or packet[0] != 2:
+        # discard packets that are obviously useless
+        return None
+    parsed = {
+        'function': packet[1],
+    }
+    (offset, parsed['xid'], langlen) = struct.unpack('!IHH',
+                                           bytes(b'\x00' + packet[7:14]))
+    parsed['lang'] = packet[14:14 + langlen].decode('utf-8')
+    parsed['payload'] = packet[14 + langlen:]
+    if offset:
+        parsed['offset'] = 14 + langlen
+        parsed['extoffset'] = offset
+    return parsed
+
+
+def _pop_url(payload):
+    urllen = struct.unpack('!H', bytes(payload[3:5]))[0]
+    url = bytes(payload[5:5+urllen]).decode('utf-8')
+    if payload[5+urllen] != 0:
+        raise Exception('Auth blocks unsupported')
+    payload = payload[5+urllen+1:]
+    return url, payload
+
+
+def _parse_SrvRply(parsed):
+    """ Modify passed dictionary to have parsed data
+
+
+    :param parsed:
+    :return:
+    """
+    payload = parsed['payload']
+    if len(payload) < 4:
+        return
+    ecode, ucount = struct.unpack('!HH', bytes(payload[0:4]))
+    if ecode:
+        parsed['errorcode'] = ecode
+    payload = payload[4:]
+    parsed['urls'] = []
+    while ucount:
+        ucount -= 1
+        url, payload = _pop_url(payload)
+        parsed['urls'].append(url)
+
+
+def _parse_slp_packet(packet, peer, rsps, xidmap):
+    parsed = _parse_slp_header(packet)
+    if not parsed:
+        return
+    addr = peer[0]
+    if '%' in addr:
+        addr = addr[:addr.index('%')]
+    mac = None
+    if addr in neightable:
+        identifier = neightable[addr]
+        mac = identifier
+    else:
+        identifier = addr
+    if (identifier, parsed['xid']) in rsps:
+        # avoid obviously duplicate entries
+        parsed = rsps[(identifier, parsed['xid'])]
+    else:
+        rsps[(identifier, parsed['xid'])] = parsed
+    if mac and 'hwaddr' not in parsed:
+        parsed['hwaddr'] = mac
+    if parsed['xid'] in xidmap:
+        parsed['services'] = [xidmap[parsed['xid']]]
+    if 'addresses' in parsed:
+        if peer not in parsed['addresses']:
+            parsed['addresses'].append(peer)
+    else:
+        parsed['addresses'] = [peer]
+    if parsed['function'] == 2:  # A service reply
+        _parse_SrvRply(parsed)
+
+
+def _v6mcasthash(srvtype):
+    # The hash algorithm described by RFC 3111
+    nums = bytearray(srvtype.encode('utf-8'))
+    hashval = 0
+    for i in nums:
+        hashval *= 33
+        hashval += i
+        hashval &= 0xffff  # only need to track the lowest 16 bits
+    hashval &= 0x3ff
+    hashval |= 0x1000
+    return '{0:x}'.format(hashval)
+
+
+def _generate_slp_header(payload, multicast, functionid, xid, extoffset=0):
+    if multicast:
+        flags = 0x2000
+    else:
+        flags = 0
+    packetlen = len(payload) + 16  # we have a fixed 16 byte header supported
+    if extoffset:  # if we have an offset, add 16 to account for this function
+        # generating a 16 byte header
+        extoffset += 16
+    if packetlen > 1400:
+        # For now, we aren't intending to support large SLP transmits
+        # raise an exception to help identify if such a requirement emerges
+        raise Exception("TODO: Transmit overflow packets")
+    # We always do SLP v2, and only v2
+    header = bytearray([2, functionid])
+    # SLP uses 24 bit packed integers, so in such places we pack 32 then
+    # discard the high byte
+    header.extend(struct.pack('!IH', packetlen, flags)[1:])
+    # '2' below refers to the length of the language tag
+    header.extend(struct.pack('!IHH', extoffset, xid, 2)[1:])
+    # we only do english (in SLP world, it's not like non-english appears...)
+    header.extend(b'en')
+    return header
+
+def _generate_attr_request(service, xid):
+    service = service.encode('utf-8')
+    payload = bytearray(struct.pack('!HH', 0, len(service)) + service)
+    payload.extend(srvreqfooter)
+    header = _generate_slp_header(payload, False, functionid=6, xid=xid)
+    return header + payload
+
+
+
+def _generate_request_payload(srvtype, multicast, xid, prlist=''):
+    prlist = prlist.encode('utf-8')
+    payload = bytearray(struct.pack('!H', len(prlist)) + prlist)
+    srvtype = srvtype.encode('utf-8')
+    payload.extend(struct.pack('!H', len(srvtype)) + srvtype)
+    payload.extend(srvreqfooter)
+    extoffset = len(payload)
+    payload.extend(attrlistext)
+    header = _generate_slp_header(payload, multicast, functionid=1, xid=xid,
+                                  extoffset=extoffset)
+    return header + payload
+
+
+def _find_srvtype(net, net4, srvtype, addresses, xid):
+    """Internal function to find a single service type
+
+    Helper to do singleton requests to srvtype
+
+    :param net: Socket active
+    :param srvtype: Service type to do now
+    :param addresses:  Pass through of addresses argument from find_targets
+    :return:
+    """
+    if addresses is None:
+        data = _generate_request_payload(srvtype, True, xid)
+        net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        v6addrs = []
+        v6hash = _v6mcasthash(srvtype)
+        # do 'interface local' and 'link local'
+        # it shouldn't make sense, but some configurations work with interface
+        # local that do not work with link local
+        v6addrs.append(('ff01::1:' + v6hash, 427, 0, 0))
+        v6addrs.append(('ff02::1:' + v6hash, 427, 0, 0))
+        for idx in list_interface_indexes():
+            # IPv6 multicast is by index, so lead with that
+            net.setsockopt(IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, idx)
+            for sa in v6addrs:
+                try:
+                    net.sendto(data, sa)
+                except socket.error:
+                    # if we hit an interface without ipv6 multicast,
+                    # this can cause an error, skip such an interface
+                    # case in point, 'lo'
+                    pass
+        for i4 in list_ips():
+            if 'broadcast' not in i4:
+                continue
+            addr = i4['addr']
+            bcast = i4['broadcast']
+            net4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
+                           socket.inet_aton(addr))
+            try:
+                net4.sendto(data, ('239.255.255.253', 427))
+            except socket.error as se:
+                # On occasion, multicasting may be disabled
+                # tolerate this scenario and move on
+                if se.errno != 101:
+                    raise
+            net4.sendto(data, (bcast, 427))
+
+
+def _grab_rsps(socks, rsps, interval, xidmap):
+    r = None
+    res = select.select(socks, (), (), interval)
+    if res:
+        r = res[0]
+    while r:
+        for s in r:
+            (rsp, peer) = s.recvfrom(9000)
+            refresh_neigh()
+            _parse_slp_packet(rsp, peer, rsps, xidmap)
+            res = select.select(socks, (), (), interval)
+            if not res:
+                r = None
+            else:
+                r = res[0]
+
+
+
+def _parse_attrlist(attrstr):
+    attribs = {}
+    previousattrlen = None
+    attrstr = stringify(attrstr)
+    while attrstr:
+        if len(attrstr) == previousattrlen:
+            raise Exception('Looping in attrstr parsing')
+        previousattrlen = len(attrstr)
+        if attrstr[0] == '(':
+            if ')' not in attrstr:
+                attribs['INCOMPLETE'] = True
+                return attribs
+            currattr = attrstr[1:attrstr.index(')')]
+            if '=' not in currattr:  # Not allegedly kosher, but still..
+                attribs[currattr] = None
+            else:
+                attrname, attrval = currattr.split('=', 1)
+                attribs[attrname] = []
+                for val in attrval.split(','):
+                    if val[:3] == '\\FF':  # we should make this bytes
+                        finalval = bytearray([])
+                        for bnum in attrval[3:].split('\\'):
+                            if bnum == '':
+                                continue
+                            finalval.append(int(bnum, 16))
+                        val = finalval
+                        if 'uuid' in attrname and len(val) == 16:
+                            lebytes = struct.unpack_from(
+                                '<IHH', memoryview(val[:8]))
+                            bebytes = struct.unpack_from(
+                                '>HHI', memoryview(val[8:]))
+                            val = '{0:08X}-{1:04X}-{2:04X}-{3:04X}-' \
+                                  '{4:04X}{5:08X}'.format(
+                                lebytes[0], lebytes[1], lebytes[2], bebytes[0],
+                                bebytes[1], bebytes[2]
+                            ).lower()
+                    attribs[attrname].append(val)
+            attrstr = attrstr[attrstr.index(')'):]
+        elif attrstr[0] == ','[0]:
+            attrstr = attrstr[1:]
+        elif ',' in attrstr:
+            currattr = attrstr[:attrstr.index(',')]
+            attribs[currattr] = None
+            attrstr = attrstr[attrstr.index(','):]
+        else:
+            currattr = attrstr
+            attribs[currattr] = None
+            attrstr = None
+    return attribs
+
+
+def _parse_attrs(data, parsed, xid=None):
+    headinfo = _parse_slp_header(data)
+    if xid is None:
+        xid = parsed['xid']
+    if headinfo['function'] != 7 or headinfo['xid'] != xid:
+        return
+    payload = headinfo['payload']
+    if struct.unpack('!H', bytes(payload[:2]))[0] != 0:
+        return
+    length = struct.unpack('!H', bytes(payload[2:4]))[0]
+    attrstr = bytes(payload[4:4+length])
+    parsed['attributes'] = _parse_attrlist(attrstr)
+
+
+def fix_info(info, handler):
+    if '_attempts' not in info:
+        info['_attempts'] = 10
+    if info['_attempts'] == 0:
+        return
+    info['_attempts'] -= 1
+    _add_attributes(info)
+    handler(info)
+
+def _add_attributes(parsed):
+    xid = parsed.get('xid', 42)
+    attrq = _generate_attr_request(parsed['services'][0], xid)
+    target = None
+    # prefer reaching out to an fe80 if present, to be highly robust
+    # in face of network changes
+    for addr in parsed['addresses']:
+        if addr[0].startswith('fe80'):
+            target = addr
+    # however if no fe80 seen, roll with the first available address
+    if not target:
+        target = parsed['addresses'][0]
+    if len(target) == 4:
+        net = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    else:
+        net = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        net.settimeout(2.0)
+        net.connect(target)
+    except socket.error:
+        return
+    try:
+        net.sendall(attrq)
+        rsp = net.recv(8192)
+        net.close()
+        _parse_attrs(rsp, parsed, xid)
+    except Exception as e:
+        # this can be a messy area, just degrade the quality of rsp
+        # in a bad situation
+        return
+
+
+def unicast_scan(address):
+    pass
+
+def query_srvtypes(target):
+    """Query the srvtypes advertised by the target
+
+    :param target: A sockaddr tuple (if you get the peer info)
+    """
+    payload = b'\x00\x00\xff\xff\x00\x07DEFAULT'
+    header = _generate_slp_header(payload, False, functionid=9, xid=1)
+    packet = header + payload
+    if len(target) == 2:
+        net = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    elif len(target) == 4:
+        net = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    else:
+        raise Exception('Unrecognized target {0}'.format(repr(target)))
+    tries = 3
+    connected = False
+    while tries and not connected:
+        tries -= 1
+        try:
+            net.settimeout(1.0)
+            net.connect(target)
+            connected = True
+        except socket.error:
+            pass
+    if not connected:
+        return [u'']
+    net.sendall(packet)
+    rs = net.recv(8192)
+    net.close()
+    parsed = _parse_slp_header(rs)
+    if parsed:
+        payload = parsed['payload']
+        if payload[:2] != '\x00\x00':
+            return
+        stypelen = struct.unpack('!H', bytes(payload[2:4]))[0]
+        stypes = payload[4:4+stypelen].decode('utf-8')
+        return stypes.split(',')
+
+def rescan(handler):
+    known_peers = set([])
+    for scanned in scan():
+        for addr in scanned['addresses']:
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            if ip not in neightable:
+                continue
+            if addr in known_peers:
+                break
+            known_peers.add(addr)
+        else:
+            handler(scanned)
+
+
+def snoop(handler, protocol=None):
+    """Watch for SLP activity
+
+    handler will be called with a dictionary of relevant attributes
+
+    :param handler:
+    :return:
+    """
+    try:
+        active_scan(handler, protocol)
+    except Exception as e:
+        raise
+    net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
+    slpg2 = socket.inet_pton(socket.AF_INET6, 'ff02::123')
+    for i6idx in list_interface_indexes():
+        mreq = slpg + struct.pack('=I', i6idx)
+        net.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
+        mreq = slpg2 + struct.pack('=I', i6idx)
+        net.setsockopt(IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, mreq)
+    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    net.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    for i4 in list_ips():
+        if 'broadcast' not in i4:
+            continue
+        slpmcast = socket.inet_aton('239.255.255.253') + \
+            socket.inet_aton(i4['addr'])
+        try:
+            net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                            slpmcast)
+        except socket.error as e:
+            if e.errno != 98:
+                raise
+            # socket in use can occur when aliased ipv4 are encountered
+    net.bind(('', 427))
+    net4.bind(('', 427))
+
+    while True:
+        try:
+            newmacs = set([])
+            r, _, _ = select.select((net, net4), (), (), 60)
+            # clear known_peers and peerbymacaddress
+            # to avoid stale info getting in...
+            # rely upon the select(0.2) to catch rapid fire and aggregate ip
+            # addresses that come close together
+            # calling code needs to understand deeper context, as snoop
+            # will now yield dupe info over time
+            known_peers = set([])
+            peerbymacaddress = {}
+            while r:
+                for s in r:
+                    (rsp, peer) = s.recvfrom(9000)
+                    ip = peer[0].partition('%')[0]
+                    if peer in known_peers:
+                        continue
+                    if ip not in neightable:
+                        update_neigh()
+                    if ip not in neightable:
+                        continue
+                    known_peers.add(peer)
+                    mac = neightable[ip]
+                    if mac in peerbymacaddress:
+                        peerbymacaddress[mac]['addresses'].append(peer)
+                    else:
+                        q = query_srvtypes(peer)
+                        if not q or not q[0]:
+                            # SLP might have started and not ready yet
+                            # ignore for now
+                            known_peers.discard(peer)
+                            continue
+                        # we want to prioritize the very well known services
+                        svcs = []
+                        for svc in q:
+                            if svc in _slp_services:
+                                svcs.insert(0, svc)
+                            else:
+                                svcs.append(svc)
+                        peerbymacaddress[mac] = {
+                            'services': svcs,
+                            'addresses': [peer],
+                        }
+                    newmacs.add(mac)
+                r, _, _ = select.select((net, net4), (), (), 0.2)
+            for mac in newmacs:
+                peerbymacaddress[mac]['xid'] = 1
+                _add_attributes(peerbymacaddress[mac])
+                peerbymacaddress[mac]['hwaddr'] = mac
+                peerbymacaddress[mac]['protocol'] = protocol
+                for srvurl in peerbymacaddress[mac].get('urls', ()):
+                    if len(srvurl) > 4:
+                        srvurl = srvurl[:-3]
+                    if srvurl.endswith('://Athena:'):
+                        continue
+                if 'service:ipmi' in peerbymacaddress[mac]['services']:
+                    continue
+                if 'service:lightttpd' in peerbymacaddress[mac]['services']:
+                    currinf = peerbymacaddress[mac]
+                    curratt = currinf.get('attributes', {})
+                    if curratt.get('System-Manufacturing', [None])[0] == 'Lenovo' and curratt.get('type', [None])[0] == 'LenovoThinkServer':
+                        peerbymacaddress[mac]['services'] = ['service:lenovo-tsm']
+                    else:
+                        continue
+                handler(peerbymacaddress[mac])
+        except Exception as e:
+            raise
+
+
+def active_scan(handler, protocol=None):
+    known_peers = set([])
+    for scanned in scan():
+        for addr in scanned['addresses']:
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            if ip not in neightable:
+                continue
+            if addr in known_peers:
+                break
+            known_peers.add(addr)
+        else:
+            scanned['protocol'] = protocol
+            handler(scanned)
+
+
+def scan(srvtypes=_slp_services, addresses=None, localonly=False):
+    """Find targets providing matching requested srvtypes
+
+    This is a generator that will iterate over respondants to the SrvType
+    requested.
+
+    :param srvtypes: An iterable list of the service types to find
+    :param addresses: An iterable of addresses/ranges.  Default is to scan
+                      local network segment using multicast and broadcast.
+                      Each address can be a single address, hyphen-delimited
+                      range, or an IP/CIDR indication of a network.
+    :return: Iterable set of results
+    """
+    net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # increase RCVBUF to max, mitigate chance of
+    # failure due to full buffer.
+    net.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16777216)
+    net4.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 16777216)
+    # SLP is very poor at scanning large counts and managing it, so we
+    # must make the best of it
+    # Some platforms/config default to IPV6ONLY, we are doing IPv4
+    # too, so force it
+    #net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+    # we are going to do broadcast, so allow that...
+    initxid = random.randint(0, 32768)
+    xididx = 0
+    xidmap = {}
+    # First we give fast repsonders of each srvtype individual chances to be
+    # processed, mitigating volume of response traffic
+    rsps = {}
+    for srvtype in srvtypes:
+        xididx += 1
+        _find_srvtype(net, net4, srvtype, addresses, initxid + xididx)
+        xidmap[initxid + xididx] = srvtype
+        _grab_rsps((net, net4), rsps, 0.1, xidmap)
+        # now do a more slow check to work to get stragglers,
+        # but fortunately the above should have taken the brunt of volume, so
+        # reduced chance of many responses overwhelming receive buffer.
+    _grab_rsps((net, net4), rsps, 1, xidmap)
+    # now to analyze and flesh out the responses
+    for id in rsps:
+        for srvurl in rsps[id].get('urls', ()):
+            if len(srvurl) > 4:
+                srvurl = srvurl[:-3]
+            if srvurl.endswith('://Athena:'):
+                continue
+        if 'service:ipmi' in rsps[id]['services']:
+            continue
+        if localonly:
+            for addr in rsps[id]['addresses']:
+                if 'fe80' in addr[0]:
+                    break
+            else:
+                continue
+        _add_attributes(rsps[id])
+        if 'service:lighttpd' in rsps[id]['services']:
+            currinf = rsps[id]
+            curratt = currinf.get('attributes', {})
+            if curratt.get('System-Manufacturing', [None])[0] == 'Lenovo' and curratt.get('type', [None])[0] == 'LenovoThinkServer':
+               currinf['services'] = ['service:lenovo-tsm']
+               serialnumber = curratt.get('Product-Serial', curratt.get('SerialNumber', None))
+               if serialnumber:
+                   curratt['enclosure-serial-number'] = serialnumber
+               mtm = curratt.get('Machine-Type', curratt.get('Product-Name', None))
+               if mtm:
+                   mtm[0] = mtm[0].rstrip()
+                   curratt['enclosure-machinetype-model'] = mtm
+            else:
+                continue
+        del rsps[id]['payload']
+        del rsps[id]['function']
+        del rsps[id]['xid']
+        yield rsps[id]
+
+
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2016 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# A consolidated manage of neighbor table information management.
+# Ultimately, this should use AF_NETLINK, but in the interest of time,
+# use ip neigh for the moment
+
+import subprocess
+import os
+
+neightable = {}
+neightime = 0
+
+import re
+
+_validmac = re.compile('..:..:..:..:..:..')
+
+
+def update_neigh():
+    global neightable
+    global neightime
+    neightable = {}
+    if os.name == 'nt':
+        return
+    ipn = subprocess.Popen(['ip', 'neigh'], stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+    (neighdata, err) = ipn.communicate()
+    neighdata = stringify(neighdata)
+    for entry in neighdata.split('\n'):
+        entry = entry.split(' ')
+        if len(entry) < 5 or not entry[4]:
+            continue
+        if entry[0] in ('192.168.0.100', '192.168.70.100', '192.168.70.125'):
+            # Note that these addresses are common static ip addresses
+            # that are hopelessly ambiguous if there are many
+            # so ignore such entries and move on
+            # ideally the system network steers clear of this landmine of
+            # a subnet, but just in case
+            continue
+        if not _validmac.match(entry[4]):
+            continue
+        neightable[entry[0]] = entry[4]
+    neightime = os.times()[4]
+
+
+def refresh_neigh():
+    global neightime
+    if os.name == 'nt':
+        return
+    if os.times()[4] > (neightime + 30):
+        update_neigh()
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2014 IBM Corporation
+# Copyright 2015-2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Various utility functions that do not neatly fit into one category or another
+import base64
+import hashlib
+import netifaces
+import os
+import re
+import socket
+import ssl
+import struct
+
+def stringify(instr):
+    # Normalize unicode and bytes to 'str', correcting for
+    # current python version
+    if isinstance(instr, bytes) and not isinstance(instr, str):
+        return instr.decode('utf-8', errors='replace')
+    elif not isinstance(instr, bytes) and not isinstance(instr, str):
+        return instr.encode('utf-8')
+    return instr
+
+def list_interface_indexes():
+    # Getting the interface indexes in a portable manner
+    # would be better, but there's difficulty from a python perspective.
+    # For now be linux specific
+    try:
+        for iface in os.listdir('/sys/class/net/'):
+            if not os.path.exists('/sys/class/net/{0}/ifindex'.format(iface)):
+                continue
+            ifile = open('/sys/class/net/{0}/ifindex'.format(iface), 'r')
+            intidx = int(ifile.read())
+            ifile.close()
+            yield intidx
+    except (IOError, OSError):
+        # Probably situation is non-Linux, just do limited support for
+        # such platforms until other people come along
+        for iface in netifaces.interfaces():
+            addrinfo = netifaces.ifaddresses(iface).get(socket.AF_INET6, [])
+            for addr in addrinfo:
+                v6addr = addr.get('addr', '').partition('%')[2]
+                if v6addr:
+                    yield(int(v6addr))
+                    break
+        return
+
+
+def list_ips():
+    # Used for getting addresses to indicate the multicast address
+    # as well as getting all the broadcast addresses
+    for iface in netifaces.interfaces():
+        addrs = netifaces.ifaddresses(iface)
+        if netifaces.AF_INET in addrs:
+            for addr in addrs[netifaces.AF_INET]:
+                yield addr
+
+def randomstring(length=20):
+    """Generate a random string of requested length
+
+    :param length: The number of characters to produce, defaults to 20
+    """
+    chunksize = length // 4
+    if length % 4 > 0:
+        chunksize += 1
+    strval = base64.urlsafe_b64encode(os.urandom(chunksize * 3))
+    return stringify(strval[0:length])
+
+
+def securerandomnumber(low=0, high=4294967295):
+    """Return a random number within requested range
+
+    Note that this function will not return smaller than 0 nor larger
+    than 2^32-1 no matter what is requested.
+    The python random number facility does not provide characteristics
+    appropriate for secure rng, go to os.urandom
+
+    :param low: Smallest number to return (defaults to 0)
+    :param high: largest number to return (defaults to 2^32-1)
+    """
+    number = -1
+    while number < low or number > high:
+        number = struct.unpack("I", os.urandom(4))[0]
+    return number
+
+
+def monotonic_time():
+    """Return a monotoc time value
+
+    In scenarios like timeouts and such, monotonic timing is preferred.
+    """
+    # for now, just support POSIX systems
+    return os.times()[4]
+
+
+def get_certificate_from_file(certfile):
+    cert = open(certfile, 'r').read()
+    inpemcert = False
+    prunedcert = ''
+    for line in cert.split('\n'):
+        if '-----BEGIN CERTIFICATE-----' in line:
+            inpemcert = True
+        if inpemcert:
+            prunedcert += line
+        if '-----END CERTIFICATE-----' in line:
+            break
+    return ssl.PEM_cert_to_DER_cert(prunedcert)
+
+
+def get_fingerprint(certificate, algo='sha512'):
+    if algo == 'sha256':
+        return 'sha256$' + hashlib.sha256(certificate).hexdigest()
+    elif algo == 'sha512':
+        return 'sha512$' + hashlib.sha512(certificate).hexdigest()
+    raise Exception('Unsupported fingerprint algorithm ' + algo)
+
+
+def cert_matches(fingerprint, certificate):
+    if not fingerprint or not certificate:
+        return False
+    algo, _, fp = fingerprint.partition('$')
+    newfp = None
+    if algo in ('sha512', 'sha256'):
+        newfp = get_fingerprint(certificate, algo)
+    return newfp and fingerprint == newfp
+
+
+numregex = re.compile('([0-9]+)')
+
+def naturalize_string(key):
+    """Analyzes string in a human way to enable natural sort
+
+    :param nodename: The node name to analyze
+    :returns: A structure that can be consumed by 'sorted'
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(numregex, key)]
+
+def natural_sort(iterable):
+    """Return a sort using natural sort if possible
+
+    :param iterable:
+    :return:
+    """
+    try:
+        return sorted(iterable, key=naturalize_string)
+    except TypeError:
+        # The natural sort attempt failed, fallback to ascii sort
+        return sorted(iterable)
+
+
+if __name__ == '__main__':
+    def testsnoop(a):
+        print(repr(a))
+    snoop(testsnoop)
