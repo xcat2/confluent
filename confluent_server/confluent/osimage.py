@@ -218,14 +218,15 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
         callback({'progress': float(sizedone) / float(totalsize)})
 
 
-def extract_file(filepath, flags=0, callback=lambda x: None, imginfo=(), extractlist=None):
+def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extractlist=None):
     """Extracts an archive from a file into the current directory."""
     totalsize = 0
     for img in imginfo:
         if not imginfo[img]:
             continue
         totalsize += imginfo[img]
-    with libarchive.file_reader(filepath) as archive:
+    archfile.seek(0)
+    with libarchive.fd_reader(archfile.fileno()) as archive:
         extract_entries(archive, flags, callback, totalsize, extractlist)
 
 
@@ -484,8 +485,13 @@ def fingerprint(archive):
                 return imginfo, None
 
 
-def import_image(filename, callback, backend=False):
-    identity = fingerprint(filename)
+def import_image(filename, callback, backend=False, mfd=None):
+    if mfd:
+        archive = os.fdopen(int(mfd), 'rb')
+    else:
+        archive = open(filename, 'rb')
+    archive.seek(0)
+    identity = fingerprint(archive)
     if not identity:
         return -1
     identity, imginfo = identity
@@ -501,11 +507,13 @@ def import_image(filename, callback, backend=False):
         print('Importing OS to ' + targpath + ':')
     printit({'progress': 0.0})
     if EXTRACT & identity['method']:
-        extract_file(filename, callback=callback, imginfo=imginfo, extractlist=identity.get('extractlist', None))
+        extract_file(archive, callback=callback, imginfo=imginfo, extractlist=identity.get('extractlist', None))
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targpath = os.path.join(targpath, basename)
-        shutil.copyfile(filename, targpath)
+        archive.seek(0)
+        with open(targpath, 'wb') as targ:
+            shutil.copyfileobj(archive, targ)
     with open(targpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
     if 'subname' in identity:
@@ -630,12 +638,11 @@ class MediaImporter(object):
 
     def importmedia(self):
         os.environ['PYTHONPATH'] = ':'.join(sys.path)
+        os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
         with open(os.devnull, 'w') as devnull:
             self.worker = subprocess.Popen(
                 [sys.executable, __file__, self.filename, '-b'],
-                stdin=devnull, stdout=subprocess.PIPE) # pass_fds needed for
-                # passing filehandle, also set environment variable to say
-                # which filehandle it is
+                stdin=devnull, stdout=subprocess.PIPE, close_fds=False)
         wkr = self.worker
         currline = b''
         while wkr.poll() is None:
@@ -680,6 +687,7 @@ def get_importing_status(importkey):
 if __name__ == '__main__':
     os.umask(0o022)
     if len(sys.argv) > 2:
-        sys.exit(import_image(sys.argv[1], callback=printit, backend=True))
+        mfd = os.environ.get('CONFLUENT_MEDIAFD', None)
+        sys.exit(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd))
     else:
         sys.exit(import_image(sys.argv[1], callback=printit))
