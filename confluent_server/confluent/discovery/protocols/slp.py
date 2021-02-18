@@ -198,7 +198,14 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
     :param addresses:  Pass through of addresses argument from find_targets
     :return:
     """
-    if addresses is None:
+    if addresses is not None:
+        for addr in addresses:
+            for saddr in socket.getaddrinfo(addr, 427):
+                if saddr[0] == socket.AF_INET:
+                    net4.sendto(data, saddr[4])
+                elif saddr[0] == socket.AF_INET6:
+                    net.sendto(data, saddr[4])
+    else:
         data = _generate_request_payload(srvtype, True, xid)
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         v6addrs = []

@@ -1,10 +1,5 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# This is extracting the confluent slp support into
-# a standalone script, for use in environments that
-# can't run full confluent and/or would prefer
-# a utility style approach to SLP
-
 # Copyright 2017-2019 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# This is extracting the confluent slp support into
+# a standalone script, for use in environments that
+# can't run full confluent and/or would prefer
+# a utility style approach to SLP
+
 
 import os
 import random
@@ -199,8 +200,15 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
     :param addresses:  Pass through of addresses argument from find_targets
     :return:
     """
-    if addresses is None:
-        data = _generate_request_payload(srvtype, True, xid)
+    data = _generate_request_payload(srvtype, True, xid)
+    if addresses is not None:
+        for addr in addresses:
+            for saddr in socket.getaddrinfo(addr, 427):
+                if saddr[0] == socket.AF_INET:
+                    net4.sendto(data, saddr[4])
+                elif saddr[0] == socket.AF_INET6:
+                    net.sendto(data, saddr[4])
+    else:
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         v6addrs = []
         v6hash = _v6mcasthash(srvtype)
@@ -846,6 +854,4 @@ def natural_sort(iterable):
 
 
 if __name__ == '__main__':
-    def testsnoop(a):
-        print(repr(a))
-    snoop(testsnoop)
+    print(repr(list(scan(addresses=['10.240.52.189']))))
