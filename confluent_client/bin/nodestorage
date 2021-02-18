@@ -186,7 +186,7 @@ funmap = {
 
 def main():
     argparser = OptParser(
-        usage='Usage: %prog <noderange> [show|create|delete|diskset] [hotspare|jbod|unconfigured]',
+        usage='Usage: %prog <noderange> [show|create|delete|diskset] [hotspare|jbod|unconfigured] [options]',
         epilog='',
     )
     argparser.add_option('-r', '--raidlevel', type='int',
