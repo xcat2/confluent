@@ -1138,6 +1138,7 @@ class ConfigManager(object):
         return _cfgstore['tenant'][self.tenant]
 
     def __init__(self, tenant, decrypt=False, username=None):
+        self.clientfiles = {}
         global _cfgstore
         with _initlock:
             if _cfgstore is None:
@@ -1171,6 +1172,13 @@ class ConfigManager(object):
                 self._cfgstore['nodes'] = {}
             self._bg_sync_to_file()
             self.wait_for_sync()
+
+    def add_client_file(self, clientfile):
+        self.clientfiles[clientfile.filename] = clientfile.fileobject
+
+    def close_client_files(self):
+        for f in self.clientfiles:
+            self.clientfiles[f].close()
 
     def get_collective_member(self, name):
         return get_collective_member(name)

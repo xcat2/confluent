@@ -175,7 +175,7 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             cfm = authdata[1]
     send_data(connection, {'authpassed': 1})
     request = tlvdata.recv(connection)
-    if request and 'collective' in request:
+    if request and isinstance(request, dict) and 'collective' in request:
         if skipauth:
             if not libssl:
                 tlvdata.send(
@@ -216,7 +216,7 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
                                       'error': 'Unexpected error - ' + str(e)})
             send_data(connection, {'_requestdone': 1})
         request = tlvdata.recv(connection)
-
+    cfm.close_client_files()
 
 def send_response(responses, connection):
     if responses is None:
@@ -227,6 +227,9 @@ def send_response(responses, connection):
 
 
 def process_request(connection, request, cfm, authdata, authname, skipauth):
+    if isinstance(request, tlvdata.ClientFile):
+        cfm.add_client_file(request)
+        return
     if not isinstance(request, dict):
         raise exc.InvalidArgumentException
     operation = request['operation']

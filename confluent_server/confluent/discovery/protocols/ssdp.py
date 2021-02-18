@@ -351,10 +351,6 @@ def _parse_ssdp(peer, rsp, peerdata):
 
 if __name__ == '__main__':
 
-    for rsp in scan(['urn:dmtf-org:service:redfish-rest:1']):
+    for rsp in scan(['urn:dmtf-org:service:redfish-rest:1'], '10.240.52.189'):
         print(repr(rsp))
-    def fun(a):
-        print(repr(a))
-    def byefun(a):
-        print('bye' + repr(a))
-    snoop(fun, byefun)
+    

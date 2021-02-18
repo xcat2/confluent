@@ -180,7 +180,8 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                     yield imp
                 return
             elif operation == 'create':
-                importer = osimage.MediaImporter(inputdata['filename'])
+                importer = osimage.MediaImporter(inputdata['filename'],
+                                                 configmanager)
                 yield msg.KeyValueData({'target': importer.targpath,
                                         'name': importer.importkey})
                 return

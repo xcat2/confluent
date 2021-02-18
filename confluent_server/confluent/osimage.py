@@ -440,10 +440,10 @@ def check_rhel(isoinfo):
     return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
 
 
-def scan_iso(filename):
+def scan_iso(archive):
     filesizes = {}
     filecontents = {}
-    with libarchive.file_reader(filename) as reader:
+    with libarchive.fd_reader(archive.fileno()) as reader:
         for ent in reader:
             if str(ent).endswith('TRANS.TBL'):
                 continue
@@ -456,31 +456,32 @@ def scan_iso(filename):
     return filesizes, filecontents
 
 
-def fingerprint(filename):
-    with open(filename, 'rb') as archive:
-        header = archive.read(32768)
-        archive.seek(32769)
-        if archive.read(6) == b'CD001\x01':
-            # ISO image
-            isoinfo = scan_iso(filename)
-            name = None
-            for fun in globals():
-                if fun.startswith('check_'):
-                    name = globals()[fun](isoinfo)
-                    if name:
-                        return name, isoinfo[0]
-            return None
-        else:
-            sum = hashlib.sha256(header)
-            if sum.digest() in HEADERSUMS:
-                archive.seek(32768)
+def fingerprint(archive):
+    header = archive.read(32768)
+    archive.seek(32769)
+    if archive.read(6) == b'CD001\x01':
+        # ISO image
+        archive.seek(0)
+        isoinfo = scan_iso(archive)
+        archive.seek(0)
+        name = None
+        for fun in globals():
+            if fun.startswith('check_'):
+                name = globals()[fun](isoinfo)
+                if name:
+                    return name, isoinfo[0]
+        return None
+    else:
+        sum = hashlib.sha256(header)
+        if sum.digest() in HEADERSUMS:
+            archive.seek(32768)
+            chunk = archive.read(32768)
+            while chunk:
+                sum.update(chunk)
                 chunk = archive.read(32768)
-                while chunk:
-                    sum.update(chunk)
-                    chunk = archive.read(32768)
-                imginfo = HASHPRINTS.get(sum.hexdigest(), None)
-                if imginfo:
-                    return imginfo, None
+            imginfo = HASHPRINTS.get(sum.hexdigest(), None)
+            if imginfo:
+                return imginfo, None
 
 
 def import_image(filename, callback, backend=False):
@@ -581,10 +582,15 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
 
 class MediaImporter(object):
 
-    def __init__(self, media):
+    def __init__(self, media, cfm=None):
         self.worker = None
         self.profiles = []
-        identity = fingerprint(media)
+        medfile = None
+        if cfm and media in cfm.clientfiles:
+            medfile = cfm.clientfiles[media]
+        else:
+            medfile = open(medfile, 'rb')
+        identity = fingerprint(medfile)
         if not identity:
             raise exc.InvalidArgumentException('Unsupported Media')
         self.percent = 0.0
@@ -611,6 +617,7 @@ class MediaImporter(object):
         if os.path.exists(self.targpath):
             raise Exception('{0} already exists'.format(self.targpath))
         self.filename = os.path.abspath(media)
+        self.medfile = medfile
         self.importer = eventlet.spawn(self.importmedia)
 
     def stop(self):

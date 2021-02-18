@@ -22,6 +22,7 @@ import confluent.tlv as tlv
 import eventlet.green.socket as socket
 from datetime import datetime
 import json
+import os
 import struct
 
 try:
@@ -65,6 +66,11 @@ def CMSG_SPACE(length):  # bits/socket.h
     ret = CMSG_ALIGN(length).value + CMSG_ALIGN(ctypes.sizeof(cmsghdr)).value
     return ctypes.c_size_t(ret)
 
+
+class ClientFile(object):
+    def __init__(self, name, mode, fd):
+        self.fileobject = os.fdopen(fd, mode)
+        self.filename = name
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 recvmsg = libc.recvmsg
@@ -183,8 +189,8 @@ def recv(handle):
             if clev == socket.SOL_SOCKET and ctype == socket.SCM_RIGHTS:
                 filehandles.fromstring(
                     cdata[:len(cdata) - len(cdata) % filehandles.itemsize])
-        print(repr(filehandles))
-        print(repr(data))
+        data = json.loads(data)
+        return ClientFile(data['filename'], data['mode'], filehandles[0])
     else:
         data = handle.recv(dlen)
         while len(data) < dlen:

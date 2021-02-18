@@ -169,7 +169,8 @@ class Command(object):
             raise Exception('Confluent service is not available')
         else:
             self._connect_tls()
-        tlvdata.recv(self.connection)
+        self.protversion = int(tlvdata.recv(self.connection).split(
+            b'--')[1].strip()[1:])
         authdata = tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
@@ -180,10 +181,12 @@ class Command(object):
             passphrase = os.environ['CONFLUENT_PASSPHRASE']
             self.authenticate(username, passphrase)
 
-    def add_file(self, name, handle):
+    def add_file(self, name, handle, mode):
+        if self.protversion < 3:
+            raise Exception('Not supported with connected confluent server')
         if not self.unixdomain:
             raise Exception('Can only add a file to a unix domain connection')
-        tlvdata.send(self.connection, {'filename': name}, handle)
+        tlvdata.send(self.connection, {'filename': name, 'mode': mode}, handle)
 
     def authenticate(self, username, password):
         tlvdata.send(self.connection,
