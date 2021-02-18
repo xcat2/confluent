@@ -32,7 +32,7 @@ indicated by `-d` to either be `unconfigured`, `jbod`, or `hotspare`.
   volumes, or selecting a volume for delete.  Default
   behavior is to use implementation provided default
 
-* `-z` **STRIPSIZE**, `--stripsizes=`**STRIPSIZE**:
+* `-z` **STRIPSIZE**, `--stripsizes`=**STRIPSIZE**:
   Comma separated list of stripsizes to use when creating volumes.
   This value is in kilobytes.  The default behavior is to allow the
   storage controller to decide
