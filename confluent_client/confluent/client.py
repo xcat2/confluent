@@ -46,6 +46,13 @@ try:
 except NameError:
     pass
 
+
+class NestedDict(dict):
+    def __missing__(self, key):
+        value = self[key] = type(self)()
+        return value
+
+
 def stringify(instr):
     # Normalize unicode and bytes to 'str', correcting for
     # current python version
@@ -427,7 +434,7 @@ def send_request(operation, path, server, parameters=None):
         result = tlvdata.recv(server)
 
 
-def attrrequested(attr, attrlist, seenattributes):
+def attrrequested(attr, attrlist, seenattributes, node=None):
     for candidate in attrlist:
         truename = candidate
         if candidate.startswith('hm'):
@@ -435,10 +442,16 @@ def attrrequested(attr, attrlist, seenattributes):
         if candidate in _attraliases:
             candidate = _attraliases[candidate]
         if fnmatch.fnmatch(attr.lower(), candidate.lower()):
-            seenattributes.add(truename)
+            if node is None:
+                seenattributes.add(truename)
+            else:
+                seenattributes[node][truename] = True
             return True
         elif attr.lower().startswith(candidate.lower() + '.'):
-            seenattributes.add(truename)
+            if node is None:
+                seenattributes.add(truename)
+            else:
+                seenattributes[node][truename] = 1
             return True
     return False
 
@@ -454,13 +467,15 @@ def _sort_attrib(k):
 
 def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
     exitcode = 0
-    seenattributes = set([])
+    seenattributes = NestedDict()
+    allnodes = set([])
     for res in session.read(path):
         if 'error' in res:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
             continue
         for node in sorted(res['databynode']):
+            allnodes.add(node)
             for attr, val in sorted(res['databynode'][node].items(), key=_sort_attrib):
                 if attr == 'error':
                     sys.stderr.write('{0}: Error: {1}\n'.format(node, val))
@@ -468,7 +483,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                 if attr == 'errorcode':
                     exitcode |= val
                     continue
-                seenattributes.add(attr)
+                seenattributes[node][attr] = True
                 if rename:
                     printattr = rename.get(attr, attr)
                 else:
@@ -476,7 +491,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                 if attrprefix:
                     printattr = attrprefix + printattr
                 currattr = res['databynode'][node][attr]
-                if show_attr(attr, requestargs, seenattributes, options):
+                if show_attr(attr, requestargs, seenattributes, options, node):
                     if 'value' in currattr:
                         if currattr['value'] is not None:
                             val = currattr['value']
@@ -557,23 +572,39 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                                 except TypeError:
                                     pass
                         cprint(attrout)
+    somematched = set([])
+    printmissing = set([])
+    badnodes = NestedDict()
     if not exitcode:
         if requestargs:
             for attr in requestargs:
-                if attr not in seenattributes:
-                    sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
-                    exitcode = 1
+                for node in allnodes:
+                    if attr in seenattributes[node]:
+                        somematched.add(attr)
+                    else:
+                        badnodes[node][attr] = True
+                        exitcode = 1
+        for node in sortutil.natural_sort(badnodes):
+            for attr in badnodes[node]:
+                if attr in somematched:
+                    sys.stderr.write(
+                        'Error: {0} matches no valid value for {1}\n'.format(
+                            attr, node))
+                else:
+                    printmissing.add(attr)
+        for missing in printmissing:
+            sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
     return exitcode
 
 
-def show_attr(attr, requestargs, seenattributes, options):
+def show_attr(attr, requestargs, seenattributes, options, node):
     try:
         reverse = options.exclude
     except AttributeError:
         reverse = False
     if requestargs is None or requestargs == []:
         return True
-    processattr = attrrequested(attr, requestargs, seenattributes)
+    processattr = attrrequested(attr, requestargs, seenattributes, node)
     if reverse:
         processattr = not processattr
     return processattr
