@@ -69,6 +69,12 @@ def install_license(session, filename):
                'management_controller/licenses/'.format(noderange)
     filename = os.path.abspath(filename)
     instargs = {'filename': filename}
+    if session.unixdomain:
+        of = open(filename, 'rb')
+        try:
+            session.add_file(filename, of.fileno(), 'rb')
+        except Exception:
+            pass
     for res in session.create(resource, instargs):
         for node in res.get('databynode', []):
             if 'error' in res['databynode'][node]:

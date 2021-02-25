@@ -111,6 +111,12 @@ def upload_media(noderange, media):
     resource = '/noderange/{0}/media/uploads/'.format(noderange)
     upargs = {'filename': filename}
     noderrs = {}
+    if session.unixdomain:
+        of = open(filename, 'rb')
+        try:
+            session.add_file(filename, of.fileno(), 'rb')
+        except Exception:
+            pass
     nodeurls = {}
     for res in session.create(resource, upargs):
         if 'created' not in res:

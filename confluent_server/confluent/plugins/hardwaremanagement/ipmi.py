@@ -462,6 +462,7 @@ persistent_ipmicmds = {}
 class IpmiHandler(object):
     def __init__(self, operation, node, element, cfd, inputdata, cfg, output,
                  realop):
+        self.cfm = cfg
         self.invmap = {}
         self.output = output
         self.sensorcategory = None
@@ -589,7 +590,7 @@ class IpmiHandler(object):
     def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
                                     self.inputdata.nodefile(self.node), self.tenant,
-                                    bank=self.inputdata.bank)
+                                    bank=self.inputdata.bank, configmanager=self.cfm)
         self.output.put(
             msg.CreatedResource(
                 'nodes/{0}/inventory/firmware/updates/active/{1}'.format(
@@ -598,7 +599,7 @@ class IpmiHandler(object):
     def handle_media_upload(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.upload_media,
                                      self.inputdata.nodefile(self.node), self.tenant,
-                                     type='mediaupload')
+                                     type='mediaupload', configmanager=self.cfm)
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 

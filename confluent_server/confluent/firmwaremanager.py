@@ -32,11 +32,12 @@ uploadsbytarget = {}
 downloadsbytarget = {}
 updatepool = eventlet.greenpool.GreenPool(256)
 _tracelog = None
+filecontentbyname = {}
 
 
-def execupdate(handler, filename, updateobj, type, owner, node):
+def execupdate(handler, filename, updateobj, type, owner, node, datfile):
     global _tracelog
-    if type != 'ffdc':
+    if type != 'ffdc' and not datfile:
         errstr = False
         if not os.path.exists(filename):
             errstr =  '{0} does not appear to exist on {1}, or is in a directory with permissions forbidding confluent user/group access'.format(
@@ -64,9 +65,10 @@ def execupdate(handler, filename, updateobj, type, owner, node):
     try:
         if type == 'firmware':
             completion = handler(filename, progress=updateobj.handle_progress,
-                                 bank=updateobj.bank)
+                                 data=datfile, bank=updateobj.bank)
         else:
-            completion = handler(filename, progress=updateobj.handle_progress)
+            completion = handler(filename, progress=updateobj.handle_progress,
+                                 data=datfile)
         if type == 'ffdc' and completion:
             filename = completion
             completion = None
@@ -90,14 +92,19 @@ def execupdate(handler, filename, updateobj, type, owner, node):
 
 class Updater(object):
     def __init__(self, node, handler, filename, tenant=None, name=None,
-                 bank=None, type='firmware', owner=None):
+                 bank=None, type='firmware', owner=None, configmanager=None):
         self.bank = bank
         self.node = node
         self.phase = 'initializing'
         self.detail = ''
         self.percent = 0.0
+        if configmanager and filename in configmanager.clientfiles:
+            cf = configmanager.clientfiles[filename]
+            datfile = os.fdopen(os.dup(cf.fileno()), cf.mode)
+        else:
+            datfile = None
         self.updateproc = updatepool.spawn(execupdate, handler, filename,
-                                           self, type, owner, node)
+                                           self, type, owner, node, datfile)
         if type == 'firmware':
             myparty = updatesbytarget
         elif type == 'mediaupload':
