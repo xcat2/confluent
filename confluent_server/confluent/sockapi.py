@@ -21,8 +21,6 @@
 #
 
 import atexit
-import ctypes
-import ctypes.util
 import errno
 import os
 import pwd
@@ -76,24 +74,6 @@ except ImportError:
     crypto = None
 
 plainsocket = None
-
-class iovec(ctypes.Structure):   # from uio.h
-    _fields_ = [('iov_base', ctypes.c_void_p),
-                ('iov_len', ctypes.c_size_t)]
-
-class msghdr(ctypes.Structure):  # from bits/socket.h
-    _fields_ = [('msg_name', ctypes.c_void_p),
-                ('msg_namelen', ctypes.c_uint),
-                ('msg_iov', ctypes.POINTER(iovec)),
-                ('msg_iovlen', ctypes.c_size_t),
-                ('msg_control', ctypes.c_void_p),
-                ('msg_controllen', ctypes.c_size_t),
-                ('msg_flags', ctypes.c_int)]
-
-libc = ctypes.CDLL(ctypes.util.find_library('c'))
-recvmsg = libc.recvmsg
-recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
-recvmsg.restype = ctypes.c_size_t
 
 def _should_authlog(path, operation):
     if (operation == 'retrieve' and
