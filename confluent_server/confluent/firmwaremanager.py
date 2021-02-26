@@ -103,6 +103,7 @@ class Updater(object):
             datfile = os.fdopen(os.dup(cf.fileno()), cf.mode)
         else:
             datfile = None
+        self.datfile = datfile
         self.updateproc = updatepool.spawn(execupdate, handler, filename,
                                            self, type, owner, node, datfile)
         if type == 'firmware':
@@ -127,6 +128,8 @@ class Updater(object):
 
     def cancel(self):
         self.updateproc.kill()
+        if self.datfile:
+            self.datfile.close()
 
     @property
     def progress(self):
