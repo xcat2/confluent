@@ -19,6 +19,7 @@ import confluent.util as util
 import confluent.log as log
 import os
 import random
+import eventlet.greenpool
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import struct
@@ -583,6 +584,8 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
         # reduced chance of many responses overwhelming receive buffer.
     _grab_rsps((net, net4), rsps, 1, xidmap)
     # now to analyze and flesh out the responses
+    handleids = set([])
+    gp = eventlet.greenpool.GreenPool(128)
     for id in rsps:
         for srvurl in rsps[id].get('urls', ()):
             if len(srvurl) > 4:
@@ -597,7 +600,10 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
                     break
             else:
                 continue
-        _add_attributes(rsps[id])
+        gp.spawn_n(_add_attributes, rsps[id])
+        handleids.add(id)
+    gp.waitall()
+    for id in handleids:
         if 'service:lighttpd' in rsps[id]['services']:
             currinf = rsps[id]
             curratt = currinf.get('attributes', {})
