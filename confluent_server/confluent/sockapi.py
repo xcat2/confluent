@@ -21,6 +21,8 @@
 #
 
 import atexit
+import ctypes
+import ctypes.util
 import errno
 import os
 import pwd
@@ -74,6 +76,8 @@ except ImportError:
     crypto = None
 
 plainsocket = None
+
+libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
 def _should_authlog(path, operation):
     if (operation == 'retrieve' and
