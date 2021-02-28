@@ -814,10 +814,10 @@ def get_smm_neighbor_fingerprints(smmaddr, cv):
     neighs = wc.grab_json_response('/scripts/neighdata.json')
     if not neighs:
         return
-    for idx in (4, 5):
-        if 'sha256' not in neighs[idx]:
+    for neigh in neighs:
+        if 'sha256' not in neigh:
             continue
-        yield 'sha256$' + b64tohex(neighs[idx]['sha256'])
+        yield 'sha256$' + b64tohex(neigh['sha256'])
 
 
 def get_nodename(cfg, handler, info):
