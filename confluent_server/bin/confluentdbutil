@@ -74,7 +74,7 @@ if args[0] == 'restore':
             for targdir in os.walk('/etc/confluent'):
                 os.chown(targdir[0], owner, group)
                 for f in targdir[2]:
-                    os.chown(os.patht.join(targdir[0], f), owner, group)
+                    os.chown(os.path.join(targdir[0], f), owner, group)
     except Exception as e:
         print(str(e))
         sys.exit(1)

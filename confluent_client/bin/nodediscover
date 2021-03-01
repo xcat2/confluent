@@ -263,7 +263,11 @@ def list_matching_macs(options, session, node=None, checknode=True):
         return [options.mac.replace(':', '-')]
     else:
         path += 'by-mac/'
-        return [x['item']['href'] for x in session.read(path)]
+        ret = []
+        for x in session.read(path):
+            if 'item' in x and 'href' in x['item']:
+                ret.append(x['item', 'href'])
+        return ret
 
 def assign_discovery(options, session, needid=True):
     abort = False
