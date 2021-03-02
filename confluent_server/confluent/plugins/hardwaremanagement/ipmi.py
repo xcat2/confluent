@@ -1528,7 +1528,7 @@ class IpmiHandler(object):
             datfile = None
             if filename in self.cfm.clientfiles:
                 cf = self.cfm.clientfiles[filename]
-                datfile = os.fdopen(os.dup(cf.filenoe()), cf.mode)
+                datfile = os.fdopen(os.dup(cf.fileno()), cf.mode)
             if datfile is None and not os.access(filename, os.R_OK):
                 errstr =  ('{0} is not readable by confluent on {1} '
                            '(ensure confluent user or group can access file '

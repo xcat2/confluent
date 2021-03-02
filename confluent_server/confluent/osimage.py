@@ -597,7 +597,7 @@ class MediaImporter(object):
         if cfm and media in cfm.clientfiles:
             medfile = cfm.clientfiles[media]
         else:
-            medfile = open(medfile, 'rb')
+            medfile = open(media, 'rb')
         identity = fingerprint(medfile)
         if not identity:
             raise exc.InvalidArgumentException('Unsupported Media')
