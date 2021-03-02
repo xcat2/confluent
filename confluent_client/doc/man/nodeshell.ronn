@@ -3,7 +3,7 @@ nodeshell(8) -- Execute command on many nodes in a noderange through ssh
 
 ## SYNOPSIS
 
-`nodeshell <noderange> [options] <command to execute on each node>`
+`nodeshell [options] <noderange> <command to execute on each node>`
 
 ## DESCRIPTION
 
@@ -13,10 +13,20 @@ nodeattribexpressions(5).  `nodeshell` provides stdout as stdout and stderr
 as stderr, unlike psh which combines all stdout and stderr into stdout.
 
 ## OPTIONS
+  
+* `-c COUNT`, `-f COUNT`, `--count=COUNT`
+  Specify the maximum number of instances to run concurrently
 
-* `-c`:
-  Specify the maximum number of instances to run concurrently.
+* `-m MAXNODES`, `--maxnodes=MAXNODES`
+  Specify a maximum number of nodes to run remote ssh command to, prompting
+  if over the threshold
+ 
+* `-n`, `--nonodeprefix`
+  Do not prefix output with node names  
 
+* `-p PORT`, `--port=PORT`
+  Specify a custom port for ssh
+       
 ## EXAMPLES
 
 * Running `echo hi` on for nodes:
