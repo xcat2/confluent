@@ -24,11 +24,8 @@ def update(nodes, element, configmanager, inputdata):
             em = emebs[node]['enclosure.manager']['value']
             eb = emebs[node]['enclosure.bay']['value']
         except KeyError:
-            yield msg.ConfluentNodeError(
-                node,
-                'Reseat is only supported on servers in an enclosure, and '
-                'with enclosure.manager and enclosure.bay defined')
-            continue
+            em = node
+            eb = -1
         try:
             for rsp in core.handle_path(
                     '/nodes/{0}/_enclosure/reseat_bay'.format(em),
