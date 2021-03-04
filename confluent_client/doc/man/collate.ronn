@@ -3,7 +3,7 @@ collate(1) -- Organize text input by node
 
 ## SYNOPSIS
 
-`<other command> | collate [-a] [-d] [-w] [-s] [-c] [-r] [-l lognametemplate]`
+`<other command> | collate [-a] [-b] [-d] [-w] [-g] [-s] [-c] [-r] [-l lognametemplate]`
 
 ## DESCRIPTION
 
@@ -21,19 +21,23 @@ node and group names sorted alphanumerically.
    when output differs along a telling group boundary.  For example, if
    output suggests a large number of nodes are unreachable, abbreviate
    showing 'rack1' as being unreachable may make more obvious a possible cause.
+   
+* `-b`, `--base`:
+   Use given node as reference for comparison when using
+   -d, instead of using the most common result      
 
 * `-d`, `--diff`:
    Express all but the most common result group in terms of diff from
    the most common result group
-
-* `-l`, `--log`:
-   Save output per node to individual log files, replacing {node} in the name
-   with the nodename of each
-
+   
 * `-w`, `--watch`:
    Update results dynamically as data becomes available, rather than
    waiting    for the command to fully complete.
-
+   
+* `-g`, `--groupcount`:
+   Show count of output groups rather than the actual
+   output
+   
 * `-s`, `--skipcommon`:
    Suppress printing of the most common result text group.  This is used to
    focus on stray output against a well known and expected result.
@@ -45,6 +49,10 @@ node and group names sorted alphanumerically.
  * `-r`, `--reverse`:
     Rather than starting with most common to least common, start with
     the least common and print the most common last.
+    
+* `-l`, `--log`:
+   Save output per node to individual log files, replacing {node} in the name
+   with the nodename of each
    
 ## EXAMPLES
  * Organizing power state of multiple nodes:  
