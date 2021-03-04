@@ -9,6 +9,12 @@ nodebmcreset(8) -- Reset management controller
 
 `nodebmcreset` allows you to reset the management controller of the specified noderange
 
+## OPTIONS
+
+* `-m`, `--maxnodes`:
+  Number of nodes to affect before prompting for
+  confirmation
+
 ## EXAMPLES:
 
 * Reset the management controller for nodes n1 through n4:
