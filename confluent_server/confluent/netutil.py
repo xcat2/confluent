@@ -82,8 +82,11 @@ _idxtoifnamemap = {}
 def _rebuildidxmap():
     _idxtoifnamemap.clear()
     for iname in os.listdir('/sys/class/net'):
-        ci = int(open('/sys/class/net/{0}/ifindex'.format(iname)).read())
-        _idxtoifnamemap[ci] = iname
+        try:
+            ci = int(open('/sys/class/net/{0}/ifindex'.format(iname)).read())
+            _idxtoifnamemap[ci] = iname
+        except Exception:  # there may be non interface in /sys/class/net
+            pass
 
 
 def myiptonets(svrip):
