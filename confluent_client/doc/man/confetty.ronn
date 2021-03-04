@@ -15,6 +15,18 @@ be mostly an aid for developing client software, with
 day to day administration generally being easier with
 the various function specific commands.
 
+## OPTIONS
+
+* `-s`, `--server`:
+  Confluent instance to connect to
+
+* `-c`, `--control`:
+  Path to offer terminal control
+
+* `-m`, `--mintime`:
+  Minimum time to run or else pause for input (used to
+  keep a terminal from closing quickly on error)
+
 ## COMMANDS
 
 The CLI may be navigated by shell commands and some other
