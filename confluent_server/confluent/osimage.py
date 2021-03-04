@@ -228,7 +228,7 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
     dfd = os.dup(archfile.fileno())
     os.lseek(dfd, 0, 0)
     try:
-        with libarchive.fd_reader(archfile.fileno()) as archive:
+        with libarchive.fd_reader(dfd) as archive:
             extract_entries(archive, flags, callback, totalsize, extractlist)
     finally:
         os.close(dfd)
@@ -451,7 +451,7 @@ def scan_iso(archive):
     dfd = os.dup(archive.fileno())
     os.lseek(dfd, 0, 0)
     try:
-        with libarchive.fd_reader(archive.fileno()) as reader:
+        with libarchive.fd_reader(dfd) as reader:
             for ent in reader:
                 if str(ent).endswith('TRANS.TBL'):
                     continue
