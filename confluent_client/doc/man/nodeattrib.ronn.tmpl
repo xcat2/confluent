@@ -40,12 +40,22 @@ See nodegroupattrib(8) command on how to manage attributes on a group level.
 
 * `-b`, `--blame`:
   Annotate inherited and expression based attributes to show their base value.
+  
 * `-c`, `--clear`:
-  Clear specified nodeattributes
+  Clear specified nodeattributes.
+  
 * `-e`, `--environment`:
-  Set specified attributes based on exported environment variable of matching name.  Environment variable names may be lower case or all upper case.  Replace . with _ as needed (e.g. info.note may be specified as either $info_note or $INFO_NOTE
+  Set specified attributes based on exported environment variable of matching name. 
+  Environment variable names may be lower case or all upper case. 
+  Replace . with _ as needed (e.g. info.note may be specified as either $info_note or $INFO_NOTE
+  
 * `-p`, `--prompt`:
-  Request interactive prompting to provide values rather than the command line or environment variables.
+  Request interactive prompting to provide values rather than the command line
+  or environment variables.
+  
+* `-m`, `--maxnodes`:
+  Prompt if trying to set attributes on more than
+  specified number of nodes.
 
 ## EXAMPLES
 * Listing matching nodes of a simple noderange:
