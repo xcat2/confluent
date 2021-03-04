@@ -225,9 +225,13 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
         if not imginfo[img]:
             continue
         totalsize += imginfo[img]
-    os.lseek(archfile.fileno(), 0, 0)
-    with libarchive.fd_reader(archfile.fileno()) as archive:
-        extract_entries(archive, flags, callback, totalsize, extractlist)
+    dfd = os.dup(archfile.fileno())
+    os.lseek(dfd, 0, 0)
+    try:
+        with libarchive.fd_reader(archfile.fileno()) as archive:
+            extract_entries(archive, flags, callback, totalsize, extractlist)
+    finally:
+        os.close(dfd)
 
 
 def check_alma(isoinfo):
@@ -444,27 +448,31 @@ def check_rhel(isoinfo):
 def scan_iso(archive):
     filesizes = {}
     filecontents = {}
-    with libarchive.fd_reader(archive.fileno()) as reader:
-        for ent in reader:
-            if str(ent).endswith('TRANS.TBL'):
-                continue
-            eventlet.sleep(0)
-            filesizes[str(ent)] = ent.size
-            if str(ent) in READFILES:
-                filecontents[str(ent)] = b''
-                for block in ent.get_blocks():
-                    filecontents[str(ent)] += bytes(block)
+    dfd = os.dup(archive.fileno())
+    os.lseek(dfd, 0, 0)
+    try:
+        with libarchive.fd_reader(archive.fileno()) as reader:
+            for ent in reader:
+                if str(ent).endswith('TRANS.TBL'):
+                    continue
+                eventlet.sleep(0)
+                filesizes[str(ent)] = ent.size
+                if str(ent) in READFILES:
+                    filecontents[str(ent)] = b''
+                    for block in ent.get_blocks():
+                        filecontents[str(ent)] += bytes(block)
+    finally:
+        os.close(dfd)
     return filesizes, filecontents
 
 
 def fingerprint(archive):
+    archive.seek(0)
     header = archive.read(32768)
-    os.lseek(archive.fileno(), 32769, 0)
+    archive.seek(32769)
     if archive.read(6) == b'CD001\x01':
         # ISO image
-        os.lseek(archive.fileno(), 0, 0)
         isoinfo = scan_iso(archive)
-        os.lseek(archive.fileno(), 0, 0)
         name = None
         for fun in globals():
             if fun.startswith('check_'):
@@ -490,7 +498,6 @@ def import_image(filename, callback, backend=False, mfd=None):
         archive = os.fdopen(int(mfd), 'rb')
     else:
         archive = open(filename, 'rb')
-    os.lseek(archive.fileno(), 0, 0)
     identity = fingerprint(archive)
     if not identity:
         return -1
@@ -511,7 +518,7 @@ def import_image(filename, callback, backend=False, mfd=None):
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targpath = os.path.join(targpath, basename)
-        os.lseek(archive.fileno(), 0, 0)
+        archive.seek(0)
         with open(targpath, 'wb') as targ:
             shutil.copyfileobj(archive, targ)
     with open(targpath + '/distinfo.yaml', 'w') as distinfo:
