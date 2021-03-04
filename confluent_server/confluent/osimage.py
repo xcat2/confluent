@@ -529,12 +529,15 @@ def import_image(filename, callback, backend=False, mfd=None):
         currsz = 0
         modpct = 1.0 - pct
         archive.seek(0, 0)
+        printat = 0
         with open(targiso, 'wb') as targ:
             buf = archive.read(32768)
             while buf:
                 currsz += len(buf)
                 pgress = pct + ((float(currsz) / float(totalsz)) * modpct)
-                callback({'progress': pgress})
+                if time.time() > printat:
+                    callback({'progress': pgress})
+                    printat = time.time() + 0.5
                 targ.write(buf)
                 buf = archive.read(32768)
     with open(targpath + '/distinfo.yaml', 'w') as distinfo:
