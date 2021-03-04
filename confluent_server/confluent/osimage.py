@@ -546,7 +546,7 @@ def import_image(filename, callback, backend=False, mfd=None):
         del identity['subname']
     with open(distpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
-    printit({'progress': 1.0})
+    callback({'progress': 1.0})
     sys.stdout.write('\n')
 
 def printit(info):
