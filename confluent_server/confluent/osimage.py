@@ -225,7 +225,7 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
         if not imginfo[img]:
             continue
         totalsize += imginfo[img]
-    archfile.seek(0)
+    os.lseek(archfile.fileno(), 0, 0)
     with libarchive.fd_reader(archfile.fileno()) as archive:
         extract_entries(archive, flags, callback, totalsize, extractlist)
 
@@ -459,12 +459,12 @@ def scan_iso(archive):
 
 def fingerprint(archive):
     header = archive.read(32768)
-    archive.seek(32769)
+    os.lseek(archive.fileno(), 32769, 0)
     if archive.read(6) == b'CD001\x01':
         # ISO image
-        archive.seek(0)
+        os.lseek(archive.fileno(), 0, 0)
         isoinfo = scan_iso(archive)
-        archive.seek(0)
+        os.lseek(archive.fileno(), 0, 0)
         name = None
         for fun in globals():
             if fun.startswith('check_'):
@@ -490,7 +490,7 @@ def import_image(filename, callback, backend=False, mfd=None):
         archive = os.fdopen(int(mfd), 'rb')
     else:
         archive = open(filename, 'rb')
-    archive.seek(0)
+    os.lseek(archive.fileno(), 0, 0)
     identity = fingerprint(archive)
     if not identity:
         return -1
@@ -511,7 +511,7 @@ def import_image(filename, callback, backend=False, mfd=None):
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targpath = os.path.join(targpath, basename)
-        archive.seek(0)
+        os.lseek(archive.fileno(), 0, 0)
         with open(targpath, 'wb') as targ:
             shutil.copyfileobj(archive, targ)
     with open(targpath + '/distinfo.yaml', 'w') as distinfo:
