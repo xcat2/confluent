@@ -517,9 +517,9 @@ def import_image(filename, callback, backend=False, mfd=None):
         extract_file(archive, callback=callback, imginfo=imginfo, extractlist=identity.get('extractlist', None))
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
-        targpath = os.path.join(targpath, basename)
+        targiso = os.path.join(targpath, basename)
         archive.seek(0)
-        with open(targpath, 'wb') as targ:
+        with open(targiso, 'wb') as targ:
             shutil.copyfileobj(archive, targ)
     with open(targpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
