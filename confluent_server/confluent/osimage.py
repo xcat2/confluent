@@ -216,6 +216,7 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
                 os.chmod(str(entry), 0o644)
     if callback:
         callback({'progress': float(sizedone) / float(totalsize)})
+    return float(sizedone) / float(totalsize)
 
 
 def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extractlist=None):
@@ -227,11 +228,14 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
         totalsize += imginfo[img]
     dfd = os.dup(archfile.fileno())
     os.lseek(dfd, 0, 0)
+    pctdone = 0
     try:
         with libarchive.fd_reader(dfd) as archive:
-            extract_entries(archive, flags, callback, totalsize, extractlist)
+            pctdone = extract_entries(archive, flags, callback, totalsize,
+                                      extractlist)
     finally:
         os.close(dfd)
+    return pctdone
 
 
 def check_alma(isoinfo):
@@ -512,15 +516,27 @@ def import_image(filename, callback, backend=False, mfd=None):
     os.chdir(targpath)
     if not backend:
         print('Importing OS to ' + targpath + ':')
-    printit({'progress': 0.0})
+    callback({'progress': 0.0})
+    pct = 0.0
     if EXTRACT & identity['method']:
-        extract_file(archive, callback=callback, imginfo=imginfo, extractlist=identity.get('extractlist', None))
+        pct = extract_file(archive, callback=callback, imginfo=imginfo,
+                           extractlist=identity.get('extractlist', None))
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targiso = os.path.join(targpath, basename)
-        archive.seek(0)
+        archive.seek(0, 2)
+        totalsz = archive.tell()
+        currsz = 0
+        modpct = 1.0 - pct
+        archive.seek(0, 0)
         with open(targiso, 'wb') as targ:
-            shutil.copyfileobj(archive, targ)
+            buf = archive.read(32768)
+            while buf:
+                currsz += len(buf)
+                pgress = pct + ((float(currsz) / float(totalsz)) * modpct)
+                callback({'progress': pgress})
+                targ.write(buf)
+                buf = archive.read(32768)
     with open(targpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
     if 'subname' in identity:
