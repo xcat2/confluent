@@ -19,7 +19,7 @@ deployment status.
 
 ## OPTIONS
 
-* '-c', '--clear`:
+* `-c`, `--clear`:
   Remove any pending deployment action
 
 * `-n`, `--network`:
@@ -28,6 +28,9 @@ deployment status.
 * `-p`, `--prepareonly`:
   Prepare the network services for deployment, but do not interact with BMCs. This is intended for scenarios where
   the boot device control and server restart will be handled outside of confluent.
+  
+* `-m`, `--maxnodes`:  
+  Specifiy a maximum nodes to be deployed.
 
 ## EXAMPLES
 * Begin the instalalation of a profile of CentOS 8.2:  
