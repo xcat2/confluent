@@ -11,6 +11,12 @@ nodeeventlog(8) -- Pull eventlog from confluent nodes
 `nodeeventlog` pulls and optionally clears the event log from the requested
 noderange.
 
+## OPTIONS
+
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to clear if clearing log, prompting if 
+  over the threshold  
+
 ## EXAMPLES
 * Pull the event log from n2 and n3:
   `# nodeeventlog n2,n3`  
