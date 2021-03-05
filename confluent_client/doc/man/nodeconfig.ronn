@@ -27,6 +27,13 @@ actually be in effect until a reboot.
   no configuration values are specified, it will show only those that differ.
   If combined with `-x`, will show all differing values except those indicated
   by `-x`
+  
+* `-b`, `--batch`:
+   Provide arguments as lines of a file, rather than the command line.  
+   
+* `-d`, `--detail`:
+  Provide detailed data as available.  This can include help text and valid
+  values for a setting.   
 
 * `-e`, `--extra`:
    Read settings that are generally not needed, but may be slow to retrieve.
@@ -37,18 +44,18 @@ actually be in effect until a reboot.
   Rather than listing only the specified configuration parameters, list all
   attributes except for the specified ones
 
-* `-d`, `--detail`:
-  Provide detailed data as available.  This can include help text and valid
-  values for a setting.
+* `-a`, `--advanced`:
+  Include advanced settings, which are normally not intended to be used
+  without direction from the relevant server vendor.
 
 * `-r`, `--restoredefault`:
   Request that the specified component of the targeted nodes will have its
   configuration reset to default.  Currently the only component implemented
   is uefi.
 
-* `-b`, '--batch':
-   Provide arguments as lines of a file, rather than the command line.
-
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to configure, prompting if over 
+  the threshold  
 
 ## EXAMPLES
 * Showing the current IP configuration of noderange BMC/IMM/XCC:
