@@ -26,6 +26,15 @@ the out of band facilities.  Firmware updates can end in one of three states:
 * `pending`:  The firmware update process has completed, but the firmware will not be active until the relevant component next resets.  Generally speaking, for UEFI update the system will need a reboot, and for BMC updates, the `nodebmcreset` command will begin the process to activate the firmware.
 * `complete`:  The firmware update process has completed and activation has proceeded.  Note that while the activation process has commenced, the component may still be in the process of rebooting when nodefirmware exits.
 
+## OPTIONS
+
+* `-b`, `--backup`:
+  Target a backup bank rather than primary
+  
+* `-m`, `--maxnodes`:
+  When updating, prompt if more than the specified number of servers will 
+  be affected  
+
 ## EXAMPLES
 
 * Pull firmware from a node:
