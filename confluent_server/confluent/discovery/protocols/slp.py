@@ -107,6 +107,8 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
     if '%' in addr:
         addr = addr[:addr.index('%')]
     mac = None
+    if addr not in neighutil.neightable:
+        neighutil.update_neigh()
     if addr in neighutil.neightable:
         identifier = neighutil.neightable[addr]
         mac = identifier
