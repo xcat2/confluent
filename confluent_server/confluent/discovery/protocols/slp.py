@@ -543,6 +543,8 @@ def active_scan(handler, protocol=None):
         for addr in scanned['addresses']:
             ip = addr[0].partition('%')[0]  # discard scope if present
             if ip not in neighutil.neightable:
+                neighutil.update_neigh()
+            if ip not in neighutil.neightable:
                 continue
             if addr in known_peers:
                 break
