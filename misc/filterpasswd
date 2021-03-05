@@ -1,0 +1,57 @@
+uidmin = 1000
+uidmax = 60000
+gidmin = 1000
+gidmax = 60000
+for line in open('/etc/login.defs').read().split('\n'):
+     try:
+         line = line[:line.index('#')]
+     except ValueError:
+         pass
+     keyval = line.split()
+     if len(keyval) < 2:
+         continue 
+     if keyval[0] == 'UID_MIN':
+         uidmin = int(keyval[1])
+     if keyval[0] == 'UID_MAX':
+         uidmax = int(keyval[1])
+     if keyval[0] == 'GID_MIN':
+         gidmin = int(keyval[1])
+     if keyval[0] == 'GID_MAX':
+         gidmax = int(keyval[1])
+
+def show_passwd(shadowmode=False):
+    for line in open('/etc/passwd').read().split('\n'):
+        try:
+            user, _, uid, _ = line.split(':', 3)
+        except ValueError:
+            continue
+        uid = int(uid)
+        if uid >= uidmin and uid <= uidmax:
+            if shadowmode:
+                yield '{0}:!!:::::::'.format(user)
+            else:
+                yield line
+
+def show_group(shadowmode=False):
+    for line in open('/etc/group').read().split('\n'):
+        try:
+            _, _, gid, _ = line.split(':', 3)
+        except ValueError:
+            continue
+        gid = int(gid)
+        if gid >= gidmin and gid <= gidmax:
+            yield line
+
+
+if __name__ == '__main__':
+    if 'passwd' in sys.argv[1]:
+        for line in show_passwd():
+            print(line)
+    elif 'shadow' in sys.argv[1]:
+        for line in show_passwd(True):
+            print(line)
+    elif 'group' in sys.argv[1]:
+        for line in show_group():
+            print(line)
+      
+
