@@ -9,6 +9,11 @@ noderemove(8) -- Remove nodes from the confluent management service
 
 `noderemove` simply removes the given noderange from the confluent database.
 
+## OPTIONS
+
+* `-m`, `--maxnodes`:
+    Specify a maximum number of nodes to delete, prompting if over the
+    threshold
 
 ## EXAMPLES
 
