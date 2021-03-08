@@ -13,6 +13,18 @@ nodeattribexpressions(5) are expanded prior to execution of the command.  For
 noderun, the commands are locally executed.  To execute commands on the nodes
 themselves, see nodeshell(8).
 
+## OPTIONS
+
+* `-f`, `-c`, `--count`:
+  Number of commands to run at a time
+  
+* `-n`, `--nonodeprefix`:
+  Do not prefix output with node names
+  
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to run the command with, prompting if over
+  the threshold
+
 ## EXAMPLES
 
 * Run ping against nodes n1 through n4:
