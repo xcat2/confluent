@@ -15,3 +15,7 @@ to that directory. The `install` command will take the specified filename and in
 argument may be of the form  xcc_fod_0034_7X21{id.serial}.key to have the serial number substituted
 to allow unique licenses to be specified in a single command.
 
+## OPTIONS
+
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to delete licenses from, prompting if over the threshold
