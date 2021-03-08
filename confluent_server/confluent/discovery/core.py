@@ -811,7 +811,11 @@ def get_smm_neighbor_fingerprints(smmaddr, cv):
     if ':' in smmaddr:
         smmaddr = '[{0}]'.format(smmaddr)
     wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
-    neighs = wc.grab_json_response('/scripts/neighdata.json')
+    try:
+        neighs = wc.grab_json_response('/scripts/neighdata.json')
+    except Exception:
+        log.log({'error': 'Failure getting LLDP information from {}'.format(smmaddr)})
+        return
     if not neighs:
         return
     for neigh in neighs:
