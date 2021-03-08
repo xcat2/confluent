@@ -19,6 +19,12 @@ running in collective mode.
 Note that due to vendor filename requirements, any filename may have vendor
 specific suffixes added to any file produced.
 
+## OPTIONS
+
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to download diagnostic data from, prompting
+    if over the threshold
+
 ## EXAMPLES
 
 * Download support data from a single node to a specific filename  
