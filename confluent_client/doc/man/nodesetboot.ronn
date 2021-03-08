@@ -33,6 +33,10 @@ control.
 
 * `-u`, `--uefi`:
   This flag does nothing, it is for command compatibility with xCAT's rsetboot
+  
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to modify next boot device, prompting if
+  over the threshold
 
 * `default`:
   Request a normal default boot with no particular device override
