@@ -12,10 +12,12 @@ noderange. This will present progress as percentage for all nodes.
 
 ## OPTIONS
 
-* `-m`:
-  Specify maximum number of nodes for noderange max.
-
-* `-c`:
+* `-c`, `-f`, `--count`:
   Specify how many rsync executions to do concurrently.  If noderange
   exceeds the count, then excess nodes will wait until one of the
-  active count completes.
+  active count completes. 
+  
+* `-m`, `--maxnodes`:
+  Specify a maximum number of nodes to run rsync to, prompting if over the
+  threshold
+  
