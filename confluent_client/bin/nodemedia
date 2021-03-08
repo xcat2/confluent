@@ -187,5 +187,7 @@ def main():
         argparser.print_help()
         sys.exit(1)
     handler(noderange, media)
+
 if __name__ == '__main__':
     main()
+    sys.exit(exitcode)
