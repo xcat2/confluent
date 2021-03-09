@@ -77,6 +77,8 @@ def initialize_ca():
 
 def prep_ssh_key(keyname):
     assure_agent()
+    if keyname in ready_keys:
+        return
     tmpdir = tempfile.mkdtemp()
     try:
         askpass = os.path.join(tmpdir, 'askpass.sh')
@@ -89,15 +91,15 @@ def prep_ssh_key(keyname):
         with open(os.devnull, 'wb') as devnull:
             subprocess.check_call(['ssh-add', keyname], stdin=devnull)
         del os.environ['CONFLUENT_SSH_PASSPHRASE']
+        ready_keys[keyname] = 1
     finally:
         shutil.rmtree(tmpdir)
 
 def sign_host_key(pubkey, nodename, principals=()):
     tmpdir = tempfile.mkdtemp()
     try:
-        if 'ca.pub' not in ready_keys:
-            prep_ssh_key('/etc/confluent/ssh/ca')
-            ready_keys['ca.pub'] = 1
+        prep_ssh_key('/etc/confluent/ssh/ca')
+        ready_keys['ca.pub'] = 1
         pkeyname = os.path.join(tmpdir, 'hostkey.pub')
         with open(pkeyname, 'wb') as pubfile:
             pubfile.write(pubkey)

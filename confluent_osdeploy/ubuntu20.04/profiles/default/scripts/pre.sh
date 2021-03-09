@@ -9,7 +9,7 @@ if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "n
 fi
 
 
-cat /custom-installation/ssh/*.rootpubkey > /root/.ssh/authorized_keys
+cat /custom-installation/ssh/*pubkey > /root/.ssh/authorized_keys
 nodename=$(grep ^NODENAME: /custom-installation/confluent/confluent.info|awk '{print $2}')
 apikey=$(cat /custom-installation/confluent/confluent.apikey)
 for pubkey in /etc/ssh/ssh_host*key.pub; do

@@ -16,7 +16,8 @@ if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "n
 fi
 
 mkdir ~/.ssh
-cat /ssh/*.rootpubkey > ~/.ssh/authorized_keys
+cat /ssh/*pubkey > ~/.ssh/authorized_keys 2>/dev/null
+
 ssh-keygen -A
 for i in  /etc/ssh/ssh_host*key.pub; do
     certname=${i/.pub/-cert.pub}

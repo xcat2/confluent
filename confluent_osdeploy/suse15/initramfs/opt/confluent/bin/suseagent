@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "Installing certificates"
 echo '<authorized_keys xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns" config:type="list">' > /tmp/rootkeys.xml
-for pub in /ssh/*.rootpubkey; do
+for pub in /ssh/*pubkey; do
     echo '<listentry>'$(cat $pub)'</listentry>' >> /tmp/rootkeys.xml
 done
 echo '</authorized_keys>' >> /tmp/rootkeys.xml

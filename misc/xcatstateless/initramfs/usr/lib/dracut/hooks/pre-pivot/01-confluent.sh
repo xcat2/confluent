@@ -15,7 +15,7 @@ fi
 sed -i "s!root:[^:]*:!root:$rootpw:!" /sysroot/etc/shadow
 mkdir -p /sysroot/root/.ssh
 chmod 700 /sysroot/root/.ssh
-cat /ssh/*.rootpubkey > /sysroot/root/.ssh/authorized_keys
+cat /ssh/*pubkey > /sysroot/root/.ssh/authorized_keys
 chmod 600 /sysroot/root/.ssh/authorized_keys
 mkdir -p /sysroot/etc/ssh/
 for i in /ssh/*.ca; do
