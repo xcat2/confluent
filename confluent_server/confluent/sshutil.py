@@ -1,11 +1,16 @@
 #!/usr/bin/python
 
+import base64
+import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import eventlet.green.subprocess as subprocess
 import glob
 import os
 import shutil
 import tempfile
+
+agent_pid = None
+ready_keys = {}
 
 def normalize_uid():
     curruid = os.geteuid()
@@ -17,6 +22,34 @@ def normalize_uid():
     return curruid
 
 
+def assure_agent():
+    global agent_pid
+    if agent_pid is None:
+        sai = subprocess.check_output(['ssh-agent'])
+        for line in sai.split(b'\n'):
+            if b';' not in line:
+                continue
+            line, _ = line.split(b';', 1)
+            if b'=' not in line:
+                continue
+            k, v = line.split(b'=', 1)
+            if not isinstance(k, str):
+                k = k.decode('utf8')
+                v = v.decode('utf8')
+            if k == 'SSH_AGENT_PID':
+                agent_pid = v
+            os.environ[k] = v
+
+def get_passphrase():
+    # convert the master key to base64
+    # for use in ssh passphrase context
+    if cfm._masterkey is None:
+        cfm.init_masterkey()
+    phrase = base64.b64encode(cfm._masterkey)
+    if not isinstance(phrase, str):
+        phrase = phrase.decode('utf8')
+    return phrase
+
 def initialize_ca():
     ouid = normalize_uid()
     try:
@@ -27,10 +60,11 @@ def initialize_ca():
     finally:
         os.seteuid(ouid)
     myname = collective.get_myname()
-    caname = '{0} SSH CA'.format(myname)
+    comment = '{0} SSH CA'.format(myname)
     subprocess.check_call(
-        ['ssh-keygen', '-C', caname, '-t', 'ed25519', '-f',
-         '/etc/confluent/ssh/ca', '-N', ''], preexec_fn=normalize_uid)
+        ['ssh-keygen', '-C', comment, '-t', 'ed25519', '-f',
+         '/etc/confluent/ssh/ca', '-N', get_passphrase()],
+         preexec_fn=normalize_uid)
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
     except OSError as e:
@@ -41,9 +75,29 @@ def initialize_ca():
     #    newent = '@cert-authority * ' + capub.read()
 
 
+def prep_ssh_key(keyname):
+    assure_agent()
+    tmpdir = tempfile.mkdtemp()
+    try:
+        askpass = os.path.join(tmpdir, 'askpass.sh')
+        with open(askpass, 'w') as ap:
+            ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\n')
+        os.chmod(askpass, 0o700)
+        os.environ['CONFLUENT_SSH_PASSPHRASE'] = get_passphrase()
+        os.environ['DISPLAY'] = 'NONE'
+        os.environ['SSH_ASKPASS'] = askpass
+        with open(os.devnull, 'wb') as devnull:
+            subprocess.check_call(['ssh-add', keyname], stdin=devnull)
+        del os.environ['CONFLUENT_SSH_PASSPHRASE']
+    finally:
+        shutil.rmtree(tmpdir)
+
 def sign_host_key(pubkey, nodename, principals=()):
     tmpdir = tempfile.mkdtemp()
     try:
+        if 'ca.pub' not in ready_keys:
+            prep_ssh_key('/etc/confluent/ssh/ca')
+            ready_keys['ca.pub'] = 1
         pkeyname = os.path.join(tmpdir, 'hostkey.pub')
         with open(pkeyname, 'wb') as pubfile:
             pubfile.write(pubkey)
@@ -51,7 +105,7 @@ def sign_host_key(pubkey, nodename, principals=()):
         principals.add(nodename)
         principals = ','.join(sorted(principals))
         subprocess.check_call(
-            ['ssh-keygen', '-s', '/etc/confluent/ssh/ca', '-I', nodename,
+            ['ssh-keygen', '-Us', '/etc/confluent/ssh/ca.pub', '-I', nodename,
              '-n', principals, '-h', pkeyname])
         certname = pkeyname.replace('.pub', '-cert.pub')
         with open(certname) as cert:
@@ -59,15 +113,21 @@ def sign_host_key(pubkey, nodename, principals=()):
     finally:
         shutil.rmtree(tmpdir)
 
-def initialize_root_key(generate):
+def initialize_root_key(generate, automation=False):
     authorized = []
     myname = collective.get_myname()
     for currkey in glob.glob('/root/.ssh/*.pub'):
         authorized.append(currkey)
-    if generate and not authorized:
+    if generate and not authorized and not automation:
         subprocess.check_call(['ssh-keygen', '-t', 'ed25519', '-f', '/root/.ssh/id_ed25519', '-N', ''])
         for currkey in glob.glob('/root/.ssh/*.pub'):
             authorized.append(currkey)
+    if automation and generate:
+        subprocess.check_call(
+            ['ssh-keygen', '-t', 'ed25519',
+            '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
+            '-C', 'Confluent Automation'], preexec_fn=normalize_uid)
+        authorized = ['/etc/confluent/ssh/automation.pub']
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh', mode=0o755)
         neededuid = os.stat('/etc/confluent').st_uid
@@ -79,15 +139,19 @@ def initialize_root_key(generate):
         if e.errno != 17:
             raise
     neededuid = os.stat('/etc/confluent').st_uid
+    if automation:
+        suffix = 'automationpubkey'
+    else:
+        suffix = 'rootpubkey'
     for auth in authorized:
         shutil.copy(
             auth,
-            '/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
-                    myname))
-        os.chmod('/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
-                myname), 0o644)
-        os.chown('/var/lib/confluent/public/site/ssh/{0}.rootpubkey'.format(
-                myname), neededuid, -1)
+            '/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
+                    myname, suffix))
+        os.chmod('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
+                myname, suffix), 0o644)
+        os.chown('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
+                myname, suffix), neededuid, -1)
 
 
 def ca_exists():
