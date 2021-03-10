@@ -82,6 +82,8 @@ _blacklistnames = (
 
 
 def _namesmatch(switchdesc, userdesc):
+    if switchdesc is None:
+        return False
     if switchdesc == userdesc:
         return True
     try:
