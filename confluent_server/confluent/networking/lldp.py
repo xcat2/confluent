@@ -139,7 +139,10 @@ def get_fingerprint(switch, port, configmanager, portmatch):
             continue
         if info.get('switch', None) != switch:
             continue
-        if portmatch(info.get('port'), port):
+        if portmatch(info.get('portid', None), port):
+            return ('sha256$' + b64tohex(info['peersha256fingerprint']),
+                    info.get('verified', False))
+        elif portmatch(info.get('port', None), port):
             return ('sha256$' + b64tohex(info['peersha256fingerprint']),
                     info.get('verified', False))
     return None, False
@@ -235,19 +238,23 @@ def _extract_neighbor_data_b(args):
         idx = oidindex[0][-1]
         idxtoifname[idx] = _lldpdesc_to_ifname(sid, idx, str(oidindex[1]))
     for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
-        iname = idxtoifname[remotedesc[0][-2]]
+        iname = idxtoifname.get(remotedesc[0][-2],
+                                idxtoportid[remotedesc[0][-2]])
         _init_lldp(lldpdata, iname, remotedesc[0][-2], idxtoportid, switch)
         _extract_extended_desc(lldpdata[iname], remotedesc[1], user)
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
-        iname = idxtoifname[remotename[0][-2]]
+        iname = idxtoifname.get(remotename[0][-2],
+                                idxtoportid[remotename[0][-2]])
         _init_lldp(lldpdata, iname, remotename[0][-2], idxtoportid, switch)
         lldpdata[iname]['peername'] = str(remotename[1])
     for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.7'):
-        iname = idxtoifname[remotename[0][-2]]
+        iname = idxtoifname.get(remotename[0][-2],
+                                idxtoportid[remotename[0][-2]])
         _init_lldp(lldpdata, iname, remotename[0][-2], idxtoportid, switch)
         lldpdata[iname]['peerportid'] = sanitize(remotename[1])
     for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
-        iname = idxtoifname[remoteid[0][-2]]
+        iname = idxtoifname.get(remoteid[0][-2],
+                                idxtoportid[remoteid[0][-2]])
         _init_lldp(lldpdata, iname, remoteid[0][-2], idxtoportid, switch)
         lldpdata[iname]['peerchassisid'] = sanitize(remoteid[1])
     for entry in lldpdata:
