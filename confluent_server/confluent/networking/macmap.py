@@ -217,13 +217,18 @@ def _map_switch_backend(args):
                 *([int(x) for x in oid[-6:]])
             )
             mactobridge[macaddr] = int(bridgeport)
-    #ciscoiftovlanmap = {}
     vlanstocheck = set([])
-    for vb in conn.walk('.1.3.6.1.4.1.9.9.68.1.2.2.1.2'):
-        vlanstocheck.add(vb[1])
-    #ciscotrunktovlanmap = {}
-    for vb in conn.walk('.1.3.6.1.4.1.9.9.46.1.6.1.1.5'):
-        vlanstocheck.add(vb[1])
+    try:
+        #ciscoiftovlanmap = {}
+        for vb in conn.walk('.1.3.6.1.4.1.9.9.68.1.2.2.1.2'):
+            vlanstocheck.add(vb[1])
+        #ciscotrunktovlanmap = {}
+        for vb in conn.walk('.1.3.6.1.4.1.9.9.46.1.6.1.1.5'):
+            vlanstocheck.add(vb[1])
+    except Exception:
+        # We might have crashed snmp on a non-cisco switch
+        # in such a case, delay 8 seconds to allow recovery to complete
+        eventlet.sleep(8)
     if not vlanstocheck:
         vlanstocheck.add(None)
     bridgetoifmap = {}
