@@ -78,7 +78,8 @@ def handle_request(env, start_response):
         start_response('406 Not supported', [])
         yield 'Unsupported content type in ACCEPT: ' + retype
         return
-    if env['REQUEST_METHOD'] not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
+    operation = env['REQUEST_METHOD']
+    if operation not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     if env['PATH_INFO'] == '/self/bmcconfig':
         hmattr = cfg.get_node_attributes(nodename, 'hardwaremanagement.*')
@@ -193,7 +194,7 @@ def handle_request(env, start_response):
         ncfg['dnsdomain'] = dnsdomain
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
-    elif env['PATH_INFO'] == '/self/sshcert':
+    elif env['PATH_INFO'] == '/self/sshcert' and reqbody:
         if not sshutil.ca_exists():
             start_response('500 Unconfigured', ())
             yield 'CA is not configured on this system (run ...)'
@@ -211,14 +212,11 @@ def handle_request(env, start_response):
         else:
             start_response('200 OK', (('Content-Type', retype),))
             yield dumper(sorted(nodes))
-    elif env['PATH_INFO'] == '/self/remoteconfigbmc':
-        if reqbody:
-            try:
-                reqbody = yaml.safe_load(reqbody)
-            except Exception:
-                reqbody = None
-        if not reqbody:
-            start_response('400 bad request', ())
+    elif env['PATH_INFO'] == '/self/remoteconfigbmc' and reqbody:
+        try:
+            reqbody = yaml.safe_load(reqbody)
+        except Exception:
+            reqbody = None
         cfgmod = reqbody.get('configmod', 'unspecified')
         if cfgmod == 'xcc':
             xcc.remote_nodecfg(nodename, cfg)
@@ -229,7 +227,7 @@ def handle_request(env, start_response):
             yield 'Unsupported configmod "{}"'.format(cfgmod)
         start_response('200 Ok', ())
         yield 'complete'
-    elif env['PATH_INFO'] == '/self/updatestatus':
+    elif env['PATH_INFO'] == '/self/updatestatus' and reqbody:
         update = yaml.safe_load(reqbody)
         if update['status'] == 'staged':
             targattr = 'deployment.stagedprofile'
@@ -258,33 +256,35 @@ def handle_request(env, start_response):
         else:
             start_response('500 Error', (('Content-Type', 'text/plain'),))
             yield 'No pending profile detected, unable to accept status update'
-    elif env['PATH_INFO'] == '/self/saveapikey':
+    elif env['PATH_INFO'] == '/self/saveapikey' and reqbody:
         cfg.set_node_attributes({
             nodename: {'deployment.sealedapikey': {'value': reqbody}}})
         start_response('200 OK', ())
         yield ''
-    elif env['PATH_INFO'].startswith('/self/scriptlist/'):
-        scriptcat = env['PATH_INFO'].replace('/self/scriptlist/', '')
-        if '..' in scriptcat:
-            start_response('400 Bad Requst', ())
+    elif env['PATH_INFO'].startswith('/self/remoteconfig/') and 'POST' == operation:
+        scriptcat = env['PATH_INFO'].replace('/self/remoteconfig/', '')
+        slist, profile = get_scriptlist(
+            scriptcat, cfg, nodename,
+            '/var/lib/confluent/public/os/{0}/ansible/{1}.d/')
+        playlist = []
+        dirname = '/var/lib/confluent/public/os/{0}/ansible/{1}.d/'.format(
+            profile, scriptcat)
+        for filename in slist:
+            if filename.endswith('.yaml') or filename.endswith('.yml'):
+                playlist.append(os.path.join(dirname, filename))
+        if not playlist:
+            start_response('200 OK', ())
             yield ''
             return
-        deployinfo = cfg.get_node_attributes(
-            nodename, ('deployment.*',))
-        deployinfo = deployinfo.get(nodename, {})
-        profile = deployinfo.get(
-            'deployment.pendingprofile', {}).get('value', '')
-        if not profile:
-            profile = deployinfo.get(
-            'deployment.stagedprofile', {}).get('value', '')
-        if not profile:
-            profile = deployinfo.get(
-            'deployment.profile', {}).get('value', '')
-        slist = None
-        try:
-            slist = os.listdir('/var/lib/confluent/public/os/{0}/scripts/{1}.d/'.format(profile, scriptcat))
-        except OSError:
-            pass
+        
+    elif env['PATH_INFO'].startswith('/self/remoteconfig/status'):
+        scriptcat = env['PATH_INFO'].replace('/self/remoteconfig/', '')
+
+    elif env['PATH_INFO'].startswith('/self/scriptlist/'):
+        scriptcat = env['PATH_INFO'].replace('/self/scriptlist/', '')
+        slist, _ = get_scriptlist(
+            scriptcat, cfg, nodename,
+            '/var/lib/confluent/public/os/{0}/scripts/{1}.d/')
         if slist:
             start_response('200 OK', (('Content-Type', 'application/yaml'),))
             yield yaml.safe_dump(util.natural_sort(slist), default_flow_style=False)
@@ -294,6 +294,27 @@ def handle_request(env, start_response):
     else:
         start_response('404 Not Found', ())
         yield 'Not found'
+
+def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
+    if '..' in scriptcat:
+        return None, None
+    deployinfo = cfg.get_node_attributes(
+        nodename, ('deployment.*',))
+    deployinfo = deployinfo.get(nodename, {})
+    profile = deployinfo.get(
+        'deployment.pendingprofile', {}).get('value', '')
+    if not profile:
+        profile = deployinfo.get(
+        'deployment.stagedprofile', {}).get('value', '')
+    if not profile:
+        profile = deployinfo.get(
+        'deployment.profile', {}).get('value', '')
+    slist = None
+    try:
+        slist = os.listdir(pathtemplate.format(profile, scriptcat))
+    except OSError:
+        pass
+    return slist, profile
 
 
 def get_cluster_list(nodename=None, cfg=None):
