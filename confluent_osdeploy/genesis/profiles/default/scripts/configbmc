@@ -411,7 +411,7 @@ def main():
         dotwait()
     while awaitprefix and not check_subnet(s, bmccfg['prefixv4'], channel):
         dotwait()
-    while awaitprefix and not check_gateway(s, bmccfg['bmcgw'], channel):
+    while awaitgw and not check_gateway(s, bmccfg['bmcgw'], channel):
         dotwait()
     sys.stdout.write('done\n')
     sys.stdout.flush()
