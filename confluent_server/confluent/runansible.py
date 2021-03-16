@@ -16,7 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import confluent.sshutil as sshutil
+try:
+    import confluent.sshutil as sshutil
+except ImportError:
+    pass
 import eventlet.green.subprocess as subprocess
 import msgpack
 import os
