@@ -468,7 +468,7 @@ class IpmiHandler(object):
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
-    def get_diags(self, savefile, progress):
+    def get_diags(self, savefile, progress, data=None):
         return self.ipmicmd.get_diagnostic_data(
             savefile, progress=progress, autosuffix=True)
 
