@@ -130,6 +130,8 @@ if __name__ == '__main__':
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
+    elif len(sys.argv) > 2 and not os.path.exists(sys.argv[-1]):
+        data = sys.argv[-1]
     if os.path.exists(sys.argv[-1]):
         data = open(sys.argv[-1]).read()
     sys.stdout.write(HTTPSClient(json=json).grab_url(sys.argv[1], data).decode())
