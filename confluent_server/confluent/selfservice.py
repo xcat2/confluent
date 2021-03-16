@@ -1,3 +1,4 @@
+import confluent.runansible as runansible
 import confluent.config.configmanager as configmanager
 import confluent.collective.manager as collective
 import confluent.netutil as netutil
@@ -272,14 +273,16 @@ def handle_request(env, start_response):
         for filename in slist:
             if filename.endswith('.yaml') or filename.endswith('.yml'):
                 playlist.append(os.path.join(dirname, filename))
-        if not playlist:
+        if playlist:
+            runansible.run_playbooks(playlist, [nodename])
+            start_response('202 Queued', ())
+            yield ''
+        else:
             start_response('200 OK', ())
             yield ''
             return
-        
     elif env['PATH_INFO'].startswith('/self/remoteconfig/status'):
         scriptcat = env['PATH_INFO'].replace('/self/remoteconfig/', '')
-
     elif env['PATH_INFO'].startswith('/self/scriptlist/'):
         scriptcat = env['PATH_INFO'].replace('/self/scriptlist/', '')
         slist, _ = get_scriptlist(
@@ -309,7 +312,7 @@ def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
     if not profile:
         profile = deployinfo.get(
         'deployment.profile', {}).get('value', '')
-    slist = None
+    slist = []
     try:
         slist = os.listdir(pathtemplate.format(profile, scriptcat))
     except OSError:
