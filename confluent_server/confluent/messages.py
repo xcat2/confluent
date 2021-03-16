@@ -1054,7 +1054,7 @@ class InputNetworkConfiguration(ConfluentInputMessage):
         if 'ipv4_gateway' not in inputdata:
             inputdata['ipv4_gateway'] = None
 
-        if 'ipv4_configuration' in inputdata:
+        if 'ipv4_configuration' in inputdata and inputdata['ipv4_configuration']:
             if inputdata['ipv4_configuration'].lower() not in ['dhcp','static']:
                 raise exc.InvalidArgumentException(
                                             'Unrecognized ipv4_configuration')
