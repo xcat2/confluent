@@ -21,6 +21,7 @@ except ImportError:
     pass
 import eventlet
 import eventlet.green.subprocess as subprocess
+import json
 import msgpack
 import os
 import struct
@@ -42,6 +43,34 @@ class PlayRunner(object):
         avail = self.results
         self.results = []
         return avail
+
+    def dump_text(self):
+        retinfo = self.dump_dict()
+        textout = ''
+        for result in retinfo['results']:
+            textout += 'TASK [{}] *******************************\n'.format(
+                result['task_name'])
+            for warning in result['warnings']:
+                textout += '[WARNING]: ' + warning + '\n'
+            if 'errorinfo' in result:
+                textout += '{} => {}\n'.format(result['state'],
+                                                result['errorinfo'])
+            else:
+                if result['changed']:
+                    textout += 'changed\n'
+                else:
+                    textout += result['state'] + '\n'
+            textout += '\n'
+        return textout
+
+    def dump_json(self):
+        return json.dumps(self.dump_dict())
+
+    def dump_dict(self):
+        return {
+            'complete': self.complete,
+            'results': self.get_available_results()
+        }
 
     def _really_run_playbooks(self):
         with open(os.devnull, 'w+') as devnull:
@@ -69,7 +98,7 @@ def run_playbooks(playfiles, nodes):
     runner._start_playbooks()
 
 
-def print_result(result, state, collector):
+def print_result(result, state, collector=None):
     output = {
         'task_name': result.task_name,
         'changed': result._result['changed'],
@@ -104,7 +133,7 @@ if __name__ == '__main__':
             print_result(result, 'UNREACHABLE', self)
 
         def v2_runner_on_ok(self, result, *args, **kwargs):
-            print_result(result, 'ok', self)
+            print_result(result, 'ok')
 
         def v2_runner_on_failed(self, result, *args, **kwargs):
             print_result(result, 'FAILED', self)

@@ -282,7 +282,16 @@ def handle_request(env, start_response):
             yield ''
             return
     elif env['PATH_INFO'].startswith('/self/remoteconfig/status'):
-        scriptcat = env['PATH_INFO'].replace('/self/remoteconfig/', '')
+        rst = runansible.running_status.get(nodename, None)
+        if not rst:
+            start_response('204 Not Running', ())
+            yield ''
+            return
+        start_response('200 OK', ())
+        if rst.complete:
+            del runansible.running_status[nodename]
+        yield rst.dump_text()
+        return
     elif env['PATH_INFO'].startswith('/self/scriptlist/'):
         scriptcat = env['PATH_INFO'].replace('/self/scriptlist/', '')
         slist, _ = get_scriptlist(
