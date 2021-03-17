@@ -37,6 +37,8 @@ except ImportError:
 
 def plot(gui, output, plotdata, bins):
     import matplotlib as mpl
+    if gui and mpl.get_backend() == 'agg':
+        sys.stderr.write('Error: No GUI backend available and -g specified!\n')
     if not gui:
         mpl.use('Agg')
     import matplotlib.pyplot as plt
