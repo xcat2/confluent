@@ -120,6 +120,8 @@ int main(int argc, char* argv[]) {
         ws.ws_col = 100;
         ws.ws_row = 31;
     }
+    if (ws.ws_col < 80) { ws.ws_col = 80; }
+    if (ws.ws_row < 24) { ws.ws_col = 24; }
     ioctl(ttyf, TIOCSWINSZ, &ws);
     tcsetattr(ttyf, TCSANOW, &tty);
     ioctl(ttyf, TIOCCONS, 0);
