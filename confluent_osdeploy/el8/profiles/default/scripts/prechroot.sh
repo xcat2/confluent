@@ -14,6 +14,10 @@ chmod -R og-rwx /mnt/sysimage/etc/confluent
 cp /tmp/functions /mnt/sysimage/etc/confluent/
 . /tmp/functions
 cp /tmp/cryptboot /mnt/sysimage/tmp/
+echo Port 2222 >> /etc/ssh/sshd_config.anaconda
+echo Match LocalPort 22 >> /etc/ssh/sshd_config.anaconda
+echo "    ChrootDirectory /mnt/sysimage" >> /etc/ssh/sshd_config.anaconda
+kill -HUP $(cat /run/sshd.pid)
 
 # Preserve the ssh setup work done for the installer
 # by copying into the target system and setting up
