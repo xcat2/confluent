@@ -10,4 +10,11 @@ apikey=$(cat /etc/confluent/confluent.apikey)
 . /etc/confluent/functions
 
 run_remote firstboot.custom
+
+# Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
+run_remote_parts firstboot
+
+# Induce execution of remote configuration, e.g. ansible plays in ansible/firstboot.d/
+run_remote_config firstboot
+
 curl --capath /etc/confluent/tls -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" -f -X POST -d "status: complete" https://$mgr/confluent-api/self/updatestatus
