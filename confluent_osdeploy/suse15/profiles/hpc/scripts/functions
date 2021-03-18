@@ -46,7 +46,7 @@ run_remote_config() {
     /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
     /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/status -w 204
     echo
-    echo 'Completed remote configuration
+    echo 'Completed remote configuration'
     echo '---------------------------------------------------------------------------'
     return
 }
