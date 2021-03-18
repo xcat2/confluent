@@ -19,6 +19,9 @@ run_remote firstboot.custom
 run_remote_parts firstboot
 
 
+# Induce execution of remote configuration, e.g. ansible plays in ansible/firstboot.d/
+run_remote_config firstboot
+
 curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
 systemctl disable firstboot
 rm /etc/systemd/system/firstboot.service

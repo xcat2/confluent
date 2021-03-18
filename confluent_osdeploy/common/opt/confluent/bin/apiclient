@@ -100,6 +100,9 @@ class HTTPSClient(client.HTTPConnection, object):
         self.sock = ctx.wrap_socket(psock, server_hostname=host)
 
     def grab_url(self, url, data=None, returnrsp=False):
+        return self.grab_url_with_status(url, data, returnrsp)[1]
+
+    def grab_url_with_status(self, url, data=None, returnrsp=False):
         if data:
             method = 'POST'
         else:
@@ -108,9 +111,9 @@ class HTTPSClient(client.HTTPConnection, object):
         rsp = self.getresponse()
         if rsp.status >= 200 and rsp.status < 300:
             if returnrsp:
-                return rsp
+                return rsp.status, rsp
             else:
-                return rsp.read()
+                return rsp.status, rsp.read()
         raise Exception(rsp.read())
 
 if __name__ == '__main__':
@@ -121,8 +124,26 @@ if __name__ == '__main__':
     if len(sys.argv) == 1:
         HTTPSClient()
         sys.exit(0)
-    if sys.argv[-2] == '-o':
-        with open(sys.argv[3], 'wb') as outf:
+    try:
+        outbin = sys.argv.index('-o')
+        sys.argv.pop(outbin)
+        outbin = sys.argv.pop(outbin)
+    except ValueError:
+        outbin = None
+    try:
+        waitfor = sys.argv.index('-w')
+        sys.argv.pop(waitfor)
+        waitfor = int(sys.argv.pop(waitfor))
+    except ValueError:
+        waitfor = None
+    try:
+        data = sys.argv.index('-d')
+        sys.argv.pop(data)
+        data = sys.argv.pop(data)
+    except ValueError:
+        data = None
+    if outbin:
+        with open(outbin, 'wb') as outf:
             reader = HTTPSClient(json=json).grab_url(
                 sys.argv[1], data, returnrsp=True)
             chunk = reader.read(16384)
@@ -130,8 +151,13 @@ if __name__ == '__main__':
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
-    elif len(sys.argv) > 2 and not os.path.exists(sys.argv[-1]):
-        data = sys.argv[-1]
-    if os.path.exists(sys.argv[-1]):
+    if len(sys.argv) > 2 and os.path.exists(sys.argv[-1]):
         data = open(sys.argv[-1]).read()
-    sys.stdout.write(HTTPSClient(json=json).grab_url(sys.argv[1], data).decode())
+    if waitfor:
+        client = HTTPSClient(json=json)
+        status = 201
+        while status != waitfor:
+            status, rsp = client.grab_url_with_status(sys.argv[1], data)
+            sys.stdout.write(rsp.decode())
+    else:
+        sys.stdout.write(HTTPSClient(json=json).grab_url(sys.argv[1], data).decode())

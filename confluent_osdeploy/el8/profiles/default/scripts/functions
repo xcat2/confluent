@@ -73,3 +73,21 @@ run_remote_python() {
     cd - > /dev/null
     return $retcode
 }
+
+run_remote_config() {
+    echo
+    set_confluent_vars
+    apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    echo '---------------------------------------------------------------------------'
+    echo Requesting to run remote configuration for "'$*'" from $mgr under profile $profile
+    /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
+    /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/status -w 204
+    echo
+    echo 'Completed remote configuration
+    echo '---------------------------------------------------------------------------'
+    return
+}
+
