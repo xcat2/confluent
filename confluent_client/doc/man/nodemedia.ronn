@@ -34,8 +34,8 @@ the host platform attempts.
 
 ## OPTIONS
 
-* `-c`:
-  Specify the maximum number of instances to run concurrently.
+* `-h`, `--help`:
+  Show help message and exit
 
 ## EXAMPLES
 * Listing currently mounted media:
