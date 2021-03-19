@@ -3,9 +3,7 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 
 ## SYNOPSIS
 
-`nodefirmware <noderange>`  
-`nodefirmware <noderange> list|<components>|core`  
-`nodefirmware <noderange> update [--backup] <filename>`  
+`nodefirmware <noderange> [list][update [--backup <file>]]|[<components>]`
 
 ## DESCRIPTION
 
@@ -31,9 +29,12 @@ the out of band facilities.  Firmware updates can end in one of three states:
 * `-b`, `--backup`:
   Target a backup bank rather than primary
   
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   When updating, prompt if more than the specified number of servers will 
   be affected  
+  
+* `-h`, `--help`:
+  Show help message and exit    
 
 ## EXAMPLES
 
