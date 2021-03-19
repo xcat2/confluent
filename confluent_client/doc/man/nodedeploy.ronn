@@ -3,9 +3,7 @@ nodedeploy(8) -- Request preparation and/or initiating a node deployment
 
 ## SYNOPSIS
 
-`nodedeploy <noderange>`  
-`nodedeploy <noderange> -c`  
-`nodedeploy <noderange> [-n] [-p] <name of profile>`  
+`nodedeploy [-h] [-c] [-n] [-p] [-m MAXNODES] <noderange> [profile]`  
 
 ## DESCRIPTION
 
@@ -29,8 +27,11 @@ deployment status.
   Prepare the network services for deployment, but do not interact with BMCs. This is intended for scenarios where
   the boot device control and server restart will be handled outside of confluent.
   
-* `-m`, `--maxnodes`:  
+* `-m MAXNODES`, `--maxnodes=MAXNODES`: 
   Specifiy a maximum nodes to be deployed.
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 ## EXAMPLES
 * Begin the instalalation of a profile of CentOS 8.2:  
