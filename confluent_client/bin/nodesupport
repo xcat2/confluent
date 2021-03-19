@@ -116,7 +116,7 @@ class OptParser(optparse.OptionParser):
 def main():
     argparser = OptParser(
         usage="Usage: %prog <noderange> servicedata "
-              "<filename>",
+              "<directory or filename>",
         epilog='\nservicedata will save service data to the given '
                'directory.  It is saved to the location on the relevant '
                'management server (the confluent server if running remote, '
