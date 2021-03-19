@@ -5,3 +5,4 @@ instmods cdc_ether
 instmods mptctl
 instmods mlx4_ib mlx5_ub ib_umad ib_ipoib
 instmods i40e hfi1 bnxt_en qed qede
+instmods dm-mod dm-log raid0 raid1 raid10 raid456 dm-raid dm-thin-pool dm-crypt dm-snapshot linear dm-era
