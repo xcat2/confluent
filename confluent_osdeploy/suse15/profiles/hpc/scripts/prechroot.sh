@@ -19,3 +19,10 @@ cp -a /tls/* /mnt/var/lib/ca-certificates/pem
 cp -a /tls/*.pem /mnt/etc/pki/trust/anchors
 
 run_remote setupssh.sh
+
+echo Port 22 >> /etc/ssh/sshd_config
+echo Port 2222 >> /etc/ssh/sshd_config
+echo Match LocalPort 22 >> /etc/ssh/sshd_config
+echo "    ChrootDirectory /mnt" >> /etc/ssh/sshd_config
+kill -HUP $(cat /run/sshd.pid)
+
