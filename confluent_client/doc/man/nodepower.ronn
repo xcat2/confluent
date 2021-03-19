@@ -30,6 +30,9 @@ off will not react to this request.
 
 * `-p`, '--showprevious':
    Show previous power state for all directives that may change power state.
+   
+* `-h`, `--help`:
+  Show help message and exit   
 
 ## EXAMPLES
 * Get power state of nodes n1 through n4:
