@@ -101,6 +101,8 @@ def initialize_genesis():
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/addons.cpio')
         os.symlink('/opt/confluent/genesis/x86_64/boot/kernel',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/kernel')
+        shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/ansible/',
+                        '/var/lib/confluent/public/os/genesis-x86_64/ansible/')
         shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
                         '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
         shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
