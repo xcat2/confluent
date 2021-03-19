@@ -11,9 +11,12 @@ nodebmcreset(8) -- Reset management controller
 
 ## OPTIONS
 
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Number of nodes to affect before prompting for
   confirmation
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 ## EXAMPLES:
 
