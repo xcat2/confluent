@@ -37,3 +37,6 @@ the json files (password protected, removed from the files, or unprotected).
   keys.json file, and only the protected data is needed.
   keys do not change and as such they do not require
   incremental backup.
+  
+  * `-h`, `--help`:
+  Show help message and exit
