@@ -3,8 +3,7 @@ nodeconfig(8) -- Show or change node configuration
 
 ## SYNOPSIS
 
-`nodeconfig <noderange> [options] [<configuration>..]`  
-`nodeconfig <noderange> [options] [<configuration=value>..]`  
+`nodeconfig [options] <noderange> [setting|setting=value]`
 
 ## DESCRIPTION
 
@@ -53,9 +52,12 @@ actually be in effect until a reboot.
   configuration reset to default.  Currently the only component implemented
   is uefi.
 
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to configure, prompting if over 
   the threshold  
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 ## EXAMPLES
 * Showing the current IP configuration of noderange BMC/IMM/XCC:
