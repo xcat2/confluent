@@ -21,9 +21,12 @@ themselves, see nodeshell(8).
 * `-n`, `--nonodeprefix`:
   Do not prefix output with node names
   
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to run the command with, prompting if over
   the threshold
+  
+* `-h`, `--help`:
+  Show help message and exit
 
 ## EXAMPLES
 
