@@ -39,6 +39,7 @@ dynamic behavior and replace with static configuration.
         <pattern>base</pattern>
       </patterns>
       <packages config:type="list">
+        <package>python3</package>
         <package>openssl</package>
         <package>chrony</package>
         <package>rsync</package>

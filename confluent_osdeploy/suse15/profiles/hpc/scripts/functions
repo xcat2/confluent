@@ -43,8 +43,8 @@ run_remote_config() {
     fi
     echo '---------------------------------------------------------------------------'
     echo Requesting to run remote configuration for "'$*'" from $mgr under profile $profile
-    /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
-    /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/status -w 204
+    python3 $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
+    python3 $apiclient /confluent-api/self/remoteconfig/status -w 204
     echo
     echo 'Completed remote configuration'
     echo '---------------------------------------------------------------------------'
