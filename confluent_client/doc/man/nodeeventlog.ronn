@@ -3,8 +3,7 @@ nodeeventlog(8) -- Pull eventlog from confluent nodes
 
 ## SYNOPSIS
 
-`nodeeventlog <noderange>`  
-`nodeeventlog <noderange> [clear]`
+`nodeeventlog [options] <noderange> [clear]`  
 
 ## DESCRIPTION
 
@@ -13,9 +12,12 @@ noderange.
 
 ## OPTIONS
 
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to clear if clearing log, prompting if 
-  over the threshold  
+  over the threshold 
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 ## EXAMPLES
 * Pull the event log from n2 and n3:
