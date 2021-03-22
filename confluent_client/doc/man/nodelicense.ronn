@@ -17,5 +17,8 @@ to allow unique licenses to be specified in a single command.
 
 ## OPTIONS
 
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to delete licenses from, prompting if over the threshold
+  
+* `-h`, `--help`:
+  Show help message and exit
