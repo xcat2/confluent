@@ -21,6 +21,8 @@ echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
 
 curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /target/etc/confluent/firstboot.sh
+curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /target/etc/confluent/functions
+source /target/etc/confluent/functions
 chmod +x /target/etc/confluent/firstboot.sh
 cp /tmp/allnodes /target/root/.shosts
 cp /tmp/allnodes /target/etc/ssh/shosts.equiv
@@ -44,11 +46,27 @@ kargs=$(curl https://$mgr/confluent-public/os/$profile/profile.yaml | grep ^inst
 if [ ! -z "$kargs" ]; then
     sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 '"${kargs}"'"/' /target/etc/default/grub
 fi
+mkdir -p /opt/confluent/bin
+mkdir -p /etc/confluent
+cp -a /target/etc/confluent/* /etc/confluent
+cp /custom-installation/confluent/bin/apiclient /opt/confluent/bin/
+cp /custom-installation/confluent/bin/apiclient /target/etc/confluent/
+
+mount -o bind /dev /target/dev
+mount -o bind /proc /target/proc
+mount -o bind /sys /target/sys
 if [ 1 = $updategrub ]; then
-    mount -o bind /dev /target/dev
-    mount -o bind /proc /target/proc
-    mount -o bind /sys /target/sys
     chroot /target update-grub
-    umount /target/sys /target/dev /target/proc
 fi
+echo "Port 22" >> /etc/ssh/sshd_config
+echo "Port 2222" >> /etc/ssh/sshd_config
+echo "Match LocalPort 22" >> /etc/ssh/sshd_config
+echo "    ChrootDirectory /target" >> /etc/ssh/sshd_config
+kill -HUP $(cat /run/sshd.pid)
+cat /target/etc/confluent/tls/*.pem > /target/etc/confluent/ca.pem
+chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post"
+source /target/etc/confluent/functions
+run_remote_config post
+
+umount /target/sys /target/dev /target/proc
 
