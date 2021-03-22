@@ -2,8 +2,7 @@ nodesetboot(8) -- Check or set next boot device for noderange
 ====================================================
 
 ## SYNOPSIS
-
-`nodesetboot <noderange>`  
+  
 `nodesetboot [options] <noderange> [default|cd|network|setup|hd|usb|floppy]`
 
 ## DESCRIPTION
@@ -21,6 +20,8 @@ to use `nodesetboot <noderange> setup` and then initiate a reboot from within
 the operating system with ssh or similar rather than using the remote hardware
 control.
 
+Running the command with no target queries the current setting.
+
 ## OPTIONS
 
 * `-b`, `--bios`:
@@ -34,9 +35,12 @@ control.
 * `-u`, `--uefi`:
   This flag does nothing, it is for command compatibility with xCAT's rsetboot
   
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to modify next boot device, prompting if
   over the threshold
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 * `default`:
   Request a normal default boot with no particular device override
