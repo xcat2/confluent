@@ -22,7 +22,7 @@ node and group names sorted alphanumerically.
    output suggests a large number of nodes are unreachable, abbreviate
    showing 'rack1' as being unreachable may make more obvious a possible cause.
    
-* `-b`, `--base`:
+* `-b BASE`, `--base=BASE`:
    Use given node as reference for comparison when using
    -d, instead of using the most common result      
 
@@ -44,15 +44,18 @@ node and group names sorted alphanumerically.
    
 * `-c`, `--count`:
    Print a count of the number of nodes in an output group under the 
-  noderange.
+   noderange.
   
- * `-r`, `--reverse`:
-    Rather than starting with most common to least common, start with
-    the least common and print the most common last.
+* `-r`, `--reverse`:
+   Rather than starting with most common to least common, start with
+   the least common and print the most common last.
     
-* `-l`, `--log`:
+* `-l LOG`, `--log=LOG`:
    Save output per node to individual log files, replacing {node} in the name
    with the nodename of each
+   
+* `-h`, `--help`:
+   Show help message and exit   
    
 ## EXAMPLES
  * Organizing power state of multiple nodes:  
