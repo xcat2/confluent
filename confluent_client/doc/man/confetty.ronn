@@ -17,15 +17,18 @@ the various function specific commands.
 
 ## OPTIONS
 
-* `-s`, `--server`:
+* `-s SERVER:PORT`, `--server=SERVER:PORT`:
   Confluent instance to connect to
 
-* `-c`, `--control`:
+* `-c PATH`, `--control=PATH`:
   Path to offer terminal control
 
-* `-m`, `--mintime`:
+* `-m MINTIME`, `--mintime=MINTIME`:
   Minimum time to run or else pause for input (used to
   keep a terminal from closing quickly on error)
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 ## COMMANDS
 
