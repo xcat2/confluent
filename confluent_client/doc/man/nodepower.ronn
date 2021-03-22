@@ -31,6 +31,10 @@ off will not react to this request.
 * `-p`, '--showprevious':
    Show previous power state for all directives that may change power state.
    
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
+   Specify a maximum number of nodes to change power state, prompting if
+   over the threshold
+   
 * `-h`, `--help`:
   Show help message and exit   
 
