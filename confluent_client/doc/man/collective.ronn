@@ -37,6 +37,9 @@ on circumstances.
 
  * `-i`:
     Provide the token as an argument rather than interactively.
+    
+* `-h`, `--help`:
+  Show help message and exit    
    
 ## EXAMPLES
  * Inviting a server called mgt2:
