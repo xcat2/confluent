@@ -56,6 +56,7 @@ class SyncList(object):
                 else:
                     raise Exception(
                         'Section "{}" is not currently supported in syncfiles'.format(ent[:-1]))
+                continue
             if '->' in ent:
                 k, v = ent.split('->')
                 k = k.strip()
@@ -82,9 +83,9 @@ def sync_list_to_node(synclist, node, suffixes):
         if 'merge' in suffixes:
             while suffixes['merge'] and suffixes['merge'][0] == '/':
                 suffixes['merge'] = suffixes['merge'][1:]
-            for ent in sl.appendmap:
-                stage_ent(sl.appendmap, ent,
-                          os.path.join(targdir, suffixes['append']))
+            for ent in sl.mergemap:
+                stage_ent(sl.mergemap, ent,
+                          os.path.join(targdir, suffixes['merge']))
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         output = subprocess.check_output(
             ['rsync', '-aL', targdir + '/', 'root@{}:/'.format(node)])
