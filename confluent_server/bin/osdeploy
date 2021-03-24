@@ -38,7 +38,7 @@ def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
     sp = ap.add_subparsers(dest='command')
     wiz = sp.add_parser('initialize', help='Do OS deployment preparation')
-    wiz.add_argument('-a', help='Initialize SSH access by confluent to nodes for automation such as ansible playbook execution', action='store_true')
+    wiz.add_argument('-a', help='Initialize SSH access by confluent to nodes for automation such as ansible playbook execution or syncfiles', action='store_true')
     wiz.add_argument('-g', help='Initialize a Genesis profile to boot systems into a rescue or staging environment', action='store_true')
     wiz.add_argument('-u', help='Pull in root user key for node deployment', action='store_true')
     wiz.add_argument('-s', help='Set up SSH CA for managing node to node ssh and known hosts', action='store_true')
