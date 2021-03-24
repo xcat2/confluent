@@ -1,4 +1,5 @@
 import confluent.runansible as runansible
+import confluent.syncfiles as syncfiles
 import confluent.config.configmanager as configmanager
 import confluent.collective.manager as collective
 import confluent.netutil as netutil
@@ -280,6 +281,18 @@ def handle_request(env, start_response):
         else:
             start_response('200 OK', ())
             yield ''
+            return
+    elif env['PATH_INFO'].startswith('/self/remotesyncfiles'):
+        if 'POST' == operation:
+            result = syncfiles.start_syncfiles(
+                nodename, cfg, json.loads(reqbody))
+            start_response(result, ())
+            yield ''
+            return
+        if 'GET' == operation:
+            status, output = syncfiles.get_syncresult(nodename)
+            start_response(status, ())
+            yield output
             return
     elif env['PATH_INFO'].startswith('/self/remoteconfig/status'):
         rst = runansible.running_status.get(nodename, None)

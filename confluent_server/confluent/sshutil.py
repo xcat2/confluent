@@ -128,7 +128,8 @@ def initialize_root_key(generate, automation=False):
         subprocess.check_call(
             ['ssh-keygen', '-t', 'ed25519',
             '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
-            '-C', 'Confluent Automation'], preexec_fn=normalize_uid)
+            '-C', 'Confluent Automation by {}'.format(myname)],
+            preexec_fn=normalize_uid)
         authorized = ['/etc/confluent/ssh/automation.pub']
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh', mode=0o755)
