@@ -45,6 +45,10 @@ class SyncList(object):
                 ent = ent[:cmtidx]
             except ValueError:
                 pass
+            for special in '!@$%^&*()|{}':
+                if special in ent:
+                    raise Exception(
+                        'Special character "{}" reserved for future use'.format(special))
             ent = ent.strip()
             if not ent:
                 continue
