@@ -53,9 +53,7 @@ class SyncList(object):
             if not ent:
                 continue
             if ent[-1] == ':':
-                if ent == 'APPEND:':
-                    currmap = self.appendmap
-                elif ent == 'MERGE:':
+                if ent == 'MERGE:':
                     currmap = self.mergemap
                 else:
                     raise Exception(
