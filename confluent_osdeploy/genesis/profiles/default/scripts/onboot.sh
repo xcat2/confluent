@@ -6,6 +6,10 @@
 # run_remote and run_remote_python are available to download scripts and
 # execute them.
 
+# This will induce server side processing of the syncfile contents if
+# present
+run_remote_python syncfileclient
+
 # Induce execution of remote configuration, e.g. ansible plays in ansible/onboot.d/
 run_remote_config onboot
 

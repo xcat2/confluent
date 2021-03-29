@@ -30,6 +30,10 @@ run_remote_python add_local_repositories
 # run_remote_python will use the appropriate python interpreter path to run the specified script
 # A post.custom is provided to more conveniently hold customizations, see the post.custom file.
 
+# This will induce server side processing of the syncfile contents if
+# present
+run_remote_python syncfileclient
+
 # run_remote example.sh
 # run_remote_python example.py
 run_remote post.custom

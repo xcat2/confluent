@@ -65,8 +65,10 @@ echo "    ChrootDirectory /target" >> /etc/ssh/sshd_config
 kill -HUP $(cat /run/sshd.pid)
 cat /target/etc/confluent/tls/*.pem > /target/etc/confluent/ca.pem
 cat /target/etc/confluent/tls/*.pem > /etc/confluent/ca.pem
+chroot /target bash -c "source /etc/confluent/functions; run_remote_python syncfileclient"
 chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post"
 source /target/etc/confluent/functions
+
 run_remote_config post
 
 umount /target/sys /target/dev /target/proc

@@ -21,6 +21,10 @@ chmod og-rwx /etc/confluent/*
 export mgr profile nodename
 . /etc/confluent/functions
 
+# This will induce server side processing of the syncfile contents if
+# present
+run_remote_python syncfileclient
+
 run_remote post.custom
 
 # Also, scripts may be placed into 'post.d', e.g. post.d/01-runfirst.sh, post.d/02-runsecond.sh
