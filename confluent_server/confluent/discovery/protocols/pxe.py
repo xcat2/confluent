@@ -494,6 +494,7 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
+        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system'.format(node)})
         return
     clipn = None
     if niccfg['ipv4_address'] and niccfg['ipv4_method'] != 'firmwaredhcp':
@@ -557,6 +558,16 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         staticassigns[fulladdr] = (clipn, repview[:replen + 28].tobytes())
     elif fulladdr in staticassigns:
         del staticassigns[fulladdr]
+    if httpboot:
+        boottype = 'HTTP'
+    else:
+        boottype = 'PXE'
+    if clipn:
+        ipinfo = 'with static address {0}'.format(niccfg['ipv4_address'])
+    else:
+        ipinfo = 'without address'
+    log.log({
+        'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
     send_raw_packet(repview, replen + 28, reqview, info)
 
 def send_raw_packet(repview, replen, reqview, info):
