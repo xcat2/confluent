@@ -72,7 +72,7 @@ def create_certificate(keyout=None, certout=None):
     if not keyout:
         raise Exception('Unable to locate TLS certificate path automatically')
     shortname = socket.gethostname().split('.')[0]
-    longname = socket.getfqdn()
+    longname = shortname # socket.getfqdn()
     subprocess.check_call(
         ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
          keyout])
@@ -81,7 +81,7 @@ def create_certificate(keyout=None, certout=None):
     # there exists non-compliant clients that fail with them as IP
     san.extend(['DNS:{0}'.format(x) for x in get_ip_addresses()])
     san.append('DNS:{0}'.format(shortname))
-    san.append('DNS:{0}'.format(longname))
+    #san.append('DNS:{0}'.format(longname))
     san = ','.join(san)
     sslcfg = get_openssl_conf_location()
     tmpconfig = tempfile.mktemp()
