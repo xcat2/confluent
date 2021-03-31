@@ -33,42 +33,67 @@ import confluent.tlvdata as tlvdata
 import confluent.util as util
 import eventlet
 import eventlet.event
+import eventlet.green.os as os
+import eventlet.green.select as select
 import eventlet.green.socket as socket
+import eventlet.green.subprocess as subprocess
 import eventlet.green.ssl as ssl
-import pyte
+import eventlet.semaphore as semaphore
+import fcntl
 import random
+import struct
 import time
 import traceback
 
 _handled_consoles = {}
 
 _tracelog = None
+_bufferdaemon = None
+_bufferlock = None
 
 try:
     range = xrange
 except NameError:
     pass
 
-pytecolors2ansi = {
-    'black': 0,
-    'red': 1,
-    'green': 2,
-    'brown': 3,
-    'blue': 4,
-    'magenta': 5,
-    'cyan': 6,
-    'white': 7,
-    'default': 9,
-}
-# might be able to use IBMPC map from pyte charsets,
-# in that case, would have to mask out certain things (like ESC)
-# in the same way that Screen's draw method would do
-# for now at least get some of the arrows in there (note ESC is one
-# of those arrows... so skip it...
-ansichars = dict(zip((0x18, 0x19), u'\u2191\u2193'))
+
+def chunk_output(output, n):
+    for i in range(0, len(output), n):
+        yield output[i:i + n]
+
+def get_buffer_output(nodename):
+    out = _bufferdaemon.stdin
+    instream = _bufferdaemon.stdout
+    if not isinstance(nodename, bytes):
+        nodename = nodename.encode('utf8')
+    outdata = b''
+    with _bufferlock:
+        out.write(struct.pack('I', len(nodename)))
+        out.write(nodename)
+        out.flush()
+        select.select((instream,), (), (), 30)
+        while not outdata or outdata[-1]:
+            chunk = instream.read(128)
+            if chunk:
+                outdata += chunk
+            else:
+                select.select((instream,), (), (), 0)
+        return outdata[:-1]
 
 
-def _utf8_normalize(data, shiftin, decoder):
+def send_output(nodename, output):
+    if not isinstance(nodename, bytes):
+        nodename = nodename.encode('utf8')
+    with _bufferlock:
+        _bufferdaemon.stdin.write(struct.pack('I', len(nodename) | (1 << 29)))
+        _bufferdaemon.stdin.write(nodename)
+        _bufferdaemon.stdin.flush()
+        for chunk in chunk_output(output, 8192):
+            _bufferdaemon.stdin.write(struct.pack('I', len(chunk) | (2 << 29)))
+            _bufferdaemon.stdin.write(chunk)
+            _bufferdaemon.stdin.flush()
+
+def _utf8_normalize(data, decoder):
     # first we give the stateful decoder a crack at the byte stream,
     # we may come up empty in the event of a partial multibyte
     try:
@@ -88,58 +113,7 @@ def _utf8_normalize(data, shiftin, decoder):
     # Finally, the low part of ascii is valid utf-8, but we are going to be
     # more interested in the cp437 versions (since this is console *output*
     # not input
-    if shiftin is None:
-        data = data.translate(ansichars)
     return data.encode('utf-8')
-
-
-def pytechars2line(chars, maxlen=None):
-    line = b'\x1b[m'  # start at default params
-    lb = False  # last bold
-    li = False  # last italic
-    lu = False  # last underline
-    ls = False  # last strikethrough
-    lr = False  # last reverse
-    lfg = 'default'  # last fg color
-    lbg = 'default'   # last bg color
-    hasdata = False
-    len = 1
-    for charidx in range(maxlen):
-        char = chars[charidx]
-        csi = bytearray([])
-        if char.fg != lfg:
-            csi.append(30 + pytecolors2ansi.get(char.fg, 9))
-            lfg = char.fg
-        if char.bg != lbg:
-            csi.append(40 + pytecolors2ansi.get(char.bg, 9))
-            lbg = char.bg
-        if char.bold != lb:
-            lb = char.bold
-            csi.append(1 if lb else 22)
-        if char.italics != li:
-            li = char.italics
-            csi.append(3 if li else 23)
-        if char.underscore != lu:
-            lu = char.underscore
-            csi.append(4 if lu else 24)
-        if char.strikethrough != ls:
-            ls = char.strikethrough
-            csi.append(9 if ls else 29)
-        if char.reverse != lr:
-            lr = char.reverse
-            csi.append(7 if lr else 27)
-        if csi:
-            line += b'\x1b[' + b';'.join(['{0}'.format(x).encode('utf-8') for x in csi]) + b'm'
-        if not hasdata and char.data.rstrip():
-            hasdata = True
-        chardata = char.data
-        if not isinstance(chardata, bytes):
-            chardata = chardata.encode('utf-8')
-        line += chardata
-        if maxlen and len >= maxlen:
-            break
-        len += 1
-    return line, hasdata
 
 
 class ConsoleHandler(object):
@@ -161,15 +135,15 @@ class ConsoleHandler(object):
         self.node = node
         self.connectstate = 'unconnected'
         self._isalive = True
-        self.buffer = pyte.Screen(100, 31)
-        self.termstream = pyte.ByteStream()
-        self.termstream.attach(self.buffer)
+        #self.buffer = pyte.Screen(100, 31)
+        #self.termstream = pyte.ByteStream()
+        #self.termstream.attach(self.buffer)
         self.livesessions = set([])
         self.utf8decoder = codecs.getincrementaldecoder('utf-8')()
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
                                      tenant=configmanager.tenant)
-        (text, termstate, timestamp) = (b'', 0, False)
+        timestamp = False
         # when reading from log file, we will use wall clock
         # it should usually match walltime.
         self.lasttime = 0
@@ -182,13 +156,7 @@ class ConsoleHandler(object):
                 # guess
                 self.lasttime = util.monotonic_time()
         self.clearbuffer()
-        self.appmodedetected = False
-        self.shiftin = None
         self.reconnect = None
-        if termstate & 1:
-            self.appmodedetected = True
-        if termstate & 2:
-            self.shiftin = b'0'
         self.users = {}
         self._attribwatcher = None
         self._console = None
@@ -216,10 +184,7 @@ class ConsoleHandler(object):
         if not isinstance(data, bytes):
             data = data.encode('utf-8')
         try:
-            self.termstream.feed(data)
-        except StopIteration:  # corrupt parser state, start over
-            self.termstream = pyte.ByteStream()
-            self.termstream.attach(self.buffer)
+            send_output(self.node, data)
         except Exception:
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
@@ -536,19 +501,7 @@ class ConsoleHandler(object):
             return
         if not isinstance(data, bytes):
             data = data.encode('utf-8')
-        if b'\x1b[?1l' in data:  # request for ansi mode cursor keys
-            self.appmodedetected = False
-        if b'\x1b[?1h' in data:  # remember the session wants the client to use
-            # 'application mode'  Thus far only observed on esxi
-            self.appmodedetected = True
-        if b'\x1b)0' in data:
-            # console indicates it wants access to special drawing characters
-            self.shiftin = b'0'
         eventdata = 0
-        if self.appmodedetected:
-            eventdata |= 1
-        if self.shiftin is not None:
-            eventdata |= 2
         # TODO: analyze buffer for registered events, examples:
         #   panics
         #   certificate signing request
@@ -557,7 +510,7 @@ class ConsoleHandler(object):
             self.clearerror = False
             self.feedbuffer(b'\x1bc\x1b[2J\x1b[1;1H')
             self._send_rcpts(b'\x1bc\x1b[2J\x1b[1;1H')
-        self._send_rcpts(_utf8_normalize(data, self.shiftin, self.utf8decoder))
+        self._send_rcpts(_utf8_normalize(data, self.utf8decoder))
         self.log(data, eventdata=eventdata)
         self.lasttime = util.monotonic_time()
         self.feedbuffer(data)
@@ -583,36 +536,7 @@ class ConsoleHandler(object):
             'connectstate': self.connectstate,
             'clientcount': len(self.livesessions),
         }
-        retdata = b'\x1b[H\x1b[J'  # clear screen
-        pendingbl = b''  # pending blank lines
-        maxlen = 0
-        for line in self.buffer.display:
-            line = line.rstrip()
-            if len(line) > maxlen:
-                maxlen = len(line)
-        for line in range(self.buffer.lines):
-            nline, notblank = pytechars2line(self.buffer.buffer[line], maxlen)
-            if notblank:
-                if pendingbl:
-                    retdata += pendingbl
-                    pendingbl = b''
-                retdata += nline + b'\r\n'
-            else:
-                pendingbl += nline + b'\r\n'
-        if len(retdata) >  6:
-            retdata = retdata[:-2]  # remove the last \r\n
-        cursordata = '\x1b[{0};{1}H'.format(self.buffer.cursor.y + 1,
-                                            self.buffer.cursor.x + 1)
-        if not isinstance(cursordata, bytes):
-            cursordata = cursordata.encode('utf-8')
-        retdata += cursordata
-        if self.shiftin is not None:  # detected that terminal requested a
-            # shiftin character set, relay that to the terminal that cannected
-            retdata += b'\x1b)' + self.shiftin
-        #if self.appmodedetected:
-        #    retdata += b'\x1b[?1h'
-        #else:
-        #    retdata += b'\x1b[?1l'
+        retdata = get_buffer_output(self.node)
         return retdata, connstate
 
     def write(self, data):
@@ -661,7 +585,16 @@ def _start_tenant_sessions(cfm):
 
 def start_console_sessions():
     global _tracelog
+    global _bufferdaemon
+    global _bufferlock
+    _bufferlock = semaphore.Semaphore()
     _tracelog = log.Logger('trace')
+    _bufferdaemon = subprocess.Popen(
+        ['/opt/confluent/bin/vtbufferd'], stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE)
+    fl = fcntl.fcntl(_bufferdaemon.stdout.fileno(), fcntl.F_GETFL)
+    fcntl.fcntl(_bufferdaemon.stdout.fileno(),
+                fcntl.F_SETFL, fl | os.O_NONBLOCK)
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
