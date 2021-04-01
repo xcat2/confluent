@@ -6,7 +6,7 @@ fi
 mkdir -p dist/confluent_vtbufferd-$VERSION
 cp *.c *.h Makefile dist/confluent_vtbufferd-$VERSION
 cd dist
-tar czvf confluent_vtbufferd-$VERSION.tar.gz confluent_vtbufferd-$VERSION
+tar czf confluent_vtbufferd-$VERSION.tar.gz confluent_vtbufferd-$VERSION
 cd -
 cp dist/confluent_vtbufferd-$VERSION.tar.gz ~/rpmbuild/SOURCES
 sed -e 's/#VERSION#/'$VERSION/  confluent_vtbufferd.spec.tmpl > ~/rpmbuild/SPECS/confluent_vtbufferd.spec
