@@ -56,38 +56,26 @@ TMT *set_termentbyname(char *name) {
 void dump_vt(TMT* outvt) {
     const TMTSCREEN *out = tmt_screen(outvt);
     const TMTPOINT *curs = tmt_cursor(outvt);
-    int line, idx, deferredlines, deferredspaces;
-    bool printedline, skipnl;
+    int line, idx, maxcol, maxrow;
     wprintf(L"\033[H\033[J");
-    deferredlines = 0;
-    skipnl = true;
-    for (line = 0; line < out->nline; line++) {
-        deferredspaces = 0;
-        printedline = false;
-        for (idx = 0; idx < out->ncol; idx++) {
-            if (out->lines[line]->chars[idx].c == L' ') {
-                deferredspaces += 1;
-            } else {
-                if (!printedline) {
-                    printedline = true;
-                    if (skipnl)
-                        skipnl = false;
-                    else
-                        wprintf(L"\r\n");
-                }
-                while (deferredlines) {
-                    wprintf(L"\r\n");
-                    deferredlines -= 1;
-                }
-                while (deferredspaces > 0) {
-                    wprintf(L" ");
-                    deferredspaces -= 1;
-                }
-                wprintf(L"%lc", out->lines[line]->chars[idx].c);
+    maxcol = 0;
+    maxrow = 0;
+    for (line = out->nline - 1; line >= 0; --line) {
+        for (idx = out->ncol - 1; idx > maxcol; --idx) {
+            if (out->lines[line]->chars[idx].c != L' ') {
+                if (maxrow < line)
+                    maxrow = line;
+                maxcol = idx;
+                break;
             }
         }
-        if (!printedline)
-            deferredlines  += 1;
+    }
+    for (line = 0; line <= maxrow; line++) {
+        for (idx = 0; idx <= maxcol; idx++) {
+            wprintf(L"%lc", out->lines[line]->chars[idx].c);
+        }
+        if (line < maxrow)
+            wprintf(L"\r\n");
     }
     fflush(stdout);
     wprintf(L"\x1b[%ld;%ldH", curs->r + 1, curs->c + 1);
