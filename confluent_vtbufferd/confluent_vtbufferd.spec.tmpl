@@ -1,9 +1,12 @@
 %define name confluent_vtbufferd
 %define version #VERSION#
 %define release 1
+%define debug_package %{nil}
+%define _build_id_links none
 
 Summary: Console buffer manager for confluent
 Name: %{name}
+Version: %{version}
 Release: %{release}
 Source0: %{name}-%{version}.tar.gz
 License: Apache2
@@ -29,6 +32,9 @@ modification, are permitted provided that the following conditions are met:
   * Neither the name of the copyright holder nor the
     names of contributors may be used to endorse or promote products
     derived from this software without specific prior written permission.
+%prep
+%setup -n %{name}-%{version} -n %{name}-%{version}
+
 
 %build
 make

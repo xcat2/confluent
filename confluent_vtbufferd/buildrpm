@@ -1,0 +1,22 @@
+VERSION=`git describe|cut -d- -f 1`
+NUMCOMMITS=`git describe|cut -d- -f 2`
+if [ "$NUMCOMMITS" != "$VERSION"  ]; then
+    VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
+fi
+mkdir -p dist/confluent_vtbufferd-$VERSION
+cp *.c *.h Makefile dist/confluent_vtbufferd-$VERSION
+cd dist
+tar czvf confluent_vtbufferd-$VERSION.tar.gz confluent_vtbufferd-$VERSION
+cd -
+cp dist/confluent_vtbufferd-$VERSION.tar.gz ~/rpmbuild/SOURCES
+sed -e 's/#VERSION#/'$VERSION/  confluent_vtbufferd.spec.tmpl > ~/rpmbuild/SPECS/confluent_vtbufferd.spec
+rpmbuild -ba ~/rpmbuild/SPECS/confluent_vtbufferd.spec  2> /dev/null |grep ^Wrote:
+if [ $? -ne 0 ]; then
+    echo "[ERROR] rpmbuild returned non-zero, run: rpmbuild -ba ~/rpmbuild/SPECS/$PKGNAME.spec"
+    exit 1
+else
+    # Clean up the generated files in this directory
+    rm -rf dist 
+fi
+
+
