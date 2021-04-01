@@ -57,7 +57,19 @@ void dump_vt(TMT* outvt) {
     const TMTSCREEN *out = tmt_screen(outvt);
     const TMTPOINT *curs = tmt_cursor(outvt);
     int line, idx, maxcol, maxrow;
-    wprintf(L"\033[H\033[J");
+    bool bold = false;
+    bool dim = false;
+    bool underline = false;
+    bool blink = false;
+    bool reverse = false;
+    bool invisible = false;
+    bool intensitychg = false;
+    tmt_color_t fg = TMT_COLOR_DEFAULT;
+    tmt_color_t bg = TMT_COLOR_DEFAULT;
+    wchar_t sgrline[30];
+    size_t srgidx = 0;
+    char colorcode = 0;
+    wprintf(L"\033c");
     maxcol = 0;
     maxrow = 0;
     for (line = out->nline - 1; line >= 0; --line) {
@@ -72,6 +84,72 @@ void dump_vt(TMT* outvt) {
     }
     for (line = 0; line <= maxrow; line++) {
         for (idx = 0; idx <= maxcol; idx++) {
+            sgrline[0] = L'\x00';
+            intensitychg = false;
+            if (out->lines[line]->chars[idx].a.bold != bold) {
+                bold = out->lines[line]->chars[idx].a.bold;
+                intensitychg = true; // Can't unbold without changing dim
+            }
+            if (out->lines[line]->chars[idx].a.dim != dim) {
+                dim = out->lines[line]->chars[idx].a.dim;
+                intensitychg = true; // Can't undim without changing bold
+            }
+            if (intensitychg) {
+                intensitychg = false;
+                wcscat(sgrline, L"22;");
+                if (bold)
+                    wcscat(sgrline, L"1;");
+                if (dim)
+                    wcscat(sgrline, L"2;");
+            }
+            if (out->lines[line]->chars[idx].a.underline != underline) {
+                underline = out->lines[line]->chars[idx].a.underline;
+                if (underline)
+                    wcscat(sgrline, L"4;");
+                else
+                    wcscat(sgrline, L"24;");
+            }
+            if (out->lines[line]->chars[idx].a.blink != blink) {
+                blink = out->lines[line]->chars[idx].a.blink;
+                if (blink)
+                    wcscat(sgrline, L"5;");
+                else
+                    wcscat(sgrline, L"25;");
+            }
+            if (out->lines[line]->chars[idx].a.reverse != reverse) {
+                reverse = out->lines[line]->chars[idx].a.reverse;
+                if (reverse)
+                    wcscat(sgrline, L"7;");
+                else
+                    wcscat(sgrline, L"27;");
+            }
+            if (out->lines[line]->chars[idx].a.invisible != invisible) {
+                invisible = out->lines[line]->chars[idx].a.invisible;
+                if (invisible)
+                    wcscat(sgrline, L"8;");
+                else
+                    wcscat(sgrline, L"28;");
+            }
+            if (out->lines[line]->chars[idx].a.fg != fg) {
+                fg = out->lines[line]->chars[idx].a.fg;
+                if (fg == TMT_COLOR_DEFAULT)
+                    colorcode = 39;
+                else
+                    colorcode = 29 + fg;
+                swprintf(sgrline + wcslen(sgrline), 4, L"%d;", colorcode);
+            }
+            if (out->lines[line]->chars[idx].a.bg != bg) {
+                bg = out->lines[line]->chars[idx].a.bg;
+                if (bg == TMT_COLOR_DEFAULT)
+                    colorcode = 49;
+                else
+                    colorcode = 39 + bg;
+                swprintf(sgrline + wcslen(sgrline), 4, L"%d;", colorcode);
+            }
+            if (sgrline[0] != 0) {
+                sgrline[wcslen(sgrline) - 1] = 0;  // Trim last ;
+                wprintf(L"\033[%lsm", sgrline);
+            }
             wprintf(L"%lc", out->lines[line]->chars[idx].c);
         }
         if (line < maxrow)
