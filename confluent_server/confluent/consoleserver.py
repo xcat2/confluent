@@ -73,7 +73,10 @@ def get_buffer_output(nodename):
         out.flush()
         select.select((instream,), (), (), 30)
         while not outdata or outdata[-1]:
-            chunk = instream.read(128)
+            try:
+                chunk = instream.read(128)
+            except IOError:
+                chunk = None
             if chunk:
                 outdata.extend(chunk)
             else:
