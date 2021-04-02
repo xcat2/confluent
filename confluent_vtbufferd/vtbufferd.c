@@ -158,10 +158,6 @@ void dump_vt(TMT* outvt) {
     fflush(stdout);
     wprintf(L"\x1b[%ld;%ldH", curs->r + 1, curs->c + 1);
     fflush(stdout);
-    idx = write(1, "\x00", 1);
-    if (idx < 0) {
-        return;
-    }
 }
 
 int main(int argc, char* argv[]) {
@@ -201,9 +197,11 @@ int main(int argc, char* argv[]) {
             if (cmd < 0)
                 continue;
             outvt = get_termentbyname(cmdbuf);
-            if (outvt != NULL) {
+            if (outvt != NULL)
                 dump_vt(outvt);
-            }
+            idx = write(1, "\x00", 1);
+            if (idx < 0)
+                continue;
         }
     }
 }
