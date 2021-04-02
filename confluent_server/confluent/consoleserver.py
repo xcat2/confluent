@@ -66,7 +66,7 @@ def get_buffer_output(nodename):
     instream = _bufferdaemon.stdout
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
-    outdata = b''
+    outdata = bytearray()
     with _bufferlock:
         out.write(struct.pack('I', len(nodename)))
         out.write(nodename)
@@ -75,10 +75,10 @@ def get_buffer_output(nodename):
         while not outdata or outdata[-1]:
             chunk = instream.read(128)
             if chunk:
-                outdata += chunk
+                outdata.extend(chunk)
             else:
                 select.select((instream,), (), (), 0)
-        return outdata[:-1]
+        return bytes(outdata[:-1])
 
 
 def send_output(nodename, output):
@@ -590,7 +590,7 @@ def start_console_sessions():
     _bufferlock = semaphore.Semaphore()
     _tracelog = log.Logger('trace')
     _bufferdaemon = subprocess.Popen(
-        ['/opt/confluent/bin/vtbufferd'], stdin=subprocess.PIPE,
+        ['/opt/confluent/bin/vtbufferd'], bufsize=0, stdin=subprocess.PIPE,
         stdout=subprocess.PIPE)
     fl = fcntl.fcntl(_bufferdaemon.stdout.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(_bufferdaemon.stdout.fileno(),
