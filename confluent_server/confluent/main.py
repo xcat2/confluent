@@ -260,6 +260,7 @@ def run(args):
         os.umask(oumask)
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
+    consoleserver.initialize()
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
     disco.start_detection()

@@ -586,7 +586,7 @@ def _start_tenant_sessions(cfm):
     cfm.watch_nodecollection(_nodechange)
 
 
-def start_console_sessions():
+def initialize():
     global _tracelog
     global _bufferdaemon
     global _bufferlock
@@ -598,6 +598,8 @@ def start_console_sessions():
     fl = fcntl.fcntl(_bufferdaemon.stdout.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(_bufferdaemon.stdout.fileno(),
                 fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
