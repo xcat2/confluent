@@ -74,7 +74,7 @@ def get_buffer_output(nodename):
         select.select((instream,), (), (), 30)
         while not outdata or outdata[-1]:
             try:
-                chunk = instream.read(128)
+                chunk = os.read(instream.fileno(), 128)
             except IOError:
                 chunk = None
             if chunk:
