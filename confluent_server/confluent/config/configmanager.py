@@ -409,7 +409,10 @@ def _push_rpc(stream, payload):
             return True
         except Exception:
             logException()
-            del cfgstreams[stream]
+            try:
+                del cfgstreams[stream]
+            except KeyError:
+                pass
             if membership_callback:
                 membership_callback()
             stream.close()
