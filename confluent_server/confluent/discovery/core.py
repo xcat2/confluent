@@ -1322,42 +1322,38 @@ known_pxe_uuids = {}
 def _map_unique_ids(nodes=None):
     global nodes_by_uuid
     global nodes_by_fprint
+    global known_pxe_uuids
     # Map current known ids based on uuid and fingperprints for fast lookup
     cfg = cfm.ConfigManager(None)
     if nodes is None:
         nodes_by_uuid = {}
         nodes_by_fprint = {}
+        known_pxe_uuids = {}
         nodes = cfg.list_nodes()
     bigmap = cfg.get_node_attributes(nodes,
                                      ('id.uuid',
                                       'pubkeys.tls_hardwaremanager'))
-    uuid_by_nodes = {}
-    fprint_by_nodes = {}
-    for uuid in nodes_by_uuid:
-        if not uuid_is_valid(uuid):
-            continue
+    for uuid in list(nodes_by_uuid):
         node = nodes_by_uuid[uuid]
         if node in bigmap:
-            uuid_by_nodes[node] = uuid
-    for fprint in nodes_by_fprint:
+            del nodes_by_uuid[uuid]
+    for uuid in list(known_pxe_uuids):
+        node = known_pxe_uuids[uuid]
+        if node in bigmap:
+            del known_pxe_uuids[uuid]
+    for fprint in list(nodes_by_fprint):
         node = nodes_by_fprint[fprint]
         if node in bigmap:
-            fprint_by_nodes[node] = fprint
+            del nodes_by_fprint[fprint]
     for node in bigmap:
-        if node in uuid_by_nodes:
-            del nodes_by_uuid[uuid_by_nodes[node]]
-        if node in fprint_by_nodes:
-            del nodes_by_fprint[fprint_by_nodes[node]]
         uuid = bigmap[node].get('id.uuid', {}).get('value', '').lower()
         if uuid_is_valid(uuid):
             nodes_by_uuid[uuid] = node
+            known_pxe_uuids[uuid] = node
         fprint = bigmap[node].get(
             'pubkeys.tls_hardwaremanager', {}).get('value', None)
         if fprint:
             nodes_by_fprint[fprint] = node
-    for uuid in known_pxe_uuids:
-        if uuid_is_valid(uuid) and uuid not in nodes_by_uuid:
-            nodes_by_uuid[uuid] = known_pxe_uuids[uuid]
 
 
 if __name__ == '__main__':
