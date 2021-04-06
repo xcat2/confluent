@@ -6,6 +6,7 @@ import os
 import pwd
 import socket
 import subprocess
+import sortutil
 import sys
 
 path = os.path.dirname(os.path.realpath(__file__))
@@ -107,11 +108,11 @@ def show_collective():
     if 'active' in res['collective']:
         if res['collective']['active']:
             print('Active collective members:')
-            for member in res['collective']['active']:
+            for member in sortutil.natural_sort(res['collective']['active']):
                 print('    {0}'.format(member))
         if res['collective']['offline']:
             print('Offline collective members:')
-            for member in res['collective']['offline']:
+            for member in sortutil.natural_sort(res['collective']['offline']):
                 print('    {0}'.format(member))
     else:
         print('Run collective show on leader for more data')
