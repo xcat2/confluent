@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
             if (outvt != NULL)
                 dump_vt(outvt);
             length = write(1, "\x00", 1);
-            if (idx < 0)
+            if (length < 0)
                 continue;
         }
     }
