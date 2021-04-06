@@ -6,7 +6,6 @@ import os
 import pwd
 import socket
 import subprocess
-import sortutil
 import sys
 
 path = os.path.dirname(os.path.realpath(__file__))
@@ -16,6 +15,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 
 import confluent.client as client
+import confluent.sortutil as sortutil
 import confluent.tlvdata as tlvdata
 
 try:
