@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
             outvt = get_termentbyname(cmdbuf);
             if (outvt != NULL)
                 dump_vt(outvt);
-            idx = write(1, "\x00", 1);
+            length = write(1, "\x00", 1);
             if (idx < 0)
                 continue;
         }
