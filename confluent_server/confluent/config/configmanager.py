@@ -739,9 +739,14 @@ def stop_following(replacement=None):
                 pass
         cfgleader = replacement
 
-def stop_leading():
+def stop_leading(newleader=None):
+    rpcpayload = None
+    if newleader is not None:
+        rpcpayload = msgpack.packb({'newleader': newleader}, use_bin_type=False)
     for stream in list(cfgstreams):
         try:
+            if rpcpayload is not None:
+                _push_rpc(cfgstreams[stream], rpcpayload)
             cfgstreams[stream].close()
         except Exception:
             pass
@@ -827,6 +832,8 @@ def follow_channel(channel):
                 rpc = msgpack.unpackb(rpc, raw=False)
                 if 'txcount' in rpc:
                     _txcount = rpc['txcount']
+                if 'newleader' in rpc:
+                    return rpc
                 if 'function' in rpc:
                     if not (rpc['function'].startswith('_true') or rpc['function'].startswith('_rpc')):
                         raise Exception("Received unsupported function call: {0}".format(rpc['function']))
@@ -856,6 +863,7 @@ def follow_channel(channel):
             stop_following(None)
         else:
             stop_following(True)
+    return {}
 
 
 def add_collective_member(name, address, fingerprint):
