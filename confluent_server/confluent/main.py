@@ -269,7 +269,7 @@ def run(args):
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
     webservice.start()
-    while len(configmanager.list_collective()) >= 2:
+    while len(list(configmanager.list_collective())) >= 2:
         # If in a collective, stall automatic startup activity
         # until we establish quorum
         try:
