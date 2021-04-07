@@ -244,7 +244,7 @@ def run(args):
         _updatepidfile()
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
-    collective.startup()
+    atexit.register(doexit)
     if dbgif:
         oumask = os.umask(0o077)
         try:
@@ -258,19 +258,27 @@ def run(args):
         except AttributeError:
             pass  # Windows...
         os.umask(oumask)
+    collective.startup()
+    consoleserver.initialize()
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
-    consoleserver.initialize()
-    webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
-    webservice.start()
-    disco.start_detection()
-    pxe.start_proxydhcp()
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
         sockservice.start()
     except NameError:
         pass
-    atexit.register(doexit)
+    webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
+    webservice.start()
+    while len(configmanager.list_collective) >= 2:
+        # If in a collective, stall automatic startup activity
+        # until we establish quorum
+        try:
+            configmanager.check_quorum()
+            break
+        except Exception:
+            eventlet.sleep(0.5)
+    disco.start_detection()
+    pxe.start_proxydhcp()
     eventlet.sleep(1)
     consoleserver.start_console_sessions()
     while 1:
