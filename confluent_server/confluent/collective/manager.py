@@ -43,6 +43,7 @@ currentleader = None
 follower = None
 retrythread = None
 failovercheck = None
+initting = True
 
 class ContextBool(object):
     def __init__(self):
@@ -500,7 +501,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.close()
             return
         myself = connection.getsockname()[0]
-        if connecting.active:
+        if connecting.active or initting:
             tlvdata.send(connection, {'error': 'Connecting right now',
                                       'backoff': True})
             connection.close()
@@ -542,6 +543,7 @@ def handle_connection(connection, cert, request, local=False):
             connection.sendall(cfgdata)
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
+        connection.settimeout(90)
         if not cfm.relay_slaved_requests(drone, connection):
             log.log({'info': 'All clients have disconnected, starting recovery process',
                      'subsystem': 'collective'})
@@ -720,6 +722,8 @@ def schedule_rebalance():
 def start_collective():
     global follower
     global retrythread
+    global initting
+    initting = True
     retrythread = None
     try:
         cfm.membership_callback = schedule_rebalance
@@ -764,3 +768,5 @@ def start_collective():
         if retrythread is None:
             retrythread = eventlet.spawn_after(random.random(),
                                                start_collective)
+    finally:
+        initting = False
