@@ -187,8 +187,6 @@ def follow_leader(remote, leader):
         log.log({'info': 'Current leader ({0}) has disappeared, restarting '
                          'collective membership'.format(leader), 'subsystem': 'collective'})
         # The leader has folded, time to startup again...
-        if follower is not None:
-            follower.kill()
         follower = None
         cfm.stop_following()
         currentleader = None
