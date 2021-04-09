@@ -80,7 +80,7 @@ else
         ip route add default via $v4gw
     fi
 fi
-echo -n "Initialiing ssh..."
+echo -n "Initializing ssh..."
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
