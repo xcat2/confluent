@@ -159,6 +159,7 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
                 raise
             currentleader = leader
         #spawn this as a thread...
+        remote.settimeout(90)
         follower = eventlet.spawn(follow_leader, remote, leader)
     return True
 
