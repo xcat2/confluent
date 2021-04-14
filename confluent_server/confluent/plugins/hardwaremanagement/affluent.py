@@ -36,7 +36,14 @@ class WebClient(object):
         self.wc.set_basic_credentials(creds[node]['secret.hardwaremanagementuser']['value'], creds[node]['secret.hardwaremanagementpassword']['value'])
     
     def fetch(self, url, results):
-        rsp, status = self.wc.grab_json_response_with_status(url)
+        try:
+            rsp, status = self.wc.grab_json_response_with_status(url)
+        except exc.PubkeyInvalid:
+            results.put(msg.ConfluentNodeError(self.node,
+                'Extended information unavailable, mismatch detected between '
+                'target certificate fingerprint and '
+                'pubkeys.tls_hardwaremanager attribute'))
+            return {}
         if status == 401:
             results.put(msg.ConfluentTargetInvalidCredentials(self.node, 'Unable to authenticate'))
             return {}
@@ -91,7 +98,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         return
     while workers:
         try:
-            datum = results.get(10)
+            datum = results.get(block=True, timeout=10)
             while datum:
                 if datum:
                     yield datum
