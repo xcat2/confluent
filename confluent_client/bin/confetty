@@ -1024,11 +1024,12 @@ if __name__ == '__main__':
         errcode = e.errorcode
     except Exception as e:
         import traceback
+        excinfo = traceback.print_exc()
         try:
             quitconfetty()
         except Exception:
             pass
-        traceback.print_exc()
+        print(excinfo)
     finally:
         if deadline and os.times()[4] < deadline:
             sys.stderr.write('[Exited early, hit enter to continue]')
