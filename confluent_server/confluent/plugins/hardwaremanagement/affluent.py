@@ -40,7 +40,7 @@ class WebClient(object):
             rsp, status = self.wc.grab_json_response_with_status(url)
         except exc.PubkeyInvalid:
             results.put(msg.ConfluentNodeError(self.node,
-                'Extended information unavailable, mismatch detected between '
+                'Mismatch detected between '
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute'))
             return {}

@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016-2019 Lenovo
+# Copyright 2016-2021 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,21 +30,32 @@
 
 # this module will provide mac to switch and full 'ifName' label
 # This functionality is restricted to the null tenant
-from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
-from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
-import eventlet.green.socket as socket
 
 if __name__ == '__main__':
-    import sys
     import confluent.config.configmanager as cfm
+    import confluent.snmputil as snmp
+
+
+from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
+from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
+import eventlet.green.select as select
+
+import eventlet.green.socket as socket
+
+
+import os
+import sys
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
-import confluent.snmputil as snmp
 import confluent.util as util
 from eventlet.greenpool import GreenPool
+import eventlet.green.subprocess as subprocess
+import fcntl
 import eventlet
 import eventlet.semaphore
+import msgpack
+import random
 import re
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
@@ -56,6 +67,8 @@ _apimacmap = {}
 _macsbyswitch = {}
 _nodesbymac = {}
 _switchportmap = {}
+_offloadevts = {}
+_offloader = None
 vintage = None
 
 
@@ -134,8 +147,8 @@ def _nodelookup(switch, ifname):
 
 
 def _affluent_map_switch(args):
-    switch, password, user, cfm = args
-    kv = util.TLSCertVerifier(cfm, switch,
+    switch, password, user, cfgm = args
+    kv = util.TLSCertVerifier(cfgm, switch,
                                   'pubkeys.tls_hardwaremanager').verify_cert
     wc =  webclient.SecureHTTPConnection(
                 switch, 443, verifycallback=kv, timeout=5)
@@ -164,6 +177,47 @@ def _affluent_map_switch(args):
                 else:
                     _nodesbymac[mac] = (nodename, nummacs)
 
+def _offload_map_switch(switch, password, user):
+    if _offloader is None:
+        _start_offloader()
+    evtid = random.randint(0, 4294967295)
+    while evtid in _offloadevts:
+        evtid = random.randint(0, 4294967295)
+    _offloadevts[evtid] = eventlet.Event()
+    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user), use_bin_type=False))
+    _offloader.stdin.flush()
+    result = _offloadevts[evtid].wait()
+    del _offloadevts[evtid]
+    return result
+
+
+
+def _start_offloader():
+    global _offloader
+    os.environ['PYTHONPATH'] = ':'.join(sys.path)
+    _offloader = subprocess.Popen(
+        [sys.executable, __file__, '-o'], bufsize=0, stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE)
+    fl = fcntl.fcntl(_offloader.stdout.fileno(), fcntl.F_GETFL)
+    fcntl.fcntl(_offloader.stdout.fileno(),
+                fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    eventlet.spawn_n(_recv_offload)
+    eventlet.sleep(0)
+
+
+def _recv_offload():
+    upacker = msgpack.Unpacker(raw=False)
+    instream = _offloader.stdout.fileno()
+    while True:
+        select.select([_offloader.stdout], [], [])
+        upacker.feed(os.read(instream, 128))
+        for result in upacker:
+            if result[0] not in _offloadevts:
+                print("Uh oh, unexpected event id... " + repr(result))
+                continue
+            _offloadevts[result[0]].send(result[1:])
+            eventlet.sleep(0)
+
 
 def _map_switch_backend(args):
     """Manipulate portions of mac address map relevant to a given switch
@@ -183,7 +237,7 @@ def _map_switch_backend(args):
     #
     global _macmap
     if len(args) == 4:
-        switch, password, user, cfm = args
+        switch, password, user, _ = args  # 4th arg is for affluent only
         if not user:
             user = None
     else:
@@ -194,6 +248,84 @@ def _map_switch_backend(args):
             return _affluent_map_switch(args)
         except Exception:
             pass
+    mactobridge, ifnamemap, bridgetoifmap = _offload_map_switch(
+        switch, password, user)
+    maccounts = {}
+    bridgetoifvalid = False
+    for mac in mactobridge:
+        try:
+            ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+            bridgetoifvalid = True
+        except KeyError:
+            continue
+        if ifname not in maccounts:
+            maccounts[ifname] = 1
+        else:
+            maccounts[ifname] += 1
+    if not bridgetoifvalid:
+        bridgetoifmap = {}
+    # Not a single mac address resolved to an interface index, chances are
+    # that the switch is broken, and the mactobridge is reporting ifidx
+    # instead of bridge port index
+    # try again, skipping the bridgetoifmap lookup
+        for mac in mactobridge:
+            try:
+                ifname = ifnamemap[mactobridge[mac]]
+                bridgetoifmap[mactobridge[mac]] = mactobridge[mac]
+            except KeyError:
+                continue
+            if ifname not in maccounts:
+                maccounts[ifname] = 1
+            else:
+                maccounts[ifname] += 1
+    newmacs = {}
+    noaffluent.add(switch)
+    for mac in mactobridge:
+        # We want to merge it so that when a mac appears in multiple
+        # places, it is captured.
+        try:
+            ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
+        except KeyError:
+            continue
+        if mac in _macmap:
+            _macmap[mac].append((switch, ifname, maccounts[ifname]))
+        else:
+            _macmap[mac] = [(switch, ifname, maccounts[ifname])]
+        if ifname in newmacs:
+            newmacs[ifname].append(mac)
+        else:
+            newmacs[ifname] = [mac]
+        nodename = _nodelookup(switch, ifname)
+        if nodename is not None:
+            if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
+                # For example, listed on both a real edge port
+                # and by accident a trunk port
+                log.log({'error': '{0} and {1} described by ambiguous'
+                                  ' switch topology values'.format(
+                                      nodename, _nodesbymac[mac][0])})
+                _nodesbymac[mac] = (None, None)
+            else:
+                _nodesbymac[mac] = (nodename, maccounts[ifname])
+    _macsbyswitch[switch] = newmacs
+
+def _snmp_map_switch_relay(rqid, switch, password, user):
+    try:
+        res = _snmp_map_switch(switch, password, user)
+        try:
+            sys.stdout.buffer.write(msgpack.packb((rqid,) + res,
+                                    use_bin_type=False))
+        except AttributeError:
+            sys.stdout.write(msgpack.packb((rqid,) + res,
+                             use_bin_type=False))
+    except Exception as e:
+        try:
+            sys.stdout.buffer.write(msgpack.packb(str(e)))
+        except AttributeError:
+            sys.stdout.write(msgpack.packb(str(e)))
+    finally:
+        sys.stdout.flush()
+
+def _snmp_map_switch(switch, password, user):
     haveqbridge = False
     mactobridge = {}
     conn = snmp.Session(switch, password, user)
@@ -203,12 +335,12 @@ def _map_switch_backend(args):
         oid, bridgeport = vb
         if not bridgeport:
             continue
-        oid = str(oid).rsplit('.', 6)  # if 7, then oid[1] would be vlan id
+        oid = str(oid).rsplit('.', 6)
+        # if 7, then oid[1] would be vlan id
         macaddr = '{0:02x}:{1:02x}:{2:02x}:{3:02x}:{4:02x}:{5:02x}'.format(
             *([int(x) for x in oid[-6:]])
         )
         mactobridge[macaddr] = int(bridgeport)
-    noaffluent.add(switch)
     if not haveqbridge:
         for vb in conn.walk('1.3.6.1.2.1.17.4.3.1.2'):
             oid, bridgeport = vb
@@ -250,62 +382,8 @@ def _map_switch_backend(args):
             except ValueError:
                 # ifidx might be '', skip in such a case
                 continue
-    maccounts = {}
-    bridgetoifvalid = False
-    for mac in mactobridge:
-        try:
-            ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
-            bridgetoifvalid = True
-        except KeyError:
-            continue
-        if ifname not in maccounts:
-            maccounts[ifname] = 1
-        else:
-            maccounts[ifname] += 1
-    if not bridgetoifvalid:
-        bridgetoifmap = {}
-    # Not a single mac address resolved to an interface index, chances are
-    # that the switch is broken, and the mactobridge is reporting ifidx
-    # instead of bridge port index
-    # try again, skipping the bridgetoifmap lookup
-        for mac in mactobridge:
-            try:
-                ifname = ifnamemap[mactobridge[mac]]
-                bridgetoifmap[mactobridge[mac]] = mactobridge[mac]
-            except KeyError:
-                continue
-            if ifname not in maccounts:
-                maccounts[ifname] = 1
-            else:
-                maccounts[ifname] += 1
-    newmacs = {}
-    for mac in mactobridge:
-        # We want to merge it so that when a mac appears in multiple
-        # places, it is captured.
-        try:
-            ifname = ifnamemap[bridgetoifmap[mactobridge[mac]]]
-        except KeyError:
-            continue
-        if mac in _macmap:
-            _macmap[mac].append((switch, ifname, maccounts[ifname]))
-        else:
-            _macmap[mac] = [(switch, ifname, maccounts[ifname])]
-        if ifname in newmacs:
-            newmacs[ifname].append(mac)
-        else:
-            newmacs[ifname] = [mac]
-        nodename = _nodelookup(switch, ifname)
-        if nodename is not None:
-            if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
-                # For example, listed on both a real edge port
-                # and by accident a trunk port
-                log.log({'error': '{0} and {1} described by ambiguous'
-                                  ' switch topology values'.format(
-                                      nodename, _nodesbymac[mac][0])})
-                _nodesbymac[mac] = (None, None)
-            else:
-                _nodesbymac[mac] = (nodename, maccounts[ifname])
-    _macsbyswitch[switch] = newmacs
+    #OFFLOAD: end of need to offload?
+    return mactobridge,ifnamemap,bridgetoifmap
 
 
 switchbackoff = 30
@@ -572,6 +650,20 @@ def rescan(cfg):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '-o':
+        upacker = msgpack.Unpacker(raw=False)
+        currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
+
+        while True:
+            r = select.select([sys.stdin], [], [])
+            try:
+                upacker.feed(sys.stdin.buffer.read())
+            except AttributeError:
+                upacker.feed(sys.stdin.read())
+            for cmd in upacker:
+                eventlet.spawn_n(_snmp_map_switch_relay, *cmd)
+        sys.exit(0)
     cg = cfm.ConfigManager(None)
     for res in update_macmap(cg):
         print("map has updated")
