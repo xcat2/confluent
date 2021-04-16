@@ -184,10 +184,16 @@ def _offload_map_switch(switch, password, user):
     while evtid in _offloadevts:
         evtid = random.randint(0, 4294967295)
     _offloadevts[evtid] = eventlet.Event()
-    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user), use_bin_type=False))
+    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user),
+                                         use_bin_type=True))
     _offloader.stdin.flush()
     result = _offloadevts[evtid].wait()
     del _offloadevts[evtid]
+    if len(result) == 2:
+        if result[0] == 1:
+            raise exc.deserialize_exc(result[1])
+        elif result[0] == 2:
+            raise Exception(result[1])
     return result
 
 
@@ -206,7 +212,7 @@ def _start_offloader():
 
 
 def _recv_offload():
-    upacker = msgpack.Unpacker(raw=False)
+    upacker = msgpack.Unpacker(encoding='utf8')
     instream = _offloader.stdout.fileno()
     while True:
         select.select([_offloader.stdout], [], [])
@@ -311,17 +317,24 @@ def _map_switch_backend(args):
 def _snmp_map_switch_relay(rqid, switch, password, user):
     try:
         res = _snmp_map_switch(switch, password, user)
+        payload = msgpack.packb((rqid,) + res, use_bin_type=True)
         try:
-            sys.stdout.buffer.write(msgpack.packb((rqid,) + res,
-                                    use_bin_type=False))
+            sys.stdout.buffer.write(payload)
         except AttributeError:
-            sys.stdout.write(msgpack.packb((rqid,) + res,
-                             use_bin_type=False))
+            sys.stdout.write(payload)
+    except exc.ConfluentException as e:
+        nestedexc = e.serialize()
+        payload = msgpack.packb((rqid, 1, nestedexc), use_bin_type=True)
+        try:
+            sys.stdout.buffer.write(payload)
+        except AttributeError:
+            sys.stdout.write(payload)
     except Exception as e:
+        payload = msgpack.packb((rqid, 2, str(e)), use_bin_type=True)
         try:
-            sys.stdout.buffer.write(msgpack.packb(str(e)))
+            sys.stdout.buffer.write(payload)
         except AttributeError:
-            sys.stdout.write(msgpack.packb(str(e)))
+            sys.stdout.write(payload)
     finally:
         sys.stdout.flush()
 
@@ -651,7 +664,7 @@ def rescan(cfg):
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '-o':
-        upacker = msgpack.Unpacker(raw=False)
+        upacker = msgpack.Unpacker(encoding='utf8')
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
 

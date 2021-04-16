@@ -25,9 +25,10 @@ def deserialize_exc(msg):
         return Exception(excd[1])
     if excd[0] not in globals():
         return Exception('Cannot deserialize: {0}'.format(repr(excd)))
-    if not issubclass(excd[0], ConfluentException):
+    classn = globals()[excd[0]]
+    if not issubclass(classn, ConfluentException):
         return Exception('Cannot deserialize: {0}'.format(repr(excd)))
-    return globals(excd[0])(*excd[1])
+    return classn(*excd[1])
 
 class ConfluentException(Exception):
     apierrorcode = 500
