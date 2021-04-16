@@ -14,16 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import confluent.util as util
+import confluent.noderange as noderange
+import confluent.collective.manager as collective
 
 
 def get_switchcreds(configmanager, switches):
     switchcfg = configmanager.get_node_attributes(
         switches, ('secret.hardwaremanagementuser', 'secret.snmpcommunity',
-                   'secret.hardwaremanagementpassword'), decrypt=True)
+                   'secret.hardwaremanagementpassword',
+                   'collective.managercandidates'), decrypt=True)
     switchauth = []
     for switch in switches:
         if not switch:
             continue
+        candmgrs = switchcfg.get(switch, {}).get('collective.managercandidates', {}).get('value', None)
+        if candmgrs:
+            candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+            if collective.get_myname() not in candmgrs:
+                continue
         switchparms = switchcfg.get(switch, {})
         user = None
         password = switchparms.get(
