@@ -148,6 +148,7 @@ unique_fields = frozenset(['serial', 'mac', 'uuid'])
 def import_csv(options, session):
     nodedata = []
     unique_data = {}
+    exitcode = 0
     with open(options.importfile, 'r') as datasrc:
         records = csv.reader(datasrc)
         fields = process_header(next(records))
@@ -188,6 +189,7 @@ def import_csv(options, session):
         for res in session.create('/nodes/', datum):
             if 'error' in res:
                 sys.stderr.write(res['error'] + '\n')
+                exitcode |= res.get('errorcode', 1)
                 continue
             elif 'created' in res:
                 print('Defined ' + res['created'])
@@ -198,11 +200,14 @@ def import_csv(options, session):
                                       {'node': nodename}):
                 if 'error' in res:
                     sys.stderr.write(res['error'] + '\n')
+                    exitcode |= res.get('errorcode', 1)
                     continue
                 elif 'assigned' in res:
                     print('Discovered ' + res['assigned'])
                 else:
                     print(repr(res))
+    if exitcode:
+        sys.exit(exitcode)
 
 
 def list_discovery(options, session):
@@ -291,12 +296,18 @@ def assign_discovery(options, session, needid=True):
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")
         sys.exit(1)
+    exitcode = 0
     for res in session.update('/discovery/by-mac/{0}'.format(matches[0]),
                    {'node': options.node}):
         if 'assigned' in res:
             print('Assigned: {0}'.format(res['assigned']))
+        elif 'error' in res:
+            sys.stderr.write('Error: {0}\n'.format(res['error']))
+            exitcode |= res.get('errorcode', 1)
         else:
             print(repr(res))
+    if exitcode:
+        sys.exit(exitcode)
 
 def blocking_scan(session):
     list(session.update('/discovery/rescan', {'rescan': 'start'}))
