@@ -346,6 +346,7 @@ def _authorize_request(env, operation):
             auditlog.log(auditmsg)
         if 'csrftoken' in httpsessions[sessid]:
             authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
+        httpsessions[sessid]['cfgmgr'] = authdata[1]
         return authinfo
     elif authdata is None:
         return {'code': 401}
@@ -393,7 +394,6 @@ def wsock_handler(ws):
     authtoken = authtoken[:-1]
     if currsess['csrftoken'] != authtoken:
         return
-    pathrequested = ws.wait()
     mythreadid = greenlet.getcurrent()
     httpsessions[sessid]['inflight'].add(mythreadid)
     name = httpsessions[sessid]['name']
@@ -409,13 +409,55 @@ def wsock_handler(ws):
             prefix, _, _ = ws.path.partition('/shell/sessions')
             shellsession = True
         _, _, nodename = prefix.rpartition('/')
-        # ok, here we need to set up a callback handler
-        # note that currently, it's always json wrapped
-        # it may be wise to send text back straight
-        # for example, could assume our json always has '{'
-        # as the first character, else plain text since it is console
-        # we will loop on ws.wait() to input data, and the data handler
-        # callback will send
+        geom = ws.wait()
+        geom = geom[1:]
+        geom = json.loads(geom)
+        width = geom['width']
+        height = geom['height']
+        skipreplay = geom.get('skipreplay', False)
+        cfgmgr = httpsessions[sessid]['cfgmgr']
+        username = httpsessions[sessid]['name']
+        def datacallback(data):
+            if isinstance(data, dict):
+                data = json.dumps(data)
+                ws.send('!' + data)
+            elif not isinstance(data, str):
+                ws.send(' ' + data.decode('utf8'))
+            else:
+                ws.send(' ' + data)
+        try:
+            if shellsession:
+                consession = shellserver.ShellSession(
+                    node=nodename, configmanager=cfgmgr,
+                    username=username, skipreplay=skipreplay,
+                    datacallback=datacallback, width=width, height=height
+                )
+            else:
+                consession = consoleserver.ConsoleSession(
+                    node=nodename, configmanager=cfgmgr,
+                    username=username, skipreplay=skipreplay,
+                    datacallback=datacallback, width=width, height=height
+                )
+        except exc.NotFoundException:
+            return
+        clientmsg = ws.wait()
+        try:
+            while clientmsg is not None:
+                if clientmsg[0] == ' ':
+                    consession.write(clientmsg[1:])
+                elif clientmsg[0] == '!':
+                    cmd = json.loads(clientmsg[1:])
+                    action = cmd.get('action', None)
+                    if action == 'break':
+                        consession.send_break()
+                    elif action == 'resize':
+                        consession.resize(
+                            width=cmd['width'], height=cmd['height'])
+                elif clientmsg[0] == '?':
+                    ws.send('?')
+                clientmsg = ws.wait()
+        finally:
+            consession.destroy()
 
 
 def resourcehandler(env, start_response):
