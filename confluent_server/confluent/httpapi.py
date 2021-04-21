@@ -463,7 +463,8 @@ def wsock_handler(ws):
 def resourcehandler(env, start_response):
     try:
         if 'HTTP_SEC_WEBSOCKET_VERSION' in env:
-            return wsock_handler(env, start_response)
+            for rsp in wsock_handler(env, start_response):
+                yield rsp
         for rsp in resourcehandler_backend(env, start_response):
             yield rsp
     except Exception as e:
