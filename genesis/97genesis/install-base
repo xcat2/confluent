@@ -2,7 +2,7 @@
 dracut_install /usr/bin/clevis-encrypt-tpm2 /usr/bin/clevis-decrypt-tpm2 /usr/bin/jose /usr/bin/mktemp
 dracut_install /lib64/libtss2-tcti-device.so.0
 dracut_install /usr/bin/tpm2_create /usr/bin/tpm2_pcrread /usr/bin/tpm2_createpolicy /usr/bin/tpm2_createprimary /usr/bin/tpm2_load /usr/bin/tpm2_unseal
-dracut_install curl openssl tar ipmitool cpio gzip lsmod ethtool
+dracut_install curl openssl tar ipmitool cpio xz gzip lsmod ethtool
 dracut_install modprobe touch echo cut wc bash netstat uniq grep ip hostname
 dracut_install awk egrep dirname bc expr sort
 dracut_install ssh sshd vi reboot lspci parted tmux mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
