@@ -420,11 +420,11 @@ def wsock_handler(ws):
         def datacallback(data):
             if isinstance(data, dict):
                 data = json.dumps(data)
-                ws.send('!' + data)
+                ws.send(u'!' + data)
             elif not isinstance(data, str):
-                ws.send(' ' + data.decode('utf8'))
+                ws.send(u' ' + data.decode('utf8'))
             else:
-                ws.send(' ' + data)
+                ws.send(u' ' + data)
         try:
             if shellsession:
                 consession = shellserver.ShellSession(
@@ -454,7 +454,7 @@ def wsock_handler(ws):
                         consession.resize(
                             width=cmd['width'], height=cmd['height'])
                 elif clientmsg[0] == '?':
-                    ws.send('?')
+                    ws.send(u'?')
                 clientmsg = ws.wait()
         finally:
             consession.destroy()

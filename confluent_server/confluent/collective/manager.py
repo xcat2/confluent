@@ -656,6 +656,7 @@ def become_leader(connection):
         reassimilate = eventlet.spawn(reassimilate_missing)
 
 def reassimilate_missing():
+    eventlet.sleep(30)
     while cfm.cfgstreams and _assimilate_missing():
         eventlet.sleep(30)
 
