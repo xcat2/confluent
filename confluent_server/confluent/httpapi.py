@@ -422,9 +422,11 @@ def wsock_handler(ws):
             if isinstance(data, dict):
                 data = json.dumps(data)
                 ws.send(u'!' + data)
-            elif not isinstance(data, str):
-                ws.send(u' ' + data.decode('utf8'))
             else:
+                try:
+                    data = data.decode('utf8')
+                except UnicodeDecodeError:
+                    data = data.decode('cp437')
                 ws.send(u' ' + data)
         try:
             if shellsession:
