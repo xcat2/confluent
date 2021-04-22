@@ -381,7 +381,8 @@ def _assign_consessionid(consolesession):
                                'expiry': time.time() + 60}
     return sessid
 
-@eventlet.websocket.WebSocketWSGI
+@eventlet.websocket.WebSocketWSGI.configured(
+    supported_protocols=['confluent.console'])
 def wsock_handler(ws):
     sessid = ws.wait()
     sessid = sessid.replace('ConfluentSessionId:', '')
