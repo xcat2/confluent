@@ -1539,7 +1539,8 @@ class IpmiHandler(object):
             try:
                 self.ipmicmd.apply_license(filename, data=datfile)
             finally:
-                datfile.close()
+                if datfile is not None:
+                    datfile.close()
         if len(self.element) == 3:
             self.output.put(msg.ChildCollection('all'))
             i = 1
