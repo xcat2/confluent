@@ -34,6 +34,7 @@ defcolumns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
 columnmapping = {
     'Node': 'nodename',
     'Model': 'modelnumber',
+    'Model Name': 'modelname',
     'Serial': 'serialnumber',
     'UUID': 'uuid',
     'Type': 'types',

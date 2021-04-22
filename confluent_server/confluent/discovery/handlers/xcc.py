@@ -63,6 +63,14 @@ class NodeHandler(immhandler.NodeHandler):
         # This is not adequate for being satisfied
         return bool(info.get('attributes', {}))
 
+    def scan(self):
+        c = webclient.SecureHTTPConnection(self.ipaddr, 443,
+            verifycallback=self.validate_cert)
+        i = c.grab_json_response('/api/providers/logoninfo')
+        modelname = i.get('items', [{}])[0].get('machine_name', None)
+        if modelname:
+            self.info['modelname'] = modelname
+
     def preconfig(self, possiblenode):
         self.tmpnodename = possiblenode
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')

@@ -252,6 +252,8 @@ def send_discovery_datum(info):
         yield msg.KeyValueData({'lowest_u': info['u']})
     if 'hostname' in info:
         yield msg.KeyValueData({'hostname': info['hostname']})
+    if 'modelname' in info:
+        yield msg.KeyValueData({'modelname': info['modelname']})
 
 
 def _info_matches(info, criteria):
