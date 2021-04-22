@@ -72,6 +72,8 @@ fi
 export mgr profile nodename
 curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
 . /tmp/functions
+run_remote pre.custom
+run_remote_parts pre
 run_remote_python getinstalldisk
 if [ -e /tmp/installdisk ]; then
     echo clearpart --all --initlabel >> /tmp/partitioning
@@ -79,4 +81,3 @@ if [ -e /tmp/installdisk ]; then
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
 curl -f https://$mgr/confluent-public/os/$profile/kickstart.custom > /tmp/kickstart.custom
-run_remote pre.custom
