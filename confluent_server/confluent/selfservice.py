@@ -259,6 +259,8 @@ def handle_request(env, start_response):
             start_response('500 Error', (('Content-Type', 'text/plain'),))
             yield 'No pending profile detected, unable to accept status update'
     elif env['PATH_INFO'] == '/self/saveapikey' and reqbody:
+        if not isinstance(reqbody, str):
+            reqbody = reqbody.decode('utf8')
         cfg.set_node_attributes({
             nodename: {'deployment.sealedapikey': {'value': reqbody}}})
         start_response('200 OK', ())
