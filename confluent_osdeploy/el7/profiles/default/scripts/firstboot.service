@@ -4,7 +4,7 @@ Requires=network-online.target
 After=network-online.target
 
 [Service]
-ExecStart=/etc/confluent/firstboot.sh
+ExecStart=/opt/confluent/bin/firstboot.sh
 
 [Install]
 WantedBy=multi-user.target

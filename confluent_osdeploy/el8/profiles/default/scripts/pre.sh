@@ -74,7 +74,7 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/funct
 . /tmp/functions
 run_remote pre.custom
 run_remote_parts pre
-if [ -e /tmp/installdisk ]; then
+if [ ! -e /tmp/installdisk ]; then
     run_remote_python getinstalldisk
 fi
 if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then

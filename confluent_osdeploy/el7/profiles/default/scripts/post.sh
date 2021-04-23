@@ -5,16 +5,14 @@ apikey=$(cat /etc/confluent/confluent.apikey)
 
 chmod 700 /etc/confluent
 chmod og-rwx /etc/confluent/*
-
 export mgr profile nodename
 . /etc/confluent/functions
-
-curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
 
 
 if [ -f /tmp/cryptboot ]; then
     run_remote tpm_luks.sh
 fi
+
 # By default, the install repository is ignored, change
 # this by manually adding local repositories
 
@@ -37,3 +35,10 @@ run_remote_python syncfileclient
 # run_remote example.sh
 # run_remote_python example.py
 run_remote post.custom
+
+# Also, scripts may be placed into 'post.d', e.g. post.d/01-runfirst.sh, post.d/02-runsecond.sh
+run_remote_parts post
+
+# Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
+run_remote_config post
+curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus

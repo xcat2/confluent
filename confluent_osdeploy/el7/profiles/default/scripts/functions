@@ -17,6 +17,13 @@ fetch_remote() {
     if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
 }
 
+run_remote_parts() {
+    scriptlist=$(/usr/libexec/platform-python /etc/confluent/apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
+    for script in $scriptlist; do
+        run_remote $1.d/$script
+    done
+}
+
 run_remote() {
     requestedcmd="'$*'"
     curlargs=""
@@ -70,3 +77,26 @@ run_remote_python() {
     cd - > /dev/null
     return $retcode
 }
+
+run_remote_config() {
+    echo
+    set_confluent_vars
+    apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    echo '---------------------------------------------------------------------------'
+    echo Requesting to run remote configuration for "'$*'" from $mgr under profile $profile
+    if [ -x /usr/libexec/platform-python ]; then
+        /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
+        /usr/libexec/platform-python $apiclient /confluent-api/self/remoteconfig/status -w 204
+    else
+        /usr/bin/python $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
+        /usr/bin/python $apiclient /confluent-api/self/remoteconfig/status -w 204
+    fi
+    echo
+    echo 'Completed remote configuration'
+    echo '---------------------------------------------------------------------------'
+    return
+}
+

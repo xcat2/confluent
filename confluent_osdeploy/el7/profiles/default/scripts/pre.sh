@@ -43,7 +43,7 @@ if [ ! -z "$blargs" ]; then
     echo "bootloader $blargs" > /tmp/grubpw
 fi
 ssh-keygen -A
-for pubkey in /etc/ssh/ssh_host_*_key.pub; do
+for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
@@ -53,9 +53,9 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
     TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
-touch /tmp/addonpackages
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
+touch /tmp/addonpackages
 if [ "$cryptboot" == "tpm2" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
 	echo $cryptboot >> /tmp/cryptboot
@@ -65,11 +65,14 @@ fi
 export mgr profile nodename
 curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
 . /tmp/functions
-run_remote_python getinstalldisk
-if [ -e /tmp/installdisk ]; then
+run_remote pre.custom
+run_remote_parts pre
+if [ ! -e /tmp/installdisk ]; then
+    run_remote_python getinstalldisk
+fi
+if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo clearpart --all --initlabel >> /tmp/partitioning
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
 python /etc/confluent/apiclient /confluent-public/os/$profile/kickstart.custom -o /tmp/kickstart.custom
-run_remote pre.custom
