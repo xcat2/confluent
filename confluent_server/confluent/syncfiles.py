@@ -69,11 +69,10 @@ class SyncList(object):
             currmap[k] = v
 
 
-def sync_list_to_node(synclist, node, suffixes):
+def sync_list_to_node(sl, node, suffixes):
     targdir = tempfile.mkdtemp('.syncto{}'.format(node))
     output = ''
     try:
-        sl = SyncList(synclist)
         for ent in sl.replacemap:
             stage_ent(sl.replacemap, ent, targdir)
         if 'append' in suffixes:
@@ -144,8 +143,11 @@ def start_syncfiles(nodename, cfg, suffixes):
     synclist = '/var/lib/confluent/public/os/{}/syncfiles'.format(profile)
     if not os.path.exists(synclist):
         return '200 OK'  # not running
+    sl = SyncList(synclist)
+    if not (sl.appendmap or sl.mergemap or sl.replacemap):
+        return '200 OK'  # the synclist has no actual entries
     syncrunners[nodename] = eventlet.spawn(
-        sync_list_to_node, synclist, nodename, suffixes)
+        sync_list_to_node, sl, nodename, suffixes)
     return '202 Queued' # backgrounded
 
 def get_syncresult(nodename):

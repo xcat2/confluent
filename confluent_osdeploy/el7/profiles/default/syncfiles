@@ -1,0 +1,13 @@
+# This file lists files to synchronize or merge to the deployed systems from the deployment server
+# To specify taking /some/path/hosts on the deploymennt server and duplicating it to /etc/hosts:
+# /some/path/hosts -> /etc/hosts
+
+# If wanting to simply use the same path for source and destinaiton, the -> may be skipped:
+# /etc/hosts
+
+# Entries under MERGE will attempt to be intelligently merged. This supports /etc/group and /etc/passwd
+# Any supporting entries in /etc/shadow or /etc/gshadow are added automatically, with password disabled
+# It also will not inject 'system' ids (under 1,000 usually) as those tend to be local and rpm managed.
+MERGE:
+# /etc/passwd
+# /etc/group
