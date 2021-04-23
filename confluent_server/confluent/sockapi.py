@@ -103,7 +103,7 @@ class ClientConsole(object):
         self.xmit = True
         for datum in self.pendingdata:
             send_data(self.client, datum)
-        self.pendingdata = None
+        self.pendingdata = []
 
 
 def send_data(connection, data):
@@ -320,6 +320,12 @@ def term_interact(authdata, authname, ccons, cfm, connection, consession,
                 continue
             elif data['operation'] == 'reopen':
                 consession.reopen()
+                continue
+            elif data['operation'] == 'pause':
+                ccons.xmit = False
+                continue
+            elif data['operation'] == 'resume':
+                ccons.xmit = True
                 continue
             elif data['operation'] == 'resize':
                 consession.resize(width=data['width'], height=data['height'])

@@ -663,6 +663,28 @@ def get_session_node(shellargs):
     return None
 
 
+def run_inline_command(path, arg, completion, **kwargs):
+    tlvdata.send(session.connection, {'operation': 'pause',
+                                              'path': currconsole})
+    buffdata = ''
+    while select.select((session.connection,), (), (), 0)[0]:
+        buffdata += consume_termdata(session.connection, bufferonly=True)
+    rc = session.simple_noderange_command(consolename, path, arg, **kwargs)
+    tlvdata.send(session.connection, {'operation': 'resume',
+                                      'path': currconsole})
+    sys.stdout.write(completion)
+    sys.stdout.flush()
+    if buffdata:
+        try:
+            sys.stdout.write(buffdata)
+        except UnicodeEncodeError:
+            sys.stdout.buffer.write(buffdata.encode('utf8'))
+        except IOError:  # Some times circumstances are bad
+                         # resort to byte at a time...
+            for d in buffdata:
+                sys.stdout.write(d)
+    return rc
+
 def conserver_command(filehandle, localcommand):
     # x - conserver has that as 'show baud', I am inclined to replace that with
     #     'request exclusive'
@@ -698,13 +720,14 @@ def conserver_command(filehandle, localcommand):
         localcommand = get_command_bytes(filehandle, localcommand, cmdlen)
 
         if localcommand[1] == 'o': # off
-            print("powering off...")
-            session.simple_noderange_command(consolename, '/power/state', 'off')
-            print("complete]\r")
+            sys.stdout.write("powering off...")
+            sys.stdout.flush()
+            consume_termdata(session.conneection)
+            run_inline_command('/power/state', 'off', 'complete]')
         elif localcommand[1] == 's':  # shutdown
-            print("shutting down...")
-            session.simple_noderange_command(consolename, '/power/state', 'shutdown')
-            print("complete]\r")
+            sys.stdout.write("shutting down...")
+            sys.stdout.flush()
+            run_inline_command('/power/state', 'shutdown', 'complete]')
         elif localcommand[1] == 'b': # boot
             cmdlen += 1
             localcommand = get_command_bytes(filehandle, localcommand, cmdlen)
@@ -715,59 +738,46 @@ def conserver_command(filehandle, localcommand):
                 bootmode = 'uefi'
                 bootdev = 'setup'
 
-                rc = session.simple_noderange_command(consolename, '/boot/nextdevice', bootdev, bootmode=bootmode)
+                rc = run_inline_command('/boot/nextdevice', bootdev, '', bootmode=bootmode)
 
                 if rc:
                     print("Error]\r")
                 else:
-                    rc = session.simple_noderange_command(consolename, '/power/state', 'boot')
+                    rc = run_inline_command('/power/state', 'boot', 'complete]')
                     if rc:
-                        print("Error]\r")
-                    else:
-                        print("complete]\r")
+                        print("Error]")
 
             elif localcommand[2] == 'n':  # boot to network
-                print("booting to network...")
-
+                sys.stdout.write("booting to network...")
+                sys.stdout.flush()
                 bootmode = 'uefi'
                 bootdev = 'network'
-
-                rc = session.simple_noderange_command(consolename, '/boot/nextdevice', bootdev, bootmode=bootmode)
-
+                rc = run_inline_command('/boot/nextdevice', bootdev, '', bootmode=bootmode)
                 if rc:
                     print("Error]\r")
                 else:
-                    rc = session.simple_noderange_command(consolename, '/power/state', 'boot')
-
+                    rc = run_inline_command('/power/state', 'boot', 'complete]')
                     if rc:
                         print("Error]\r")
-                    else:
-                        print("complete]\r")
-
             elif localcommand[2] == '\x0d':  # boot to default
                 print("booting to default...")
 
                 bootmode = 'uefi'
                 bootdev = 'default'
 
-                rc = session.simple_noderange_command(consolename, '/boot/nextdevice', bootdev, bootmode=bootmode)
+                rc = run_inline_command(consolename, '/boot/nextdevice', bootdev, '', bootmode=bootmode)
 
                 if rc:
                     print("Error]\r")
                 else:
-                    rc = session.simple_noderange_command(consolename, '/power/state', 'boot')
-
+                    rc = run_inline_command('/power/state', 'boot', 'complete]')
                     if rc:
                         print("Error]\r")
-                    else:
-                        print("complete]\r")
-
             else:
                 print("Unknown boot state.]\r")
 
         else:
             print("Unknown power state.]\r")
-
         check_power_state()
     elif localcommand[0] == 'r':
         sys.stdout.write('\x1b7\x1b[999;999H\x1b[6n')
@@ -929,65 +939,7 @@ def main():
                 rdylist = ()
             for fh in rdylist:
                 if fh == session.connection:
-                    # this only should get called in the
-                    # case of a console session
-                    # each command should slurp up all relevant
-                    # recv potential
-                    #fh.read()
-                    try:
-                        data = tlvdata.recv(fh)
-                    except Exception:
-                        data = None
-                    if type(data) == dict:
-                        updatestatus(data)
-                        continue
-                    if data is not None:
-                        data = client.stringify(data)
-                        if clearpowermessage:
-                            sys.stdout.write("\x1b[2J\x1b[;H")
-                            clearpowermessage = False
-                        try:
-                            sys.stdout.write(data)
-                        except UnicodeEncodeError:
-                            sys.stdout.buffer.write(data.encode('utf8'))
-                        except IOError:  # Some times circumstances are bad
-                            # resort to byte at a time...
-                            for d in data:
-                                sys.stdout.write(d)
-                        now = time.time()
-                        if ('showtime' not in laststate or
-                                (now // 60) != laststate['showtime'] // 60):
-                            # don't bother churning if minute does not change
-                            laststate['showtime'] = now
-                            updatestatus()
-                        try:
-                            sys.stdout.flush()
-                        except Exception:
-                            # EWOULDBLOCK causes this to raise, ignore
-                            # this scenario comfortable that it
-                            # will come out soon enough
-                            pass
-                    else:
-                        deadline = 5
-                        connected = False
-                        while not connected and deadline > 0:
-                            try:
-                                server_connect()
-                                connected = True
-                            except Exception:
-                                pass
-                            if not connected:
-                                time.sleep(1)
-                                deadline -=1
-                        if connected:
-                            do_command(
-                                "start /nodes/%s/console/session skipreplay=True" % consolename,
-                                netserver)
-                        else:
-                            doexit = True
-                            inconsole = False
-                            sys.stdout.write("\r\n[remote disconnected]\r\n")
-                        break
+                    consume_termdata(fh)
                 else:
                     try:
                         myinput = fh.read()
@@ -1012,6 +964,64 @@ def main():
                     doexit = True
                     sys.stdout.write('Lost connection to server')
     quitconfetty(fullexit=True)
+
+def consume_termdata(fh, bufferonly=False):
+    global clearpowermessage
+    try:
+        data = tlvdata.recv(fh)
+    except Exception:
+        data = None
+    if type(data) == dict:
+        updatestatus(data)
+        return
+    if data is not None:
+        data = client.stringify(data)
+        if clearpowermessage:
+            sys.stdout.write("\x1b[2J\x1b[;H")
+            clearpowermessage = False
+        if bufferonly:
+            return data
+        try:
+            sys.stdout.write(data)
+        except UnicodeEncodeError:
+            sys.stdout.buffer.write(data.encode('utf8'))
+        except IOError:  # Some times circumstances are bad
+                         # resort to byte at a time...
+            for d in data:
+                sys.stdout.write(d)
+        now = time.time()
+        if ('showtime' not in laststate or
+                                (now // 60) != laststate['showtime'] // 60):
+            # don't bother churning if minute does not change
+            laststate['showtime'] = now
+            updatestatus()
+        try:
+            sys.stdout.flush()
+        except Exception:
+            # EWOULDBLOCK causes this to raise, ignore
+            # this scenario comfortable that it
+            # will come out soon enough
+            pass
+    else:
+        deadline = 5
+        connected = False
+        while not connected and deadline > 0:
+            try:
+                server_connect()
+                connected = True
+            except Exception:
+                pass
+            if not connected:
+                time.sleep(1)
+                deadline -=1
+        if connected:
+            do_command(
+                "start /nodes/%s/console/session skipreplay=True" % consolename,
+                netserver)
+        else:
+            doexit = True
+            inconsole = False
+            sys.stdout.write("\r\n[remote disconnected]\r\n")
 
 if __name__ == '__main__':
     errcode = 0
