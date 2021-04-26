@@ -70,6 +70,7 @@ class NodeHandler(immhandler.NodeHandler):
         modelname = i.get('items', [{}])[0].get('machine_name', None)
         if modelname:
             self.info['modelname'] = modelname
+        super(NodeHandler, self).scan()
 
     def preconfig(self, possiblenode):
         self.tmpnodename = possiblenode
