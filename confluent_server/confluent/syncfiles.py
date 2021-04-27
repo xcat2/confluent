@@ -65,10 +65,7 @@ class SyncList(object):
                 v = v.strip()
             else:
                 k = ent
-                if '*' in ent:
-                    v = os.path.dirname(ent)
-                else:
-                    v = ent
+                v = None
             currmap[k] = v
 
 
@@ -109,22 +106,32 @@ def stage_ent(currmap, ent, targdir):
             everyfent.extend(os.path.dirname(tmpent))
     if not everyfent:
         raise Exception('No matching files for "{}"'.format(ent))
+    if dst is None:  # this is to indicate source and destination as one
+        dst = os.path.dirname(everyfent[0]) + '/'
     while dst and dst[0] == '/':
         dst = dst[1:]
+    if len(everyfent) > 1 and dst[-1] != '/':
+        raise Exception(
+            'Multiple files match {}, {} needs a trailing slash to indicate a directory'.format(ent, dst))
     fulltarg = os.path.join(targdir, dst)
-    if dst[-1] == '/' or len(everyfent) > 1 or os.path.isdir(everyfent[0]):
-        # target *must* be a directory
-        fulltargdir = fulltarg
-    else:
-        fulltargdir = os.path.join(targdir, os.path.dirname(dst))
-    mkdirp(fulltargdir)
     for targ in everyfent:
-        if fulltargdir == fulltarg:
-            os.symlink(
-                targ, os.path.join(
-                    fulltargdir, os.path.basename(targ)))
+        mkpathorlink(targ, fulltarg)
+
+def mkpathorlink(source, destination):
+    if os.path.isdir(source):
+        mkdirp(destination)
+        for ent in os.listdir(source):
+            currsrc = os.path.join(source, ent)
+            currdst = os.path.join(destination, ent)
+            mkpathorlink(currsrc, currdst)
+    else:
+        if destination[-1] == '/':
+            mkdirp(destination)
+            destination = os.path.join(destination, os.path.basename(source))
         else:
-            os.symlink(targ, fulltarg)
+            mkdirp(os.path.dirname(destination))
+        os.symlink(source, destination)
+
 
 syncrunners = {}
 
