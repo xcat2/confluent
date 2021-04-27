@@ -45,7 +45,7 @@ class SyncList(object):
                 ent = ent[:cmtidx]
             except ValueError:
                 pass
-            for special in '!@$%^&*()|{}':
+            for special in '!@$%^&()|{}':
                 if special in ent:
                     raise Exception(
                         'Special character "{}" reserved for future use'.format(special))
@@ -65,7 +65,10 @@ class SyncList(object):
                 v = v.strip()
             else:
                 k = ent
-                v = ent
+                if '*' in ent:
+                    v = os.path.dirname(ent)
+                else:
+                    v = ent
             currmap[k] = v
 
 
