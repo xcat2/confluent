@@ -82,9 +82,15 @@ int main(int argc, char* argv[]) {
                 if (sock < 0) continue;
                 setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
                 if (curr->ai_family == AF_INET) {
-                        bind(sock, (struct sockaddr*)&net4bind, sizeof(struct sockaddr_in));
+                    if (bind(sock, (struct sockaddr*)&net4bind, sizeof(struct sockaddr_in)) < 0) {
+                        fprintf(stderr, "Unable to bind port 302\n");
+                        exit(1);
+                    }
                 } else if (curr->ai_family == AF_INET6) {
-                        bind(sock, (struct sockaddr*)&net6bind, sizeof(struct sockaddr_in6));
+                    if (bind(sock, (struct sockaddr*)&net6bind, sizeof(struct sockaddr_in6)) < 0) {
+                        fprintf(stderr, "Unable to bind port 302\n");
+                        exit(1);
+                    }
                 } else {
                         continue;
                 }
