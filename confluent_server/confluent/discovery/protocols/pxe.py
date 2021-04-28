@@ -252,8 +252,9 @@ def proxydhcp():
             optidx = rq.index(b'\x63\x82\x53\x63') + 4
         except ValueError:
             continue
+        hwlen = rq[2]
         opts, disco = opts_to_dict(rq, optidx, 3)
-        disco['uuid']
+        disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rq[28:28+hwlen]])
         node = None
         if disco.get('hwaddr', None) in macmap:
             node = macmap[disco['hwaddr']]
@@ -261,7 +262,7 @@ def proxydhcp():
             node = uuidmap[disco['uuid']]
         if not node:
             continue
-        hwlen = rq[2]
+
         myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
         if not myipn:
             continue
