@@ -180,11 +180,14 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                 except Exception:
                                     continue
                                 for query in headline[-1].split('/'):
+                                    node = None
                                     if query.startswith('uuid='):
                                         curruuid = query.split('=', 1)[1].lower()
                                         node = uuidlookup(curruuid)
-                                        if not node:
-                                            break
+                                    elif query.startswith('mac='):
+                                        currmac = query.split('=', 1)[1].lower()
+                                        node = uuidlookup(currmac)
+                                    if node:
                                         # Do not bother replying to a node that
                                         # we have no deployment activity
                                         # planned for

@@ -1,4 +1,4 @@
-# Copyright 2016-2017 Lenovo
+# Copyright 2016-2021 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -912,8 +912,11 @@ def get_nodename_from_chained_smms(cfg, handler, info):
                 nodename = newnodename
     return nodename
 
-def get_node_by_uuid(uuid):
-    return nodes_by_uuid.get(uuid, None)
+def get_node_by_uuid_or_mac(uuidormac):
+    node = pxe.macmap.get(uuidormac, None)
+    if node is not None:
+        return node
+    return nodes_by_uuid.get(uuidormac, None)
 
 def get_nodename_from_enclosures(cfg, info):
     nodename = None
@@ -1305,7 +1308,7 @@ def start_detection():
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
         rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
-    eventlet.spawn_n(ssdp.snoop, None, None, ssdp, get_node_by_uuid)
+    eventlet.spawn_n(ssdp.snoop, None, None, ssdp, get_node_by_uuid_or_mac)
 
 def stop_autosense():
     for watcher in list(autosensors):

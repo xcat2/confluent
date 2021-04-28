@@ -26,5 +26,6 @@ dracut_install /usr/lib/udev/rules.d/10-dm.rules /usr/sbin/dmsetup /usr/lib/udev
 #dracut_install /usr/lib/opa-fm/bin/opafmd
 #dracut_install /usr/sbin/opensm /usr/libexec/opensm-launch
 dracut_install /usr/lib64/libibverbs/libhfi1verbs-rdmav25.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/lib64/libibverbs/libmlx4-rdmav25.so /usr/lib64/libibverbs/libmlx5-rdmav25.so
+inst /usr/lib/dracut/modules.d/40network/net-lib.sh /lib/net-lib.sh
 
 #dracut_install mstflint This would have mlx update support, but it incurs gigantic dependencies, libicudata
