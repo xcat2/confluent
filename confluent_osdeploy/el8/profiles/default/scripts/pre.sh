@@ -54,6 +54,8 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
 done
+grep -v RSAAuthentication /etc/ssh/sshd_config.anaconda > /etc/ssh/sshd_config.anaconda.new
+mv /etc/ssh/sshd_config.anaconda.new /etc/ssh/sshd_config.anaconda
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
 if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
