@@ -1,5 +1,5 @@
 #!/bin/sh
-tail -f ${0}.log >& /dev/tty &
+tail -f /tmp/nochroot/${0}.log >& /dev/tty &
 # need to copy over ssh key info
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 apikey=$(cat /etc/confluent/confluent.apikey)

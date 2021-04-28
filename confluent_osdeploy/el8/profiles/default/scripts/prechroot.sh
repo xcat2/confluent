@@ -13,7 +13,11 @@ cp -a /etc/confluent /mnt/sysimage/etc
 chmod -R og-rwx /mnt/sysimage/etc/confluent
 cp /tmp/functions /mnt/sysimage/etc/confluent/
 . /tmp/functions
-cp /tmp/cryptboot /mnt/sysimage/tmp/
+if [ -f /tmp/cryptboot ]; then
+    cp /tmp/cryptboot /mnt/sysimage/tmp/
+fi
+mkdir -p /mnt/sysimage/tmp/nochroot/tmp
+mount -o bind,ro /tmp/ /mnt/sysimage/tmp/nochroot/tmp
 echo Port 2222 >> /etc/ssh/sshd_config.anaconda
 echo Match LocalPort 22 >> /etc/ssh/sshd_config.anaconda
 echo "    ChrootDirectory /mnt/sysimage" >> /etc/ssh/sshd_config.anaconda
