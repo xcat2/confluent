@@ -1,4 +1,5 @@
 #!/bin/sh
+tail -f ${0}.log >& /dev/tty &
 # need to copy over ssh key info
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 apikey=$(cat /etc/confluent/confluent.apikey)
@@ -41,4 +42,4 @@ run_remote_parts post
 
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post
-curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
+curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus

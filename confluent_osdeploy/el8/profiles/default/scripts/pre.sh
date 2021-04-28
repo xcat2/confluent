@@ -8,6 +8,7 @@
 # method is to edit the kicktstart file and comment out or
 # delete %include /tmp/partitioning
 
+tail -f ${0}.log >& /dev/tty &
 /usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
 nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
 nmcli c u $nicname
@@ -34,7 +35,7 @@ if [ "$rootpw" = null ]; then
 else
     echo "rootpw --iscrypted $rootpw" > /tmp/rootpw
 fi
-curl -f https://$mgr/confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
+curl -sf https://$mgr/confluent-public/os/$profile/profile.yaml > /tmp/instprofile.yaml
 blargs=$(grep ^installedargs: /tmp/instprofile.yaml | sed -e 's/#.*//' -e 's/^installedargs: //')
 if [ ! -z "$blargs" ]; then
 	blargs=' --append="'$blargs'"'
@@ -50,7 +51,7 @@ if [ ! -z "$blargs" ]; then
 fi
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
+    curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
 done
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
@@ -70,7 +71,7 @@ fi
 
 
 export mgr profile nodename
-curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
+curl -sf https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
 . /tmp/functions
 run_remote pre.custom
 run_remote_parts pre
@@ -82,4 +83,4 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
-curl -f https://$mgr/confluent-public/os/$profile/kickstart.custom > /tmp/kickstart.custom
+curl -sf https://$mgr/confluent-public/os/$profile/kickstart.custom > /tmp/kickstart.custom
