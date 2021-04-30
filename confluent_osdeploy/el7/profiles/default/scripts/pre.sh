@@ -1,5 +1,4 @@
 #!/bin/sh
-tail -f ${0}.log >& /dev/tty &
 
 # This runs prior to the installer beginning. This is used to rewrite the 
 # scripted install file, merging data from confluent and identifying
@@ -8,7 +7,12 @@ tail -f ${0}.log >& /dev/tty &
 # If you want to use a more custom partition plan, the easiest
 # method is to edit the kicktstart file and comment out or
 # delete %include /tmp/partitioning
-
+if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
+    consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
+    TMUX= tmux a <> $consoledev >&0 2>&1 &
+fi
+exec >> /tmp/confluent-pre.log
+tail -f /tmp/confluent-pre.log > /dev/tty &
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
@@ -50,10 +54,6 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
 done
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
-if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
-    consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
-    TMUX= tmux a <> $consoledev >&0 2>&1 &
-fi
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
 touch /tmp/addonpackages

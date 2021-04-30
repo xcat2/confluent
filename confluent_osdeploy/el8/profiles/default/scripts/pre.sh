@@ -7,8 +7,12 @@
 # If you want to use a more custom partition plan, the easiest
 # method is to edit the kicktstart file and comment out or
 # delete %include /tmp/partitioning
-
-tail -f ${0}.log >& /dev/tty &
+if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
+    consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
+    tmux a <> $consoledev >&0 2>&1 &
+fi
+exec >> /tmp/confluent-pre.log
+tail -f /tmp/confluent-pre.log > /dev/tty &
 /usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
 nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
 nmcli c u $nicname
@@ -57,10 +61,7 @@ done
 grep -v RSAAuthentication /etc/ssh/sshd_config.anaconda > /etc/ssh/sshd_config.anaconda.new
 mv /etc/ssh/sshd_config.anaconda.new /etc/ssh/sshd_config.anaconda
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
-if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
-    consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
-    tmux a <> $consoledev >&0 2>&1 &
-fi
+
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
 touch /tmp/cryptpkglist
