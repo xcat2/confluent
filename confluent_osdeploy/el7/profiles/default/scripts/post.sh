@@ -2,7 +2,7 @@
 mkdir -p /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
 tail -f /var/log/confluent/confluent-post.log > /dev/tty &
-# need to copy over ssh key info
+logshowpid=$!
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 apikey=$(cat /etc/confluent/confluent.apikey)
 
@@ -45,3 +45,4 @@ run_remote_parts post
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post
 curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
+kill $logshowpid

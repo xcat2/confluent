@@ -13,6 +13,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
 fi
 exec >> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
+logshowpid=$!
 /usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
 nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
 nmcli c u $nicname
@@ -87,3 +88,4 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
 curl -sf https://$mgr/confluent-public/os/$profile/kickstart.custom > /tmp/kickstart.custom
+kill $logshowpid

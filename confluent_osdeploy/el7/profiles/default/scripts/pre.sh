@@ -13,6 +13,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
 fi
 exec >> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
+loogshowpid=$!
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
@@ -77,3 +78,4 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
 python /etc/confluent/apiclient /confluent-public/os/$profile/kickstart.custom -o /tmp/kickstart.custom
+kill $logshowpid
