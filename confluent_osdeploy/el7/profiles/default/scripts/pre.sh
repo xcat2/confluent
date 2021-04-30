@@ -13,7 +13,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
 fi
 exec >> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
-loogshowpid=$!
+logshowpid=$!
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }

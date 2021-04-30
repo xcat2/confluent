@@ -9,17 +9,11 @@
 # delete %include /tmp/partitioning
 if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
-    tmux a <> $consoledev >&0 2>&1 &
+    TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
 exec >> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
-/usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
-nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
-nmcli c u $nicname
-while ip -6 addr | grep tentative > /dev/null; do
-   sleep 0.5
-done
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
@@ -54,23 +48,19 @@ fi
 if [ ! -z "$blargs" ]; then
     echo "bootloader $blargs" > /tmp/grubpw
 fi
+ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$mgr/confluent-api/self/sshcert > $certfile
     echo HostCertificate $certfile >> /etc/ssh/sshd_config.anaconda
 done
-grep -v RSAAuthentication /etc/ssh/sshd_config.anaconda > /etc/ssh/sshd_config.anaconda.new
-mv /etc/ssh/sshd_config.anaconda.new /etc/ssh/sshd_config.anaconda
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
-
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
-touch /tmp/cryptpkglist
 touch /tmp/addonpackages
 if [ "$cryptboot" == "tpm2" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
 	echo $cryptboot >> /tmp/cryptboot
-	echo clevis-dracut >> /tmp/cryptpkglist
 fi
 
 
@@ -87,5 +77,5 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
-curl -sf https://$mgr/confluent-public/os/$profile/kickstart.custom > /tmp/kickstart.custom
+python /etc/confluent/apiclient /confluent-public/os/$profile/kickstart.custom -o /tmp/kickstart.custom
 kill $logshowpid
