@@ -11,6 +11,9 @@ mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export nodename mgr profile
 . /etc/confluent/functions
+exec >> /var/log/confluent/confluent-firstboot.log
+tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
+logshowpid=$!
 
 if [ ! -f /etc/confluent/firstboot.ran ]; then
     touch /etc/confluent/firstboot.ran
@@ -29,3 +32,4 @@ curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLU
 systemctl disable firstboot
 rm /etc/systemd/system/firstboot.service
 rm /etc/confluent/firstboot.ran
+kill $logshowpid
