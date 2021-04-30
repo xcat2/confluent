@@ -17,7 +17,7 @@ dracut_install dmidecode /usr/lib64/libstdc++.so.6
 dracut_install ps free find
 inst /bin/bash /bin/sh
 #inst_hook cmdline 10 $moddir/cmdline.sh # moved to addons.cpio
-dracut_install killall chown chroot dd expr kill parted rsync shutdown sort blockdev findfs insmod lvm pivot_root
+dracut_install killall chown chroot dd expr kill parted rsync shutdown sort blockdev findfs insmod lvm
 dracut_install /etc/udev/hwdb.bin
 dracut_install /usr/share/hwdata/pci.ids
 dracut_install ibstat ibstatus
