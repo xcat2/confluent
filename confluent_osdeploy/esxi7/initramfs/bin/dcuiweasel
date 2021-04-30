@@ -28,6 +28,19 @@ node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 cp /opt/confluent/bin/clortho /clortho
 /clortho $node $mgr > /etc/confluent/confluent.apikey
+APIKEY=$(cat /etc/confluent/confluent.apikey)
+while [ -z "$APIKEY" ]; do
+    if [ ! -f /var/run/vmware/show-esx-shell-login ]; then
+        chvt 1
+        sleep 1
+        chvt 2
+        /etc/init.d/ESXShell start
+    fi
+    echo "Deployment server failed to grant node deployment token, retrying token retrieval"
+    echo "A debug session has been made available on Alt-F1"
+    /clortho $node $mgr > /etc/confluent/confluent.apikey
+    APIKEY=$(cat /etc/confluent/confluent.apikey)
+done
 cat /tls/*.pem > /etc/confluent/ca.pem
 /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg.new
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg.new | sed -e 's/^profile: //')
