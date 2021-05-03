@@ -238,6 +238,26 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
     return pctdone
 
 
+def check_rocky(isoinfo):
+    ver = None
+    arch = None
+    cat = None
+    for entry in isoinfo[0]:
+        if 'rocky-release-8' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el8'
+            break
+    else:
+        return None
+    if arch == 'noarch' and '.discinfo' in isoinfo[1]:
+        prodinfo = isoinfo[1]['.discinfo']
+        arch = prodinfo.split(b'\n')[2]
+        if not isinstance(arch, str):
+            arch = arch.decode('utf-8')
+    return {'name': 'rocky-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
+
+
 def check_alma(isoinfo):
     ver = None
     arch = None
