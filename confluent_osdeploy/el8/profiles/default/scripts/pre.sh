@@ -15,6 +15,12 @@ exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
+/usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
+nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
+nmcli c u $nicname
+while ip -6 addr | grep tentative > /dev/null; do
+   sleep 0.5
+done
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 locale=$(grep ^locale: /etc/confluent/confluent.deploycfg)
 locale=${locale#locale: }
@@ -62,6 +68,7 @@ touch /tmp/addonpackages
 if [ "$cryptboot" == "tpm2" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
 	echo $cryptboot >> /tmp/cryptboot
+    echo clevis-dracut >> /tmp/cryptpkglist
 fi
 
 
