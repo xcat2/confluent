@@ -8,7 +8,7 @@
 # for customization, which will run in a more normal mechanism
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
-export mgr profile nodename
+export confluent_mgr confluent_profile nodename
 cp -a /etc/confluent /mnt/sysimage/etc
 chmod -R og-rwx /mnt/sysimage/etc/confluent
 cp /tmp/functions /mnt/sysimage/etc/confluent/

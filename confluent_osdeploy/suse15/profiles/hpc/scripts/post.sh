@@ -20,7 +20,7 @@ chmod 700 /etc/confluent
 chmod og-rwx /etc/confluent/*
 
 
-export mgr profile nodename
+export confluent_mgr confluent_profile nodename
 . /etc/confluent/functions
 
 # This will induce server side processing of the syncfile contents if

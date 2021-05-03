@@ -93,11 +93,11 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     echo HostKey $privfile >> /etc/ssh/sshd_config
 done
 /usr/sbin/sshd
-profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | awk '{print $2}')
-mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg | awk '{print $2}')
-export profile mgr
-echo "Running https://$mgr/confluent-public/os/$profile/scripts/onboot.sh"
-/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/functions > /tmp/functions
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+export confluent_profile confluent_mgr
+echo "Running https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh"
+/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
 run_remote onboot.sh
 while :; do

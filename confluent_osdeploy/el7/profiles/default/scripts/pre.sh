@@ -65,7 +65,7 @@ if [ "$cryptboot" == "tpm2" ]; then
 fi
 
 
-export mgr profile nodename
+export confluent_mgr confluent_profile nodename
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
 run_remote pre.custom

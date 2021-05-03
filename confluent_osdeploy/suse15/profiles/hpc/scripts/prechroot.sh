@@ -7,7 +7,7 @@
 confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
-export mgr profile nodename
+export confluent_mgr confluent_profile nodename
 mkdir -p /mnt/etc/confluent
 chmod 700 /mnt/etc/confluent
 cp /tmp/functions /mnt/etc/confluent/

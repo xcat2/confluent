@@ -64,6 +64,7 @@ done
 /usr/sbin/sshd -f /etc/ssh/sshd_config.anaconda
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
+touch /tmp/cryptpkglist
 touch /tmp/addonpackages
 if [ "$cryptboot" == "tpm2" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
@@ -72,7 +73,7 @@ if [ "$cryptboot" == "tpm2" ]; then
 fi
 
 
-export mgr profile nodename
+export confluent_mgr confluent_profile nodename
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
 run_remote pre.custom
