@@ -1,6 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script runs at the end of the final boot, updating status
+exec >> /var/log/confluent/confluent-firstboot.log
+exec 2>> /var/log/confluent/confluent-firstboot.log
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')

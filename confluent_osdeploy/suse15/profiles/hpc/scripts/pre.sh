@@ -1,8 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script runs before the installer executes, and sets up ssh during install as well
 # as rewriting the autoyast file with any substitutions prior to it being evaluated for real
 
+exec >> /tmp/confluent-pre.log
+exec 2>> /tmp/confluent-pre.log
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 rootpw=$(grep rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 if [ "$rootpw" = "null" ]; then

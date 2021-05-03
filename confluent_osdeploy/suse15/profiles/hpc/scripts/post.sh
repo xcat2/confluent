@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script runs at the end of install in the installed system
 # but still under the installer kernel.
@@ -9,6 +9,8 @@
 # If there are dependencies on the kernel (drivers or special filesystems)
 # then firstboot.sh would be the script to customize.
 
+exec >> /var/log/confluent/confluent-post.log
+exec 2>> /var/log/confluent/confluent-post.log
 confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')

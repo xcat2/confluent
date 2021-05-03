@@ -27,4 +27,6 @@ echo Port 2222 >> /etc/ssh/sshd_config
 echo Match LocalPort 22 >> /etc/ssh/sshd_config
 echo "    ChrootDirectory /mnt" >> /etc/ssh/sshd_config
 kill -HUP $(cat /run/sshd.pid)
+mkdir -p /mnt/var/log/confluent
+cp /tmp/confluent*log /mnt/var/log/confluent
 
