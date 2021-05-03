@@ -269,7 +269,7 @@ def handle_request(env, start_response):
         scriptcat = env['PATH_INFO'].replace('/self/remoteconfig/', '')
         slist, profile = get_scriptlist(
             scriptcat, cfg, nodename,
-            '/var/lib/confluent/public/os/{0}/ansible/{1}.d/')
+            '/var/lib/confluent/public/os/{0}/ansible/{1}')
         playlist = []
         dirname = '/var/lib/confluent/public/os/{0}/ansible/{1}.d/'.format(
             profile, scriptcat)
@@ -311,7 +311,7 @@ def handle_request(env, start_response):
         scriptcat = env['PATH_INFO'].replace('/self/scriptlist/', '')
         slist, _ = get_scriptlist(
             scriptcat, cfg, nodename,
-            '/var/lib/confluent/public/os/{0}/scripts/{1}.d/')
+            '/var/lib/confluent/public/os/{0}/scripts/{1}')
         if slist:
             start_response('200 OK', (('Content-Type', 'application/yaml'),))
             yield yaml.safe_dump(util.natural_sort(slist), default_flow_style=False)
@@ -337,8 +337,11 @@ def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
         profile = deployinfo.get(
         'deployment.profile', {}).get('value', '')
     slist = []
+    target = pathtemplate.format(profile, scriptcat)
+    if not os.path.isdir(target) and os.path.isdir(target + '.d'):
+        target = target + '.d'
     try:
-        slist = os.listdir(pathtemplate.format(profile, scriptcat))
+        slist = os.listdir(target)
     except OSError:
         pass
     return slist, profile

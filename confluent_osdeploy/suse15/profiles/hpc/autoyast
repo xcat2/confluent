@@ -103,10 +103,10 @@ dynamic behavior and replace with static configuration.
           <source>
 <![CDATA[
 #!/bin/sh
-mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
-profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
-curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
+curl $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/pre.sh > /tmp/pre.sh
 . /tmp/pre.sh
 ]]>
           </source>
@@ -119,13 +119,13 @@ curl $proto://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/pre.sh
           <source>
 <![CDATA[
 #!/bin/sh
-mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
-profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
-curl $proto://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/prechroot.sh
+curl $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/prechroot.sh > /tmp/prechroot.sh
 . /tmp/prechroot.sh
-curl -f $proto://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
-curl -f $proto://$mgr/confluent-public/os/$profile/scripts/post.sh > /mnt/etc/confluent/post.sh
+curl -f $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
+curl -f $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/post.sh > /mnt/etc/confluent/post.sh
 chmod +x /mnt/etc/confluent/firstboot.sh
 chmod +x /mnt/etc/confluent/post.sh
 cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/

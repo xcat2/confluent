@@ -9,10 +9,10 @@
 # If there are dependencies on the kernel (drivers or special filesystems)
 # then firstboot.sh would be the script to customize.
 
-mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
-profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
-apikey=$(cat /etc/confluent/confluent.apikey)
+confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 
 chmod 700 /etc/confluent
 chmod og-rwx /etc/confluent/*
@@ -28,10 +28,10 @@ run_remote_python syncfileclient
 run_remote post.custom
 
 # Also, scripts may be placed into 'post.d', e.g. post.d/01-runfirst.sh, post.d/02-runsecond.sh
-run_remote_parts post
+run_remote_parts post.d
 
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
-run_remote_config post
+run_remote_config post.d
 
-curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/updatestatus
+curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
 

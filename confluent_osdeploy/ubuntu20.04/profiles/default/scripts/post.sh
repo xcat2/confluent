@@ -20,8 +20,8 @@ echo '    HostbasedAuthentication yes' >> $sshconf
 echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
 
-curl -f https://$mgr/confluent-public/os/$profile/scripts/firstboot.sh > /target/etc/confluent/firstboot.sh
-curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /target/etc/confluent/functions
+curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /target/etc/confluent/firstboot.sh
+curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /target/etc/confluent/functions
 source /target/etc/confluent/functions
 chmod +x /target/etc/confluent/firstboot.sh
 cp /tmp/allnodes /target/root/.shosts
@@ -42,7 +42,7 @@ if [ "$textcons" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
         updategrub=1
     fi
 fi
-kargs=$(curl https://$mgr/confluent-public/os/$profile/profile.yaml | grep ^installedargs: | sed -e 's/#.*//')
+kargs=$(curl https://$confluent_mgr/confluent-public/os/$confluent_profile/profile.yaml | grep ^installedargs: | sed -e 's/#.*//')
 if [ ! -z "$kargs" ]; then
     sed -i 's/GRUB_CMDLINE_LINUX="\([^"]*\)"/GRUB_CMDLINE_LINUX="\1 '"${kargs}"'"/' /target/etc/default/grub
 fi
@@ -66,7 +66,7 @@ kill -HUP $(cat /run/sshd.pid)
 cat /target/etc/confluent/tls/*.pem > /target/etc/confluent/ca.pem
 cat /target/etc/confluent/tls/*.pem > /etc/confluent/ca.pem
 chroot /target bash -c "source /etc/confluent/functions; run_remote_python syncfileclient"
-chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post"
+chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d"
 source /target/etc/confluent/functions
 
 run_remote_config post

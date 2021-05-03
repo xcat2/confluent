@@ -18,6 +18,6 @@ chmod 700 /mnt/sysimage/root/.ssh/
 cp /root/.ssh/authorized_keys /mnt/sysimage/root/.ssh/
 chmod 600 /mnt/sysimage/root/.ssh/authorized_keys
 cp /etc/ssh/ssh_known_hosts /mnt/sysimage/etc/ssh/
-curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$mgr/confluent-api/self/nodelist > /tmp/allnodes
+curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /tmp/allnodes
 cp /tmp/allnodes /mnt/sysimage/etc/ssh/shosts.equiv
 cp /tmp/allnodes /mnt/sysimage/root/.shosts

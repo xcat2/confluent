@@ -4,8 +4,8 @@
 # is still running, with the to-be-booted system mounted in /mnt
 
 # carry over deployment configuration and api key for OS install action
-mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
-profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 export mgr profile nodename
 mkdir -p /mnt/etc/confluent

@@ -21,12 +21,12 @@ cat /ssh/*pubkey > ~/.ssh/authorized_keys 2>/dev/null
 ssh-keygen -A
 for i in  /etc/ssh/ssh_host*key.pub; do
     certname=${i/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$i https://$mgr/confluent-api/self/sshcert > $certname
+    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$i https://$confluent_mgr/confluent-api/self/sshcert > $certname
     echo HostKey ${i%.pub} >> /etc/ssh/sshd_config
     echo HostCertificate $certname >> /etc/ssh/sshd_config
 done
 /usr/sbin/sshd
-curl -f https://$mgr/confluent-public/os/$profile/scripts/functions > /tmp/functions
+curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
 ntpcfg=""
 if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
