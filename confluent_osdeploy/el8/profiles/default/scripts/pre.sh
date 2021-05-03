@@ -78,5 +78,12 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
 fi
-python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
+if [ -e /usr/libexec/platform-python ]; then
+    python=/usr/libexec/platform-python
+elif [ -e /usr/bin/python3 ]; then
+    python=/usr/byn/python3
+else
+    python=/usr/bin/python
+fi
+$python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 kill $logshowpid
