@@ -12,6 +12,7 @@ profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export nodename mgr profile
 . /etc/confluent/functions
 exec >> /var/log/confluent/confluent-firstboot.log
+exec 2>> /var/log/confluent/confluent-firstboot.log
 tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
 logshowpid=$!
 

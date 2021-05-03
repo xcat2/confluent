@@ -12,6 +12,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
 exec >> /tmp/confluent-pre.log
+exec 2>> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
