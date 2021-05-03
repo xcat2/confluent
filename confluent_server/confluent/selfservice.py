@@ -271,8 +271,11 @@ def handle_request(env, start_response):
             scriptcat, cfg, nodename,
             '/var/lib/confluent/public/os/{0}/ansible/{1}')
         playlist = []
-        dirname = '/var/lib/confluent/public/os/{0}/ansible/{1}.d/'.format(
+        dirname = '/var/lib/confluent/public/os/{0}/ansible/{1}/'.format(
             profile, scriptcat)
+        if not os.path.isdir(dirname):
+            dirname = '/var/lib/confluent/public/os/{0}/ansible/{1}.d/'.format(
+                profile, scriptcat)
         for filename in slist:
             if filename.endswith('.yaml') or filename.endswith('.yml'):
                 playlist.append(os.path.join(dirname, filename))
