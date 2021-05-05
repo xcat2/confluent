@@ -143,7 +143,7 @@ if __name__ == '__main__':
     except ValueError:
         data = None
     if outbin:
-        with open(outbin, 'wb') as outf:
+        with open(outbin, 'ab+') as outf:
             reader = HTTPSClient(json=json).grab_url(
                 sys.argv[1], data, returnrsp=True)
             chunk = reader.read(16384)
