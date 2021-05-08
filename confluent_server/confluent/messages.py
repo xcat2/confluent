@@ -1791,6 +1791,19 @@ class License(ConfluentMessage):
         else:
             self.kvpairs = {name: {'License': kv}}
 
+class GraphicalConsole(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, name=None, mime=None, data=None):
+        self.notnode = name is None
+        self.desc = 'Graphical console launcher'
+
+        kv = []
+        kv.append({'mime': mime, 'data': data})
+        if self.notnode:
+            self.kvpairs = {'Launcher': kv}
+        else:
+            self.kvpairs = {name: {'Launcher': kv}}
 
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
