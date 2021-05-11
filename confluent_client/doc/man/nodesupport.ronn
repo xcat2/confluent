@@ -21,9 +21,12 @@ specific suffixes added to any file produced.
 
 ## OPTIONS
 
-* `-m`, `--maxnodes`:
+* `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to download diagnostic data from, prompting
-    if over the threshold
+  if over the threshold
+  
+* `-h`, `--help`:
+  Show help message and exit  
 
 ## EXAMPLES
 
