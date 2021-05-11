@@ -608,6 +608,10 @@ class IpmiHandler(object):
                             self.node, 'Invalid prefix length given'))
                     else:
                         raise
+        elif len(self.element) == 4 and self.element[-1] != 'management':
+            self.output.put(
+                    msg.ConfluentTargetNotFound(self.node,
+                                                'Interface not found'))
 
     def handle_users(self):
         # Create user
