@@ -580,6 +580,8 @@ class IpmiHandler(object):
             self.decode_alert()
         elif self.element == ['console', 'license']:
             self.handle_license()
+        elif self.element == ['console', 'graphical']:
+            self.handle_graphical_console()
         elif self.element == ['support', 'servicedata']:
             self.handle_servicedata_fetch()
         elif self.element == ['description']:
@@ -1569,6 +1571,12 @@ class IpmiHandler(object):
     def handle_description(self):
         dsc = self.ipmicmd.get_description()
         self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_graphical_console(self):
+        args = self.ipmicmd.get_graphical_console()
+        m = msg.GraphicalConsole(self.node, *args)
+        self.output.put(m)
+        return
 
 
 def _str_health(health):
