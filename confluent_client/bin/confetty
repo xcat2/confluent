@@ -765,7 +765,7 @@ def conserver_command(filehandle, localcommand):
                 bootmode = 'uefi'
                 bootdev = 'default'
 
-                rc = run_inline_command(consolename, '/boot/nextdevice', bootdev, '', bootmode=bootmode)
+                rc = run_inline_command('/boot/nextdevice', bootdev, '', bootmode=bootmode)
 
                 if rc:
                     print("Error]\r")
