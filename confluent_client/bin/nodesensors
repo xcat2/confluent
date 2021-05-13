@@ -32,6 +32,13 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 
+
+class hybridcsv(csv.excel):
+    lineterminator = '\n'
+
+
+csv.register_dialect('hybrid', hybridcsv)
+
 import confluent.client as client
 
 sensorcollections = {
@@ -209,7 +216,7 @@ def main():
             headernames.append(headername)
     if options.csv:
         linebyline = False
-        csvwriter = csv.writer(sys.stdout)
+        csvwriter = csv.writer(sys.stdout, dialect='hybrid')
         if options.interval:
             csvwriter.writerow(['time', 'node'] + headernames)
         else:
