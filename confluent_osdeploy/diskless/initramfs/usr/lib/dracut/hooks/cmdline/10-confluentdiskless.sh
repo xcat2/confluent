@@ -119,42 +119,22 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     echo HostKey $privfile >> /etc/ssh/sshd_config
 done
 /usr/sbin/sshd
-diskless_url=$(getarg diskless_url)
-imgname=/$(basename $diskless_url)
-if [[ "$diskless_url" == https://* ]]; then
-    curl -f $diskless_url > $imgname
-    mount -t tmpfs memroot /sysroot
-    cd /sysroot
-    echo -n "Extracting $imgname..."
-    tar xf $imgname
-    echo "Done"
-elif [[ "$diskless_url" == nfs://* ]]; then
-    mkdir -p /mnt/remote
-    diskless_url=${diskless_url#nfs://}
-    nfs_server=${diskless_url%%/*}
-    nfs_path=/${diskless_url#*/}
-    lowerdir=/mnt/remote
-    if ! mount -o nolock,ro,noacl,vers=3 $nfs_server:$nfs_path /mnt/remote; then
-        if mount -o nolock,ro,noacl,vers=3 $nfs_server:$(dirname $nfs_path) /mnt/remote; then
-            if [ -e /mnt/remote/$(basename $nfs_path) ]; then
-                mkdir -p /mnt/imgmount
-                mount -o ro /mnt/remote/$(basename $nfs_path) /mnt/imgmount
-                lowerdir=/mnt/imgmount
-            fi
-        fi
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg| awk '{print $2}')
+confluent_proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg| awk '{print $2}')
+confluent_urls=""
+for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed -e s/%/%25/); do
+    if [[ $addr == *:* ]]; then
+        confluent_urls="$confluent_urls $confluent_proto://[$addr]/confluent-public/os/$confluent_profile/rootimg.sfs"
+    else
+        confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
     fi
-    if [ -f $lowerdir/gocryptfs.conf ]; then
-        mkdir -p /mnt/decrypted
-        gocryptfs $lowerdir /mnt/decrypted
-        lowerdir=/mnt/decrypted
-    fi
-    mkdir -p /mnt/overlay
-    mount -t tmpfs overlay /mnt/overlay
-    mkdir /mnt/overlay/work
-    mkdir /mnt/overlay/upper
-    mount -t overlay -o index=off,lowerdir=$lowerdir,workdir=/mnt/overlay/work,upperdir=/mnt/overlay/upper overlayroot /sysroot
-
-fi
+done
+mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
+curlmount $confluent_urls /mnt/remoteimg
+mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
+mount -t tmpfs overlay /mnt/overlay
+mkdir -p /mnt/overlay/upper /mnt/overlay/work
+mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
 mkdir -p /sysroot/etc/ssh
 mkdir -p /sysroot/etc/confluent
 mkdir -p /sysroot/root/.ssh
