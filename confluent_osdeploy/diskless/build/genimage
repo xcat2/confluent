@@ -26,7 +26,7 @@ done
 latestkernel=$(ls $installroot/boot/vmlinuz-*|grep -v rescue|sed -e s/.*vmlinuz-//|tail -n 1)
 mkdir -p $destdir/boot/efi/boot $destdir/boot/initramfs
 cp $installroot/boot/vmlinuz-$latestkernel $destdir/boot/kernel 
-cp $installroot/boot/initramfs-diskless-$kernel.img $destdir/boot/initramfs/distribution
+cp $installroot/boot/initramfs-diskless-$latestkernel.img $destdir/boot/initramfs/distribution
 cp $installroot/boot/efi/EFI/BOOT/BOOTX64.EFI $destdir/boot/efi/boot
 cp $installroot/boot/efi/EFI/centos/grubx64.efi $destdir/boot/efi/boot
 
