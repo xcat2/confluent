@@ -129,8 +129,10 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
         confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
     fi
 done
+confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
+confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-curlmount $confluent_urls /mnt/remoteimg
+/opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
 mount -t tmpfs overlay /mnt/overlay
 mkdir -p /mnt/overlay/upper /mnt/overlay/work
