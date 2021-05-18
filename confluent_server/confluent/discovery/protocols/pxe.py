@@ -276,6 +276,13 @@ def proxydhcp():
             bootfile = b'confluent/x86_64/ipxe.efi'
         elif disco['arch'] == 'bios-x86':
             bootfile = b'confluent/x86_64/ipxe.kkpxe'
+        if len(bootfile) > 127:
+            log.log(
+                {'info': 'Boot offer cannot be made to {0} as the '
+                'profile name "{1}" is {2} characters longer than is supported '
+                'for this boot method.'.format(
+                    node, profile, len(bootfile) - 127)})
+            continue
         rpv[:240] = rqv[:240].tobytes()
         rpv[0:1] = b'\x02'
         rpv[108:108 + len(bootfile)] = bootfile
@@ -485,6 +492,13 @@ def check_reply(node, info, packet, sock, cfg, reqview):
         )
         if not isinstance(bootfile, bytes):
             bootfile = bootfile.encode('utf8')
+        if len(bootfile) > 127:
+            log.log(
+                {'info': 'Boot offer cannot be made to {0} as the '
+                'profile name "{1}" is {2} characters longer than is supported '
+                'for this boot method.'.format(
+                    node, profile, len(bootfile) - 127)})
+            return
         repview[108:108 + len(bootfile)] = bootfile
     repview[20:24] = myipn
     gateway = None
