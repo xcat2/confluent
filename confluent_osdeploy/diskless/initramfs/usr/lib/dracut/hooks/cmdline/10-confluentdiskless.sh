@@ -62,6 +62,8 @@ if [[ $confluent_mgr == *%* ]]; then
     ifname=${ifname%:}
 fi
 needseal=1
+oldumask=$(umask)
+umask 0077
 while [ -z "$confluent_apikey" ]; do
     /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
     if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
@@ -85,6 +87,7 @@ if [ $needseal == 1 ]; then
     fi
 fi
 curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+umask $oldumask
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
@@ -219,6 +222,14 @@ while [ ! -e /sysroot/sbin/init ]; do
         sleep 1
     done
 done
+rootpassword=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg)
+rootpassword=${rootpassword#rootpassword: }
+if [ "$rootpassword" = "null" ]; then
+    rootpassword=""
+fi
 
+if [ ! -z "$rootpassword" ]; then
+    sed -i "s@root:[^:]*:@root:$rootpassword:@" /sysroot/etc/shadow
+fi
 exec /opt/confluent/bin/start_root
 
