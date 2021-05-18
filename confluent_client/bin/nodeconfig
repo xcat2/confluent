@@ -159,7 +159,7 @@ def parse_config_line(arguments, single=False):
             if setmode is None:
                 setmode = True
             if setmode != True:
-                bailout('Cannot do set and query in same command')
+                bailout('Cannot do set and query in same command: Query detected but "{0}" appears to be set'.format(param))
             if '=' in param:
                 key, _, value = param.partition('=')
                 _assign_value()
@@ -171,7 +171,7 @@ def parse_config_line(arguments, single=False):
             if setmode is None:
                 setmode = False
             if setmode != False:
-                bailout('Cannot do set and query in same command')
+                bailout('Cannot do set and query in same command: Set mode detected but "{0}" appears to be a query'.format(param))
             if '.' not in param:
                 if param == 'bmc':
                     printallbmc = True
