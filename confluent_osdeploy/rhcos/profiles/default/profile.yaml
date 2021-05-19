@@ -1,0 +1,2 @@
+label: RedHat CoreOS %%VERSION%% %%ARCH%% (Default Profile)
+kernelargs: quiet

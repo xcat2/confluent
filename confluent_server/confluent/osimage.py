@@ -23,6 +23,7 @@ READFILES = set([
     'media.2/products',
     '.DISCINFO',
     '.discinfo',
+    'zipl.prm',
 ])
 
 HEADERSUMS = set([b'\x85\xeddW\x86\xc5\xbdhx\xbe\x81\x18X\x1e\xb4O\x14\x9d\x11\xb7C8\x9b\x97R\x0c-\xb8Ht\xcb\xb3'])
@@ -423,6 +424,21 @@ def _priv_check_oraclelinux(isoinfo):
     major = ver.split('.', 1)[0]
     return {'name': 'oraclelinux-{0}-{1}'.format(ver, arch), 'method': EXTRACT,
             'category': 'el{0}'.format(major)}
+
+
+def check_rhcos(isoinfo):
+    arch = 'x86_64'  # TODO: would check magic of vmlinuz to see which arch
+    if 'zipl.prm' in isoinfo[1]:
+        prodinfo = isoinfo[1]['zipl.prm']
+        if not isinstance(prodinfo, str):
+            prodinfo = prodinfo.decode('utf8')
+        for inf in prodinfo.split():
+            if inf.startswith('coreos.liveiso=rhcos-'):
+                _, ver, _ = inf.split('-')
+                return {'name': 'rhcos-{0}-{1}'.format(ver, arch),
+                        'method': EXTRACT, 'category': 'rhcos'}
+
+
 
 def check_rhel(isoinfo):
     ver = None
