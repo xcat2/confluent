@@ -434,9 +434,13 @@ def check_rhcos(isoinfo):
             prodinfo = prodinfo.decode('utf8')
         for inf in prodinfo.split():
             if inf.startswith('coreos.liveiso=rhcos-'):
-                _, ver, _ = inf.split('-')
+                ver = inf.split('-')[1]
                 return {'name': 'rhcos-{0}-{1}'.format(ver, arch),
-                        'method': EXTRACT, 'category': 'rhcos'}
+                        'method': EXTRACT, 'category': 'coreos'}
+            elif inf.startswith('coreos.liveiso=fedore-coreos-'):
+                ver = inf.split('-')[2]
+                return {'name': 'fedoracoreos-{0}-{1}'.format(ver, arch),
+                        'method': EXTRACT, 'category': 'coreos'}
 
 
 
