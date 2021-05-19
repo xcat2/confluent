@@ -1,3 +1,4 @@
+/*
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2021 Lenovo
@@ -13,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+*/
 
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
@@ -166,8 +168,16 @@ static const struct fuse_operations http_ops = {
 int main(int argc, char* argv[]) {
     char *tmp;
     double fsize;
-    int i, j;
-    srand(time(NULL));
+    unsigned int i;
+    int j;
+    j = open("/dev/urandom", O_RDONLY);
+    if (j <= 0 || read(j, (char*)&i, 4) < 0) {
+        i = time(NULL);
+    }
+    if (j > 0) {
+        close(j);
+    }
+    srand(i);
     j = 0;
     memset(urls, 0, 32*sizeof(char*));
     urlidx = 0;
