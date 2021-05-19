@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
     memset(filename, 0, MAX_FILE_LEN);
     for (i=0; i < argc; i++) {
         if (strstr(argv[i], ":") > 0) {
-            if (j <= MAX_URL_PATHS) {
+            if (j < MAX_URL_PATHS) {
                 urls[j] = argv[i];
                 tmp = strrchr(urls[j++], '/');
                 strncpy(filename, tmp, MAX_FILE_LEN);
