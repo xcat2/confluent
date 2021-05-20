@@ -100,5 +100,7 @@ if [ -e /lib/nm-lib.sh ]; then
         fi
     fi
 fi
+cat /proc/cmdline /etc/cmdline.d/01-confluent.conf | tr '\n' ' ' > /run/fakecmdline
+mount -o bind /run/fakecmdline /proc/cmdline
 
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/rootfs.img | rdcore stream-hash /etc/coreos-live-want-rootfs | bsdtar -xf - -C /
