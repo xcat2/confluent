@@ -247,8 +247,10 @@ echo 'Host *' >> $sshconf
 echo '    HostbasedAuthentication yes' >> $sshconf
 echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
-curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
+curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
+chmod 640 /sysroot/etc/ssh/*_key
+chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
 
 exec /opt/confluent/bin/start_root
 
