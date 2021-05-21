@@ -251,6 +251,12 @@ curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/con
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
 chmod 640 /sysroot/etc/ssh/*_key
 chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
+chroot /sysroot cat /etc/confluent/ca.pem >> /etc/pki/tls/certs/ca-bundle.crt
+curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
+mkdir -p /sysroot/opt/confluent/bin
+curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
+chmod +x /sysroot/opt/confluent/bin/onboot.sh
+ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 
 exec /opt/confluent/bin/start_root
 
