@@ -199,6 +199,7 @@ mkdir -p /sysroot/etc/ssh
 mkdir -p /sysroot/etc/confluent
 mkdir -p /sysroot/root/.ssh
 cp /root/.ssh/* /sysroot/root/.ssh
+chmod 700 /sysroot/root/.ssh
 cp /etc/confluent/* /sysroot/etc/confluent/
 cp /etc/ssh/*key* /sysroot/etc/ssh/
 for pubkey in /etc/ssh/ssh_host*key.pub; do
@@ -209,6 +210,7 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     fi
     echo HostKey $privfile >> /sysroot/etc/ssh/sshd_config
 done
+
 mkdir -p /sysroot/dev /sysroot/sys /sysroot/proc /sysroot/run
 if [ ! -z "$autocons" ]; then
     autocons=${autocons%,*}
@@ -231,5 +233,22 @@ fi
 if [ ! -z "$rootpassword" ]; then
     sed -i "s@root:[^:]*:@root:$rootpassword:@" /sysroot/etc/shadow
 fi
+for i in /ssh/*.ca; do
+    echo '@cert-authority *' $(cat $i) >> /sysroot/etc/ssh/ssh_known_hosts
+done
+echo HostbasedAuthentication yes >> /sysroot/etc/ssh/sshd_config
+echo HostbasedUsesNameFromPacketOnly yes >> /sysroot/etc/ssh/sshd_config
+echo IgnoreRhosts no >> /sysroot/etc/ssh/sshd_config
+sshconf=/sysroot/etc/ssh/ssh_config
+if [ -d /sysroot/etc/ssh/ssh_config.d/ ]; then
+    sshconf=/sysroot/etc/ssh/ssh_config.d/01-confluent.conf
+fi
+echo 'Host *' >> $sshconf
+echo '    HostbasedAuthentication yes' >> $sshconf
+echo '    EnableSSHKeysign yes' >> $sshconf
+echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
+curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
+cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
+
 exec /opt/confluent/bin/start_root
 
