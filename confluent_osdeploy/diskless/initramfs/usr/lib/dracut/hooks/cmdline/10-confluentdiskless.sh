@@ -62,6 +62,8 @@ if [[ $confluent_mgr == *%* ]]; then
     ifname=${ifname%:}
 fi
 needseal=1
+oldumask=$(umask)
+umask 0077
 while [ -z "$confluent_apikey" ]; do
     /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
     if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
@@ -85,6 +87,7 @@ if [ $needseal == 1 ]; then
     fi
 fi
 curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+umask $oldumask
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
@@ -106,7 +109,62 @@ else
     if [ ! -z "$v4gw" ]; then
         ip route add default via $v4gw
     fi
+    mkdir -p /run/NetworkManager/system-connections
+    cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+[connection]
+id=eno1
+EOC
+    echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+type=ethernet
+autoconnect-retries=1
+EOC
+    echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+multi-connect=1
+permissions=
+wait-device-timeout=60000
+
+[ethernet]
+mac-address-blacklist=
+
+[ipv4]
+EOC
+    echo address1=$v4addr/$v4nm >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    if [ ! -z "$v4gw" ]; then
+        echo gateway=$v4gw >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    fi
+    nameserversec=0
+    nameservers=""
+    while read -r entry; do
+        if [ $nameserversec = 1 ]; then
+            if [[ $entry == "-"* ]]; then
+                nameservers="$nameservers"${entry#- }";"
+                continue
+            fi
+        fi
+        nameserversec=0
+        if [ "${entry%:*}" = "nameservers" ]; then
+            nameserversec=1
+            continue
+        fi
+    done < /etc/confluent/confluent.deploycfg
+    echo dns=$nameservers >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
+    dnsdomain=${dnsdomain#dnsdomain: }
+    echo dns-search=$dnsdomain >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+may-fail=false
+method=manual
+
+[ipv6]
+addr-gen-mode=eui64
+method=auto
+
+[proxy]
+EOC
 fi
+chmod 600 /run/NetworkManager/system-connections/*.nmconnection
 echo -n "Initializing ssh..."
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
@@ -129,8 +187,10 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
         confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
     fi
 done
+confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
+confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-curlmount $confluent_urls /mnt/remoteimg
+/opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
 mount -t tmpfs overlay /mnt/overlay
 mkdir -p /mnt/overlay/upper /mnt/overlay/work
@@ -139,6 +199,7 @@ mkdir -p /sysroot/etc/ssh
 mkdir -p /sysroot/etc/confluent
 mkdir -p /sysroot/root/.ssh
 cp /root/.ssh/* /sysroot/root/.ssh
+chmod 700 /sysroot/root/.ssh
 cp /etc/confluent/* /sysroot/etc/confluent/
 cp /etc/ssh/*key* /sysroot/etc/ssh/
 for pubkey in /etc/ssh/ssh_host*key.pub; do
@@ -149,6 +210,7 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     fi
     echo HostKey $privfile >> /sysroot/etc/ssh/sshd_config
 done
+
 mkdir -p /sysroot/dev /sysroot/sys /sysroot/proc /sysroot/run
 if [ ! -z "$autocons" ]; then
     autocons=${autocons%,*}
@@ -162,6 +224,39 @@ while [ ! -e /sysroot/sbin/init ]; do
         sleep 1
     done
 done
+rootpassword=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg)
+rootpassword=${rootpassword#rootpassword: }
+if [ "$rootpassword" = "null" ]; then
+    rootpassword=""
+fi
+
+if [ ! -z "$rootpassword" ]; then
+    sed -i "s@root:[^:]*:@root:$rootpassword:@" /sysroot/etc/shadow
+fi
+for i in /ssh/*.ca; do
+    echo '@cert-authority *' $(cat $i) >> /sysroot/etc/ssh/ssh_known_hosts
+done
+echo HostbasedAuthentication yes >> /sysroot/etc/ssh/sshd_config
+echo HostbasedUsesNameFromPacketOnly yes >> /sysroot/etc/ssh/sshd_config
+echo IgnoreRhosts no >> /sysroot/etc/ssh/sshd_config
+sshconf=/sysroot/etc/ssh/ssh_config
+if [ -d /sysroot/etc/ssh/ssh_config.d/ ]; then
+    sshconf=/sysroot/etc/ssh/ssh_config.d/01-confluent.conf
+fi
+echo 'Host *' >> $sshconf
+echo '    HostbasedAuthentication yes' >> $sshconf
+echo '    EnableSSHKeysign yes' >> $sshconf
+echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
+curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
+cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
+chmod 640 /sysroot/etc/ssh/*_key
+chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
+chroot /sysroot cat /etc/confluent/ca.pem >> /etc/pki/tls/certs/ca-bundle.crt
+curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
+mkdir -p /sysroot/opt/confluent/bin
+curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
+chmod +x /sysroot/opt/confluent/bin/onboot.sh
+ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 
 exec /opt/confluent/bin/start_root
 

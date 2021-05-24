@@ -25,7 +25,7 @@ cd utils
 make all
 cp copernicus clortho autocons ../opt/confluent/bin
 cd ..
-for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04; do
+for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos; do
     mkdir ${os}out
     cd ${os}out
     cp -a ../opt .
@@ -48,7 +48,7 @@ cp -a esxi7out esxi6out
 cp -a esxi7 esxi6
 
 %install
-for os in rhvh4 el7 el8 genesis suse15 ubuntu20.04 esxi6 esxi7; do
+for os in rhvh4 el7 el8 genesis suse15 ubuntu20.04 esxi6 esxi7 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs

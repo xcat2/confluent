@@ -11,6 +11,16 @@ import tempfile
 
 agent_pid = None
 ready_keys = {}
+_sshver = None
+
+def sshver():
+    global _sshver
+    if _sshver is None:
+        p = subprocess.Popen(['ssh', '-V'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        _, output = p.communicate()
+        _sshver = float(output.split()[0].split(b'_')[1].split(b'p')[0])
+    return _sshver
 
 def normalize_uid():
     curruid = os.geteuid()
@@ -23,6 +33,8 @@ def normalize_uid():
 
 
 def assure_agent():
+    if sshver() <= 7.6:
+        return
     global agent_pid
     if agent_pid is None:
         sai = subprocess.check_output(['ssh-agent'])
@@ -41,6 +53,8 @@ def assure_agent():
             os.environ[k] = v
 
 def get_passphrase():
+    if sshver() <= 7.6:
+        return ''
     # convert the master key to base64
     # for use in ssh passphrase context
     if cfm._masterkey is None:
@@ -106,8 +120,9 @@ def sign_host_key(pubkey, nodename, principals=()):
         principals = set(principals)
         principals.add(nodename)
         principals = ','.join(sorted(principals))
+        flags = '-Us' if sshver() > 7.6 else '-s'
         subprocess.check_call(
-            ['ssh-keygen', '-Us', '/etc/confluent/ssh/ca.pub', '-I', nodename,
+            ['ssh-keygen', flags, '/etc/confluent/ssh/ca.pub', '-I', nodename,
              '-n', principals, '-h', pkeyname])
         certname = pkeyname.replace('.pub', '-cert.pub')
         with open(certname) as cert:

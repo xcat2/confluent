@@ -23,6 +23,7 @@ READFILES = set([
     'media.2/products',
     '.DISCINFO',
     '.discinfo',
+    'zipl.prm',
 ])
 
 HEADERSUMS = set([b'\x85\xeddW\x86\xc5\xbdhx\xbe\x81\x18X\x1e\xb4O\x14\x9d\x11\xb7C8\x9b\x97R\x0c-\xb8Ht\xcb\xb3'])
@@ -424,6 +425,37 @@ def _priv_check_oraclelinux(isoinfo):
     return {'name': 'oraclelinux-{0}-{1}'.format(ver, arch), 'method': EXTRACT,
             'category': 'el{0}'.format(major)}
 
+
+def fixup_coreos(targpath):
+    # the efi boot image holds content that the init script would want
+    # to mcopy, but the boot sector is malformed usually, so change it to 1
+    # sector per track
+    if os.path.exists(targpath + '/images/efiboot.img'):
+        with open(targpath + '/images/efiboot.img', 'rb+') as bootimg:
+            bootimg.seek(0x18)
+            if bootimg.read != b'\x00\x00':
+                bootimg.seek(0x18)
+                bootimg.write(b'\x01')
+
+
+def check_coreos(isoinfo):
+    arch = 'x86_64'  # TODO: would check magic of vmlinuz to see which arch
+    if 'zipl.prm' in isoinfo[1]:
+        prodinfo = isoinfo[1]['zipl.prm']
+        if not isinstance(prodinfo, str):
+            prodinfo = prodinfo.decode('utf8')
+        for inf in prodinfo.split():
+            if inf.startswith('coreos.liveiso=rhcos-'):
+                ver = inf.split('-')[1]
+                return {'name': 'rhcos-{0}-{1}'.format(ver, arch),
+                        'method': EXTRACT, 'category': 'coreos'}
+            elif inf.startswith('coreos.liveiso=fedore-coreos-'):
+                ver = inf.split('-')[2]
+                return {'name': 'fedoracoreos-{0}-{1}'.format(ver, arch),
+                        'method': EXTRACT, 'category': 'coreos'}
+
+
+
 def check_rhel(isoinfo):
     ver = None
     arch = None
@@ -502,7 +534,7 @@ def fingerprint(archive):
             if fun.startswith('check_'):
                 name = globals()[fun](isoinfo)
                 if name:
-                    return name, isoinfo[0]
+                    return name, isoinfo[0], fun.replace('check_', '')
         return None
     else:
         sum = hashlib.sha256(header)
@@ -514,7 +546,7 @@ def fingerprint(archive):
                 chunk = archive.read(32768)
             imginfo = HASHPRINTS.get(sum.hexdigest(), None)
             if imginfo:
-                return imginfo, None
+                return imginfo, None, None
 
 
 def import_image(filename, callback, backend=False, mfd=None):
@@ -525,7 +557,7 @@ def import_image(filename, callback, backend=False, mfd=None):
     identity = fingerprint(archive)
     if not identity:
         return -1
-    identity, imginfo = identity
+    identity, imginfo, funname = identity
     targpath = identity['name']
     distpath = '/var/lib/confluent/distributions/' + targpath
     if identity.get('subname', None):
@@ -566,6 +598,8 @@ def import_image(filename, callback, backend=False, mfd=None):
         del identity['subname']
     with open(distpath + '/distinfo.yaml', 'w') as distinfo:
         distinfo.write(yaml.dump(identity, default_flow_style=False))
+    if 'fixup_{0}'.format(funname) in globals():
+        globals()['fixup_{0}'.format(funname)](targpath)
     callback({'progress': 1.0})
     sys.stdout.write('\n')
 
@@ -648,7 +682,7 @@ class MediaImporter(object):
         if not identity:
             raise exc.InvalidArgumentException('Unsupported Media')
         self.percent = 0.0
-        identity, _ = identity
+        identity, _, _ = identity
         self.phase = 'copying'
         if not identity:
             raise Exception('Unrecognized OS Media')

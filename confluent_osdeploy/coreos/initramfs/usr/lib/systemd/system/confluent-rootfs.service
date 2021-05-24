@@ -1,0 +1,19 @@
+[Unit]
+Description=Confluent initialization
+DefaultDependencies=false
+
+After=basic.target
+# Network is enabled here
+After=dracut-initqueue.service
+Before=coreos-livepxe-rootfs.service
+
+
+# If we fail, the boot will fail.  Be explicit about it.
+OnFailure=emergency.target
+OnFailureJobMode=isolate
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/confluent/bin/initconfluent.sh
+

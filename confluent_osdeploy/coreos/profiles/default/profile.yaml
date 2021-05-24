@@ -1,0 +1,5 @@
+label: RedHat CoreOS %%VERSION%% %%ARCH%% (Default Profile)
+kernelargs: quiet random.trust_cpu=on ignition.firstboot ignition.platform.id=metal
+#the above boots and will have ignition agent phone home and await instructions
+#kernelargs: quiet random.trust_cpu=on ignition.firstboot ignition.platform.id=metal  coreos.inst=yes coreos.inst.install_dev=sda 
+#the above runs the installer to write to disk
