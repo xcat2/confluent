@@ -20,6 +20,7 @@ yum  -y $capsargs --releasever=8  --installroot=$installroot install $pkglist
 cp -a $mydir/dracut $installroot/usr/lib/dracut/modules.d/97diskless
 chmod a+x $installroot/usr/lib/dracut/modules.d/97diskless/*
 "
+sed -i s/SELINUX=enforcing/SELINUX=disabled/ $installroot/etc/selinux/config
 for kernel in $(ls $installroot/boot/vmlinuz-*|grep -v rescue|sed -e s/.*vmlinuz-//); do
     echo -n "Creating diskless initramfs for $kernel"
     chroot $installroot dracut -v --xz -N -m "diskless base terminfo" -f boot/initramfs-diskless-$kernel.img $kernel
