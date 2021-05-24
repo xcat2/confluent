@@ -1,6 +1,7 @@
 installroot=$1
 destdir=$2
 
+mkdir -p $installroot
 touch $installroot/.testcap
 if setcap cap_net_raw+p $installroot/.testcap >& /dev/null; then
     capsargs=""
@@ -16,13 +17,13 @@ mount -o bind /proc $installroot/proc
 mount -o bind /sys $installroot/sys
 mount -o bind /dev $installroot/dev
 yum  -y $capsargs --releasever=8  --installroot=$installroot install $pkglist
-cp -a $dirname/dracut $installroot/usr/lib/dracut/modules.d/97diskless
+cp -a $mydir/dracut $installroot/usr/lib/dracut/modules.d/97diskless
 chmod a+x $installroot/usr/lib/dracut/modules.d/97diskless/*
+"
 for kernel in $(ls $installroot/boot/vmlinuz-*|grep -v rescue|sed -e s/.*vmlinuz-//); do
     echo -n "Creating diskless initramfs for $kernel"
     chroot $installroot dracut -v --xz -N -m "diskless base terminfo" -f boot/initramfs-diskless-$kernel.img $kernel
 done
-"
 latestkernel=$(ls $installroot/boot/vmlinuz-*|grep -v rescue|sed -e s/.*vmlinuz-//|tail -n 1)
 mkdir -p $destdir/boot/efi/boot $destdir/boot/initramfs
 cp $installroot/boot/vmlinuz-$latestkernel $destdir/boot/kernel 
