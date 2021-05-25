@@ -302,7 +302,7 @@ def handle_request(env, start_response):
     elif env['PATH_INFO'].startswith('/self/remoteconfig/status'):
         rst = runansible.running_status.get(nodename, None)
         if not rst:
-            start_response('204 Not Running', ())
+            start_response('204 Not Running', (('Content-Length', '0'),))
             yield ''
             return
         start_response('200 OK', ())
