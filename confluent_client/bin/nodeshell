@@ -48,6 +48,8 @@ def run():
                          help='Do not prefix output with node names')
     argparser.add_option('-p', '--port', type='int', default=0,
                          help='Specify a custom port for ssh')
+    argparser.add_option('-s', '--substitutename',
+                         help='Use a different name other than the nodename for ssh')
     argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to run remote ssh command to, '
@@ -71,6 +73,19 @@ def run():
     exitcode = 0
 
     c.stop_if_noderange_over(args[0], options.maxnodes)
+    nodemap = {}
+    if options.substitutename:
+        subname = options.substitutename
+        if '{' not in subname:
+            subname = '{node}' + subname
+        for exp in c.create('/noderange/{0}/attributes/expression'.format(args[0]),
+                        {'expression': subname}):
+            if 'error' in exp:
+                sys.stderr.write(exp['error'] + '\n')
+                exitcode |= exp.get('errorcode', 1)
+            ex = exp.get('databynode', ())
+            for node in ex:
+                nodemap[node] = ex[node]['value']
     for exp in c.create('/noderange/{0}/attributes/expression'.format(args[0]),
                         {'expression': cmdstr}):
         if 'error' in exp:
@@ -79,12 +94,13 @@ def run():
         ex = exp.get('databynode', ())
         for node in ex:
             cmd = ex[node]['value']
+            sshnode = nodemap.get(node, node)
             if not isinstance(cmd, str) and not isinstance(cmd, bytes):
                 cmd = cmd.encode('utf-8')
             if options.port:
-                cmdv = ['ssh', '-p', '{0}'.format(options.port), node, cmd]
+                cmdv = ['ssh', '-p', '{0}'.format(options.port), sshnode, cmd]
             else:
-                cmdv = ['ssh', node, cmd]
+                cmdv = ['ssh', sshnode, cmd]
             if currprocs < concurrentprocs:
                 currprocs += 1
                 run_cmdv(node, cmdv, all, pipedesc)
