@@ -26,7 +26,14 @@ as stderr, unlike psh which combines all stdout and stderr into stdout.
 
 * `-p PORT`, `--port=PORT`
   Specify a custom port for ssh
-       
+
+* `-s SUBSTITUTION`, `--substitutename=SUBSTITITUTION`
+  Specify a substitution name instead of the nodename.  If no {} are in the substitution,
+  it is considered to be an append.  For example, '-s -ib' would produce 'node1-ib' from 'node1'.
+  Full expression syntax is supported, in which case the substitution is considered to be the entire
+  new name. {node}-ib would be equivalent to -ib.  For example, nodeshell -s {bmc} node1 
+  would ssh to the BMC instead of the node.
+
 ## EXAMPLES
 
 * Running `echo hi` on for nodes:
