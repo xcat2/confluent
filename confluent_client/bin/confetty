@@ -722,7 +722,7 @@ def conserver_command(filehandle, localcommand):
         if localcommand[1] == 'o': # off
             sys.stdout.write("powering off...")
             sys.stdout.flush()
-            consume_termdata(session.conneection)
+            consume_termdata(session.connection)
             run_inline_command('/power/state', 'off', 'complete]')
         elif localcommand[1] == 's':  # shutdown
             sys.stdout.write("shutting down...")
