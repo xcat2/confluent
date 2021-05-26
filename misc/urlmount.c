@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 #include <unistd.h>
 
 CURL *curl;
@@ -39,9 +40,38 @@ typedef struct downloadbuffer {
 #define MAX_FILE_LEN 1024
 #define MAX_URL_PATHS 512
 static char filename[MAX_FILE_LEN];
-static int urlidx;
+static int urlidx, newidx;
 static char* urls[MAX_URL_PATHS];
 
+
+void *http_rechecker(void *argp) {
+    CURL *checkurl;
+    int tmpidx, tmpval;
+    tmpidx = open("/dev/urandom", O_RDONLY);
+    if (tmpidx <= 0 || read(tmpidx, (char*)&tmpval, 4) < 0)
+        tmpval = time(NULL);
+    if (tmpidx > 0)
+        close(tmpidx);
+    srand(tmpval);
+    checkurl = curl_easy_init();
+    curl_easy_setopt(checkurl, CURLOPT_ERRORBUFFER, curlerror);
+    //We want to consider error conditions fatal, rather than
+    //passing error text as data
+    curl_easy_setopt(checkurl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(checkurl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(checkurl, CURLOPT_NOBODY, 1);
+    while (1) {
+        sleep(25 + rand() % 10);  // Spread out retries across systems
+        tmpidx = 0;
+        while (tmpidx < urlidx && tmpidx < newidx && urls[tmpidx] != NULL) {
+            curl_easy_setopt(checkurl, CURLOPT_URL, urls[tmpidx]);
+            if (curl_easy_perform(checkurl) == CURLE_OK)
+                newidx = tmpidx;
+            else
+                tmpidx++;
+        }
+    }
+}
 
 static int http_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                         off_t offset, struct fuse_file_info *fi)
@@ -87,26 +117,43 @@ static int http_read(const char *path, char *buf, size_t size, off_t offset,
 
     if (strcmp(path, filename) != 0) return -ENOENT;
     memset(headbuffer, 0, 512);
+    if (offset >= filesize) return 0;
+    if (offset + size - 1 >= filesize) size = filesize - offset - 1;
     snprintf(headbuffer, 512, "%ld-%ld", offset, offset + size - 1);
     curl_easy_setopt(curl, CURLOPT_RANGE, headbuffer);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &dlbuf);
+    if (newidx < MAX_URL_PATHS) {
+        reconnecting = 1;
+        urlidx = newidx;
+        newidx = MAX_URL_PATHS;
+        fd = fopen("/dev/kmsg", "w+");
+        fprintf(fd, "<5>urlmount: Connecting to %s\n", urls[urlidx]);
+        fclose(fd);
+        curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
+    }
     while (curl_easy_perform(curl) != CURLE_OK) {
         reconnecting = 1;
         fd = fopen("/dev/kmsg", "w+");
         dlbuf.completed = 0;
-        fprintf(fd, "<1>urlmount: error while communicating with %s: %s\n", urls[urlidx], curlerror);
+        fprintf(fd, "<4>urlmount: error while communicating with %s: %s\n", urls[urlidx], curlerror);
+        fclose(fd);
         urlidx++;
         if (urls[urlidx] == NULL)
             urlidx = 0;
-        if (urlidx == startidx)
+        if (urlidx == startidx) {
+            fd = fopen("/dev/kmsg", "w+");
+            fprintf(fd, "<1>urlmount: All connections to source are down\n");
+            fclose(fd);
             sleep(10);
-        fprintf(fd, "urlmount: Connecting to %s\n", urls[urlidx]);
-        curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
+        }
+        fd = fopen("/dev/kmsg", "w+");
+        fprintf(fd, "<5>urlmount: Connecting to %s\n", urls[urlidx]);
         fclose(fd);
+        curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
     }
     if (reconnecting) {
         fd = fopen("/dev/kmsg", "w+");
-        fprintf(fd, "<1>urlmount: Successfully connected to %s\n", urls[urlidx]);
+        fprintf(fd, "<5>urlmount: Successfully connected to %s\n", urls[urlidx]);
         fclose(fd);
     }
     curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD, &dldbl);
@@ -170,17 +217,11 @@ int main(int argc, char* argv[]) {
     double fsize;
     unsigned int i;
     int j;
-    j = open("/dev/urandom", O_RDONLY);
-    if (j <= 0 || read(j, (char*)&i, 4) < 0) {
-        i = time(NULL);
-    }
-    if (j > 0) {
-        close(j);
-    }
-    srand(i);
+    pthread_t tid;
     j = 0;
     memset(urls, 0, 32*sizeof(char*));
     urlidx = 0;
+    newidx = MAX_URL_PATHS;
     curl_global_init(CURL_GLOBAL_DEFAULT);
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlerror);
@@ -208,7 +249,6 @@ int main(int argc, char* argv[]) {
     for (i=0; urls[i] != NULL; i++) {
         printf("Registering mount path: %s\n", urls[i]);
     }
-    urlidx = rand() % j;
     j = urlidx;
     printf("Connecting to %s\n", urls[urlidx]);
     curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
@@ -238,5 +278,6 @@ int main(int argc, char* argv[]) {
     }
     curl_easy_cleanup(curl);
     curl_global_cleanup();
+    pthread_create(&tid, NULL, http_rechecker, NULL);
     fuse_main(argc, argv, &http_ops, NULL);
 }
