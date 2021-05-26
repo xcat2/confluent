@@ -10,7 +10,8 @@ dracut_install du df ssh-keygen scp clear dhclient
 dracut_install /lib64/libnss_dns-2.28.so /lib64/libnss_dns.so.2
 dracut_install /usr/lib64/libnl-3.so.200
 dracut_install /etc/nsswitch.conf /etc/services /etc/protocols
-dracut_install chmod whoami head tail basename tr 
+dracut_install chmod whoami head tail basename tr
+dracut_install /usr/sbin/arping /usr/sbin/dhclient-script ipcalc logger hostnamectl
 inst /bin/bash /bin/sh
 dracut_install /lib64/libfuse.so.2 /lib64/libfuse.so.2.9.7
 dracut_install chown chroot dd expr kill parted rsync sort blockdev findfs insmod lvm
