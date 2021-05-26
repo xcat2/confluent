@@ -199,6 +199,8 @@ class ConfluentMessage(object):
                 notes.append('Broken because of %s' % val['broken'])
             elif val is not None and 'expression' in val:
                 value = val['expression']
+            elif isinstance(val, dict):
+                value = _htmlify_structure(val)
             if value is None:
                 value = ''
             if val is not None and value == '' and 'isset' in val and val[
@@ -298,6 +300,7 @@ class DeletedResource(ConfluentMessage):
     notnode = True
     def __init__(self, resource):
         self.myargs = [resource]
+        self.desc = 'Delete Resource'
         self.kvpairs = {'deleted': resource}
 
     def strip_node(self, node):
@@ -310,6 +313,7 @@ class CreatedResource(ConfluentMessage):
 
     def __init__(self, resource):
         self.myargs = [resource]
+        self.desc = 'Create Resource'
         self.kvpairs = {'created': resource}
 
     def strip_node(self, node):
