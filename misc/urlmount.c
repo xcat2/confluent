@@ -176,7 +176,9 @@ static int http_open(const char *path, struct fuse_file_info *fi) {
 static void* http_init(struct fuse_conn_info *conn) {
     // Because we fork, we need to redo curl
     // or else suffer the wrath of NSS TLS
+    pthread_t tid;
     curl_global_init(CURL_GLOBAL_DEFAULT);
+    pthread_create(&tid, NULL, http_rechecker, NULL);
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlerror);
     //We want to consider error conditions fatal, rather than
@@ -217,7 +219,6 @@ int main(int argc, char* argv[]) {
     double fsize;
     unsigned int i;
     int j;
-    pthread_t tid;
     j = 0;
     memset(urls, 0, 32*sizeof(char*));
     urlidx = 0;
@@ -278,6 +279,5 @@ int main(int argc, char* argv[]) {
     }
     curl_easy_cleanup(curl);
     curl_global_cleanup();
-    pthread_create(&tid, NULL, http_rechecker, NULL);
     fuse_main(argc, argv, &http_ops, NULL);
 }
