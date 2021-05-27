@@ -1368,7 +1368,7 @@ class IpmiHandler(object):
                 oldpower = self.ipmicmd.get_power()
                 if 'powerstate' in oldpower:
                     oldpower = oldpower['powerstate']
-            self.ipmicmd.set_power(powerstate, wait=30)
+            self.ipmicmd.set_power(powerstate, wait=True)
             if powerstate == 'boot' and oldpower == 'on':
                 power = {'powerstate': 'reset'}
             else:
