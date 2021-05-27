@@ -703,6 +703,7 @@ class MediaImporter(object):
             targpath += '/' + identity['subname']
         self.targpath = '/var/lib/confluent/distributions/' + targpath
         if os.path.exists(self.targpath):
+            del importing[importkey]
             raise Exception('{0} already exists'.format(self.targpath))
         self.filename = os.path.abspath(media)
         self.medfile = medfile
