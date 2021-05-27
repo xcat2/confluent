@@ -1364,11 +1364,14 @@ class IpmiHandler(object):
         elif 'update' == self.op:
             powerstate = self.inputdata.powerstate(self.node)
             oldpower = None
+            waitamount = 30
             if powerstate == 'boot':
                 oldpower = self.ipmicmd.get_power()
                 if 'powerstate' in oldpower:
                     oldpower = oldpower['powerstate']
-            self.ipmicmd.set_power(powerstate, wait=True)
+            elif powerstate == 'shutdown':
+                waitamount = True
+            self.ipmicmd.set_power(powerstate, wait=waitamount)
             if powerstate == 'boot' and oldpower == 'on':
                 power = {'powerstate': 'reset'}
             else:
