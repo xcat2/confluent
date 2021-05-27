@@ -361,22 +361,24 @@ def osimport(imagefile):
             print('Importing from {0} to {1}'.format(imagefile, rsp['target']))
         else:
             print(repr(rsp))
-    while importing:
-        for rsp in c.read('/deployment/importing/{0}'.format(shortname)):
-            if 'progress' in rsp:
-                sys.stdout.write('{0}: {1:.2f}%    \r'.format(rsp['phase'],
-                                                          rsp['progress']))
-                if rsp['phase'] == 'complete':
-                    importing = False
-                    sys.stdout.write('\n')
-                    for profile in rsp['profiles']:
-                        print('Deployment profile created: {0}'.format(profile))
-                sys.stdout.flush()
-            else:
-                print(repr(rsp))
-            time.sleep(0.5)
-    if shortname:
-        list(c.delete('/deployment/importing/{0}'.format(shortname)))
+    try:
+        while importing:
+            for rsp in c.read('/deployment/importing/{0}'.format(shortname)):
+                if 'progress' in rsp:
+                    sys.stdout.write('{0}: {1:.2f}%    \r'.format(rsp['phase'],
+                                                            rsp['progress']))
+                    if rsp['phase'] == 'complete':
+                        importing = False
+                        sys.stdout.write('\n')
+                        for profile in rsp['profiles']:
+                            print('Deployment profile created: {0}'.format(profile))
+                    sys.stdout.flush()
+                else:
+                    print(repr(rsp))
+                time.sleep(0.5)
+    finally:
+        if shortname:
+            list(c.delete('/deployment/importing/{0}'.format(shortname)))
 
 if __name__ == '__main__':
     main(sys.argv)
