@@ -135,6 +135,8 @@ def main():
         build_root(opts, args[1:])
     if args[0] == 'exec':
         exec_root(opts, args[1:])
+    if args[0] == 'pack':
+        pack_image(opts, args[1:])
 
 
 def exec_root(opts, args):
@@ -145,6 +147,7 @@ def exec_root_backend(optargs):
     installroot = args[0]
     imgname = os.path.basename(installroot)
     _mount_constrained_fs(opts, installroot)
+    _mount('/etc/resolv.conf', os.path.join(installroot, 'etc/resolv.conf'), flags=MS_BIND|MS_RDONLY)
     os.chroot(installroot)
     os.chdir('/')
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
