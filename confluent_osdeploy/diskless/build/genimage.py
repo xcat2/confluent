@@ -148,6 +148,7 @@ def exec_root_backend(optargs):
     imgname = os.path.basename(installroot)
     _mount_constrained_fs(opts, installroot)
     _mount('/etc/resolv.conf', os.path.join(installroot, 'etc/resolv.conf'), flags=MS_BIND|MS_RDONLY)
+    _mount('none', os.path.join(installroot, 'etc/resolv.conf'), flags=MS_RDONLY|MS_REMOUNT|MS_BIND)
     os.chroot(installroot)
     os.chdir('/')
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
@@ -172,6 +173,7 @@ def build_root_backend(optargs):
     installroot = args[0]
     _mount_constrained_fs(opts, installroot)
     subprocess.check_call(yumargs)
+    open(os.path.join(installroot, 'etc/resolv.conf'),'w').close()
     mydir = os.path.dirname(__file__)
     dracutdir = os.path.join(mydir, 'dracut')
     targdir = os.path.join(installroot, 'usr/lib/dracut/modules.d/97diskless')
