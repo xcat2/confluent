@@ -1,6 +1,6 @@
 CC := gcc
 CFLAGS := -Os
-TARGETS := copernicus autocons
+TARGETS := copernicus autocons start_root
 
 all: $(TARGETS) clortho
 

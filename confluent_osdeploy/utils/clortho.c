@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
             currtype = buffer[0];
 	    if (currtype & 0b10000000) {
                 currlen = buffer[1] << 8;
-                read(sock, buffer, 1);
+                while (read(sock, buffer, 1) < 0) {}; 
                 currlen |= buffer[0];
             } else {
                 currlen = buffer[1];
@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
                 buffer[currlen] = 0;
             }
             if (currtype == 2) {
-                dprintf(sock, "\x03%c", currlen);
+                dprintf(sock, "\x03%zu", currlen);
                 ret = write(sock, buffer, currlen);
                 slen = strlen(cryptedpass) & 0xff;
                 dprintf(sock, "\x04%c%s", slen, cryptedpass);

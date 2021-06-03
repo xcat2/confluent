@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
     timeout.tv_usec = 500000;
     FD_ZERO(&set);
     FD_SET(ttyf, &set);
-    write(ttyf, "\0337\033[999;999H\033[6n\0338", 18);
+    if (write(ttyf, "\0337\033[999;999H\033[6n\0338", 18) < 0) {};
     while (select(ttyf + 1, &set, NULL, NULL, &timeout) > 0) {
         if ((tmpi = read(ttyf, buff + bufflen, 127 - bufflen)) < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
