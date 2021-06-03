@@ -248,6 +248,12 @@ def pack_image(opts, args):
     initrdname = os.path.join(args[0], 'boot/initramfs-diskless-{0}.img'.format(mostrecent))
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     mkdirp(os.path.join(outdir, 'boot/initramfs'))
+    os.symlink(
+        '/var/lib/confluent/public/site/initramfs.cpio',
+        os.path.join(outdir, 'boot/initramfs/site.cpio'))
+    #os.symlink(
+    #    '/var/lib/confluent/public/site/initramfs.cpio',
+    #    os.path.join(outdir, 'boot/initramfs/site.cpio'))
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
     shutil.copyfile(os.path.join(args[0], 'boot/efi/EFI/BOOT/BOOTX64.EFI'), os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
