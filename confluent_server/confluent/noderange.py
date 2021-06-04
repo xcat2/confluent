@@ -106,7 +106,7 @@ class NodeRange(object):
         self.endpage = None
         self.cfm = config
         try:
-            elements = _parser.parseString("(" + noderange + ")").asList()[0]
+            elements = _parser.parseString("(" + noderange + ")", parseAll=True).asList()[0]
         except pp.ParseException as pe:
             raise Exception("Invalid syntax")
         if noderange[0] in ('<', '>'):
