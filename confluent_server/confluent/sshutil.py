@@ -34,7 +34,7 @@ def normalize_uid():
 
 def assure_agent():
     if sshver() <= 7.6:
-        return
+        return False
     global agent_pid
     if agent_pid is None:
         sai = subprocess.check_output(['ssh-agent'])
@@ -51,6 +51,7 @@ def assure_agent():
             if k == 'SSH_AGENT_PID':
                 agent_pid = v
             os.environ[k] = v
+    return True
 
 def get_passphrase():
     if sshver() <= 7.6:
@@ -90,8 +91,10 @@ def initialize_ca():
 
 
 def prep_ssh_key(keyname):
-    assure_agent()
     if keyname in ready_keys:
+        return
+    if not assure_agent():
+        ready_keys[keyname] = 1
         return
     tmpdir = tempfile.mkdtemp()
     try:
@@ -121,8 +124,9 @@ def sign_host_key(pubkey, nodename, principals=()):
         principals.add(nodename)
         principals = ','.join(sorted(principals))
         flags = '-Us' if sshver() > 7.6 else '-s'
+        keyname = '/etc/confluent/ssh/ca.pub' if flags == '-Us' else '/etc/confluent/ssh/ca'
         subprocess.check_call(
-            ['ssh-keygen', flags, '/etc/confluent/ssh/ca.pub', '-I', nodename,
+            ['ssh-keygen', flags, keyname, '-I', nodename,
              '-n', principals, '-h', pkeyname])
         certname = pkeyname.replace('.pub', '-cert.pub')
         with open(certname) as cert:
