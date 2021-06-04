@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
                 buffer[currlen] = 0;
             }
             if (currtype == 2) {
-                dprintf(sock, "\x03%zu", currlen);
+                dprintf(sock, "\x03%c", (int)currlen);
                 ret = write(sock, buffer, currlen);
                 slen = strlen(cryptedpass) & 0xff;
                 dprintf(sock, "\x04%c%s", slen, cryptedpass);
