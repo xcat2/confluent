@@ -77,13 +77,15 @@ try:
 except NameError:
     unicode = str
 
-def seek_element(currplace, currkey):
+def seek_element(currplace, currkey, depth):
     try:
         return currplace[currkey]
     except TypeError:
         if isinstance(currplace, PluginCollection):
             # we hit a plugin curated collection, all children
             # are up to the plugin to comprehend
+            if currplace.maxdepth and depth > currplace.maxdepth:
+                raise
             return currplace
         raise
 
@@ -91,8 +93,9 @@ def seek_element(currplace, currkey):
 def nested_lookup(nestdict, key):
     try:
         currloc = nestdict
-        for currk in key:
-            currloc = seek_element(currloc, currk)
+        for i in range(len(key)):
+            currk = key[i]
+            currloc = seek_element(currloc, currk, len(key) - i)
         return currloc
     except TypeError:
         raise exc.NotFoundException("Invalid element requested")
@@ -143,8 +146,9 @@ class PluginRoute(object):
 
 
 class PluginCollection(object):
-    def __init__(self, routedict):
+    def __init__(self, routedict, maxdepth=1):
         self.routeinfo = routedict
+        self.maxdepth = maxdepth
 
 
 def handle_deployment(configmanager, inputdata, pathcomponents,
