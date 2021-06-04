@@ -41,7 +41,8 @@ for os in el8; do
     mkdir ${os}disklessout
     cd ${os}disklessout
     cp -a ../opt .
-    cp -a ../${os}-diskless/initramfs/* .
+    #TODO: actually have el8 stateless content
+    #cp -a ../${os}-diskless/initramfs/* .
     cp -a ../common/* .
     cp -a ../stateless-bin/* opt/confluent/bin
     find . | cpio -H newc -o > ../addons.cpio
@@ -66,7 +67,7 @@ for os in rhvh4 el7 el8 genesis suse15 ubuntu20.04 esxi6 esxi7 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     if [ -d ${os}disklessout ]; then
-        mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}diskless/initramfs
+        mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
         cp ${os}disklessout/addons.* %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
     fi
     cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
