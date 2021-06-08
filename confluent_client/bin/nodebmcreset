@@ -47,14 +47,14 @@ exitcode = 0
 errorNodes = set([])
 session.stop_if_noderange_over(noderange, options.maxnodes)
 success = session.simple_noderange_command(noderange, 'configuration/management_controller/reset', 'reset', key='state', errnodes=errorNodes)   # = 0 if successful
-if success != 0:
-    sys.exit(success)
 
 # Determine which nodes were successful and print them
 
 allNodes = set([])
 
 for node in session.read('/noderange/{0}/nodes/'.format(noderange)):
+    if 'error' in node and success != 0:
+        sys.exit(success)
     allNodes.add(node['item']['href'].replace("/", ""))
 
 goodNodes = allNodes - errorNodes
