@@ -190,6 +190,10 @@ done
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
+# if untethered
+# offer alternative to urlmount here, download and mount it if the 
+# user wants to expend ram to be untethered, proc/cmdline to configure
+# else
 /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
 #mount -t tmpfs overlay /mnt/overlay
