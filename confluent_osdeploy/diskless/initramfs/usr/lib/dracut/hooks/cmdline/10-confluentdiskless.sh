@@ -192,7 +192,11 @@ confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$conf
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
 /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
-mount -t tmpfs overlay /mnt/overlay
+#mount -t tmpfs overlay /mnt/overlay
+modprobe zram
+echo 16G > /sys/block/zram0/disksize
+mkfs.xfs /dev/zram0
+mount /dev/zram0 /mnt/overlay
 mkdir -p /mnt/overlay/upper /mnt/overlay/work
 mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
 mkdir -p /sysroot/etc/ssh
