@@ -61,6 +61,7 @@ class ElHandler(object):
         self.arch = arch
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
+        self.oscategory = 'el8'
         self.yumargs = []
 
     def add_pkglists(self, profile='default'):
@@ -159,9 +160,6 @@ def run_constrained(function, args):
     _mount('proc', '/proc', fstype='proc')
     function(args)
     os._exit(0)
-
-
-
 
 
 def main():
@@ -276,12 +274,12 @@ def fingerprint_source(sourcepath):
                 return oshandler
     return oshandler
 
-def fingerprint_host_el():
+def fingerprint_host_el(hostpath='/'):
     try:
         import rpm
     except ImportError:
         return None
-    ts = rpm.TransactionSet()
+    ts = rpm.TransactionSet(hostpath)
     rpms = ts.dbMatch('provides', 'system-release')
     for inf in rpms:
         if 'el8' not in inf.release:
@@ -292,7 +290,7 @@ def fingerprint_host_el():
         return ElHandler(osname, inf.version, os.uname().machine)
 
 
-def fingerprint_host():
+def fingerprint_host(hostpath='/'):
     oshandler = None
     for fun in [fingerprint_host_el]:
         oshandler = fun()
@@ -352,6 +350,23 @@ def pack_image(opts, args):
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
     subprocess.check_call(['mksquashfs', args[0],
                            os.path.join(outdir, 'rootimg.sfs'), '-comp', 'xz'])
+    oshandler = fingerprint_host(args[0])
+    if oshandler:
+        prettyname = oshandler.osname
+        with open(os.path.join(args[0], 'etc/os-release')) as osr:
+            osrdata = osr.read().split('\n')
+            for line in osrdata:
+                if line.startswith('PRETTY_NAME="'):
+                    prettyname = line.replace(
+                        'PRETTY_NAME=', '').replace('"', '')
+        label = '{0} ({1}'.format(prettyname, 'Diskless Boot')
+        with open(os.path.join(outdir, 'profile.yaml'), 'w') as profile:
+            profile.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n')
+        os.symlink(
+            '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/addons.cpio'.format(
+                oshandler.oscategory),
+            os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+
 
 
 
