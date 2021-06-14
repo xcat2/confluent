@@ -1,0 +1,28 @@
+Name: confluent_imgutil
+Version: #VERSION#
+Summary: Confluent OS imaging utility
+License: Apache2
+URL: https://hpc.lenovo.com/
+Source: confluent_imgutil.tar.xz
+BuildArch: noarch
+BuildRoot: /tmp/
+
+%description
+Utility for generating, modifying, and packing confluent deployment
+images for diskless boot.
+
+%prep
+%setup -n imgutil
+
+%build
+mkdir -p opt/confluent/lib/imgutil
+mkdir -p opt/confluent/bin
+mv imgutil opt/confluent/bin/
+mv el8 opt/confluent/lib/imgutil/
+
+%install
+cp -a opt %{buildroot}/
+
+%files
+/opt/confluent/bin/imgutil
+/opt/confluent/lib/imgutil

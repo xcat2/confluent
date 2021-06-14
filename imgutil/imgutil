@@ -55,6 +55,14 @@ def create_yumconf(sourcedir):
                 yumconf.write('enabled=1\ngpgcheck=0\n\n')
     return repodir
 
+def get_mydir(oscategory):
+    mydir = os.path.dirname(__file__)
+    mycopy = os.path.join(mydir, oscategory)
+    gencopy = os.path.join('/opt/confluent/lib/imgutil', oscategory)
+    if os.path.exists(mycopy):
+        return mycopy
+    return gencopy
+
 class ElHandler(object):
     def __init__(self, name, version, arch):
         self.name = name
@@ -66,7 +74,7 @@ class ElHandler(object):
         self.yumargs = []
 
     def add_pkglists(self, profile='default'):
-        with open(os.path.join(os.path.dirname(__file__), 'el8/profiles/{}/pkglist'.format(profile)), 'r') as pkglist:
+        with open(os.path.join(get_mydir('el8'), 'profiles/{}/pkglist'.format(profile)), 'r') as pkglist:
             pkgs = pkglist.read()
             pkgs = pkgs.split()
             self.yumargs.extend(pkgs)
@@ -88,8 +96,8 @@ class ElHandler(object):
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
         mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
         open(os.path.join(self.targpath, 'etc/resolv.conf'),'w').close()
-        mydir = os.path.dirname(__file__)
-        dracutdir = os.path.join(mydir, 'el8/dracut')
+        mydir = get_mydir('el8')
+        dracutdir = os.path.join(mydir, 'dracut')
         targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
         shutil.copytree(dracutdir, targdir)
         with open(os.path.join(self.targpath, 'etc/dracut.conf.d/diskless.conf'), 'w') as dracutconf:
@@ -360,10 +368,12 @@ def pack_image(opts, args):
         label = '{0} ({1}'.format(prettyname, 'Diskless Boot')
         with open(os.path.join(outdir, 'profile.yaml'), 'w') as profile:
             profile.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n')
-        os.symlink(
-            '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/addons.cpio'.format(
-                oshandler.oscategory),
+        oscat = oshandler.oscategory
+        confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
+        os.symlink('{}/initramfs/addons.cpio'.format(confdir),
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+        if os.path.exists('{}/profiles/default'.format(confdir)):
+            shutil.copytree('{}/profiles/default', outdir)
     try:
         pwd.getpwnam('confluent')
         subprocess.check_call(['chown', '-R', 'confluent', outdir])
