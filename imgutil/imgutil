@@ -5,6 +5,7 @@ import ctypes.util
 import glob
 import optparse
 import os
+import pwd
 import re
 import shutil
 import struct
@@ -336,9 +337,6 @@ def pack_image(opts, args):
     os.symlink(
         '/var/lib/confluent/public/site/initramfs.cpio',
         os.path.join(outdir, 'boot/initramfs/site.cpio'))
-    #os.symlink(
-    #    '/var/lib/confluent/public/site/initramfs.cpio',
-    #    os.path.join(outdir, 'boot/initramfs/site.cpio'))
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
     shutil.copyfile(os.path.join(args[0], 'boot/efi/EFI/BOOT/BOOTX64.EFI'), os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
@@ -366,7 +364,11 @@ def pack_image(opts, args):
             '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/addons.cpio'.format(
                 oshandler.oscategory),
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
-
+    try:
+        pwd.getpwnam('confluent')
+        subprocess.check_call(['chown', '-R', 'confluent', outdir])
+    except KeyError:
+        pass
 
 
 
