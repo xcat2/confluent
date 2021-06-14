@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import configparser
 import ctypes
 import ctypes.util
 import glob
@@ -8,12 +9,8 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
-import dnf.rpm
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 CLONE_NEWNS = 0x00020000
@@ -32,6 +29,74 @@ MS_PRIVATE = 1<<18
 
 
 numregex = re.compile('([0-9]+)')
+
+def create_yumconf(sourcedir):
+    repodir = tempfile.mkdtemp(prefix='genimage-yumrepos.d-')
+    yumconf = open(os.path.join(repodir, 'repos.repo'), 'w+')
+    if '/' not in sourcedir:
+        sourcedir = os.path.join('/var/lib/confluent/distributions', sourcedir)
+    if os.path.exists(sourcedir + '/repodata'):
+        pass
+    else:
+        c = configparser.ConfigParser()
+        c.read(sourcedir + '/.treeinfo')
+        for sec in c.sections():
+            if sec.startswith('variant-'):
+                try:
+                    repopath = c.get(sec, 'repository')
+                except Exception:
+                    continue
+                _, varname = sec.split('-', 1)
+                yumconf.write('[genimage-{0}]\n'.format(varname.lower()))
+                yumconf.write('name=Local install repository for {0}\n'.format(varname))
+                currdir = os.path.join(sourcedir, repopath)
+                yumconf.write('baseurl={0}\n'.format(currdir))
+                yumconf.write('enabled=1\ngpgcheck=0\n\n')
+    return repodir
+
+class ElHandler(object):
+    def __init__(self, name, version, arch):
+        self.name = name
+        self.version = version
+        self.arch = arch
+        self.sourcepath = None
+        self.osname = '{}-{}-{}'.format(name, version, arch)
+        self.yumargs = []
+
+    def add_pkglists(self, profile='default'):
+        with open(os.path.join(os.path.dirname(__file__), 'el8/profiles/{}/pkglist'.format(profile)), 'r') as pkglist:
+            pkgs = pkglist.read()
+            pkgs = pkgs.split()
+            self.yumargs.extend(pkgs)
+
+    def set_source(self, sourcepath):
+        yumconfig = create_yumconf(sourcepath)
+        self.yumargs.extend(
+            ['--setopt=reposdir={0}'.format(yumconfig), '--disablerepo=*',
+             '--enablerepo=genimage-*'])
+        self.sourcepath = sourcepath
+
+    def set_target(self, targpath):
+        self.targpath = targpath
+        self.yumargs.extend(
+            ['--installroot={0}'.format(targpath),
+             '--releasever={0}'.format(self.version), 'install'])
+
+    def prep_root(self):
+        mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
+        mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
+        open(os.path.join(self.targpath, 'etc/resolv.conf'),'w').close()
+        mydir = os.path.dirname(__file__)
+        dracutdir = os.path.join(mydir, 'el8/dracut')
+        targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
+        shutil.copytree(dracutdir, targdir)
+        with open(os.path.join(self.targpath, 'etc/dracut.conf.d/diskless.conf'), 'w') as dracutconf:
+            dracutconf.write('compress=xz\nhostonly=no\ndracutmodules+="diskless base terminfo\n')
+        cmd = ['chmod', 'a+x']
+        cmd.extend(glob.glob(os.path.join(targdir, '*')))
+        subprocess.check_call(cmd)
+        subprocess.check_call(['yum'] + self.yumargs)
+
 
 def naturalize_string(key):
     """Analyzes string in a human way to enable natural sort
@@ -96,29 +161,7 @@ def run_constrained(function, args):
     os._exit(0)
 
 
-def create_yumconf(sourcedir):
-    repodir = tempfile.mkdtemp(prefix='genimage-yumrepos.d-')
-    yumconf = open(os.path.join(repodir, 'repos.repo'), 'w+')
-    if '/' not in sourcedir:
-        sourcedir = os.path.join('/var/lib/confluent/distributions', sourcedir)
-    if os.path.exists(sourcedir + '/repodata'):
-        pass
-    else:
-        c = configparser.ConfigParser()
-        c.read(sourcedir + '/.treeinfo')
-        for sec in c.sections():
-            if sec.startswith('variant-'):
-                try:
-                    repopath = c.get(sec, 'repository')
-                except Exception:
-                    continue
-                _, varname = sec.split('-', 1)
-                yumconf.write('[genimage-{0}]\n'.format(varname.lower()))
-                yumconf.write('name=Local install repository for {0}\n'.format(varname))
-                currdir = os.path.join(sourcedir, repopath)
-                yumconf.write('baseurl={0}\n'.format(currdir))
-                yumconf.write('enabled=1\ngpgcheck=0\n\n')
-    return repodir
+
 
 
 def main():
@@ -168,31 +211,13 @@ def _mount(src, dst, fstype=0, flags=0, options=0, mode=None):
     if mode is not None:
         os.chmod(dst, mode)
 
+
 def build_root_backend(optargs):
-    opts, args, yumargs = optargs
+    opts, args, oshandler = optargs
     installroot = args[0]
     _mount_constrained_fs(opts, installroot)
-    subprocess.check_call(yumargs)
-    open(os.path.join(installroot, 'etc/resolv.conf'),'w').close()
-    mydir = os.path.dirname(__file__)
-    dracutdir = os.path.join(mydir, 'dracut')
-    targdir = os.path.join(installroot, 'usr/lib/dracut/modules.d/97diskless')
-    shutil.copytree(dracutdir, targdir)
-    cmd = ['chmod', 'a+x']
-    cmd.extend(glob.glob(os.path.join(targdir, '*')))
-    subprocess.check_call(cmd)
-    kerns = glob.glob(os.path.join(installroot, 'boot/vmlinuz-*'))
-    for kern in kerns:
-        if '*' in kern:
-            raise Exception("No kernels installed")
-        if 'rescue' in kern:
-            continue
-        kver = get_kern_version(kern)
-        print("Generating diskless initramfs for {0}".format(kver))
-        subprocess.check_call(
-            ['chroot', installroot, 'dracut', '--xz', '-N', '-m',
-             'diskless base terminfo', '-f',
-             '/boot/initramfs-diskless-{0}.img'.format(kver), kver])
+    oshandler.prep_root()
+
 
 def _mount_constrained_fs(opts, installroot):
     _mount('/dev', os.path.join(installroot, 'dev'), flags=MS_BIND|MS_RDONLY)
@@ -212,26 +237,88 @@ def _mount_constrained_fs(opts, installroot):
         mkdirp(dst)
         _mount(src, dst, flags=MS_BIND|MS_RDONLY)
 
+def check_root(installroot):
+    # Ensure that the target is an adequate filesystem to
+    # be root
+    mkdirp(installroot)
+    testpath = os.path.join(installroot, '.testcap')
+    with open(testpath, 'w') as tp:
+        tp.write('')
+    try:
+        subprocess.check_call(['setcap', 'cap_net_raw+p', testpath])
+    finally:
+        os.remove(testpath)
+
+
+def fingerprint_source_el(files, sourcepath):
+    for filen in files:
+        if '-release-8' in filen:
+            parts = filen.split('-')
+            osname = '_'.join(parts[:-3])
+            if osname == 'centos_linux':
+                osname = 'centos'
+            ver = parts[-2]
+            arch = parts[-1].split('.')[-2]
+            if arch == 'noarch':
+                prodinfo = open(os.path.join(sourcepath, '.discinfo')).read()
+                arch = prodinfo.split('\n')[2]
+            return ElHandler(osname, ver, arch)
+    return None
+
+
+def fingerprint_source(sourcepath):
+    oshandler = None
+    funs = [fingerprint_source_el]
+    for _, _, files in os.walk(sourcepath):
+        for ffun in funs:
+            oshandler = ffun(files, sourcepath)
+            if oshandler is not None:
+                return oshandler
+    return oshandler
+
+def fingerprint_host_el():
+    try:
+        import rpm
+    except ImportError:
+        return None
+    ts = rpm.TransactionSet()
+    rpms = ts.dbMatch('provides', 'system-release')
+    for inf in rpms:
+        if 'el8' not in inf.release:
+            continue
+        osname = inf.name.replace('-release', '').replace('-', '_')
+        if osname == 'centos_linux':
+            osname = 'centos'
+        return ElHandler(osname, inf.version, os.uname().machine)
+
+
+def fingerprint_host():
+    oshandler = None
+    for fun in [fingerprint_host_el]:
+        oshandler = fun()
+        if oshandler is not None:
+            return oshandler
+    return oshandler
+
 def build_root(opts, args):
+    check_root(args[0])
     yumargs = ['yum', '--installroot={0}'.format(args[0])]
     if opts.source:
-        yumconfig = create_yumconf(opts.source)
-        yumargs.extend(['--setopt=reposdir={0}'.format(yumconfig), '--disablerepo=*', '--enablerepo=genimage-*'])
+        oshandler = fingerprint_source(opts.source)
+        if oshandler is not None:
+            oshandler.set_source(opts.source)
     else:
-        # default to using the host version, unless the target already has
-        # it setup
-        releasever = dnf.rpm.detect_releasever(args[0])
-        if not releasever:
-            releasever = dnf.rpm.detect_releasever('/')
-        yumargs.extend(['--releasever={0}'.format(releasever)])
-    yumargs.append('install')
-    with open(os.path.join(os.path.dirname(__file__), 'pkglist'), 'r') as pkglist:
-        pkgs = pkglist.read()
-        pkgs = pkgs.split()
-        yumargs.extend(pkgs)
+        oshandler = fingerprint_host()
+    if oshandler is None:
+        sys.stderr.write(
+            'Unable to recognize source directory {0}\n'.format(
+                opts.source))
+        sys.exit(1)
+    oshandler.set_target(args[0])
+    oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
         mkdirp(os.path.join(args[0], dirname))
-    run_constrained(build_root_backend, (opts, args, yumargs))
+    run_constrained(build_root_backend, (opts, args, oshandler))
     if len(args) > 1:
         pack_image(opts, args)
 
@@ -245,7 +332,7 @@ def pack_image(opts, args):
             continue
         kvermap[get_kern_version(kern)] = kern
     mostrecent = list(natural_sort(kvermap))[-1]
-    initrdname = os.path.join(args[0], 'boot/initramfs-diskless-{0}.img'.format(mostrecent))
+    initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     mkdirp(os.path.join(outdir, 'boot/initramfs'))
     os.symlink(
