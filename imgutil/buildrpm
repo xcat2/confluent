@@ -9,4 +9,4 @@ cd ..
 tar Jcvf confluent_imgutil.tar.xz imgutil
 mv confluent_imgutil.tar.xz ~/rpmbuild/SOURCES/
 cd -
-rpmbuild -ba confluent_osdeploy.spec
+rpmbuild -ba confluent_imgutil.spec
