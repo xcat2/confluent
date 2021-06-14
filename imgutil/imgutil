@@ -73,8 +73,8 @@ class ElHandler(object):
         self.oscategory = 'el8'
         self.yumargs = []
 
-    def add_pkglists(self, profile='default'):
-        with open(os.path.join(get_mydir('el8'), 'profiles/{}/pkglist'.format(profile)), 'r') as pkglist:
+    def add_pkglists(self):
+        with open(os.path.join(get_mydir('el8'), 'pkglist'), 'r') as pkglist:
             pkgs = pkglist.read()
             pkgs = pkgs.split()
             self.yumargs.extend(pkgs)
