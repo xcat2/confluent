@@ -65,11 +65,12 @@ for os in rhvh4 el7 el8 genesis suse15 ubuntu20.04 esxi6 esxi7 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
+    cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     if [ -d ${os}disklessout ]; then
         mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
         cp ${os}disklessout/addons.* %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
+        cp -a ${os}-diskless/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os-diskless/profiles
     fi
-    cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     find %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles -name .gitignore -exec rm -f {} +
 done
 
