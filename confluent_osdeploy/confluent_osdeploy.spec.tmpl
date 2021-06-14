@@ -41,8 +41,7 @@ for os in el8; do
     mkdir ${os}disklessout
     cd ${os}disklessout
     cp -a ../opt .
-    #TODO: actually have el8 stateless content
-    #cp -a ../${os}-diskless/initramfs/* .
+    cp -a ../${os}-diskless/initramfs/* .
     cp -a ../common/* .
     cp -a ../stateless-bin/* opt/confluent/bin
     find . | cpio -H newc -o > ../addons.cpio
