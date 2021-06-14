@@ -91,7 +91,7 @@ class ElHandler(object):
         targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
         shutil.copytree(dracutdir, targdir)
         with open(os.path.join(self.targpath, 'etc/dracut.conf.d/diskless.conf'), 'w') as dracutconf:
-            dracutconf.write('compress=xz\nhostonly=no\ndracutmodules+="diskless base terminfo\n')
+            dracutconf.write('compress=xz\nhostonly=no\ndracutmodules+="diskless base terminfo"\n')
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
