@@ -190,4 +190,5 @@ done
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 mkdir -p /etc/confluent
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
+. /etc/confluent/functions
 source_remote imageboot.sh
