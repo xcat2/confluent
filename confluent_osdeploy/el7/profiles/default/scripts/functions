@@ -51,7 +51,7 @@ source_remote() {
     chmod +x $1
     cmd=$1
     shift
-    source $cmd
+    source ./$cmd
     cd - > /dev/null
     return $retcode
 }

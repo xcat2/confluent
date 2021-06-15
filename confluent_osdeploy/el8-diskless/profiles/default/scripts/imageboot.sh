@@ -1,6 +1,6 @@
 . /lib/dracut-lib.sh
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-if [ "unethered" = $(getarg confluent_imagemethod) ]; then
+if [ "unethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -O /mnt/remoteimg/rootimg.sfs
 else
