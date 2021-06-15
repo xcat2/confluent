@@ -343,6 +343,7 @@ def pack_image(opts, args):
     initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     mkdirp(os.path.join(outdir, 'boot/initramfs'))
+    profname = os.path.basename(outdir)
     os.symlink(
         '/var/lib/confluent/public/site/initramfs.cpio',
         os.path.join(outdir, 'boot/initramfs/site.cpio'))
@@ -358,6 +359,7 @@ def pack_image(opts, args):
     subprocess.check_call(['mksquashfs', args[0],
                            os.path.join(outdir, 'rootimg.sfs'), '-comp', 'xz'])
     oshandler = fingerprint_host(args[0])
+    tryupdateboot = False
     if oshandler:
         prettyname = oshandler.osname
         with open(os.path.join(args[0], 'etc/os-release')) as osr:
@@ -375,9 +377,12 @@ def pack_image(opts, args):
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
         if os.path.exists('{}/profiles/default'.format(confdir)):
             copy_tree('{}/profiles/default'.format(confdir), outdir)
+            tryupdate = True
     try:
         pwd.getpwnam('confluent')
         subprocess.check_call(['chown', '-R', 'confluent', outdir])
+        if tryupdate:
+            subprocess.check_call(['osdeploy', 'updateboot', profname])
     except KeyError:
         pass
 
