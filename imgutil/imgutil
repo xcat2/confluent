@@ -340,7 +340,7 @@ def build_root(opts, args):
 def pack_image(opts, args):
     outdir = args[1]
     if '/' not in outdir:
-        outdir = os.path.join('/var/lib/conflent/public/os/', outdir)
+        outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
     kerns = glob.glob(os.path.join(args[0], 'boot/vmlinuz-*'))
     kvermap = {}
     for kern in kerns:
