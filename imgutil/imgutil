@@ -2,6 +2,7 @@
 import configparser
 import ctypes
 import ctypes.util
+from distutils.dir_util import copy_tree
 import glob
 import optparse
 import os
@@ -373,7 +374,7 @@ def pack_image(opts, args):
         os.symlink('{}/initramfs/addons.cpio'.format(confdir),
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
         if os.path.exists('{}/profiles/default'.format(confdir)):
-            shutil.copytree('{}/profiles/default'.format(confdir), outdir)
+            copy_tree('{}/profiles/default'.format(confdir), outdir)
     try:
         pwd.getpwnam('confluent')
         subprocess.check_call(['chown', '-R', 'confluent', outdir])
