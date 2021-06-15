@@ -316,6 +316,8 @@ def build_root(opts, args):
     check_root(args[0])
     yumargs = ['yum', '--installroot={0}'.format(args[0])]
     if opts.source:
+        if '/' not in opts.source and not os.path.exists(opts.source):
+            opts.source = os.path.join('/var/lib/confluent/distributions/', opts.source)
         oshandler = fingerprint_source(opts.source)
         if oshandler is not None:
             oshandler.set_source(opts.source)
@@ -337,6 +339,8 @@ def build_root(opts, args):
 
 def pack_image(opts, args):
     outdir = args[1]
+    if '/' not in outdir:
+        outdir = os.path.join('/var/lib/conflent/public/os/', outdir)
     kerns = glob.glob(os.path.join(args[0], 'boot/vmlinuz-*'))
     kvermap = {}
     for kern in kerns:

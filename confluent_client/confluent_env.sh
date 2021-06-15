@@ -156,6 +156,25 @@ _confluent_osimage_completion()
     fi
 }
 
+_confluent_imgutil_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS == 2 ]; then
+        COMPREPLY=($(compgen -W "build exec pack" -- ${COMP_WORDS[COMP_CWORD]}))
+        return
+    elif [ ${CMPARGS[1]} == 'build' ]; then
+        COMPREPLY=($(compgen -W "-s $(ls /var/lib/confluent/distributions)" -- ${COMP_WORDS[COMP_CWORD]}))
+	return
+    elif [ ${CMPARGS[1]} == 'pack' ]; then
+        compopt -o dirnames
+        COMPREPLY=()
+        return
+    elif [ ${CMPARGS[1]} == 'exec' ]; then
+        compopt -o dirnames
+	COMPREPLY=($(compgen -W "-v" -- ${COMP_WORDS[COMP_CWORD]}))
+        return
+    fi
+}
 _confluent_nodedeploy_completion()
 {
     _confluent_get_args
@@ -302,6 +321,7 @@ complete -F _confluent_nr_completion nodeeventlog
 complete -F _confluent_nodefirmware_completion nodefirmware
 complete -F _confluent_nodedeploy_completion nodedeploy
 complete -F _confluent_osimage_completion osdeploy
+complete -F _confluent_imgutil_completion imgutil
 complete -F _confluent_ng_completion nodegroupattrib
 complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
