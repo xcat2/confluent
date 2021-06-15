@@ -15,7 +15,7 @@ the json files (password protected, removed from the files, or unprotected).
 
 ## OPTIONS
 
-* `-p`, `--password`:
+* `-p PASSWORD`, `--password=PASSWORD`:
   If specified, information such as usernames and passwords will be encrypted
   using the given password.
   
