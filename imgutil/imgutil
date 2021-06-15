@@ -237,10 +237,14 @@ def _mount_constrained_fs(opts, installroot):
     for v in opts.volume:
         if ':' in v:
             src, dst = v.split(':')
+            while dst and dst[0] == '/':
+                dst = dst[1:]
             dst = os.path.join(installroot, dst)
         else:
             src = v
             dst = os.path.join(installroot, 'run/external')
+            while v and v[0] = '/':
+                v = v[1:]
             dst = os.path.join(dst, v)
         mkdirp(dst)
         _mount(src, dst, flags=MS_BIND|MS_RDONLY)
