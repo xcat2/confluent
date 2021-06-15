@@ -79,5 +79,5 @@ mkdir -p /sysroot/opt/confluent/bin
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
-cp /etc/confluennt/functions /sysroot/etc/confluent/functions
+cp /etc/confluent/functions /sysroot/etc/confluent/functions
 exec /opt/confluent/bin/start_root
