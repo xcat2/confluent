@@ -373,7 +373,7 @@ def pack_image(opts, args):
         os.symlink('{}/initramfs/addons.cpio'.format(confdir),
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
         if os.path.exists('{}/profiles/default'.format(confdir)):
-            shutil.copytree('{}/profiles/default', outdir)
+            shutil.copytree('{}/profiles/default'.format(confdir), outdir)
     try:
         pwd.getpwnam('confluent')
         subprocess.check_call(['chown', '-R', 'confluent', outdir])

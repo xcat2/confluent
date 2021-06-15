@@ -68,6 +68,7 @@ for os in rhvh4 el7 el8 genesis suse15 ubuntu20.04 esxi6 esxi7 coreos; do
     cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     if [ -d ${os}disklessout ]; then
         mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
+        mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/profiles
         cp ${os}disklessout/addons.* %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
         cp -a ${os}-diskless/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os-diskless/profiles
     fi
