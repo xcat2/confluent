@@ -1,8 +1,8 @@
 . /lib/dracut-lib.sh
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-if [ "unethered" = "$(getarg confluent_imagemethod)" ]; then
+if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
-    curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -O /mnt/remoteimg/rootimg.sfs
+    curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
     confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
@@ -13,7 +13,7 @@ modprobe zram
 memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
 memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
-mkfs.xfs /dev/zram0
+mkfs.xfs /dev/zram0 > /dev/null
 mount /dev/zram0 /mnt/overlay
 mkdir -p /mnt/overlay/upper /mnt/overlay/work
 mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
