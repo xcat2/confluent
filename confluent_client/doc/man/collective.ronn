@@ -6,8 +6,8 @@ collective(1) -- Check and manage a confluent collective
 `collective invite <server>`  
 `collective join <server> [-i TOKEN]`  
 `collective show`  
-`collective gencert`
-`collective delete`
+`collective gencert`  
+`collective delete`  
 
 
 ## DESCRIPTION
