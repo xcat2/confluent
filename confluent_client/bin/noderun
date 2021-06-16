@@ -39,7 +39,7 @@ import confluent.sortutil as sortutil
 
 def run():
     argparser = optparse.OptionParser(
-        usage="Usage: %prog [options] noderange commandexpression",
+        usage="Usage: %prog [options] <noderange> <command expression>",
         epilog="Expressions are the same as in attributes, e.g. "
                "'ipmitool -H {hardwaremanagement.manager}' will be expanded.")
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
