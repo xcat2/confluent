@@ -3,7 +3,7 @@ nodelicense(8) -- Manage license keys on BMC
 
 ## SYNOPSIS
 
-`nodelicense <noderange> [list|install <filename>|delete <license>|save <directory>]`
+`nodelicense <noderange> [list][install <filename>|save <directory>|delete <license>]`
 
 ## DESCRIPTION
 
