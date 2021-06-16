@@ -3,7 +3,7 @@ noderun(8) -- Run arbitrary commands per node in a noderange
 
 ## SYNOPSIS
 
-`noderun <noderange> <command string>`
+`noderun [options] <noderange> <command expression>`
 
 ## DESCRIPTION
 
@@ -15,7 +15,7 @@ themselves, see nodeshell(8).
 
 ## OPTIONS
 
-* `-f`, `-c`, `--count`:
+* `-f COUNT`, `-c COUNT`, `--count=COUNT`:
   Number of commands to run at a time
   
 * `-n`, `--nonodeprefix`:
