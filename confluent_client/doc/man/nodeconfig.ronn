@@ -27,7 +27,7 @@ actually be in effect until a reboot.
   If combined with `-x`, will show all differing values except those indicated
   by `-x`
   
-* `-b`, `--batch`:
+* `-b settings.batch`, `--batch=settings.batch`:
    Provide arguments as lines of a file, rather than the command line.  
    
 * `-d`, `--detail`:
@@ -47,7 +47,7 @@ actually be in effect until a reboot.
   Include advanced settings, which are normally not intended to be used
   without direction from the relevant server vendor.
 
-* `-r`, `--restoredefault`:
+* `-r COMPONENT`, `--restoredefault=COMPONENT`:
   Request that the specified component of the targeted nodes will have its
   configuration reset to default.  Currently the only component implemented
   is uefi.
