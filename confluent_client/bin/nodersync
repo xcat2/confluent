@@ -40,7 +40,7 @@ import confluent.sortutil as sortutil
 
 def run():
     argparser = optparse.OptionParser(
-        usage="Usage: %prog location noderange:location",
+        usage="Usage: %prog <file/directorylist> <noderange>:<destination>",
     )
     argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
