@@ -37,7 +37,7 @@ if sys.version_info[0] < 3:
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange [clear]")
+    usage="Usage: %prog [options] <noderange> [clear]")
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to clear if clearing log, '
