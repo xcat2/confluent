@@ -33,7 +33,7 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage='''\n       %prog noderange
+    usage='''\n       %prog <noderange>
              \n ''')
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
