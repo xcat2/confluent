@@ -36,7 +36,7 @@ exitcode = 0
 
 argparser = optparse.OptionParser(
     usage="Usage: "
-          "%prog <noderange> [list][install <file>|save <directory>|delete <name>]")
+          "%prog <noderange> [list][install <filename>|save <directory>|delete <name>]")
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to delete licenses from, '
