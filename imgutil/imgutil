@@ -64,21 +64,64 @@ def get_mydir(oscategory):
         return mycopy
     return gencopy
 
-class ElHandler(object):
+class OsHandler(object):
     def __init__(self, name, version, arch):
         self.name = name
         self.version = version
         self.arch = arch
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
+
+    def list_packages(self):
+        with open(os.path.join(get_mydir(self.oscategory), 'pkglist'), 'r') as pkglist:
+            pkgs = pkglist.read()
+            pkgs = pkgs.split()
+        return pkgs
+
+class SuseHandler(OsHandler):
+    def __init__(self, name, version, arch):
+        super().__init__(name, version, arch)
+        if not version.startswith(b'15.'):
+            raise Exception('Unsupported Suse version {}'.format(version.decode('utf8')))
+        self.oscategory = 'suse15'
+        self.zyppargs = []
+        self.sources = []
+
+    def set_target(self, targpath):
+        self.targpath = targpath
+
+    def add_pkglists(self):
+        self.zyppargs.extend(self.list_packages())
+
+    def set_source(self, sourcepath):
+        self.sources.append('file://' + sourcepath)
+        enterprise = False
+        for moddir in glob.glob(sourcepath + '/Module-*'):
+            self.sources.append('file://' + moddir)
+            enterprise = True
+        if enterprise:
+            self.sources.append('file://' + os.path.join(sourcepath, 'Product-HPC'))
+
+    def prep_root(self):
+        mkdirp(self.targpath)
+        if not self.sources:
+            targzypp = os.path.join(self.targpath, 'etc/zypp')
+            mkdirp(targzypp)
+            shutil.copytree(
+                '/etc/zypp/repos.d/', os.path.join(targzypp, 'repos.d'))
+        for source in self.sources:
+            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source])
+        subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+
+
+class ElHandler(OsHandler):
+    def __init__(self, name, version, arch):
+        super().__init__(name, version, arch)
         self.oscategory = 'el8'
         self.yumargs = []
 
     def add_pkglists(self):
-        with open(os.path.join(get_mydir('el8'), 'pkglist'), 'r') as pkglist:
-            pkgs = pkglist.read()
-            pkgs = pkgs.split()
-            self.yumargs.extend(pkgs)
+        self.yumargs.extend(self.list_packages())
 
     def set_source(self, sourcepath):
         yumconfig = create_yumconf(sourcepath)
@@ -262,6 +305,36 @@ def check_root(installroot):
         os.remove(testpath)
 
 
+def fingerprint_source_suse(files, sourcepath):
+    if os.path.exists(os.path.join(sourcepath, 'distinfo.yaml')):
+        with open(os.path.join(sourcepath, 'distinfo.yaml', 'r')) as distinfo:
+            di = distinfo.read()
+            issuse = False
+            osname, ver, arch = (None, None, None)
+            for line in di.split('\n'):
+                key, val = line.split(': ')
+                if key == 'category' and val == 'suse15':
+                    issuse = True
+                if key == 'name':
+                    osname, ver, arch = val.split('-')
+            if issuse:
+                return SuseHandler(osname, ver, arch)
+
+    for filen in files:
+        if '-release-8' in filen:
+            parts = filen.split('-')
+            osname = '_'.join(parts[:-3])
+            if osname == 'centos_linux':
+                osname = 'centos'
+            ver = parts[-2]
+            arch = parts[-1].split('.')[-2]
+            if arch == 'noarch':
+                prodinfo = open(os.path.join(sourcepath, '.discinfo')).read()
+                arch = prodinfo.split('\n')[2]
+            return ElHandler(osname, ver, arch)
+    return None
+
+
 def fingerprint_source_el(files, sourcepath):
     for filen in files:
         if '-release-8' in filen:
@@ -280,7 +353,7 @@ def fingerprint_source_el(files, sourcepath):
 
 def fingerprint_source(sourcepath):
     oshandler = None
-    funs = [fingerprint_source_el]
+    funs = [fingerprint_source_el, fingerprint_source_suse]
     for _, _, files in os.walk(sourcepath):
         for ffun in funs:
             oshandler = ffun(files, sourcepath)
@@ -304,9 +377,25 @@ def fingerprint_host_el(hostpath='/'):
         return ElHandler(osname, inf.version, os.uname().machine)
 
 
+def fingerprint_host_suse(hostpath='/'):
+    try:
+        import rpm
+    except ImportError:
+        return None
+    ts = rpm.TransactionSet(hostpath)
+    rpms = ts.dbMatch('provides', 'distribution-release')
+    osname = None
+    for inf in rpms:
+        if b'openSUSE' in inf.name and b'Leap' in inf.summary:
+            osname = 'opensuse_leap'
+        if inf.name.startswith(b'SLE_'):
+            osname = 'sle'
+    if osname:
+        return SuseHandler(osname, inf.version, os.uname().machine)
+
 def fingerprint_host(hostpath='/'):
     oshandler = None
-    for fun in [fingerprint_host_el]:
+    for fun in [fingerprint_host_el, fingerprint_host_suse]:
         oshandler = fun()
         if oshandler is not None:
             return oshandler
