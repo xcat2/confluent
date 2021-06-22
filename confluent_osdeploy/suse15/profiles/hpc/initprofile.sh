@@ -16,5 +16,5 @@ profile=$(basename $2)
 if [[ $profile =~ ^sle.* ]]; then
 	sed -i 's/%%IFSLE%%//;s/%%ENDIFSLE%%//' $2/autoyast
 else
-	sed -i 's/%%IFSLE%%/<!--/;s/%%ENDIFSLE%%/-->/' $2/autoyast
+	sed -i '/%%IFSLE%%/<!--/,/%%ENDIFSLE%%/d' $2/autoyast
 fi
