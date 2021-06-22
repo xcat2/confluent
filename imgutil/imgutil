@@ -111,7 +111,19 @@ class SuseHandler(OsHandler):
                 '/etc/zypp/repos.d/', os.path.join(targzypp, 'repos.d'))
         for source in self.sources:
             subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source])
+        mydir = get_mydir(self.oscategory)
+        mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
+        mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
+        dracutdir = os.path.join(mydir, 'dracut')
+        targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
+        shutil.copytree(dracutdir, targdir)
+        with open(os.path.join(self.targpath, 'etc/dracut.conf.d/diskless.conf'), 'w') as dracutconf:
+            dracutconf.write('compress=xz\nhostonly=no\ndracutmodules+="diskless base terminfo"\n')
+        cmd = ['chmod', 'a+x']
+        cmd.extend(glob.glob(os.path.join(targdir, '*')))
+        subprocess.check_call(cmd)
         subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+        os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
 
 
 class ElHandler(OsHandler):
@@ -140,7 +152,7 @@ class ElHandler(OsHandler):
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
         mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
         open(os.path.join(self.targpath, 'etc/resolv.conf'),'w').close()
-        mydir = get_mydir('el8')
+        mydir = get_mydir(self.oscategory)
         dracutdir = os.path.join(mydir, 'dracut')
         targdir = os.path.join(self.targpath, 'usr/lib/dracut/modules.d/97diskless')
         shutil.copytree(dracutdir, targdir)
