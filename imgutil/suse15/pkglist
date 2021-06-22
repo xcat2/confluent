@@ -15,3 +15,4 @@ shim
 kernel-default
 tpm2.0-tools
 wicked
+vim
