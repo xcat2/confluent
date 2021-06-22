@@ -438,6 +438,8 @@ def pack_image(opts, args):
         kvermap[get_kern_version(kern)] = kern
     mostrecent = list(natural_sort(kvermap))[-1]
     initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
+    if not os.path.exists(initrdname):
+        initrdname = os.path.join(args[0], 'boot/initrd-{0}'.format(mostrecent))
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     mkdirp(os.path.join(outdir, 'boot/initramfs'))
     profname = os.path.basename(outdir)
@@ -446,17 +448,23 @@ def pack_image(opts, args):
         os.path.join(outdir, 'boot/initramfs/site.cpio'))
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
-    shutil.copyfile(os.path.join(args[0], 'boot/efi/EFI/BOOT/BOOTX64.EFI'), os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
+    shimlocation = os.path.join(args[0], 'boot/efi/EFI/BOOT/BOOTX64.EFI')
+    if not os.path.exists(shimlocation):
+        shimlocation = os.path.join(args[0], 'usr/lib64/efi/shim.efi')
+    shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
     grubbin = None
     for candidate in glob.glob(os.path.join(args[0], 'boot/efi/EFI/*')):
         if 'BOOT' not in candidate:
             grubbin = os.path.join(candidate, 'grubx64.efi')
             break
+    if not grubbin:
+        grubbin = os.path.join(args[0], 'usr/lib64/efi/grub.efi')
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
+    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
     subprocess.check_call(['mksquashfs', args[0],
                            os.path.join(outdir, 'rootimg.sfs'), '-comp', 'xz'])
     oshandler = fingerprint_host(args[0])
-    tryupdateboot = False
+    tryupdate = False
     if oshandler:
         prettyname = oshandler.osname
         with open(os.path.join(args[0], 'etc/os-release')) as osr:

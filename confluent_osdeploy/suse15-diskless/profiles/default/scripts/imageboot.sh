@@ -71,9 +71,8 @@ echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
 curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
-chmod 640 /sysroot/etc/ssh/*_key
-chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
-cat /sysroot/etc/confluent/ca.pem >> /sysroot/etc/pki/tls/certs/ca-bundle.crt
+chmod 600 /sysroot/etc/ssh/*_key
+chroot /sysroot cat /etc/confluent/ca.pem >> /sysroot/var/lib/ca-certificates/ca-bundle.pem
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
 mkdir -p /sysroot/opt/confluent/bin
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh

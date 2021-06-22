@@ -8,6 +8,7 @@ dracut_install ssh sshd reboot parted mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
 dracut_install efibootmgr uuidgen
 dracut_install du df ssh-keygen scp clear dhclient
 dracut_install /lib64/libnss_dns-2* /lib64/libnss_dns.so.2
+dracut_install /lib64/libnss_compat*
 dracut_install /usr/lib64/libnl-3.so.200
 dracut_install /etc/nsswitch.conf /etc/services /etc/protocols
 dracut_install chmod whoami head tail basename tr
