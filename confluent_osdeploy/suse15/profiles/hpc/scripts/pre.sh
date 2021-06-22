@@ -39,10 +39,6 @@ if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
 fi
 run_remote_python getinstalldisk
 sed -e s'!'%%INSTDISK%%'!'/dev/$(cat /tmp/installdisk)'!' -e s'!'%%NODENAME%%'!'$nodename'!' -e s'!<networking>!'$ntpcfg'<networking>!' -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
-#This would be nice, but suse discards comments before it makes it to /tmp/profile
-#for file in $(grep '<!--INSERT' /tmp/profile/modified.xml |sed -e s/.*INSERT:// -e 's/-->//'); do
-#    sed -i 's%<!--INSERT:'${file}'-->'"%$(cat $file|tr -d '\n')"% /tmp/profile/modified.xml
-#done
 if grep append /tmp/bootloader.xml > /dev/null; then
     sed -i 's@</general>@</general>'"$(tr -d '\n' < /tmp/bootloader.xml)"'@' /tmp/profile/modified.xml
 fi
