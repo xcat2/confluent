@@ -37,7 +37,7 @@ for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos; do
     mv ../addons.cpio .
     cd ..
 done
-for os in el8; do
+for os in el8 suse15; do
     mkdir ${os}disklessout
     cd ${os}disklessout
     cp -a ../opt .
