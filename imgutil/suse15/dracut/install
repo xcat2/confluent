@@ -1,6 +1,6 @@
 dracut_install /usr/bin/mktemp
 dracut_install /usr/lib64/libtss2-tcti-device.so.*
-dracut_install /usr/bin/tpm2_create /usr/bin/tpm2_pcrread /usr/bin/tpm2_createpolicy /usr/bin/tpm2_createprimary /usr/bin/tpm2_load /usr/bin/tpm2_unseal
+dracut_install /usr/bin/tpm2_create /usr/bin/tpm2_pcrread /usr/bin/tpm2_createpolicy /usr/bin/tpm2_createprimary /usr/bin/tpm2_load /usr/bin/tpm2_unseal /usr/bin/tpm2_getcap /usr/bin/tpm2_evictcontrol
 dracut_install curl openssl tar cpio gzip lsmod ethtool xz lsmod ethtool
 dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname expr sort

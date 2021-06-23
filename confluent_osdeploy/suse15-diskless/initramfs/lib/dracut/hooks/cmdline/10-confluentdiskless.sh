@@ -65,28 +65,39 @@ fi
 needseal=1
 oldumask=$(umask)
 umask 0077
+for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
+    unsealeddata=$(tpm2_unseal -Q -c $hdl)
+    if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
+        confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
+    fi
+done
+needseal=0
 while [ -z "$confluent_apikey" ]; do
     /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
     if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
-	needseal=0
-        sed -e s/^SEALED:// /etc/confluent/confluent.apikey | clevis-decrypt-tpm2 > /etc/confluent/confluent.apikey.decrypt
-        mv /etc/confluent/confluent.apikey.decrypt /etc/confluent/confluent.apikey
+        # we don't support remote sealed api keys
+        echo > /etc/confluent/confluent.apikey
     fi
     confluent_apikey=$(cat /etc/confluent/confluent.apikey)
     if [ -z "$confluent_apikey" ]; then
-        echo "Unable to acquire node api key, no TPM2 sealed nor fresh token available, retrying..."
+        echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$nodename', retrying..."
         sleep 10
     fi
+    needseal=1
 done
 if [[ $confluent_mgr == *:* ]]; then
     confluent_mgr="[$confluent_mgr]"
 fi
-#if [ $needseal == 1 ]; then
-#    sealed=$(echo $confluent_apikey | clevis-encrypt-tpm2 {})
-#    if [ ! -z "$sealed" ]; then
-#        curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d $sealed https://$confluent_mgr/confluent-api/self/saveapikey
-#    fi
-#fi
+if [ $needseal == 1 ]; then
+    tmpdir=$(mktemp -d)
+    cd $tmpdir
+    tpm2_createprimary -G ecc -Q --key-context=prim.ctx
+    (echo -n "CONFLUENT_APIKEY:";cat /etc/confluent/confluent.apikey) | tpm2_create -Q --public=data.pub --private=data.priv -i - -C prim.ctx
+    tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
+    tpm2_evictcontrol -Q -c data.ctx
+    cd -
+    rm -rf $tmpdir
+fi
 curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 umask $oldumask
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
