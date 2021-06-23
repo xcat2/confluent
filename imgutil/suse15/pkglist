@@ -1,4 +1,5 @@
 hostname
+curl
 irqbalance
 less
 sudo
