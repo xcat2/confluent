@@ -69,6 +69,7 @@ for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
     unsealeddata=$(tpm2_unseal -Q -c $hdl)
     if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
         confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
+        echo $confluent_apikey > /etc/confluent/confluent.apikey
     fi
 done
 needseal=0
