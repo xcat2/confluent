@@ -307,7 +307,12 @@ def _authorize_request(env, operation):
             return ('logout',)
         name, passphrase = base64.b64decode(
             env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(b':', 1)
-        authdata = auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
+        try:
+            authdata = auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
+        except Exception as e:
+            if hasattr(e, 'prompts'):
+                return {'code': 403, 'prompts': e.prompts}
+            raise
         if authdata is False:
             return {'code': 403}
         elif not authdata:
@@ -519,7 +524,14 @@ def resourcehandler_backend(env, start_response):
         return
     if authorized['code'] == 403:
         start_response('403 Forbidden', badauth)
-        yield 'Forbidden'
+        response = {'result': 'Forbidden'}
+        if 'prompts' in authorized:
+            response['prompts'] = []
+            for prompt in authorized['prompts']:
+                if not isinstance(prompt, str):
+                    prompt = prompt.decode('utf8')
+                response['prompts'].append(prompt)
+        yield json.dumps(response)
         return
     if authorized['code'] != 200:
         raise Exception("Unrecognized code from auth engine")

@@ -283,9 +283,14 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
                     # pam_unix uses unix_chkpwd which reque
                     os.setuid(pwe.pw_uid)
                     usergood = pam.authenticate(user, passphrase, service=_pamservice)
+                except pam.PromptsNeeded:
+                    os._exit(2)
                 finally:
                     os._exit(0 if usergood else 1)
-            usergood = os.waitpid(pid, 0)[1] == 0
+            usergood = os.waitpid(pid, 0)[1]
+            if (usergood >> 8) == 2:
+                pam.authenticate(user, passphrase, service=_pamservice)
+            usergood = usergood == 0
         else:
             # We are running as root, we don't need to fork in order to authenticate the
             # user

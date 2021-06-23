@@ -103,6 +103,12 @@ pam_authenticate          = libpam.pam_authenticate
 pam_authenticate.restype  = c_int
 pam_authenticate.argtypes = [PamHandle, c_int]
 
+
+class PromptsNeeded(Exception):
+    def __init__(self, prompts):
+        self.prompts = prompts
+
+
 class pam():
     code   = 0
     reason = None
@@ -110,7 +116,7 @@ class pam():
     def __init__(self):
         pass
 
-    def authenticate(self, username, password, service='login', encoding='utf-8', resetcreds=True):
+    def authenticate(self, username, password, service='login', encoding='utf-8', resetcreds=True, answers=None):
         """username and password authentication for the given service.
 
            Returns True for success, or False for failure.
@@ -142,8 +148,15 @@ class pam():
             p_response[0] = response
             for i in range(n_messages):
                 if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
-                    dst = calloc(len(password)+1, sizeof(c_char))
-                    memmove(dst, cpassword, len(password))
+                    prompts.add(messages[i].contents.msg)
+                    if answers and messages[i].contents.msg in answers:
+                        currpassword = answers[messages[i].contents.msg]
+                        currcpassword = c_char_p(currpassword)
+                    else:
+                        currpassword = password
+                        currcpassword = cpassword
+                    dst = calloc(len(currpassword)+1, sizeof(c_char))
+                    memmove(dst, currcpassword, len(currpassword))
                     response[i].resp = dst
                     response[i].resp_retcode = 0
             return 0
@@ -169,6 +182,7 @@ class pam():
         # do this up front so we can safely throw an exception if there's
         # anything wrong with it
         cpassword = c_char_p(password)
+        prompts = set([])
 
         handle = PamHandle()
         conv   = PamConv(my_conv, 0)
@@ -198,7 +212,8 @@ class pam():
 
         if hasattr(libpam, 'pam_end'):
             pam_end(handle, retval)
-
+        if answers is None and len(prompts) > 1 and not auth_success:
+            raise PromptsNeeded(prompts)
         return auth_success
 
 
