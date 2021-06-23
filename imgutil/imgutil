@@ -253,8 +253,17 @@ def exec_root_backend(optargs):
     installroot = args[0]
     imgname = os.path.basename(installroot)
     _mount_constrained_fs(opts, installroot)
-    _mount('/etc/resolv.conf', os.path.join(installroot, 'etc/resolv.conf'), flags=MS_BIND|MS_RDONLY)
-    _mount('none', os.path.join(installroot, 'etc/resolv.conf'), flags=MS_RDONLY|MS_REMOUNT|MS_BIND)
+    sourceresolv = '/etc/resolv.conf'
+    if os.path.islink(sourceresolv):
+        sourceresolv = os.readlink(sourceresolv)
+    dstresolv = os.path.join(installroot, 'etc/resolv.conf')
+    if os.path.islink(dstresolv):
+        dstresolv = os.path.join(installroot, os.readlink(dstresolv)[1:])
+    if not os.path.exists(dstresolv):
+        mkdirp(os.path.dirname(dstresolv))
+        open(dstresolv, 'w').close()
+    _mount(sourceresolv, dstresolv, flags=MS_BIND|MS_RDONLY)
+    _mount('none', dstresolv, flags=MS_RDONLY|MS_REMOUNT|MS_BIND)
     os.chroot(installroot)
     os.chdir('/')
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
