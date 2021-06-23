@@ -95,8 +95,8 @@ while read -r entry; do
         continue
     fi
 done < /etc/confluent/confluent.deploycfg
-nameserverrs=${nameservers% }
-sed -i 's/^NETCONFIG_DNS_STATIC_SERVERS="/NETCONFIG_DNS_STATIC_SERVERS="'$nameservers/ /sysroot/etc/sysconfig/network/config
+nameservers=${nameservers% }
+sed -i 's/^NETCONFIG_DNS_STATIC_SERVERS="/NETCONFIG_DNS_STATIC_SERVERS="'"$nameservers"/ /sysroot/etc/sysconfig/network/config
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 sed -i 's/^NETCONFIG_DNS_STATIC_SEARCHLIST="/NETCONFIG_DNS_STATIC_SEARCHLIST="'$dnsdomain/ /sysroot/etc/sysconfig/network/config
