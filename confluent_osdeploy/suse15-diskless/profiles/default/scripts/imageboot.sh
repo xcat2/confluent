@@ -79,4 +79,25 @@ curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/o
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+
+nameserversec=0
+nameservers=""
+while read -r entry; do
+    if [ $nameserversec = 1 ]; then
+        if [[ $entry == "-"* ]]; then
+            nameservers="$nameservers"${entry#- }";"
+            continue
+        fi
+    fi
+    nameserversec=0
+    if [ "${entry%:*}" = "nameservers" ]; then
+        nameserversec=1
+        continue
+    fi
+done < /etc/confluent/confluent.deploycfg
+sed -i 's/^NETCONFIG_DNS_STATIC_SERVERS="/NETCONFIG_DNS_STATIC_SERVERS="'$nameservers/
+dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
+dnsdomain=${dnsdomain#dnsdomain: }
+sed -i 's/^NETCONFIG_DNS_STATIC_SEARCHLIST="/NETCONFIG_DNS_STATIC_SEARCHLIST="'$dnsdomain/
+cp /run/confluent/ifroute-* /run/confluent/ifcfg-* /sysroot/etc/sysconfig/network
 exec /opt/confluent/bin/start_root
