@@ -485,7 +485,7 @@ def pack_image(opts, args):
                 if line.startswith('PRETTY_NAME="'):
                     prettyname = line.replace(
                         'PRETTY_NAME=', '').replace('"', '')
-        label = '{0} ({1}'.format(prettyname, 'Diskless Boot')
+        label = '{0} ({1})'.format(prettyname, 'Diskless Boot')
         with open(os.path.join(outdir, 'profile.yaml'), 'w') as profile:
             profile.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n'.format(label))
         oscat = oshandler.oscategory
