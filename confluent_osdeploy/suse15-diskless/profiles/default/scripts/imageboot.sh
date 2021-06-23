@@ -98,6 +98,6 @@ done < /etc/confluent/confluent.deploycfg
 sed -i 's/^NETCONFIG_DNS_STATIC_SERVERS="/NETCONFIG_DNS_STATIC_SERVERS="'$nameservers/ /sysroot/etc/sysconfig/network/config
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
-sed -i 's/^NETCONFIG_DNS_STATIC_SEARCHLIST="/NETCONFIG_DNS_STATIC_SEARCHLIST="'$dnsdomain/sysroot/etc/sysconfig/network/config
+sed -i 's/^NETCONFIG_DNS_STATIC_SEARCHLIST="/NETCONFIG_DNS_STATIC_SEARCHLIST="'$dnsdomain/ /sysroot/etc/sysconfig/network/config
 cp /run/confluent/ifroute-* /run/confluent/ifcfg-* /sysroot/etc/sysconfig/network
 exec /opt/confluent/bin/start_root
