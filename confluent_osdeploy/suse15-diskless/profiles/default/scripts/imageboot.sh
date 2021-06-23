@@ -85,7 +85,7 @@ nameservers=""
 while read -r entry; do
     if [ $nameserversec = 1 ]; then
         if [[ $entry == "-"* ]]; then
-            nameservers="$nameservers"${entry#- }";"
+            nameservers="$nameservers"${entry#- }" "
             continue
         fi
     fi
@@ -95,6 +95,7 @@ while read -r entry; do
         continue
     fi
 done < /etc/confluent/confluent.deploycfg
+nameserverrs=${nameservers% }
 sed -i 's/^NETCONFIG_DNS_STATIC_SERVERS="/NETCONFIG_DNS_STATIC_SERVERS="'$nameservers/ /sysroot/etc/sysconfig/network/config
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
