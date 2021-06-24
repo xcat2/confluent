@@ -1,3 +1,29 @@
+get_remote_apikey() {
+    while [ -z "$confluent_apikey" ]; do
+        /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
+        if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
+            # we don't support remote sealed api keys anymore
+            echo > /etc/confluent/confluent.apikey
+        fi
+        confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+        if [ -z "$confluent_apikey" ]; then
+            echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$nodename', retrying..."
+            sleep 10
+        else
+            tmpdir=$(mktemp -d)
+            cd $tmpdir
+            tpm2_startauthsession --session=session.ctx
+            tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+            tpm2_createprimary -G ecc -Q --key-context=prim.ctx
+            (echo -n "CONFLUENT_APIKEY:";cat /etc/confluent/confluent.apikey) | tpm2_create -Q --policy=pcr15.sha256.policy --public=data.pub --private=data.priv -i - -C prim.ctx
+            tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
+            tpm2_evictcontrol -Q -c data.ctx
+            tpm2_flushcontext session.ctx
+            cd -
+            rm -rf $tmpdir
+        fi
+    done
+}
 root=1
 rootok=1
 netroot=confluent
@@ -41,6 +67,27 @@ cat /tls/*.pem > /etc/confluent/ca.pem
 mkdir -p /etc/pki/tls/certs
 cat /tls/*.pem > /etc/pki/tls/certs/ca-bundle.crt
 TRIES=0
+oldumask=$(umask)
+umask 0077
+tpmdir=$(mktemp -d)
+cd $tpmdir
+lasthdl=""
+for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
+    tpm2_startauthsession --policy-session --session=session.ctx
+    tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+    unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
+    tpm2_flushcontext session.ctx
+    if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
+        confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
+        echo $confluent_apikey > /etc/confluent/confluent.apikey
+        if [ -n "$lasthdl" ]; then
+            tpm2_evictcontrol -c $lasthdl
+        fi
+        lasthdl=$hdl
+    fi
+done
+cd -
+rm -rf $tpmdir
 touch /etc/confluent/confluent.info
 cd /sys/class/net
 echo -n "Scanning for network configuration..."
@@ -61,32 +108,28 @@ if [[ $confluent_mgr == *%* ]]; then
     ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
     ifname=${ifname%:}
 fi
-needseal=1
-oldumask=$(umask)
-umask 0077
-while [ -z "$confluent_apikey" ]; do
-    /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
-    if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
-	needseal=0
-        sed -e s/^SEALED:// /etc/confluent/confluent.apikey | clevis-decrypt-tpm2 > /etc/confluent/confluent.apikey.decrypt
-        mv /etc/confluent/confluent.apikey.decrypt /etc/confluent/confluent.apikey
+
+ready=0
+while [ $ready = "0" ]; do
+    get_remote_apikey
+    if [[ $confluent_mgr == *:* ]]; then
+        confluent_mgr="[$confluent_mgr]"
     fi
-    confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-    if [ -z "$confluent_apikey" ]; then
-        echo "Unable to acquire node api key, no TPM2 sealed nor fresh token available, retrying..."
-        sleep 10
+    tmperr=$(mktemp)
+    curl -sSf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg 2> $tmperr
+    if grep 401 $tmperr > /dev/null; then
+        confluent_apikey=""
+        if [ -n "$lasthdl" ]; then
+            tpm2_evictcontrol -c $lasthdl
+        fi
+        confluent_mgr=${confluent_mgr#[}
+        confluent_mgr=${confluent_mgr%]}
+    else
+        ready=1
     fi
+    rm $tmperr
 done
-if [[ $confluent_mgr == *:* ]]; then
-    confluent_mgr="[$confluent_mgr]"
-fi
-if [ $needseal == 1 ]; then
-    sealed=$(echo $confluent_apikey | clevis-encrypt-tpm2 {})
-    if [ ! -z "$sealed" ]; then
-        curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d $sealed https://$confluent_mgr/confluent-api/self/saveapikey
-    fi
-fi
-curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 umask $oldumask
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
