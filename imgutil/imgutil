@@ -328,11 +328,13 @@ def check_root(installroot):
 
 def fingerprint_source_suse(files, sourcepath):
     if os.path.exists(os.path.join(sourcepath, 'distinfo.yaml')):
-        with open(os.path.join(sourcepath, 'distinfo.yaml', 'r')) as distinfo:
+        with open(os.path.join(sourcepath, 'distinfo.yaml'), 'r') as distinfo:
             di = distinfo.read()
             issuse = False
             osname, ver, arch = (None, None, None)
             for line in di.split('\n'):
+                if ': ' not in line:
+                    continue
                 key, val = line.split(': ')
                 if key == 'category' and val == 'suse15':
                     issuse = True
