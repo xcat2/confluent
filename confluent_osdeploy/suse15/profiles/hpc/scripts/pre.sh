@@ -44,4 +44,4 @@ if grep append /tmp/bootloader.xml > /dev/null; then
 fi
 sed -i 's#root</username>#root</username>'"$(tr -d '\n' < /tmp/rootkeys.xml)"'#' /tmp/profile/modified.xml
 sed -i 's@/hwclock>@/hwclock>'"$(tr -d '\n' < /tmp/timezone)"'@' /tmp/profile/modified.xml
-sed -i 's@<product_dir>@'"$(tr -d '\n' < /tmp/pkgurl)"'<product_dir>@' /tmp/profile/modified.xml
+sed -i 's@<media_url/>@'"$(tr -d '\n' < /tmp/pkgurl)"'@' /tmp/profile/modified.xml
