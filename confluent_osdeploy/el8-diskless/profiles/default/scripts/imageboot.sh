@@ -2,7 +2,7 @@
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
 if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
-    curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
+    curl -# https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
     confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
@@ -73,6 +73,7 @@ curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/con
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
 chmod 640 /sysroot/etc/ssh/*_key
 chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
+mkdir -p /sysroot/etc/pki/tls/certs/
 cat /sysroot/etc/confluent/ca.pem >> /sysroot/etc/pki/tls/certs/ca-bundle.crt
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
 mkdir -p /sysroot/opt/confluent/bin
