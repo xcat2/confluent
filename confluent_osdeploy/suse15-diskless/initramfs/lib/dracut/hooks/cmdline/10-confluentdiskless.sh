@@ -19,7 +19,7 @@ get_remote_apikey() {
             tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
             tpm2_evictcontrol -Q -c data.ctx
             tpm2_flushcontext session.ctx
-            cd -
+            cd - > /dev/null
             rm -rf $tmpdir
         fi
     done
@@ -87,7 +87,7 @@ for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
         lasthdl=$hdl
     fi
 done
-cd -
+cd - > /dev/null
 rm -rf $tpmdir
 touch /etc/confluent/confluent.info
 cd /sys/class/net

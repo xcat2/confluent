@@ -74,7 +74,7 @@ for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
         lasthdl=$hdl
     fi
 done
-cd -
+cd - > /dev/null
 rm -rf $tpmdir
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 umask $oldumask
@@ -92,7 +92,7 @@ if [ "$new_apikey" != "$confluent_apikey" ]; then
     tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
     tpm2_evictcontrol -Q -c data.ctx
     tpm2_flushcontext session.ctx
-    cd -
+    cd - > /dev/null
     rm -rf $tmpdir
 fi
 tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2 2> /dev/null
