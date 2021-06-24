@@ -55,7 +55,47 @@ done
 cd /
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 hostname $nodename
+tpmdir=$(mktemp -d)
+cd $tpmdir
+lasthdl=""
+oldumask=$(umask)
+umask 0077
+for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
+    tpm2_startauthsession --policy-session --session=session.ctx
+    tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+    unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
+    tpm2_flushcontext session.ctx
+    if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
+        confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
+        echo $confluent_apikey > /etc/confluent/confluent.apikey
+        if [ -n "$lasthdl" ]; then
+            tpm2_evictcontrol -c $lasthdl
+        fi
+        lasthdl=$hdl
+    fi
+done
+cd -
+rm -rf $tpmdir
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+umask $oldumask
+new_apikey=$(cat /etc/confluent/confluent.apikey)
+if [ "$new_apikey" != "$confluent_apikey" ]; then
+    if [ -n "$lasthdl" ]; then
+        tpm2_evictcontrol -c $lasthdl
+    fi
+    tmpdir=$(mktemp -d)
+    cd $tmpdir
+    tpm2_startauthsession --session=session.ctx
+    tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+    tpm2_createprimary -G ecc -Q --key-context=prim.ctx
+    (echo -n "CONFLUENT_APIKEY:$new_apikey") | tpm2_create -Q --policy=pcr15.sha256.policy --public=data.pub --private=data.priv -i - -C prim.ctx
+    tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
+    tpm2_evictcontrol -Q -c data.ctx
+    tpm2_flushcontext session.ctx
+    cd -
+    rm -rf $tmpdir
+fi
+tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2 2> /dev/null
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
