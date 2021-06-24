@@ -4,7 +4,7 @@ cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97
 chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/97genesis/installkernel
 mkdir -p boot/initramfs
 mkdir -p boot/efi/boot
-dracut --xz -N -m "genesis base" -f boot/initramfs/distribution $(uname -r)
+dracut --no-early-microcode --xz -N -m "genesis base" -f boot/initramfs/distribution $(uname -r)
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
