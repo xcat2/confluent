@@ -76,7 +76,7 @@ lasthdl=""
 for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
     tpm2_startauthsession --policy-session --session=session.ctx
     tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
-    unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl)
+    unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
     tpm2_flushcontext session.ctx
     if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
         confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
