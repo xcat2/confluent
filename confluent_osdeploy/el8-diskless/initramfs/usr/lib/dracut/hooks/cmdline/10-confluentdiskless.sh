@@ -155,8 +155,8 @@ else
     mkdir -p /run/NetworkManager/system-connections
     cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 [connection]
-id=eno1
 EOC
+    echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
     echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
     cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 type=ethernet
