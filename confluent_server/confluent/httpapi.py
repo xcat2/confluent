@@ -305,8 +305,13 @@ def _authorize_request(env, operation):
                 # of a CSRF
                 return {'code': 401}
             return ('logout',)
-        name, passphrase = base64.b64decode(
-            env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(b':', 1)
+        if env['HTTP_AUTHORIZATION'].startswith('MultiBasic '):
+            name, passphrase = base64.b64decode(
+                env['HTTP_AUTHORIZATION'].replace('MultiBasic ', '')).split(b':', 1)
+            passphrase = json.loads(passphrase)
+        else:
+            name, passphrase = base64.b64decode(
+                env['HTTP_AUTHORIZATION'].replace('Basic ', '')).split(b':', 1)
         try:
             authdata = auth.check_user_passphrase(name, passphrase, operation=operation, element=element)
         except Exception as e:

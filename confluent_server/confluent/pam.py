@@ -116,7 +116,7 @@ class pam():
     def __init__(self):
         pass
 
-    def authenticate(self, username, password, service='login', encoding='utf-8', resetcreds=True, answers=None):
+    def authenticate(self, username, password, service='login', encoding='utf-8', resetcreds=True):
         """username and password authentication for the given service.
 
            Returns True for success, or False for failure.
@@ -142,19 +142,38 @@ class pam():
         def my_conv(n_messages, messages, p_response, app_data):
             """Simple conversation function that responds to any
                prompt where the echo is off with the supplied password"""
+            for i in range(n_messages):
+                if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
+                    currprompt = messages[i].contents.msg.decode('utf8').strip()
+                    prompts.add(currprompt)
+            for i in range(n_messages):
+                if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
+                    currprompt = messages[i].contents.msg.decode('utf8').strip()
+                    if isinstance(password, dict):
+                        if currprompt in password:
+                            continue
+                        elif len(prompts) > 1:
+                            return 19 # PAM_CONV_ERR
+                    else:
+                        if len(prompts) > 1:
+                            return 19 # PAM_CONV_ERR
             # Create an array of n_messages response objects
             addr = calloc(n_messages, sizeof(PamResponse))
             response = cast(addr, POINTER(PamResponse))
             p_response[0] = response
             for i in range(n_messages):
                 if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
-                    prompts.add(messages[i].contents.msg)
-                    if answers and messages[i].contents.msg in answers:
-                        currpassword = answers[messages[i].contents.msg]
-                        currcpassword = c_char_p(currpassword)
+                    currprompt = messages[i].contents.msg.decode('utf8').strip()
+                    if isinstance(password, dict):
+                        if currprompt in password:
+                            currpassword = password[currprompt]
+                            currcpassword = c_char_p(currpassword.encode('utf8'))
+                        elif len(password) == 1:
+                            currpassword = list(password.values())[0]
+                            currcpassword = c_char_p(currpassword.encode('utf8'))
                     else:
                         currpassword = password
-                        currcpassword = cpassword
+                        currcpassword = c_char_p(password.encode('utf8'))
                     dst = calloc(len(currpassword)+1, sizeof(c_char))
                     memmove(dst, currcpassword, len(currpassword))
                     response[i].resp = dst
@@ -164,7 +183,6 @@ class pam():
         # python3 ctypes prefers bytes
         if sys.version_info >= (3,):
             if isinstance(username, str): username = username.encode(encoding)
-            if isinstance(password, str): password = password.encode(encoding)
             if isinstance(service, str):  service  = service.encode(encoding)
         else:
             if isinstance(username, unicode):
@@ -174,14 +192,13 @@ class pam():
             if isinstance(service, unicode):
                 service  = service.encode(encoding)
 
-        if b'\x00' in username or b'\x00' in password or b'\x00' in service:
+        if b'\x00' in username or b'\x00' in service:
             self.code = 4  # PAM_SYSTEM_ERR in Linux-PAM
             self.reason = 'strings may not contain NUL'
             return False
 
         # do this up front so we can safely throw an exception if there's
         # anything wrong with it
-        cpassword = c_char_p(password)
         prompts = set([])
 
         handle = PamHandle()
@@ -212,7 +229,7 @@ class pam():
 
         if hasattr(libpam, 'pam_end'):
             pam_end(handle, retval)
-        if answers is None and len(prompts) > 1 and not auth_success:
+        if (not isinstance(password, dict)) and len(prompts) > 1 and not auth_success:
             raise PromptsNeeded(prompts)
         return auth_success
 

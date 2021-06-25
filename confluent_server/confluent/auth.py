@@ -221,11 +221,14 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
     if ucfg is None:
         eventlet.sleep(0.05)
         return None
+    bpassphrase = None
+    if isinstance(passphrase, dict) and len(passphrase) == 1:
+        passphrase = list(passphrase.values())[0]
     if isinstance(passphrase, bytes):
         bpassphrase = passphrase
-    else:
+    elif not isinstance(passphrase, dict):
         bpassphrase = passphrase.encode('utf8')
-    if (user, tenant) in _passcache:
+    if (user, tenant) in _passcache and bpassphrase:
         if hashlib.sha256(bpassphrase).digest() == _passcache[(user, tenant)]:
             return authorize(user, element, tenant, operation=operation)
         else:
@@ -233,7 +236,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             # while someone is legitimately logged in
             # invalidate cache and force the slower check
             del _passcache[(user, tenant)]
-    if 'cryptpass' in ucfg:
+    if 'cryptpass' in ucfg and bpassphrase:
         _passchecking[(user, tenant)] = True
         # TODO(jbjohnso): WORKERPOOL
         # PBKDF2 is, by design, cpu intensive
@@ -296,7 +299,8 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             # user
             usergood = pam.authenticate(user, passphrase, service=_pamservice)
         if usergood:
-            _passcache[(user, tenant)] = hashlib.sha256(bpassphrase).digest()
+            if bpassphrase:
+                _passcache[(user, tenant)] = hashlib.sha256(bpassphrase).digest()
             return authorize(user, element, tenant, operation, skipuserobj=False)
     eventlet.sleep(0.05)  # stall even on test for existence of a username
     return None

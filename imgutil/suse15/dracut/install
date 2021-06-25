@@ -1,4 +1,4 @@
-dracut_install /usr/bin/mktemp
+dracut_install mktemp
 dracut_install /usr/lib64/libtss2-tcti-device.so.*
 dracut_install tpm2_create tpm2_pcrread tpm2_createpolicy tpm2_createprimary
 dracut_install tpm2_load tpm2_unseal tpm2_getcap tpm2_evictcontrol
