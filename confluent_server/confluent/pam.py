@@ -104,17 +104,12 @@ pam_authenticate.restype  = c_int
 pam_authenticate.argtypes = [PamHandle, c_int]
 
 
-class PromptsNeeded(Exception):
-    def __init__(self, prompts):
-        self.prompts = prompts
-
-
 class pam():
     code   = 0
     reason = None
 
     def __init__(self):
-        pass
+        self.prompts = set([])
 
     def authenticate(self, username, password, service='login', encoding='utf-8', resetcreds=True):
         """username and password authentication for the given service.
@@ -145,17 +140,17 @@ class pam():
             for i in range(n_messages):
                 if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
                     currprompt = messages[i].contents.msg.decode('utf8').strip()
-                    prompts.add(currprompt)
+                    self.prompts.add(currprompt)
             for i in range(n_messages):
                 if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
                     currprompt = messages[i].contents.msg.decode('utf8').strip()
                     if isinstance(password, dict):
                         if currprompt in password:
                             continue
-                        elif len(prompts) > 1:
+                        elif len(self.prompts) > 1:
                             return 19 # PAM_CONV_ERR
                     else:
-                        if len(prompts) > 1:
+                        if len(self.prompts) > 1:
                             return 19 # PAM_CONV_ERR
             # Create an array of n_messages response objects
             addr = calloc(n_messages, sizeof(PamResponse))
@@ -197,10 +192,6 @@ class pam():
             self.reason = 'strings may not contain NUL'
             return False
 
-        # do this up front so we can safely throw an exception if there's
-        # anything wrong with it
-        prompts = set([])
-
         handle = PamHandle()
         conv   = PamConv(my_conv, 0)
         retval = pam_start(service, username, byref(conv), byref(handle))
@@ -229,8 +220,6 @@ class pam():
 
         if hasattr(libpam, 'pam_end'):
             pam_end(handle, retval)
-        if (not isinstance(password, dict)) and len(prompts) > 1 and not auth_success:
-            raise PromptsNeeded(prompts)
         return auth_success
 
 

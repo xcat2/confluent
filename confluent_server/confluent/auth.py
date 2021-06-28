@@ -26,6 +26,7 @@ import Cryptodome.Protocol.KDF as KDF
 from fnmatch import fnmatch
 import hashlib
 import hmac
+import msgpack
 import multiprocessing
 import os
 import pwd
@@ -99,6 +100,10 @@ _deniedbyrole = {
     }
 }
 
+
+class PromptsNeeded(Exception):
+    def __init__(self, prompts):
+        self.prompts = prompts
 
 def _get_usertenant(name, tenant=False):
     """_get_usertenant
@@ -278,22 +283,34 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             # to let a non-0 user check anothers password.
             # We will fork and the child will assume elevated privilege to
             # get unix_chkpwd helper to enable checking /etc/shadow
+            getprompt, sendprompt = os.pipe()
+            getprompt, sendprompt = os.fdopen(getprompt, 'rb', 0), os.fdopen(sendprompt, 'wb', 0)
             pid = os.fork()
             if not pid:
                 usergood = False
                 try:
+                    getprompt.close()
                     # we change to the uid we are trying to authenticate as, because
                     # pam_unix uses unix_chkpwd which reque
                     os.setuid(pwe.pw_uid)
-                    usergood = pam.authenticate(user, passphrase, service=_pamservice)
-                except pam.PromptsNeeded:
-                    os._exit(2)
+                    pa = pam.pam()
+                    usergood = pa.authenticate(user, passphrase, service=_pamservice)
+                    if (not usergood and len(pa.prompts) > 1 and
+                            (not isinstance(passphrase, dict) or
+                            (set(passphrase) - pa.prompts))):
+                        sendprompt.write(msgpack.packb(list(pa.prompts)))
+                        sendprompt.close()
+                        os._exit(2)
                 finally:
                     os._exit(0 if usergood else 1)
+            sendprompt.close()
             usergood = os.waitpid(pid, 0)[1]
             if (usergood >> 8) == 2:
-                pam.authenticate(user, passphrase, service=_pamservice)
+                prompts = getprompt.read()
+                if (prompts):
+                    raise PromptsNeeded(msgpack.unpackb(prompts))
             usergood = usergood == 0
+            getprompt.close()
         else:
             # We are running as root, we don't need to fork in order to authenticate the
             # user
