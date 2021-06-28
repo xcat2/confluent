@@ -56,7 +56,8 @@ def handle_request(env, start_response):
         yield 'Unauthorized'
         return
     cfg = configmanager.ConfigManager(None)
-    eak = cfg.get_node_attributes(nodename, 'crypted.selfapikey').get(
+    ea = cfg.get_node_attributes(nodename, ['crypted.selfapikey', 'deployment.apiarmed'])
+    eak = ea.get(
         nodename, {}).get('crypted.selfapikey', {}).get('hashvalue', None)
     if not eak:
         start_response('401 Unauthorized', [])
@@ -67,6 +68,8 @@ def handle_request(env, start_response):
         start_response('401 Unauthorized', [])
         yield 'Unauthorized'
         return
+    if ea.get(nodename, {}).get('deployment.apiarmed', {}).get('value', None) == 'once':
+        cfg.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
     retype = env.get('HTTP_ACCEPT', 'application/yaml')
     isgeneric = False
     if retype == '*/*':
