@@ -66,33 +66,29 @@ def get_certificate_paths():
 
     return keypath, certpath
 
-def create_certificate(keyout=None, certout=None):
-    if not keyout:
-        keyout, certout = get_certificate_paths()
-    if not keyout:
-        raise Exception('Unable to locate TLS certificate path automatically')
-    shortname = socket.gethostname().split('.')[0]
-    longname = shortname # socket.getfqdn()
-    subprocess.check_call(
-        ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
-         keyout])
-    san = ['IP:{0}'.format(x) for x in get_ip_addresses()]
-    # It is incorrect to put IP addresses as DNS type.  However
-    # there exists non-compliant clients that fail with them as IP
-    san.extend(['DNS:{0}'.format(x) for x in get_ip_addresses()])
-    san.append('DNS:{0}'.format(shortname))
-    #san.append('DNS:{0}'.format(longname))
-    san = ','.join(san)
+def assure_tls_ca():
+    keyout, certout = ('/etc/confluent/tls/cakey.pem', '/etc/confluent/tls/cacert.pem')
+    if os.path.exists(certout):
+        return
+    try:
+        os.makedirs('/etc/confluent/tls')
+    except OSError as e:
+        if e.errno != 17:
+            raise
     sslcfg = get_openssl_conf_location()
     tmpconfig = tempfile.mktemp()
     shutil.copy2(sslcfg, tmpconfig)
+    subprocess.check_call(
+        ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
+         keyout])
     try:
         with open(tmpconfig, 'a') as cfgfile:
-            cfgfile.write('\n[SAN]i\nbasicConstraints = CA:true\nsubjectAltName={0}'.format(san))
+            cfgfile.write('\n[CACert]\nbasicConstraints = CA:true\n')
         subprocess.check_call([
             'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
-            '7300', '-out', certout, '-subj', '/CN={0}'.format(longname),
-            '-extensions', 'SAN', '-config', tmpconfig
+            '27300', '-out', certout, '-subj',
+            '/CN=Confluent TLS Certificate authority ({0})'.format(socket.gethostname()),
+            '-extensions', 'CACert', '-config', tmpconfig
         ])
     finally:
         os.remove(tmpconfig)
@@ -104,9 +100,9 @@ def create_certificate(keyout=None, certout=None):
     except OSError as e:
         if e.errno != 17:
             raise
-    shutil.copy2(certout, fname)
+    shutil.copy2('/etc/confluent/tls/cacert.pem', fname)
     hv = subprocess.check_output(
-        ['openssl', 'x509', '-in', certout, '-hash', '-noout'])
+        ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'])
     if not isinstance(hv, str):
         hv = hv.decode('utf8')
     hv = hv.strip()
@@ -122,6 +118,52 @@ def create_certificate(keyout=None, certout=None):
             except OSError:
                 pass
     os.symlink(certname, hashname)
+
+def create_certificate(keyout=None, certout=None):
+    if not keyout:
+        keyout, certout = get_certificate_paths()
+    if not keyout:
+        raise Exception('Unable to locate TLS certificate path automatically')
+    assure_tls_ca()
+    shortname = socket.gethostname().split('.')[0]
+    longname = shortname # socket.getfqdn()
+    subprocess.check_call(
+        ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
+         keyout])
+    san = ['IP:{0}'.format(x) for x in get_ip_addresses()]
+    # It is incorrect to put IP addresses as DNS type.  However
+    # there exists non-compliant clients that fail with them as IP
+    san.extend(['DNS:{0}'.format(x) for x in get_ip_addresses()])
+    san.append('DNS:{0}'.format(shortname))
+    #san.append('DNS:{0}'.format(longname))
+    san = ','.join(san)
+    sslcfg = get_openssl_conf_location()
+    tmpconfig = tempfile.mktemp()
+    extconfig = tempfile.mktemp()
+    csrout = tempfile.mktemp()
+    shutil.copy2(sslcfg, tmpconfig)
+    try:
+        with open(tmpconfig, 'a') as cfgfile:
+            cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
+        with open(extconfig, 'a') as cfgfile:
+            cfgfile.write('\nbasicConstraints=CA:false\nsubjectAltName={0}'.format(san))
+        subprocess.check_call([
+            'openssl', 'req', '-new', '-key', keyout, '-out', csrout, '-subj',
+            '/CN={0}'.format(longname),
+            '-extensions', 'SAN', '-config', tmpconfig
+        ])
+        subprocess.check_call([
+            'openssl', 'x509', '-req', '-in', csrout,
+            '-CA', '/etc/confluent/tls/cacert.pem',
+            '-CAkey', '/etc/confluent/tls/cakey.pem',
+            '-set_serial', '0x123', '-out', certout, '-days', '27300',
+            '-extfile', extconfig
+        ])
+    finally:
+        os.remove(tmpconfig)
+        os.remove(csrout)
+        os.remove(extconfig)
+
 
 if __name__ == '__main__':
     outdir = os.getcwd()
