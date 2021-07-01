@@ -1,0 +1,13 @@
+Source: confluent-vtbufferd
+Maintainer: HPC Team <hpchelp@lenovo.com>
+Section: misc
+Priority: optional
+Standards-Version: 4.5.0
+Build-Depends: debhelper (>= 12)
+
+Package: confluent-vtbufferd
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: VT buffers for confluent service
+ Provides VT consoles in memory for redraw on connections.
+

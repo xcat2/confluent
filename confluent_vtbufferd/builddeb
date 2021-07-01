@@ -1,0 +1,23 @@
+#!/bin/bash
+set -x
+cd `dirname $0`
+PKGNAME=$(basename $(pwd))
+DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
+OPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
+DSCARGS="--with-python3=True --with-python2=False"
+VERSION=`git describe|cut -d- -f 1`
+NUMCOMMITS=`git describe|cut -d- -f 2`
+if [ "$NUMCOMMITS" != "$VERSION"  ]; then
+    VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
+fi
+cd ..
+rm -rf /tmp/confluent
+mkdir -p /tmp/confluent # $DPKGNAME
+cp -a * .git /tmp/confluent # $DPKGNAME
+cd /tmp/confluent
+mv $PKGNAME $DPKGNAME-${VERSION}
+sed -i s/%%VERSION%%/$VERSION/ $DPKGNAME-${VERSION}/debian/changelog
+tar cvzf ${DPKGNAME}_${VERSION}.orig.tar.gz $DPKGNAME-${VERSION}
+cd $DPKGNAME-${VERSION}
+debuild -us -uc
+exit 0
