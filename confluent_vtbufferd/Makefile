@@ -3,3 +3,8 @@ vtbufferd: vtbufferd.c tmt.c
 
 clean:
 	rm vtbufferd
+
+install:
+	mkdir -p $(DESTDIR)/opt/confluent/bin
+	$(INSTALL) -s vtbufferd $(DESTDIR)/opt/confluent/bin
+
