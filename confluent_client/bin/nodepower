@@ -32,7 +32,7 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] noderange "
+    usage="Usage: %prog [options] <noderange> "
           "([status|on|off|shutdown|boot|reset])")
 argparser.add_option('-p', '--showprevious', dest='previous',
                      action='store_true', default=False,
