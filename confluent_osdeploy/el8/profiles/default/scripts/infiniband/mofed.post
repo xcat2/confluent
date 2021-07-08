@@ -14,6 +14,6 @@ if lspci -d 15b3:: -n |grep 15b3 > /dev/null; then
     tar xf infiniband/mofed.tgz
     # The rest is common between tar and iso
     cd MLNX_OFED*
-    ./mlnxofedinstall --force
+    ./mlnxofedinstall --force --without-32bit
 fi
 
