@@ -35,10 +35,11 @@ reboot
 %packages
 #-kernel-uek # This can opt out of the UEK for the relevant distribution
 chrony
-rsync
-python
-tar
 pciutils
+python
+rsync
+tar
+-iwl*-firmware
 %include /tmp/addonpackages
 %end
 

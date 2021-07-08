@@ -35,11 +35,13 @@ reboot
 %packages
 @^minimal-environment
 #-kernel-uek # This can opt out of the UEK for the relevant distribution
+bind-utils
 chrony
-rsync
-python3
-tar
 pciutils
+python3
+rsync
+tar
+-iwl*-firmware
 %include /tmp/addonpackages
 %include /tmp/cryptpkglist
 %end
