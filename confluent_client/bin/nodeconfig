@@ -43,7 +43,7 @@ def bailout(msg, code=1):
     sys.exit(code)
 
 
-argparser = optparse.OptionParser(usage="Usage: %prog [options] noderange [option|option=value]")
+argparser = optparse.OptionParser(usage="Usage: %prog [options] <noderange> [setting|setting=value]")
 argparser.add_option('-c', '--comparedefault', dest='comparedefault',
                      action='store_true', default=False,
                      help='Compare given settings to default or list settings '
