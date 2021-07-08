@@ -3,8 +3,7 @@ nodepower(8) -- Check or change power state of confluent nodes
 
 ## SYNOPSIS
 
-`nodepower <noderange>`  
-`nodepower <noderange> [-p] [on|off|boot|shutdown|reset|status]`
+`nodepower [options] <noderange> ([status|on|off|shutdown|boot|reset])`
 
 ## DESCRIPTION
 
@@ -28,7 +27,7 @@ off will not react to this request.
 
 ## OPTIONS
 
-* `-p`, '--showprevious':
+* `-p`, `--showprevious`:
    Show previous power state for all directives that may change power state.
    
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
