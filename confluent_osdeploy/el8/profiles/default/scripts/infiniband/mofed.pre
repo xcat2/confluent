@@ -1,10 +1,11 @@
 # Add needed base packages to the install
 cat << EOF >> /tmp/addonpackages
+gcc-gfortran
+kernel-modules-extra
+lsof
 perl
 pkgconf-pkg-config
-tcsh
-lsof
-tk
-gcc-gfortran
 tcl
+tcsh
+tk
 EOF
