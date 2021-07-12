@@ -76,6 +76,7 @@ fi
 export confluent_mgr confluent_profile nodename
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
+$python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 run_remote pre.custom
 run_remote_parts pre.d
 if [ ! -e /tmp/installdisk ]; then
@@ -93,5 +94,4 @@ elif [ -e /usr/bin/python3 ]; then
 else
     python=/usr/bin/python
 fi
-$python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 kill $logshowpid
