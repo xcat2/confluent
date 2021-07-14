@@ -507,7 +507,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                                                                   printattr)
                         else:
                             attrout = '{0}: {1}:'.format(node, printattr)
-                    elif 'broken' in currattr:
+                    elif isinstance(currattr, dict) and 'broken' in currattr:
                         attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                                   '{2}'.format(node, printattr,
                                                currattr['broken'])
@@ -524,7 +524,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                         blame = options.blame
                     except AttributeError:
                         blame = False
-                    if blame or 'broken' in currattr:
+                    if blame or (isinstance(currattr, dict) and 'broken' in currattr):
                         blamedata = []
                         if 'inheritedfrom' in currattr:
                             blamedata.append('inherited from group {0}'.format(
@@ -633,7 +633,7 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                         attrout = '{0}: {1}: ********'.format(noderange, attr)
                     else:
                         attrout = '{0}: {1}:'.format(noderange, attr)
-                elif 'broken' in currattr:
+                elif isinstance(currattr, dict) 'broken' in currattr:
                     attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                               '{2}'.format(noderange, attr,
                                            currattr['broken'])
