@@ -32,6 +32,93 @@ MS_PRIVATE = 1<<18
 
 numregex = re.compile('([0-9]+)')
 
+def get_partition_info():
+    with open('/proc/mounts') as procmounts:
+        mountinfo = procmounts.read()
+    for entry in mountinfo.split('\n'):
+        if not entry:
+            continue
+        dev, mount, fs, flags = entry.split()[:4]
+        if fs in ('cgroup', 'sysfs', 'proc', 'devtmpfs', 'proc', 'tmpfs'):
+            continue
+        if mount.startswith('/sys/') or mount.startswith('/proc/'):
+            continue
+        if mount.startswith('/dev/'):
+            continue
+        fsinfo = os.statvfs(mount)
+        partinfo = {
+            'mount': mount,
+            'filesystem': fs,
+            'minsize': (fsinfo.f_blocks - fsinfo.f_bfree) * fsinfo.f_bsize,
+            'initsize': fsinfo.f_blocks * fsinfo.f_bsize,
+            'flags': flags,
+            'device': dev,
+        }
+        yield partinfo
+
+def sanitize_shadow(shadowfile):
+    with open(shadowfile) as shadin:
+        shadata = shadin.read()
+    newshadow = ''
+    for shadent in shadata.split('\n'):
+        if not shadent:
+            continue
+        passent = shadent.split(':')
+        if passent[1] not in ('*', '!!'):
+            passent[1] = '!!'
+        newshadow += ':'.join(passent) + '\n'
+    return newshadow
+
+def capture_fs(fsinfo):
+    _mount(fsinfo['mount'], '/run/imgutil/capin', flags=MS_BIND|MS_RDONLY)
+    targdir = None
+    if fsinfo['mount'] == '/etc':
+        targdir = '/run/imgutil/capin'
+    elif fsinfo['mount'] == '/':
+        targdir = '/run/imgutil/capin/etc'
+    if targdir is not None:
+        if os.path.exists(os.path.join(targdir, 'shadow')):
+            _mount_file('/run/imgutil/captmp/shadow', os.path.join(targdir, 'shadow'))
+        if os.path.exists(os.path.join(targdir, 'gshadow')):
+            _mount_file('/run/imgutil/captmp/gshadow', os.path.join(targdir, 'gshadow'))
+        if os.path.exists(os.path.join(targdir, 'shadow-')):
+            _mount_file('/run/imgutil/captmp/empty', os.path.join(targdir, 'shadow-'))
+        if os.path.exists(os.path.join(targdir, 'gshadow-')):
+            _mount_file('/run/imgutil/captmp/empty', os.path.join(targdir, 'gshadow-'))
+        for sshkey in glob.glob(os.path.join(targdir, 'ssh/*key')):
+            _mount_file('/run/imgutil/captmp/empty', sshkey)
+        for sshkey in glob.glob(os.path.join(targdir, 'pki/tls/private/*')):
+            _mount_file('/run/imgutil/captmp/empty', sshkey)
+        if os.path.exists(os.path.join(targdir, 'confluent')):
+            _mount('none', os.path.join(targdir, 'confluent'), 'tmpfs')
+    fname = 'root'  + fsinfo['mount']
+    fname = fname.replace('/', '_')
+    if fname[-1] == '_':
+        fname = fname[:-1]
+    fname = fname + '.sfs'
+    fname = os.path.join('/run/imgutil/capout', fname)
+    subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname, '-comp', 'xz'])
+
+def capture_system():
+    mkdirp('/run/imgutil/capout')
+    _mount('none', '/run/imgutil/capout', 'tmpfs')
+    run_constrained(capture_system_back, None)
+
+def capture_system_back(args):
+    newshadow = sanitize_shadow('/etc/shadow')
+    newgshadow = sanitize_shadow('/etc/gshadow')
+    mkdirp('/run/imgutil/capin')
+    mkdirp('/run/imgutil/captmp')
+    _mount('none', '/run/imgutil/captmp', 'tmpfs')
+    with open('/run/imgutil/captmp/shadow', 'w') as shadowout:
+        shadowout.write(newshadow)
+    with open('/run/imgutil/captmp/gshadow', 'w') as shadowout:
+        shadowout.write(newgshadow)
+    with open('/run/imgutil/captmp/empty', 'w') as shadowout:
+        pass
+    for fs in get_partition_info():
+        run_constrained(capture_fs, fs)
+
 def create_yumconf(sourcedir):
     repodir = tempfile.mkdtemp(prefix='genimage-yumrepos.d-')
     yumconf = open(os.path.join(repodir, 'repos.repo'), 'w+')
@@ -237,16 +324,27 @@ def main():
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
         'will override the target to be /run/root', action='append')
     (opts, args) = parser.parse_args()
+    if not args:
+        parser.print_usage()
+        sys.exit(1)
     if args[0] == 'build':
         build_root(opts, args[1:])
-    if args[0] == 'exec':
+    elif args[0] == 'capture':
+        capture_system()
+    elif args[0] == 'exec':
         exec_root(opts, args[1:])
-    if args[0] == 'pack':
+    elif args[0] == 'pack':
         pack_image(opts, args[1:])
+    else:
+        parser.print_usage()
 
 
 def exec_root(opts, args):
     run_constrained(exec_root_backend, (opts, args))
+
+def _mount_file(source, dst):
+    _mount(source, dst, flags=MS_BIND|MS_RDONLY)
+    _mount('none', dst, flags=MS_RDONLY|MS_REMOUNT|MS_BIND)
 
 def exec_root_backend(optargs):
     opts, args = optargs
