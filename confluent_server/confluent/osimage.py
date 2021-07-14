@@ -672,6 +672,8 @@ class MediaImporter(object):
 
     def __init__(self, media, cfm=None):
         self.worker = None
+        if not os.path.exists('/var/lib/confluent/public'):
+            raise Exception('`osdeploy initialize` must be executed before importing any media')
         self.profiles = []
         medfile = None
         if cfm and media in cfm.clientfiles:
