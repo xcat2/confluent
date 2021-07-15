@@ -4,6 +4,7 @@ import ctypes
 import ctypes.util
 from distutils.dir_util import copy_tree
 import glob
+import json
 import optparse
 import os
 import pwd
@@ -39,11 +40,7 @@ def get_partition_info():
         if not entry:
             continue
         dev, mount, fs, flags = entry.split()[:4]
-        if fs in ('cgroup', 'sysfs', 'proc', 'devtmpfs', 'proc', 'tmpfs'):
-            continue
-        if mount.startswith('/sys/') or mount.startswith('/proc/'):
-            continue
-        if mount.startswith('/dev/'):
+        if fs not in ('ext3', 'ext4', 'xfs', 'btrfs', 'vfat'):
             continue
         fsinfo = os.statvfs(mount)
         partinfo = {
@@ -69,7 +66,8 @@ def sanitize_shadow(shadowfile):
         newshadow += ':'.join(passent) + '\n'
     return newshadow
 
-def capture_fs(fsinfo):
+def capture_fs(args):
+    fsinfo, fname = args
     _mount(fsinfo['mount'], '/run/imgutil/capin', flags=MS_BIND|MS_RDONLY)
     targdir = None
     if fsinfo['mount'] == '/etc':
@@ -91,13 +89,7 @@ def capture_fs(fsinfo):
             _mount_file('/run/imgutil/captmp/empty', sshkey)
         if os.path.exists(os.path.join(targdir, 'confluent')):
             _mount('none', os.path.join(targdir, 'confluent'), 'tmpfs')
-    fname = 'root'  + fsinfo['mount']
-    fname = fname.replace('/', '_')
-    if fname[-1] == '_':
-        fname = fname[:-1]
-    fname = fname + '.sfs'
-    fname = os.path.join('/run/imgutil/capout', fname)
-    subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname, '-comp', 'xz'])
+    subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
 def capture_system():
     mkdirp('/run/imgutil/capout')
@@ -116,8 +108,46 @@ def capture_system_back(args):
         shadowout.write(newgshadow)
     with open('/run/imgutil/captmp/empty', 'w') as shadowout:
         pass
-    for fs in get_partition_info():
-        run_constrained(capture_fs, fs)
+    i = 0
+    with open('/run/imgutil/capout/final.img', 'wb') as outimg:
+        # Signature
+        outimg.write(b'\x63\x7b\x9d\x26\xb7fd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1CONFLUENT_IMAGE')
+        for fs in get_partition_info():
+            fname = '{0:03d}'.format(i)  + fs['mount']
+            i += 1
+            fname = fname.replace('/', '_')
+            if fname[-1] == '_':
+                fname = fname[:-1]
+            fname = os.path.join('/run/imgutil/capout', fname)
+            run_constrained(capture_fs, (fs, fname))
+            isize = os.stat(fname + '.sfs').st_size
+            outimg.write(struct.pack('!H', len(fs['mount'].encode('utf8'))))
+            outimg.write(fs['mount'].encode('utf8'))
+            fs['compressed_size'] = isize
+            with open(fname + '.json', 'w') as fsinfout:
+                fsinfout.write(json.dumps(fs))
+            jsize = os.stat(fname + '.json').st_size
+            outimg.write(struct.pack('!I', jsize))
+            with open(fname + '.json','rb') as fsinfoin:
+                outimg.write(fsinfoin.read())
+            # want to pad to 4096, the pad size (2 bytes) and image size
+            # (8 bytes) will contribute to padding (or drive need for more)
+            # padding
+            pad = 4096 - ((outimg.tell() + 10) % 4096)
+            outimg.write(struct.pack('!H', pad))
+            if pad:
+                outimg.write(b'\x00' * pad)
+            outimg.write(struct.pack('!Q', isize))
+            with open(fname + '.sfs', 'rb') as imgin:
+                currchunk = imgin.read(32768)
+                while currchunk:
+                    outimg.write(currchunk)
+                    currchunk = imgin.read(32768)
+            pad = 4096 - (outimg.tell() % 4096)
+            if pad < 4096:
+                outimg.write(b'\x00' * pad)
+
+
 
 def create_yumconf(sourcedir):
     repodir = tempfile.mkdtemp(prefix='genimage-yumrepos.d-')
