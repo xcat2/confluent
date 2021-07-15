@@ -7,7 +7,20 @@ else
     confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 fi
-mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
+/opt/confluent/bin/confluent_imginfo /mnt/remoteimg/rootimg.sfs > /tmp/rootimg.info
+if grep '^Format: squashfs' /tmp/rootimg.info > /dev/null; then
+    mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
+elif grep  '^Format: confluent_multisqaush' /tmp/rootimg.info; then
+    loopdev=$(losetup -f)
+    losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
+    tail -n +3 /tmp/rootimg.info  | awk '{print 0 " " $4 " '$loopdev' " $3 " " $7}'
+    tail -n +3 /tmp/rootimg.info  | awk '{gsub("/", "_"); print "echo 0 " $4 " linear '$loopdev' " $3 " | dmsetup create mproot" $7}' > /tmp/setupmount.sh
+    . /tmp/setupmount.sh
+    cat /tmp/setupmount.sh |awk '{printf "mount /dev/mapper/"$NF" "; sub("mproot", ""); gsub("_", "/"); print "/mnt/remote"$NF}' > /tmp/mountparts.sh
+    . /tmp/mountparts.sh
+fi
+
+
 #mount -t tmpfs overlay /mnt/overlay
 modprobe zram
 memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
