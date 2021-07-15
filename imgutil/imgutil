@@ -66,6 +66,10 @@ def sanitize_shadow(shadowfile):
         newshadow += ':'.join(passent) + '\n'
     return newshadow
 
+def mask_file(filename, maskwith='/run/imgutil/captmp/empty'):
+    if os.path.exists(filename):
+        _mount_file(maskwith, filename)
+
 def capture_fs(args):
     fsinfo, fname = args
     _mount(fsinfo['mount'], '/run/imgutil/capin', flags=MS_BIND|MS_RDONLY)
@@ -75,20 +79,18 @@ def capture_fs(args):
     elif fsinfo['mount'] == '/':
         targdir = '/run/imgutil/capin/etc'
     if targdir is not None:
-        if os.path.exists(os.path.join(targdir, 'shadow')):
-            _mount_file('/run/imgutil/captmp/shadow', os.path.join(targdir, 'shadow'))
-        if os.path.exists(os.path.join(targdir, 'gshadow')):
-            _mount_file('/run/imgutil/captmp/gshadow', os.path.join(targdir, 'gshadow'))
-        if os.path.exists(os.path.join(targdir, 'shadow-')):
-            _mount_file('/run/imgutil/captmp/empty', os.path.join(targdir, 'shadow-'))
-        if os.path.exists(os.path.join(targdir, 'gshadow-')):
-            _mount_file('/run/imgutil/captmp/empty', os.path.join(targdir, 'gshadow-'))
-        for sshkey in glob.glob(os.path.join(targdir, 'ssh/*key')):
-            _mount_file('/run/imgutil/captmp/empty', sshkey)
-        for sshkey in glob.glob(os.path.join(targdir, 'pki/tls/private/*')):
-            _mount_file('/run/imgutil/captmp/empty', sshkey)
-        if os.path.exists(os.path.join(targdir, 'confluent')):
-            _mount('none', os.path.join(targdir, 'confluent'), 'tmpfs')
+        mask_file(os.path.join(targdir, 'shadow'), '/run/imgutil/captmp/shadow')
+        mask_file(os.path.join(targdir, 'gshadow'), '/run/imgutil/captmp/gshadow')
+        mask_file(os.path.join(targdir, 'fstab'), '/run/imgutil/captmp/fstab')
+        mask_file(os.path.join(targdir, 'shadow-'))
+        mask_file(os.path.join(targdir, 'gshadow-'))
+        mask_file(os.path.join(targdir, 'hostname'))
+        for tname in glob.glob(os.path.join(targdir, 'ssh/*key')):
+            _mount_file('/run/imgutil/captmp/empty', tname)
+        for tname in glob.glob(os.path.join(targdir, 'pki/tls/private/*')):
+            _mount_file('/run/imgutil/captmp/empty', tname)
+        if os.path.exists(os.path.join(targdir, 'sysconfig/network-scripts')):
+            _mount('none', os.path.join(targdir, 'sysconfig/network-scripts'), 'tmpfs')
     subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
 def capture_system():
@@ -96,12 +98,27 @@ def capture_system():
     _mount('none', '/run/imgutil/capout', 'tmpfs')
     run_constrained(capture_system_back, None)
 
+def generalize_fstab():
+    with open('/etc/fstab') as tabfile:
+        fstab = tabfile.read().split('\n')
+    newtab = ''
+    for tab in fstab:
+        tabent = tab.split('#', 1)[0]
+        tabent = tabent.split()
+        if len(tabent) >= 3 and tabent[2] in ('ext3', 'ext4', 'xfs', 'btrfs', 'vfat', 'swap'):
+            newtab += tab.replace(tabent[0], '#ORIGFSTAB#' + tabent[0] + '#', 1) + '\n'
+        else:
+            newtab += tab + '\n'
+    with open('/run/imgutil/captmp/fstab', 'w') as newtabout:
+        newtabout.write(newtab)
+
 def capture_system_back(args):
     newshadow = sanitize_shadow('/etc/shadow')
     newgshadow = sanitize_shadow('/etc/gshadow')
     mkdirp('/run/imgutil/capin')
     mkdirp('/run/imgutil/captmp')
     _mount('none', '/run/imgutil/captmp', 'tmpfs')
+    generalize_fstab()
     with open('/run/imgutil/captmp/shadow', 'w') as shadowout:
         shadowout.write(newshadow)
     with open('/run/imgutil/captmp/gshadow', 'w') as shadowout:
@@ -109,7 +126,7 @@ def capture_system_back(args):
     with open('/run/imgutil/captmp/empty', 'w') as shadowout:
         pass
     i = 0
-    with open('/run/imgutil/capout/final.img', 'wb') as outimg:
+    with open('/run/imgutil/capout/rootimg.sfs', 'wb') as outimg:
         # Signature
         outimg.write(b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1CONFLUENT_IMAGE')
         for fs in get_partition_info():
@@ -152,7 +169,6 @@ def capture_system_back(args):
             pad = 4096 - (outimg.tell() % 4096)
             if pad < 4096:
                 outimg.write(b'\x00' * pad)
-
 
 
 def create_yumconf(sourcedir):

@@ -10,7 +10,7 @@ fi
 /opt/confluent/bin/confluent_imginfo /mnt/remoteimg/rootimg.sfs > /tmp/rootimg.info
 if grep '^Format: squashfs' /tmp/rootimg.info > /dev/null; then
     mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
-elif grep  '^Format: confluent_multisqaush' /tmp/rootimg.info; then
+elif grep  '^Format: confluent_multisquash' /tmp/rootimg.info; then
     loopdev=$(losetup -f)
     losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
     tail -n +3 /tmp/rootimg.info  | awk '{print 0 " " $4 " '$loopdev' " $3 " " $7}'
