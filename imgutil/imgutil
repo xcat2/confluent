@@ -130,6 +130,12 @@ def capture_system_back(args):
             outimg.write(struct.pack('!I', jsize))
             with open(fname + '.json','rb') as fsinfoin:
                 outimg.write(fsinfoin.read())
+            outimg.write(struct.pack('!Q', fs['minsize']))
+            outimg.write(struct.pack('!Q', fs['initsize']))
+            outimg.write(struct.pack('!H', len(fs['filesystem'].encode('utf8'))))
+            outimg.write(fs['filesystem'].encode('utf8'))
+            outimg.write(struct.pack('!H', len(fs['device'].encode('utf8'))))
+            outimg.write(fs['device'].encode('utf8'))
             # want to pad to 4096, the pad size (2 bytes) and image size
             # (8 bytes) will contribute to padding (or drive need for more)
             # padding
