@@ -24,7 +24,7 @@ mkdir -p opt/confluent/bin
 mkdir -p stateless-bin
 cd utils
 make all
-cp copernicus clortho autocons ../opt/confluent/bin
+cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
 cp start_root urlmount ../stateless-bin/
 cd ..
 for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos; do

@@ -1,6 +1,6 @@
 CC := gcc
 CFLAGS := -Os
-TARGETS := copernicus autocons start_root
+TARGETS := copernicus autocons start_root confluent_imginfo
 
 all: $(TARGETS) clortho urlmount
 
