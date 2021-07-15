@@ -633,7 +633,7 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                         attrout = '{0}: {1}: ********'.format(noderange, attr)
                     else:
                         attrout = '{0}: {1}:'.format(noderange, attr)
-                elif isinstance(currattr, dict) 'broken' in currattr:
+                elif isinstance(currattr, dict) and 'broken' in currattr:
                     attrout = '{0}: {1}: *ERROR* BROKEN EXPRESSION: ' \
                               '{2}'.format(noderange, attr,
                                            currattr['broken'])
