@@ -111,7 +111,7 @@ def capture_system_back(args):
     i = 0
     with open('/run/imgutil/capout/final.img', 'wb') as outimg:
         # Signature
-        outimg.write(b'\x63\x7b\x9d\x26\xb7fd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1CONFLUENT_IMAGE')
+        outimg.write(b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1CONFLUENT_IMAGE')
         for fs in get_partition_info():
             fname = '{0:03d}'.format(i)  + fs['mount']
             i += 1
