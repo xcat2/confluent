@@ -3,10 +3,13 @@
 # the image will be used to deploy itself
 # provide both access to image (for parsing metadata)
 # and existing mounts of image (to take advantage of caching)
-mkdir -p /sysroot/run/imginst/sourceimage
-mount -o bind /mnt/remoteimg /sysroot/run/imginst/sourceimage
 mount -o bind /sys /sysroot/sys
 mount -o bind /dev /sysroot/dev
+mount -o bind /proc /sysroot/proc
+mount -o bind /run /sysroot/run
+mkdir -p /sysroot/run/imginst/sourceimage
+mount -o bind /mnt/remoteimg /sysroot/run/imginst/sourceimage
+
 if [ ! -f /tmp/mountparts.sh ]; then
     mkdir -p /sysroot/run/imginst/sources/_
     mount -o bind /mnt/remote /sysroot/run/imginst/sources/_
@@ -28,5 +31,7 @@ if [ ! -f /sysroot/tmp/installdisk ]; then
     done
 fi
 lvm vgchange -a n
+udevadm control -e
+chroot /sysroot /usr/lib/systemd/systemd-udevd --daemon
 chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python image2disk.py"
 

@@ -1,0 +1,210 @@
+#!/usr/bin/python3
+import json
+import os
+import re
+import struct
+import subprocess
+
+def get_next_part_meta(img, imgsize):
+    if img.tell() == imgsize:
+        return None
+    pathlen = struct.unpack('!H', img.read(2))[0]
+    mountpoint = img.read(pathlen).decode('utf8')
+    jsonlen = struct.unpack('!I', img.read(4))[0]
+    metadata = json.loads(img.read(jsonlen).decode('utf8'))
+    img.seek(16, 1) # skip the two 64-bit values we don't use, they are in json
+    nextlen = struct.unpack('!H', img.read(2))[0]
+    img.seek(nextlen, 1) # skip filesystem type
+    nextlen = struct.unpack('!H', img.read(2))[0]
+    img.seek(nextlen, 1) # skip orig devname (redundant with json)
+    nextlen = struct.unpack('!H', img.read(2))[0]
+    img.seek(nextlen, 1) # skip padding
+    nextlen = struct.unpack('!Q', img.read(8))[0]
+    img.seek(nextlen, 1)  # go to next section
+    return metadata
+
+def get_multipart_image_meta(img):
+    img.seek(0, 2)
+    imgsize = img.tell()
+    img.seek(31)
+    partinfo = get_next_part_meta(img, imgsize)
+    while partinfo:
+        yield partinfo
+        partinfo = get_next_part_meta(img, imgsize)
+
+def get_image_metadata(imgpath):
+    with open(imgpath, 'rb') as img:
+        header = img.read(16)
+        if header == b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1':
+            for md in get_multipart_image_meta(img):
+                yield md
+        else:
+            raise Exception('Installation from single part image not supported')
+
+class PartedRunner():
+    def __init__(self, disk):
+        self.disk = disk
+
+    def run(self, command):
+        command = command.split()
+        command = ['parted', '-a', 'optimal', '-s', self.disk] + command
+        return subprocess.check_output(command).decode('utf8')
+
+def fixup(rootdir, vols):
+    fstabfile = os.path.join(rootdir, 'etc/fstab')
+    with open(fstabfile) as tfile:
+        fstab = tfile.read().split('\n')
+
+def had_swap():
+    with open('/etc/fstab') as tabfile:
+        tabs = tabfile.read().split('\n')
+        for tab in tabs:
+            tab = tab.split()
+            if len(tab) < 3:
+                continue
+            if tab[2] == 'swap':
+                return True
+    return False
+
+def install_to_disk(imgpath):
+    lvmvols = {}
+    deftotsize = 0
+    mintotsize = 0
+    deflvmsize = 0
+    minlvmsize = 0
+    biggestsize = 0
+    biggestfs = None
+    plainvols = {}
+    allvols = []
+    swapsize = 0
+    if had_swap():
+        with open('/proc/meminfo') as meminfo:
+            swapsize = meminfo.read().split('\n')[0]
+        swapsize = int(swapsize.split()[1])
+        if swapsize < 2097152:
+            swapsize = swapsize * 2
+        elif swapsize > 8388608 and swapsize < 67108864:
+            swapsize = swapsize * 0.5
+        elif swapsize >= 67108864:
+            swapsize = 33554432
+        swapsize = swapsize * 1024
+    deftotsize = swapsize
+    mintotsize = swapsize
+    for fs in get_image_metadata('/run/imginst/sourceimage/rootimg.sfs'):
+        allvols.append(fs)
+        deftotsize += fs['initsize']
+        mintotsize += fs['minsize']
+        if fs['initsize'] > biggestsize:
+            biggestfs = fs
+            biggestsize = fs['initsize']
+        if fs['device'].startswith('/dev/mapper'):
+            lvmvols[fs['device'].replace('/dev/mapper/', '')] = fs
+            deflvmsize += fs['initsize']
+            minlvmsize += fs['minsize']
+        else:
+            plainvols[int(re.search('(\d+)$', fs['device'])[0])] = fs
+    with open('/tmp/installdisk') as diskin:
+        instdisk = diskin.read()
+    instdisk = '/dev/' + instdisk
+    parted = PartedRunner(instdisk)
+    dinfo = parted.run('unit s print')
+    dinfo = dinfo.split('\n')
+    sectors = 0
+    sectorsize = 0
+    for inf in dinfo:
+        if inf.startswith('Disk {0}:'.format(instdisk)):
+            _, sectors = inf.split(': ')
+            sectors = int(sectors.replace('s', ''))
+        if inf.startswith('Sector size (logical/physical):'):
+            _, sectorsize = inf.split(':')
+            sectorsize = sectorsize.split('/')[0]
+            sectorsize = sectorsize.replace('B', '')
+            sectorsize = int(sectorsize)
+    # for now, only support resizing/growing the largest partition
+    minexcsize = deftotsize - biggestfs['initsize']
+    mintotsize = deftotsize - biggestfs['initsize'] + biggestfs['minsize']
+    minsectors = mintotsize // sectorsize
+    if sectors < (minsectors + 65536):
+        raise Exception('Disk too small to fit image')
+    biggestsectors = sectors - (minexcsize // sectorsize)
+    biggestsize = sectorsize * biggestsectors
+    parted.run('mklabel gpt')
+    curroffset = 2048
+    for volidx in sorted(plainvols):
+        vol = plainvols[volidx]
+        if vol is not biggestfs:
+            size = vol['initsize'] // sectorsize
+        else:
+            size = biggestsize // sectorsize
+        size += 2047 - (size % 2048)
+        end = curroffset + size
+        if end > sectors:
+            end = sectors
+        parted.run('mkpart primary {}s {}s'.format(curroffset, end))
+        vol['targetdisk'] = instdisk + '{0}'.format(volidx)
+        curroffset += size + 1
+    if not lvmvols:
+        if swapsize:
+            swapsize = swapsize // sectorsize
+            swapsize += 2047 - (size % 2048)
+            end = curroffset + swapsize
+            if end > sectors:
+                end = sectors
+            parted.run('mkpart swap {}s {}s'.format(curroffset, end))
+            subprocess.check_call(['mkswap', instdisk + '{}'.format(volidx + 1)])
+    else:
+        parted.run('mkpart lvm {}s 100%'.format(curroffset))
+        lvmpart = instdisk + '{}'.format(volidx + 1)
+        subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
+        subprocess.check_call(['vgcreate', 'localstorage', lvmpart])
+        vginfo = subprocess.check_output(['vgdisplay', 'localstorage', '--units', 'b']).decode('utf8')
+        vginfo = vginfo.split('\n')
+        pesize = 0
+        pes = 0
+        for infline in vginfo:
+            infline = infline.split()
+            if len(infline) >= 3 and infline[:2] == ['PE', 'Size']:
+                pesize = int(infline[2])
+            if len(infline) >= 5 and infline[:2] == ['Free', 'PE']:
+                pes = int(infline[4])
+        takeaway = swapsize // pesize
+        for volidx in lvmvols:
+            vol = lvmvols[volidx]
+            if vol is biggestfs:
+                continue
+            takeaway += vol['initsize'] // pesize
+            takeaway += 1
+        biggestextents = pes - takeaway
+        for volidx in lvmvols:
+            vol = lvmvols[volidx]
+            if vol is biggestfs:
+                extents = biggestextents
+            else:
+                extents = vol['initsize'] // pesize
+                extents += 1
+            if vol['mount'] == '/':
+                lvname = 'root'
+            else:
+                lvname = vol['mount'].replace('/', '_')
+            subprocess.check_call(['lvcreate', '-l', '{}'.format(extents), '-y', '-n', lvname, 'localstorage'])
+            vol['targetdisk'] = '/dev/localstorage/{}'.format(lvname)
+        if swapsize:
+            subprocess.check_call(['lvcreate', '-y', '-l', '{}'.format(swapsize // pesize), '-n', 'swap', 'localstorage'])
+            subprocess.check_call(['mkswap', '/dev/localstorage/swap'])
+        os.makedirs('/run/imginst/targ')
+        for vol in allvols:
+            with open(vol['targetdisk'], 'wb') as partition:
+                partition.write(b'\x00' * 1 * 1024 * 1024)
+            subprocess.check_call(['mkfs.{}'.format(vol['filesystem']), vol['targetdisk']])
+            subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ'])
+            source = vol['mount'].replace('/', '_')
+            source = '/run/imginst/sources/' + source
+            subprocess.check_call(['cp', '-ax', source + '/.', '/run/imginst/targ'])
+            subprocess.check_call(['umount', '/run/imginst/targ'])
+        for vol in allvols:
+            subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
+        fixup('/run/imginst/targ', allvols)
+
+
+if __name__ == '__main__':
+    install_to_disk('/run/imginst/sourceimage/rootimg.sfs')
