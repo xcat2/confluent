@@ -112,7 +112,7 @@ def install_to_disk(imgpath):
             swapsize = swapsize * 0.5
         elif swapsize >= 67108864:
             swapsize = 33554432
-        swapsize = swapsize * 1024
+        swapsize = int(swapsize * 1024)
     deftotsize = swapsize
     mintotsize = swapsize
     for fs in get_image_metadata('/run/imginst/sourceimage/rootimg.sfs'):
