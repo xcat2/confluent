@@ -28,8 +28,15 @@ memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
 mkfs.xfs /dev/zram0 > /dev/null
 mount -o discard /dev/zram0 /mnt/overlay
-mkdir -p /mnt/overlay/upper /mnt/overlay/work
-mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
+if [ ! -f /tmp/mountparts.sh ]; then
+    mkdir -p /mnt/overlay/upper /mnt/overlay/work
+    mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
+else
+    for srcmount in $(cat /tmp/mountparts.sh | awk '{print $3}'); do
+        mkdir -p /mnt/overlay${srcmount}/upper /mnt/overlay${srcmount}/work
+        mount -t overlay -o upperdir=/mnt/overlay${srcmount}/upper,workdir=/mnt/overlay${srcmount}/work,lowerdir=${srcmount} disklesspart /sysroot${srcmount#/mnt/remote}
+    done
+fi
 mkdir -p /sysroot/etc/ssh
 mkdir -p /sysroot/etc/confluent
 mkdir -p /sysroot/root/.ssh
