@@ -51,9 +51,34 @@ class PartedRunner():
         return subprocess.check_output(command).decode('utf8')
 
 def fixup(rootdir, vols):
+    devbymount = {}
+    for vol in vols:
+        devbymount[vol['mount']] = vol['targetdisk']
     fstabfile = os.path.join(rootdir, 'etc/fstab')
     with open(fstabfile) as tfile:
         fstab = tfile.read().split('\n')
+    while not fstab[0]:
+        fstab = fstab[1:]
+    with open(fstabfile, 'w') as tfile:
+        for tab in fstab:
+            entry = tab.split()
+            if tab.startswith('#ORIGFSTAB#'):
+                if entry[1] in devbymount:
+                    targetdev = devbymount[entry[1]]
+                    if targetdev.startswith('/dev/localstorage/'):
+                        entry[0] = targetdev
+                    else:
+                        uuid = subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', targetdev]).decode('utf8')
+                        uuid = uuid.strip()
+                        entry[0] = 'UUID={}'.format(uuid)
+                elif entry[2] == 'swap':
+                    entry[0] = '/dev/mapper/localstorage-swap'
+                entry[0] = entry[0].ljust(42)
+                entry[1] = entry[1].ljust(16)
+                entry[3] = entry[3].ljust(28)
+                tab = '\t'.join(entry)
+            tfile.write(tab + '\n')
+
 
 def had_swap():
     with open('/etc/fstab') as tabfile:
