@@ -1,0 +1,4 @@
+#!/bin/bash
+. /etc/confluent/functions
+run_remote_python getinstalldisk
+run_remote_parts pre.d
