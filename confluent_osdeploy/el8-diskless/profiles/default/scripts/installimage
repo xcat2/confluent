@@ -1,4 +1,32 @@
 #!/bin/bash
 . /etc/confluent/functions
-run_remote_python getinstalldisk
-run_remote_parts pre.d
+# the image will be used to deploy itself
+# provide both access to image (for parsing metadata)
+# and existing mounts of image (to take advantage of caching)
+mkdir -p /sysroot/run/imginst/sourceimage
+mount -o bind /mnt/remoteimg /sysroot/run/imginst/sourceimage
+mount -o bind /sys /sysroot/sys
+mount -o bind /dev /sysroot/dev
+if [ ! -f /tmp/mountparts.sh ]; then
+    mkdir -p /sysroot/run/imginst/sources/_
+    mount -o bind /mnt/remote /sysroot/run/imginst/sources/_
+else
+    for srcmount in $(cat /tmp/mountparts.sh | awk '{print $2}'); do
+        srcname=${srcmount#/dev/mapper/mproot}
+        srcdir=$(echo $srcmount | sed -e 's!/dev/mapper/mproot!/mnt/remote!' -e 's!_!/!g')
+        mkdir -p /sysroot/run/imginst/sources/$srcname
+        mount -o bind $srcdir /sysroot/run/imginst/sources/$srcname
+    done
+fi
+cd /sysroot/run
+chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_python getinstalldisk"
+chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_parts pre.d"
+if [ ! -f /sysroot/tmp/installdisk ]; then
+    echo 'Unable to find a suitable installation target device, ssh to port 2222 to investigate'
+    while [ ! -f /sysroot/tmp/installdisk ]; do
+        sleep 1
+    done
+fi
+lvm vgchange -a n
+chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python image2disk.py"
+
