@@ -143,6 +143,7 @@ class ConsoleHandler(object):
         #self.termstream.attach(self.buffer)
         self.livesessions = set([])
         self.utf8decoder = codecs.getincrementaldecoder('utf-8')()
+        self.pendingbytes = None
         if self._logtobuffer:
             self.logger = log.Logger(node, console=True,
                                      tenant=configmanager.tenant)
@@ -186,8 +187,15 @@ class ConsoleHandler(object):
     def feedbuffer(self, data):
         if not isinstance(data, bytes):
             data = data.encode('utf-8')
+        if self.pendingbytes is not None:
+            self.pendingbytes += data
+        self.pendingbytes = b''
         try:
             send_output(self.node, data)
+            data = self.pendingbytes
+            self.pendingbytes = None
+            if data:
+                send_output(self.node, data)
         except Exception:
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
