@@ -244,6 +244,7 @@ def get_myname():
 def handle_connection(connection, cert, request, local=False):
     global currentleader
     global retrythread
+    global initting
     connection.settimeout(5)
     operation = request['operation']
     if cert:
@@ -395,6 +396,11 @@ def handle_connection(connection, cert, request, local=False):
             tlvdata.send(connection, {'error': 'Invalid token'})
             connection.close()
             return
+        if not list(cfm.list_collective()):
+            # First enrollment of a collective, since the collective doesn't
+            # quite exist, then set initting false to let the enrollment action
+            # drive this particular initialization
+            initting = False
         myrsp = base64.b64encode(myrsp)
         fprint = util.get_fingerprint(cert)
         myfprint = util.get_fingerprint(mycert)
