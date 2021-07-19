@@ -66,31 +66,47 @@ def sanitize_shadow(shadowfile):
         newshadow += ':'.join(passent) + '\n'
     return newshadow
 
-def mask_file(filename, maskwith='/run/imgutil/captmp/empty'):
-    if os.path.exists(filename):
-        _mount_file(maskwith, filename)
+def mask_file(mdir, filename, maskwith='/run/imgutil/captmp/empty'):
+    if filename.startswith(mdir):
+        filename = filename.replace(mdir, '', 1)
+        if filename[0] == '/':
+            filename = filename[1:]
+        filename = os.path.join(mdir, filename)
+        if filename[0] == '/':
+            filename = filename[1:]
+        filename = os.path.join('/run/imgutil/capin/', filename)
+        if os.path.exists(filename):
+            secontext = os.getxattr(filename, 'security.selinux')
+            _mount_file(maskwith, filename)
+            if secontext:
+                secontext = secontext.split(b'\x00', 1)[0].decode('utf8')
+                subprocess.check_call(['chcon', secontext, maskwith])
 
 def capture_fs(args):
     fsinfo, fname = args
     _mount(fsinfo['mount'], '/run/imgutil/capin', flags=MS_BIND|MS_RDONLY)
     targdir = None
-    if fsinfo['mount'] == '/etc':
-        targdir = '/run/imgutil/capin'
-    elif fsinfo['mount'] == '/':
-        targdir = '/run/imgutil/capin/etc'
-    if targdir is not None:
-        mask_file(os.path.join(targdir, 'shadow'), '/run/imgutil/captmp/shadow')
-        mask_file(os.path.join(targdir, 'gshadow'), '/run/imgutil/captmp/gshadow')
-        mask_file(os.path.join(targdir, 'fstab'), '/run/imgutil/captmp/fstab')
-        mask_file(os.path.join(targdir, 'shadow-'))
-        mask_file(os.path.join(targdir, 'gshadow-'))
-        mask_file(os.path.join(targdir, 'hostname'))
+    mdir = fsinfo['mount']
+    mask_file(mdir, '/etc/shadow', '/run/imgutil/captmp/shadow')
+    mask_file(mdir, '/etc/gshadow', '/run/imgutil/captmp/gshadow')
+    mask_file(mdir, '/etc/fstab', '/run/imgutil/captmp/fstab')
+    mask_file(mdir, '/etc/confluent/confluent.apikey')
+    mask_file(mdir, '/etc/shadow-')
+    mask_file(mdir, '/etc/gshadow-')
+    mask_file(mdir, '/etc/hostname')
+    if '/etc'.startswith(mdir):
+        targdir = '/etc'.replace(mdir, '', 1)
+        targdir = os.path.join('/run/imgutil/capin', targdir)
         for tname in glob.glob(os.path.join(targdir, 'ssh/*key')):
             _mount_file('/run/imgutil/captmp/empty', tname)
         for tname in glob.glob(os.path.join(targdir, 'pki/tls/private/*')):
             _mount_file('/run/imgutil/captmp/empty', tname)
         if os.path.exists(os.path.join(targdir, 'sysconfig/network-scripts')):
             _mount('none', os.path.join(targdir, 'sysconfig/network-scripts'), 'tmpfs')
+    if '/root'.startswith(mdir):
+        targdir = '/root'.replace(mdir, '', 1)
+        for tname in glob.glob(os.path.join(targdir, '.ssh/id_*')):
+            _mount_file('/run/imgutil/captmp/empty, tname')
     subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
 def capture_system():

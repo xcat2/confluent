@@ -2,7 +2,10 @@
 import json
 import os
 import re
+import time
+import socket
 import struct
+import sys
 import subprocess
 
 def get_next_part_meta(img, imgsize):
@@ -78,6 +81,20 @@ def fixup(rootdir, vols):
                 entry[3] = entry[3].ljust(28)
                 tab = '\t'.join(entry)
             tfile.write(tab + '\n')
+    with open(os.path.join(rootdir, 'etc/hostname'), 'w') as nameout:
+        nameout.write(socket.gethostname())
+            #NEED: grub config, ssh (maybe in script that calls image2disk), hostname.
+    #network interfaces, /etc/shadow of root's password, efibootmgr, various failed services
+    # grub error: 
+#    error: ../../grub-core/commands/search.c:296:no such device:
+#^M7c1840f3-64e3-4fca-ae3d-aa5ae9333e32.
+#^Merror: ../../grub-core/commands/search.c:296:no such device:
+#^M7c1840f3-64e3-4fca-ae3d-aa5ae9333e32.
+#^Merror: ../../grub-core/commands/search.c:296:no such device: A278-1D2E.
+#^Merror: ../../grub-core/commands/search.c:296:no such device: A278-1D2E.
+
+
+
 
 
 def had_swap():
@@ -224,7 +241,56 @@ def install_to_disk(imgpath):
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ'])
             source = vol['mount'].replace('/', '_')
             source = '/run/imginst/sources/' + source
-            subprocess.check_call(['cp', '-ax', source + '/.', '/run/imginst/targ'])
+            blankfsstat = os.statvfs('/run/imginst/targ')
+            blankused = (blankfsstat.f_blocks - blankfsstat.f_bfree) * blankfsstat.f_bsize
+            sys.stdout.write('\nWriting {0}: '.format(vol['mount']))
+            with subprocess.Popen(['cp', '-ax', source + '/.', '/run/imginst/targ']) as copier:
+                stillrunning = copier.poll()
+                lastprogress = 0.0
+                while stillrunning is None:
+                    currfsstat = os.statvfs('/run/imginst/targ')
+                    currused = (currfsstat.f_blocks - currfsstat.f_bfree) * currfsstat.f_bsize
+                    currused -= blankused
+                    with open('/proc/meminfo') as meminf:
+                        for line in meminf.read().split('\n'):
+                            if line.startswith('Dirty:'):
+                                _, dirty, _ = line.split()
+                                dirty = int(dirty) * 1024
+                    progress = (currused - dirty) / vol['minsize']
+                    if progress < lastprogress:
+                        progress = lastprogress
+                    if progress > 0.99:
+                        progress = 0.99
+                    lastprogress = progress
+                    progress = progress * 100
+                    sys.stdout.write('\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress).ljust(70))
+                    sys.stdout.flush()
+                    time.sleep(0.5)
+                    stillrunning = copier.poll()
+                if stillrunning != 0:
+                    raise Exception("Error copying volume")
+                with subprocess.Popen(['sync']) as syncrun:
+                    stillrunning = syncrun.poll()
+                    while stillrunning is None:
+                        with open('/proc/meminfo') as meminf:
+                            for line in meminf.read().split('\n'):
+                                if line.startswith('Dirty:'):
+                                    _, dirty, _ = line.split()
+                                    dirty = int(dirty) * 1024
+                        progress = (vol['minsize'] - dirty) / vol['minsize']
+                        if progress < lastprogress:
+                            progress = lastprogress
+                        if progress > 0.99:
+                            progress = 0.99
+                        lastprogress = progress
+                        progress = progress * 100
+                        sys.stdout.write('\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress).ljust(70))
+                        sys.stdout.flush()
+                        time.sleep(0.5)
+                        stillrunning = syncrun.poll()
+                sys.stdout.write('\rDone writing {0}'.format(vol['mount']).ljust(70))
+                sys.stdout.write('\n')
+                sys.stdout.flush()
             subprocess.check_call(['umount', '/run/imginst/targ'])
         for vol in allvols:
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
