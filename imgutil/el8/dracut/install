@@ -4,7 +4,7 @@ dracut_install tpm2_create tpm2_pcrread tpm2_createpolicy tpm2_createprimary
 dracut_install tpm2_load tpm2_unseal tpm2_getcap tpm2_evictcontrol
 dracut_install tpm2_pcrextend tpm2_policypcr tpm2_flushcontext tpm2_startauthsession
 dracut_install curl openssl tar cpio gzip lsmod ethtool xz lsmod ethtool
-dracut_install modprobe touch echo cut wc bash netstat uniq grep ip hostname
+dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname expr sort
 dracut_install ssh sshd reboot parted mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
 dracut_install efibootmgr uuidgen
@@ -23,7 +23,7 @@ dracut_install losetup # multipart support
 
 #this would be nfs with lock, but not needed, go nolock
 #dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify
-dracut_install mount.nfs  /etc/netconfig
+#dracut_install mount.nfs  /etc/netconfig
 inst /usr/lib/dracut/modules.d/40network/net-lib.sh /lib/net-lib.sh
 
 

@@ -125,11 +125,6 @@ def capture_remote(opts, args):
     outdir = args[1]
     if '/' not in outdir:
         outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
-    mkdirp(os.path.join(outdir, 'boot/efi/boot'))
-    mkdirp(os.path.join(outdir, 'boot/initramfs/'))
-    profname = os.path.basename(outdir)
-    os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
-               os.path.join(outdir, 'boot/initramfs/site.cpio'))
     # need kernel, initramfs, shim, grub
     # maybe break pack_image into three, one that is common to call
     # with here locally,
@@ -139,11 +134,32 @@ def capture_remote(opts, args):
     utillib = os.path.join(utillib, 'el8/dracut/')
     subprocess.check_call(['ssh', targ, 'mkdir', '-p', '/run/imgutil/capenv'])
     subprocess.check_call(['rsync', __file__, '{0}:/run/imgutil/capenv/'.format(targ)])
+    finfo = subprocess.check_output(['ssh', targ, 'python3', '/run/imgutil/capenv/imgutil', 'getfingerprint']).decode('utf8')
+    finfo = json.loads(finfo)
+    if finfo['oscategory'] != 'el8':
+        raise Exception('Not yet supported for capture: ' + repr(finfo))
+    oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
     subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97imgutil'.format(targ)])
     subprocess.check_call(['ssh', targ, 'chmod', '755', '/usr/lib/dracut/modules.d/97imgutil/install*'])
     kernfile = subprocess.check_output(['ssh', targ, 'ls', '/boot/vmlinuz-$(uname -r)'])
     subprocess.check_call(['ssh', targ, 'dracut', '-N', '--xz', '-m', '"imgutil base terminfo"', '/run/imgutil/capout/initramfs'])
+    # prep to receive result of above
+    mkdirp(os.path.join(outdir, 'boot/efi/boot'))
+    mkdirp(os.path.join(outdir, 'boot/initramfs/'))
+    profname = os.path.basename(outdir)
+    os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
+               os.path.join(outdir, 'boot/initramfs/site.cpio'))
+    confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
+    os.symlink('{}/initramfs/addons.cpio'.format(confdir),
+            os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+    if os.path.exists('{}/profiles/default'.format(confdir)):
+            copy_tree('{}/profiles/default'.format(confdir), outdir)
+    # now we need kernel, initramfs, rootimg.sfs, grub, and shim...
+    label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
+
+
+
 
 
 
@@ -266,6 +282,11 @@ class OsHandler(object):
         self.arch = arch
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
+
+    def get_json(self):
+        info = {'oscategory': self.oscategory,
+                'version': self.version, 'arch': self.arch, 'name': self.name}
+        return json.dumps(info)
 
     def list_packages(self):
         with open(os.path.join(get_mydir(self.oscategory), 'pkglist'), 'r') as pkglist:
@@ -439,6 +460,8 @@ def main():
         build_root(opts, args[1:])
     elif args[0] == 'capture':
         capture_remote(opts, args[1:])
+    elif args[0] == 'getfingerprint':
+        print(fingerprint_host().get_json())
     elif args[0] == 'capturelocal':
         capture_system()
     elif args[0] == 'exec':
