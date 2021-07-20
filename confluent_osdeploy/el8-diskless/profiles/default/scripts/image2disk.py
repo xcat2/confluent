@@ -1,9 +1,12 @@
 #!/usr/bin/python3
+import glob
 import json
 import os
 import re
 import time
+import shutil
 import socket
+import stat
 import struct
 import sys
 import subprocess
@@ -62,6 +65,8 @@ def fixup(rootdir, vols):
         fstab = tfile.read().split('\n')
     while not fstab[0]:
         fstab = fstab[1:]
+    if os.path.exists(os.path.join(rootdir, '.autorelabel')):
+        os.unlink(os.path.join(rootdir, '.autorelabel'))
     with open(fstabfile, 'w') as tfile:
         for tab in fstab:
             entry = tab.split()
@@ -82,19 +87,84 @@ def fixup(rootdir, vols):
                 tab = '\t'.join(entry)
             tfile.write(tab + '\n')
     with open(os.path.join(rootdir, 'etc/hostname'), 'w') as nameout:
-        nameout.write(socket.gethostname())
-            #NEED: grub config, ssh (maybe in script that calls image2disk), hostname.
-    #network interfaces, /etc/shadow of root's password, efibootmgr, various failed services
-    # grub error: 
-#    error: ../../grub-core/commands/search.c:296:no such device:
-#^M7c1840f3-64e3-4fca-ae3d-aa5ae9333e32.
-#^Merror: ../../grub-core/commands/search.c:296:no such device:
-#^M7c1840f3-64e3-4fca-ae3d-aa5ae9333e32.
-#^Merror: ../../grub-core/commands/search.c:296:no such device: A278-1D2E.
-#^Merror: ../../grub-core/commands/search.c:296:no such device: A278-1D2E.
-
-
-
+        nameout.write(socket.gethostname() + '\n')
+    selinuxconfig = os.path.join(rootdir, 'etc/selinux/config')
+    policy = None
+    if os.path.exists(selinuxconfig):
+        with open(selinuxconfig) as cfgin:
+            sec = cfgin.read().split('\n')
+            for l in sec:
+                l = l.split('#', 1)[0]
+                if l.startswith('SELINUXTYPE='):
+                    _, policy = l.split('=')
+    for sshkey in glob.glob(os.path.join(rootdir, 'etc/ssh/*_key*')):
+        os.unlink(sshkey)
+    for sshkey in glob.glob('/etc/ssh/*_key*'):
+        newkey = os.path.join(rootdir, sshkey[1:])
+        shutil.copy2(sshkey, newkey)
+        finfo = os.stat(sshkey)
+        os.chown(newkey, finfo[stat.ST_UID], finfo[stat.ST_GID])
+    for ifcfg in glob.glob(os.path.join(rootdir, 'etc/sysconfig/network-scripts/*')):
+        os.unlink(ifcfg)
+    for ifcfg in glob.glob(os.path.join(rootdir, 'etc/NetworkManager/system-connections/*')):
+        os.unlink(ifcfg)
+    for ifcfg in glob.glob('/run/NetworkManager/system-connections/*'):
+        newcfg = ifcfg.split('/')[-1]
+        newcfg = os.path.join(rootdir, 'etc/NetworkManager/system-connections/{0}'.format(newcfg))
+        shutil.copy2(ifcfg, newcfg)
+    if policy:
+        sys.stdout.write('Applying SELinux labeling...')
+        sys.stdout.flush()
+        subprocess.check_call(['setfiles', '-r', rootdir, os.path.join(rootdir, 'etc/selinux/{}/contexts/files/file_contexts'.format(policy)), rootdir])
+        sys.stdout.write('Done\n')
+        sys.stdout.flush()
+    for metafs in ('proc', 'sys', 'dev'):
+        subprocess.check_call(['mount', '-o', 'bind', '/{}'.format(metafs), os.path.join(rootdir, metafs)])
+    with open(os.path.join(rootdir, 'etc/sysconfig/grub')) as defgrubin:
+        defgrub = defgrubin.read().split('\n')
+    with open(os.path.join(rootdir, 'etc/sysconfig/grub'), 'w') as defgrubout:
+        for gline in defgrub:
+            gline = gline.split()
+            newline = []
+            for ent in gline:
+                if ent.startswith('resume=') or ent.startswith('rd.lvm.lv'):
+                    continue
+                newline.append(ent)
+            defgrubout.write(' '.join(newline) + '\n')
+    grubcfg = subprocess.check_output(['find', rootdir, '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/')
+    subprocess.check_call(['chroot', rootdir, 'grub2-mkconfig', '-o', grubcfg])
+    newroot = None
+    with open('/etc/shadow') as shadowin:
+        shents = shadowin.read().split('\n')
+        for shent in shents:
+            shent = shent.split(':')
+            if not shent:
+                continue
+            if shent[0] == 'root' and shent[1] not in ('*', '!!', ''):
+                newroot = shent[1]
+    if newroot:
+        shlines = None
+        with open(os.path.join(rootdir, 'etc/shadow')) as oshadow:
+            shlines = oshadow.read().split('\n')
+        with open(os.path.join(rootdir, 'etc/shadow'), 'w') as oshadow:
+            for line in shlines:
+                if line.startswith('root:'):
+                    line = line.split(':')
+                    line[1] = newroot
+                    line = ':'.join(line)
+                oshadow.write(line + '\n')
+    partnum = None
+    targblock = None
+    for vol in vols:
+        if vol['mount'] == '/boot/efi':
+            targdev = vol['targetdisk']
+            partnum = re.search('(\d+)$', targdev).group(1)
+            targblock = re.search('(.*)\d+$', targdev).group(1)
+    if targblock:
+        shimpath = subprocess.check_output(['find', os.path.join(rootdir, 'boot/efi'), '-name', 'shimx64.efi']).decode('utf8').strip()
+        shimpath = shimpath.replace(rootdir, '/').replace('/boot/efi', '').replace('//', '/').replace('/', '\\')
+        subprocess.check_call(['efibootmgr', '-c', '-d', targblock, '-l', shimpath, '--part', partnum])
+    #other network interfaces
 
 
 def had_swap():
@@ -263,7 +333,7 @@ def install_to_disk(imgpath):
                         progress = 0.99
                     lastprogress = progress
                     progress = progress * 100
-                    sys.stdout.write('\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress).ljust(70))
+                    sys.stdout.write('\x1b[1K\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress))
                     sys.stdout.flush()
                     time.sleep(0.5)
                     stillrunning = copier.poll()
@@ -284,11 +354,11 @@ def install_to_disk(imgpath):
                             progress = 0.99
                         lastprogress = progress
                         progress = progress * 100
-                        sys.stdout.write('\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress).ljust(70))
+                        sys.stdout.write('\x1b[1K\rWriting {0}: {1:3.2f}%'.format(vol['mount'], progress))
                         sys.stdout.flush()
                         time.sleep(0.5)
                         stillrunning = syncrun.poll()
-                sys.stdout.write('\rDone writing {0}'.format(vol['mount']).ljust(70))
+                sys.stdout.write('\x1b[1K\rDone writing {0}'.format(vol['mount']))
                 sys.stdout.write('\n')
                 sys.stdout.flush()
             subprocess.check_call(['umount', '/run/imginst/targ'])
