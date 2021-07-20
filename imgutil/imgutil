@@ -120,6 +120,35 @@ def capture_fs(args):
         masker.mask('/root/.ssh/id_*')
         subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
+def capture_remote(opts, args):
+    targ = args[0]
+    outdir = args[1]
+    if '/' not in outdir:
+        outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
+    mkdirp(os.path.join(outdir, 'boot/efi/boot'))
+    mkdirp(os.path.join(outdir, 'boot/initramfs/'))
+    profname = os.path.basename(outdir)
+    os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
+               os.path.join(outdir, 'boot/initramfs/site.cpio'))
+    # need kernel, initramfs, shim, grub
+    # maybe break pack_image into three, one that is common to call
+    # with here locally,
+    # another that is remotely called to gather target profile info
+    # and a third that is exclusive to pack_image for diskless mode
+    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
+    utillib = os.path.join(utillib, 'el8/dracut/')
+    subprocess.check_call(['ssh', targ, 'mkdir', '-p', '/run/imgutil/capenv'])
+    subprocess.check_call(['rsync', __file__, '{0}:/run/imgutil/capenv/'.format(targ)])
+    subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
+    subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97imgutil'.format(targ)])
+    subprocess.check_call(['ssh', targ, 'chmod', '755', '/usr/lib/dracut/modules.d/97imgutil/install*'])
+    kernfile = subprocess.check_output(['ssh', targ, 'ls', '/boot/vmlinuz-$(uname -r)'])
+    subprocess.check_call(['ssh', targ, 'dracut', '-N', '--xz', '-m', '"imgutil base terminfo"', '/run/imgutil/capout/initramfs'])
+
+
+
+
+
 def capture_system():
     mkdirp('/run/imgutil/capout')
     _mount('none', '/run/imgutil/capout', 'tmpfs')
@@ -409,6 +438,8 @@ def main():
     if args[0] == 'build':
         build_root(opts, args[1:])
     elif args[0] == 'capture':
+        capture_remote(opts, args[1:])
+    elif args[0] == 'capturelocal':
         capture_system()
     elif args[0] == 'exec':
         exec_root(opts, args[1:])
