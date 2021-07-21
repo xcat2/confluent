@@ -19,7 +19,10 @@ mkdir -p /opt/confluent/bin
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
 chmod +x /opt/confluent/bin/firstboot.sh
 systemctl enable firstboot
-
+selinuxpolicy=$(grep ^SELINUXTYPE /etc/selinux/config |awk -F= '{print $2}')
+if [ ! -z "$selinuxpolicy" ]; then
+    setfiles /etc/selinux/${selinuxpolicy}/contexts/files/file_contexts /etc/
+fi
 run_remote post.custom
 # post scripts may be placed into post.d, e.g. post.d/01-firstaction.sh, post.d/02-secondaction.sh
 run_remote_parts post.d
