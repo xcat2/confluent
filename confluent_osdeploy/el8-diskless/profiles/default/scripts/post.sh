@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # This script is executed 'chrooted' into a cloned disk target before rebooting
-# 
+#
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
@@ -18,6 +18,7 @@ curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/fi
 mkdir -p /opt/confluent/bin
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
 chmod +x /opt/confluent/bin/firstboot.sh
+systemctl enable firstboot
 
 run_remote post.custom
 # post scripts may be placed into post.d, e.g. post.d/01-firstaction.sh, post.d/02-secondaction.sh
