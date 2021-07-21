@@ -170,8 +170,12 @@ def capture_remote(opts, args):
     if os.path.exists('{}/profiles/default'.format(confdir)):
             copy_tree('{}/profiles/default'.format(confdir), outdir)
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
+    with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
+        profileout.write('label: {}\n'.format(label))
+        profileout.write('kernelargs: quiet installtodisk # remove installtodisk to boot stateless')
     subprocess.check_call(['chmod', 'o+r,go-w', '-R', outdir])
     subprocess.check_call(['chown', '-R', 'confluent', outdir])
+    subprocess.check_call(['osdeploy', 'updateboot', profname])
 
 
 def capture_system():
