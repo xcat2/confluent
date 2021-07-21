@@ -509,6 +509,8 @@ class IpmiHandler(object):
             return self.handle_hostname()
         elif self.element[1:3] == ['management_controller', 'domain_name']:
             return self.handle_domain_name()
+        elif self.element[1:3] == ['management_controller', 'location']:
+            return self.handle_location_config()
         elif self.element[1:3] == ['management_controller', 'ntp']:
             return self.handle_ntp()
         elif self.element[1:4] == ['management_controller', 'extended', 'all']:
@@ -1275,6 +1277,10 @@ class IpmiHandler(object):
             dn = self.inputdata.domain_name(self.node)
             self.ipmicmd.set_domain_name(dn)
             return
+
+    def handle_location_config(self):
+        if 'read' == self.op:
+            lc = self.ipmicmd.get_location_information()
 
     def handle_bmcconfig(self, advanced=False):
         if 'read' == self.op:

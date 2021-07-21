@@ -266,6 +266,10 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
+                'location': PluginRoute({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
                 'ntp': {
                     'enabled': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
