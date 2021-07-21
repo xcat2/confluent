@@ -34,4 +34,6 @@ lvm vgchange -a n
 udevadm control -e
 chroot /sysroot /usr/lib/systemd/systemd-udevd --daemon
 chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python image2disk.py"
+chroot /sysroot/run/imginst/targ bash -c "source /etc/confluent/functions; run_remote post.sh"
+chroot /sysroot bash -c "umount \$(tac /proc/mounts|awk '{print \$2}'|grep ^/run/imginst/targ)"
 

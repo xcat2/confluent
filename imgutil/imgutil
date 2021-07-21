@@ -120,6 +120,20 @@ def capture_fs(args):
         masker.mask('/root/.ssh/id_*')
         subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
+def capture_local_cleanup():
+    shutil.rmtree('/usr/lib/dracut/modules.d/97confluent')
+    subprocess.check_call(['umount', '/run/imgutil/capout'])
+
+def build_boot_tree(targpath):
+    for dscript in glob.glob('/usr/lib/dracut/modules.d/97confluent/install*'):
+        os.chmod(dscript, 0o755)
+    kver = os.uname().release
+    mkdirp(os.path.join(targpath, 'boot/initramfs/'))
+    subprocess.check_call(['dracut', '-N', '--xz', '-m', 'confluent base terminfo', os.path.join(targpath, 'boot/initramfs/distribution')])
+    shutil.copy2('/boot/vmlinuz-{}'.format(kver), os.path.join(targpath, 'boot/kernel'))
+    gather_bootloader(targpath)
+
+
 def capture_remote(opts, args):
     targ = args[0]
     outdir = args[1]
@@ -140,13 +154,12 @@ def capture_remote(opts, args):
         raise Exception('Not yet supported for capture: ' + repr(finfo))
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
-    subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97imgutil'.format(targ)])
-    subprocess.check_call(['ssh', targ, 'chmod', '755', '/usr/lib/dracut/modules.d/97imgutil/install*'])
-    kernfile = subprocess.check_output(['ssh', targ, 'ls', '/boot/vmlinuz-$(uname -r)'])
-    subprocess.check_call(['ssh', targ, 'dracut', '-N', '--xz', '-m', '"imgutil base terminfo"', '/run/imgutil/capout/initramfs'])
-    # prep to receive result of above
-    mkdirp(os.path.join(outdir, 'boot/efi/boot'))
-    mkdirp(os.path.join(outdir, 'boot/initramfs/'))
+    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
+    utillib = os.path.join(utillib, '{}/dracut/'.format(oscat))
+    subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97confluent'.format(targ)])
+    subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalboot'])
+    subprocess.check_call(['rsync', '-a', '{0}:/run/imgutil/capout/'.format(targ), outdir])
+    subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalcleanup'])
     profname = os.path.basename(outdir)
     os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
                os.path.join(outdir, 'boot/initramfs/site.cpio'))
@@ -155,7 +168,6 @@ def capture_remote(opts, args):
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
     if os.path.exists('{}/profiles/default'.format(confdir)):
             copy_tree('{}/profiles/default'.format(confdir), outdir)
-    # now we need kernel, initramfs, rootimg.sfs, grub, and shim...
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
 
 
@@ -198,6 +210,7 @@ def capture_system_back(args):
     with open('/run/imgutil/captmp/empty', 'w') as shadowout:
         pass
     i = 0
+    todelete = []
     with open('/run/imgutil/capout/rootimg.sfs', 'wb') as outimg:
         # Signature
         outimg.write(b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1CONFLUENT_IMAGE')
@@ -210,11 +223,13 @@ def capture_system_back(args):
             fname = os.path.join('/run/imgutil/capout', fname)
             run_constrained(capture_fs, (fs, fname))
             isize = os.stat(fname + '.sfs').st_size
+            todelete.append(fname + '.sfs')
             outimg.write(struct.pack('!H', len(fs['mount'].encode('utf8'))))
             outimg.write(fs['mount'].encode('utf8'))
             fs['compressed_size'] = isize
             with open(fname + '.json', 'w') as fsinfout:
                 fsinfout.write(json.dumps(fs))
+            todelete.append(fname + '.json')
             jsize = os.stat(fname + '.json').st_size
             outimg.write(struct.pack('!I', jsize))
             with open(fname + '.json','rb') as fsinfoin:
@@ -241,6 +256,8 @@ def capture_system_back(args):
             pad = 4096 - (outimg.tell() % 4096)
             if pad < 4096:
                 outimg.write(b'\x00' * pad)
+    for fname in todelete:
+        os.remove(fname)
 
 
 def create_yumconf(sourcedir):
@@ -464,6 +481,10 @@ def main():
         print(fingerprint_host().get_json())
     elif args[0] == 'capturelocal':
         capture_system()
+    elif args[0] == 'capturelocalboot':
+        build_boot_tree('/run/imgutil/capout')
+    elif args[0] == 'capturelocalcleanup':
+        capture_local_cleanup()
     elif args[0] == 'exec':
         exec_root(opts, args[1:])
     elif args[0] == 'pack':
@@ -702,19 +723,7 @@ def pack_image(opts, args):
         os.path.join(outdir, 'boot/initramfs/site.cpio'))
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
-    shimlocation = os.path.join(args[0], 'boot/efi/EFI/BOOT/BOOTX64.EFI')
-    if not os.path.exists(shimlocation):
-        shimlocation = os.path.join(args[0], 'usr/lib64/efi/shim.efi')
-    shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
-    grubbin = None
-    for candidate in glob.glob(os.path.join(args[0], 'boot/efi/EFI/*')):
-        if 'BOOT' not in candidate:
-            grubbin = os.path.join(candidate, 'grubx64.efi')
-            break
-    if not grubbin:
-        grubbin = os.path.join(args[0], 'usr/lib64/efi/grub.efi')
-    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
-    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
+    gather_bootloader(outdir, args[0])
     subprocess.check_call(['mksquashfs', args[0],
                            os.path.join(outdir, 'rootimg.sfs'), '-comp', 'xz'])
     oshandler = fingerprint_host(args[0])
@@ -744,6 +753,22 @@ def pack_image(opts, args):
             subprocess.check_call(['osdeploy', 'updateboot', profname])
     except KeyError:
         pass
+
+def gather_bootloader(outdir, rootpath='/'):
+    shimlocation = os.path.join(rootpath, 'boot/efi/EFI/BOOT/BOOTX64.EFI')
+    if not os.path.exists(shimlocation):
+        shimlocation = os.path.join(rootpath, 'usr/lib64/efi/shim.efi')
+    mkdirp(os.path.join(outdir, 'boot/efi/boot'))
+    shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
+    grubbin = None
+    for candidate in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*')):
+        if 'BOOT' not in candidate:
+            grubbin = os.path.join(candidate, 'grubx64.efi')
+            break
+    if not grubbin:
+        grubbin = os.path.join(rootpath, 'usr/lib64/efi/grub.efi')
+    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
+    shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
 
 
 

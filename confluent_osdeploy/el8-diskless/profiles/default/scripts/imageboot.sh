@@ -101,4 +101,9 @@ curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/o
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+if grep installtodisk /proc/cmdline > /dev/null; then
+    . /etc/confluent/functions
+    run_remote installimage
+    exec reboot -f
+fi
 exec /opt/confluent/bin/start_root

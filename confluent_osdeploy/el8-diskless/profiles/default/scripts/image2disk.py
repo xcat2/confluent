@@ -112,6 +112,8 @@ def fixup(rootdir, vols):
         newcfg = ifcfg.split('/')[-1]
         newcfg = os.path.join(rootdir, 'etc/NetworkManager/system-connections/{0}'.format(newcfg))
         shutil.copy2(ifcfg, newcfg)
+    shutil.rmtree(os.path.join(rootdir, 'etc/confluent/'))
+    shutil.copytree('/etc/confluent', os.path.join(rootdir, 'etc/confluent'))
     if policy:
         sys.stdout.write('Applying SELinux labeling...')
         sys.stdout.flush()
