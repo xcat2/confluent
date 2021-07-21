@@ -173,7 +173,7 @@ def capture_remote(opts, args):
     with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
         profileout.write('label: {}\n'.format(label))
         profileout.write('kernelargs: quiet installtodisk # remove installtodisk to boot stateless')
-    subprocess.check_call(['chmod', 'o+r,go-w', '-R', outdir])
+    subprocess.check_call(['chmod', 'o+r,go-w,a-t', '-R', outdir])
     subprocess.check_call(['chown', '-R', 'confluent', outdir])
     subprocess.check_call(['osdeploy', 'updateboot', profname])
 
