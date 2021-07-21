@@ -117,7 +117,8 @@ def fixup(rootdir, vols):
     if policy:
         sys.stdout.write('Applying SELinux labeling...')
         sys.stdout.flush()
-        subprocess.check_call(['setfiles', '-r', rootdir, os.path.join(rootdir, 'etc/selinux/{}/contexts/files/file_contexts'.format(policy)), rootdir])
+        subprocess.check_call(['setfiles', '-r', rootdir, os.path.join(rootdir, 'etc/selinux/{}/contexts/files/file_contexts'.format(policy)), os.path.join(rootdir, 'etc')])
+        subprocess.check_call(['setfiles', '-r', rootdir, os.path.join(rootdir, 'etc/selinux/{}/contexts/files/file_contexts'.format(policy)), os.path.join(rootdir, 'opt')])
         sys.stdout.write('Done\n')
         sys.stdout.flush()
     for metafs in ('proc', 'sys', 'dev'):
