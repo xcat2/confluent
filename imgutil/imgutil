@@ -137,6 +137,7 @@ def build_boot_tree(targpath):
 def capture_remote(opts, args):
     targ = args[0]
     outdir = args[1]
+    os.umask(0o022)
     if '/' not in outdir:
         outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
     # need kernel, initramfs, shim, grub
@@ -169,12 +170,8 @@ def capture_remote(opts, args):
     if os.path.exists('{}/profiles/default'.format(confdir)):
             copy_tree('{}/profiles/default'.format(confdir), outdir)
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
-
-
-
-
-
-
+    subprocess.check_call(['chmod', 'o+r,go-w', '-R', outdir])
+    subprocess.check_call(['chown', '-R', 'confluent', outdir])
 
 
 def capture_system():
@@ -769,8 +766,6 @@ def gather_bootloader(outdir, rootpath='/'):
         grubbin = os.path.join(rootpath, 'usr/lib64/efi/grub.efi')
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
-
-
 
 
 if __name__ == '__main__':
