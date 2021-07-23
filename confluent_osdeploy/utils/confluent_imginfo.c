@@ -60,11 +60,23 @@ int main(int argc, char* argv[]) {
         printf("Format: squashfs\n");
         exit(0);
     }
-    if (memcmp(buffer, "\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1", 16) != 0) {
-        fprintf(stderr, "Unrecognized image format\n");
-        exit(1);
+    if (memcmp(buffer, "\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1", 16) == 0) {
+        printf("Format: confluent_multisquash\nminsize\tdefsize\toffset\tsize\tfstype\torigdev\tmount\n");
+        fread(buffer, 1, 1, img);
+        fseek(img, buffer[0], SEEK_CUR);
+        while (read_part(img, imgsize));
+        exit(0);
     }
-    printf("Format: confluent_multisquash\nminsize\tdefsize\toffset\tsize\tfstype\torigdev\tmount\n");
-    fseek(img, 31, SEEK_SET);
-    while (read_part(img, imgsize));
+    if (memcmp(buffer, "\xaa\xd5\x0f\x7e\x5d\xfb\x4b\x7c\xa1\x2a\xf4\x0b\x6d\x94\xf7\xfc", 16) == 0) {
+        fread(buffer, 1, 1, img);
+        fseek(img, buffer[0], SEEK_CUR);
+        fread(buffer, 1, 1, img);
+        if (buffer[0] == 0) {
+            printf("Format: confluent_crypted\n");
+            exit(0);
+        }
+    }
+    fprintf(stderr, "Unrecognized image format\n");
+    exit(1);
+
 }

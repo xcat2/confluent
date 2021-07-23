@@ -324,6 +324,27 @@ def handle_request(env, start_response):
         else:
             start_response('200 OK', ())
             yield ''
+    elif env['PATH_INFO'].startswith('/self/profileprivate/pending/'):
+        fname = env['PATH_INFO'].replace('/self/profileprivate/', '')
+        deployinfo = cfg.get_node_attributes(
+        nodename, ('deployment.*',))
+        deployinfo = deployinfo.get(nodename, {})
+        profile = deployinfo.get(
+            'deployment.pendingprofile', {}).get('value', '')
+        if not profile:
+            start_response('400 No pending profile', ())
+            yield 'No profile'
+            return
+        fname = '/var/lib/confluent/private/os/{}/{}'.format(profile, fname)
+        try:
+            with open(fname, 'rb') as privdata:
+                start_response('200 OK', ())
+                yield privdata.read()
+                return
+        except IOError:
+            start_response('404 Not Found', ())
+            yield 'Not found'
+            return
     else:
         start_response('404 Not Found', ())
         yield 'Not found'

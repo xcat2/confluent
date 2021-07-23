@@ -212,9 +212,9 @@ def capture_system_back(args):
         pass
     i = 0
     todelete = []
-    with open('/run/imgutil/capout/rootimg.sfs', 'wb') as outimg:
+    with open('/run/imgutil/capout/rootimg.sfs.plain', 'wb') as outimg:
         # Signature
-        outimg.write(b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1CONFLUENT_IMAGE')
+        outimg.write(b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1\x0fCONFLUENT_IMAGE')
         for fs in get_partition_info():
             fname = '{0:03d}'.format(i)  + fs['mount']
             i += 1
@@ -259,6 +259,30 @@ def capture_system_back(args):
                 outimg.write(b'\x00' * pad)
     for fname in todelete:
         os.remove(fname)
+    imgsize = os.stat('/run/imgutil/capout/rootimg.sfs.plain').st_size
+    with open('/run/imgutil/capout/rootimg.sfs', 'wb') as outimg:
+        outimg.write(b'\xaa\xd5\x0f\x7e\x5d\xfb\x4b\x7c\xa1\x2a\xf4\x0b\x6d\x94\xf7\xfc\x14CONFLUENT_CRYPTIMAGE')
+        outimg.seek(imgsize + 4095)
+        outimg.write(b'\x00')
+    dmname = os.path.basename(tempfile.mktemp())
+    key = os.urandom(32).hex()
+    neededblocks = imgsize // 512
+    if imgsize % 512:
+        neededblocks += 1
+    loopdev = subprocess.check_output(['losetup', '-f']).decode('utf8').strip()
+    subprocess.check_call(['losetup', loopdev, '/run/imgutil/capout/rootimg.sfs'])
+    subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 4096'.format(neededblocks, key, loopdev)])
+    with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
+        with open('/run/imgutil/capout/rootimg.sfs.plain', 'rb') as plainin:
+            chunk = plainin.read(65536)
+            while chunk:
+                cryptout.write(chunk)
+                chunk = plainin.read(65536)
+    os.remove('/run/imgutil/capout/rootimg.sfs.plain')
+    with open('/run/imgutil/private.key', 'w') as keyout:
+        keyout.write('aes-xts-plain64\n')
+        keyout.write(key + '\n')
+
 
 
 def create_yumconf(sourcedir):
