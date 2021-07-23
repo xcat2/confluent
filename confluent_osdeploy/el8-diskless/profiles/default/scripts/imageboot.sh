@@ -12,11 +12,11 @@ loopdev=$(losetup -f)
 mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
 if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
-    curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self//profileprivate/pending/rootimg.key' > /tmp/rootimg.key
+    curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key
     cipher=$(head -n 1 /tmp/rootimg.key)
-    key=$(head -n 1 /tmp/rootimg.key)
-    len=$(stat -c %s /mnt/remoteimg/rootimg.sfs)
-    len=$(((i-4096)/512))
+    key=$(tail -n 1 /tmp/rootimg.key)
+    len=$(wc -c /mnt/remoteimg/rootimg.sfs | awk '{print $1}')
+    len=$(((len-4096)/512))
     dmsetup create cryptimg --table "0 $len crypt $cipher $key 0 $loopdev 8"
     /opt/confluent/bin/confluent_imginfo /dev/mapper/cryptimg > /tmp/rootimg.info
     mntsrc=/dev/mapper/cryptimg
