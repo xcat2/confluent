@@ -164,7 +164,10 @@ def capture_remote(opts, args):
     sys.stdout.write('Transferring image...')
     sys.stdout.flush()
     subprocess.check_call(['rsync', '-a', '{0}:/run/imgutil/capout/'.format(targ), outdir])
+    oum = os.umask(0o077)
+    mkdirp(os.path.join(privdir, 'pending'))
     subprocess.check_call(['rsync', '-a', '{0}:/run/imgutil/private.key'.format(targ), '{}/pending/rootimg.key'.format(privdir)])
+    os.umask(oum)
     sys.stdout.write('Done\n')
     sys.stdout.flush()
     subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalcleanup'])
@@ -291,8 +294,10 @@ def encrypt_image(plainfile, cryptfile, keyfile):
             while chunk:
                 cryptout.write(chunk)
                 chunk = plainin.read(65536)
+    oum = os.umask(0o077)
     with open(keyfile, 'w') as keyout:
-        keyout.write(key)
+        keyout.write('aes-xts-plain64\n{}\n'.format(key))
+    os.umask(oum)
 
 
 
@@ -753,6 +758,7 @@ def pack_image(opts, args):
     initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args[0], 'boot/initrd-{0}'.format(mostrecent))
+    mkdirp(os.path.join(privdir, 'pending/'))
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     mkdirp(os.path.join(outdir, 'boot/initramfs'))
     profname = os.path.basename(outdir)
