@@ -140,8 +140,8 @@ def capture_remote(opts, args):
     os.umask(0o022)
     if '/' in outdir:
         raise Exception('Full path not supported, supply only the profile name')
-    outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
+    outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
     # need kernel, initramfs, shim, grub
     # maybe break pack_image into three, one that is common to call
     # with here locally,
@@ -266,8 +266,14 @@ def capture_system_back(args):
                 outimg.write(b'\x00' * pad)
     for fname in todelete:
         os.remove(fname)
-    imgsize = os.stat('/run/imgutil/capout/rootimg.sfs.plain').st_size
-    with open('/run/imgutil/capout/rootimg.sfs', 'wb') as outimg:
+    plainfile = '/run/imgutil/capout/rootimg.sfs.plain'
+    cryptfile = '/run/imgutil/capout/rootimg.sfs'
+    encrypt_image(plainfile, cryptfile, '/run/imgutil/private.key')
+    os.remove(plainfile)
+
+def encrypt_image(plainfile, cryptfile, keyfile):
+    imgsize = os.stat(plainfile).st_size
+    with open(cryptfile, 'wb') as outimg:
         outimg.write(b'\xaa\xd5\x0f\x7e\x5d\xfb\x4b\x7c\xa1\x2a\xf4\x0b\x6d\x94\xf7\xfc\x14CONFLUENT_CRYPTIMAGE')
         outimg.seek(imgsize + 4095)
         outimg.write(b'\x00')
@@ -277,18 +283,16 @@ def capture_system_back(args):
     if imgsize % 512:
         neededblocks += 1
     loopdev = subprocess.check_output(['losetup', '-f']).decode('utf8').strip()
-    subprocess.check_call(['losetup', loopdev, '/run/imgutil/capout/rootimg.sfs'])
+    subprocess.check_call(['losetup', loopdev, cryptfile])
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 4096'.format(neededblocks, key, loopdev)])
     with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
-        with open('/run/imgutil/capout/rootimg.sfs.plain', 'rb') as plainin:
+        with open(plainfile, 'rb') as plainin:
             chunk = plainin.read(65536)
             while chunk:
                 cryptout.write(chunk)
                 chunk = plainin.read(65536)
-    os.remove('/run/imgutil/capout/rootimg.sfs.plain')
-    with open('/run/imgutil/private.key', 'w') as keyout:
-        keyout.write('aes-xts-plain64\n')
-        keyout.write(key + '\n')
+    with open(keyfile, 'w') as keyout:
+        keyout.write(key)
 
 
 
@@ -735,8 +739,10 @@ def build_root(opts, args):
 
 def pack_image(opts, args):
     outdir = args[1]
-    if '/' not in outdir:
-        outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
+    if '/' in outdir:
+        raise Exception('Full path not supported, supply only the profile name')
+    privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
+    outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
     kerns = glob.glob(os.path.join(args[0], 'boot/vmlinuz-*'))
     kvermap = {}
     for kern in kerns:
@@ -756,8 +762,11 @@ def pack_image(opts, args):
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
     gather_bootloader(outdir, args[0])
+    tmploc = tempfile.mktemp()
     subprocess.check_call(['mksquashfs', args[0],
-                           os.path.join(outdir, 'rootimg.sfs'), '-comp', 'xz'])
+                           tmploc, '-comp', 'xz'])
+    encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
+    os.remove(tmploc)
     oshandler = fingerprint_host(args[0])
     tryupdate = False
     if oshandler:
