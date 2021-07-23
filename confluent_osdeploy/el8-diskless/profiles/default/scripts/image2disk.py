@@ -32,7 +32,9 @@ def get_next_part_meta(img, imgsize):
 def get_multipart_image_meta(img):
     img.seek(0, 2)
     imgsize = img.tell()
-    img.seek(31)
+    img.seek(16)
+    seekamt = img.read(1)
+    img.seek(struct.unpack('B', seekamt)[0], 1)
     partinfo = get_next_part_meta(img, imgsize)
     while partinfo:
         yield partinfo
@@ -205,7 +207,7 @@ def install_to_disk(imgpath):
         swapsize = int(swapsize * 1024)
     deftotsize = swapsize
     mintotsize = swapsize
-    for fs in get_image_metadata('/run/imginst/sourceimage/rootimg.sfs'):
+    for fs in get_image_metadata(imgpath):
         allvols.append(fs)
         deftotsize += fs['initsize']
         mintotsize += fs['minsize']
@@ -371,4 +373,4 @@ def install_to_disk(imgpath):
 
 
 if __name__ == '__main__':
-    install_to_disk('/run/imginst/sourceimage/rootimg.sfs')
+    install_to_disk(os.environ['mountsrc'])

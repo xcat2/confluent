@@ -9,7 +9,7 @@ else
 fi
 /opt/confluent/bin/confluent_imginfo /mnt/remoteimg/rootimg.sfs > /tmp/rootimg.info
 loopdev=$(losetup -f)
-mountsrc=$loopdev
+export mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
 if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
     curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key
@@ -19,13 +19,12 @@ if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
     len=$(((len-4096)/512))
     dmsetup create cryptimg --table "0 $len crypt $cipher $key 0 $loopdev 8"
     /opt/confluent/bin/confluent_imginfo /dev/mapper/cryptimg > /tmp/rootimg.info
-    mntsrc=/dev/mapper/cryptimg
+    mountsrc=/dev/mapper/cryptimg
 fi
 
 if grep '^Format: squashfs' /tmp/rootimg.info > /dev/null; then
     mount -o ro $mountsrc /mnt/remote
 elif grep  '^Format: confluent_multisquash' /tmp/rootimg.info; then
-    tail -n +3 /tmp/rootimg.info  | awk '{print 0 " " $4 " '$mountsrc' " $3 " " $7}'
     tail -n +3 /tmp/rootimg.info  | awk '{gsub("/", "_"); print "echo 0 " $4 " linear '$mountsrc' " $3 " | dmsetup create mproot" $7}' > /tmp/setupmount.sh
     . /tmp/setupmount.sh
     cat /tmp/setupmount.sh |awk '{printf "mount /dev/mapper/"$NF" "; sub("mproot", ""); gsub("_", "/"); print "/mnt/remote"$NF}' > /tmp/mountparts.sh

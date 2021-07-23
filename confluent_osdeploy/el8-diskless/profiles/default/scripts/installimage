@@ -7,8 +7,7 @@ mount -o bind /sys /sysroot/sys
 mount -o bind /dev /sysroot/dev
 mount -o bind /proc /sysroot/proc
 mount -o bind /run /sysroot/run
-mkdir -p /sysroot/run/imginst/sourceimage
-mount -o bind /mnt/remoteimg /sysroot/run/imginst/sourceimage
+
 
 if [ ! -f /tmp/mountparts.sh ]; then
     mkdir -p /sysroot/run/imginst/sources/_
