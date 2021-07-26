@@ -160,18 +160,26 @@ _confluent_imgutil_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 2 ]; then
-        COMPREPLY=($(compgen -W "build exec pack" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "build exec pack capture" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     elif [ ${CMPARGS[1]} == 'build' ]; then
         COMPREPLY=($(compgen -W "-s $(ls /var/lib/confluent/distributions)" -- ${COMP_WORDS[COMP_CWORD]}))
-	return
+	    return
     elif [ ${CMPARGS[1]} == 'pack' ]; then
-        compopt -o dirnames
+        if [ $NUMARGS == 3 ]; then
+            compopt -o dirnames
+        fi
         COMPREPLY=()
+        return
+    elif [ ${CMPARGS[1]} == 'capture' ]; then
+        if [ $NUMARGS == 3 ]; then
+            _confluent_nn_completion
+            return
+        fi
         return
     elif [ ${CMPARGS[1]} == 'exec' ]; then
         compopt -o dirnames
-	COMPREPLY=($(compgen -W "-v" -- ${COMP_WORDS[COMP_CWORD]}))
+	    COMPREPLY=($(compgen -W "-v" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     fi
 }
@@ -257,9 +265,6 @@ _confluent_nodeattrib_completion()
 _confluent_nn_completion()
 {
     _confluent_get_args
-    if [ $NUMARGS -gt 2 ]; then
-        return;
-    fi
     INPUT=${COMP_WORDS[COMP_CWORD]}
     INPUT=${INPUT##*,-}
     INPUT=${INPUT##*,}
