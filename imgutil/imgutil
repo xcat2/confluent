@@ -453,23 +453,36 @@ class ElHandler(OsHandler):
         subprocess.check_call(['yum'] + self.yumargs)
 
 
-def naturalize_string(key):
+def versionize_string(key):
     """Analyzes string in a human way to enable natural sort
 
     :param nodename: The node name to analyze
     :returns: A structure that can be consumed by 'sorted'
     """
-    return [int(text) if text.isdigit() else text.lower()
-            for text in re.split(numregex, key)]
+    versionlist = []
+    patchlist = []
+    addto = versionlist
+    for part in re.split(numregex, key):
+        if part in ('', '.'):
+            continue
+        if part == '-':
+            addto = patchlist
+            continue
+        if not part.isdigit():
+            break
+        addto.append(int(part))
+    return [versionlist, patchlist]
 
-def natural_sort(iterable):
+
+
+def version_sort(iterable):
     """Return a sort using natural sort if possible
 
     :param iterable:
     :return:
     """
     try:
-        return sorted(iterable, key=naturalize_string)
+        return sorted(iterable, key=versionize_string)
     except TypeError:
         # The natural sort attempt failed, fallback to ascii sort
         return sorted(iterable)
@@ -769,7 +782,7 @@ def pack_image(opts, args):
         if 'rescue' in kern:
             continue
         kvermap[get_kern_version(kern)] = kern
-    mostrecent = list(natural_sort(kvermap))[-1]
+    mostrecent = list(version_sort(kvermap))[-1]
     initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args[0], 'boot/initrd-{0}'.format(mostrecent))
