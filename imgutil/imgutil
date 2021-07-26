@@ -30,6 +30,11 @@ MS_BIND = 4096
 MS_REC = 16384
 MS_PRIVATE = 1<<18
 
+fallocate = libc.fallocate
+fallocate.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int64, ctypes.c_int64]
+fallocate.restype = ctypes.c_int
+FALLOC_FL_KEEP_SIZE = 1
+FALLOC_FL_PUNCH_HOLE = 2
 
 numregex = re.compile('([0-9]+)')
 
@@ -259,11 +264,14 @@ def capture_system_back(args):
             if pad:
                 outimg.write(b'\x00' * pad)
             outimg.write(struct.pack('!Q', isize))
-            with open(fname + '.sfs', 'rb') as imgin:
-                currchunk = imgin.read(32768)
+            with open(fname + '.sfs', 'rb+') as imgin:
+                lastoffset = 0
+                currchunk = imgin.read(2097152)
                 while currchunk:
+                    fallocate(imgin.fileno(), FALLOC_FL_KEEP_SIZE|FALLOC_FL_PUNCH_HOLE, lastoffset, len(currchunk))
+                    lastoffset = imgin.tell()
                     outimg.write(currchunk)
-                    currchunk = imgin.read(32768)
+                    currchunk = imgin.read(2097152)
             pad = 4096 - (outimg.tell() % 4096)
             if pad < 4096:
                 outimg.write(b'\x00' * pad)
@@ -289,11 +297,16 @@ def encrypt_image(plainfile, cryptfile, keyfile):
     subprocess.check_call(['losetup', loopdev, cryptfile])
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 8'.format(neededblocks, key, loopdev)])
     with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
-        with open(plainfile, 'rb') as plainin:
-            chunk = plainin.read(65536)
+        with open(plainfile, 'rb+') as plainin:
+            lastoffset = 0
+            chunk = plainin.read(2097152)
             while chunk:
+                fallocate(plainin.fileno(), FALLOC_FL_KEEP_SIZE|FALLOC_FL_PUNCH_HOLE, lastoffset, len(chunk))
+                lastoffset = plainin.tell()
                 cryptout.write(chunk)
-                chunk = plainin.read(65536)
+                chunk = plainin.read(2097152)
+    subprocess.check_call(['dmsetup', 'remove', dmname])
+    subprocess.check_call(['losetup', '-d', loopdev])
     oum = os.umask(0o077)
     with open(keyfile, 'w') as keyout:
         keyout.write('aes-xts-plain64\n{}\n'.format(key))
