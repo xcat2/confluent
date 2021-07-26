@@ -136,7 +136,7 @@ def fixup(rootdir, vols):
                     continue
                 newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
-    grubcfg = subprocess.check_output(['find', rootdir, '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/')
+    grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/')
     subprocess.check_call(['chroot', rootdir, 'grub2-mkconfig', '-o', grubcfg])
     newroot = None
     with open('/etc/shadow') as shadowin:
