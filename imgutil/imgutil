@@ -173,6 +173,8 @@ def capture_remote(opts, args):
     mkdirp(os.path.join(privdir, 'pending'))
     subprocess.check_call(['rsync', '-a', '{0}:/run/imgutil/private.key'.format(targ), '{}/pending/rootimg.key'.format(privdir)])
     os.umask(oum)
+    subprocess.check_call(['chown', '-R', 'confluent', privdir])
+    subprocess.check_call(['chmod', 'og-rwx', '-R', privdir])
     sys.stdout.write('Done\n')
     sys.stdout.flush()
     subprocess.check_call(['ssh', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalcleanup'])
@@ -771,7 +773,9 @@ def pack_image(opts, args):
     initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args[0], 'boot/initrd-{0}'.format(mostrecent))
+    oum = os.umask(0o077)
     mkdirp(os.path.join(privdir, 'pending/'))
+    os.umask(oum)
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     mkdirp(os.path.join(outdir, 'boot/initramfs'))
     profname = os.path.basename(outdir)
@@ -809,6 +813,7 @@ def pack_image(opts, args):
     try:
         pwd.getpwnam('confluent')
         subprocess.check_call(['chown', '-R', 'confluent', outdir])
+        subprocess.check_call(['chown', '-R', 'confluent', privdir])
         if tryupdate:
             subprocess.check_call(['osdeploy', 'updateboot', profname])
     except KeyError:
