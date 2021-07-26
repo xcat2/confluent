@@ -23,6 +23,7 @@ selinuxpolicy=$(grep ^SELINUXTYPE /etc/selinux/config |awk -F= '{print $2}')
 if [ ! -z "$selinuxpolicy" ]; then
     setfiles /etc/selinux/${selinuxpolicy}/contexts/files/file_contexts /etc/
 fi
+run_remote_python syncfileclient
 run_remote post.custom
 # post scripts may be placed into post.d, e.g. post.d/01-firstaction.sh, post.d/02-secondaction.sh
 run_remote_parts post.d
