@@ -18,7 +18,7 @@ import yaml
 COPY = 1
 EXTRACT = 2
 READFILES = set([
-    'README.diskdefines',
+    '.disk/info',
     'media.1/products',
     'media.2/products',
     '.DISCINFO',
@@ -336,26 +336,24 @@ def check_esxi(isoinfo):
         }
 
 def check_ubuntu(isoinfo):
-    if 'README.diskdefines' not in isoinfo[1]:
+    if '.disk/info' not in isoinfo[1]:
         return None
     arch = None
     variant = None
     ver = None
-    diskdefs = isoinfo[1]['README.diskdefines']
+    diskdefs = isoinfo[1]['.disk/info']
     for info in diskdefs.split(b'\n'):
         if not info:
             continue
-        _, key, val = info.split(b' ', 2)
-        val = val.strip()
-        if key == b'ARCH':
-            arch = val
-            if arch == b'amd64':
-                arch = b'x86_64'
-        elif key == b'DISKNAME':
-            variant, ver, _ = val.split(b' ', 2)
-            if variant != b'Ubuntu-Server':
-                return None
-    if variant:
+        info = info.split(b' ')
+        name = info[0].strip()
+        ver = info[1].strip()
+        arch = info[-2].strip()
+        if name != b'Ubuntu-Server':
+            return None
+        if arch == b'amd64':
+            arch = b'x86_64'
+    if ver:
         if not isinstance(ver, str):
             ver = ver.decode('utf8')
         if not isinstance(arch, str):
