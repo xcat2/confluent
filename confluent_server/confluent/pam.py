@@ -168,7 +168,9 @@ class pam():
                             currcpassword = c_char_p(currpassword.encode('utf8'))
                     else:
                         currpassword = password
-                        currcpassword = c_char_p(password.encode('utf8'))
+                        if not isinstance(currpassword, bytes):
+                            currpassword = currpassword.encode('utf8')
+                        currcpassword = c_char_p(currpassword)
                     dst = calloc(len(currpassword)+1, sizeof(c_char))
                     memmove(dst, currcpassword, len(currpassword))
                     response[i].resp = dst
