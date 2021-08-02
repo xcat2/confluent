@@ -359,8 +359,12 @@ class OsHandler(object):
         self.osname = '{}-{}-{}'.format(name, version, arch)
 
     def get_json(self):
-        info = {'oscategory': self.oscategory,
-                'version': self.version, 'arch': self.arch, 'name': self.name}
+        odata = [self.oscategory, self.version, self.arch, self.name]
+        for idx in range(len(odata)):
+            if not isinstance(odata[idx], str):
+                odata[idx] = odata[idx].decode('utf8')
+        info = {'oscategory': odata[0],
+                'version': odata[1], 'arch': odata[2], 'name': odata[3]}
         return json.dumps(info)
 
     def list_packages(self):
