@@ -42,7 +42,7 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=${autocons##*/}
     echo "Automatic console configured for $autocons"
 fi
-echo "Initializng confluent diskless environment"
+echo "Initializing confluent diskless environment"
 echo -n "udevd: "
 /usr/lib/systemd/systemd-udevd --daemon
 echo -n "Loading drivers..."
