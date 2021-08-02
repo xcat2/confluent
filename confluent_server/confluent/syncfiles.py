@@ -100,10 +100,7 @@ def stage_ent(currmap, ent, targdir):
     allfents = ent.split()
     for tmpent in allfents:
         fents = glob.glob(tmpent)
-        if fents:
-            everyfent.extend(fents)
-        else:
-            everyfent.extend(os.path.dirname(tmpent))
+        everyfent.extend(fents)
     if not everyfent:
         raise Exception('No matching files for "{}"'.format(ent))
     if dst is None:  # this is to indicate source and destination as one
