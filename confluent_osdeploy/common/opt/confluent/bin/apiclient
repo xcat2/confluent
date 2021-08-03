@@ -28,9 +28,10 @@ def get_apikey(nodename, mgr):
             apikey = apikey.decode('utf8')
         if apikey.startswith('SEALED:'):
             apikey = ""
-        sys.stderr.write(
-            "Failed getting API token, check deployment.apiarmed attribute on {}\n".format(nodename))
-        time.sleep(10)
+        if not apikey:
+            sys.stderr.write(
+                "Failed getting API token, check deployment.apiarmed attribute on {}\n".format(nodename))
+            time.sleep(10)
     with open('/etc/confluent/confluent.apikey', 'w+') as apiout:
         apiout.write(apikey)
     apikey = apikey.strip()
