@@ -76,6 +76,13 @@ fi
 export confluent_mgr confluent_profile nodename
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
+if [ -e /usr/libexec/platform-python ]; then
+    python=/usr/libexec/platform-python
+elif [ -e /usr/bin/python3 ]; then
+    python=/usr/byn/python3
+else
+    python=/usr/bin/python
+fi
 $python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 run_remote pre.custom
 run_remote_parts pre.d
@@ -86,12 +93,5 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo clearpart --all --initlabel >> /tmp/partitioning
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
-fi
-if [ -e /usr/libexec/platform-python ]; then
-    python=/usr/libexec/platform-python
-elif [ -e /usr/bin/python3 ]; then
-    python=/usr/byn/python3
-else
-    python=/usr/bin/python
 fi
 kill $logshowpid
