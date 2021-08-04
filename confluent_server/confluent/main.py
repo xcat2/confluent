@@ -59,6 +59,7 @@ import gc
 from greenlet import greenlet
 import sys
 import os
+import glob
 import signal
 import socket
 import time
@@ -209,6 +210,26 @@ def setlimits():
     except Exception:
         pass
 
+def assure_ownership(path):
+    try:
+        if os.getuid() != os.stat(path).st_uid:
+            sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
+            sys.exit(1)
+    except OSError as e:
+        if e.errno == 13:
+            sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
+            sys.exit(1)
+
+def sanity_check():
+    if os.getuid() == 0:
+        return True
+    assure_ownership('/etc/confluent')
+    assure_ownership('/etc/confluent/cfg')
+    for filename in glob.glob('/etc/confluent/cfg/*'):
+        assure_ownership(filename)
+    assure_ownership('/etc/confluent/privkey.pem')
+    assure_ownership('/etc/confluent/srvcert.pem')
+
 
 def run(args):
     setlimits()
@@ -226,6 +247,7 @@ def run(args):
         sys.stderr.write("Error unlocking credential store\n")
         doexit()
         sys.exit(1)
+    sanity_check()
     try:
         confluentcore.load_plugins()
     except:
