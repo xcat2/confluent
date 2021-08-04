@@ -168,10 +168,15 @@ def capture_remote(opts, args):
     sys.stdout.write('Generating deployment initramfs...')
     sys.stdout.flush()
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalboot'])
+    mkdirp(outdir)
     print('Done\nTransferring image...')
     sys.stdout.flush()
     subprocess.check_call(['rsync', '-a', '--info=progress2', '{0}:/run/imgutil/capout/'.format(targ), outdir])
     oum = os.umask(0o077)
+    for path in ('/var/lib/confluent', '/var/lib/confluent/private', '/var/lib/confluent/private/os'):
+        if not os.path.exists(path):
+            mkdirp(path)
+            subprocess.check_call(['chown', 'confluent', path])
     mkdirp(os.path.join(privdir, 'pending'))
     subprocess.check_call(['rsync', '-a', '{0}:/run/imgutil/private.key'.format(targ), '{}/pending/rootimg.key'.format(privdir)])
     os.umask(oum)
@@ -793,6 +798,10 @@ def pack_image(opts, args):
     if not os.path.exists(initrdname):
         initrdname = os.path.join(args[0], 'boot/initrd-{0}'.format(mostrecent))
     oum = os.umask(0o077)
+    for path in ('/var/lib/confluent', '/var/lib/confluent/private', '/var/lib/confluent/private/os'):
+        if not os.path.exists(path):
+            mkdirp(path)
+            subprocess.check_call(['chown', 'confluent', path])
     mkdirp(os.path.join(privdir, 'pending/'))
     os.umask(oum)
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
