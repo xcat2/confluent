@@ -138,7 +138,7 @@ class Updater(object):
 
 
 def remove_updates(nodes, tenant, element, type='firmware'):
-    if len(element) < 5 and element[:2] != ['media', 'uploads']:
+    if len(element) < 5 and element[:2] not in (['media', 'uploads'], ['support', 'servicedata']):
         raise exc.InvalidArgumentException()
     upid = element[-1]
     if type == 'firmware':
