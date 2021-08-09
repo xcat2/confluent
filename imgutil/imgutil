@@ -569,6 +569,8 @@ def main():
         exec_root(opts, args[1:])
     elif args[0] == 'pack':
         pack_image(opts, args[1:])
+    #elif args[0] == 'unpack':
+        #unpack_image(opts, args[1:])
     else:
         parser.print_usage()
 
@@ -779,6 +781,14 @@ def build_root(opts, args):
     run_constrained(build_root_backend, (opts, args, oshandler))
     if len(args) > 1:
         pack_image(opts, args)
+
+
+def unpack_image(opts, args):
+    scratchdir = args[1]
+    indir = args[0]
+    if os.path.isdir(indir):
+        indir = os.path.join(indir, 'rootimg.sfs')
+    #TODO: read header, if encrypted, then setup decryption to facilitate unpack
 
 
 def pack_image(opts, args):
