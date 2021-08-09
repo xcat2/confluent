@@ -89,6 +89,23 @@ def main(args):
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
     elif args.profile:
+        profnames = []
+        for prof in c.read('/deployment/profiles/'):
+            profname = prof.get('item', {}).get('href', None)
+            if profname:
+                profname = profname.replace('/', '')
+                profnames.append(profname)
+                if profname == args.profile:
+                    break
+        else:
+            sys.stderr.write('The specified profile "{}" is not an available profile\n'.format(args.profile))
+            if profnames:
+                sys.stderr.write('The following profiles are available:\n')
+                for profname in profnames:
+                    sys.stderr.write('    ' + profname + '\n')
+            else:
+                sys.stderr.write('No deployment profiles available, try osdeploy fiimport or imgutil capture\n')
+            sys.exit(1)
         armonce(args.noderange, c)
         setpending(args.noderange, args.profile, c)
     else:
