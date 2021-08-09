@@ -12,6 +12,9 @@ profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
 export nodename mgr profile
 . /etc/confluent/functions
+while ! ping -c 1 $confluent_mgr >& /dev/null; do
+	sleep 1
+done
 
 
 run_remote firstboot.custom

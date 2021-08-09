@@ -15,6 +15,9 @@ exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
 logshowpid=$!
+while ! ping -c 1 $confluent_mgr >& /dev/null; do
+	sleep 1
+done
 
 if [ ! -f /etc/confluent/firstboot.ran ]; then
     touch /etc/confluent/firstboot.ran

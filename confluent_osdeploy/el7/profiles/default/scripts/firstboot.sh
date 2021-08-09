@@ -11,6 +11,9 @@ confluent_mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg|awk '{prin
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export nodename confluent_mgr confluent_profile
 . /etc/confluent/functions
+while ! ping -c 1 $confluent_mgr >& /dev/null; do
+	sleep 1
+done
 exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &

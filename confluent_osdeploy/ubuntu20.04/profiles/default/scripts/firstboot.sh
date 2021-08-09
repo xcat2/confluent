@@ -9,6 +9,9 @@ fi
 nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+while ! ping -c 1 $confluent_mgr >& /dev/null; do
+	sleep 1
+done
 hostnamectl set-hostname $(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
 touch /etc/cloud/cloud-init.disabled
 source /etc/confluent/functions

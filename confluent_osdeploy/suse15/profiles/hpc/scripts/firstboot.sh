@@ -10,6 +10,9 @@ confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 . /etc/confluent/functions
+while ! ping -c 1 $confluent_mgr >& /dev/null; do
+	sleep 1
+done
 
 for i in  /etc/ssh/ssh_host*key.pub; do
     certname=${i/.pub/-cert.pub}
