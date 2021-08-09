@@ -100,11 +100,12 @@ class NodeRange(object):
     :param config: Config manager object to use to vet elements
     """
 
-    def __init__(self, noderange, config=None):
+    def __init__(self, noderange, config=None, purenumeric=False):
         global lastnoderange
         self.beginpage = None
         self.endpage = None
         self.cfm = config
+        self.purenumeric = purenumeric
         try:
             elements = _parser.parseString("(" + noderange + ")", parseAll=True).asList()[0]
         except pp.ParseException as pe:
@@ -159,16 +160,27 @@ class NodeRange(object):
         return set([atom])
 
     def expandrange(self, seqrange, delimiter):
-        pieces = seqrange.split(delimiter)
-        if len(pieces) % 2 != 0:
-            return self.failorreturn(seqrange)
-        halflen = len(pieces) // 2
-        left = delimiter.join(pieces[:halflen])
-        right = delimiter.join(pieces[halflen:])
-        leftbits = _numextractor.parseString(left).asList()
-        rightbits = _numextractor.parseString(right).asList()
-        if len(leftbits) != len(rightbits):
-            return self.failorreturn(seqrange)
+        increment = 1
+        if self.purenumeric:
+            seqranges = seqrange.replace('-', ':').replace('..', ':')
+            pieces = seqranges.split(':')
+            if len(pieces) > 3:
+                raise Exception("Invalid numeric sequence")
+            leftbits = [pieces[0]]
+            rightbits = [pieces[1]]
+            if len(pieces) == 3:
+                increment = int(pieces[2])
+        else:
+            pieces = seqrange.split(delimiter)
+            if len(pieces) % 2 != 0:
+                return self.failorreturn(seqrange)
+            halflen = len(pieces) // 2
+            left = delimiter.join(pieces[:halflen])
+            right = delimiter.join(pieces[halflen:])
+            leftbits = _numextractor.parseString(left).asList()
+            rightbits = _numextractor.parseString(right).asList()
+            if len(leftbits) != len(rightbits):
+                return self.failorreturn(seqrange)
         finalfmt = ''
         iterators = []
         for idx in range(len(leftbits)):
@@ -194,7 +206,7 @@ class NodeRange(object):
                 else:  # differently padded, but same number...
                     return self.failorreturn(seqrange)
                 numformat = '{0:0%d}' % width
-                for num in range(minnum, maxnum):
+                for num in range(minnum, maxnum, increment):
                     curseq.append(numformat.format(num))
         results = set([])
         for combo in itertools.product(*iterators):
@@ -230,7 +242,7 @@ class NodeRange(object):
         for idx in range(len(element)):
             if element[idx][0] == '[':
                 nodes = set([])
-                for numeric in NodeRange(element[idx][1:-1]).nodes:
+                for numeric in NodeRange(element[idx][1:-1], purenumeric=True).nodes:
                     nodes |= self._expandstring(
                         [prefix + numeric] + element[idx + 1:])
                 return nodes
