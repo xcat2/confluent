@@ -569,8 +569,8 @@ def main():
         exec_root(opts, args[1:])
     elif args[0] == 'pack':
         pack_image(opts, args[1:])
-    #elif args[0] == 'unpack':
-        #unpack_image(opts, args[1:])
+    elif args[0] == 'unpack':
+        unpack_image(opts, args[1:])
     else:
         parser.print_usage()
 
@@ -782,13 +782,68 @@ def build_root(opts, args):
     if len(args) > 1:
         pack_image(opts, args)
 
+def prep_decrypt(indir):
+    indir = os.path.abspath(indir)
+    pubdir = os.path.dirname(indir)
+    currtabs = subprocess.check_output(['dmsetup', 'table'])
+    currtabs = currtabs.decode('utf8').split('\n')
+    usednames = set([])
+    for tab in currtabs:
+        if not tab:
+            continue
+        tabname, _ = tab.split(':', 1)
+        usednames.add(tabname)
+    dmname = os.path.basename(tempfile.mktemp())
+    while dmname in usednames:
+        dmname = os.path.basename(tempfile.mktemp())
+    privdir = pubdir.replace('public/os', 'private/os')
+    privdir = os.path.join(privdir, 'pending')
+    privdir = os.path.join(privdir, 'rootimg.key')
+    with open(privdir, 'r') as keyfile:
+        keyinfo = keyfile.read().split('\n', 2)
+    cipher, key = keyinfo[:2]
+    imglen = os.path.getsize(indir) - 4096
+    if imglen % 512 != 0:
+        raise Exception('Image is not correctly sized for encryption')
+    imglen = imglen // 512
+    loopdev = subprocess.check_output(['losetup', '-f'])
+    loopdev = loopdev.decode('utf8')
+    loopdev = loopdev.strip()
+    subprocess.check_call(['losetup', '-r', loopdev, indir])
+    tempfile.mktemp()
+    subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {0} crypt {1} {2} 0 {3} 8'.format(
+        imglen, cipher, key, loopdev)])
+    return '/dev/mapper/{0}'.format(dmname)
+
 
 def unpack_image(opts, args):
     scratchdir = args[1]
     indir = args[0]
+    if not os.path.exists(indir) and '/' not in indir:
+        indir = os.path.join('/var/lib/confluent/public/os', indir)
     if os.path.isdir(indir):
         indir = os.path.join(indir, 'rootimg.sfs')
-    #TODO: read header, if encrypted, then setup decryption to facilitate unpack
+    cleandmtable = None
+    prepped = False
+    try:
+        while not prepped:
+            with open(indir, 'rb') as inpack:
+                hdr = inpack.read(16)
+                if hdr == b'\xaa\xd5\x0f\x7e\x5d\xfb\x4b\x7c\xa1\x2a\xf4\x0b\x6d\x94\xf7\xfc':
+                    indir = prep_decrypt(indir)
+                    cleandmtable = os.path.basename(indir)
+                    continue
+                if hdr == b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1':
+                    raise Exception("Multi-partition squash image not supported")
+                if hdr[:4] in (b'sqsh', b'hsqs'):
+                    break
+                raise Exception('Unrecognized image format')
+        mkdirp(scratchdir)
+        os.chdir(scratchdir)
+        subprocess.check_call(['unsquashfs', indir])
+    finally:
+        if cleandmtable:
+            subprocess.check_call(['dmsetup', 'remove', cleandmtable])
 
 
 def pack_image(opts, args):

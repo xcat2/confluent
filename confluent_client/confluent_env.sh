@@ -160,10 +160,17 @@ _confluent_imgutil_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 2 ]; then
-        COMPREPLY=($(compgen -W "build exec pack capture" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "build exec unpack pack capture" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     elif [ ${CMPARGS[1]} == 'build' ]; then
         COMPREPLY=($(compgen -W "-s $(ls /var/lib/confluent/distributions)" -- ${COMP_WORDS[COMP_CWORD]}))
+	    return
+    elif [ ${CMPARGS[1]} == 'unpack' ]; then
+        if [ $NUMARGS == 3 ]; then
+            COMPREPLY=($(compgen -W "-s $(ls /var/lib/confluent/public/os)" -- ${COMP_WORDS[COMP_CWORD]}))
+            return
+        fi
+        compopt -o dirnames
 	    return
     elif [ ${CMPARGS[1]} == 'pack' ]; then
         if [ $NUMARGS == 3 ]; then
