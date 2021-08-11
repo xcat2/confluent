@@ -40,6 +40,7 @@ dynamic behavior and replace with static configuration.
       </patterns>
       <packages config:type="list">
 	<package>openssh</package>
+	<package>iputils</package>
         <package>python3</package>
         <package>openssl</package>
         <package>chrony</package>
