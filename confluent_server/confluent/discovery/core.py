@@ -1090,7 +1090,7 @@ def discover_node(cfg, handler, info, nodename, manual):
         del unknown_info[info['hwaddr']]
     info['discostatus'] = 'identified'
     dp = cfg.get_node_attributes(
-        [nodename], ('discovery.policy',
+        [nodename], ('discovery.policy', 'id.uuid',
                      'pubkeys.tls_hardwaremanager'))
     policy = dp.get(nodename, {}).get('discovery.policy', {}).get(
         'value', None)
@@ -1163,10 +1163,19 @@ def discover_node(cfg, handler, info, nodename, manual):
         except KeyError:
             pass
         return True
-    log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
-                     'value allowing discovery (open or permissive)'.format(
-                        nodename)})
-    info['discofailure'] = 'policy'
+    if info['handler'] == pxeh:
+        olduuid = dp.get(nodename, {}).get('discovery.policy', {}).get(
+            'value', None)
+        if olduuid.lower() != info['uuid']:
+            log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
+                            'value allowing discovery (open, permissive, or pxe)'.format(
+                                nodename)})
+            info['discofailure'] = 'policy'
+    else:
+        log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
+                         'value allowing discovery (open or permissive)'.format(
+                            nodename)})
+        info['discofailure'] = 'policy'
     return False
 
 

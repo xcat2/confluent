@@ -34,6 +34,7 @@ import eventlet.green.socket as socket
 import eventlet.green.select as select
 import netifaces
 import struct
+import time
 import traceback
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
@@ -41,6 +42,8 @@ libc = ctypes.CDLL(ctypes.util.find_library('c'))
 iphdr = b'\x45\x00\x00\x00\x00\x00\x00\x00\x40\x11\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff'
 constiphdrsum = b'\x85\x11'
 udphdr = b'\x00\x43\x00\x44\x00\x00\x00\x00'
+ignoremacs = {}
+ignoredisco = {}
 
 def _ipsum(data):
     currsum = 0
@@ -392,10 +395,9 @@ def snoop(handler, protocol=None):
                         'architecture': disco['arch'],
                         'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                         'services': ('pxe-client',)}
-                if disco['uuid']:  #TODO(jjohnson2): need to explictly check for
-                                # discover, so that the parser can go ahead and
-                                # parse the options including uuid to enable
-                                # ACK
+                if (disco['uuid']
+                        and time.time() > ignoredisco.get(netaddr, 0) + 60):
+                    ignoredisco[netaddr] = time.time()
                     handler(info)
                 consider_discover(info, rqinfo, net4, cfg, rqv)
         except Exception as e:
@@ -457,6 +459,11 @@ def check_reply(node, info, packet, sock, cfg, reqview):
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = get_deployment_profile(node, cfg, cfd)
     if not profile:
+        if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
+            ignoremacs[info['hwaddr']] = time.time()
+            log.log({'info': 'Ignoring boot attempt by {0} no deployment profile specified (uuid {1}, hwaddr {2})'.format(
+                node, info['uuid'], info['hwaddr']
+            )})
         return
     myipn = info['netinfo']['recvip']
     myipn = socket.inet_aton(myipn)
@@ -638,6 +645,13 @@ def consider_discover(info, packet, sock, cfg, reqview):
         check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview)
     elif packet.get(53, None) == b'\x03':
         ack_request(packet, reqview, info)
+    elif info.get('uuid', None) and info.get('hwaddr', None):
+        if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
+            ignoremacs[info['hwaddr']] = time.time()
+            log.log(
+                    {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
+                        info['uuid'], info['hwaddr']
+            )})
 
 
 if __name__ == '__main__':
