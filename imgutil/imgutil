@@ -840,7 +840,7 @@ def unpack_image(opts, args):
                 raise Exception('Unrecognized image format')
         mkdirp(scratchdir)
         os.chdir(scratchdir)
-        subprocess.check_call(['unsquashfs', indir])
+        subprocess.check_call(['unsquashfs', '-d', 'rootfs', indir])
     finally:
         if cleandmtable:
             subprocess.check_call(['dmsetup', 'remove', cleandmtable])
