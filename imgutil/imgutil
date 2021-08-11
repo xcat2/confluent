@@ -5,7 +5,7 @@ import ctypes.util
 from distutils.dir_util import copy_tree
 import glob
 import json
-import optparse
+import argparse
 import os
 import pwd
 import re
@@ -541,22 +541,37 @@ def run_constrained(function, args):
 
 
 def main():
-    parser = optparse.OptionParser()
-    parser.add_option('-s', '--source', help='Directory to pull installation '
-        'from (e.g. /var/lib/confluent/distributions/rocky-8.3-x86_64')
-    parser.add_option(
-        '-v', '--volume',
+    parser = argparse.ArgumentParser(description='Work with confluent OS images')
+    sps = parser.add_subparsers(dest='subcommand')
+    buildp = sps.add_parser('build', help='Build a new diskless image from scratch')
+    buildp.add_argument('--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
+    buildp.add_argument('scratchdir', help='Directory to build new diskless root in')
+    execp = sps.add_parser('exec', help='Start specified scratch directory as container')
+    execp.add_argument('--volume',
         help='Directory to make available in install environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
         'will override the target to be /run/root', action='append')
-    (opts, args) = parser.parse_args()
-    if not args:
+    execp.add_argument('scratchdir', help='Directory of an unpacked diskless root')
+    unpackp = sps.add_parser('unpack', help='Unpack a diskless image to a scratch directory')
+    unpackp.add_argument('profilename', help='The diskless OS profile to unpack')
+    unpackp.add_argument('scratchdir', help='Directory to extract diskless root to')
+    packp = sps.add_parser('pack', help='Pack a scratch directory to a diskless profile')
+    packp.add_argument('scratchdir', help='Directory containing diskless root')
+    packp.add_argument('profilename', help='The desired diskless OS profile name to pack the root into')
+    args = parser.parse_args()
+    if not args or not args.subcommand:
         parser.print_usage()
         sys.exit(1)
-    if args[0] == 'build':
+    if args.subcommand == 'build':
         build_root(opts, args[1:])
-    elif args[0] == 'capture':
+    elif args.subcommand == 'capture':
         capture_remote(opts, args[1:])
+    elif args.subcommand == 'unpack':
+        unpack_image(args)
+    elif args.subcommand == 'exec':
+        exec_root(args)
+    elif args.subcommand == 'pack':
+        pack_image(args)
     elif args[0] == 'getfingerprint':
         print(fingerprint_host().get_json())
     elif args[0] == 'capturelocal':
@@ -565,12 +580,7 @@ def main():
         build_boot_tree('/run/imgutil/capout')
     elif args[0] == 'capturelocalcleanup':
         capture_local_cleanup()
-    elif args[0] == 'exec':
-        exec_root(opts, args[1:])
-    elif args[0] == 'pack':
-        pack_image(opts, args[1:])
-    elif args[0] == 'unpack':
-        unpack_image(opts, args[1:])
+    
     else:
         parser.print_usage()
 
@@ -619,20 +629,20 @@ def _mount(src, dst, fstype=0, flags=0, options=0, mode=None):
 
 
 def build_root_backend(optargs):
-    opts, args, oshandler = optargs
-    installroot = args[0]
-    _mount_constrained_fs(opts, installroot)
+    args, oshandler = optargs
+    installroot = args.scratchdir
+    _mount_constrained_fs(args, installroot)
     oshandler.prep_root()
 
 
-def _mount_constrained_fs(opts, installroot):
+def _mount_constrained_fs(args, installroot):
     _mount('/dev', os.path.join(installroot, 'dev'), flags=MS_BIND|MS_RDONLY)
     _mount('proc', os.path.join(installroot, 'proc'), fstype='proc')
     _mount('sys', os.path.join(installroot, 'sys'), fstype='sysfs')
     _mount('runfs', os.path.join(installroot, 'run'), fstype='tmpfs')
-    if opts.volume is None:
-        opts.volume = []
-    for v in opts.volume:
+    if args.volume is None:
+        args.volume = []
+    for v in args.volume:
         if ':' in v:
             src, dst = v.split(':')
             while dst and dst[0] == '/':
@@ -758,29 +768,29 @@ def fingerprint_host(hostpath='/'):
             return oshandler
     return oshandler
 
-def build_root(opts, args):
-    check_root(args[0])
-    yumargs = ['yum', '--installroot={0}'.format(args[0])]
-    if opts.source:
-        if '/' not in opts.source and not os.path.exists(opts.source):
-            opts.source = os.path.join('/var/lib/confluent/distributions/', opts.source)
-        oshandler = fingerprint_source(opts.source)
+def build_root(args):
+    check_root(args.scratchdir)
+    yumargs = ['yum', '--installroot={0}'.format(args.scratchdir)]
+    if args.source:
+        if '/' not in args.source and not os.path.exists(args.source):
+            args.source = os.path.join('/var/lib/confluent/distributions/', args.source)
+        oshandler = fingerprint_source(args.source)
         if oshandler is not None:
-            oshandler.set_source(opts.source)
+            oshandler.set_source(args.source)
     else:
         oshandler = fingerprint_host()
     if oshandler is None:
         sys.stderr.write(
             'Unable to recognize source directory {0}\n'.format(
-                opts.source))
+                args.source))
         sys.exit(1)
-    oshandler.set_target(args[0])
+    oshandler.set_target(args.scratchdir)
     oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
-        mkdirp(os.path.join(args[0], dirname))
-    run_constrained(build_root_backend, (opts, args, oshandler))
-    if len(args) > 1:
-        pack_image(opts, args)
+        mkdirp(os.path.join(args.scratchdir, dirname))
+    run_constrained(build_root_backend, (args, oshandler))
+    #if len(args) > 1:
+    #    pack_image(opts, args)
 
 def prep_decrypt(indir):
     indir = os.path.abspath(indir)
@@ -816,9 +826,9 @@ def prep_decrypt(indir):
     return '/dev/mapper/{0}'.format(dmname)
 
 
-def unpack_image(opts, args):
-    scratchdir = args[1]
-    indir = args[0]
+def unpack_image(args):
+    scratchdir = args.scratchdir
+    indir = args.profilename
     if not os.path.exists(indir) and '/' not in indir:
         indir = os.path.join('/var/lib/confluent/public/os', indir)
     if os.path.isdir(indir):
@@ -846,22 +856,22 @@ def unpack_image(opts, args):
             subprocess.check_call(['dmsetup', 'remove', cleandmtable])
 
 
-def pack_image(opts, args):
-    outdir = args[1]
+def pack_image(profile):
+    outdir = profile
     if '/' in outdir:
         raise Exception('Full path not supported, supply only the profile name')
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
     outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
-    kerns = glob.glob(os.path.join(args[0], 'boot/vmlinuz-*'))
+    kerns = glob.glob(os.path.join(profile, 'boot/vmlinuz-*'))
     kvermap = {}
     for kern in kerns:
         if 'rescue' in kern:
             continue
         kvermap[get_kern_version(kern)] = kern
     mostrecent = list(version_sort(kvermap))[-1]
-    initrdname = os.path.join(args[0], 'boot/initramfs-{0}.img'.format(mostrecent))
+    initrdname = os.path.join(profile, 'boot/initramfs-{0}.img'.format(mostrecent))
     if not os.path.exists(initrdname):
-        initrdname = os.path.join(args[0], 'boot/initrd-{0}'.format(mostrecent))
+        initrdname = os.path.join(profile, 'boot/initrd-{0}'.format(mostrecent))
     oum = os.umask(0o077)
     for path in ('/var/lib/confluent', '/var/lib/confluent/private', '/var/lib/confluent/private/os'):
         if not os.path.exists(path):
@@ -877,25 +887,25 @@ def pack_image(opts, args):
         os.path.join(outdir, 'boot/initramfs/site.cpio'))
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
-    gather_bootloader(outdir, args[0])
+    gather_bootloader(outdir, profile)
     tmploc = tempfile.mktemp()
-    subprocess.check_call(['mksquashfs', args[0],
+    subprocess.check_call(['mksquashfs', profile,
                            tmploc, '-comp', 'xz'])
     encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
     os.remove(tmploc)
-    oshandler = fingerprint_host(args[0])
+    oshandler = fingerprint_host(profile)
     tryupdate = False
     if oshandler:
         prettyname = oshandler.osname
-        with open(os.path.join(args[0], 'etc/os-release')) as osr:
+        with open(os.path.join(profile, 'etc/os-release')) as osr:
             osrdata = osr.read().split('\n')
             for line in osrdata:
                 if line.startswith('PRETTY_NAME="'):
                     prettyname = line.replace(
                         'PRETTY_NAME=', '').replace('"', '')
         label = '{0} ({1})'.format(prettyname, 'Diskless Boot')
-        with open(os.path.join(outdir, 'profile.yaml'), 'w') as profile:
-            profile.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n'.format(label))
+        with open(os.path.join(outdir, 'profile.yaml'), 'w') as profiley:
+            profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n'.format(label))
         oscat = oshandler.oscategory
         confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
         os.symlink('{}/initramfs/addons.cpio'.format(confdir),
