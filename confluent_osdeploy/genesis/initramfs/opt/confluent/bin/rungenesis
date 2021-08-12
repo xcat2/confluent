@@ -11,10 +11,10 @@ if ! grep console= /proc/cmdline >& /dev/null; then
         (while :; do TMUX=xterm-256color tmux a <> $autocons >&0 2>&1; done) &
         (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
     else
-        (while :; do TERM=xterm-256color tmux a <> /dev/console >&0 2>&1; done) &
+        (while :; do TERM=linux tmux a <> /dev/console >&0 2>&1; done) &
     fi
 else
-    (while :; do tmux a <> /dev/console >&0 2>&1; done) &
+    (while :; do TERM=xterm-256color tmux a <> /dev/console >&0 2>&1; done) &
     (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
 fi
 (while :; do TERM=linux tmux <> /dev/tty2 >&0 2>&1; done) &
