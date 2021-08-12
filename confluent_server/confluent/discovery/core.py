@@ -912,6 +912,13 @@ def get_nodename_from_chained_smms(cfg, handler, info):
                 nodename = newnodename
     return nodename
 
+def get_node_guess_by_uuid(uuid):
+    for mac in known_uuids.get(uuid, {}):
+        nodename = known_uuids[uuid][mac].get('nodename', None)
+        if nodename:
+            return nodename
+    return None
+
 def get_node_by_uuid_or_mac(uuidormac):
     node = pxe.macmap.get(uuidormac, None)
     if node is not None:
@@ -1326,7 +1333,7 @@ def stop_autosense():
 
 def start_autosense():
     autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
-    autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe))
+    autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
 
 
 nodes_by_fprint = {}

@@ -301,7 +301,7 @@ def start_proxydhcp():
     eventlet.spawn_n(proxydhcp)
 
 
-def snoop(handler, protocol=None):
+def snoop(handler, protocol=None, nodeguess=None):
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
@@ -399,7 +399,7 @@ def snoop(handler, protocol=None):
                         and time.time() > ignoredisco.get(netaddr, 0) + 60):
                     ignoredisco[netaddr] = time.time()
                     handler(info)
-                consider_discover(info, rqinfo, net4, cfg, rqv)
+                consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess)
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                             event=log.Events.stacktrace)
@@ -638,7 +638,7 @@ def ack_request(pkt, rq, info):
     repview[26:28] = struct.pack('!H', datasum)
     send_raw_packet(repview, len(rply), rq, info)
 
-def consider_discover(info, packet, sock, cfg, reqview):
+def consider_discover(info, packet, sock, cfg, reqview, nodeguess):
     if info.get('hwaddr', None) in macmap and info.get('uuid', None):
         check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview)
     elif info.get('uuid', None) in uuidmap:
@@ -648,10 +648,30 @@ def consider_discover(info, packet, sock, cfg, reqview):
     elif info.get('uuid', None) and info.get('hwaddr', None):
         if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
             ignoremacs[info['hwaddr']] = time.time()
-            log.log(
-                    {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
-                        info['uuid'], info['hwaddr']
-            )})
+            maybenode = None
+            if nodeguess:
+                maybenode = nodeguess(info['uuid'])
+            if maybenode:
+                # originally was going to just offer up the node (the likely
+                # scenario is that it was manually added, autodiscovery picked
+                # up the TLS match, and correlated)
+                # However, since this is technically unverified data, we shouldn't
+                # act upon it until confirmed by process or user
+                # So instead, offer a hint about what is probably the case, but
+                # hasn't yet been approved by anything
+                log.log(
+                        {'info': 'Boot attempt from uuid {0} or hardware '
+                                 'address {1}, which is not confirmed to be a '
+                                 'node, but seems to be {2}. To confirm node '
+                                 'identity, \'nodediscover reassign -n {2}\' or '
+                                 '\'nodeattrib {2} id.uuid={0}\''.format(
+                            info['uuid'], info['hwaddr'], maybenode
+                )})
+            else:
+                log.log(
+                        {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
+                            info['uuid'], info['hwaddr']
+                )})
 
 
 if __name__ == '__main__':
