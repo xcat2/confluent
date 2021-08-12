@@ -385,7 +385,9 @@ def snoop(handler, protocol=None, nodeguess=None):
                             'services': (vivso['service-type'],),
                             'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                             'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
-                    handler(info)
+                    if time.time() > ignoredisco.get(netaddr, 0) + 90:
+                        ignoredisco[netaddr] = time.time()
+                        handler(info)
                     #consider_discover(info, rqinfo, net4, cfg, rqv)
                     continue
                 # We will fill out service to have something to byte into,
@@ -396,7 +398,7 @@ def snoop(handler, protocol=None, nodeguess=None):
                         'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                         'services': ('pxe-client',)}
                 if (disco['uuid']
-                        and time.time() > ignoredisco.get(netaddr, 0) + 60):
+                        and time.time() > ignoredisco.get(netaddr, 0) + 90):
                     ignoredisco[netaddr] = time.time()
                     handler(info)
                 consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess)

@@ -711,13 +711,25 @@ def detected(info):
     nodename, info['maccount'] = get_nodename(cfg, handler, info)
     if nodename and handler and handler.https_supported:
         dp = cfg.get_node_attributes([nodename],
-                                     ('pubkeys.tls_hardwaremanager',))
-        lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
+                                     ('pubkeys.tls_hardwaremanager', 'id.uuid', 'discovery.policy'))
+        dp = dp.get(nodename, {})
+        lastfp = dp.get('pubkeys.tls_hardwaremanager',
                                           {}).get('value', None)
         if util.cert_matches(lastfp, handler.https_cert):
             info['nodename'] = nodename
             known_nodes[nodename][info['hwaddr']] = info
             info['discostatus'] = 'discovered'
+            uuid = info.get('uuid', None)
+            if uuid:
+                storeuuid = dp.get('id.uuid', {}).get('value', None)
+                if not storeuuid:
+                    discop = dp.get('discovery.policy', {}).get('value', '')
+                    if discop:
+                        policies = set(discop.split(','))
+                    else:
+                        policies = set([])
+                    if policies & {'open', 'permissive'}:
+                        cfg.set_node_attributes({nodename: {'id.uuid': info['uuid']}})
             return  # already known, no need for more
     #TODO(jjohnson2): We might have to get UUID for certain searches...
     #for now defer probe until inside eval_node.  We might not have
@@ -850,6 +862,9 @@ def get_nodename(cfg, handler, info):
             if nodename is None:
                 _map_unique_ids()
                 nodename = nodes_by_uuid.get(curruuid, None)
+    if not nodename and info['handler'] == pxeh:
+        enrich_pxe_info(info)
+        nodename = info.get('nodename', None)
     if not nodename:
         # Ok, see if it is something with a chassis-uuid and discover by
         # chassis
@@ -1171,7 +1186,7 @@ def discover_node(cfg, handler, info, nodename, manual):
             pass
         return True
     if info['handler'] == pxeh:
-        olduuid = dp.get(nodename, {}).get('discovery.policy', {}).get(
+        olduuid = dp.get(nodename, {}).get('id.uuid', {}).get(
             'value', None)
         if olduuid.lower() != info['uuid']:
             log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
