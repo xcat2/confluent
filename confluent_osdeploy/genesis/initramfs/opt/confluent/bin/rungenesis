@@ -8,10 +8,10 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     echo $autocons > /tmp/01-autocons.devnode
     if [ ! -z "$autocons" ]; then
         echo "Using $(cat /tmp/01-autocons.conf)"
-        (while :; do tmux a <> $autocons >&0 2>&1; done) &
+        (while :; do TMUX=xterm-256color tmux a <> $autocons >&0 2>&1; done) &
         (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
     else
-        (while :; do tmux a <> /dev/console >&0 2>&1; done) &
+        (while :; do TERM=xterm-256color tmux a <> /dev/console >&0 2>&1; done) &
     fi
 else
     (while :; do tmux a <> /dev/console >&0 2>&1; done) &
