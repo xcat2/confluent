@@ -825,6 +825,7 @@ def handle_dispatch(connection, cert, dispatch, peername):
             _forward_rsp(connection, res)
     keepalive.kill()
     connection.sendall('\x00\x00\x00\x00\x00\x00\x00\x00')
+    connection.close()
 
 
 def _forward_rsp(connection, res):

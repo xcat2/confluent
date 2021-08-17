@@ -720,6 +720,7 @@ class ProxyConsole(object):
         if self.remote:
             try:
                 tlvdata.send(self.remote, {'operation': 'stop'})
+                self.remote.close()
             except Exception:
                 pass
         self.clisession = None
