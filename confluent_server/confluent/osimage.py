@@ -607,10 +607,10 @@ def printit(info):
 
 
 def list_distros():
-    return os.listdir('/var/lib/confluent/distributions')
+    return sorted(os.listdir('/var/lib/confluent/distributions'))
 
 def list_profiles():
-    return os.listdir('/var/lib/confluent/public/os/')
+    return sorted(os.listdir('/var/lib/confluent/public/os/'))
 
 def get_profile_label(profile):
     with open('/var/lib/confluent/public/os/{0}/profile.yaml') as metadata:
