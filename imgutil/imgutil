@@ -2,6 +2,7 @@
 import configparser
 import ctypes
 import ctypes.util
+import datetime
 from distutils.dir_util import copy_tree
 import glob
 import json
@@ -902,6 +903,8 @@ def pack_image(args):
                            tmploc, '-comp', 'xz'])
     encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
     os.remove(tmploc)
+    with open(os.path.join(outdir, 'build-info'), 'w') as buildinfo:
+        buildinfo.write('Packed from {} on {}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
     oshandler = fingerprint_host(args.scratchdir)
     tryupdate = False
     if oshandler:
