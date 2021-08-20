@@ -38,7 +38,7 @@ if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
     ntpcfg=$(paste -sd '' /tmp/ntp.cfg)
 fi
 run_remote_python getinstalldisk
-sed -e s'!'%%INSTDISK%%'!'/dev/$(cat /tmp/installdisk)'!' -e s'!'%%NODENAME%%'!'$nodename'!' -e s'!<networking>!'$ntpcfg'<networking>!' -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
+sed -e s'!'%%INSTDISK%%'!'/dev/$(cat /tmp/installdisk)'!' -e s'!'%%NODENAME%%'!'$nodename'!' -e 's!<networking\(.*\)>!'"$ntpcfg"'<networking\1>!' -e "s?%%ROOTPASSWORD%%?${rootpw}?" /tmp/profile/autoinst.xml > /tmp/profile/modified.xml
 if grep append /tmp/bootloader.xml > /dev/null; then
     sed -i 's@</general>@</general>'"$(tr -d '\n' < /tmp/bootloader.xml)"'@' /tmp/profile/modified.xml
 fi
