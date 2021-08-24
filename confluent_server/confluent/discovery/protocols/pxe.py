@@ -27,6 +27,7 @@ import confluent.collective.manager as collective
 import confluent.noderange as noderange
 import confluent.log as log
 import confluent.netutil as netutil
+import confluent.util as util
 import ctypes
 import ctypes.util
 import eventlet
@@ -44,6 +45,9 @@ constiphdrsum = b'\x85\x11'
 udphdr = b'\x00\x43\x00\x44\x00\x00\x00\x00'
 ignoremacs = {}
 ignoredisco = {}
+
+mcastv6addr = 'ff02::1:2'
+
 
 def _ipsum(data):
     currsum = 0
@@ -189,6 +193,26 @@ def _decode_ocp_vivso(rq, idx, size):
         idx += rq[idx + 1] + 2
     return '', None, vivso
 
+def v6opts_to_dict(rq):
+    optidx = 0
+    reqdict = {}
+    disco = {'uuid':None, 'arch': None, 'vivso': None}
+    try:
+        while optidx < len(rq):
+            optnum, optlen = struct.unpack('!HH', rq[optidx:optidx+4])
+            reqdict[optnum] = rq[optidx + 4:optidx + 4 + optlen]
+            optidx += optlen + 4
+    except IndexError:
+        pass
+    if 1 in reqdict:
+        duid = reqdict[1]
+        if struct.unpack('!H', duid[:2])[0] == 4:
+            disco['uuid'] = decode_uuid(duid[2:])
+    if 61 in reqdict:
+        arch = bytes(rq[optidx+4:optidx+4+optlen])
+        disco['arch'] = pxearchs.get(bytes(reqdict[61]), None)
+    return reqdict, disco
+
 def opts_to_dict(rq, optidx, expectype=1):
     reqdict = {}
     disco = {'uuid':None, 'arch': None, 'vivso': None}
@@ -317,94 +341,116 @@ def snoop(handler, protocol=None, nodeguess=None):
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     net4.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
     net4.bind(('', 67))
+    v6addr = socket.inet_pton(socket.AF_INET6, mcastv6addr)
+    net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    for ifidx in util.list_interface_indexes():
+        v6grp = v6addr + struct.pack('=I', ifidx)
+        net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
+    net6.bind(('', 547))
+    clientaddr = sockaddr_in()
+    rawbuffer = bytearray(2048)
+    data = pkttype.from_buffer(rawbuffer)
+    msg = msghdr()
+    cmsgarr = bytearray(cmsgsize)
+    cmsg = cmsgtype.from_buffer(cmsgarr)
+    iov = iovec()
+    iov.iov_base = ctypes.addressof(data)
+    iov.iov_len = 2048
+    msg.msg_iov = ctypes.pointer(iov)
+    msg.msg_iovlen = 1
+    msg.msg_control = ctypes.addressof(cmsg)
+    msg.msg_controllen = ctypes.sizeof(cmsg)
+    msg.msg_name = ctypes.addressof(clientaddr)
+    msg.msg_namelen = ctypes.sizeof(clientaddr)
+    # We'll leave name and namelen blank for now
     while True:
         try:
             # Just need some delay, picked a prime number so that overlap with other
             # timers might be reduced, though it really is probably nothing
-            ready = select.select([net4], [], [], None)
+            ready = select.select([net4, net6], [], [], None)
             if not ready or not ready[0]:
                 continue
-            clientaddr = sockaddr_in()
-            rawbuffer = bytearray(2048)
-            data = pkttype.from_buffer(rawbuffer)
-            msg = msghdr()
-            cmsgarr = bytearray(cmsgsize)
-            cmsg = cmsgtype.from_buffer(cmsgarr)
-            iov = iovec()
-            iov.iov_base = ctypes.addressof(data)
-            iov.iov_len = 2048
-            msg.msg_iov = ctypes.pointer(iov)
-            msg.msg_iovlen = 1
-            msg.msg_control = ctypes.addressof(cmsg)
-            msg.msg_controllen = ctypes.sizeof(cmsg)
-            msg.msg_name = ctypes.addressof(clientaddr)
-            msg.msg_namelen = ctypes.sizeof(clientaddr)
-            # We'll leave name and namelen blank for now
-            i = recvmsg(net4.fileno(), ctypes.pointer(msg), 0)
-            # if we have a small packet, just skip, it can't possible hold enough
-            # data and avoids some downstream IndexErrors that would be messy
-            # with try/except
-            if i < 64:
-                continue
-            #peer = ipfromint(clientaddr.sin_addr.s_addr)
-            # We don't need peer yet, generally it's 0.0.0.0
-            _, level, typ = struct.unpack('QII', cmsgarr[:16])
-            if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
-                idx, recv, targ = struct.unpack('III', cmsgarr[16:28])
-                recv = ipfromint(recv)
-                targ = ipfromint(targ)
-            # peer is the source ip (in dhcpdiscover, 0.0.0.0)
-            # recv is the 'ip' that recevied the packet, regardless of target
-            # targ is the ip in the destination ip of the header.
-            # idx is the ip link number of the receiving nic
-            # For example, a DHCPDISCOVER will probably have:
-            # peer of 0.0.0.0
-            # targ of 255.255.255.255
-            # recv of <actual ip address that could reply>
-            # idx correlated to the nic
-            rqv = memoryview(rawbuffer)
-            rq = bytearray(rqv[:i])
-            if rq[0] == 1:  # Boot request
-                addrlen = rq[2]
-                if addrlen > 16 or addrlen == 0:
-                    continue
-                rawnetaddr = rq[28:28+addrlen]
-                netaddr = ':'.join(['{0:02x}'.format(x) for x in rawnetaddr])
-                optidx = 0
-                try:
-                    optidx = rq.index(b'\x63\x82\x53\x63') + 4
-                except ValueError:
-                    continue
-                txid = rq[4:8] # struct.unpack('!I', rq[4:8])[0]
-                rqinfo, disco = opts_to_dict(rq, optidx)
-                vivso = disco.get('vivso', None)
-                if vivso:
-                    # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
-                    info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
-                            'architecture': vivso.get('arch', ''),
-                            'services': (vivso['service-type'],),
-                            'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
-                            'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
-                    if time.time() > ignoredisco.get(netaddr, 0) + 90:
-                        ignoredisco[netaddr] = time.time()
-                        handler(info)
-                    #consider_discover(info, rqinfo, net4, cfg, rqv)
-                    continue
-                # We will fill out service to have something to byte into,
-                # but the nature of the beast is that we do not have peers,
-                # so that will not be present for a pxe snoop
-                info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
-                        'architecture': disco['arch'],
-                        'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
-                        'services': ('pxe-client',)}
-                if (disco['uuid']
-                        and time.time() > ignoredisco.get(netaddr, 0) + 90):
-                    ignoredisco[netaddr] = time.time()
-                    handler(info)
-                consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess)
+            for netc in ready[0]:
+                idx = None
+                if netc == net4:
+                    i = recvmsg(netc.fileno(), ctypes.pointer(msg), 0)
+                    # if we have a small packet, just skip, it can't possible hold enough
+                    # data and avoids some downstream IndexErrors that would be messy
+                    # with try/except
+                    if i < 64:
+                        continue
+                    _, level, typ = struct.unpack('QII', cmsgarr[:16])
+                    if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
+                        idx, recv = struct.unpack('II', cmsgarr[16:24])
+                        recv = ipfromint(recv)
+                    rqv = memoryview(rawbuffer)
+                    if rawbuffer[0] == 1:  # Boot request
+                        process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv)
+                elif netc == net6:
+                    recv = 'ff02::1:2'
+                    pkt, addr = netc.recvfrom(2048)
+                    idx = addr[-1]
+                    i = len(pkt)
+                    if i < 64:
+                        continue
+                    rqv = memoryview(pkt)
+                    rq = bytearray(rqv[:2])
+                    if rq[0] == 1: # dhcpv6 solicit
+                        process_dhcp6req(rqv, addr[0])
+
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                             event=log.Events.stacktrace)
+
+def process_dhcp6req(rqv, addr):
+    txid = rqv[1:4]
+    req, disco = v6opts_to_dict(bytearray(rqv[4:]))
+    if 'uuid' not in disco:
+        return
+    print(addr)
+    print(repr(disco))
+
+
+def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
+    rq = bytearray(rqv)
+    addrlen = rq[2]
+    if addrlen > 16 or addrlen == 0:
+        return
+    rawnetaddr = rq[28:28+addrlen]
+    netaddr = ':'.join(['{0:02x}'.format(x) for x in rawnetaddr])
+    optidx = 0
+    try:
+        optidx = rq.index(b'\x63\x82\x53\x63') + 4
+    except ValueError:
+        return
+    txid = rq[4:8] # struct.unpack('!I', rq[4:8])[0]
+    rqinfo, disco = opts_to_dict(rq, optidx)
+    vivso = disco.get('vivso', None)
+    if vivso:
+                        # info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
+        info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
+                                'architecture': vivso.get('arch', ''),
+                                'services': (vivso['service-type'],),
+                                'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
+                                'attributes': {'enclosure-machinetype-model': [vivso.get('machine', '')]}}
+        if time.time() > ignoredisco.get(netaddr, 0) + 90:
+            ignoredisco[netaddr] = time.time()
+            handler(info)
+                        #consider_discover(info, rqinfo, net4, cfg, rqv)
+        return
+                    # We will fill out service to have something to byte into,
+                    # but the nature of the beast is that we do not have peers,
+                    # so that will not be present for a pxe snoop
+    info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
+                            'architecture': disco['arch'],
+                            'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
+                            'services': ('pxe-client',)}
+    if (disco['uuid']
+                            and time.time() > ignoredisco.get(netaddr, 0) + 90):
+        ignoredisco[netaddr] = time.time()
+        handler(info)
+    consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess)
 
 
 
