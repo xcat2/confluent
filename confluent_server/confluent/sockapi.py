@@ -200,7 +200,10 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
                 send_data(connection, {'errorcode': 500,
                                         'error': 'Unexpected error - ' + str(e)})
                 send_data(connection, {'_requestdone': 1})
-            request = tlvdata.recv(connection)
+            try:
+                request = tlvdata.recv(connection)
+            except Exception:
+                request = None
     finally:
         cfm.close_client_files()
         try:
