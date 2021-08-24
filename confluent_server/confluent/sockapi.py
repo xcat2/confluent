@@ -205,7 +205,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             except Exception:
                 request = None
     finally:
-        cfm.close_client_files()
+        if cfm:
+            cfm.close_client_files()
         try:
             connection.close()
         except Exception:

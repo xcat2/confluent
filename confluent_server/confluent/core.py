@@ -1054,12 +1054,12 @@ def dispatch_request(nodes, manager, element, configmanager, inputdata,
         remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
                                  keyfile='/etc/confluent/privkey.pem',
                                  certfile='/etc/confluent/srvcert.pem')
-    except Exception:
+    except Exception as e:
         for node in nodes:
             if a:
                 yield msg.ConfluentResourceUnavailable(
-                    node, 'Collective member {0} is unreachable'.format(
-                        a['name']))
+                    node, 'Collective member {0} is unreachable ({1})'.format(
+                        a['name'], str(e)))
             else:
                 yield msg.ConfluentResourceUnavailable(
                     node,
