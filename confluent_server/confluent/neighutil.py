@@ -59,16 +59,16 @@ def _update_neigh():
                     while len(rta):
                         rtalen, rtatyp = struct.unpack('HH', rta[:4])
                         if rtatyp == 2:  # hwaddr
-                            curraddr = rta[4:rtalen].tobytes()  # ':'.join(['{:02x}'.format(x) for x in bytearray(rta[4:rtalen].tobytes())])
+                            curraddr = rta[4:rtalen].tobytes()
                             if len(curraddr) == 20:
                                 curraddr = curraddr[12:]
                         elif rtatyp == 1:  # ip address
-                            currip = rta[4:rtalen].tobytes()  # socket.inet_ntop(fam, rta[4:rtalen].tobytes())
+                            currip = rta[4:rtalen].tobytes()
                         rta = rta[rtalen:]
                         if not rtalen:
-                            if curraddr and currip:
-                                neightable[currip] = curraddr
                             break
+                    if curraddr and currip:
+                        neightable[currip] = curraddr
             v = v[length:]
 
 
