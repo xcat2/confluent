@@ -86,7 +86,7 @@ def sync_list_to_node(sl, node, suffixes):
                 suffixes['merge'] = suffixes['merge'][1:]
             for ent in sl.mergemap:
                 stage_ent(sl.mergemap, ent,
-                          os.path.join(targdir, suffixes['merge']))
+                          os.path.join(targdir, suffixes['merge']), True)
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         output = subprocess.check_output(
             ['rsync', '-rvL', targdir + '/', 'root@{}:/'.format(node)])
@@ -94,7 +94,7 @@ def sync_list_to_node(sl, node, suffixes):
         shutil.rmtree(targdir)
     return output
 
-def stage_ent(currmap, ent, targdir):
+def stage_ent(currmap, ent, targdir, appendexist=False):
     dst = currmap[ent]
     everyfent = []
     allfents = ent.split()
@@ -112,9 +112,9 @@ def stage_ent(currmap, ent, targdir):
             'Multiple files match {}, {} needs a trailing slash to indicate a directory'.format(ent, dst))
     fulltarg = os.path.join(targdir, dst)
     for targ in everyfent:
-        mkpathorlink(targ, fulltarg)
+        mkpathorlink(targ, fulltarg, appendexist)
 
-def mkpathorlink(source, destination):
+def mkpathorlink(source, destination, appendexist=False):
     if os.path.isdir(source):
         mkdirp(destination)
         for ent in os.listdir(source):
@@ -127,7 +127,18 @@ def mkpathorlink(source, destination):
             destination = os.path.join(destination, os.path.basename(source))
         else:
             mkdirp(os.path.dirname(destination))
-        os.symlink(source, destination)
+        if appendexist and os.path.exists(destination):
+            tmpnam = tempfile.mktemp()
+            shutil.copy(destination, tmpnam)
+            os.remove(destination)
+            with open(destination, 'w') as realdest:
+                with open(tmpnam) as olddest:
+                    realdest.write(olddest.read())
+                with open(source) as sourcedata:
+                    realdest.write(sourcedata.read())
+            os.remove(tmpnam)
+        else:
+            os.symlink(source, destination)
 
 
 syncrunners = {}
