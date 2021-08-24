@@ -20,6 +20,7 @@
 
 import confluent.util as util
 import os
+import eventlet.semaphore as semaphore
 import eventlet.green.socket as socket
 import struct
 
@@ -28,10 +29,9 @@ neightime = 0
 
 import re
 
-_validmac = re.compile('..:..:..:..:..:..')
+neighlock = semaphore.Semaphore()
 
-
-def update_neigh():
+def _update_neigh():
     global neightable
     global neightime
     neightime = os.times()[4]
@@ -41,6 +41,7 @@ def update_neigh():
     nlhdr = b'\x1c\x00\x00\x00\x1e\x00\x01\x03\x00\x00\x00\x00\x00\x00\x00\x00'
     ndmsg=  b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
     s.sendall(nlhdr + ndmsg)
+    neightable = {}
     while True:
         pdata = s.recv(65536)
         v = memoryview(pdata)
@@ -50,7 +51,7 @@ def update_neigh():
             length, typ = struct.unpack('IH', v[:6])
             if typ == 28:
                 hlen = struct.calcsize('BIHBB')
-                fam, idx, state, flags, typ = struct.unpack('BIHBB', v[16:16+hlen])
+                _, idx, state, flags, typ = struct.unpack('BIHBB', v[16:16+hlen])
                 if typ == 1:  # only handle unicast entries
                     curraddr = None
                     currip = None
@@ -58,10 +59,11 @@ def update_neigh():
                     while len(rta):
                         rtalen, rtatyp = struct.unpack('HH', rta[:4])
                         if rtatyp == 2:  # hwaddr
-                            hwlen = rtalen - 4
-                            curraddr = ':'.join(['{:02x}'.format(x) for x in bytearray(rta[4:rtalen].tobytes())])
+                            curraddr = rta[4:rtalen].tobytes()  # ':'.join(['{:02x}'.format(x) for x in bytearray(rta[4:rtalen].tobytes())])
+                            if len(curraddr) == 20:
+                                curraddr = curraddr[12:]
                         elif rtatyp == 1:  # ip address
-                            currip = socket.inet_ntop(fam, rta[4:rtalen].tobytes())
+                            currip = rta[4:rtalen].tobytes()  # socket.inet_ntop(fam, rta[4:rtalen].tobytes())
                         rta = rta[rtalen:]
                         if not rtalen:
                             if curraddr and currip:
@@ -70,9 +72,23 @@ def update_neigh():
             v = v[length:]
 
 
-def refresh_neigh():
-    global neightime
+def get_hwaddr(ipaddr):
+    hwaddr = None
     if os.name == 'nt':
-        return
-    if os.times()[4] > (neightime + 30):
-        update_neigh()
+        return hwaddr
+    if ':' in ipaddr:
+        ipaddr = socket.inet_pton(socket.AF_INET6, ipaddr)
+    elif '.' in ipaddr:
+        ipaddr = socket.inet_pton(socket.AF_INET, ipaddr)
+    with neighlock:
+        updated = False
+        if os.times()[4] > (neightime + 30):
+            _update_neigh()
+            updated = True
+        hwaddr = neightable.get(ipaddr, None)
+        if not hwaddr and not updated:
+            _update_neigh()
+            hwaddr = neightable.get(ipaddr, None)
+    if hwaddr:
+        hwaddr = ':'.join(['{:02x}'.format(x) for x in bytearray(hwaddr)])
+    return hwaddr

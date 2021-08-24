@@ -106,12 +106,9 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
     addr = peer[0]
     if '%' in addr:
         addr = addr[:addr.index('%')]
-    mac = None
-    if addr not in neighutil.neightable:
-        neighutil.update_neigh()
-    if addr in neighutil.neightable:
-        identifier = neighutil.neightable[addr]
-        mac = identifier
+    mac = neighutil.get_hwaddr(addr)
+    if mac:
+        identifier = mac
     else:
         identifier = addr
     if (identifier, parsed['xid']) in rsps:
@@ -254,7 +251,6 @@ def _grab_rsps(socks, rsps, interval, xidmap):
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
-            neighutil.refresh_neigh()
             _parse_slp_packet(rsp, peer, rsps, xidmap)
             res = select.select(socks, (), (), interval)
             if not res:
@@ -415,11 +411,12 @@ def rescan(handler):
     known_peers = set([])
     for scanned in scan():
         for addr in scanned['addresses']:
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            if ip not in neighutil.neightable:
-                continue
             if addr in known_peers:
                 break
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            macaddr = neighutil.get_hwaddr(ip)
+            if not macaddr:
+                continue
             known_peers.add(addr)
         else:
             handler(scanned)
@@ -484,12 +481,10 @@ def snoop(handler, protocol=None):
                     ip = peer[0].partition('%')[0]
                     if peer in known_peers:
                         continue
-                    if ip not in neighutil.neightable:
-                        neighutil.update_neigh()
-                    if ip not in neighutil.neightable:
+                    mac = neighutil.get_hwaddr(ip)
+                    if not mac:
                         continue
                     known_peers.add(peer)
-                    mac = neighutil.neightable[ip]
                     if mac in peerbymacaddress:
                         peerbymacaddress[mac]['addresses'].append(peer)
                     else:
@@ -541,13 +536,12 @@ def active_scan(handler, protocol=None):
     known_peers = set([])
     for scanned in scan():
         for addr in scanned['addresses']:
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            if ip not in neighutil.neightable:
-                neighutil.update_neigh()
-            if ip not in neighutil.neightable:
-                continue
             if addr in known_peers:
                 break
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            macaddr = neighutil.get_hwaddr(ip)
+            if not macaddr:
+                continue
             known_peers.add(addr)
         else:
             scanned['protocol'] = protocol

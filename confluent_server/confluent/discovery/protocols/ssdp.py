@@ -61,13 +61,12 @@ def active_scan(handler, protocol=None):
     known_peers = set([])
     for scanned in scan(['urn:dmtf-org:service:redfish-rest:1']):
         for addr in scanned['addresses']:
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            if ip not in neighutil.neightable:
-                neighutil.update_neigh()
-            if ip not in neighutil.neightable:
-                continue
             if addr in known_peers:
                 break
+            ip = addr[0].partition('%')[0]  # discard scope if present
+            hwaddr = neighutil.get_hwaddr(ip)
+            if not hwaddr:
+                continue
             known_peers.add(addr)
         else:
             scanned['protocol'] = protocol
@@ -134,11 +133,9 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                         ip = peer[0].partition('%')[0]
                         if peer in known_peers:
                             continue
-                        if ip not in neighutil.neightable:
-                            neighutil.update_neigh()
-                        if ip not in neighutil.neightable:
+                        mac = neighutil.get_hwaddr(ip)
+                        if not mac:
                             continue
-                        mac = neighutil.neightable[ip]
                         known_peers.add(peer)
                         newmacs.add(mac)
                         if mac in peerbymacaddress:
@@ -284,7 +281,6 @@ def _find_service(service, target):
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
-            neighutil.refresh_neigh()
             _parse_ssdp(peer, rsp, peerdata)
         timeout = deadline - util.monotonic_time()
         if timeout < 0:
@@ -316,11 +312,9 @@ def _parse_ssdp(peer, rsp, peerdata):
     ip = peer[0].partition('%')[0]
     nid = ip
     mac = None
-    if ip not in neighutil.neightable:
-        neighutil.update_neigh()
-    if ip in neighutil.neightable:
-        nid = neighutil.neightable[ip]
-        mac = nid
+    mac = neighutil.get_hwaddr(ip)
+    if mac:
+        nid = mac
     headlines = rsp.split(b'\r\n')
     try:
         _, code, _ = headlines[0].split(b' ', 2)
