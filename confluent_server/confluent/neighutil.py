@@ -92,3 +92,8 @@ def get_hwaddr(ipaddr):
     if hwaddr:
         hwaddr = ':'.join(['{:02x}'.format(x) for x in bytearray(hwaddr)])
     return hwaddr
+
+
+if __name__ == '__main__':
+    import sys
+    print(repr(get_hwaddr(sys.argv[1])))
