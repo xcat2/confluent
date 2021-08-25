@@ -370,13 +370,20 @@ class OsHandler(object):
         self.arch = arch
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
-        if args.pkglist:
-            self.pkglist = args.pkglist
+        try:
+            pkglist = args.packagelist
+        except AttributeError:
+            pkglist = ''
+        if pkglist:
+            self.pkglist = pkglist
             if '/' not in self.pkglist:
                 self.pkglist = os.path.join(get_mydir(self.oscategory), self.pkglist)
         else:
             self.pkglist = os.path.join(get_mydir(self.oscategory), 'pkglist')
-        self.addrepos = args.addrepos
+        try:
+            self.addrepos = args.addrepos
+        except AttributeError:
+            self.addrepos = ''
 
     def get_json(self):
         odata = [self.oscategory, self.version, self.arch, self.name]
@@ -394,11 +401,11 @@ class OsHandler(object):
         return pkgs
 
 class SuseHandler(OsHandler):
-    def __init__(self, name, version, arch):
-        super().__init__(name, version, arch)
+    def __init__(self, name, version, arch, args):
         if not version.startswith(b'15.'):
             raise Exception('Unsupported Suse version {}'.format(version.decode('utf8')))
         self.oscategory = 'suse15'
+        super().__init__(name, version, arch, args)
         self.zyppargs = []
         self.sources = []
 
@@ -445,10 +452,11 @@ class SuseHandler(OsHandler):
 
 
 class ElHandler(OsHandler):
-    def __init__(self, name, version, arch):
-        super().__init__(name, version, arch)
+    def __init__(self, name, version, arch, args):
         self.oscategory = 'el8'
         self.yumargs = []
+        super().__init__(name, version, arch, args)
+
 
     def add_pkglists(self):
         self.yumargs.extend(self.list_packages())
@@ -699,7 +707,7 @@ def check_root(installroot):
         os.remove(testpath)
 
 
-def fingerprint_source_suse(files, sourcepath):
+def fingerprint_source_suse(files, sourcepath, args):
     if os.path.exists(os.path.join(sourcepath, 'distinfo.yaml')):
         with open(os.path.join(sourcepath, 'distinfo.yaml'), 'r') as distinfo:
             di = distinfo.read()
@@ -727,11 +735,11 @@ def fingerprint_source_suse(files, sourcepath):
             if arch == 'noarch':
                 prodinfo = open(os.path.join(sourcepath, '.discinfo')).read()
                 arch = prodinfo.split('\n')[2]
-            return ElHandler(osname, ver, arch)
+            return ElHandler(osname, ver, arch, args)
     return None
 
 
-def fingerprint_source_el(files, sourcepath):
+def fingerprint_source_el(files, sourcepath, args):
     for filen in files:
         if '-release-8' in filen:
             parts = filen.split('-')
@@ -743,21 +751,21 @@ def fingerprint_source_el(files, sourcepath):
             if arch == 'noarch':
                 prodinfo = open(os.path.join(sourcepath, '.discinfo')).read()
                 arch = prodinfo.split('\n')[2]
-            return ElHandler(osname, ver, arch)
+            return ElHandler(osname, ver, arch, args)
     return None
 
 
-def fingerprint_source(sourcepath):
+def fingerprint_source(sourcepath, args):
     oshandler = None
     funs = [fingerprint_source_el, fingerprint_source_suse]
     for _, _, files in os.walk(sourcepath):
         for ffun in funs:
-            oshandler = ffun(files, sourcepath)
+            oshandler = ffun(files, sourcepath, args)
             if oshandler is not None:
                 return oshandler
     return oshandler
 
-def fingerprint_host_el(hostpath='/'):
+def fingerprint_host_el(args, hostpath='/'):
     try:
         import rpm
     except ImportError:
@@ -770,10 +778,10 @@ def fingerprint_host_el(hostpath='/'):
         osname = inf.name.replace('-release', '').replace('-', '_')
         if osname == 'centos_linux':
             osname = 'centos'
-        return ElHandler(osname, inf.version, os.uname().machine)
+        return ElHandler(osname, inf.version, os.uname().machine, args)
 
 
-def fingerprint_host_suse(hostpath='/'):
+def fingerprint_host_suse(args, hostpath='/'):
     try:
         import rpm
     except ImportError:
@@ -789,10 +797,10 @@ def fingerprint_host_suse(hostpath='/'):
     if osname:
         return SuseHandler(osname, inf.version, os.uname().machine)
 
-def fingerprint_host(hostpath='/'):
+def fingerprint_host(args, hostpath='/'):
     oshandler = None
     for fun in [fingerprint_host_el, fingerprint_host_suse]:
-        oshandler = fun()
+        oshandler = fun(args, hostpath)
         if oshandler is not None:
             return oshandler
     return oshandler
@@ -803,11 +811,11 @@ def build_root(args):
     if args.source:
         if '/' not in args.source and not os.path.exists(args.source):
             args.source = os.path.join('/var/lib/confluent/distributions/', args.source)
-        oshandler = fingerprint_source(args.source)
+        oshandler = fingerprint_source(args.source, args)
         if oshandler is not None:
             oshandler.set_source(args.source)
     else:
-        oshandler = fingerprint_host()
+        oshandler = fingerprint_host(args)
     if oshandler is None:
         sys.stderr.write(
             'Unable to recognize source directory {0}\n'.format(
@@ -924,7 +932,7 @@ def pack_image(args):
     os.remove(tmploc)
     with open(os.path.join(outdir, 'build-info'), 'w') as buildinfo:
         buildinfo.write('Packed from {} on {}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
-    oshandler = fingerprint_host(args.scratchdir)
+    oshandler = fingerprint_host(args, args.scratchdir)
     tryupdate = False
     if oshandler:
         prettyname = oshandler.osname
