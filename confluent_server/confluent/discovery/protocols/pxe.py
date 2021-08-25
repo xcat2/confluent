@@ -25,6 +25,7 @@
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
+import confluent.neighutil as neighutil
 import confluent.log as log
 import confluent.netutil as netutil
 import confluent.util as util
@@ -397,20 +398,32 @@ def snoop(handler, protocol=None, nodeguess=None):
                     rqv = memoryview(pkt)
                     rq = bytearray(rqv[:2])
                     if rq[0] == 1: # dhcpv6 solicit
-                        process_dhcp6req(rqv, addr[0])
+                        process_dhcp6req(handler, rqv, addr, netc, cfg, nodeguess)
 
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                             event=log.Events.stacktrace)
 
-def process_dhcp6req(rqv, addr):
-    txid = rqv[1:4]
+def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
+    ip = addr[0]
     req, disco = v6opts_to_dict(bytearray(rqv[4:]))
-    if 'uuid' not in disco:
+    req['txid'] = rqv[1:4]
+    if not disco.get('uuid', None) or not disco.get('arch', None):
         return
-    print(addr)
-    print(repr(disco))
-
+    mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
+    if not mac:
+        net.sendto(b'\x00', addr)
+    tries = 5
+    while tries and not mac:
+        eventlet.sleep(0.01)
+        tries -= 1
+        mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
+    info = {'hwaddr': mac, 'uuid': disco['uuid'],
+            'architecture': disco['arch'], 'services': ('pxe-client',)}
+    if ignoredisco.get(mac, 0) + 90 < time.time():
+        ignoredisco[mac] = time.time()
+        handler(info)
+    consider_discover(info, req, net, cfg, None, nodeguess, addr)
 
 def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
     rq = bytearray(rqv)
@@ -501,9 +514,8 @@ def get_deployment_profile(node, cfg, cfd=None):
 
 staticassigns = {}
 myipbypeer = {}
-def check_reply(node, info, packet, sock, cfg, reqview):
+def check_reply(node, info, packet, sock, cfg, reqview, addr):
     httpboot = info['architecture'] == 'uefi-httpboot'
-    replen = 275  # default is going to be 286
     cfd = cfg.get_node_attributes(node, ('deployment.*'))
     profile = get_deployment_profile(node, cfg, cfd)
     if not profile:
@@ -513,6 +525,26 @@ def check_reply(node, info, packet, sock, cfg, reqview):
                 node, info['uuid'], info['hwaddr']
             )})
         return
+    if addr:
+        if not httpboot:
+            log.log({'info': 'IPv6 PXE boot attempt by {0}, but IPv6 PXE is not supported, try IPv6 HTTP boot or IPv4 boot'.format(node)})
+            return
+        return reply_dhcp6(node, addr, cfg)
+    else:
+        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile)
+
+def reply_dhcp6(node, addr, cfg):
+    myaddrs = netutil.get_my_addresses(addr[-1], socket.AF_INET6)
+    if not myaddrs:
+        log.log({'info': 'Unable to provide IPv6 boot services to {0} , no viable IPv6 configuration on interface index "{1}" to respond through.'.format(node, addr[-1])})
+        return
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=addr[-1])
+
+    print(repr(addr))
+    pass
+
+def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
+    replen = 275  # default is going to be 286
     myipn = info['netinfo']['recvip']
     myipn = socket.inet_aton(myipn)
 
@@ -686,11 +718,11 @@ def ack_request(pkt, rq, info):
     repview[26:28] = struct.pack('!H', datasum)
     send_raw_packet(repview, len(rply), rq, info)
 
-def consider_discover(info, packet, sock, cfg, reqview, nodeguess):
+def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None):
     if info.get('hwaddr', None) in macmap and info.get('uuid', None):
-        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview)
+        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr)
     elif info.get('uuid', None) in uuidmap:
-        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview)
+        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr)
     elif packet.get(53, None) == b'\x03':
         ack_request(packet, reqview, info)
     elif info.get('uuid', None) and info.get('hwaddr', None):

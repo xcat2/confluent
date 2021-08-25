@@ -172,20 +172,38 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                                                                 None)
     cfgdata = {
         'ipv4_gateway': None,
+        'ipv4_broken': True,
+        'ipv6_broken': True,
         'ipv4_address': None,
         'ipv4_method': None,
         'prefix': None,
+        'ipv6_prefix': None,
+        'ipv6_address': None,
+        'ipv6_method': None,
     }
-    nets = None
-    needsvrip = False
+    myaddrs = []
     if ifidx is not None:
         dhcprequested = False
-        nets = list(_iftonets(ifidx))
-        if not nets:
-            cfgdata['ipv4_broken'] = True
+        myaddrs = get_my_addresses(ifidx)
+        for addr in myaddrs:
+            try:
+                if addr[0] == socket.AF_INET:
+                    del cfgdata['ipv4_broken']
+                elif addr[1] == socket.AF_INET6:
+                    del cfgdata['ipv6_broken']
+            except KeyError:
+                pass
     if serverip is not None:
-        needsvrip = True
+        if '.' in serverip:
+            fam = socket.AF_INET
+        elif ':' in serverip:
+            fam = socket.AF_INET6
+        else:
+            raise ValueError('"{0}" is not a valid ip argument')
+        ipbytes = socket.inet_pton(fam, serverip)
         dhcprequested = False
+        myips = [x for x in get_my_addresses() if x[1] == ipbytes]
+        print(repr(myips))
         nets = list(myiptonets(serverip))
     genericmethod = 'static'
     ipbynodename = None
@@ -194,7 +212,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             node, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
     except Exception:
         ipbynodename = None
-    if nets is not None:
+    if nets:
         candgws = []
         candsrvs = []
         for net in nets:
@@ -266,6 +284,40 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 cfgdata['ipv4_gateway'] = gw
                 break
     return cfgdata
+
+nlhdrsz = struct.calcsize('IHHII')
+ifaddrsz = struct.calcsize('BBBBI')
+
+def get_my_addresses(idx=0, family=0):
+    # RTM_GETADDR = 22
+    # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
+    nlhdr = struct.pack('IHHII', nlhdrsz + ifaddrsz, 22, 0x301, 0, 0)
+    # ifaddrmsg struct: u8 family, u8 prefixlen, u8 flags, u8 scope, u32 index
+    ifaddrmsg = struct.pack('BBBBI', family, 0, 0, 0, idx)
+    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
+    s.bind((0, 0))
+    s.sendall(nlhdr + ifaddrmsg)
+    addrs = []
+    while True:
+        pdata = s.recv(65536)
+        v = memoryview(pdata)
+        if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
+            break
+        while len(v):
+            length, typ = struct.unpack('IH', v[:6])
+            if typ == 20:
+                fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
+                if (ridx == idx or not idx) and scope == 0:
+                    rta = v[nlhdrsz+ifaddrsz:length]
+                    while len(rta):
+                        rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                        if rtatyp == 1:
+                            addrs.append((fam, rta[4:rtalen].tobytes(), plen, ridx))
+                        if not rtalen:
+                            break
+                        rta = rta[rtalen:]
+            v = v[length:]
+    return addrs
 
 
 def get_prefix_len_for_ip(ip):
