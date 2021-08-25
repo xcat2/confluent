@@ -38,14 +38,16 @@ def _update_neigh():
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
     s.bind((0, 0))
     # RTM_GETNEIGH
+    # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
     nlhdr = b'\x1c\x00\x00\x00\x1e\x00\x01\x03\x00\x00\x00\x00\x00\x00\x00\x00'
+    # ndmsg struct u8 family u8 pad, u16 pad, s32 ifidx, u16 state, u8 flags, u8 type
     ndmsg=  b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
     s.sendall(nlhdr + ndmsg)
     neightable = {}
     while True:
         pdata = s.recv(65536)
         v = memoryview(pdata)
-        if struct.unpack('H', v[4:6])[0] == 3:
+        if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
             break
         while len(v):
             length, typ = struct.unpack('IH', v[:6])
