@@ -39,6 +39,24 @@ def cidr_to_mask(cidr):
     return socket.inet_ntop(
         socket.AF_INET, struct.pack('!I', (2**32 - 1) ^ (2**(32 - cidr) - 1)))
 
+def ipn_on_same_subnet(fam, first, second, prefix):
+    if fam == socket.AF_INET6:
+        if prefix > 64:
+            firstmask = 0xffffffffffffffff
+            secondmask = (2**64-1) ^ (2**(128 - prefix) - 1)
+        else:
+            firstmask = (2**64-1) ^ (2**(64 - prefix) - 1)
+            secondmask = 0
+        first = struct.unpack('!QQ', first)
+        second = struct.unpack('!QQ', second)
+        return ((first[0] & firstmask == second[0] & firstmask)
+            and (first[1] & secondmask == second[1] & secondmask))
+    else:
+        mask = (2**32 - 1) ^ (2**(32 - prefix) - 1)
+        first = struct.unpack('!I', first)[0]
+        second = struct.unpack('!I', second)[0]
+        return (first & mask == second & mask)
+
 def ip_on_same_subnet(first, second, prefix):
     if first.startswith('::ffff:') and '.' in first:
         first = first.replace('::ffff:', '')
@@ -172,8 +190,6 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                                                                 None)
     cfgdata = {
         'ipv4_gateway': None,
-        'ipv4_broken': True,
-        'ipv6_broken': True,
         'ipv4_address': None,
         'ipv4_method': None,
         'prefix': None,
@@ -185,14 +201,17 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     if ifidx is not None:
         dhcprequested = False
         myaddrs = get_my_addresses(ifidx)
+        v4broken = True
+        v6broken = True
         for addr in myaddrs:
-            try:
-                if addr[0] == socket.AF_INET:
-                    del cfgdata['ipv4_broken']
-                elif addr[1] == socket.AF_INET6:
-                    del cfgdata['ipv6_broken']
-            except KeyError:
-                pass
+            if addr[0] == socket.AF_INET:
+                v4broken = False
+            elif addr[0] == socket.AF_INET6:
+                v6broken = False
+        if v4broken:
+            cfgdata['ipv4_broken'] = True
+        if v6broken:
+            cfgdata['ipv6_broken'] = True
     if serverip is not None:
         if '.' in serverip:
             fam = socket.AF_INET
@@ -202,87 +221,136 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             raise ValueError('"{0}" is not a valid ip argument')
         ipbytes = socket.inet_pton(fam, serverip)
         dhcprequested = False
-        myips = [x for x in get_my_addresses() if x[1] == ipbytes]
-        print(repr(myips))
-        nets = list(myiptonets(serverip))
+        myaddrs = [x for x in get_my_addresses() if x[1] == ipbytes]
     genericmethod = 'static'
     ipbynodename = None
+    ip6bynodename = None
     try:
-        ipbynodename = socket.getaddrinfo(
-            node, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
-    except Exception:
-        ipbynodename = None
-    if nets:
+        for addr in socket.getaddrinfo(node, 0, 0, socket.SOCK_DGRAM):
+            if addr[0] == socket.AF_INET:
+                ipbynodename = addr[-1][0]
+            elif addr[0] == socket.AF_INET6:
+                ip6bynodename = addr[-1][0]
+    except socket.gaierror:
+        pass
+    if myaddrs:
         candgws = []
         candsrvs = []
-        for net in nets:
-            net, prefix, svrip = net
-            candsrvs.append(svrip)
-            cfgdata['deploy_server'] = svrip
+        for myaddr in myaddrs:
+            fam, svrip, prefix = myaddr[:3]
+            candsrvs.append((fam, svrip, prefix))
+            if fam == socket.AF_INET:
+                cfgdata['deploy_server'] = socket.inet_ntop(socket.AF_INET, svrip)
+                nver = '4'
+            elif fam == socket.AF_INET6:
+                cfgdata['deploy_server_v6'] = socket.inet_ntop(socket.AF_INET6, svrip)
+                nver = '6'
             for candidate in cfgbyname:
-                ipmethod = cfgbyname[candidate].get('ipv4_method', 'static')
+                ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
                 if ipmethod == 'dhcp':
                     dhcprequested = True
                     continue
                 if ipmethod == 'firmwaredhcp':
                     genericmethod = ipmethod
-                candip = cfgbyname[candidate].get('ipv4_address', None)
+                candip = cfgbyname[candidate].get('ipv{}_address'.format(nver), None)
                 if candip and '/' in candip:
                     candip, candprefix = candip.split('/')
                     if int(candprefix) != prefix:
                         continue
-                candgw = cfgbyname[candidate].get('ipv4_gateway', None)
+                candgw = cfgbyname[candidate].get('ipv{}_gateway'.format(nver), None)
                 if candip:
                     try:
-                        if ip_on_same_subnet(net, candip, prefix):
-                            cfgdata['ipv4_address'] = candip
-                            cfgdata['ipv4_method'] = ipmethod
-                            cfgdata['ipv4_gateway'] = cfgbyname[candidate].get(
-                                'ipv4_gateway', None)
-                            cfgdata['prefix'] = prefix
-                            if ipbynodename and ipbynodename == candip:
+                        for inf in socket.getaddrinfo(candip, 0, fam, socket.SOCK_STREAM):
+                            candipn = socket.inet_pton(fam, inf[-1][0])
+                        if ipn_on_same_subnet(fam, svrip, candipn, prefix):
+                            cfgdata['ipv{}_address'.format(nver)] = candip
+                            cfgdata['ipv{}_method'.format(nver)] = ipmethod
+                            cfgdata['ipv{}_gateway'.format(nver)] = cfgbyname[candidate].get(
+                                'ipv{}_gateway'.format(nver), None)
+                            if nver == '4':
+                                cfgdata['prefix'] = prefix
+                            else:
+                                cfgdata['prefix_v{}'.format(nver)] = prefix
+                            if candip in (ipbynodename, ip6bynodename):
                                 cfgdata['matchesnodename'] = True
                             return cfgdata
                     except Exception as e:
                         cfgdata['error_msg'] = "Error trying to evaluate net.*ipv4_address attribute value '{0}' on {1}: {2}".format(candip, node, str(e))
                 elif candgw:
-                    if ip_on_same_subnet(net, candgw, prefix):
-                        candgws.append(candgw)
+                    for inf in socket.getaddrinfo(candgw, 0, fam, socket.SOCK_STREAM):
+                        candgwn = socket.inet_pton(fam, inf[-1][0])
+                    if ipn_on_same_subnet(fam, svrip, candgwn, prefix):
+                        candgws.append((fam, candgwn, prefix))
         if dhcprequested:
             if not cfgdata.get('ipv4_method', None):
                 cfgdata['ipv4_method'] = 'dhcp'
+            if not cfgdata.get('ipv6_method', None):
+                cfgdata['ipv6_method'] = 'dhcp'
             return cfgdata
-        if ipbynodename == None:
+        if ipbynodename == None and ip6bynodename == None:
             return cfgdata
-        for net in nets:
-            net, prefix, svrip = net
-            if ip_on_same_subnet(net, ipbynodename, prefix):
+        for myaddr in myaddrs:
+            fam, svrip, prefix = myaddr[:3]
+            if fam == socket.AF_INET:
+                bynodename = ipbynodename
+                nver = '4'
+            else:
+                bynodename = ip6bynodename
+                nver = '6'
+            ipbynodenamn = socket.inet_pton(fam, bynodename)
+            if ipn_on_same_subnet(fam, svrip, ipbynodenamn, prefix):
                 cfgdata['matchesnodename'] = True
-                cfgdata['ipv4_address'] = ipbynodename
-                cfgdata['ipv4_method'] = genericmethod
-                cfgdata['prefix'] = prefix
-                break
+                cfgdata['ipv{}_address'.format(nver)] = bynodename
+                cfgdata['ipv{}_method'.format(nver)] = genericmethod
+                if nver == '4':
+                    cfgdata['prefix'] = prefix
+                else:
+                    cfgdata['prefix_v6'] = prefix
         for svr in candsrvs:
-            if ip_on_same_subnet(svr, ipbynodename, prefix):
-                cfgdata['deploy_server'] = svr
-                break
+            fam, svr, prefix = svr
+            if fam == socket.AF_INET:
+                bynodename = ipbynodename
+            elif fam == socket.AF_INET6:
+                bynodename = ip6bynodename
+            bynodenamn = socket.inet_pton(fam, bynodename)
+            if ipn_on_same_subnet(fam, svr, bynodenamn, prefix):
+                svrname = socket.inet_ntop(fam, svr)
+                if fam == socket.AF_INET:
+                    cfgdata['deploy_server'] = svrname
+                else:
+                    cfgdata['deploy_server_v6'] = svrname
         for gw in candgws:
-            if ip_on_same_subnet(gw, ipbynodename, prefix):
-                cfgdata['ipv4_gateway'] = gw
-                break
+            fam, candgwn, prefix = gw
+            if fam == socket.AF_INET:
+                nver = '4'
+                bynodename = ipbynodename
+            elif fam == socket.AF_INET6:
+                nver = '6'
+                bynodename = ip6bynodename
+            bynodenamn = socket.inet_pton(fam, bynodename)
+            if ipn_on_same_subnet(fam, candgwn, bynodenamn, prefix):
+                cfgdata['ipv{}_gateway'.format(nver)] = socket.inet_ntop(fam, candgwn)
         return cfgdata
     if ip is not None:
-        prefixlen = get_prefix_len_for_ip(ip)
-        cfgdata['prefix'] = prefixlen
-        for setting in nodenetattribs:
-            if 'ipv4_gateway' not in setting:
-                continue
-            gw = nodenetattribs[setting].get('value', None)
-            if gw is None or not gw:
-                continue
-            if ip_on_same_subnet(ip, gw, prefixlen):
-                cfgdata['ipv4_gateway'] = gw
-                break
+        for prefixinfo in get_prefix_len_for_ip(ip):
+            fam, prefix = prefixinfo
+            if fam == socket.AF_INET:
+                cfgdata['prefix'] = prefix
+                nver = '4'
+            else:
+                cfgdata['prefix_v6'] = prefix
+                nver = '6'
+            for setting in nodenetattribs:
+                if 'ipv{}_gateway'.format(nver) not in setting:
+                    continue
+                gw = nodenetattribs[setting].get('value', None)
+                if gw is None or not gw:
+                    continue
+                gwn = socket.inet_pton(fam, gw)
+                ipn = socket.inet_pton(fam, ip)
+                if ipn_on_same_subnet(fam, ipn, gwn, prefix):
+                    cfgdata['ipv{}_gateway'.format(nver)] = gw
+                    break
     return cfgdata
 
 nlhdrsz = struct.calcsize('IHHII')
@@ -321,36 +389,17 @@ def get_my_addresses(idx=0, family=0):
 
 
 def get_prefix_len_for_ip(ip):
-    # for now, we'll use the system route table
-    # later may provide for configuration lookup to override the route
-    # table
-    ip = getaddrinfo(ip, 0, socket.AF_INET)[0][-1][0]
-    try:
-        ipn = socket.inet_aton(ip)
-    except socket.error:  # For now, assume 64 for ipv6
-        return 64
-    # It comes out big endian, regardless of host arch
-    ipn = struct.unpack('>I', ipn)[0]
-    rf = open('/proc/net/route')
-    ri = rf.read()
-    rf.close()
-    ri = ri.split('\n')[1:]
-    for rl in ri:
-        if not rl:
-            continue
-        rd = rl.split('\t')
-        if rd[1] == '00000000':  # default gateway, not useful for this
-            continue
-        # don't have big endian to look at, assume that it is host endian
-        maskn = struct.unpack('I', struct.pack('>I', int(rd[7], 16)))[0]
-        netn = struct.unpack('I', struct.pack('>I', int(rd[1], 16)))[0]
-        if ipn & maskn == netn:
-            nbits = 0
-            while maskn:
-                nbits += 1
-                maskn = maskn << 1 & 0xffffffff
-            return nbits
-    raise exc.NotImplementedException("Non local addresses not supported")
+    myaddrs = get_my_addresses()
+    found = False
+    for inf in socket.getaddrinfo(ip, 0, 0, socket.SOCK_DGRAM):
+        for myaddr in myaddrs:
+            if inf[0] != myaddr[0]:
+                continue
+            if ipn_on_same_subnet(myaddr[0], myaddr[1], socket.inet_pton(myaddr[0], inf[-1][0]), myaddr[2]):
+                found = True
+                yield (myaddr[0], myaddr[2])
+    if not found:
+        raise exc.NotImplementedException("Non local addresses not supported")
 
 def addresses_match(addr1, addr2):
     """Check two network addresses for similarity

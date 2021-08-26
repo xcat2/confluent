@@ -461,6 +461,26 @@ node = {
                         'case for other net attributes, net.eth0.ipv4_gateway '
                         'and similar is accepted.'
     },
+    'net.ipv6_address': {
+        'description': 'When configuring static, use this address.  If '
+                       'unspecified, it will check if the node name resolves '
+                       'to an IP address.  Additionally, the subnet prefix '
+                       'may be specified with a suffix, e.g. "/64".  If not '
+                       'specified, it will attempt to autodetect based on '
+                       'current network configuration.'
+    },
+    'net.ipv6_method': {
+        'description': 'Whether to use static or dhcp when configuring this '
+                       'interface for IPv6. "firmwaredhcp" means to defer to '
+                       'external DHCP server during firmware execution, but '
+                       'use static for OS',
+        'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'none')
+    },
+    'net.ipv6_gateway': {
+        'description':  'The IPv6 gateway to use if applicable.  As is the '
+                        'case for other net attributes, net.eth0.ipv6_gateway '
+                        'and similar is accepted.'
+    },
     'net.hwaddr': {
         'description': 'The hardware address, aka MAC address of the interface indicated, generally populated by the '
                        'PXE discovery mechanism'
