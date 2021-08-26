@@ -658,6 +658,7 @@ class ProxyConsole(object):
         while data:
             self.data_handler(data)
             data = tlvdata.recv(self.remote)
+        self.remote.close()
 
     def get_buffer_age(self):
         # the server sends a buffer age if appropriate, no need to handle
@@ -720,7 +721,6 @@ class ProxyConsole(object):
         if self.remote:
             try:
                 tlvdata.send(self.remote, {'operation': 'stop'})
-                self.remote.close()
             except Exception:
                 pass
         self.clisession = None
