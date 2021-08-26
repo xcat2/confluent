@@ -358,7 +358,9 @@ def create_yumconf(sourcedir, addrepos):
                 yumconf.write('enabled=1\ngpgcheck=0\n\n')
     addrepoidx = 1
     for repo in addrepos.split(','):
-        yumconf.write('[addrepo-{0}]\n', addrepoidx)
+        if not repo:
+            continue
+        yumconf.write('[addrepo-{0}]\n'.format(addrepoidx))
         yumconf.write('name=Add-on repository {0}\n'.format(addrepoidx))
         yumconf.write('baseurl={0}\n'.format(repo))
         yumconf.write('enabled=1\ngpgcheck\0\n\n')
@@ -708,13 +710,6 @@ def check_root(installroot):
     # Ensure that the target is an adequate filesystem to
     # be root
     mkdirp(installroot)
-    testpath = os.path.join(installroot, '.testcap')
-    with open(testpath, 'w') as tp:
-        tp.write('')
-    try:
-        subprocess.check_call(['setcap', 'cap_net_raw+p', testpath])
-    finally:
-        os.remove(testpath)
 
 
 def fingerprint_source_suse(files, sourcepath, args):
