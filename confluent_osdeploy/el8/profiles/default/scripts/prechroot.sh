@@ -12,6 +12,8 @@ export confluent_mgr confluent_profile nodename
 cp -a /etc/confluent /mnt/sysimage/etc
 chmod -R og-rwx /mnt/sysimage/etc/confluent
 cp /tmp/functions /mnt/sysimage/etc/confluent/
+hostnamectl set-hostname $nodename
+cp /etc/hostname /mnt/sysimage/etc/hostname
 . /tmp/functions
 if [ -f /tmp/cryptboot ]; then
     cp /tmp/cryptboot /mnt/sysimage/tmp/
