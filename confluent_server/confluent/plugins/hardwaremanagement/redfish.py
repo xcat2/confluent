@@ -183,7 +183,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
             if 'Access Denied' in str(pe):
                 raise exc.TargetEndpointBadCredentials()
             if 'Redfish not ready' in str(pe):
-                raise exc.TargetEndpointUnreachable('Redfish not yet ready')
+                raise exc.TargetEndpointUnreachable('Redfish is not supported by this system or is not yet ready')
             raise
 
     def close_confluent(self):

@@ -15,6 +15,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 CLONE_NEWNS = 0x00020000
@@ -315,7 +316,16 @@ def encrypt_image(plainfile, cryptfile, keyfile):
                 lastoffset = plainin.tell()
                 cryptout.write(chunk)
                 chunk = plainin.read(2097152)
-    subprocess.check_call(['dmsetup', 'remove', dmname])
+    mounted = True
+    tries = 30
+    time.sleep(0.1)
+    while mounted:
+        tries -= 1
+        try:
+            subprocess.check_call(['dmsetup', 'remove', dmname])
+            mounted = False
+        except subprocess.CalledProcessError:
+            time.sleep(0.1)
     subprocess.check_call(['losetup', '-d', loopdev])
     oum = os.umask(0o077)
     with open(keyfile, 'w') as keyout:
@@ -890,7 +900,16 @@ def unpack_image(args):
         subprocess.check_call(['unsquashfs', '-d', 'rootfs', indir])
     finally:
         if cleandmtable:
-            subprocess.check_call(['dmsetup', 'remove', cleandmtable])
+            mounted = True
+            tries = 30
+            time.sleep(0.1)
+            while mounted and tries:
+                tries -= 1
+                try:
+                    subprocess.check_call(['dmsetup', 'remove', cleandmtable])
+                    mounted = False
+                except subprocess.CalledProcessError:
+                    time.sleep(0.1)
 
 
 def pack_image(args):
