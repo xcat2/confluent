@@ -4,11 +4,7 @@ import json
 import os
 import sys
 
-tmppassword = 'to3BdS91ABrd'
 missingargs = False
-if 'XCCUSER' not in os.environ:
-    print('Must set XCCUSER environment variable')
-    missingargs = True
 if 'XCCPASS' not in os.environ:
     print('Must set XCCPASS environment variable')
     missingargs = True
