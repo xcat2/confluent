@@ -727,7 +727,7 @@ def fingerprint_source_suse(files, sourcepath, args):
                 if key == 'name':
                     osname, ver, arch = val.split('-')
             if issuse:
-                return SuseHandler(osname, ver, arch)
+                return SuseHandler(osname, ver, arch, args)
 
     for filen in files:
         if '-release-8' in filen:
@@ -800,7 +800,7 @@ def fingerprint_host_suse(args, hostpath='/'):
         if inf.name.startswith(b'SLE_'):
             osname = 'sle'
     if osname:
-        return SuseHandler(osname, inf.version, os.uname().machine)
+        return SuseHandler(osname, inf.version, os.uname().machine, args)
 
 def fingerprint_host(args, hostpath='/'):
     oshandler = None
