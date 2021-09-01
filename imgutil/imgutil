@@ -415,7 +415,7 @@ class OsHandler(object):
 class SuseHandler(OsHandler):
     def __init__(self, name, version, arch, args):
         if not isinstance(version, str):
-            version = version.decade('utf8')
+            version = version.decode('utf8')
         if not version.startswith('15.'):
             raise Exception('Unsupported Suse version {}'.format(version))
         self.oscategory = 'suse15'
@@ -831,9 +831,13 @@ def build_root(args):
     else:
         oshandler = fingerprint_host(args)
     if oshandler is None:
-        sys.stderr.write(
-            'Unable to recognize source directory {0}\n'.format(
-                args.source))
+        if args.source:
+            sys.stderr.write(
+                'Unable to recognize source directory {0}\n'.format(
+                    args.source))
+        else:
+            sys.stderr.write(
+                'Unable to recognize build system os\n')
         sys.exit(1)
     oshandler.set_target(args.scratchdir)
     oshandler.add_pkglists()
