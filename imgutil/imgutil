@@ -971,7 +971,7 @@ def pack_image(args):
                         'PRETTY_NAME=', '').replace('"', '')
         label = '{0} ({1})'.format(prettyname, 'Diskless Boot')
         with open(os.path.join(outdir, 'profile.yaml'), 'w') as profiley:
-            profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n'.format(label))
+            profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered # tethered is default when unspecified to save on memory, untethered will use more ram, but will not have any ongoing runtime root fs dependency on the http servers.\n'.format(label))
         oscat = oshandler.oscategory
         confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
         os.symlink('{}/initramfs/addons.cpio'.format(confdir),
