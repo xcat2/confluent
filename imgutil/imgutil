@@ -440,7 +440,10 @@ class SuseHandler(OsHandler):
 
     def prep_root(self, args):
         mkdirp(self.targpath)
-        if not self.sources:
+        if self.sources:
+            addkeycmd = ['rpm', '--root', self.targpath, '--import'] + glob.glob('/usr/lib/rpm/gnupg/keys/*.asc')
+            subprocess.check_call(addkeycmd)
+        else:
             targzypp = os.path.join(self.targpath, 'etc/zypp')
             mkdirp(targzypp)
             shutil.copytree(
