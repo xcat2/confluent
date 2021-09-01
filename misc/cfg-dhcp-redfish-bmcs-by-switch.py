@@ -14,6 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script demonstrates a strategy for redfish bmcs that
+# dhcp to leverage the confluent switch scanning to help
+# bootstrap such devices. Be aware of the uuid reformatting
+# code, and determine if it is relevant for the target system
+# in question.  The normal thing would be to leave UUID as-is,
+# but some implementations mangle it in a misunderstanding
+# of 'wire format' UUID.  Also, here xCAT is used as the 
+# 'dhcp helper', so that may need to be replaced with dnsmasq
+# or direct isc dhcp code.
+
+# Unfortunately, this is particular about the dhcp server,
+# the user must know if the bmc in question mangles the uuid
+# or not, and other such limitation make this difficult to blindly
+# recommend, but hopefully can be useful reference material
+
+
 import sys
 sys.path.append('/opt/confluent/lib/python')
 import confluent.client as cli
