@@ -617,7 +617,7 @@ def main():
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
-        'will override the target to be /run/root', action='append')
+        'will override the target to be /run/root, and something like /var/lib/repository:- will cause it to mount to the identical path inside the image', action='append')
     buildp.add_argument('scratchdir', help='Directory to build new diskless root in')
     execp = sps.add_parser('exec', help='Start specified scratch directory as container')
     execp.add_argument('-v', '--volume',
