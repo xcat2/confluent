@@ -7,7 +7,29 @@ else
     confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 fi
-mount -o loop,ro /mnt/remoteimg/*.sfs /mnt/remote
+/opt/confluent/bin/confluent_imginfo /mnt/remoteimg/rootimg.sfs > /tmp/rootimg.info
+loopdev=$(losetup -f)
+export mountsrc=$loopdev
+losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
+if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
+    curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key
+    cipher=$(head -n 1 /tmp/rootimg.key)
+    key=$(tail -n 1 /tmp/rootimg.key)
+    len=$(wc -c /mnt/remoteimg/rootimg.sfs | awk '{print $1}')
+    len=$(((len-4096)/512))
+    dmsetup create cryptimg --table "0 $len crypt $cipher $key 0 $loopdev 8"
+    /opt/confluent/bin/confluent_imginfo /dev/mapper/cryptimg > /tmp/rootimg.info
+    mountsrc=/dev/mapper/cryptimg
+fi
+if grep '^Format: squashfs' /tmp/rootimg.info > /dev/null; then
+    mount -o ro $mountsrc /mnt/remote
+elif grep  '^Format: confluent_multisquash' /tmp/rootimg.info; then
+    tail -n +3 /tmp/rootimg.info  | awk '{gsub("/", "_"); print "echo 0 " $4 " linear '$mountsrc' " $3 " | dmsetup create mproot" $7}' > /tmp/setupmount.sh
+    . /tmp/setupmount.sh
+    cat /tmp/setupmount.sh |awk '{printf "mount /dev/mapper/"$NF" "; sub("mproot", ""); gsub("_", "/"); print "/mnt/remote"$NF}' > /tmp/mountparts.sh
+    . /tmp/mountparts.sh
+fi
+
 #mount -t tmpfs overlay /mnt/overlay
 modprobe zram
 memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
@@ -15,8 +37,15 @@ memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
 mkfs.xfs /dev/zram0 > /dev/null
 mount -o discard /dev/zram0 /mnt/overlay
-mkdir -p /mnt/overlay/upper /mnt/overlay/work
-mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
+if [ ! -f /tmp/mountparts.sh ]; then
+    mkdir -p /mnt/overlay/upper /mnt/overlay/work
+    mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
+else
+    for srcmount in $(cat /tmp/mountparts.sh | awk '{print $3}'); do
+        mkdir -p /mnt/overlay${srcmount}/upper /mnt/overlay${srcmount}/work
+        mount -t overlay -o upperdir=/mnt/overlay${srcmount}/upper,workdir=/mnt/overlay${srcmount}/work,lowerdir=${srcmount} disklesspart /sysroot${srcmount#/mnt/remote}
+    done
+fi
 mkdir -p /sysroot/etc/ssh
 mkdir -p /sysroot/etc/confluent
 mkdir -p /sysroot/root/.ssh
@@ -77,6 +106,7 @@ curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/o
 mkdir -p /sysroot/opt/confluent/bin
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
+cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
 
@@ -101,4 +131,9 @@ dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 sed -i 's/^NETCONFIG_DNS_STATIC_SEARCHLIST="/NETCONFIG_DNS_STATIC_SEARCHLIST="'$dnsdomain/ /sysroot/etc/sysconfig/network/config
 cp /run/confluent/ifroute-* /run/confluent/ifcfg-* /sysroot/etc/sysconfig/network
+if grep installtodisk /proc/cmdline > /dev/null; then
+    . /etc/confluent/functions
+    run_remote installimage
+    exec reboot -f
+fi
 exec /opt/confluent/bin/start_root
