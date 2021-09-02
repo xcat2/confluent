@@ -439,11 +439,10 @@ class SuseHandler(OsHandler):
             self.sources.append('file://' + os.path.join(sourcepath, 'Product-HPC'))
 
     def prep_root(self, args):
+        gpgkeys = []
         mkdirp(self.targpath)
-        if self.sources:
-            addkeycmd = ['rpm', '--root', self.targpath, '--import'] + glob.glob('/usr/lib/rpm/gnupg/keys/*.asc')
-            subprocess.check_call(addkeycmd)
-        else:
+        if not self.sources:
+            gpgkeys = glob.glob('/usr/lib/rpm/gnupg/keys/*.asc')
             targzypp = os.path.join(self.targpath, 'etc/zypp')
             mkdirp(targzypp)
             shutil.copytree(
@@ -452,8 +451,14 @@ class SuseHandler(OsHandler):
         for source in self.sources:
             if not source:
                 continue
+            if source.startswith('file://'):
+                gpgpath = source.replace('file://', '')
+                gpgkeys.extend(glob.glob(os.path.join(gpgpath, '*/gpg-pubkey*.asc')))
             subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
             idx += 1
+        if gpgkeys:
+                addkeycmd = ['rpm', '--root', self.targpath, '--import'] + gpgkeys
+                subprocess.check_call(addkeycmd)
         for source in self.addrepos.split(','):
             if not source:
                 continue
