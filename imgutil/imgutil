@@ -387,6 +387,8 @@ class OsHandler(object):
         except AttributeError:
             pkglist = ''
         if pkglist:
+            if os.path.exists(os.path.abspath(pkglist)):
+                pkglist = os.path.abspath(pkglist)
             self.pkglist = pkglist
             if '/' not in self.pkglist:
                 self.pkglist = os.path.join(get_mydir(self.oscategory), self.pkglist)
@@ -848,6 +850,8 @@ def fingerprint_host(args, hostpath='/'):
     return oshandler
 
 def build_root(args):
+    if args.scratchdir:
+        args.scratchdir = os.path.abspath(args.scratchdir)
     check_root(args.scratchdir)
     yumargs = ['yum', '--installroot={0}'.format(args.scratchdir)]
     if args.source:
