@@ -928,6 +928,7 @@ def unpack_image(args):
                 raise Exception('Unrecognized image format')
         while scratchdir.endswith('/'):
             scratchdir = scratchdir[:-1]
+        scratchdir = os.path.abspath(scratchdir)
         parentdir = os.path.dirname(scratchdir)
         targdir = os.path.basename(scratchdir)
         mkdirp(parentdir)
