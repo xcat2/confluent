@@ -799,20 +799,27 @@ def fingerprint_host_el(args, hostpath='/'):
 
 
 def fingerprint_host_suse(args, hostpath='/'):
-    try:
-        import rpm
-    except ImportError:
-        return None
-    ts = rpm.TransactionSet(hostpath)
-    rpms = ts.dbMatch('provides', 'distribution-release')
+    vers = None
     osname = None
-    for inf in rpms:
-        if b'openSUSE' in inf.name and b'Leap' in inf.summary:
-            osname = 'opensuse_leap'
-        if inf.name.startswith(b'SLE_'):
-            osname = 'sle'
+    try:
+        with open(os.path.join(hostpath, 'etc/os-release')) as relfile:
+            relinfo = relfile.read().split('\n')
+            for inf in relinfo:
+                if '=' in inf:
+                    key, val = inf.split('=', 1)
+                    if key == 'ID':
+                        if val.lower().replace('"', '') == 'opensuse-leap':
+                            osname = 'opensuse_leap'
+                        elif val.lower().replace(
+                                '"', '') in ('sle_hpc', 'sles'):
+                            osname = 'sle'
+                    elif key == 'VERSION_ID':
+                        vers = val.replace('"', '')
+    except IOError:
+        pass
     if osname:
-        return SuseHandler(osname, inf.version, os.uname().machine, args)
+        return SuseHandler(osname, vers, os.uname().machine, args)
+
 
 def fingerprint_host(args, hostpath='/'):
     oshandler = None
