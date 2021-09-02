@@ -967,7 +967,7 @@ def pack_image(args):
     distpath = None
     try:
         with open(imginfofile) as imginfoin:
-            imginfo = imginfoin.read.split('\n')
+            imginfo = imginfoin.read().split('\n')
             for lineinfo in imginfo:
                 if lineinfo.startswith('BUILDSRC='):
                     distpath = lineinfo.replace('BUILDSRC=', '')
