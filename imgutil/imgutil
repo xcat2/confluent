@@ -705,6 +705,11 @@ def build_root_backend(optargs):
     installroot = args.scratchdir
     _mount_constrained_fs(args, installroot)
     oshandler.prep_root(optargs)
+    mkdirp(os.path.join(installroot, 'etc/'))
+    with open(os.path.join(installroot, 'etc/img.buildinfo'), 'w') as imginfo:
+        imginfo.write('BUILDDATE={}\n'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
+        if args.source:
+            imginfo.write('BUILDSRC={}\n'.format(args.source))
 
 
 def _mount_constrained_fs(args, installroot):
@@ -954,6 +959,16 @@ def pack_image(args):
         raise Exception('Full path not supported, supply only the profile name')
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
     outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
+    imginfofile = os.path.join(args.scratchdir, 'etc/img.buildinfo')
+    distpath = None
+    try:
+        with open(imginfofile) as imginfoin:
+            imginfo = imginfoin.read.split('\n')
+            for lineinfo in imginfo:
+                if lineinfo.startswith('BUILDSRC='):
+                    distpath = lineinfo.replace('BUILDSRC=', '')
+    except IOError:
+        pass
     kerns = glob.glob(os.path.join(args.scratchdir, 'boot/vmlinuz-*'))
     kvermap = {}
     for kern in kerns:
@@ -987,6 +1002,8 @@ def pack_image(args):
     os.remove(tmploc)
     with open(os.path.join(outdir, 'build-info'), 'w') as buildinfo:
         buildinfo.write('Packed from {} on {}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
+    if distpath:
+        os.symlink(distpath, os.path.join(outdir, 'distribution'))
     oshandler = fingerprint_host(args, args.scratchdir)
     tryupdate = False
     if oshandler:
