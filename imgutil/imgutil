@@ -717,6 +717,8 @@ def _mount_constrained_fs(args, installroot):
     for v in args.volume:
         if ':' in v:
             src, dst = v.split(':')
+            if dst == '-':
+                dst = src
             while dst and dst[0] == '/':
                 dst = dst[1:]
             dst = os.path.join(installroot, dst)
