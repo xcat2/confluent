@@ -625,6 +625,7 @@ def main():
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
         'will override the target to be /run/root', action='append')
     execp.add_argument('scratchdir', help='Directory of an unpacked diskless root')
+    execp.add_argument('cmd', nargs='*', help='Optional command to run (defaults to a shell)')
     unpackp = sps.add_parser('unpack', help='Unpack a diskless image to a scratch directory')
     unpackp.add_argument('profilename', help='The diskless OS profile to unpack')
     unpackp.add_argument('scratchdir', help='Directory to extract diskless root to')
@@ -677,7 +678,12 @@ def exec_root_backend(args):
     os.chroot(installroot)
     os.chdir('/')
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
-    os.execv('/bin/bash', ['/bin/bash', '--login', '--noprofile'])
+    if args.cmd:
+        if not args.cmd[0].startswith('/'):
+            args.cmd[0] = shutil.which(args.cmd[0])
+        os.execv(args.cmd[0], args.cmd)
+    else:
+        os.execv('/bin/bash', ['/bin/bash', '--login', '--noprofile'])
 
 
 def _mount(src, dst, fstype=0, flags=0, options=0, mode=None):
