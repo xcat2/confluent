@@ -875,7 +875,7 @@ def prep_decrypt(indir):
     currtabs = currtabs.decode('utf8').split('\n')
     usednames = set([])
     for tab in currtabs:
-        if not tab:
+        if ':' not in tab:
             continue
         tabname, _ = tab.split(':', 1)
         usednames.add(tabname)
@@ -924,9 +924,13 @@ def unpack_image(args):
                 if hdr[:4] in (b'sqsh', b'hsqs'):
                     break
                 raise Exception('Unrecognized image format')
-        mkdirp(scratchdir)
-        os.chdir(scratchdir)
-        subprocess.check_call(['unsquashfs', '-d', 'rootfs', indir])
+        while scratchdir.endswith('/'):
+            scratchdir = scratchdir[:-1]
+        parentdir = os.path.dirname(scratchdir)
+        targdir = os.path.basename(scratchdir)
+        mkdirp(parentdir)
+        os.chdir(parentdir)
+        subprocess.check_call(['unsquashfs', '-d', targdir, indir])
     finally:
         if cleandmtable:
             mounted = True
