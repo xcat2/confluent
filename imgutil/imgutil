@@ -680,6 +680,7 @@ def exec_root_backend(args):
     os.chroot(installroot)
     os.chdir('/')
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
+    os.environ['CONFLUENT_IMGUTIL_MODE'] = 'exec'
     if args.cmd:
         if not args.cmd[0].startswith('/'):
             args.cmd[0] = shutil.which(args.cmd[0])
@@ -708,7 +709,7 @@ def build_root_backend(optargs):
     _mount_constrained_fs(args, installroot)
     oshandler.prep_root(optargs)
     mkdirp(os.path.join(installroot, 'etc/'))
-    with open(os.path.join(installroot, 'etc/img.buildinfo'), 'w') as imginfo:
+    with open(os.path.join(installroot, 'etc/confluentimg.buildinfo'), 'w') as imginfo:
         imginfo.write('BUILDDATE={}\n'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
         if args.source:
             imginfo.write('BUILDSRC={}\n'.format(args.source))
@@ -963,7 +964,7 @@ def pack_image(args):
         raise Exception('Full path not supported, supply only the profile name')
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
     outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
-    imginfofile = os.path.join(args.scratchdir, 'etc/img.buildinfo')
+    imginfofile = os.path.join(args.scratchdir, 'etc/confluentimg.buildinfo')
     distpath = None
     try:
         with open(imginfofile) as imginfoin:
