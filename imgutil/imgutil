@@ -363,7 +363,7 @@ def create_yumconf(sourcedir, addrepos):
         yumconf.write('[addrepo-{0}]\n'.format(addrepoidx))
         yumconf.write('name=Add-on repository {0}\n'.format(addrepoidx))
         yumconf.write('baseurl={0}\n'.format(repo))
-        yumconf.write('enabled=1\ngpgcheck\0\n\n')
+        yumconf.write('enabled=1\ngpgcheck=0\n\n')
         addrepoidx += 1
     return repodir
 
@@ -496,7 +496,7 @@ class ElHandler(OsHandler):
         yumconfig = create_yumconf(sourcepath, self.addrepos)
         self.yumargs.extend(
             ['--setopt=reposdir={0}'.format(yumconfig), '--disablerepo=*',
-             '--enablerepo=genimage-*'])
+             '--enablerepo=genimage-*', '--enablerepo=addrepo-*'])
         self.sourcepath = sourcepath
 
     def set_target(self, targpath):
