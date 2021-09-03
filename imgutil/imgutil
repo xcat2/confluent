@@ -464,6 +464,8 @@ class SuseHandler(OsHandler):
         for source in self.addrepos.split(','):
             if not source:
                 continue
+            if not source.startswith('/') and os.path.exists(os.path.abspath(source)):
+                source = os.path.abspath(source)
             source = 'file://' + source
             subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
             idx += 1
