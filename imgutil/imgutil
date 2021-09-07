@@ -363,7 +363,7 @@ def create_yumconf(sourcedir, addrepos):
         yumconf.write('[addrepo-{0}]\n'.format(addrepoidx))
         yumconf.write('name=Add-on repository {0}\n'.format(addrepoidx))
         yumconf.write('baseurl={0}\n'.format(repo))
-        yumconf.write('enabled=1\ngpgcheck\0\n\n')
+        yumconf.write('enabled=1\ngpgcheck=0\n\n')
         addrepoidx += 1
     return repodir
 
@@ -387,6 +387,8 @@ class OsHandler(object):
         except AttributeError:
             pkglist = ''
         if pkglist:
+            if os.path.exists(os.path.abspath(pkglist)):
+                pkglist = os.path.abspath(pkglist)
             self.pkglist = pkglist
             if '/' not in self.pkglist:
                 self.pkglist = os.path.join(get_mydir(self.oscategory), self.pkglist)
@@ -414,8 +416,10 @@ class OsHandler(object):
 
 class SuseHandler(OsHandler):
     def __init__(self, name, version, arch, args):
-        if not version.startswith(b'15.'):
-            raise Exception('Unsupported Suse version {}'.format(version.decode('utf8')))
+        if not isinstance(version, str):
+            version = version.decode('utf8')
+        if not version.startswith('15.'):
+            raise Exception('Unsupported Suse version {}'.format(version))
         self.oscategory = 'suse15'
         super().__init__(name, version, arch, args)
         self.zyppargs = []
@@ -437,17 +441,34 @@ class SuseHandler(OsHandler):
             self.sources.append('file://' + os.path.join(sourcepath, 'Product-HPC'))
 
     def prep_root(self, args):
+        gpgkeys = []
         mkdirp(self.targpath)
         if not self.sources:
+            gpgkeys = glob.glob('/usr/lib/rpm/gnupg/keys/*.asc')
             targzypp = os.path.join(self.targpath, 'etc/zypp')
             mkdirp(targzypp)
             shutil.copytree(
                 '/etc/zypp/repos.d/', os.path.join(targzypp, 'repos.d'))
+        idx = 1
         for source in self.sources:
-            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source])
+            if not source:
+                continue
+            if source.startswith('file://'):
+                gpgpath = source.replace('file://', '')
+                gpgkeys.extend(glob.glob(os.path.join(gpgpath, '*/gpg-pubkey*.asc')))
+            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
+            idx += 1
+        if gpgkeys:
+                addkeycmd = ['rpm', '--root', self.targpath, '--import'] + gpgkeys
+                subprocess.check_call(addkeycmd)
         for source in self.addrepos.split(','):
+            if not source:
+                continue
+            if not source.startswith('/') and os.path.exists(os.path.abspath(source)):
+                source = os.path.abspath(source)
             source = 'file://' + source
-            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source])
+            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
+            idx += 1
         mydir = get_mydir(self.oscategory)
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
         mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
@@ -477,7 +498,7 @@ class ElHandler(OsHandler):
         yumconfig = create_yumconf(sourcepath, self.addrepos)
         self.yumargs.extend(
             ['--setopt=reposdir={0}'.format(yumconfig), '--disablerepo=*',
-             '--enablerepo=genimage-*'])
+             '--enablerepo=genimage-*', '--enablerepo=addrepo-*'])
         self.sourcepath = sourcepath
 
     def set_target(self, targpath):
@@ -600,7 +621,7 @@ def main():
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
-        'will override the target to be /run/root', action='append')
+        'will override the target to be /run/root, and something like /var/lib/repository:- will cause it to mount to the identical path inside the image', action='append')
     buildp.add_argument('scratchdir', help='Directory to build new diskless root in')
     execp = sps.add_parser('exec', help='Start specified scratch directory as container')
     execp.add_argument('-v', '--volume',
@@ -608,12 +629,14 @@ def main():
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
         'will override the target to be /run/root', action='append')
     execp.add_argument('scratchdir', help='Directory of an unpacked diskless root')
+    execp.add_argument('cmd', nargs='*', help='Optional command to run (defaults to a shell)')
     unpackp = sps.add_parser('unpack', help='Unpack a diskless image to a scratch directory')
     unpackp.add_argument('profilename', help='The diskless OS profile to unpack')
     unpackp.add_argument('scratchdir', help='Directory to extract diskless root to')
     packp = sps.add_parser('pack', help='Pack a scratch directory to a diskless profile')
     packp.add_argument('scratchdir', help='Directory containing diskless root')
     packp.add_argument('profilename', help='The desired diskless OS profile name to pack the root into')
+    packp.add_argument('-b', '--baseprofile', help='Profile to copy extra info from, for example to make a new version of an existing profile, reference the previous one as baseprofile', default=None)
     capturep = sps.add_parser('capture', help='Capture an image for cloning from a running system')
     capturep.add_argument('node', help='Node to capture image from')
     capturep.add_argument('profilename', help='Profile name for captured image')
@@ -660,7 +683,13 @@ def exec_root_backend(args):
     os.chroot(installroot)
     os.chdir('/')
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
-    os.execv('/bin/bash', ['/bin/bash', '--login', '--noprofile'])
+    os.environ['CONFLUENT_IMGUTIL_MODE'] = 'exec'
+    if args.cmd:
+        if not args.cmd[0].startswith('/'):
+            args.cmd[0] = shutil.which(args.cmd[0])
+        os.execv(args.cmd[0], args.cmd)
+    else:
+        os.execv('/bin/bash', ['/bin/bash', '--login', '--noprofile'])
 
 
 def _mount(src, dst, fstype=0, flags=0, options=0, mode=None):
@@ -682,6 +711,11 @@ def build_root_backend(optargs):
     installroot = args.scratchdir
     _mount_constrained_fs(args, installroot)
     oshandler.prep_root(optargs)
+    mkdirp(os.path.join(installroot, 'etc/'))
+    with open(os.path.join(installroot, 'etc/confluentimg.buildinfo'), 'w') as imginfo:
+        imginfo.write('BUILDDATE={}\n'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
+        if args.source:
+            imginfo.write('BUILDSRC={}\n'.format(args.source))
 
 
 def _mount_constrained_fs(args, installroot):
@@ -694,6 +728,8 @@ def _mount_constrained_fs(args, installroot):
     for v in args.volume:
         if ':' in v:
             src, dst = v.split(':')
+            if dst == '-':
+                dst = src
             while dst and dst[0] == '/':
                 dst = dst[1:]
             dst = os.path.join(installroot, dst)
@@ -787,20 +823,27 @@ def fingerprint_host_el(args, hostpath='/'):
 
 
 def fingerprint_host_suse(args, hostpath='/'):
-    try:
-        import rpm
-    except ImportError:
-        return None
-    ts = rpm.TransactionSet(hostpath)
-    rpms = ts.dbMatch('provides', 'distribution-release')
+    vers = None
     osname = None
-    for inf in rpms:
-        if b'openSUSE' in inf.name and b'Leap' in inf.summary:
-            osname = 'opensuse_leap'
-        if inf.name.startswith(b'SLE_'):
-            osname = 'sle'
+    try:
+        with open(os.path.join(hostpath, 'etc/os-release')) as relfile:
+            relinfo = relfile.read().split('\n')
+            for inf in relinfo:
+                if '=' in inf:
+                    key, val = inf.split('=', 1)
+                    if key == 'ID':
+                        if val.lower().replace('"', '') == 'opensuse-leap':
+                            osname = 'opensuse_leap'
+                        elif val.lower().replace(
+                                '"', '') in ('sle_hpc', 'sles'):
+                            osname = 'sle'
+                    elif key == 'VERSION_ID':
+                        vers = val.replace('"', '')
+    except IOError:
+        pass
     if osname:
-        return SuseHandler(osname, inf.version, os.uname().machine, args)
+        return SuseHandler(osname, vers, os.uname().machine, args)
+
 
 def fingerprint_host(args, hostpath='/'):
     oshandler = None
@@ -811,6 +854,8 @@ def fingerprint_host(args, hostpath='/'):
     return oshandler
 
 def build_root(args):
+    if args.scratchdir:
+        args.scratchdir = os.path.abspath(args.scratchdir)
     check_root(args.scratchdir)
     yumargs = ['yum', '--installroot={0}'.format(args.scratchdir)]
     if args.source:
@@ -822,9 +867,13 @@ def build_root(args):
     else:
         oshandler = fingerprint_host(args)
     if oshandler is None:
-        sys.stderr.write(
-            'Unable to recognize source directory {0}\n'.format(
-                args.source))
+        if args.source:
+            sys.stderr.write(
+                'Unable to recognize source directory {0}\n'.format(
+                    args.source))
+        else:
+            sys.stderr.write(
+                'Unable to recognize build system os\n')
         sys.exit(1)
     oshandler.set_target(args.scratchdir)
     oshandler.add_pkglists()
@@ -841,7 +890,7 @@ def prep_decrypt(indir):
     currtabs = currtabs.decode('utf8').split('\n')
     usednames = set([])
     for tab in currtabs:
-        if not tab:
+        if ':' not in tab:
             continue
         tabname, _ = tab.split(':', 1)
         usednames.add(tabname)
@@ -890,9 +939,14 @@ def unpack_image(args):
                 if hdr[:4] in (b'sqsh', b'hsqs'):
                     break
                 raise Exception('Unrecognized image format')
-        mkdirp(scratchdir)
-        os.chdir(scratchdir)
-        subprocess.check_call(['unsquashfs', '-d', 'rootfs', indir])
+        while scratchdir.endswith('/'):
+            scratchdir = scratchdir[:-1]
+        scratchdir = os.path.abspath(scratchdir)
+        parentdir = os.path.dirname(scratchdir)
+        targdir = os.path.basename(scratchdir)
+        mkdirp(parentdir)
+        os.chdir(parentdir)
+        subprocess.check_call(['unsquashfs', '-d', targdir, indir])
     finally:
         if cleandmtable:
             mounted = True
@@ -907,12 +961,41 @@ def unpack_image(args):
                     time.sleep(0.1)
 
 
+def recursecp(source, targ):
+    if os.path.islink(source):
+        if os.path.exists(targ):
+            return
+        linktarg = os.readlink(source)
+        os.symlink(linktarg, targ)
+    if os.path.isdir(source):
+        if not os.path.exists(targ):
+            os.mkdir(targ)
+        for entry in os.listdir(source):
+            srcentry = os.path.join(source, entry)
+            targentry = os.path.join(targ, entry)
+            recursecp(srcentry, targentry)
+    elif os.path.exists(targ):
+        return
+    else:
+        shutil.copy2(source, targ)
+
+
 def pack_image(args):
     outdir = args.profilename
     if '/' in outdir:
         raise Exception('Full path not supported, supply only the profile name')
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
     outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
+    imginfofile = os.path.join(args.scratchdir, 'etc/confluentimg.buildinfo')
+    distpath = None
+    try:
+        with open(imginfofile) as imginfoin:
+            imginfo = imginfoin.read().split('\n')
+            for lineinfo in imginfo:
+                if lineinfo.startswith('BUILDSRC='):
+                    distpath = lineinfo.replace('BUILDSRC=', '')
+    except IOError:
+        pass
     kerns = glob.glob(os.path.join(args.scratchdir, 'boot/vmlinuz-*'))
     kvermap = {}
     for kern in kerns:
@@ -945,26 +1028,36 @@ def pack_image(args):
     encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
     os.remove(tmploc)
     with open(os.path.join(outdir, 'build-info'), 'w') as buildinfo:
-        buildinfo.write('Packed from {} on {}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
-    oshandler = fingerprint_host(args, args.scratchdir)
-    tryupdate = False
-    if oshandler:
-        prettyname = oshandler.osname
-        with open(os.path.join(args.scratchdir, 'etc/os-release')) as osr:
-            osrdata = osr.read().split('\n')
-            for line in osrdata:
-                if line.startswith('PRETTY_NAME="'):
-                    prettyname = line.replace(
-                        'PRETTY_NAME=', '').replace('"', '')
-        label = '{0} ({1})'.format(prettyname, 'Diskless Boot')
-        with open(os.path.join(outdir, 'profile.yaml'), 'w') as profiley:
-            profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered\n'.format(label))
-        oscat = oshandler.oscategory
-        confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
-        os.symlink('{}/initramfs/addons.cpio'.format(confdir),
-            os.path.join(outdir, 'boot/initramfs/addons.cpio'))
-        if os.path.exists('{}/profiles/default'.format(confdir)):
-            copy_tree('{}/profiles/default'.format(confdir), outdir)
+        buildinfo.write('PACKEDFROM={}\nPACKDATE={}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
+        if args.baseprofile:
+            buildinfo.write('BASEPROFILE={}\n'.format(args.baseprofile))
+    if args.baseprofile:
+        if '/' not in args.baseprofile:
+            args.baseprofile = os.path.join('/var/lib/confluent/public/os', args.baseprofile)
+        recursecp(args.baseprofile, outdir)
+        tryupdate = True
+    else:
+        if distpath:
+            os.symlink(distpath, os.path.join(outdir, 'distribution'))
+        oshandler = fingerprint_host(args, args.scratchdir)
+        tryupdate = False
+        if oshandler:
+            prettyname = oshandler.osname
+            with open(os.path.join(args.scratchdir, 'etc/os-release')) as osr:
+                osrdata = osr.read().split('\n')
+                for line in osrdata:
+                    if line.startswith('PRETTY_NAME="'):
+                        prettyname = line.replace(
+                            'PRETTY_NAME=', '').replace('"', '')
+            label = '{0} ({1})'.format(prettyname, 'Diskless Boot')
+            with open(os.path.join(outdir, 'profile.yaml'), 'w') as profiley:
+                profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered # tethered is default when unspecified to save on memory, untethered will use more ram, but will not have any ongoing runtime root fs dependency on the http servers.\n'.format(label))
+            oscat = oshandler.oscategory
+            confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
+            os.symlink('{}/initramfs/addons.cpio'.format(confdir),
+                os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+            if os.path.exists('{}/profiles/default'.format(confdir)):
+                copy_tree('{}/profiles/default'.format(confdir), outdir)
             tryupdate = True
     try:
         pwd.getpwnam('confluent')

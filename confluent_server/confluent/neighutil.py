@@ -15,8 +15,6 @@
 # limitations under the License.
 
 # A consolidated manage of neighbor table information management.
-# Ultimately, this should use AF_NETLINK, but in the interest of time,
-# use ip neigh for the moment
 
 import confluent.util as util
 import os
@@ -44,34 +42,37 @@ def _update_neigh():
     ndmsg=  b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
     s.sendall(nlhdr + ndmsg)
     neightable = {}
-    while True:
-        pdata = s.recv(65536)
-        v = memoryview(pdata)
-        if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
-            break
-        while len(v):
-            length, typ = struct.unpack('IH', v[:6])
-            if typ == 28:
-                hlen = struct.calcsize('BIHBB')
-                _, idx, state, flags, typ = struct.unpack('BIHBB', v[16:16+hlen])
-                if typ == 1:  # only handle unicast entries
-                    curraddr = None
-                    currip = None
-                    rta = v[16+hlen:length]
-                    while len(rta):
-                        rtalen, rtatyp = struct.unpack('HH', rta[:4])
-                        if rtatyp == 2:  # hwaddr
-                            curraddr = rta[4:rtalen].tobytes()
-                            if len(curraddr) == 20:
-                                curraddr = curraddr[12:]
-                        elif rtatyp == 1:  # ip address
-                            currip = rta[4:rtalen].tobytes()
-                        rta = rta[rtalen:]
-                        if not rtalen:
-                            break
-                    if curraddr and currip:
-                        neightable[currip] = curraddr
-            v = v[length:]
+    try:
+        while True:
+            pdata = s.recv(65536)
+            v = memoryview(pdata)
+            if struct.unpack('H', v[4:6])[0] == 3:
+                break
+            while len(v):
+                length, typ = struct.unpack('IH', v[:6])
+                if typ == 28:
+                    hlen = struct.calcsize('BIHBB')
+                    _, idx, state, flags, typ = struct.unpack('BIHBB', v[16:16+hlen])
+                    if typ == 1:  # only handle unicast entries
+                        curraddr = None
+                        currip = None
+                        rta = v[16+hlen:length]
+                        while len(rta):
+                            rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                            if rtatyp == 2:  # hwaddr
+                                curraddr = rta[4:rtalen].tobytes()
+                                if len(curraddr) == 20:
+                                    curraddr = curraddr[12:]
+                            elif rtatyp == 1:  # ip address
+                                currip = rta[4:rtalen].tobytes()
+                            rta = rta[rtalen:]
+                            if not rtalen:
+                                break
+                        if curraddr and currip:
+                            neightable[currip] = curraddr
+                v = v[length:]
+    finally:
+        s.close()
 
 
 def get_hwaddr(ipaddr):

@@ -20,6 +20,7 @@ dracut_install /lib64/libfuse.so.2 /lib64/libfuse.so.2.9.7
 dracut_install chown chroot dd expr kill parted rsync sort blockdev findfs insmod lvm
 dracut_install /usr/lib/udev/rules.d/10-dm.rules /usr/sbin/dmsetup /usr/lib/udev/rules.d/95-dm-notify.rules
 dracut_install /usr/lib/systemd/network/99-default.link
+dracut_install losetup # multipart support
 
 #this would be nfs with lock, but not needed, go nolock
 #dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify

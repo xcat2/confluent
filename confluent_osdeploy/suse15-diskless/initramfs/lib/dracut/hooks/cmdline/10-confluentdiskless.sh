@@ -102,7 +102,7 @@ done
 cd /
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 hostname $nodename
-confluent_mgr=$(grep '^EXTMGRINFO:.*1$' /etc/confluent/confluent.info | awk -F': ' '{print $2}' | awk -F'|' '{print $1}')
+confluent_mgr=$(grep '^EXTMGRINFO:.*1$' /etc/confluent/confluent.info | head -n 1|awk -F': ' '{print $2}' | awk -F'|' '{print $1}')
 if [ -z "$confluent_mgr" ]; then
     confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info|head -n 1 | awk '{print $2}')
 fi

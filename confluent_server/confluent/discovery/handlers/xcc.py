@@ -340,6 +340,10 @@ class NodeHandler(immhandler.NodeHandler):
                 rsp, status = wc.grab_json_response_with_status(
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,Administrator,0,0,0,0,,8,'.format(uid, username)})
+            elif status == 200 and rsp.get('return', 0) == 13:
+                rsp, status = wc.grab_json_response_with_status(
+                    '/api/function',
+                    {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,,,'.format(uid, username)})
             self.tmppasswd = None
         self._currcreds = (username, passwd)
 
