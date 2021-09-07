@@ -398,7 +398,7 @@ def snoop(handler, protocol=None, nodeguess=None):
                         continue
                     rqv = memoryview(pkt)
                     rq = bytearray(rqv[:2])
-                    if rq[0] == 1: # dhcpv6 solicit
+                    if rq[0] in (1, 3): # dhcpv6 solicit
                         process_dhcp6req(handler, rqv, addr, netc, cfg, nodeguess)
 
         except Exception as e:
@@ -409,6 +409,7 @@ def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     ip = addr[0]
     req, disco = v6opts_to_dict(bytearray(rqv[4:]))
     req['txid'] = rqv[1:4]
+    req['rqtype'] = bytearray(rqv[:1])[0]
     if not disco.get('uuid', None) or not disco.get('arch', None):
         return
     mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
@@ -577,7 +578,7 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     if len(ipass):
         replylen += len(ipass)
     reply = bytearray(replylen)
-    reply[0] = 2
+    reply[0] = 2 if packet['rqtype'] == 1 else 7
     reply[1:4] = packet['txid']
     offset = 4
     struct.pack_into('!HH', reply, offset, 1, len(packet[1]))
