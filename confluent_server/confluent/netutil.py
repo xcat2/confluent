@@ -226,10 +226,13 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     ipbynodename = None
     ip6bynodename = None
     try:
-        for addr in socket.getaddrinfo(node, 0, 0, socket.SOCK_DGRAM):
-            if addr[0] == socket.AF_INET:
-                ipbynodename = addr[-1][0]
-            elif addr[0] == socket.AF_INET6:
+        for addr in socket.getaddrinfo(node, 0, socket.AF_INET, socket.SOCK_DGRAM):
+            ipbynodename = addr[-1][0]
+        
+    except socket.gaierror:
+        pass
+    try:
+        for addr in socket.getaddrinfo(node, 0, socket.AF_INET6, socket.SOCK_DGRAM):
                 ip6bynodename = addr[-1][0]
     except socket.gaierror:
         pass
@@ -270,7 +273,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                             if nver == '4':
                                 cfgdata['prefix'] = prefix
                             else:
-                                cfgdata['prefix_v{}'.format(nver)] = prefix
+                                cfgdata['ipv{}_prefix'.format(nver)] = prefix
                             if candip in (ipbynodename, ip6bynodename):
                                 cfgdata['matchesnodename'] = True
                             return cfgdata
@@ -297,6 +300,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             else:
                 bynodename = ip6bynodename
                 nver = '6'
+            if not bynodename:  # node is missing either ipv6 or ipv4, ignore
+                continue
             ipbynodenamn = socket.inet_pton(fam, bynodename)
             if ipn_on_same_subnet(fam, svrip, ipbynodenamn, prefix):
                 cfgdata['matchesnodename'] = True
@@ -305,13 +310,15 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 if nver == '4':
                     cfgdata['prefix'] = prefix
                 else:
-                    cfgdata['prefix_v6'] = prefix
+                    cfgdata['ipv{}_prefix'.format(nver)] = prefix
         for svr in candsrvs:
             fam, svr, prefix = svr
             if fam == socket.AF_INET:
                 bynodename = ipbynodename
             elif fam == socket.AF_INET6:
                 bynodename = ip6bynodename
+            if not bynodename:
+                continue  # ignore undefined family
             bynodenamn = socket.inet_pton(fam, bynodename)
             if ipn_on_same_subnet(fam, svr, bynodenamn, prefix):
                 svrname = socket.inet_ntop(fam, svr)
@@ -338,8 +345,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 cfgdata['prefix'] = prefix
                 nver = '4'
             else:
-                cfgdata['prefix_v6'] = prefix
                 nver = '6'
+                cfgdata['ipv{}_prefix'.format(nver)] = prefix
             for setting in nodenetattribs:
                 if 'ipv{}_gateway'.format(nver) not in setting:
                     continue

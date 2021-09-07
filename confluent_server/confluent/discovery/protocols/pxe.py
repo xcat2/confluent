@@ -38,6 +38,7 @@ import netifaces
 import struct
 import time
 import traceback
+import uuid
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
@@ -529,19 +530,87 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr):
         if not httpboot:
             log.log({'info': 'IPv6 PXE boot attempt by {0}, but IPv6 PXE is not supported, try IPv6 HTTP boot or IPv4 boot'.format(node)})
             return
-        return reply_dhcp6(node, addr, cfg)
+        return reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
     else:
         return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile)
 
-def reply_dhcp6(node, addr, cfg):
+def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     myaddrs = netutil.get_my_addresses(addr[-1], socket.AF_INET6)
     if not myaddrs:
-        log.log({'info': 'Unable to provide IPv6 boot services to {0} , no viable IPv6 configuration on interface index "{1}" to respond through.'.format(node, addr[-1])})
+        log.log({'info': 'Unable to provide IPv6 boot services to {0}, no viable IPv6 configuration on interface index "{1}" to respond through.'.format(node, addr[-1])})
         return
     niccfg = netutil.get_nic_config(cfg, node, ifidx=addr[-1])
+    ipv6addr = niccfg.get('ipv6_address', None)
+    ipv6prefix = niccfg.get('ipv6_prefix', None)
+    ipv6method = niccfg.get('ipv6_method', 'static')
+    ipv6srvaddr = niccfg.get('deploy_server_v6', None)
+    if not ipv6srvaddr:
+        log.log({'info': 'Unable to determine an appropriate ipv6 server ip for {}'.format(node)})
+        return
+    insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
+        {}).get('value', 'never')
+    if not insecuremode:
+        insecuremode = 'never'
+    proto = 'https' if insecuremode == 'never' else 'http'
+    bootfile = '{0}://[{1}]/confluent-public/os/{2}/boot.img'.format(
+        proto, ipv6srvaddr, profile
+    )
+    if not isinstance(bootfile, bytes):
+        bootfile = bootfile.encode('utf8')
+    ipass = []
+    if ipv6method not in ('dhcp', 'firmwaredhcp') and ipv6addr:
+        if not ipv6prefix:
+            log.log({'info': 'Unable to determine prefix to serve to address {} for node {}'.format(ipv6addr, node)})
+            return
+        ipass = bytearray(40)
+        ipass[:4] = packet[3][:4]  # pass iaid back
+        ipass[4:16] = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x18'
+        ipass[16:32] = socket.inet_pton(socket.AF_INET6, ipv6addr)
+        ipass[32:40] = b'\x00\x00\x00\x78\x00\x00\x01\x2c'
+    #1 msgtype
+    #3 txid
+    #22 - server ident
+    #len(packet[1]) + 4 - client ident
+    #len(ipass) + 4 or 0
+    #len(url) + 4
+    replylen = 50 + len(bootfile) + len(packet[1]) + 4
+    if len(ipass):
+        replylen += len(ipass)
+    reply = bytearray(replylen)
+    reply[0] = 2
+    reply[1:4] = packet['txid']
+    offset = 4
+    struct.pack_into('!HH', reply, offset, 1, len(packet[1]))
+    offset += 4
+    reply[offset:offset+len(packet[1])] = packet[1]
+    offset += len(packet[1])
+    struct.pack_into('!HHH', reply, offset, 2, 18, 4)
+    offset += 6
+    reply[offset:offset+16] = get_my_duid()
+    offset += 16
+    if ipass:
+        struct.pack_into('!HH', reply, offset, 3, len(ipass))
+        offset += 4
+        reply[offset:offset + len(ipass)] = ipass
+        offset += len(ipass)
+    struct.pack_into('!HH', reply, offset, 59, len(bootfile))
+    offset += 4
+    reply[offset:offset + len(bootfile)] = bootfile
+    offset += len(bootfile)
+    # Need the HTTPClient in the vendor class for reply
+    struct.pack_into('!HHIH', reply, offset, 16, 16, 0, 10)
+    offset += 10
+    reply[offset:offset + 10] = b'HTTPClient'
+    sock.sendto(reply, addr)
 
-    print(repr(addr))
-    pass
+
+_myuuid = None
+def get_my_duid():
+    global _myuuid
+    if not _myuuid:
+        _myuuid = uuid.uuid4().bytes
+    return _myuuid
+
 
 def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     replen = 275  # default is going to be 286
