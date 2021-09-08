@@ -357,14 +357,15 @@ def create_yumconf(sourcedir, addrepos):
                 yumconf.write('baseurl={0}\n'.format(currdir))
                 yumconf.write('enabled=1\ngpgcheck=0\n\n')
     addrepoidx = 1
-    for repo in addrepos.split(','):
-        if not repo:
-            continue
-        yumconf.write('[addrepo-{0}]\n'.format(addrepoidx))
-        yumconf.write('name=Add-on repository {0}\n'.format(addrepoidx))
-        yumconf.write('baseurl={0}\n'.format(repo))
-        yumconf.write('enabled=1\ngpgcheck=0\n\n')
-        addrepoidx += 1
+    for repos in addrepos:
+        for repo in repos.split(','):
+            if not repo:
+                continue
+            yumconf.write('[addrepo-{0}]\n'.format(addrepoidx))
+            yumconf.write('name=Add-on repository {0}\n'.format(addrepoidx))
+            yumconf.write('baseurl={0}\n'.format(repo))
+            yumconf.write('enabled=1\ngpgcheck=0\n\n')
+            addrepoidx += 1
     return repodir
 
 def get_mydir(oscategory):
@@ -397,7 +398,7 @@ class OsHandler(object):
         try:
             self.addrepos = args.addrepos
         except AttributeError:
-            self.addrepos = ''
+            self.addrepos = []
 
     def get_json(self):
         odata = [self.oscategory, self.version, self.arch, self.name]
@@ -461,14 +462,15 @@ class SuseHandler(OsHandler):
         if gpgkeys:
                 addkeycmd = ['rpm', '--root', self.targpath, '--import'] + gpgkeys
                 subprocess.check_call(addkeycmd)
-        for source in self.addrepos.split(','):
-            if not source:
-                continue
-            if not source.startswith('/') and os.path.exists(os.path.abspath(source)):
-                source = os.path.abspath(source)
-            source = 'file://' + source
-            subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
-            idx += 1
+        for sources in self.addrepos:
+            for source in sources.split(','):
+                if not source:
+                    continue
+                if not source.startswith('/') and os.path.exists(os.path.abspath(source)):
+                    source = os.path.abspath(source)
+                source = 'file://' + source
+                subprocess.check_call(['zypper', '-R', self.targpath, 'ar', source, 'source-{}'.format(idx)])
+                idx += 1
         mydir = get_mydir(self.oscategory)
         mkdirp(os.path.join(self.targpath, 'usr/lib/dracut/modules.d'))
         mkdirp(os.path.join(self.targpath, 'etc/dracut.conf.d'))
@@ -498,7 +500,9 @@ class ElHandler(OsHandler):
         yumconfig = create_yumconf(sourcepath, self.addrepos)
         self.yumargs.extend(
             ['--setopt=reposdir={0}'.format(yumconfig), '--disablerepo=*',
-             '--enablerepo=genimage-*', '--enablerepo=addrepo-*'])
+             '--enablerepo=genimage-*'])
+        if self.addrepos:
+            self.yumargs.extend(['--enablerepo=addrepo-*'])
         self.sourcepath = sourcepath
 
     def set_target(self, targpath):
@@ -615,7 +619,7 @@ def main():
     parser = argparse.ArgumentParser(description='Work with confluent OS cloning and diskless images')
     sps = parser.add_subparsers(dest='subcommand')
     buildp = sps.add_parser('build', help='Build a new diskless image from scratch')
-    buildp.add_argument('-r', '--addrepos', help='Repositories to add in addition to the main source', default='')
+    buildp.add_argument('-r', '--addrepos', help='Repositories to add in addition to the main source', default=[], action='append')
     buildp.add_argument('-p', '--packagelist', help='Filename of package list', default='')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
     buildp.add_argument('-v', '--volume',
@@ -637,6 +641,7 @@ def main():
     packp.add_argument('scratchdir', help='Directory containing diskless root')
     packp.add_argument('profilename', help='The desired diskless OS profile name to pack the root into')
     packp.add_argument('-b', '--baseprofile', help='Profile to copy extra info from, for example to make a new version of an existing profile, reference the previous one as baseprofile', default=None)
+    packp.add_argument('-u', '--unencrypted', help='Pack an unencrypted image rather than encrypting', action='store_true')
     capturep = sps.add_parser('capture', help='Capture an image for cloning from a running system')
     capturep.add_argument('node', help='Node to capture image from')
     capturep.add_argument('profilename', help='Profile name for captured image')
@@ -1022,11 +1027,15 @@ def pack_image(args):
     shutil.copyfile(kvermap[mostrecent], os.path.join(outdir, 'boot/kernel'))
     shutil.copyfile(initrdname, os.path.join(outdir, 'boot/initramfs/distribution'))
     gather_bootloader(outdir, args.scratchdir)
-    tmploc = tempfile.mktemp()
+    if args.unencrypted:
+        tmploc = os.path.join(outdir, 'rootimg.sfs')
+    else:
+        tmploc = tempfile.mktemp()
     subprocess.check_call(['mksquashfs', args.scratchdir,
                            tmploc, '-comp', 'xz'])
-    encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
-    os.remove(tmploc)
+    if not args.unencrypted:
+        encrypt_image(tmploc, os.path.join(outdir, 'rootimg.sfs'), '{}/pending/rootimg.key'.format(privdir))
+        os.remove(tmploc)
     with open(os.path.join(outdir, 'build-info'), 'w') as buildinfo:
         buildinfo.write('PACKEDFROM={}\nPACKDATE={}\n'.format(args.scratchdir, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))
         if args.baseprofile:
