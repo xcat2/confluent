@@ -149,29 +149,63 @@ def handle_request(env, start_response):
         if currtzvintage and currtzvintage > (time.time() - 30.0):
             ncfg['timezone'] = currtz
         else:
-            langinfo = subprocess.check_output(
-                ['localectl', 'status']).split(b'\n')
-            for line in langinfo:
-                line = line.strip()
-                if line.startswith(b'System Locale:'):
-                    ccurrlocale = line.split(b'=')[-1]
-                    if not ccurrlocale:
-                        continue
-                    if not isinstance(ccurrlocale, str):
-                        ccurrlocale = ccurrlocale.decode('utf8')
-                    if ccurrlocale == 'n/a':
-                        continue
-                    currlocale = ccurrlocale
-                elif line.startswith(b'VC Keymap:'):
-                    ckeymap = line.split(b':')[-1]
-                    ckeymap = ckeymap.strip()
-                    if not ckeymap:
-                        continue
-                    if not isinstance(ckeymap, str):
-                        ckeymap = ckeymap.decode('utf8')
-                    if ckeymap == 'n/a':
-                        continue
-                    keymap = ckeymap
+            needlocalectl = True
+            try:
+                with open('/etc/vconsole.conf') as consconf:
+                    for line in consconf.read().split('\n'):
+                        line = line.split('#', 1)[0]
+                        if '=' not in line:
+                            continue
+                        k, v = line.split('=', 1)
+                        if k == 'KEYMAP':
+                            keymap = v
+                            needlocalectl = False
+                if not needlocalectl:
+                    needlocalectl = True
+                    localeconf = None
+                    if os.path.exists('/etc/locale.conf'):
+                        localeconf = '/etc/locale.conf'
+                    elif os.path.exists('/etc/default/locale'):
+                        localeconf = '/etc/default/locale'
+                    if localeconf:
+                        with open(localeconf) as lcin:
+                            for line in lcin.read().split('\n'):
+                                line = line.split('#', 1)[0]
+                                if '=' not in line:
+                                    continue
+                                k, v = line.split('=', 1)
+                                if k == 'LANG':
+                                    needlocalectl = False
+                                    currlocale = v
+            except IOError:
+                pass
+            if needlocalectl:
+                try:
+                    langinfo = subprocess.check_output(
+                        ['localectl', 'status']).split(b'\n')
+                except Exception:
+                    langinfo = []
+                for line in langinfo:
+                    line = line.strip()
+                    if line.startswith(b'System Locale:'):
+                        ccurrlocale = line.split(b'=')[-1]
+                        if not ccurrlocale:
+                            continue
+                        if not isinstance(ccurrlocale, str):
+                            ccurrlocale = ccurrlocale.decode('utf8')
+                        if ccurrlocale == 'n/a':
+                            continue
+                        currlocale = ccurrlocale
+                    elif line.startswith(b'VC Keymap:'):
+                        ckeymap = line.split(b':')[-1]
+                        ckeymap = ckeymap.strip()
+                        if not ckeymap:
+                            continue
+                        if not isinstance(ckeymap, str):
+                            ckeymap = ckeymap.decode('utf8')
+                        if ckeymap == 'n/a':
+                            continue
+                        keymap = ckeymap
             tdc = subprocess.check_output(['timedatectl']).split(b'\n')
             for ent in tdc:
                 ent = ent.strip()
