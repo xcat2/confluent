@@ -108,8 +108,8 @@ if [ "$autoconfigmethod" = "static" ]; then
     if [ "$ipgw" = "null" ]; then
         ipgw=""
     fi
-    ipnm=$(grep ^prefix: /etc/confluent/confluent.deploycfg)
-    ipnm=${ipnm#prefix: }
+    ipnm=$(grep ^ipv6_prefix: /etc/confluent/confluent.deploycfg)
+    ipnm=${ipnm#ipv6_prefix: }
     echo "Setting up $ifname as static at $ipaddr/$ipnm"
     ip addr add dev $ifname $ipaddr/$ipnm
     if [ ! -z "$ipgw" ]; then
