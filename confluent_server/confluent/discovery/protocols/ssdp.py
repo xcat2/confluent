@@ -204,7 +204,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         msecs = int(currtime * 1000 % 1000)
                                         reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
                                         if '%' in peer[0]:
-                                            iface = peer[0].split('%', 1)[1]
+                                            iface = socket.getaddrinfo(peer[0], 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][-1]
                                             reply += 'MGTIFACE: {0}\r\n'.format(
                                                 peer[0].split('%', 1)[1])
                                             ncfg = netutil.get_nic_config(

@@ -110,7 +110,13 @@ def handle_request(env, start_response):
         yield dumper(res)
     elif env['PATH_INFO'] == '/self/deploycfg':
         if 'HTTP_CONFLUENT_MGTIFACE' in env:
-            ncfg = netutil.get_nic_config(cfg, nodename, ifidx=env['HTTP_CONFLUENT_MGTIFACE'])
+            nicname = env['HTTP_CONFLUENT_MGTIFACE']
+            try:
+                ifidx = int(nicname)
+            except ValueError:
+                with open('/sys/class/net/{}/ifindex'.format(nicname), 'r') as nici:
+                    ifidx = int(nici.read())
+            ncfg = netutil.get_nic_config(cfg, nodename, ifidx=ifidx)
         else:
             myip = env.get('HTTP_X_FORWARDED_HOST', None)
             if ']' in myip:
@@ -158,7 +164,7 @@ def handle_request(env, start_response):
                             continue
                         k, v = line.split('=', 1)
                         if k == 'KEYMAP':
-                            keymap = v
+                            keymap = v.replace('"', '')
                             needlocalectl = False
                 if not needlocalectl:
                     needlocalectl = True
@@ -176,7 +182,7 @@ def handle_request(env, start_response):
                                 k, v = line.split('=', 1)
                                 if k == 'LANG':
                                     needlocalectl = False
-                                    currlocale = v
+                                    currlocale = v.replace('"', '')
             except IOError:
                 pass
             if needlocalectl:

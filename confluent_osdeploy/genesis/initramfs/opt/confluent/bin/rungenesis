@@ -99,13 +99,30 @@ tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
+autoconfigmethod=$(grep ipv6_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
+if [ "$autoconfigmethod" = "static" ]; then
+    ipaddr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
+    ipaddr=${ipaddr#ipv6_address: }
+    ipgw=$(grep ^ipv6_gateway: /etc/confluent/confluent.deploycfg)
+    ipgw=${ipgw#ipv6_gateway: }
+    if [ "$ipgw" = "null" ]; then
+        ipgw=""
+    fi
+    ipnm=$(grep ^prefix: /etc/confluent/confluent.deploycfg)
+    ipnm=${ipnm#prefix: }
+    echo "Setting up $ifname as static at $ipaddr/$ipnm"
+    ip addr add dev $ifname $ipaddr/$ipnm
+    if [ ! -z "$ipgw" ]; then
+        ip route add default via $ipgw
+    fi
+fi
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
     dhclient $ifname
     echo "Complete:"
     ip addr show dev $ifname
-else
+elif [ "$autocinfigmethtod" = "static" ]; then
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
