@@ -65,14 +65,18 @@ class HTTPSClient(client.HTTPConnection, object):
             ifidx = host.split('%', 1)[1]
             with open('/tmp/confluent.ifidx', 'w+') as ifout:
                 ifout.write(ifidx)
+        v4srv = None
+        v6srv = None
+        if ':' in host:
+            v6srv = host
+        else:
+            v4srv = host
         if json:
             self.stdheaders['ACCEPT'] = 'application/json'
         try:
             info = open('/etc/confluent/confluent.deploycfg').read().split('\n')
         except Exception:
             info = None
-        v4srv = None
-        v6srv = None
         if info:
             for line in info:
                 if line.startswith('deploy_server: '):
@@ -84,6 +88,8 @@ class HTTPSClient(client.HTTPConnection, object):
             self.stdheaders['CONFLUENT_MGTIFACE'] = mgtiface
         self.v4srv = v4srv
         self.v6srv = v6srv
+        self.port = port
+        self.host = None
         self.connect()
         client.HTTPConnection.__init__(self, host, port)
         self.node = node
@@ -92,16 +98,21 @@ class HTTPSClient(client.HTTPConnection, object):
         self.stdheaders[key] = val
 
     def connect(self):
-        try:
-            addrinf = socket.getaddrinfo(self.v4srv, self.port)[0]
-            psock = socket.socket(addrinf[0])
-            psock.connect(addrinf[4])
-            self.host = self.v4srv
-        except OSError:
-            addrinf = socket.getaddrinfo(self.v6srv, self.port)[0]
-            psock = socket.socket(addrinf[0])
-            psock.connect(addrinf[4])
-            self.host = self.v6srv
+        hosts = []
+        if self.v4srv:
+            hosts.append(self.v4srv)
+        if self.v6srv:
+            hosts.append(self.v6srv)
+        for host in hosts:
+            try:
+                addrinf = socket.getaddrinfo(host, self.port)[0]
+                psock = socket.socket(addrinf[0])
+                psock.connect(addrinf[4])
+                self.host = host
+            except OSError:
+                continue
+        if not self.host:
+            raise Exception('Unable to reach any hosts')
         ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         ctx.load_verify_locations('/etc/confluent/ca.pem')
         host = self.host.split('%', 1)[0]
