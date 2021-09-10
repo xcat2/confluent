@@ -122,7 +122,7 @@ if [ "$autoconfigmethod" = "dhcp" ]; then
     dhclient $ifname
     echo "Complete:"
     ip addr show dev $ifname
-elif [ "$autocinfigmethtod" = "static" ]; then
+elif [ "$autoconfigmethod" = "static" ]; then
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
