@@ -151,11 +151,12 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
 done
 /usr/sbin/sshd
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | awk '{print $2}')
-confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg | awk '{print $2}')
-export confluent_profile confluent_mgr
-echo "Running https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh"
+export confluent_profile
 /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
+set_confluent_vars
+export confluent_mgr
+echo "Running https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh"
 run_remote onboot.sh
 while :; do
     bash
