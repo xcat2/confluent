@@ -19,14 +19,18 @@ def get_apikey(nodename, mgr, mgr6):
         apikey = open('/etc/confluent/confluent.apikey').read().strip()
         if apikey:
             return apikey
+    hosts = []
+    for host in (mgr, mgr6):
+        if not host:
+            continue
+        hosts.append(host)
     while not apikey:
-        try:
-            apikey = subprocess.check_output(['/opt/confluent/bin/clortho', nodename, mgr])
-        except subprocess.CalledProcessError:
+        for host in hosts:
             try:
-                apikey = subprocess.check_output(['/opt/confluent/bin/clortho', nodename, mgr6])
+                apikey = subprocess.check_output(['/opt/confluent/bin/clortho', nodename, host])
             except subprocess.CalledProcessError:
-                apikey = ''
+                continue
+            break
         if not isinstance(apikey, str):
             apikey = apikey.decode('utf8')
         if apikey.startswith('SEALED:'):
