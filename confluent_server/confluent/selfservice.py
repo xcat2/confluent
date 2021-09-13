@@ -108,7 +108,7 @@ def handle_request(env, start_response):
         # credential security results in user/password having to be deferred
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(res)
-    elif env['PATH_INFO'] == '/self/deploycfg':
+    elif env['PATH_INFO'] in ('/self/deploycfg', '/self/deploycfg2'):
         if 'HTTP_CONFLUENT_MGTIFACE' in env:
             nicname = env['HTTP_CONFLUENT_MGTIFACE']
             try:
@@ -125,6 +125,10 @@ def handle_request(env, start_response):
                 myip = myip.split(':', 1)[0]
             myip = myip.replace('[', '').replace(']', '')
             ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
+        if env['PATH_INFO'] == '/self/deploycfg':
+            for key in list(ncfg):
+                if 'v6' in key:
+                    del ncfg[key]
         if ncfg['prefix']:
             ncfg['ipv4_netmask'] = netutil.cidr_to_mask(ncfg['prefix'])
         if ncfg['ipv4_method'] == 'firmwaredhcp':
