@@ -76,7 +76,7 @@ for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
 done
 cd - > /dev/null
 rm -rf $tpmdir
-/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
 umask $oldumask
 new_apikey=$(cat /etc/confluent/confluent.apikey)
 if [ "$new_apikey" != "$confluent_apikey" ]; then
