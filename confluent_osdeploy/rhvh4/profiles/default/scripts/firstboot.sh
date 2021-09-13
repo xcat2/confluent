@@ -7,7 +7,7 @@
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 apikey=$(cat /etc/confluent/confluent.apikey)
-mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
 export nodename mgr profile

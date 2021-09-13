@@ -43,7 +43,7 @@ reboot
 
 %pre
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
-mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.sh
 . /tmp/preinst.sh
 %end
@@ -51,7 +51,7 @@ curl -f https://$mgr/confluent-public/os/$profile/scripts/pre.sh > /tmp/preinst.
 %post --nochroot
 mkdir -p /mnt/sysimage/etc/confluent
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
-mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/prechroot.sh > /tmp/postinst.sh
 . /tmp/postinst.sh
 
@@ -68,7 +68,7 @@ systemctl enable firstboot
 chgrp ssh_keys /etc/ssh/ssh*key
 restorecon /etc/ssh/ssh*key /root/.shosts /etc/ssh/shosts.equiv /etc/ssh/ssh_config.d/* /etc/confluent/firstboot.sh
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
-mgr=$(grep deploy_server /etc/confluent/confluent.deploycfg |awk '{print $2}')
+mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 curl -f https://$mgr/confluent-public/os/$profile/scripts/post.sh > /tmp/postinst.sh
 . /tmp/postinst.sh
 %end
