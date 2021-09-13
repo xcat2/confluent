@@ -221,14 +221,17 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             raise ValueError('"{0}" is not a valid ip argument')
         ipbytes = socket.inet_pton(fam, serverip)
         dhcprequested = False
-        myaddrs = [x for x in get_my_addresses() if x[1] == ipbytes]
+        matchlla = None
+        if ipbytes[:8] == b'\xfe\x80\x00\x00\x00\x00\x00\x00':
+            myaddrs = get_my_addresses(matchlla=ipbytes)
+        else:
+            myaddrs = [x for x in get_my_addresses() if x[1] == ipbytes]
     genericmethod = 'static'
     ipbynodename = None
     ip6bynodename = None
     try:
         for addr in socket.getaddrinfo(node, 0, socket.AF_INET, socket.SOCK_DGRAM):
             ipbynodename = addr[-1][0]
-        
     except socket.gaierror:
         pass
     try:
@@ -363,7 +366,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
 nlhdrsz = struct.calcsize('IHHII')
 ifaddrsz = struct.calcsize('BBBBI')
 
-def get_my_addresses(idx=0, family=0):
+def get_my_addresses(idx=0, family=0, matchlla=None):
     # RTM_GETADDR = 22
     # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
     nlhdr = struct.pack('IHHII', nlhdrsz + ifaddrsz, 22, 0x301, 0, 0)
@@ -382,7 +385,15 @@ def get_my_addresses(idx=0, family=0):
             length, typ = struct.unpack('IH', v[:6])
             if typ == 20:
                 fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
-                if (ridx == idx or not idx) and scope == 0:
+                if matchlla:
+                    if scope == 253:
+                        rta = v[nlhdrsz+ifaddrsz:length]
+                        while len(rta):
+                            rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                            if rta[4:rtalen].tobytes() == matchlla:
+                                return get_my_addresses(idx=ridx)
+                            rta = rta[rtalen:]
+                elif (ridx == idx or not idx) and scope == 0:
                     rta = v[nlhdrsz+ifaddrsz:length]
                     while len(rta):
                         rtalen, rtatyp = struct.unpack('HH', rta[:4])
