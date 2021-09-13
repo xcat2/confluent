@@ -13,7 +13,7 @@ import time
 class InvalidApiKey(Exception):
     pass
 
-def get_apikey(nodename, mgr, mgr6):
+def get_apikey(nodename, mgr, mgr6=None):
     apikey = ""
     if os.path.exists('/etc/confluent/confluent.apikey'):
         apikey = open('/etc/confluent/confluent.apikey').read().strip()
