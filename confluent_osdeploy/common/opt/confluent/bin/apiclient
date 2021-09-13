@@ -94,14 +94,17 @@ class HTTPSClient(client.HTTPConnection, object):
         self.v6srv = v6srv
         self.port = port
         self.host = None
-        self.connect()
-        client.HTTPConnection.__init__(self, host, port)
         self.node = node
+        host = self.check_connections()
+        client.HTTPConnection.__init__(self, host, port)
+        self.connect()
+
 
     def set_header(self, key, val):
         self.stdheaders[key] = val
 
-    def connect(self):
+    def check_connections(self):
+        foundsrv = None
         hosts = []
         if self.v4srv:
             hosts.append(self.v4srv)
@@ -112,11 +115,18 @@ class HTTPSClient(client.HTTPConnection, object):
                 addrinf = socket.getaddrinfo(host, self.port)[0]
                 psock = socket.socket(addrinf[0])
                 psock.connect(addrinf[4])
-                self.host = host
+                foundsrv = host
+                psock.close()
             except OSError:
                 continue
-        if not self.host:
+        if not foundsrv:
             raise Exception('Unable to reach any hosts')
+        return foundsrv
+
+    def connect(self):
+        addrinf = socket.getaddrinfo(self.host, self.port)[0]
+        psock = socket.socket(addrinf[0])
+        psock.connect(addrinf[4])
         ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         ctx.load_verify_locations('/etc/confluent/ca.pem')
         host = self.host.split('%', 1)[0]
