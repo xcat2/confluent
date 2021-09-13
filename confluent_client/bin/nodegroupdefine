@@ -45,14 +45,15 @@ except IndexError:
 client.check_globbing(noderange)
 session = client.Command()
 exitcode = 0
-attribs = {'name': noderange}
-for arg in args[1:]:
-    key, val = arg.split('=', 1)
-    attribs[key] = val
-for r in session.create('/nodegroups/', attribs):
-    if 'error' in r:
-        sys.stderr.write(r['error'] + '\n')
-        exitcode |= 1
-    if 'created' in r:
-        print('{0}: created'.format(r['created']))
+for group in noderange.split(','):
+    attribs = {'name': group}
+    for arg in args[1:]:
+        key, val = arg.split('=', 1)
+        attribs[key] = val
+    for r in session.create('/nodegroups/', attribs):
+        if 'error' in r:
+            sys.stderr.write(r['error'] + '\n')
+            exitcode |= 1
+        if 'created' in r:
+            print('{0}: created'.format(r['created']))
 sys.exit(exitcode)
