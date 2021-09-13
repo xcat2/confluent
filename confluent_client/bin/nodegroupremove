@@ -43,10 +43,11 @@ noderange = args[0]
 client.check_globbing(noderange)
 session = client.Command()
 exitcode = 0
-for r in session.delete('/nodegroups/{0}'.format(noderange)):
-    if 'error' in r:
-        sys.stderr.write(r['error'] + '\n')
-        exitcode |= 1
-    if 'deleted' in r:
-        print('{0}: deleted'.format(r['deleted']))
+for group in noderange.split(','):
+    for r in session.delete('/nodegroups/{0}'.format(noderange)):
+        if 'error' in r:
+            sys.stderr.write(r['error'] + '\n')
+            exitcode |= 1
+        if 'deleted' in r:
+            print('{0}: deleted'.format(r['deleted']))
 sys.exit(exitcode)
