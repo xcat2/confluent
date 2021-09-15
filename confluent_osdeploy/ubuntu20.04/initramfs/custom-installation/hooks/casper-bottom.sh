@@ -16,7 +16,7 @@ deploycfg=/root/custom-installation/confluent/confluent.deploycfg
 if [ -z "$MGTIFACE" ]; then
 	chroot . usr/bin/curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
 else
-	chroot . usr/bin/curl -f -H "ONFLUENT_MGTIFACE: $MGTIFACE" -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
+	chroot . usr/bin/curl -f -H "CONFLUENT_MGTIFACE: $MGTIFACE" -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
 fi
 umask $oum
 nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
