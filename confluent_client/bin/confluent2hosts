@@ -1,0 +1,157 @@
+#!/usr/bin/python2
+import argparse
+import os
+import signal
+import sys
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+import confluent.client as client
+import confluent.sortutil as sortutil
+
+def partitionhostsline(line):
+    comment = ''
+    if '#' in line:
+        cmdidx = line.index('#')
+        comment = line[cmdidx:]
+        line = line[:cmdidx].strip()
+    if not line.strip():
+        return '', [], comment
+    ipaddr, names = line.split(maxsplit=1)
+    names = names.split()
+    return ipaddr, names, comment
+
+class HostMerger(object):
+    def __init__(self):
+        self.byip = {}
+        self.byname = {}
+        self.byname6 = {}
+        self.sourcelines = []
+        self.targlines = []
+
+    def read_source(self, sourcefile):
+        with open(sourcefile, 'r') as hfile:
+            self.sourcelines = hfile.read().split('\n')
+        while not self.sourcelines[-1]:
+            self.sourcelines = self.sourcelines[:-1]
+        for x in range(len(self.sourcelines)):
+            line = self.sourcelines[x]
+            currip, names, comment = partitionhostsline(line)
+            if currip:
+                self.byip[currip] = x
+            byname = self.byname
+            if ':' in currip:
+                byname = self.byname6
+            for name in names:
+                byname[name] = x
+
+    def add_entry(self, ip, names):
+        targ = self.byname
+        if ':' in ip:
+            targ = self.byname6
+        line = '{:<39} {}'.format(ip, names)
+        x = len(self.sourcelines)
+        self.sourcelines.append(line)
+        for name in names.split():
+            if not name:
+                continue
+            targ[name] = x
+        self.byip[ip] = x
+
+
+    def read_target(self, targetfile):
+        with open(targetfile, 'r') as hfile:
+            lines = hfile.read().split('\n')
+            while not lines[-1]:
+                lines = lines[:-1]
+            for y in range(len(lines)):
+                line = lines[y]
+                currip, names, comment = partitionhostsline(line)
+                byname = self.byname
+                if ':' in currip:
+                    byname = self.byname6
+                if currip in self.byip:
+                    x = self.byip[currip]
+                    if self.sourcelines[x] is None:
+                        # have already consumed this entry
+                        continue
+                    self.targlines.append(self.sourcelines[x])
+                    self.sourcelines[x] = None
+                    continue
+                for name in names:
+                    if name in byname:
+                        x = byname[name]
+                        if self.sourcelines[x] is None:
+                            break
+                        self.targlines.append(self.sourcelines[x])
+                        self.sourcelines[x] = None
+                        break
+                else:
+                    self.targlines.append(line)
+
+    def write_out(self, targetfile):
+        while not self.targlines[-1]:
+            self.targlines = self.targlines[:-1]
+        while not self.sourcelines[-1]:
+            self.sourcelines = self.sourcelines[:-1]
+            if not self.sourcelines:
+                break
+        with open(targetfile, 'w') as hosts:
+            for line in self.targlines:
+                hosts.write(line + '\n')
+            for line in self.sourcelines:
+                if line is not None:
+                    hosts.write(line + '\n')
+
+def main():
+    ap = argparse.ArgumentParser(description="Create/amend /etc/hosts file for given noderange")
+    ap.add_argument('noderange', help='Noderange to generate/update /etc/hosts for')
+    ap.add_argument('-i', '--ip', help='Expression to generate addresses (e.g. 172.16.1.{n1} or fd2b:246f:8a50::{n1:x})')
+    ap.add_argument('-n', '--name', help='Expression for name to add ({node}-compute, etc). If unspecified, "{node} {node}.{dns.domain}" will be used', action='append')
+    args = ap.parse_args()
+    c = client.Command()
+    if args.name:
+        names = ' '.join(args.name)
+    else:
+        names = '{node} {node}.{dns.domain}'
+    if not args.ip:
+        sys.stderr.write('-i is currently required\n')
+        sys.exit(1)
+    namesbynode = {}
+    ipbynode = {}
+    expurl = '/noderange/{0}/attributes/expression'.format(args.noderange)
+    expression = names
+    exitcode = 0
+    exitcode |= expand_expression(c, namesbynode, expurl, names)
+    exitcode |= expand_expression(c, ipbynode, expurl, args.ip)
+    if exitcode:
+        sys.exit(exitcode)
+    merger = HostMerger()
+    for node in ipbynode:
+        merger.add_entry(ipbynode[node], namesbynode[node])
+    merger.read_target('/etc/hosts')
+    os.rename('/etc/hosts', '/etc/hosts.confluentbkup')
+    merger.write_out('/etc/hosts')
+
+
+
+def expand_expression(c, namesbynode, expurl, expression):
+    exitcode = 0
+    for exp in c.create(expurl, {'expression': expression}):
+        if 'error' in exp:
+            sys.stderr.write(exp['error'] + '\n')
+            exitcode |= exp.get('errorcode', 1)
+        ex = exp.get('databynode', ())
+        for node in ex:
+            namesbynode[node] = ex[node]['value']
+    return exitcode
+
+
+if __name__ == '__main__':
+    main()
