@@ -1,3 +1,4 @@
+#!/bin/bash
 function test_mgr() {
     if curl -s https://${1}/confluent-api/ > /dev/null; then
         return 0
@@ -169,4 +170,5 @@ run_remote_config() {
     echo '---------------------------------------------------------------------------'
     return
 }
-
+#If invoked as a command, use the arguments to actually run a function
+(return 0 2>/dev/null) || $1 "${@:2}"

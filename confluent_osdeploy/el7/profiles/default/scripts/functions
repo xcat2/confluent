@@ -1,3 +1,4 @@
+#!/bin/bash
 function set_confluent_vars() {
     if [ -z "$nodename" ]; then
         nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
@@ -134,3 +135,5 @@ run_remote_config() {
     return
 }
 
+#If invoked as a command, use the arguments to actually run a function
+(return 0 2>/dev/null) || $1 "${@:2}"
