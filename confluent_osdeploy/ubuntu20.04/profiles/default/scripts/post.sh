@@ -63,6 +63,13 @@ echo "Port 2222" >> /etc/ssh/sshd_config
 echo "Match LocalPort 22" >> /etc/ssh/sshd_config
 echo "    ChrootDirectory /target" >> /etc/ssh/sshd_config
 kill -HUP $(cat /run/sshd.pid)
+if [ -e /sys/firmware/efi ]; then
+    bootnum=$(efibootmgr | grep ubuntu | sed -e 's/ .*//' -e 's/\*//' -e s/Boot//)
+    currboot=$(efibootmgr | grep ^BootOrder: | awk '{print $2}')
+    nextboot=$(echo $currboot| awk -F, '{print $1}')
+    [ "$nextboot" = "$bootnum" ] || efibootmgr -o $bootnum,$currboot
+    efibootmgr -D
+fi
 cat /target/etc/confluent/tls/*.pem > /target/etc/confluent/ca.pem
 cat /target/etc/confluent/tls/*.pem > /etc/confluent/ca.pem
 chroot /target bash -c "source /etc/confluent/functions; run_remote_python syncfileclient"
