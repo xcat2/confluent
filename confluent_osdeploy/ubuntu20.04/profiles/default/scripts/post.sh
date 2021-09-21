@@ -67,8 +67,8 @@ if [ -e /sys/firmware/efi ]; then
     bootnum=$(efibootmgr | grep ubuntu | sed -e 's/ .*//' -e 's/\*//' -e s/Boot//)
     currboot=$(efibootmgr | grep ^BootOrder: | awk '{print $2}')
     nextboot=$(echo $currboot| awk -F, '{print $1}')
-    [ "$nextboot" = "$bootnum" ] || efibootmgr -o $bootnum,$currboot
-    efibootmgr -D
+    [ "$nextboot" = "$bootnum" ] || chroot /target efibootmgr -o $bootnum,$currboot
+    chroot /target efibootmgr -D
 fi
 cat /target/etc/confluent/tls/*.pem > /target/etc/confluent/ca.pem
 cat /target/etc/confluent/tls/*.pem > /etc/confluent/ca.pem
