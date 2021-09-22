@@ -142,6 +142,7 @@ def create_certificate(keyout=None, certout=None):
     extconfig = tempfile.mktemp()
     csrout = tempfile.mktemp()
     shutil.copy2(sslcfg, tmpconfig)
+    serialnum = '0x' + ''.join(['{:02x}'.format(x) for x in bytearray(os.urandom(20))])
     try:
         with open(tmpconfig, 'a') as cfgfile:
             cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
@@ -156,7 +157,7 @@ def create_certificate(keyout=None, certout=None):
             'openssl', 'x509', '-req', '-in', csrout,
             '-CA', '/etc/confluent/tls/cacert.pem',
             '-CAkey', '/etc/confluent/tls/cakey.pem',
-            '-set_serial', '0x123', '-out', certout, '-days', '27300',
+            '-set_serial', serialnum, '-out', certout, '-days', '27300',
             '-extfile', extconfig
         ])
     finally:
