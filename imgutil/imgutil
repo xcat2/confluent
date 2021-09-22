@@ -609,7 +609,7 @@ def run_constrained(function, args):
 
 def main():
     if sys.argv[1] == 'getfingerprint':
-        print(fingerprint_host().get_json())
+        print(fingerprint_host(None).get_json())
         return
     elif sys.argv[1] == 'capturelocal':
         capture_system()
