@@ -54,7 +54,7 @@ def print_mem_info(node, prefix, meminfo):
     elif 'DDR4' in meminfo['memory_type']:
         memdescfmt += '4-{1} '
     elif 'DCPMM' in meminfo['memory_type']:
-        memdescfmt = '{0}GB PC{1} '
+        memdescfmt = '{0}GB {1} '
         meminfo['module_type'] = 'DCPMM'
     else:
         print('{0}: {1}: Unrecognized Memory'.format(node, prefix))
