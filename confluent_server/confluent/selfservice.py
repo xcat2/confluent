@@ -192,7 +192,7 @@ def handle_request(env, start_response):
             if needlocalectl:
                 try:
                     langinfo = subprocess.check_output(
-                        ['localectl', 'status']).split(b'\n')
+                        ['localectl', 'status'], timeout=86400).split(b'\n')
                 except Exception:
                     langinfo = []
                 for line in langinfo:
@@ -216,7 +216,7 @@ def handle_request(env, start_response):
                         if ckeymap == 'n/a':
                             continue
                         keymap = ckeymap
-            tdc = subprocess.check_output(['timedatectl']).split(b'\n')
+            tdc = subprocess.check_output(['timedatectl'], timeout=86400).split(b'\n')
             for ent in tdc:
                 ent = ent.strip()
                 if ent.startswith(b'Time zone:'):

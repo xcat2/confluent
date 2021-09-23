@@ -15,7 +15,7 @@ def get_openssl_conf_location():
         raise Exception("Cannot find openssl config file")
 
 def get_ip_addresses():
-    lines = subprocess.check_output('ip addr'.split(' '))
+    lines = subprocess.check_output('ip addr'.split(' '), timeout=86400)
     if not isinstance(lines, str):
         lines = lines.decode('utf8')
     for line in lines.split('\n'):
@@ -102,7 +102,7 @@ def assure_tls_ca():
             raise
     shutil.copy2('/etc/confluent/tls/cacert.pem', fname)
     hv = subprocess.check_output(
-        ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'])
+        ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'], timeout=86400)
     if not isinstance(hv, str):
         hv = hv.decode('utf8')
     hv = hv.strip()

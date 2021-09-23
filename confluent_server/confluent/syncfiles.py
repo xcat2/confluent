@@ -89,7 +89,7 @@ def sync_list_to_node(sl, node, suffixes):
                           os.path.join(targdir, suffixes['merge']), True)
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         output = subprocess.check_output(
-            ['rsync', '-rvL', targdir + '/', 'root@{}:/'.format(node)])
+            ['rsync', '-rvL', targdir + '/', 'root@{}:/'.format(node)], timeout=86400)
     finally:
         shutil.rmtree(targdir)
     return output
