@@ -4,6 +4,7 @@ import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import eventlet.green.subprocess as subprocess
+import eventlet
 import glob
 import os
 import shutil
@@ -31,26 +32,33 @@ def normalize_uid():
         raise Exception('Need to run as root or owner of /etc/confluent')
     return curruid
 
-
+agent_starting = False
 def assure_agent():
     if sshver() <= 7.6:
         return False
+    global agent_starting
     global agent_pid
+    while agent_starting:
+        eventlet.sleep(0.1)
     if agent_pid is None:
-        sai = subprocess.check_output(['ssh-agent'])
-        for line in sai.split(b'\n'):
-            if b';' not in line:
-                continue
-            line, _ = line.split(b';', 1)
-            if b'=' not in line:
-                continue
-            k, v = line.split(b'=', 1)
-            if not isinstance(k, str):
-                k = k.decode('utf8')
-                v = v.decode('utf8')
-            if k == 'SSH_AGENT_PID':
-                agent_pid = v
-            os.environ[k] = v
+        try:
+            agent_starting = True
+            sai = subprocess.check_output(['ssh-agent'])
+            for line in sai.split(b'\n'):
+                if b';' not in line:
+                    continue
+                line, _ = line.split(b';', 1)
+                if b'=' not in line:
+                    continue
+                k, v = line.split(b'=', 1)
+                if not isinstance(k, str):
+                    k = k.decode('utf8')
+                    v = v.decode('utf8')
+                if k == 'SSH_AGENT_PID':
+                    agent_pid = v
+                os.environ[k] = v
+        finally:
+            agent_starting = False
     return True
 
 def get_passphrase():
@@ -90,11 +98,18 @@ def initialize_ca():
     #    newent = '@cert-authority * ' + capub.read()
 
 
+adding_key = False
 def prep_ssh_key(keyname):
+    global adding_key
+    while adding_key:
+        eventlet.sleep(0.1)
+    adding_key = True
     if keyname in ready_keys:
+        adding_key = False
         return
     if not assure_agent():
         ready_keys[keyname] = 1
+        adding_key = False
         return
     tmpdir = tempfile.mkdtemp()
     try:
@@ -110,6 +125,7 @@ def prep_ssh_key(keyname):
         del os.environ['CONFLUENT_SSH_PASSPHRASE']
         ready_keys[keyname] = 1
     finally:
+        adding_key = False
         shutil.rmtree(tmpdir)
 
 def sign_host_key(pubkey, nodename, principals=()):
