@@ -615,8 +615,9 @@ def get_my_duid():
 
 def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     replen = 275  # default is going to be 286
-    myipn = info['netinfo']['recvip']
-    myipn = socket.inet_aton(myipn)
+    # while myipn is describing presumed destination, it's really
+    # vague in the face of aliases, need to convert to ifidx and evaluate
+    # aliases for best match to guess
 
     rqtype = packet[53][0]
     insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
@@ -635,29 +636,13 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     reply = bytearray(512)
     repview = memoryview(reply)
     repview[:20] = iphdr
-    repview[12:16] = myipn
     repview[20:28] = udphdr
+    orepview = repview
     repview = repview[28:]
     repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     repview[10:11] = b'\x80'  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
-    if httpboot:
-        proto = 'https' if insecuremode == 'never' else 'http'
-        bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
-            proto, info['netinfo']['recvip'], profile
-        )
-        if not isinstance(bootfile, bytes):
-            bootfile = bootfile.encode('utf8')
-        if len(bootfile) > 127:
-            log.log(
-                {'info': 'Boot offer cannot be made to {0} as the '
-                'profile name "{1}" is {2} characters longer than is supported '
-                'for this boot method.'.format(
-                    node, profile, len(bootfile) - 127)})
-            return
-        repview[108:108 + len(bootfile)] = bootfile
-    repview[20:24] = myipn
     gateway = None
     netmask = None
     niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'])
@@ -678,6 +663,27 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         netmask = niccfg['prefix']
         netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
         netmask = struct.pack('!I', netmask)
+    myipn = niccfg['deploy_server']
+    if not myipn:
+        myipn = info['netinfo']['recvip']
+    if httpboot:
+        proto = 'https' if insecuremode == 'never' else 'http'
+        bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
+            proto, myipn, profile
+        )
+        if not isinstance(bootfile, bytes):
+            bootfile = bootfile.encode('utf8')
+        if len(bootfile) > 127:
+            log.log(
+                {'info': 'Boot offer cannot be made to {0} as the '
+                'profile name "{1}" is {2} characters longer than is supported '
+                'for this boot method.'.format(
+                    node, profile, len(bootfile) - 127)})
+            return
+        repview[108:108 + len(bootfile)] = bootfile
+    myipn = socket.inet_aton(myipn)
+    orepview[12:16] = myipn
+    repview[20:24] = myipn
     repview[236:240] = b'\x63\x82\x53\x63'
     repview[240:242] = b'\x35\x01'
     if rqtype == 1:  # if discover, then offer
