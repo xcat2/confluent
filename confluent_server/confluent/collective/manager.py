@@ -478,10 +478,10 @@ def handle_connection(connection, cert, request, local=False):
             return
         log.log({'info': 'Connecting in response to assimilation',
                  'subsystem': 'collective'})
-        if cfm.cfgstreams:
-            retire_as_leader(connection.getpeername())
-        tlvdata.send(connection, {'status': 0})
         newleader = connection.getpeername()[0]
+        if cfm.cfgstreams:
+            retire_as_leader(newleader)
+        tlvdata.send(connection, {'status': 0})
         connection.close()
         if not connect_to_leader(None, None, leader=newleader):
             if retrythread is None:
