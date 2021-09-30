@@ -184,8 +184,12 @@ def follow_leader(remote, leader):
         if newleader:
             log.log(
                 {'info': 'Previous leader directed us to join new leader {}'.format(newleader)})
-            if connect_to_leader(None, get_myname(), newleader):
-                return
+            try:
+                if connect_to_leader(None, get_myname(), newleader):
+                    return
+            except Exception:
+                log.log({'error': 'Unknown error attempting to connect to {}, check trace log'.format(newleader), 'subsystem': 'collective'})
+                cfm.logException()
         log.log({'info': 'Current leader ({0}) has disappeared, restarting '
                          'collective membership'.format(leader), 'subsystem': 'collective'})
         # The leader has folded, time to startup again...
