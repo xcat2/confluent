@@ -90,6 +90,25 @@ def sync_list_to_node(sl, node, suffixes):
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         output = subprocess.check_output(
             ['rsync', '-rvL', targdir + '/', 'root@{}:/'.format(node)], timeout=86400)
+    except Exception as e:
+        if 'CalledProcessError' not in repr(e):
+            # https://github.com/eventlet/eventlet/issues/413
+            # for some reason, can't catch the calledprocesserror normally
+            # for this exception, implement a hack workaround
+            raise
+        unreadablefiles = []
+        for root, dirnames, filenames in os.walk(targdir):
+            for filename in filenames:
+                filename = os.path.join(root, filename)
+                try:
+                    with open(filename, 'r') as _:
+                        pass
+                except OSError as e:
+                    unreadablefiles.append(filename.replace(targdir, ''))
+        if unreadablefiles:
+            raise Exception("Syncing failed due to unreadable files: " + ','.join(unreadablefiles))
+        else:
+            raise
     finally:
         shutil.rmtree(targdir)
     return output
