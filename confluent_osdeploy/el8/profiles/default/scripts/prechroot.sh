@@ -21,6 +21,7 @@ fi
 mkdir -p /mnt/sysimage/var/log/confluent
 mv /tmp/confluent-pre.log /mnt/sysimage/var/log/confluent
 echo Port 2222 >> /etc/ssh/sshd_config.anaconda
+echo Port 22 >> /etc/ssh/sshd_config.anaconda
 echo Match LocalPort 22 >> /etc/ssh/sshd_config.anaconda
 echo "    ChrootDirectory /mnt/sysimage" >> /etc/ssh/sshd_config.anaconda
 kill -HUP $(cat /run/sshd.pid)
