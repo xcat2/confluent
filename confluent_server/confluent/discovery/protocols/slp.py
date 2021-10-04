@@ -104,8 +104,6 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
     if not parsed:
         return
     addr = peer[0]
-    if '%' in addr:
-        addr = addr[:addr.index('%')]
     mac = neighutil.get_hwaddr(addr)
     if mac:
         identifier = mac
@@ -413,8 +411,7 @@ def rescan(handler):
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            macaddr = neighutil.get_hwaddr(ip)
+            macaddr = neighutil.get_hwaddr(addr[0])
             if not macaddr:
                 continue
             known_peers.add(addr)
@@ -478,10 +475,9 @@ def snoop(handler, protocol=None):
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
-                    ip = peer[0].partition('%')[0]
                     if peer in known_peers:
                         continue
-                    mac = neighutil.get_hwaddr(ip)
+                    mac = neighutil.get_hwaddr(peer[0])
                     if not mac:
                         continue
                     known_peers.add(peer)
@@ -534,14 +530,31 @@ def snoop(handler, protocol=None):
 
 def active_scan(handler, protocol=None):
     known_peers = set([])
+    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    net6 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    toprocess = []
+    # Implement a warmup, inducing neighbor table activity
+    # by kernel and giving 2 seconds for a retry or two if
+    # needed
     for scanned in scan():
+        toprocess.append(scanned)
+        for addr in scanned['addresses']:
+            macaddr = neighutil.get_hwaddr(addr[0])
+            if not macaddr:
+                if ':' in addr[0]:
+                    net6.sendto(b'\x00', (addr[0], 8989))
+                else:
+                    net4.sendto(b'\x00', (addr[0], 8989))
+    eventlet.sleep(2.2)
+    for scanned in toprocess:
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            macaddr = neighutil.get_hwaddr(ip)
+            macaddr = neighutil.get_hwaddr(addr[0])
             if not macaddr:
                 continue
+            if not scanned.get('hwaddr', None):
+                scanned['hwaddr'] = macaddr
             known_peers.add(addr)
         else:
             scanned['protocol'] = protocol

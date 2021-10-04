@@ -76,6 +76,8 @@ def _update_neigh():
 
 
 def get_hwaddr(ipaddr):
+    if '%' in ipaddr:
+        ipaddr, _ = ipaddr.split('%', 1)
     hwaddr = None
     if os.name == 'nt':
         return hwaddr

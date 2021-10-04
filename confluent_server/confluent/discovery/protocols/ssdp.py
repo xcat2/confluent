@@ -63,8 +63,7 @@ def active_scan(handler, protocol=None):
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
-            ip = addr[0].partition('%')[0]  # discard scope if present
-            hwaddr = neighutil.get_hwaddr(ip)
+            hwaddr = neighutil.get_hwaddr(addr[0])
             if not hwaddr:
                 continue
             known_peers.add(addr)
@@ -130,10 +129,9 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     rsp = rsp.split(b'\r\n')
                     method, _, _ = rsp[0].split(b' ', 2)
                     if method == b'NOTIFY':
-                        ip = peer[0].partition('%')[0]
                         if peer in known_peers:
                             continue
-                        mac = neighutil.get_hwaddr(ip)
+                        mac = neighutil.get_hwaddr(peer[0])
                         if not mac:
                             continue
                         known_peers.add(peer)
@@ -309,10 +307,9 @@ def check_cpstorage(urldata):
 
 
 def _parse_ssdp(peer, rsp, peerdata):
-    ip = peer[0].partition('%')[0]
-    nid = ip
+    nid = peer[0]
     mac = None
-    mac = neighutil.get_hwaddr(ip)
+    mac = neighutil.get_hwaddr(peer[0])
     if mac:
         nid = mac
     headlines = rsp.split(b'\r\n')
