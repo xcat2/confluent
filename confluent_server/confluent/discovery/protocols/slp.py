@@ -196,6 +196,7 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
     :param addresses:  Pass through of addresses argument from find_targets
     :return:
     """
+    data = _generate_request_payload(srvtype, True, xid)
     if addresses is not None:
         for addr in addresses:
             for saddr in socket.getaddrinfo(addr, 427):
@@ -204,7 +205,6 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
                 elif saddr[0] == socket.AF_INET6:
                     net.sendto(data, saddr[4])
     else:
-        data = _generate_request_payload(srvtype, True, xid)
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         v6addrs = []
         v6hash = _v6mcasthash(srvtype)
@@ -472,6 +472,7 @@ def snoop(handler, protocol=None):
             # will now yield dupe info over time
             known_peers = set([])
             peerbymacaddress = {}
+            deferpeers = []
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
@@ -479,30 +480,15 @@ def snoop(handler, protocol=None):
                         continue
                     mac = neighutil.get_hwaddr(peer[0])
                     if not mac:
+                        s.sendto(b'\x00', peer)
+                        deferpeers.append(peer)
                         continue
-                    known_peers.add(peer)
-                    if mac in peerbymacaddress:
-                        peerbymacaddress[mac]['addresses'].append(peer)
-                    else:
-                        q = query_srvtypes(peer)
-                        if not q or not q[0]:
-                            # SLP might have started and not ready yet
-                            # ignore for now
-                            known_peers.discard(peer)
-                            continue
-                        # we want to prioritize the very well known services
-                        svcs = []
-                        for svc in q:
-                            if svc in _slp_services:
-                                svcs.insert(0, svc)
-                            else:
-                                svcs.append(svc)
-                        peerbymacaddress[mac] = {
-                            'services': svcs,
-                            'addresses': [peer],
-                        }
-                    newmacs.add(mac)
+                    process_peer(newmacs, known_peers, peerbymacaddress, peer)
                 r, _, _ = select.select((net, net4), (), (), 0.2)
+            if deferpeers:
+                eventlet.sleep(2.2)
+                for peer in deferpeers:
+                    process_peer(newmacs, known_peers, peerbymacaddress, peer)
             for mac in newmacs:
                 peerbymacaddress[mac]['xid'] = 1
                 _add_attributes(peerbymacaddress[mac])
@@ -527,6 +513,33 @@ def snoop(handler, protocol=None):
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                          event=log.Events.stacktrace)
 
+def process_peer(newmacs, known_peers, peerbymacaddress, peer):
+    mac = neighutil.get_hwaddr(peer[0])
+    if not mac:
+        foobar
+    known_peers.add(peer)
+    if mac in peerbymacaddress:
+        peerbymacaddress[mac]['addresses'].append(peer)
+    else:
+        q = query_srvtypes(peer)
+        if not q or not q[0]:
+                            # SLP might have started and not ready yet
+                            # ignore for now
+            known_peers.discard(peer)
+            foobar
+                        # we want to prioritize the very well known services
+        svcs = []
+        for svc in q:
+            if svc in _slp_services:
+                svcs.insert(0, svc)
+            else:
+                svcs.append(svc)
+        peerbymacaddress[mac] = {
+                            'services': svcs,
+                            'addresses': [peer],
+                        }
+    newmacs.add(mac)
+
 
 def active_scan(handler, protocol=None):
     known_peers = set([])
@@ -542,9 +555,9 @@ def active_scan(handler, protocol=None):
             macaddr = neighutil.get_hwaddr(addr[0])
             if not macaddr:
                 if ':' in addr[0]:
-                    net6.sendto(b'\x00', (addr[0], 8989))
+                    net6.sendto(b'\x00', addr)
                 else:
-                    net4.sendto(b'\x00', (addr[0], 8989))
+                    net4.sendto(b'\x00', addr)
     eventlet.sleep(2.2)
     for scanned in toprocess:
         for addr in scanned['addresses']:
