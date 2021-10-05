@@ -549,16 +549,19 @@ def active_scan(handler, protocol=None):
     # Implement a warmup, inducing neighbor table activity
     # by kernel and giving 2 seconds for a retry or two if
     # needed
+    missingneigh = False
     for scanned in scan():
         toprocess.append(scanned)
         for addr in scanned['addresses']:
             macaddr = neighutil.get_hwaddr(addr[0])
             if not macaddr:
+                missingneigh = True
                 if ':' in addr[0]:
                     net6.sendto(b'\x00', addr)
                 else:
                     net4.sendto(b'\x00', addr)
-    eventlet.sleep(2.2)
+    if missingneigh:
+        eventlet.sleep(2.2)
     for scanned in toprocess:
         for addr in scanned['addresses']:
             if addr in known_peers:

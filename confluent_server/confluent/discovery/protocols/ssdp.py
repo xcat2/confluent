@@ -35,6 +35,7 @@ import confluent.noderange as noderange
 import confluent.util as util
 import confluent.log as log
 import confluent.netutil as netutil
+import eventlet
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import eventlet.greenpool as gp
@@ -66,6 +67,8 @@ def active_scan(handler, protocol=None):
             hwaddr = neighutil.get_hwaddr(addr[0])
             if not hwaddr:
                 continue
+            if not scanned.get('hwaddr', None):
+                scanned['hwaddr'] = hwaddr
             known_peers.add(addr)
         else:
             scanned['protocol'] = protocol
@@ -76,6 +79,32 @@ def scan(services, target=None):
         for rply in _find_service(service, target):
             yield rply
 
+
+def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers):
+    known_peers.add(peer)
+    newmacs.add(mac)
+    if mac in peerbymacaddress:
+        peerbymacaddress[mac]['addresses'].append(peer)
+    else:
+        peerbymacaddress[mac] = {
+            'hwaddr': mac,
+            'addresses': [peer],
+        }
+        peerdata = peerbymacaddress[mac]
+        for headline in rsp[1:]:
+            if not headline:
+                continue
+            headline = util.stringify(headline)
+            header, _, value = headline.partition(':')
+            header = header.strip()
+            value = value.strip()
+            if header == 'NT':
+                peerdata['service'] = value
+            elif header == 'NTS':
+                if value == 'ssdp:byebye':
+                    machandlers[mac] = byehandler
+                elif value == 'ssdp:alive':
+                    machandlers[mac] = None # handler
 
 def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for SSDP notify messages
@@ -119,6 +148,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     while True:
         try:
             newmacs = set([])
+            deferrednotifies = []
             machandlers = {}
             r, _, _ = select.select((net4, net6), (), (), 60)
             while r:
@@ -127,37 +157,18 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     if rsp[:4] == b'PING':
                         continue
                     rsp = rsp.split(b'\r\n')
-                    method, _, _ = rsp[0].split(b' ', 2)
+                    if b' ' not in rsp[0]:
+                        continue
+                    method, _ = rsp[0].split(b' ', 1)
                     if method == b'NOTIFY':
                         if peer in known_peers:
                             continue
                         mac = neighutil.get_hwaddr(peer[0])
                         if not mac:
+                            s.sendto(b'\x00', peer)
+                            deferrednotifies.append((peer, rsp))
                             continue
-                        known_peers.add(peer)
-                        newmacs.add(mac)
-                        if mac in peerbymacaddress:
-                            peerbymacaddress[mac]['addresses'].append(peer)
-                        else:
-                            peerbymacaddress[mac] = {
-                                'hwaddr': mac,
-                                'addresses': [peer],
-                            }
-                            peerdata = peerbymacaddress[mac]
-                            for headline in rsp[1:]:
-                                if not headline:
-                                    continue
-                                headline = util.stringify(headline)
-                                header, _, value = headline.partition(':')
-                                header = header.strip()
-                                value = value.strip()
-                                if header == 'NT':
-                                    peerdata['service'] = value
-                                elif header == 'NTS':
-                                    if value == 'ssdp:byebye':
-                                        machandlers[mac] = byehandler
-                                    elif value == 'ssdp:alive':
-                                        machandlers[mac] = None # handler
+                        _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers)
                     elif method == b'M-SEARCH':
                         if not uuidlookup:
                             continue
@@ -215,6 +226,12 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
                 r, _, _ = select.select((net4, net6), (), (), 0.2)
+            if deferrednotifies:
+                eventlet.sleep(2.2)
+                mac = neighutil.get_hwaddr(peer[0])
+                if not mac:
+                    continue
+                _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers)
             for mac in newmacs:
                 thehandler = machandlers.get(mac, None)
                 if thehandler:
@@ -276,14 +293,24 @@ def _find_service(service, target):
     deadline = util.monotonic_time() + 4
     r, _, _ = select.select((net4, net6), (), (), 4)
     peerdata = {}
+    deferparse = []
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
+            if not neighutil.get_hwaddr(peer[0]):
+                deferparse.append((rsp, peer))
+                s.sendto(b'\x00', peer)
+                continue
             _parse_ssdp(peer, rsp, peerdata)
         timeout = deadline - util.monotonic_time()
         if timeout < 0:
             timeout = 0
         r, _, _ = select.select((net4, net6), (), (), timeout)
+    if deferparse:
+        eventlet.sleep(2.2)
+    for dp in deferparse:
+        rsp, peer = dp
+        _parse_ssdp(peer, rsp, peerdata)
     querypool = gp.GreenPool()
     pooltargs = []
     for nid in peerdata:
@@ -348,7 +375,6 @@ def _parse_ssdp(peer, rsp, peerdata):
 
 
 if __name__ == '__main__':
-
-    for rsp in scan(['urn:dmtf-org:service:redfish-rest:1'], '10.240.52.189'):
+    def printit(rsp):
         print(repr(rsp))
-    
+    active_scan(printit)
