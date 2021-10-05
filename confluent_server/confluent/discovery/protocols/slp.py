@@ -246,12 +246,11 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
             net4.sendto(data, (bcast, 427))
 
 
-def _grab_rsps(socks, rsps, interval, xidmap):
+def _grab_rsps(socks, rsps, interval, xidmap, deferrals):
     r = None
     res = select.select(socks, (), (), interval)
     if res:
         r = res[0]
-    deferrals = []
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
@@ -261,11 +260,6 @@ def _grab_rsps(socks, rsps, interval, xidmap):
                 r = None
             else:
                 r = res[0]
-    if deferrals:
-        eventlet.sleep(2.2)
-        for defer in deferrals:
-            rsp, peer = defer
-            _parse_slp_packet(rsp, peer, rsps, xidmap)
 
 
 
@@ -604,15 +598,21 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     # First we give fast repsonders of each srvtype individual chances to be
     # processed, mitigating volume of response traffic
     rsps = {}
+    deferrals = []
     for srvtype in srvtypes:
         xididx += 1
         _find_srvtype(net, net4, srvtype, addresses, initxid + xididx)
         xidmap[initxid + xididx] = srvtype
-        _grab_rsps((net, net4), rsps, 0.1, xidmap)
-        # now do a more slow check to work to get stragglers,
-        # but fortunately the above should have taken the brunt of volume, so
-        # reduced chance of many responses overwhelming receive buffer.
-    _grab_rsps((net, net4), rsps, 1, xidmap)
+        _grab_rsps((net, net4), rsps, 0.1, xidmap, deferrals)
+    # now do a more slow check to work to get stragglers,
+    # but fortunately the above should have taken the brunt of volume, so
+    # reduced chance of many responses overwhelming receive buffer.
+    _grab_rsps((net, net4), rsps, 1, xidmap, deferrals)
+    if deferrals:
+        eventlet.sleep(1.2)  # already have a one second pause from select above
+        for defer in deferrals:
+            rsp, peer = defer
+            _parse_slp_packet(rsp, peer, rsps, xidmap)
     # now to analyze and flesh out the responses
     handleids = set([])
     gp = eventlet.greenpool.GreenPool(128)
