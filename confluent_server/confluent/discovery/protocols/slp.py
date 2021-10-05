@@ -516,18 +516,18 @@ def snoop(handler, protocol=None):
 def process_peer(newmacs, known_peers, peerbymacaddress, peer):
     mac = neighutil.get_hwaddr(peer[0])
     if not mac:
-        foobar
+        return
     known_peers.add(peer)
     if mac in peerbymacaddress:
         peerbymacaddress[mac]['addresses'].append(peer)
     else:
         q = query_srvtypes(peer)
         if not q or not q[0]:
-                            # SLP might have started and not ready yet
-                            # ignore for now
+            # SLP might have started and not ready yet
+            # ignore for now
             known_peers.discard(peer)
-            foobar
-                        # we want to prioritize the very well known services
+            return
+        # we want to prioritize the very well known services
         svcs = []
         for svc in q:
             if svc in _slp_services:
