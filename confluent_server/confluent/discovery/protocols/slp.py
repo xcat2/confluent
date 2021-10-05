@@ -99,7 +99,7 @@ def _parse_SrvRply(parsed):
         parsed['urls'].append(url)
 
 
-def _parse_slp_packet(packet, peer, rsps, xidmap):
+def _parse_slp_packet(packet, peer, rsps, xidmap, defer=None, sock=None):
     parsed = _parse_slp_header(packet)
     if not parsed:
         return
@@ -108,7 +108,12 @@ def _parse_slp_packet(packet, peer, rsps, xidmap):
     if mac:
         identifier = mac
     else:
-        identifier = addr
+        if defer is None:
+            identifier = addr
+        else:
+            sock.sendto(b'\x00', peer)
+            defer.append((packet, peer))
+            return
     if (identifier, parsed['xid']) in rsps:
         # avoid obviously duplicate entries
         parsed = rsps[(identifier, parsed['xid'])]
@@ -246,15 +251,21 @@ def _grab_rsps(socks, rsps, interval, xidmap):
     res = select.select(socks, (), (), interval)
     if res:
         r = res[0]
+    deferrals = []
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
-            _parse_slp_packet(rsp, peer, rsps, xidmap)
+            _parse_slp_packet(rsp, peer, rsps, xidmap, deferrals, s)
             res = select.select(socks, (), (), interval)
             if not res:
                 r = None
             else:
                 r = res[0]
+    if deferrals:
+        eventlet.sleep(2.2)
+        for defer in deferrals:
+            rsp, peer = defer
+            _parse_slp_packet(rsp, peer, rsps, xidmap)
 
 
 
@@ -543,26 +554,11 @@ def process_peer(newmacs, known_peers, peerbymacaddress, peer):
 
 def active_scan(handler, protocol=None):
     known_peers = set([])
-    net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    net6 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     toprocess = []
     # Implement a warmup, inducing neighbor table activity
     # by kernel and giving 2 seconds for a retry or two if
     # needed
-    missingneigh = False
     for scanned in scan():
-        toprocess.append(scanned)
-        for addr in scanned['addresses']:
-            macaddr = neighutil.get_hwaddr(addr[0])
-            if not macaddr:
-                missingneigh = True
-                if ':' in addr[0]:
-                    net6.sendto(b'\x00', addr)
-                else:
-                    net4.sendto(b'\x00', addr)
-    if missingneigh:
-        eventlet.sleep(2.2)
-    for scanned in toprocess:
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
