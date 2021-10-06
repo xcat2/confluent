@@ -20,30 +20,48 @@ This contains support utilities for enabling deployment of x86_64 architecture s
 %setup -n confluent_osdeploy
 
 %build
+mkdir -p el9/opt/confluent/bin
+mkdir -p el9/stateless-bin
 mkdir -p opt/confluent/bin
 mkdir -p stateless-bin
 cd utils
+podman run --privileged --rm -v $(pwd):/buildutils -i -t fedorabuilder make -C /buildutils
+cp confluent_imginfo copernicus clortho autocons ../el9/opt/confluent/bin
+cp start_root urlmount ../el9stateless-bin/
+make clean
 make all
 cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
 cp start_root urlmount ../stateless-bin/
 cd ..
-for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos; do
+for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos el9; do
     mkdir ${os}out
     cd ${os}out
-    cp -a ../opt .
+    if [ -d ../${os} ]; then 
+        cp -a ../${os}/opt .
+    else
+        cp -a ../opt .
+    fi
     cp -a ../${os}/initramfs/* .
     cp -a ../common/* .
     find . | cpio -H newc -o > ../addons.cpio
     mv ../addons.cpio .
     cd ..
 done
-for os in el8 suse15; do
+for os in el8 suse15 el9; do
     mkdir ${os}disklessout
     cd ${os}disklessout
-    cp -a ../opt .
+    if [ -d ../${os} ]; then 
+        cp -a ../${os}/opt .
+    else
+        cp -a ../opt .
+    fi
     cp -a ../${os}-diskless/initramfs/* .
     cp -a ../common/* .
-    cp -a ../stateless-bin/* opt/confluent/bin
+    if [ -d ../${os} ]; then 
+        cp -a ../${os}/stateless-bin/* opt/confluent/bin
+    else
+        cp -a ../stateless-bin/* opt/confluent/bin
+    fi
     find . | cpio -H newc -o > ../addons.cpio
     mv ../addons.cpio .
     cd ..
