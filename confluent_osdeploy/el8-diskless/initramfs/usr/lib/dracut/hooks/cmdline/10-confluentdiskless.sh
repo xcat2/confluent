@@ -134,7 +134,7 @@ while [ $ready = "0" ]; do
 done
 tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 umask $oldumask
-autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg |awk '{print $2}')
+autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
     dhclient $ifname

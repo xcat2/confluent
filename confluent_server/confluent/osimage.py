@@ -302,6 +302,12 @@ def check_centos(isoinfo):
             cat = 'el8'
             isstream = '_stream'
             break
+        elif 'centos-stream-release-9' in entry:
+            ver = entry.split('-')[3]
+            arch = entry.split('.')[-2]
+            cat = 'el9'
+            isstream = '_stream'
+            break
         elif 'centos-linux-release-8' in entry:
             ver = entry.split('-')[3]
             arch = entry.split('.')[-2]

@@ -11,11 +11,22 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
     consoledev=$(cat /run/install/cmdline.d/01-autocons.conf | sed -e 's!console=!/dev/!' -e 's/,.*//')
     TMUX= tmux a <> $consoledev >&0 2>&1 &
 fi
+function confluentpython() {
+    if [ -x /usr/libexec/platform-python ]; then
+        /usr/libexec/platform-python $*
+    elif [ -x /usr/bin/python3 ]; then
+        /usr/bin/python3 $*
+    elif [ -x /usr/bin/python ]; then
+        /usr/bin/python $*
+    elif [ -x /usr/bin/python2 ]; then
+        /usr/bin/python2 $*
+    fi
+}
 exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
-/usr/libexec/platform-python /etc/confluent/apiclient >& /dev/null
+confluentpython /etc/confluent/apiclient >& /dev/null
 nicname=$(ip link|grep ^$(cat /tmp/confluent.ifidx): | awk '{print $2}' | awk -F: '{print $1}')
 nmcli c u $nicname
 while ip -6 addr | grep tentative > /dev/null; do
@@ -76,14 +87,7 @@ fi
 export confluent_mgr confluent_profile nodename
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
-if [ -e /usr/libexec/platform-python ]; then
-    python=/usr/libexec/platform-python
-elif [ -e /usr/bin/python3 ]; then
-    python=/usr/byn/python3
-else
-    python=/usr/bin/python
-fi
-$python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
+confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 run_remote pre.custom
 run_remote_parts pre.d
 if [ ! -e /tmp/installdisk ]; then

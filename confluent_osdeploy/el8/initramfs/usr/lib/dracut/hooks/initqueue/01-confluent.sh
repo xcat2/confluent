@@ -1,5 +1,16 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
+function confluentpython() {
+    if [ -x /usr/libexec/platform-python ]; then
+        /usr/libexec/platform-python $*
+    elif [ -x /usr/bin/python3 ]; then
+        /usr/bin/python3 $*
+    elif [ -x /usr/bin/python ]; then
+        /usr/bin/python $*
+    elif [ -x /usr/bin/python2 ]; then
+        /usr/bin/python2 $*
+    fi
+}
 if [ -f /tmp/dd_disk ]; then
     for dd in $(cat /tmp/dd_disk); do
         if [ -e $dd ]; then
@@ -38,7 +49,7 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
 cat /tls/*.pem > /etc/confluent/ca.pem
-/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+confluentpython /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
