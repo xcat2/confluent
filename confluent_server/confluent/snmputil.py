@@ -33,9 +33,9 @@ def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
     res = getaddrinfo(name, 161, 0, socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
-        return snmp.Udp6TransportTarget(res[0][4])
+        return snmp.Udp6TransportTarget(res[0][4], 2)
     else:
-        return snmp.UdpTransportTarget(res[0][4])
+        return snmp.UdpTransportTarget(res[0][4], 2)
 
 
 class Session(object):
