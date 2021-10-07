@@ -36,6 +36,7 @@ class SyncList(object):
         self.replacemap = {}
         self.appendmap = {}
         self.mergemap = {}
+        self.optmap = {}
         with open(filename, 'r') as slfile:
             slist = slfile.read()
         entries = slist.split('\n')
@@ -71,10 +72,32 @@ class SyncList(object):
                             break
                     else:
                         continue
+                optparts = v.split()
+                v = optparts[0]
+                optparts = optparts[1:]
             else:
-                k = ent
+                kparts = []
+                optparts = []
+                currparts = kparts
+                for part in ent.split():
+                    if part[0] == '(':
+                        currparts = optparts
+                    currparts.append(part)
+                k = ' '.join(kparts)
                 v = None
+            entopts = {}
+            if optparts:
+                if optparts[0][0] != '(' or optparts[-1][-1] != ')':
+                    raise Exception("Unsupported syntax in syncfile: " + ent)
+                opts = ','.join(optparts)
+                opts = [1:-1]
+                for opt in opts.split(','):
+                    optname, optval = opt.split('=')
+                    entopts[optname] = optval
             currmap[k] = v
+            targ = v if v else k
+            for f in targ.split():
+                self.optmap[f] = entopts
 
 
 def sync_list_to_node(sl, node, suffixes):
@@ -119,7 +142,11 @@ def sync_list_to_node(sl, node, suffixes):
             raise
     finally:
         shutil.rmtree(targdir)
-    return output
+    retval = {
+        'options': sl.optmap,
+        'output': output,
+    }
+    return output # need dictionary with output and options
 
 def stage_ent(currmap, ent, targdir, appendexist=False):
     dst = currmap[ent]
