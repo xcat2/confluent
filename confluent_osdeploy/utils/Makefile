@@ -17,4 +17,4 @@ $(TARGETS): % : %.c
 	strip -s $@
 
 clean:
-	rm $(TARGETS) clortho
+	rm $(TARGETS) clortho urlmount

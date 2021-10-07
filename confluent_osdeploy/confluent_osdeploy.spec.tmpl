@@ -6,6 +6,7 @@ Summary: OS Deployment support for confluent
 License: Apache2
 URL: https://hpc.lenovo.com/
 Source0: confluent_osdeploy.tar.xz
+Source1: confluent_el9bin.tar.xz
 BuildArch: noarch
 Requires: confluent_ipxe mtools tar
 BuildRoot: /tmp
@@ -17,18 +18,12 @@ This contains support utilities for enabling deployment of x86_64 architecture s
 %define debug_package %{nil}
 
 %prep
-%setup -n confluent_osdeploy
+%setup -n confluent_osdeploy -a 1
 
 %build
-mkdir -p el9bin/opt/confluent/bin
-mkdir -p el9bin/stateless-bin
 mkdir -p opt/confluent/bin
 mkdir -p stateless-bin
 cd utils
-podman run --privileged --rm -v $(pwd):/buildutils -i -t fedorabuilder make -C /buildutils
-cp confluent_imginfo copernicus clortho autocons ../el9bin/opt/confluent/bin
-cp start_root urlmount ../el9bin/stateless-bin/
-make clean
 make all
 cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
 cp start_root urlmount ../stateless-bin/
