@@ -142,11 +142,13 @@ def sync_list_to_node(sl, node, suffixes):
             raise
     finally:
         shutil.rmtree(targdir)
+    if not isinstance(output, str):
+        output = output.decode('utf8')
     retval = {
         'options': sl.optmap,
         'output': output,
     }
-    return output # need dictionary with output and options
+    return retval # need dictionary with output and options
 
 def stage_ent(currmap, ent, targdir, appendexist=False):
     dst = currmap[ent]

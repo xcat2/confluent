@@ -344,7 +344,7 @@ def handle_request(env, start_response):
         if 'GET' == operation:
             status, output = syncfiles.get_syncresult(nodename)
             output = json.dumps(output)
-            start_response(status, (('Content-Type', 'application/json')))
+            start_response(status, (('Content-Type', 'application/json'),))
             yield output
             return
     elif env['PATH_INFO'].startswith('/self/remoteconfig/status'):
