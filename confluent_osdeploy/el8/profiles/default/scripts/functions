@@ -64,7 +64,11 @@ fetch_remote() {
 
 source_remote_parts() {
     confluentscripttmpdir=$(mktemp -d)
-    scriptlist=$(confluentpython /etc/confluent/apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
+    apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    scriptlist=$(confluentpython $apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
     for script in $scriptlist; do
         source_remote $1/$script
     done
@@ -73,7 +77,11 @@ source_remote_parts() {
 
 run_remote_parts() {
     confluentscripttmpdir=$(mktemp -d)
-    scriptlist=$(confluentpython /etc/confluent/apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
+    apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    scriptlist=$(confluentpython $apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
     for script in $scriptlist; do
         run_remote $1/$script
     done
