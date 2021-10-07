@@ -20,6 +20,7 @@ import shutil
 import tempfile
 import confluent.sshutil as sshutil
 import eventlet.green.subprocess as subprocess
+import confluent.noderange as noderange
 import eventlet
 
 def mkdirp(path):
@@ -30,7 +31,7 @@ def mkdirp(path):
             raise
 
 class SyncList(object):
-    def __init__(self, filename):
+    def __init__(self, filename, nodename, cfg):
         slist = None
         self.replacemap = {}
         self.appendmap = {}
@@ -45,7 +46,7 @@ class SyncList(object):
                 ent = ent[:cmtidx]
             except ValueError:
                 pass
-            for special in '!@$%^&()|{}':
+            for special in '$%^&|{}':
                 if special in ent:
                     raise Exception(
                         'Special character "{}" reserved for future use'.format(special))
@@ -63,6 +64,13 @@ class SyncList(object):
                 k, v = ent.split('->')
                 k = k.strip()
                 v = v.strip()
+                if ':' in v:
+                    nr, v = v.split(':', 1)
+                    for candidate in noderange.NodeRange(nr, cfg).nodes:
+                        if candidate == nodename:
+                            break
+                    else:
+                        continue
             else:
                 k = ent
                 v = None
@@ -180,7 +188,7 @@ def start_syncfiles(nodename, cfg, suffixes):
     synclist = '/var/lib/confluent/public/os/{}/syncfiles'.format(profile)
     if not os.path.exists(synclist):
         return '200 OK'  # not running
-    sl = SyncList(synclist)
+    sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap):
         return '200 OK'  # the synclist has no actual entries
     syncrunners[nodename] = eventlet.spawn(
