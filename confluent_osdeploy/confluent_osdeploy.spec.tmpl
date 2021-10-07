@@ -27,7 +27,7 @@ mkdir -p stateless-bin
 cd utils
 podman run --privileged --rm -v $(pwd):/buildutils -i -t fedorabuilder make -C /buildutils
 cp confluent_imginfo copernicus clortho autocons ../el9bin/opt/confluent/bin
-cp start_root urlmount ../el9stateless-bin/
+cp start_root urlmount ../el9bin/stateless-bin/
 make clean
 make all
 cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
