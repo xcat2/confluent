@@ -25,7 +25,7 @@ def partitionhostsline(line):
     names = names.split()
     return ipaddr, names, comment
 
-class HostMerger:
+class HostMerger(object):
     def __init__(self):
         self.byip = {}
         self.byname = {}
@@ -75,8 +75,12 @@ class HostMerger:
     def write_out(self, targetfile):
         while not self.targlines[-1]:
             self.targlines = self.targlines[:-1]
+            if not self.targlines:
+                break
         while not self.sourcelines[-1]:
             self.sourcelines = self.sourcelines[:-1]
+            if not self.sourcelines:
+                break
         with open(targetfile, 'w') as hosts:
             for line in self.targlines:
                 hosts.write(line + '\n')
@@ -129,12 +133,14 @@ class CredMerger:
                 except ValueError:
                     continue
                 if targfile:
-                    if uid <= minid or uid >= maxid:
+                    if uid < minid or uid > maxid:
                         self.targdata.append(line)
                     else:
                         self.discardnames[name] = 1
                 else:
-                    if uid >= minid and uid <= maxid:
+                    if name[0] in ('+', '#', '@'):
+                        self.sourcedata.append(line)
+                    elif uid >= minid and uid <= maxid:
                         self.sourcedata.append(line)
 
     def read_shadow(self, source):
@@ -167,6 +173,8 @@ class CredMerger:
                     shadout.write(line + '\n')
                 for line in self.sourcedata:
                     name, _ = line.split(':', 1)
+                    if name[0] in ('+', '#', '@'):
+                        continue
                     if name in self.shadowednames:
                         continue
                     shadout.write(name + ':!:::::::\n')
