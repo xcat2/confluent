@@ -90,7 +90,7 @@ class SyncList(object):
                 if optparts[0][0] != '(' or optparts[-1][-1] != ')':
                     raise Exception("Unsupported syntax in syncfile: " + ent)
                 opts = ','.join(optparts)
-                opts = [1:-1]
+                opts = opts[1:-1]
                 for opt in opts.split(','):
                     optname, optval = opt.split('=')
                     entopts[optname] = optval
