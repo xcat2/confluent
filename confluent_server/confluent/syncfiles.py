@@ -22,6 +22,8 @@ import confluent.sshutil as sshutil
 import eventlet.green.subprocess as subprocess
 import confluent.noderange as noderange
 import eventlet
+import pwd
+import grp
 
 def mkdirp(path):
     try:
@@ -93,6 +95,18 @@ class SyncList(object):
                 opts = opts[1:-1]
                 for opt in opts.split(','):
                     optname, optval = opt.split('=')
+                    if optname == 'owner':
+                        try:
+                            uid = pwd.getpwnam(optval).pw_uid
+                        except KeyError:
+                            uid = None
+                        optval = {'name': optval, 'id': uid}
+                    elif optname == 'group':
+                        try:
+                            gid = grp.getgrnam(optval).gr_gid
+                        except KeyError:
+                            gid = None
+                        optval = {'name': optval, 'id': gid}
                     entopts[optname] = optval
             currmap[k] = v
             targ = v if v else k
