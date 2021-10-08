@@ -3,6 +3,8 @@ import importlib
 import tempfile
 import json
 import os
+import pwd
+import grp
 import shutil
 try:
     from importlib.machinery import SourceFileLoader
@@ -203,10 +205,13 @@ def synchronize():
         data = json.dumps({'merge': tmpdir})
         status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles', data)
         if status == 202:
+            lastrsp = ''
             while status != 204:
                 status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
                 if not isinstance(rsp, str):
                     rsp = rsp.decode('utf8')
+                if status == 200:
+                    lastrsp = rsp
             pendpasswd = os.path.join(tmpdir, 'etc/passwd')
             if os.path.exists(pendpasswd):
                 cm = CredMerger()
@@ -225,6 +230,27 @@ def synchronize():
                 cm.read_source(pendhosts)
                 cm.read_target('/etc/hosts')
                 cm.write_out('/etc/hosts')
+            if lastrsp:
+                lastrsp = json.loads(lastrsp)
+                opts = lastrsp.get('options', {})
+                for fname in opts:
+                    uid = -1
+                    gid = -1
+                    for opt in opts[fname]:
+                        if opt == 'owner':
+                            try:
+                                uid = pwd.getpwnam(opts[fname][opt]['name']).pw_uid
+                            except KeyError:
+                                uid = opts[fname][opt]['id']
+                        elif opt == 'group':
+                            try:
+                                gid = grp.getgrnam(opts[fname][opt]['name']).gr_gid
+                            except KeyError:
+                                gid = opts[fname][opt]['id']
+                        elif opt == 'permissions':
+                            os.chmod(fname, int(opts[fname][opt], 8))
+                    if uid != -1 or gid != -1:
+                        os.chown(fname, uid, gid)
     finally:
         shutil.rmtree(tmpdir)
 
