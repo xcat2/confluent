@@ -43,7 +43,7 @@ def assure_agent():
     if agent_pid is None:
         try:
             agent_starting = True
-            sai = subprocess.check_output(['ssh-agent'])
+            sai = subprocess.check_output(['ssh-agent'], timeout=86400)
             for line in sai.split(b'\n'):
                 if b';' not in line:
                     continue
