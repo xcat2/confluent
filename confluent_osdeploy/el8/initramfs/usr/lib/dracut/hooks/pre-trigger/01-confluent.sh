@@ -1,5 +1,12 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
+udevadm trigger
+udevadm trigger --type=devices --action=add
+udevadm settle
+modprobe ib_ipoib
+modprobe ib_umad
+modprobe hfi1
+modprobe mlx5_ib
 function confluentpython() {
     if [ -x /usr/libexec/platform-python ]; then
         /usr/libexec/platform-python $*
