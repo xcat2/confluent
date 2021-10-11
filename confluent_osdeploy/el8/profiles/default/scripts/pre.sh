@@ -97,7 +97,7 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo clearpart --all --initlabel >> /tmp/partitioning
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
-     dd if=/dev/zero of=/dev/$(cat /tmp/installdisk) bs=1M count=1
-     vgchange -a n
+     dd if=/dev/zero of=/dev/$(cat /tmp/installdisk) bs=1M count=1 >& /dev/null
+     vgchange -a n >& /dev/null
 fi
 kill $logshowpid
