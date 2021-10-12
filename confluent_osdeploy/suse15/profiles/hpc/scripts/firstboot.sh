@@ -5,7 +5,16 @@ exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
-confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+v6cfg=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg)
+v6cfg=${v6cfg#ipv6_method: }
+if [ "$v6cfg" = "static" ]; then
+    confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
+    confluent_mgr=${confluent_mgr#deploy_server_v6: }
+    confluent_mgr="[$confluent_mgr]"
+else
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
+    confluent_mgr=${confluent_mgr#deploy_server: }
+fi
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
