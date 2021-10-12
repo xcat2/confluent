@@ -56,7 +56,7 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
 cat /tls/*.pem > /etc/confluent/ca.pem
-confluentpython /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+confluentpython /opt/confluent/bin/apiclient /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
 ifname=${ifname%:}
@@ -69,8 +69,15 @@ hostname=$nodename
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
     hostname=$hostname.$dnsdomain
 fi
-mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
-mgr=${mgr#deploy_server: }
+v6cfg=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg)
+if [ "$v6cfg" = "static" ]; then
+    mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
+    mgr=${mgr#deploy_server_v6: }
+    mgr="[$mgr]"
+else
+    mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
+    mgr=${mgr#deploy_server: }
+fi
 profilename=$(grep ^profile: /etc/confluent/confluent.deploycfg)
 profilename=${profilename#profile: }
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
@@ -96,7 +103,18 @@ export kickstart
 export root
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
-if [ "$autoconfigmethod" = "dhcp" ]; then
+if [ "$v6cfg" = "static" ]; then
+    v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
+    v6addr=${v6addr#ipv6_address: }
+    v6gw=$(grep ^ipv6_gateway: /etc/confluent/confluent.deploycfg)
+    v6gw=${v6gw#ipv6_gateway: }
+    if [ "$v6gw" = "null" ]; then
+        v6gw=""
+    fi
+    v6nm=$(grep ipv6_prefix: /etc/confluent/confluent.deploycfg)
+    v6nm=${v6nm#ipv6_prefix: }
+    echo ip=$v6addr::$v6gw:$v6nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+elif [ "$autoconfigmethod" = "dhcp" ]; then
     echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
 else
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
