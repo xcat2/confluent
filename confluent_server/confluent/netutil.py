@@ -337,9 +337,10 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             elif fam == socket.AF_INET6:
                 nver = '6'
                 bynodename = ip6bynodename
-            bynodenamn = socket.inet_pton(fam, bynodename)
-            if ipn_on_same_subnet(fam, candgwn, bynodenamn, prefix):
-                cfgdata['ipv{}_gateway'.format(nver)] = socket.inet_ntop(fam, candgwn)
+            if bynodename:
+                bynodenamn = socket.inet_pton(fam, bynodename)
+                if ipn_on_same_subnet(fam, candgwn, bynodenamn, prefix):
+                    cfgdata['ipv{}_gateway'.format(nver)] = socket.inet_ntop(fam, candgwn)
         return cfgdata
     if ip is not None:
         for prefixinfo in get_prefix_len_for_ip(ip):
