@@ -7,7 +7,18 @@
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+v6cfg=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg)
+v6cfg=${v6cfg#ipv6_method: }
+if [ "$v6cfg" = "static" ]; then
+    confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
+    confluent_mgr=${confluent_mgr#deploy_server_v6: }
+    confluent_pingtarget=$confluent_mgr
+    confluent_mgr="[$confluent_mgr]"
+else
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
+    confluent_mgr=${confluent_mgr#deploy_server: }
+    confluent_pingtarget=$confluent_mgr
+fi
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export nodename confluent_mgr confluent_profile
 . /etc/confluent/functions
@@ -15,7 +26,7 @@ exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
 logshowpid=$!
-while ! ping -c 1 $confluent_mgr >& /dev/null; do
+while ! ping -c 1 $confluent_pingtarget >& /dev/null; do
 	sleep 1
 done
 
