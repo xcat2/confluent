@@ -70,6 +70,7 @@ if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
     hostname=$hostname.$dnsdomain
 fi
 v6cfg=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg)
+v6cfg=${v6cfg#ipv6_method: }
 if [ "$v6cfg" = "static" ]; then
     mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
     mgr=${mgr#deploy_server_v6: }
@@ -106,10 +107,13 @@ autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$v6cfg" = "static" ]; then
     v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
     v6addr=${v6addr#ipv6_address: }
+    v6addr="[$v6addr]"
     v6gw=$(grep ^ipv6_gateway: /etc/confluent/confluent.deploycfg)
     v6gw=${v6gw#ipv6_gateway: }
     if [ "$v6gw" = "null" ]; then
         v6gw=""
+    else
+        v6gw="[$v6gw]"
     fi
     v6nm=$(grep ipv6_prefix: /etc/confluent/confluent.deploycfg)
     v6nm=${v6nm#ipv6_prefix: }
