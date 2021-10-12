@@ -9,7 +9,7 @@ get_remote_apikey() {
         if [ -z "$confluent_apikey" ]; then
             echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$nodename', retrying..."
             sleep 10
-        else
+        elif [ -c /dev/tpm0 ]; then
             tmpdir=$(mktemp -d)
             cd $tmpdir
             tpm2_startauthsession --session=session.ctx
@@ -72,20 +72,22 @@ umask 0077
 tpmdir=$(mktemp -d)
 cd $tpmdir
 lasthdl=""
-for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
-    tpm2_startauthsession --policy-session --session=session.ctx
-    tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
-    unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
-    tpm2_flushcontext session.ctx
-    if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
-        confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
-        echo $confluent_apikey > /etc/confluent/confluent.apikey
-        if [ -n "$lasthdl" ]; then
-            tpm2_evictcontrol -c $lasthdl
+if [ -c /dev/tpm0 ]; then
+    for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
+        tpm2_startauthsession --policy-session --session=session.ctx
+        tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+        unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
+        tpm2_flushcontext session.ctx
+        if [[ $unsealeddata == "CONFLUENT_APIKEY:"* ]]; then
+            confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
+            echo $confluent_apikey > /etc/confluent/confluent.apikey
+            if [ -n "$lasthdl" ]; then
+                tpm2_evictcontrol -c $lasthdl
+            fi
+            lasthdl=$hdl
         fi
-        lasthdl=$hdl
-    fi
-done
+    done
+fi
 cd - > /dev/null
 rm -rf $tpmdir
 touch /etc/confluent/confluent.info
@@ -132,7 +134,9 @@ while [ $ready = "0" ]; do
     fi
     rm $tmperr
 done
-tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+if [ -c /dev/tpm0 ]; then
+    tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
+fi
 umask $oldumask
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
