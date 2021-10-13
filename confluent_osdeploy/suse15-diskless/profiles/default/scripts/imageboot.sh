@@ -136,4 +136,6 @@ if grep installtodisk /proc/cmdline > /dev/null; then
     run_remote installimage
     exec reboot -f
 fi
+mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
+ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 exec /opt/confluent/bin/start_root
