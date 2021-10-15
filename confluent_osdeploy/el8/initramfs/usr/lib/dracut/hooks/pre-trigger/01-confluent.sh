@@ -132,6 +132,7 @@ if [ "$v6cfg" = "static" ]; then
     v6nm=$(grep ipv6_prefix: /etc/confluent/confluent.deploycfg)
     v6nm=${v6nm#ipv6_prefix: }
     echo ip=$v6addr::$v6gw:$v6nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+fi
 nameserversec=0
 while read -r entry; do
     if [ $nameserversec = 1 ]; then
