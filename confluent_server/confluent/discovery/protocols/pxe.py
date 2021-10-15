@@ -233,7 +233,10 @@ def opts_to_dict(rq, optidx, expectype=1):
     maybeztp = False
     if 239 in reqdict.get(55, []):
         maybeztp = True
-    vci = stringify(reqdict.get(60, b''))
+    try:
+        vci = stringify(reqdict.get(60, b''))
+    except UnicodeDecodeError:
+        vci = ''
     if vci.startswith('cumulus-linux'):
         disco['arch'] = vci.replace('cumulus-linux', '').strip()
         iscumulus = True
