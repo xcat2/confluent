@@ -37,6 +37,7 @@ class SyncList(object):
         slist = None
         self.replacemap = {}
         self.appendmap = {}
+        self.appendoncemap = {}
         self.mergemap = {}
         self.optmap = {}
         with open(filename, 'r') as slfile:
@@ -59,6 +60,8 @@ class SyncList(object):
             if ent[-1] == ':':
                 if ent == 'MERGE:':
                     currmap = self.mergemap
+                elif ent == 'APPENDONCE:':
+                    currmap = self.appendoncemap
                 else:
                     raise Exception(
                         'Section "{}" is not currently supported in syncfiles'.format(ent[:-1]))
@@ -132,6 +135,12 @@ def sync_list_to_node(sl, node, suffixes):
             for ent in sl.mergemap:
                 stage_ent(sl.mergemap, ent,
                           os.path.join(targdir, suffixes['merge']), True)
+        if 'appendonce' in suffixes:
+            while suffixes['appendonce'] and suffixes['appendonce'][0] == '/':
+                suffixes['appendonce'] = suffixes['appendonce'][1:]
+            for ent in sl.appendoncemap:
+                stage_ent(sl.appendoncemap, ent,
+                          os.path.join(targdir, suffixes['appendonce']), True)
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         output = subprocess.check_output(
             ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(node)], timeout=86400)
