@@ -104,6 +104,20 @@ export kickstart
 export root
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
+if [ "$autoconfigmethod" = "dhcp" ]; then
+    echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
+elif [ "$autoconfigmethod" = "static" ]; then
+    v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
+    v4addr=${v4addr#ipv4_address: }
+    v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
+    v4gw=${v4gw#ipv4_gateway: }
+    if [ "$v4gw" = "null" ]; then
+        v4gw=""
+    fi
+    v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
+    v4nm=${v4nm#ipv4_netmask: }
+    echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
+fi
 if [ "$v6cfg" = "static" ]; then
     v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
     v6addr=${v6addr#ipv6_address: }
@@ -118,20 +132,6 @@ if [ "$v6cfg" = "static" ]; then
     v6nm=$(grep ipv6_prefix: /etc/confluent/confluent.deploycfg)
     v6nm=${v6nm#ipv6_prefix: }
     echo ip=$v6addr::$v6gw:$v6nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
-elif [ "$autoconfigmethod" = "dhcp" ]; then
-    echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
-else
-    v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
-    v4addr=${v4addr#ipv4_address: }
-    v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
-    v4gw=${v4gw#ipv4_gateway: }
-    if [ "$v4gw" = "null" ]; then
-        v4gw=""
-    fi
-    v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
-    v4nm=${v4nm#ipv4_netmask: }
-    echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
-fi
 nameserversec=0
 while read -r entry; do
     if [ $nameserversec = 1 ]; then
