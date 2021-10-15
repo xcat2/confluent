@@ -198,11 +198,26 @@ class CredMerger:
                         continue
                     shadout.write(name + ':!::\n')
 
+def appendonce(basepath, filename):
+    with open(filename, 'rb') as filehdl:
+        thedata = filehdl.read()
+    targname = filename.replace(basepath, '')
+    try:
+        with open(targname, 'rb') as filehdl:
+            targdata = filehdl.read()
+    except IOError:
+        targdata = b''
+    if thedata in targdata:
+        return
+    with open(targname, 'ab') as targhdl:
+        targhdl.write(thedata)
+
 def synchronize():
     tmpdir = tempfile.mkdtemp()
+    appendoncedir = tempfile.mkdtemp()
     try:
         ac = apiclient.HTTPSClient()
-        data = json.dumps({'merge': tmpdir})
+        data = json.dumps({'merge': tmpdir, 'appendonce': appendoncedir})
         status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles', data)
         if status == 202:
             lastrsp = ''
@@ -230,6 +245,9 @@ def synchronize():
                 cm.read_source(pendhosts)
                 cm.read_target('/etc/hosts')
                 cm.write_out('/etc/hosts')
+            for dirn in os.walk(appendoncedir):
+                for filen in dirn[2]:
+                    appendonce(appendoncedir, os.path.join(dirn[0], filen))
             if lastrsp:
                 lastrsp = json.loads(lastrsp)
                 opts = lastrsp.get('options', {})
