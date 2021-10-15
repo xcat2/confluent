@@ -6,6 +6,18 @@ function test_mgr() {
     return 1
 }
 
+function confluentpython() {
+    if [ -x /usr/libexec/platform-python ]; then
+        /usr/libexec/platform-python $*
+    elif [ -x /usr/bin/python3 ]; then
+        /usr/bin/python3 $*
+    elif [ -x /usr/bin/python ]; then
+        /usr/bin/python $*
+    elif [ -x /usr/bin/python2 ]; then
+        /usr/bin/python2 $*
+    fi
+}
+
 function set_confluent_vars() {
     if [ -z "$nodename" ]; then
         nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
@@ -40,6 +52,7 @@ function set_confluent_vars() {
 }
 
 fetch_remote() {
+    curlargs=""
     if [ -f /etc/confluent/ca.pem ]; then
         curlargs=" --cacert /etc/confluent/ca.pem"
     fi
@@ -49,38 +62,76 @@ fetch_remote() {
     if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
 }
 
+source_remote_parts() {
+    confluentscripttmpdir=$(mktemp -d)
+    apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    scriptlist=$(confluentpython $apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
+    for script in $scriptlist; do
+        source_remote $1/$script
+    done
+    unset confluentscripttmpdir
+}
+
 run_remote_parts() {
-    scriptlist=$(python3 /etc/confluent/apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
+    confluentscripttmpdir=$(mktemp -d)
+    apiclient=/opt/confluent/bin/apiclient
+    if [ -f /etc/confluent/apiclient ]; then
+        apiclient=/etc/confluent/apiclient
+    fi
+    scriptlist=$(confluentpython $apiclient /confluent-api/self/scriptlist/$1|sed -e 's/^- //')
     for script in $scriptlist; do
         run_remote $1/$script
     done
+    unset confluentscripttmpdir
+}
+
+source_remote() {
+    set_confluent_vars
+    echo
+    echo '---------------------------------------------------------------------------'
+    echo Sourcing $1 from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
+    if [ -z "$confluentscripttmpdir" ]; then
+        confluentscripttmpdir=$(mktemp -d)
+    fi
+    echo Sourcing from $confluentscripttmpdir
+    cd $confluentscripttmpdir
+    fetch_remote $1
+    if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
+    chmod +x $1
+    cmd=$1
+    shift
+    source ./$cmd
+    cd - > /dev/null
+    return $retcode
 }
 
 run_remote() {
     requestedcmd="'$*'"
-    curlargs=""
-    if [ -f /etc/confluent/ca.pem ]; then
-        curlargs=" --cacert /etc/confluent/ca.pem"
-    fi
     set_confluent_vars
     echo
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
-    tmpdir=$(mktemp -d)
-    echo Executing in $tmpdir
-    cd $tmpdir
-    mkdir -p $(dirname $1)
-    curl -f -sS $curlargs https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/$1 > $1
+    if [ -z "$confluentscripttmpdir" ]; then
+        confluentscripttmpdir=$(mktemp -d)
+    fi
+    echo Executing in $confluentscripttmpdir
+    cd $confluentscripttmpdir
+    fetch_remote $1
     if [ $? != 0 ]; then echo $requestedcmd failed to download; return 1; fi
     chmod +x $1
     cmd=$1
-    #if [ -x /usr/bin/chcon ]; then
-    #    chcon system_u:object_r:bin_t:s0 $cmd
-    #fi
+    if [ -x /usr/bin/chcon ]; then
+        chcon system_u:object_r:bin_t:s0 $cmd
+    fi
     shift
     ./$cmd $*
     retcode=$?
-    echo "$requestedcmd exited with code $retcode"
+    if [ $retcode -ne 0 ]; then
+        echo "$requestedcmd exited with code $retcode"
+    fi
     cd - > /dev/null
     return $retcode
 }
@@ -99,7 +150,7 @@ run_remote_python() {
     mkdir -p $(dirname $1)
     curl -f -sS $curlargs https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo "'$*'" failed to download; return 1; fi
-    python3 $*
+    confluentpython $*
     retcode=$?
     echo "'$*' exited with code $retcode"
     cd - > /dev/null
@@ -115,13 +166,12 @@ run_remote_config() {
     fi
     echo '---------------------------------------------------------------------------'
     echo Requesting to run remote configuration for "'$*'" from $confluent_mgr under profile $confluent_profile
-    python3 $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
-    python3 $apiclient /confluent-api/self/remoteconfig/status -w 204
+    confluentpython $apiclient /confluent-api/self/remoteconfig/"$*" -d {}
+    confluentpython $apiclient /confluent-api/self/remoteconfig/status -w 204
     echo
     echo 'Completed remote configuration'
     echo '---------------------------------------------------------------------------'
     return
 }
-
 #If invoked as a command, use the arguments to actually run a function
 (return 0 2>/dev/null) || $1 "${@:2}"
