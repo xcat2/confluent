@@ -241,7 +241,7 @@ def start_syncfiles(nodename, cfg, suffixes):
     if not os.path.exists(synclist):
         return '200 OK'  # not running
     sl = SyncList(synclist, nodename, cfg)
-    if not (sl.appendmap or sl.mergemap or sl.replacemap):
+    if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
         return '200 OK'  # the synclist has no actual entries
     syncrunners[nodename] = eventlet.spawn(
         sync_list_to_node, sl, nodename, suffixes)
