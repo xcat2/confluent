@@ -3,6 +3,8 @@ try:
     import http.client as client
 except ImportError:
     import httplib as client
+import ctypes
+import ctypes.util
 import os
 import socket
 import subprocess
@@ -12,6 +14,55 @@ import time
 
 class InvalidApiKey(Exception):
     pass
+
+c_libcrypt = ctypes.CDLL(ctypes.util.find_library('crypt'))
+c_crypt = c_libcrypt.crypt
+c_crypt.argtypes = (ctypes.c_char_p, ctypes.char_p)
+c_crypt.restype = ctypes.c_char_p
+
+
+def get_net_apikey(nodename, mgr):
+    alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./'
+    newpass = ''.join([alpha[x >> 2] for x in bytearray(os.urandom(32))])
+    salt = '$5$' + ''.join([alpha[x >> 2] for x in bytearray(os.urandom(8))])
+    newpass = newpass.encode('utf8')
+    salt = salt.encode('utf8')
+    crypted = c_crypt(newpass, salt)
+    for addrinfo in socket.getaddrinfo(mgr, 13001, type=socket.SOCK_STREAM):
+        try:
+            clisock = socket.socket(addrinfo[0], addrinfo[1])
+            clisock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if addrinfo[0] == socket.AF_INET:
+                cliaddr = ('0.0.0.0', 302)
+            else:
+                cliaddr = ('::', 302)
+            clisock.bind(cliaddr)
+            clisock.connect(addrinfo[-1])
+            rsp = clisock.recv(8)
+            if rsp != b'\xc2\xd1-\xa8\x80\xd8j\xba':
+                raise Exception('Unrecognized credential banner')
+            hellostr = bytearray([1, len(nodename)]) + bytearray(nodename.encode('utf8')) + bytearray(b'\x00\x00')
+            clisock.send(hellostr)
+            rsp = bytearray(clisock.recv(2))
+            if not rsp:
+                continue
+            if rsp[0] == 128:
+                continue
+            if rsp[0] == 2:
+                echotoken = clisock.recv(rsp[1])
+                clisock.recv(2)  # drain \x00\x00
+                clisock.send(bytes(bytearray([3, rsp[1]])))
+                clisock.send(echotoken)
+                clisock.send(bytes(bytearray([4, len(crypted)])))
+                clisock.send(crypted)
+                clisock.send(b'\x00\x00')
+            rsp = bytearray(clisock.recv(2))
+            if rsp[0] == 5:
+                return newpass.decode('utf8')
+        finally:
+            clisock.close()
+    return ''
+
 
 def get_apikey(nodename, mgr, mgr6=None):
     apikey = ""
@@ -26,15 +77,9 @@ def get_apikey(nodename, mgr, mgr6=None):
         hosts.append(host)
     while not apikey:
         for host in hosts:
-            try:
-                apikey = subprocess.check_output(['/opt/confluent/bin/clortho', nodename, host])
-            except subprocess.CalledProcessError:
-                continue
-            break
-        if not isinstance(apikey, str):
-            apikey = apikey.decode('utf8')
-        if apikey.startswith('SEALED:'):
-            apikey = ""
+            apikey = get_net_apikey(nodename, host)
+            if apikey:
+                break
         if not apikey:
             sys.stderr.write(
                 "Failed getting API token, check deployment.apiarmed attribute on {}\n".format(nodename))
