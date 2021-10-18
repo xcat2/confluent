@@ -155,15 +155,21 @@ class HTTPSClient(client.HTTPConnection, object):
             hosts.append(self.v4srv)
         if self.v6srv:
             hosts.append(self.v6srv)
-        for host in hosts:
-            try:
-                addrinf = socket.getaddrinfo(host, self.port)[0]
-                psock = socket.socket(addrinf[0])
-                psock.connect(addrinf[4])
-                foundsrv = host
-                psock.close()
-            except OSError:
+        for timeo in (0.1, 10):
+            for host in hosts:
+                try:
+                    addrinf = socket.getaddrinfo(host, self.port)[0]
+                    psock = socket.socket(addrinf[0])
+                    psock.settimeout(timeo)
+                    psock.connect(addrinf[4])
+                    foundsrv = host
+                    psock.close()
+                    break
+                except OSError:
+                    continue
+            else:
                 continue
+            break
         if not foundsrv:
             raise Exception('Unable to reach any hosts')
         return foundsrv
