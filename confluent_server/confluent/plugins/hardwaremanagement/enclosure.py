@@ -26,6 +26,10 @@ def update(nodes, element, configmanager, inputdata):
         except KeyError:
             em = node
             eb = -1
+        if not em:
+            em = node
+        if not eb:
+            eb = -1
         try:
             for rsp in core.handle_path(
                     '/nodes/{0}/_enclosure/reseat_bay'.format(em),
