@@ -150,7 +150,9 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             newmacs = set([])
             deferrednotifies = []
             machandlers = {}
-            r, _, _ = select.select((net4, net6), (), (), 60)
+            r = select.select((net4, net6), (), (), 60)
+            if r:
+                r = r[0]
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
@@ -201,13 +203,13 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         currmac = query.split('=', 1)[1].lower()
                                         node = uuidlookup(currmac)
                                     if node:
+                                        cfg = cfm.ConfigManager(None)
+                                        cfd = cfg.get_node_attributes(
+                                            node, ['deployment.pendingprofile', 'collective.managercandidates'])
                                         if not forcereply:
                                             # Do not bother replying to a node that
                                             # we have no deployment activity
                                             # planned for
-                                            cfg = cfm.ConfigManager(None)
-                                            cfd = cfg.get_node_attributes(
-                                                node, ['deployment.pendingprofile', 'collective.managercandidates'])
                                             if not cfd.get(node, {}).get(
                                                     'deployment.pendingprofile', {}).get('value', None):
                                                 break
@@ -234,7 +236,9 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
                                         break
-                r, _, _ = select.select((net4, net6), (), (), 0.2)
+                r = select.select((net4, net6), (), (), 0.2)
+                if r:
+                    r = r[0]
             if deferrednotifies:
                 eventlet.sleep(2.2)
                 mac = neighutil.get_hwaddr(peer[0])
