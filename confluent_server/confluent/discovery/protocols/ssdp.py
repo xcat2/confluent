@@ -145,6 +145,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     net4.bind(('', 1900))
     net6.bind(('', 1900))
     peerbymacaddress = {}
+    myuuid = cfm.get_global('confluent_uuid')
     while True:
         try:
             newmacs = set([])
@@ -180,6 +181,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                             headline = headline.partition(':')
                             if len(headline) < 3:
                                 continue
+                            forcereply = False
                             if  headline[0] == 'ST' and headline[-1].startswith(' urn:xcat.org:service:confluent:'):
                                 try:
                                     cfm.check_quorum()
@@ -187,22 +189,28 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                     continue
                                 for query in headline[-1].split('/'):
                                     node = None
-                                    if query.startswith('uuid='):
+                                    if query.startswith('confluentuuid='):
+                                        curruuid = query.split('=', 1)[1].lower()
+                                        if curruuid != myuuid:
+                                            break
+                                        forcereply = True
+                                    elif query.startswith('uuid='):
                                         curruuid = query.split('=', 1)[1].lower()
                                         node = uuidlookup(curruuid)
                                     elif query.startswith('mac='):
                                         currmac = query.split('=', 1)[1].lower()
                                         node = uuidlookup(currmac)
                                     if node:
-                                        # Do not bother replying to a node that
-                                        # we have no deployment activity
-                                        # planned for
-                                        cfg = cfm.ConfigManager(None)
-                                        cfd = cfg.get_node_attributes(
-                                            node, ['deployment.pendingprofile', 'collective.managercandidates'])
-                                        if not cfd.get(node, {}).get(
-                                                'deployment.pendingprofile', {}).get('value', None):
-                                            break
+                                        if not forcereply:
+                                            # Do not bother replying to a node that
+                                            # we have no deployment activity
+                                            # planned for
+                                            cfg = cfm.ConfigManager(None)
+                                            cfd = cfg.get_node_attributes(
+                                                node, ['deployment.pendingprofile', 'collective.managercandidates'])
+                                            if not cfd.get(node, {}).get(
+                                                    'deployment.pendingprofile', {}).get('value', None):
+                                                break
                                         candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
                                         if candmgrs:
                                             candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
@@ -225,6 +233,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
                                         s.sendto(reply, peer)
+                                        break
                 r, _, _ = select.select((net4, net6), (), (), 0.2)
             if deferrednotifies:
                 eventlet.sleep(2.2)

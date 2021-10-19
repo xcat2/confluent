@@ -129,6 +129,8 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
             colldata = tlvdata.recv(remote)
             # the protocol transmits global data, but for now we ignore it
             globaldata = tlvdata.recv(remote)
+            if 'confluent_uuid' in globaldata:
+                cfm.set_global('confluent_uuid', globaldata['confluent_uuid'])
             dbi = tlvdata.recv(remote)
             dbsize = dbi['dbsize']
             dbjson = b''
@@ -550,7 +552,7 @@ def handle_connection(connection, cert, request, local=False):
                                           connection.getpeername()[0])
             tlvdata.send(connection, cfm._dump_keys(None, False))
             tlvdata.send(connection, cfm._cfgstore['collective'])
-            tlvdata.send(connection, {}) # cfm.get_globals())
+            tlvdata.send(connection, {'confluent_uuid': cfm.get_global('confluent_uuid')}) # cfm.get_globals())
             cfgdata = cfm.ConfigManager(None)._dump_to_json()
             tlvdata.send(connection, {'txcount': cfm._txcount,
                                       'dbsize': len(cfgdata)})

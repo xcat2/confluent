@@ -64,6 +64,7 @@ import signal
 import socket
 import time
 import traceback
+import uuid
 
 
 def _daemonize():
@@ -267,6 +268,10 @@ def run(args):
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
     atexit.register(doexit)
+    confluentuuid = configmanager.get_global('confluent_uuid')
+    if not confluentuuid:
+        confluentuuid = str(uuid.uuid4())
+        configmanager.set_global('confluent_uuid', confluentuuid)
     if dbgif:
         oumask = os.umask(0o077)
         try:

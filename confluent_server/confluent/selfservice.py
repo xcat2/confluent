@@ -146,6 +146,7 @@ def handle_request(env, start_response):
         ncfg['profile'] = profile
         protocol = deployinfo.get('deployment.useinsecureprotocols', {}).get(
             'value', 'never')
+        ncfg['confluent_uuid'] = configmanager.get_global('confluent_uuid')
         ncfg['textconsole'] = bool(deployinfo.get(
                                   'console.method', {}).get('value', None))
         if protocol == 'always':
