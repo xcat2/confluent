@@ -127,10 +127,7 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
             log.log({'info': 'Following leader {0}'.format(leader),
                      'subsystem': 'collective'})
             colldata = tlvdata.recv(remote)
-            # the protocol transmits global data, but for now we ignore it
             globaldata = tlvdata.recv(remote)
-            if 'confluent_uuid' in globaldata:
-                cfm.set_global('confluent_uuid', globaldata['confluent_uuid'])
             dbi = tlvdata.recv(remote)
             dbsize = dbi['dbsize']
             dbjson = b''
@@ -150,8 +147,8 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
                     cfm._true_add_collective_member(c, colldata[c]['address'],
                                                     colldata[c]['fingerprint'],
                                                     sync=False)
-                #for globvar in globaldata:
-                #    cfm.set_global(globvar, globaldata[globvar], False)
+                for globvar in globaldata:
+                    cfm.set_global(globvar, globaldata[globvar], False)
                 cfm._txcount = dbi.get('txcount', 0)
                 cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
                                                                sync=False)
