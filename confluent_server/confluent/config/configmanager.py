@@ -794,7 +794,7 @@ def commit_clear():
     # currently just 'autosense' which is intended to be active
     # per collective member
     for globvar in _oldcfgstore.get('globals', ()):
-        if globvar.endswith('_key'):
+        if globvar.endswith('_key') or globvar == 'confluent_uuid':
             continue
         _cfgstore['globals'][globvar] = _oldcfgstore['globals'][globvar]
     _oldcfgstore = None

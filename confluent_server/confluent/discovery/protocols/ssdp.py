@@ -145,7 +145,6 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     net4.bind(('', 1900))
     net6.bind(('', 1900))
     peerbymacaddress = {}
-    myuuid = cfm.get_global('confluent_uuid')
     while True:
         try:
             newmacs = set([])
@@ -190,6 +189,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                 for query in headline[-1].split('/'):
                                     node = None
                                     if query.startswith('confluentuuid='):
+                                        myuuid = cfm.get_global('confluent_uuid')
                                         curruuid = query.split('=', 1)[1].lower()
                                         if curruuid != myuuid:
                                             break
