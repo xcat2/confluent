@@ -96,6 +96,7 @@ def scan_confluents():
             s4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, addr[1])
             s4.sendto(msg, ('239.255.255.250', 1900))
     r = select.select((s4, s6), (), (), 4)
+    srvlist = []
     if r:
         r = r[0]
     while r:
@@ -111,10 +112,11 @@ def scan_confluents():
                 elif line.startswith(b'MGTIFACE: '):
                     current['mgtiface'] = line.replace(b'MGTIFACE: ', b'').strip().decode('utf8')
             srvs[peer[0]] = current
+            srvlist.append(peer[0])
         r = select.select((s4, s6), (), (), 2)
         if r:
             r = r[0]
-    return srvs
+    return srvlist, srvs
 
 
 def get_net_apikey(nodename, mgr):
@@ -267,9 +269,9 @@ class HTTPSClient(client.HTTPConnection, object):
                 continue
             break
         if not foundsrv:
-            srvs = scan_confluents()
+            srvlist, srvs = scan_confluents()
             hosts = []
-            for srv in srvs:
+            for srv in srvlist:
                 if srvs[srv].get('isdefault', False):
                     hosts = [srv] + hosts
                 else:
