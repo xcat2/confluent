@@ -506,7 +506,7 @@ def remap_nodes(nodeattribs, configmanager):
 
 def get_deployment_profile(node, cfg, cfd=None):
     if not cfd:
-        cfd = cfg.get_node_attributes(node, ('deployment.*'))
+        cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
     if not profile:
         return None
@@ -521,7 +521,7 @@ staticassigns = {}
 myipbypeer = {}
 def check_reply(node, info, packet, sock, cfg, reqview, addr):
     httpboot = info['architecture'] == 'uefi-httpboot'
-    cfd = cfg.get_node_attributes(node, ('deployment.*'))
+    cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile = get_deployment_profile(node, cfg, cfd)
     if not profile:
         if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
