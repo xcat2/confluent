@@ -111,6 +111,8 @@ def scan_confluents():
                     current['isdefault'] = True
                 elif line.startswith(b'MGTIFACE: '):
                     current['mgtiface'] = line.replace(b'MGTIFACE: ', b'').strip().decode('utf8')
+            if len(peer) > 2:
+                current['myidx'] = peer[-1]
             srvs[peer[0]] = current
             srvlist.append(peer[0])
         r = select.select((s4, s6), (), (), 2)
