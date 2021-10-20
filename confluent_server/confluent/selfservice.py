@@ -217,7 +217,10 @@ def handle_request(env, start_response):
                         if ckeymap == 'n/a':
                             continue
                         keymap = ckeymap
-            tdc = subprocess.check_output(['timedatectl'], timeout=86400).split(b'\n')
+            try:
+                tdc = subprocess.check_output(['timedatectl'], timeout=86400).split(b'\n')
+            except TypeError:
+                tdc = subprocess.check_output(['timedatectl']).split(b'\n')
             for ent in tdc:
                 ent = ent.strip()
                 if ent.startswith(b'Time zone:'):
