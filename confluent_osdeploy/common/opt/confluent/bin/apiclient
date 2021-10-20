@@ -175,9 +175,21 @@ def get_apikey(nodename, mgr, mgr6=None):
         hosts.append(host)
     while not apikey:
         for host in hosts:
-            apikey = get_net_apikey(nodename, host)
+            try:
+                apikey = get_net_apikey(nodename, host)
+            except OSError:
+                apikey = None
             if apikey:
                 break
+        else:
+            srvlist, _ = scan_confluents()
+            for host in srvlist:
+                try:
+                    apikey = get_net_apikey(nodename, host)
+                except OSError:
+                    apikey = None
+                if apikey:
+                    break
         if not apikey:
             sys.stderr.write(
                 "Failed getting API token, check deployment.apiarmed attribute on {}\n".format(nodename))
