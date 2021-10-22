@@ -32,6 +32,20 @@ def mkdirp(path):
         if e.errno != 17:
             raise
 
+def get_entries(filename):
+    with open(filename, 'r') as slfile:
+        slist = slfile.read()
+    entries = slist.split('\n')
+    for ent in entries:
+        ent = ent.split('#', 1)[0].strip()
+        if not ent:
+            continue
+        if ent[0] == '<':
+            for subent in get_entries(ent[1:]):
+                yield subent
+        else:
+            yield subent
+
 class SyncList(object):
     def __init__(self, filename, nodename, cfg):
         slist = None
@@ -40,9 +54,7 @@ class SyncList(object):
         self.appendoncemap = {}
         self.mergemap = {}
         self.optmap = {}
-        with open(filename, 'r') as slfile:
-            slist = slfile.read()
-        entries = slist.split('\n')
+        entries = get_entries(filename)
         currmap = self.replacemap
         for ent in entries:
             try:

@@ -409,10 +409,21 @@ class OsHandler(object):
                 'version': odata[1], 'arch': odata[2], 'name': odata[3]}
         return json.dumps(info)
 
-    def list_packages(self):
-        with open(self.pkglist, 'r') as pkglist:
+    def list_packages(self, pkglistfile=None):
+        if pkglistfile is None:
+            pkglistfile = self.pkglist
+        with open(pkglistfile, 'r') as pkglist:
             pkgs = pkglist.read()
             pkgs = pkgs.split()
+        retpkgs = []
+        for pkg in pkgs:
+            pkg = pkg.split('#', 1)[0].strip()
+            if not pkg:
+                continue
+            if pkg[0] == '<':  # Include from specified file
+                pkgs.extend(self.list_packages(pkg[1:]))
+            else:
+                pkgs.append(pkg)
         return pkgs
 
 class SuseHandler(OsHandler):
