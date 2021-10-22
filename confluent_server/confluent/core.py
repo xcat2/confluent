@@ -47,6 +47,7 @@ import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.osimage as osimage
+import confluent.plugin as plugin
 try:
     import confluent.shellmodule as shellmodule
 except ImportError:
@@ -71,6 +72,7 @@ import sys
 
 pluginmap = {}
 dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol')
+PluginCollection = plugin.PluginCollection
 
 try:
     unicode
@@ -131,8 +133,27 @@ def load_plugins():
                     pluginmap[name] = tmpmod
             else:
                 pluginmap[plugin] = tmpmod
+                _register_resource(tmpmod)
+        plugins.clear()
         # restore path to not include the plugindir
         sys.path.pop(1)
+
+
+def _register_resource(plugin):
+    global noderesources
+    if 'custom_resources' in plugin.__dict__:
+        _merge_dict(noderesources, plugin.custom_resources)
+
+
+def _merge_dict(original, custom):
+    for k,v in custom.items():
+        if k in original:
+            if isinstance(original.get(k), dict):
+                _merge_dict(original.get(k), custom.get(k))
+            else:
+                original[k] = custom.get(k)
+        else:
+            original[k] = custom.get(k)
 
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
@@ -144,11 +165,6 @@ class PluginRoute(object):
     def __init__(self, routedict):
         self.routeinfo = routedict
 
-
-class PluginCollection(object):
-    def __init__(self, routedict, maxdepth=1):
-        self.routeinfo = routedict
-        self.maxdepth = maxdepth
 
 
 def handle_deployment(configmanager, inputdata, pathcomponents,
