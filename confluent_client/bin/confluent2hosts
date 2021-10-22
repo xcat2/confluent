@@ -23,7 +23,7 @@ def partitionhostsline(line):
         line = line[:cmdidx].strip()
     if not line.strip():
         return '', [], comment
-    ipaddr, names = line.split(maxsplit=1)
+    ipaddr, names = line.split(None, 1)
     names = names.split()
     return ipaddr, names, comment
 
@@ -66,9 +66,11 @@ class HostMerger(object):
 
 
     def read_target(self, targetfile):
+        if not os.path.exists(targetfile):
+            return
         with open(targetfile, 'r') as hfile:
             lines = hfile.read().split('\n')
-            while not lines[-1]:
+            while lines and not lines[-1]:
                 lines = lines[:-1]
             for y in range(len(lines)):
                 line = lines[y]
@@ -96,9 +98,9 @@ class HostMerger(object):
                     self.targlines.append(line)
 
     def write_out(self, targetfile):
-        while not self.targlines[-1]:
+        while self.targlines and not self.targlines[-1]:
             self.targlines = self.targlines[:-1]
-        while not self.sourcelines[-1]:
+        while self.sourcelines and not self.sourcelines[-1]:
             self.sourcelines = self.sourcelines[:-1]
             if not self.sourcelines:
                 break
@@ -135,8 +137,9 @@ def main():
     merger = HostMerger()
     for node in ipbynode:
         merger.add_entry(ipbynode[node], namesbynode[node])
-    merger.read_target('/etc/hosts')
-    os.rename('/etc/hosts', '/etc/hosts.confluentbkup')
+    if os.path.exists('/etc/hosts'):
+        merger.read_target('/etc/hosts')
+        os.rename('/etc/hosts', '/etc/hosts.confluentbkup')
     merger.write_out('/etc/hosts')
 
 
