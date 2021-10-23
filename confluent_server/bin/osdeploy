@@ -107,7 +107,8 @@ def initialize_genesis():
                         '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
         shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
                        '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
-    except Exception:
+    except Exception as e:
+        sys.stderr.write(str(e) + '\n')
         retcode = 1
     finally:
         os._exit(retcode)
@@ -260,7 +261,9 @@ def initialize(cmdset):
                 cacert = b'@cert-authority * ' + cacert
                 skh.write(cacert)
     if cmdset.g:
-        initialize_genesis()
+        rc = initialize_genesis()
+        if rc != 0:
+            sys.exit(rc)
     if not didsomething and (cmdset.k or cmdset.l or cmdset.g or cmdset.p):
         if cmdset.g:
             updateboot('genesis-x86_64')
