@@ -90,14 +90,17 @@ curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/f
 confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 run_remote pre.custom
 run_remote_parts pre.d
+confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart -o /tmp/kickstart.base
+grep '^%include /tmp/partitioning' /tmp/kickstart.* > /dev/null || touch /tmp/installdisk
 if [ ! -e /tmp/installdisk ]; then
     run_remote_python getinstalldisk
 fi
+grep '^%include /tmp/partitioning' /tmp/kickstart.* > /dev/null || rm /tmp/installdisk
 if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     echo clearpart --all --initlabel >> /tmp/partitioning
     echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
     echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
-     dd if=/dev/zero of=/dev/$(cat /tmp/installdisk) bs=1M count=1 >& /dev/null
-     vgchange -a n >& /dev/null
+    dd if=/dev/zero of=/dev/$(cat /tmp/installdisk) bs=1M count=1 >& /dev/null
+    vgchange -a n >& /dev/null
 fi
 kill $logshowpid
