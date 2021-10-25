@@ -2281,6 +2281,9 @@ class ConfigManager(object):
                     newdict = {'value': attribmap[node][attrname]}
                 else:
                     newdict = attribmap[node][attrname]
+                # add check here, skip None attributes
+                if newdict is None:
+                    continue
                 if 'value' in newdict and attrname.startswith("secret."):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
