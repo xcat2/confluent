@@ -63,7 +63,7 @@ fetch_remote() {
 }
 
 source_remote_parts() {
-    confluentscripttmpdir=$(mktemp -d confluentscripts.XXXXXXXXX)
+    confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
     apiclient=/opt/confluent/bin/apiclient
     if [ -f /etc/confluent/apiclient ]; then
         apiclient=/etc/confluent/apiclient
@@ -77,7 +77,7 @@ source_remote_parts() {
 }
 
 run_remote_parts() {
-    confluentscripttmpdir=$(mktemp -d confluentscripts.XXXXXXXXX)
+    confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
     apiclient=/opt/confluent/bin/apiclient
     if [ -f /etc/confluent/apiclient ]; then
         apiclient=/etc/confluent/apiclient
@@ -96,7 +96,7 @@ source_remote() {
     echo '---------------------------------------------------------------------------'
     echo Sourcing $1 from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
     if [ -z "$confluentscripttmpdir" ]; then
-        confluentscripttmpdir=$(mktemp -d confluentscripts.XXXXXXXXX)
+        confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
     fi
     echo Sourcing from $confluentscripttmpdir
     cd $confluentscripttmpdir
@@ -118,7 +118,7 @@ run_remote() {
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
     if [ -z "$confluentscripttmpdir" ]; then
-        confluentscripttmpdir=$(mktemp -d confluentscripts.XXXXXXXXX)
+        confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
     fi
     echo Executing in $confluentscripttmpdir
     cd $confluentscripttmpdir
@@ -148,7 +148,7 @@ run_remote_python() {
     fi
     echo '---------------------------------------------------------------------------'
     echo Running python script "'$*'" from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
-    confluentscripttmpdir=$(mktemp -d confluentscripts.XXXXXXXXX)
+    confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
     echo Executing in $confluentscripttmpdir
     cd $confluentscripttmpdir
     mkdir -p $(dirname $1)
