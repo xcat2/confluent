@@ -44,7 +44,7 @@ def get_entries(filename):
             for subent in get_entries(ent[1:]):
                 yield subent
         else:
-            yield subent
+            yield ent
 
 class SyncList(object):
     def __init__(self, filename, nodename, cfg):
