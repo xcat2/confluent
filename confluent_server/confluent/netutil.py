@@ -174,12 +174,21 @@ class NetManager(object):
         method = attribs.get('ipv4_method', None)
         if method != 'dhcp':
             ipv4addr = attribs.get('ipv4_address', None)
-            if not ipv4addr:
+            if ipv4addr:
+                try:
+                    for ai in socket.getaddrinfo(ipv4addr, 0, socket.AF_INET, socket.SOCK_STREAM):
+                        ipv4addr = ai[-1][0]
+                except socket.gaierror:
+                    pass
+            else:
                 currname = attribs.get('hostname', self.node).split()[0]
                 if currname and currname not in self.consumednames4:
-                    for ai in socket.getaddrinfo(currname, 0, socket.AF_INET, socket.SOCK_STREAM):
-                        ipv4addr = ai[-1][0]
-                        self.consumednames4.add(currname)
+                    try:
+                        for ai in socket.getaddrinfo(currname, 0, socket.AF_INET, socket.SOCK_STREAM):
+                            ipv4addr = ai[-1][0]
+                            self.consumednames4.add(currname)
+                    except socket.gaierror:
+                        pass
             if ipv4addr:
                 myattribs['ipv4_method'] = 'static'
                 myattribs['ipv4_address'] = ipv4addr
@@ -190,12 +199,21 @@ class NetManager(object):
         method = attribs.get('ipv6_method', None)
         if method != 'dhcp':
             ipv6addr = attribs.get('ipv6_address', None)
-            if not ipv6addr:
+            if ipv6addr:
+                try:
+                    for ai in socket.getaddrinfo(ipv6addr, 0, socket.AF_INET6, socket.SOCK_STREAM):
+                        ipv6addr = ai[-1][0]
+                except socket.gaierror:
+                    pass
+            else:
                 currname = attribs.get('hostname', self.node).split()[0]
                 if currname and currname not in self.consumednames6:
-                    for ai in socket.getaddrinfo(currname, 0, socket.AF_INET6, socket.SOCK_STREAM):
-                        ipv6addr = ai[-1][0]
-                        self.consumednames6.add(currname)
+                    try:
+                        for ai in socket.getaddrinfo(currname, 0, socket.AF_INET6, socket.SOCK_STREAM):
+                            ipv6addr = ai[-1][0]
+                            self.consumednames6.add(currname)
+                    except socket.gaierror:
+                        pass
             if ipv6addr:
                 myattribs['ipv6_method'] = 'static'
                 myattribs['ipv6_address'] = ipv6addr
@@ -257,6 +275,9 @@ def get_full_net_config(configmanager, node, serverip=None):
     if serverip:
         myaddrs = get_addresses_by_serverip(serverip)
     nm = NetManager(myaddrs, node, configmanager)
+    if None in sorted(attribs):
+        nm.process_attribs(None, attribs[None])
+        del attribs[None]
     for netname in attribs:
         nm.process_attribs(netname, attribs[netname])
     retattrs = {}
