@@ -108,6 +108,15 @@ def handle_request(env, start_response):
         # credential security results in user/password having to be deferred
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(res)
+    elif env['PATH_INFO'] == '/self/netcfg':
+        myip = env.get('HTTP_X_FORWARDED_HOST', None)
+        if ']' in myip:
+            myip = myip.split(']', 1)[0]
+        else:
+            myip = myip.split(':', 1)[0]
+        ncfg = netutil.get_full_net_config(cfg, nodename, myip)
+        start_response('200 OK', (('Content-Type', retype),))
+        yield dumper(ncfg)
     elif env['PATH_INFO'] in ('/self/deploycfg', '/self/deploycfg2'):
         if 'HTTP_CONFLUENT_MGTIFACE' in env:
             nicname = env['HTTP_CONFLUENT_MGTIFACE']

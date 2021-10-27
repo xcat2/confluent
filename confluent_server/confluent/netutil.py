@@ -185,7 +185,7 @@ class NetManager(object):
                 myattribs['ipv4_address'] = ipv4addr
         else:
             myattribs['ipv4_method'] = 'dhcp'
-        if attribs.get('ipv4_gateway', None) and 'ipv4_method' in self.myattribs[netname]:
+        if attribs.get('ipv4_gateway', None) and 'ipv4_method' in myattribs:
             myattribs['ipv4_gateway'] = attribs['ipv4_gateway']
         method = attribs.get('ipv6_method', None)
         if method != 'dhcp':
@@ -197,7 +197,7 @@ class NetManager(object):
                         ipv6addr = ai[-1][0]
                         self.consumednames6.add(currname)
             if ipv6addr:
-                myattribs['ipv6_methad'] = 'static'
+                myattribs['ipv6_method'] = 'static'
                 myattribs['ipv6_address'] = ipv6addr
         if attribs.get('ipv6_gateway', None) and 'ipv6_method' in myattribs:
             myattribs['ipv6_gateway'] = attribs['ipv6_gateway']
@@ -205,19 +205,30 @@ class NetManager(object):
             del self.myattribs[netname]
             return
         if ipv4addr:
-            ipv4bytes = socket.inet_pton(socket.AF_INET, ipv4addr)
+            prefixlen = None
+            if '/' in ipv4addr:
+                ipv4addr, _ = ipv4addr.split('/', 1)
+            ipv4bytes = socket.inet_pton(socket.AF_INET, ipv4addr.split('/')[0])
             for addr in self.myaddrs:
                 if addr[0] != socket.AF_INET:
                     continue
                 if ipn_on_same_subnet(addr[0], addr[1], ipv4bytes, addr[2]):
                     myattribs['current_nic'] = True
+                    myattribs['ipv4_address'] = '{0}/{1}'.format(ipv4addr, addr[2])
         if not myattribs.get('current_nic', False) and ipv6addr:
+            if '/' in ipv6addr:
+                ipv6addr, _ = ipv6addr.split('/', 1)
             ipv6bytes = socket.inet_pton(socket.AF_INET6, ipv6addr)
             for addr in self.myaddrs:
                 if addr[0] != socket.AF_INET6:
                     continue
                 if ipn_on_same_subnet(addr[0], addr[1], ipv6bytes, addr[2]):
                     myattribs['current_nic'] = True
+                    myattribs['ipv6_address'] = '{0}/{1}'.format(ipv6addr, addr[2])
+        if '/' not in myattribs.get('ipv6_address', '/'):
+            myattribs['ipv6_address'] += '/64'
+        if '/' not in myattribs.get('ipv4_address', '/'):
+            myattribs['ipv4_address'] += '/16'
         if 'current_nic' not in myattribs:
             myattribs['current_nic'] = False
 
@@ -248,7 +259,12 @@ def get_full_net_config(configmanager, node, serverip=None):
     nm = NetManager(myaddrs, node, configmanager)
     for netname in attribs:
         nm.process_attribs(netname, attribs[netname])
-    return nm.myattribs
+    retattrs = {}
+    if None in nm.myattribs:
+        retattrs['default'] = nm.myattribs[None]
+        del nm.myattribs[None]
+    retattrs['extranets'] = nm.myattribs
+    return retattrs
 
 
 
