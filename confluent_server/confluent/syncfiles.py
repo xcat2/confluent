@@ -33,6 +33,7 @@ def mkdirp(path):
             raise
 
 def get_entries(filename):
+    secname = 'REPLACE:'
     filename = filename.strip()
     if filename[-1] == '>':
         filename = filename[:-1]
@@ -43,9 +44,12 @@ def get_entries(filename):
         ent = ent.split('#', 1)[0].strip()
         if not ent:
             continue
+        if ent in ('APPENDONCE:', 'MERGE:', 'REPLACE:'):
+            secname = ent
         if ent[0] == '<':
             for subent in get_entries(ent[1:]):
                 yield subent
+            yield secname
         else:
             yield ent
 
@@ -77,6 +81,8 @@ class SyncList(object):
                     currmap = self.mergemap
                 elif ent == 'APPENDONCE:':
                     currmap = self.appendoncemap
+                elif ent == 'REPLACE:':
+                    currmap = self.replacemap
                 else:
                     raise Exception(
                         'Section "{}" is not currently supported in syncfiles'.format(ent[:-1]))
