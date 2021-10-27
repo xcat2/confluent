@@ -148,11 +148,18 @@ def inametonets(iname):
 class NetManager(object):
     def __init__(self, myaddrs, node, configmanager):
         self.myaddrs = myaddrs
+        self._allmyaddrs = None
         self.cfm = configmanager
         self.node = node
         self.myattribs = {}
         self.consumednames4 = set([])
         self.consumednames6 = set([])
+
+    @property
+    def allmyaddrs(self):
+        if not self._allmyaddrs:
+            self._allmyaddrs = get_my_addresses()
+        return self._allmyaddrs
 
     def process_attribs(self, netname, attribs):
         self.myattribs[netname] = {}
@@ -246,7 +253,7 @@ class NetManager(object):
         if '/' not in myattribs.get('ipv6_address', '/'):
             ipn = socket.inet_pton(socket.AF_INET6, myattribs['ipv6_address'])
             plen = 64
-            for addr in get_my_addresses():
+            for addr in self.allmyaddrs:
                 if addr[0] != socket.AF_INET6:
                     continue
                 if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
@@ -255,7 +262,7 @@ class NetManager(object):
         if '/' not in myattribs.get('ipv4_address', '/'):
             ipn = socket.inet_pton(socket.AF_INET, myattribs['ipv4_address'])
             plen = 16
-            for addr in get_my_addresses():
+            for addr in self.allmyaddrs:
                 if addr[0] != socket.AF_INET:
                     continue
                 if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
