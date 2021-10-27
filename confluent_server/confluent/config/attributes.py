@@ -452,7 +452,7 @@ node = {
                         'to leave this blank unless needing to set up interfaces that are not on a common subnet with a confluent server, '
                         'as confluent servers provide autodetection for matching the correct network definition to an interface.'
                         'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
-                        'a team'.
+                        'a team'
     },
     'net.ipv4_address': {
         'description': 'When configuring static, use this address.  If '
