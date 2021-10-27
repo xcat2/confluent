@@ -251,7 +251,7 @@ class NetManager(object):
                     continue
                 if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
                     plen = addr[2]
-            myattribs['ipv6_address'] += '/64'
+            myattribs['ipv6_address'] += '/{0}'.format(plen)
         if '/' not in myattribs.get('ipv4_address', '/'):
             ipn = socket.inet_pton(socket.AF_INET, myattribs['ipv4_address'])
             plen = 16
@@ -260,7 +260,7 @@ class NetManager(object):
                     continue
                 if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
                     plen = addr[2]
-            myattribs['ipv4_address'] += '/'.format(plen)
+            myattribs['ipv4_address'] += '/{0}'.format(plen)
         if 'current_nic' not in myattribs:
             myattribs['current_nic'] = False
 
