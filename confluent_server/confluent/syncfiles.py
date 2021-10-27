@@ -33,6 +33,9 @@ def mkdirp(path):
             raise
 
 def get_entries(filename):
+    filename = filename.strip()
+    if filename[-1] == '>':
+        filename = filename[:-1]
     with open(filename, 'r') as slfile:
         slist = slfile.read()
     entries = slist.split('\n')

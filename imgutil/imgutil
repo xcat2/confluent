@@ -412,6 +412,9 @@ class OsHandler(object):
     def list_packages(self, pkglistfile=None):
         if pkglistfile is None:
             pkglistfile = self.pkglist
+        pkglistfile = pkglistfile.strip()
+        if pkglistfile[-1] == '>':
+            pkglistfile = pkglistfile[:-1]
         with open(pkglistfile, 'r') as pkglist:
             pkgs = pkglist.read()
             pkgs = pkgs.split()
