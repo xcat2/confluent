@@ -144,6 +144,114 @@ def inametonets(iname):
         net = socket.inet_ntoa(struct.pack('!I', net))
         yield (net, mask_to_cidr(addr['netmask']), addr['addr'])
 
+
+class NetManager(object):
+    def __init__(self, myaddrs, node, configmanager):
+        self.myaddrs = myaddrs
+        self.cfm = configmanager
+        self.node = node
+        self.myattribs = {}
+        self.consumednames4 = set([])
+        self.consumednames6 = set([])
+
+    def process_attribs(self, netname, attribs):
+        self.myattribs[netname] = {}
+        ipv4addr = None
+        ipv6addr = None
+        myattribs = self.myattribs[netname]
+        hwaddr = attribs.get('hwaddr', None)
+        if hwaddr:
+            myattribs['hwaddr'] = hwaddr
+        conname = attribs.get('connection_name', None)
+        if conname:
+            myattribs['connection_name'] = conname
+        iname = attribs.get('interface_names', None)
+        if iname:
+            myattribs['interface_names'] = iname
+        teammod = attribs.get('team_mode', None)
+        if teammod:
+            myattribs['team_mode'] = teammod
+        method = attribs.get('ipv4_method', None)
+        if method != 'dhcp':
+            ipv4addr = attribs.get('ipv4_address', None)
+            if not ipv4addr:
+                currname = attribs.get('hostname', self.node).split()[0]
+                if currname and currname not in self.consumednames4:
+                    for ai in socket.getaddrinfo(currname, 0, socket.AF_INET, socket.SOCK_STREAM):
+                        ipv4addr = ai[-1][0]
+                        self.consumednames4.add(currname)
+            if ipv4addr:
+                myattribs['ipv4_method'] = 'static'
+                myattribs['ipv4_address'] = ipv4addr
+        else:
+            myattribs['ipv4_method'] = 'dhcp'
+        if attribs.get('ipv4_gateway', None) and 'ipv4_method' in self.myattribs[netname]:
+            myattribs['ipv4_gateway'] = attribs['ipv4_gateway']
+        method = attribs.get('ipv6_method', None)
+        if method != 'dhcp':
+            ipv6addr = attribs.get('ipv6_address', None)
+            if not ipv6addr:
+                currname = attribs.get('hostname', self.node).split()[0]
+                if currname and currname not in self.consumednames6:
+                    for ai in socket.getaddrinfo(currname, 0, socket.AF_INET6, socket.SOCK_STREAM):
+                        ipv6addr = ai[-1][0]
+                        self.consumednames6.add(currname)
+            if ipv6addr:
+                myattribs['ipv6_methad'] = 'static'
+                myattribs['ipv6_address'] = ipv6addr
+        if attribs.get('ipv6_gateway', None) and 'ipv6_method' in myattribs:
+            myattribs['ipv6_gateway'] = attribs['ipv6_gateway']
+        if 'ipv4_method' not in myattribs and 'ipv6_method' not in myattribs:
+            del self.myattribs[netname]
+            return
+        if ipv4addr:
+            ipv4bytes = socket.inet_pton(socket.AF_INET, ipv4addr)
+            for addr in self.myaddrs:
+                if addr[0] != socket.AF_INET:
+                    continue
+                if ipn_on_same_subnet(addr[0], addr[1], ipv4bytes, addr[2]):
+                    myattribs['current_nic'] = True
+        if not myattribs.get('current_nic', False) and ipv6addr:
+            ipv6bytes = socket.inet_pton(socket.AF_INET6, ipv6addr)
+            for addr in self.myaddrs:
+                if addr[0] != socket.AF_INET6:
+                    continue
+                if ipn_on_same_subnet(addr[0], addr[1], ipv6bytes, addr[2]):
+                    myattribs['current_nic'] = True
+        if 'current_nic' not in myattribs:
+            myattribs['current_nic'] = False
+
+
+def get_full_net_config(configmanager, node, serverip=None):
+    cfd = configmanager.get_node_attributes(node, ['net.*'])
+    cfd = cfd.get(node, {})
+    attribs = {}
+    for attrib in cfd:
+        val = cfd[attrib].get('value', None)
+        if val is None:
+            continue
+        if attrib.startswith('net.'):
+            attrib = attrib.replace('net.', '').rsplit('.', 1)
+            if len(attrib) == 1:
+                iface = None
+                attrib = attrib[0]
+            else:
+                iface, attrib = attrib
+            if attrib in ('switch', 'switchport', 'bootable'):
+                continue
+            if iface not in attribs:
+                attribs[iface] = {}
+            attribs[iface][attrib] = val
+    myaddrs = None
+    if serverip:
+        myaddrs = get_addresses_by_serverip(serverip)
+    nm = NetManager(myaddrs, node, configmanager)
+    for netname in attribs:
+        nm.process_attribs(netname, attribs[netname])
+    return nm.myattribs
+
+
+
 # TODO(jjohnson2): have a method to arbitrate setting methods, to aid
 # in correct matching of net.* based on parameters, mainly for pxe
 # The scheme for pxe:
@@ -213,19 +321,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         if v6broken:
             cfgdata['ipv6_broken'] = True
     if serverip is not None:
-        if '.' in serverip:
-            fam = socket.AF_INET
-        elif ':' in serverip:
-            fam = socket.AF_INET6
-        else:
-            raise ValueError('"{0}" is not a valid ip argument')
-        ipbytes = socket.inet_pton(fam, serverip)
         dhcprequested = False
-        matchlla = None
-        if ipbytes[:8] == b'\xfe\x80\x00\x00\x00\x00\x00\x00':
-            myaddrs = get_my_addresses(matchlla=ipbytes)
-        else:
-            myaddrs = [x for x in get_my_addresses() if x[1] == ipbytes]
+        myaddrs = get_addresses_by_serverip(serverip)
     genericmethod = 'static'
     ipbynodename = None
     ip6bynodename = None
@@ -363,6 +460,20 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     cfgdata['ipv{}_gateway'.format(nver)] = gw
                     break
     return cfgdata
+
+def get_addresses_by_serverip(serverip):
+    if '.' in serverip:
+        fam = socket.AF_INET
+    elif ':' in serverip:
+        fam = socket.AF_INET6
+    else:
+        raise ValueError('"{0}" is not a valid ip argument')
+    ipbytes = socket.inet_pton(fam, serverip)
+    if ipbytes[:8] == b'\xfe\x80\x00\x00\x00\x00\x00\x00':
+        myaddrs = get_my_addresses(matchlla=ipbytes)
+    else:
+        myaddrs = [x for x in get_my_addresses() if x[1] == ipbytes]
+    return myaddrs
 
 nlhdrsz = struct.calcsize('IHHII')
 ifaddrsz = struct.calcsize('BBBBI')
