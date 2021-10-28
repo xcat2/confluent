@@ -296,10 +296,10 @@ def get_full_net_config(configmanager, node, serverip=None):
     if serverip:
         myaddrs = get_addresses_by_serverip(serverip)
     nm = NetManager(myaddrs, node, configmanager)
-    if None in sorted(attribs):
+    if None in attribs:
         nm.process_attribs(None, attribs[None])
         del attribs[None]
-    for netname in attribs:
+    for netname in sorted(attribs):
         nm.process_attribs(netname, attribs[netname])
     retattrs = {}
     if None in nm.myattribs:
