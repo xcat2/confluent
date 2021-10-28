@@ -204,14 +204,20 @@ def get_apikey(nodename, hosts):
 class HTTPSClient(client.HTTPConnection, object):
     def __init__(self, usejson=False, port=443, host=None):
         self.stdheaders = {}
+        mgtiface = None
         if usejson:
             self.stdheaders['ACCEPT'] = 'application/json'
         if host:
             self.hosts = [host]
+            with open('/etc/confluent/confluent.info') as cinfo:
+                info = cinfo.read().split('\n')
+                for line in info:
+                    if line.startswith('NODENAME:'):
+                        node = line.split(' ')[1]
+                        self.stdheaders['CONFLUENT_NODENAME'] = node
         else:
             self.hosts = []
             info = open('/etc/confluent/confluent.info').read().split('\n')
-            mgtiface = None
             havedefault = '0'
             for line in info:
                 if line.startswith('NODENAME:'):
