@@ -114,6 +114,7 @@ def handle_request(env, start_response):
             myip = myip.split(']', 1)[0]
         else:
             myip = myip.split(':', 1)[0]
+        myip = myip.replace('[', '').replace(']', '')
         ncfg = netutil.get_full_net_config(cfg, nodename, myip)
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
