@@ -1,0 +1,117 @@
+#!/usr/bin/python
+
+import json
+import socket
+import time
+import subprocess
+from importlib.machinery import SourceFileLoader
+try:
+    apiclient = SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient').load_module()
+except FileNotFoundError:
+    apiclient = SourceFileLoader('apiclient', '/etc/confluent/apiclient').load_module()
+
+def add_lla(iface, mac):
+    pieces = mac.split(':')
+    initbyte = int(pieces[0], 16) ^ 2
+    lla = 'fe80::{0:x}{1}:{2}ff:fe{3}:{4}{5}/64'.format(initbyte, pieces[1], pieces[2], pieces[3], pieces[4], pieces[5])
+    subprocess.check_call(['ip', 'addr', 'add', 'dev', iface, lla, 'scope', 'link'])
+    return lla
+
+#cli = apiclient.HTTPSClient(json=True)
+#c = cli.grab_url_with_status('/confluent-api/self/netcfg')
+def add_missing_llas():
+    #NetworkManager goes out of its way to suppress ipv6 lla, so will just add some
+    added = {}
+    linkinfo = subprocess.check_output(['ip', '-br', 'l']).decode('utf8')
+    ifaces = {}
+    for line in linkinfo.split('\n'):
+        line = line.strip().split()
+        if not line or 'LOOPBACK' in line[-1] or 'NO-CARRIER' in line[-1]:
+            continue
+        ifaces[line[0]] = line[2]
+    ips = {}
+    ipinfo = subprocess.check_output(['ip', '-br', '-6', 'a']).decode('utf8')
+    for line in ipinfo.split('\n'):
+        line = line.strip().split(None, 2)
+        if not line:
+            continue
+        ips[line[0]] = line[2]
+    for iface in ifaces:
+        for addr in ips.get(iface, '').split():
+            if addr.startswith('fe80::'):
+                break
+        else:
+            added[iface] = add_lla(iface, ifaces[iface])
+    return added
+
+def rm_tmp_llas(tmpllas):
+    for iface in tmpllas:
+        subprocess.check_call(['ip', 'addr', 'del', 'dev', iface, tmpllas[iface]])
+
+def await_tentative():
+    while b'tentative' in subprocess.check_output(['ip', 'a']):
+        time.sleep(1)
+
+def map_idx_to_name():
+    map = {}
+    for line in subprocess.check_output(['ip', 'l']).decode('utf8').splitlines():
+        if line.startswith(' '):
+            continue
+        idx, iface, _ = line.split(':', 2)
+        idx = int(idx)
+        iface = iface.strip()
+        map[idx] = iface
+    return map
+
+
+def get_interface_name(iname, settings):
+    explicitname = settings.get('interface_names', None)
+    if explicitname:
+        return explicitname
+    if settings.get('current_nic', False):
+        return iname
+    return None
+
+
+if __name__ == '__main__':
+    tmpllas = add_missing_llas()
+    await_tentative()
+    idxmap = map_idx_to_name()
+    netname_to_interfaces = {}
+    myaddrs = apiclient.get_my_addresses()
+    srvs, _ = apiclient.scan_confluents()
+    doneidxs = set([])
+    for srv in srvs:
+        s = socket.create_connection((srv, 443))
+        myname = s.getsockname()
+        s.close()
+        if len(myname) == 4:
+            curridx = myname[-1]
+        else:
+            myname = myname[0]
+            myname = socket.inet_pton(socket.AF_INET, myname)
+            for addr in myaddrs:
+                if myname == bytes(addr[1]):
+                    curridx = addr[-1]
+        if curridx in doneidxs:
+            continue
+        status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+        nc = json.loads(nc)
+        iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
+        if iname:
+            if 'default' in netname_to_interfaces:
+                netname_to_interfaces['default']['interfaces'].add(iname)
+            else:
+                netname_to_interfaces['default'] = {'interfaces': set([iname]), 'settings': nc['default']}
+        for netname in nc.get('extranets', {}):
+            uname = '_' + netname
+            iname = get_interface_name(idxmap[curridx], nc['extranets'][netname])
+            if iname:
+                if uname in netname_to_interfaces:
+                    netname_to_interfaces[uname]['interfaces'].add(iname)
+                else:
+                    netname_to_interfaces[uname] = {'interfaces': set([iname]), 'settings': nc['extranets'][netname]}
+        doneidxs.add(curridx)
+    rm_tmp_llas(tmpllas)
+    print(repr(netname_to_interfaces))
+
