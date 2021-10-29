@@ -92,11 +92,13 @@ run_remote_parts() {
 
 source_remote() {
     set_confluent_vars
+    unsettmpdir=0
     echo
     echo '---------------------------------------------------------------------------'
     echo Sourcing $1 from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
     if [ -z "$confluentscripttmpdir" ]; then
         confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
+        unsettmpdir=1
     fi
     echo Sourcing from $confluentscripttmpdir
     cd $confluentscripttmpdir
@@ -107,18 +109,25 @@ source_remote() {
     shift
     source ./$cmd
     cd - > /dev/null
+    if [ "$unsettmpdir" = 1 ]; then
+        rm -rf $confluentscripttmpdir
+        unset confluentscripttmpdir
+        unsettmpdir=0
+    fi
     rm -rf $confluentscripttmpdir
     return $retcode
 }
 
 run_remote() {
     requestedcmd="'$*'"
+    unsettmpdir=0
     set_confluent_vars
     echo
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
     if [ -z "$confluentscripttmpdir" ]; then
         confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
+        unsettmpdir=1
     fi
     echo Executing in $confluentscripttmpdir
     cd $confluentscripttmpdir
@@ -136,7 +145,11 @@ run_remote() {
         echo "$requestedcmd exited with code $retcode"
     fi
     cd - > /dev/null
-    rm -rf $confluentscripttmpdir
+    if [ "$unsettmpdir" = 1 ]; then
+        rm -rf $confluentscripttmpdir
+        unset confluentscripttmpdir
+        unsettmpdir=0
+    fi
     return $retcode
 }
 
