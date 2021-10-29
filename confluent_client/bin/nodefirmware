@@ -164,7 +164,7 @@ def show_firmware(session):
                         firmware_shown = True
                         printfirm(node, prefix, inv[prefix])
     if not nodes_matched:
-        sys.stderr.write('No matching nodes for noderange "{0}"'.format(noderange))
+        sys.stderr.write('No matching nodes for noderange "{0}"\n'.format(noderange))
     elif not firmware_shown and not exitcode:
         argparser.print_help()
 
