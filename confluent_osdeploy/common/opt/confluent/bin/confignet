@@ -2,6 +2,7 @@
 
 import json
 import socket
+import sys
 import time
 import subprocess
 from importlib.machinery import SourceFileLoader
@@ -54,14 +55,25 @@ def await_tentative():
 
 def map_idx_to_name():
     map = {}
+    devtype = {}
+    prevdev = None
     for line in subprocess.check_output(['ip', 'l']).decode('utf8').splitlines():
         if line.startswith(' '):
+            typ = line.split()[0].split('/')[1]
+            devtype[prevdev] = typ if type != 'ether' else 'ethernet'
             continue
-        idx, iface, _ = line.split(':', 2)
+        idx, iface, rst = line.split(':', 2)
+        prevdev = iface.strip()
+        rst = rst.split()
+        try:
+            midx = rst.index('master')
+            continue
+        except ValueError:
+            pass
         idx = int(idx)
         iface = iface.strip()
         map[idx] = iface
-    return map
+    return map, devtype
 
 
 def get_interface_name(iname, settings):
@@ -72,11 +84,71 @@ def get_interface_name(iname, settings):
         return iname
     return None
 
+class NetworkManager(object):
+    def __init__(self, devtypes):
+        self.connections = {}
+        self.uuidbyname = {}
+        self.read_connections()
+        self.teamidx = 0
+        self.devtypes = devtypes
+
+    def read_connections(self):
+        self.connections = {}
+        self.uuidbyname = {}
+        ci = subprocess.check_output(['nmcli', 'c']).decode('utf8')
+        for inf in ci.splitlines():
+            n, u, t, dev = inf.split()
+            if n == 'NAME':
+                continue
+            if dev == '--':
+                dev = None
+            self.uuidbyname[n] = u
+            self.connections[u] = {'name': n, 'uuid': u, 'type': t, 'dev': dev}
+
+    def add_team_member(self, team, member):
+        if member in self.uuidbyname:
+            subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[member]])
+        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
+
+    def apply_configuration(self, cfg):
+        cmdargs = []
+        stgs = cfg['settings']
+        cmdargs.extend(['ipv6.method', stgs.get('ipv6_method', 'link-local')])
+        if stgs.get('ipv6_address', None):
+            cmdargs.extend(['ipv6.addresses', stgs['ipv6_address']])
+        cmdargs.extend(['ipv4.method', stgs.get('ipv4_method', 'disabled')])
+        if stgs.get('ipv4_address', None):
+            cmdargs.extend(['ipv4.addresses', stgs['ipv4_address']])
+        if stgs.get('ipv4_gateway', None):
+            cmdargs.extend(['ipv4.gateway', stgs['ipv4_gateway']])
+        if stgs.get('ipv6_gateway', None):
+            cmdargs.extend(['ipv6.gateway', stgs['ipv6_gateway']])
+        if len(cfg['interfaces']) > 1:  # team time.. should be..
+            if not cfg['settings'].get('team_mode', None):
+                sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
+                return
+            if not cfg['settings'].get('connection_name', None):
+                cfg['settings']['connection_name'] = 'team{0}'.format(self.teamidx)
+                self.teamidx += 1
+            cname = cfg['settings']['connection_name']
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team', 'con-name', cname, 'connection.interface-name', cname, 'team.runner', stgs['team_mode']] + cmdargs)
+            for iface in cfg['interfaces']:
+                self.add_team_member(cname, iface)
+        else:
+            cname = stgs.get('connection_name', None)
+            iname = list(cfg['interfaces'])[0]
+            if not cname:
+                cname = iname
+            if cname in self.uuidbyname:
+                subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[cname]])
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', self.devtypes[iname], 'con-name', cname, 'connection.interface-name', iname] + cmdargs)
+
+
 
 if __name__ == '__main__':
     tmpllas = add_missing_llas()
     await_tentative()
-    idxmap = map_idx_to_name()
+    idxmap, devtypes = map_idx_to_name()
     netname_to_interfaces = {}
     myaddrs = apiclient.get_my_addresses()
     srvs, _ = apiclient.scan_confluents()
@@ -113,5 +185,7 @@ if __name__ == '__main__':
                     netname_to_interfaces[uname] = {'interfaces': set([iname]), 'settings': nc['extranets'][netname]}
         doneidxs.add(curridx)
     rm_tmp_llas(tmpllas)
-    print(repr(netname_to_interfaces))
+    nm = NetworkManager(devtypes)
+    for netn in netname_to_interfaces:
+        nm.apply_configuration(netname_to_interfaces[netn])
 
