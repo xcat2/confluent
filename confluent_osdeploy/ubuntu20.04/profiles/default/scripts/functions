@@ -172,6 +172,7 @@ run_remote_python() {
     echo "'$*' exited with code $retcode"
     cd - > /dev/null
     rm -rf $confluentscripttmpdir
+    unset confluentscripttmpdir
     return $retcode
 }
 
