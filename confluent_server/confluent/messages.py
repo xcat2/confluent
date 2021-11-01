@@ -1471,18 +1471,18 @@ class InputAlertDestination(ConfluentMessage):
                             self.valid_alert_params[key](inputdata[node][key])
             else:
                 return
-            for key in inputdata:
-                if key not in self.valid_alert_params:
-                    raise exc.InvalidArgumentException(
-                            'Unrecognized alert parameter ' + key)
-                if isinstance(inputdata[key], dict):
-                    inputdata[key] = self.valid_alert_params[key](
-                        inputdata[key]['value'])
-                else:
-                    inputdata[key] = self.valid_alert_params[key](
-                        inputdata[key])
-            for node in nodes:
-                self.alertcfg[node] = inputdata
+       for key in inputdata:
+           if key not in self.valid_alert_params:
+               raise exc.InvalidArgumentException(
+                       'Unrecognized alert parameter ' + key)
+           if isinstance(inputdata[key], dict):
+               inputdata[key] = self.valid_alert_params[key](
+                   inputdata[key]['value'])
+           else:
+               inputdata[key] = self.valid_alert_params[key](
+                   inputdata[key])
+       for node in nodes:
+           self.alertcfg[node] = inputdata
 
     def alert_params_by_node(self, node):
         return self.alertcfg[node]
