@@ -50,7 +50,11 @@ def rm_tmp_llas(tmpllas):
         subprocess.check_call(['ip', 'addr', 'del', 'dev', iface, tmpllas[iface]])
 
 def await_tentative():
+    maxwait = 10
     while b'tentative' in subprocess.check_output(['ip', 'a']):
+        if maxwait == 0:
+            break
+        maxwait -= 1
         time.sleep(1)
 
 def map_idx_to_name():
@@ -88,6 +92,8 @@ class NetworkManager(object):
     def __init__(self, devtypes):
         self.connections = {}
         self.uuidbyname = {}
+        self.uuidbydev = {}
+        self.connectiondetail = {}
         self.read_connections()
         self.teamidx = 0
         self.devtypes = devtypes
@@ -95,6 +101,8 @@ class NetworkManager(object):
     def read_connections(self):
         self.connections = {}
         self.uuidbyname = {}
+        self.uuidbydev = {}
+        self.connectiondetail = {}
         ci = subprocess.check_output(['nmcli', 'c']).decode('utf8')
         for inf in ci.splitlines():
             n, u, t, dev = inf.split()
@@ -103,26 +111,55 @@ class NetworkManager(object):
             if dev == '--':
                 dev = None
             self.uuidbyname[n] = u
+            if dev:
+                self.uuidbydev[dev] = u
             self.connections[u] = {'name': n, 'uuid': u, 'type': t, 'dev': dev}
+            deats = {}
+            for deat in subprocess.check_output(['nmcli', 'c', 's', u]).decode('utf8').splitlines():
+                k, v = deat.split(':', 1)
+                v = v.strip()
+                if v == '--':
+                    continue
+                if '(default)' in v:
+                    continue
+                deats[k] = v
+            self.connectiondetail[u] = deats
+
 
     def add_team_member(self, team, member):
+        bondcfg = {}
+        if member in self.uuidbydev:
+            myuuid = self.uuidbydev[member]
+            deats = self.connectiondetail[myuuid]
+            currteam = deats.get('connection.master', None)
+            if currteam == team:
+                return
+            for stg in ('ipv4.dhcp-hostname', 'ipv4.dns', 'ipv6.dns', 'ipv6.dhcp-hostname'):
+                if deats.get(stg, None):
+                    bondcfg[stg] = deats[stg]
         if member in self.uuidbyname:
             subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[member]])
         subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
+        if bondcfg:
+            args = []
+            for parm in bondcfg:
+                args.append(parm)
+                args.append(bondcfg[parm])
+            subprocess.check_call(['nmcli', 'c', 'm', team] + args)
 
     def apply_configuration(self, cfg):
-        cmdargs = []
+        cmdargs = {}
         stgs = cfg['settings']
-        cmdargs.extend(['ipv6.method', stgs.get('ipv6_method', 'link-local')])
+        cmdargs['ipv6.method'] = stgs.get('ipv6_method', 'link-local')
         if stgs.get('ipv6_address', None):
-            cmdargs.extend(['ipv6.addresses', stgs['ipv6_address']])
-        cmdargs.extend(['ipv4.method', stgs.get('ipv4_method', 'disabled')])
+            cmdargs['ipv6.addresses'] = stgs['ipv6_address']
+        cmdargs['ipv4.method'] = stgs.get('ipv4_method', 'disabled')
         if stgs.get('ipv4_address', None):
-            cmdargs.extend(['ipv4.addresses', stgs['ipv4_address']])
+            cmdargs['ipv4.addresses'] = stgs['ipv4_address']
         if stgs.get('ipv4_gateway', None):
-            cmdargs.extend(['ipv4.gateway', stgs['ipv4_gateway']])
+            cmdargs['ipv4.gateway'] = stgs['ipv4_gateway']
         if stgs.get('ipv6_gateway', None):
-            cmdargs.extend(['ipv6.gateway', stgs['ipv6_gateway']])
+            cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
         if len(cfg['interfaces']) > 1:  # team time.. should be..
             if not cfg['settings'].get('team_mode', None):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
@@ -131,17 +168,30 @@ class NetworkManager(object):
                 cfg['settings']['connection_name'] = 'team{0}'.format(self.teamidx)
                 self.teamidx += 1
             cname = cfg['settings']['connection_name']
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team', 'con-name', cname, 'connection.interface-name', cname, 'team.runner', stgs['team_mode']] + cmdargs)
+            cargs = []
+            for arg in cmdargs:
+                cargs.append(arg)
+                cargs.append(cmdargs[arg])
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team', 'con-name', cname, 'connection.interface-name', cname, 'team.runner', stgs['team_mode']] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
+            subprocess.check_call(['nmcli', 'c', 'u', cname])
         else:
             cname = stgs.get('connection_name', None)
             iname = list(cfg['interfaces'])[0]
             if not cname:
                 cname = iname
-            if cname in self.uuidbyname:
-                subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[cname]])
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', self.devtypes[iname], 'con-name', cname, 'connection.interface-name', iname] + cmdargs)
+            u = self.uuidbyname.get(cname, None)
+            cargs = []
+            for arg in cmdargs:
+                cargs.append(arg)
+                cargs.append(cmdargs[arg])
+            if u:
+                cmdargs['connection.interface-name'] = iname
+                subprocess.check_call(['nmcli', 'c', 'm', u] + cargs)
+                subprocess.check_call(['nmcli', 'c', 'u', u])
+            else:
+                subprocess.check_call(['nmcli', 'c', 'add', 'type', self.devtypes[iname], 'con-name', cname, 'connection.interface-name', iname] + cargs)
 
 
 
