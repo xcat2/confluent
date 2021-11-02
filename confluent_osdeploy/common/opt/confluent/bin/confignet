@@ -1,9 +1,12 @@
 #!/usr/bin/python
 
+import glob
 import json
+import os
 import socket
 import sys
 import time
+import shlex
 import subprocess
 from importlib.machinery import SourceFileLoader
 try:
@@ -15,7 +18,10 @@ def add_lla(iface, mac):
     pieces = mac.split(':')
     initbyte = int(pieces[0], 16) ^ 2
     lla = 'fe80::{0:x}{1}:{2}ff:fe{3}:{4}{5}/64'.format(initbyte, pieces[1], pieces[2], pieces[3], pieces[4], pieces[5])
-    subprocess.check_call(['ip', 'addr', 'add', 'dev', iface, lla, 'scope', 'link'])
+    try:
+        subprocess.check_call(['ip', 'addr', 'add', 'dev', iface, lla, 'scope', 'link'])
+    except Exception:
+        return None
     return lla
 
 #cli = apiclient.HTTPSClient(json=True)
@@ -29,6 +35,8 @@ def add_missing_llas():
         line = line.strip().split()
         if not line or 'LOOPBACK' in line[-1] or 'NO-CARRIER' in line[-1]:
             continue
+        if 'UP' not in line[-1]:
+            subprocess.call(['ip', 'link', 'set', line[0], 'up'])
         ifaces[line[0]] = line[2]
     ips = {}
     ipinfo = subprocess.check_output(['ip', '-br', '-6', 'a']).decode('utf8')
@@ -42,7 +50,9 @@ def add_missing_llas():
             if addr.startswith('fe80::'):
                 break
         else:
-            added[iface] = add_lla(iface, ifaces[iface])
+            newlla = add_lla(iface, ifaces[iface])
+            if newlla:
+                added[iface] = newlla
     return added
 
 def rm_tmp_llas(tmpllas):
@@ -62,9 +72,10 @@ def map_idx_to_name():
     devtype = {}
     prevdev = None
     for line in subprocess.check_output(['ip', 'l']).decode('utf8').splitlines():
-        if line.startswith(' '):
+        if line.startswith(' ') and 'link/' in line:
             typ = line.split()[0].split('/')[1]
             devtype[prevdev] = typ if type != 'ether' else 'ethernet'
+        if line.startswith(' '):
             continue
         idx, iface, rst = line.split(':', 2)
         prevdev = iface.strip()
@@ -87,6 +98,89 @@ def get_interface_name(iname, settings):
     if settings.get('current_nic', False):
         return iname
     return None
+
+class WickedManager(object):
+    def __init__(self):
+        self.teamidx = 0
+        self.read_connections()
+
+    def read_connections(self):
+        self.cfgbydev = {}
+        for ifcfg in glob.glob('/etc/sysconfig/network/ifcfg-*'):
+            devname = ifcfg.replace('/etc/sysconfig/network/ifcfg-', '')
+            if devname == 'lo':
+                continue
+            currcfg = {}
+            self.cfgbydev[devname] = currcfg
+            for cfg in open(ifcfg).read().splitlines():
+                cfg = cfg.split('#', 1)[0]
+                kv = ' '.join(shlex.split(cfg)).split('=', 1)
+                if len(kv) != 2:
+                    continue
+                k, v = kv
+                k = k.strip()
+                v = v.strip()
+                currcfg[k] = v
+
+    def apply_configuration(self, cfg):
+        stgs = cfg['settings']
+        ipcfg = 'STARTMODE=auto\n'
+        routecfg = ''
+        bootproto4 = stgs.get('ipv4_method', 'none')
+        bootproto6 = stgs.get('ipv6_method', 'none')
+        if bootproto4 == 'dhcp' and bootproto6 == 'dhcp':
+            ipcfg += 'BOOTPROTO=dhcp\n'
+        elif bootproto4 == 'dhcp':
+            ipcfg += 'BOOTPROTO=dhcp4\n'
+        elif bootproto6 == 'dhcp':
+            ipcfg += 'BOOTPROTO=dhcp6\n'
+        else:
+            ipcfg += 'BOOTPROTO=static\n'
+        if stgs.get('ipv4_address', None):
+            ipcfg += 'IPADDR=' + stgs['ipv4_address'] + '\n'
+        v4gw = stgs.get('ipv4_gateway', None)
+        if stgs.get('ipv6_address', None):
+            ipcfg += 'IPADDR_V6=' + stgs['ipv6_address'] + '\n'
+        v6gw = stgs.get('ipv6_gateway', None)
+        cname = None
+        if len(cfg['interfaces']) > 1:  # creating new team
+            if not stgs.get('team_mode', None):
+                sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
+                return
+            if not stgs.get('connection_name', None):
+                stgs['connection_name'] = 'team{0}'.format(self.teamidx)
+                self.teamidx += 1
+            cname = stgs['connection_name']
+            with open('/etc/sysconfig/network/ifcfg-{0}'.format(cname), 'w') as teamout:
+                teamout.write(ipcfg)
+                teamout.write('TEAM_RUNNER={0}\n'.format(stgs['team_mode']))
+                idx = 1
+                for iface in cfg['interfaces']:
+                    subprocess.call(['wicked', 'ifdown', iface])
+                    try:
+                        os.remove('/etc/sysconfig/network/ifcfg-{0}'.format(iface))
+                        os.remove('/etc/sysconfig/network/ifroute-{0}'.format(iface))
+                    except OSError:
+                        pass
+                    teamout.write('TEAM_PORT_DEVICE_{0}={1}\n'.format(idx, iface))
+                    idx += 1
+        else:
+            cname = list(cfg['interfaces'])[0]
+            priorcfg = self.cfgbydev.get(cname, {})
+            for cf in priorcfg:
+                if cf.startswith('TEAM_'):
+                    ipcfg += '{0}={1}\n'.format(cf, priorcfg[cf])
+            with open('/etc/sysconfig/network/ifcfg-{0}'.format(cname), 'w') as iout:
+                iout.write(ipcfg)
+        if v4gw:
+            routecfg += 'default {0} - {1}\n'.format(v4gw, cname)
+        if v6gw:
+            routecfg += 'default {0} - {1}\n'.format(v6gw, cname)
+        if routecfg:
+            with open('/etc/sysconfig/network/ifroute-{0}'.format(cname), 'w') as routeout:
+                routeout.write(routecfg)
+        subprocess.call(['wicked', 'ifup', cname])
+
 
 class NetworkManager(object):
     def __init__(self, devtypes):
@@ -239,7 +333,10 @@ if __name__ == '__main__':
                     netname_to_interfaces[uname] = {'interfaces': set([iname]), 'settings': nc['extranets'][netname]}
         doneidxs.add(curridx)
     rm_tmp_llas(tmpllas)
-    nm = NetworkManager(devtypes)
+    if os.path.exists('/usr/bin/nmcli'):
+        nm = NetworkManager(devtypes)
+    elif os.path.exists('/usr/sbin/wicked'):
+        nm = WickedManager()
     for netn in netname_to_interfaces:
         nm.apply_configuration(netname_to_interfaces[netn])
     if havefirewall:
