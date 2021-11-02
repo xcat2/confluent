@@ -108,6 +108,15 @@ def handle_request(env, start_response):
         # credential security results in user/password having to be deferred
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(res)
+    elif env['PATH_INFO'] == '/self/myattribs':
+        cfd = cfg.get_node_attributes(nodename, '*').get(nodename, {})
+        rsp = {}
+        for k in cfd:
+            if k.startswith('secret') or k.startswith('crypt') or 'value' not in cfd[k] or not cfd[k]['value']:
+                continue
+            rsp[k] = cfd[k]['value']
+        start_response('200 OK', (('Conntent-Type', retype),))
+        yield dumper(rsp)
     elif env['PATH_INFO'] == '/self/netcfg':
         myip = env.get('HTTP_X_FORWARDED_HOST', None)
         if ']' in myip:
