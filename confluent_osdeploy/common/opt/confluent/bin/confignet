@@ -196,6 +196,10 @@ class NetworkManager(object):
 
 
 if __name__ == '__main__':
+    havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'])
+    havefirewall = havefirewall == 0
+    if havefirewall:
+        subprocess.check_call(['systemctl', 'stop', 'firewalld'])
     tmpllas = add_missing_llas()
     await_tentative()
     idxmap, devtypes = map_idx_to_name()
@@ -238,4 +242,7 @@ if __name__ == '__main__':
     nm = NetworkManager(devtypes)
     for netn in netname_to_interfaces:
         nm.apply_configuration(netname_to_interfaces[netn])
+    if havefirewall:
+        subprocess.check_call(['systemctl', 'start', 'firewalld'])
+    await_tentative()
 
