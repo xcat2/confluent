@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 import collections
 import os
 import struct
@@ -11,8 +11,10 @@ import tty
 
 def writeout(data):
     done = False
+    if isinstance(data, str) and not isinstance(data, bytes):
+        data = data.encode('utf8')
     try:
-        sys.stdout.write(data)
+        sys.stdout.buffer.write(data)
         done = True
     except IOError:
         time.sleep(0.1)
@@ -21,8 +23,8 @@ def writeout(data):
 
 class LogReplay(object):
     def __init__(self, logfile, cblfile):
-        self.bin = open(cblfile, 'r')
-        self.txt = open(logfile, 'r')
+        self.bin = open(cblfile, 'rb')
+        self.txt = open(logfile, 'rb')
         self.cleardata = []
         self.clearidx = 0
         self.pendingdata = collections.deque([])
@@ -58,14 +60,14 @@ class LogReplay(object):
 
     def get_output(self, reverse=False):
         endoffset = None
-        output = ''
+        output = b''
         if reverse:  # Forget the uncommited future, if present
-            output += '\x1b[2J\x1b[H'
+            output += b'\x1b[2J\x1b[H'
             endoffset, priordata = self._rewind(4096)
             if priordata is not None:
                 return priordata, 1
         elif self.needclear:
-            output += '\x1b[2J\x1b[H'
+            output += b'\x1b[2J\x1b[H'
             self.needclear = False
         if self.cleardata and self.clearidx < len(self.cleardata):
             datachunk = self.cleardata[self.clearidx]
@@ -76,7 +78,7 @@ class LogReplay(object):
         while (not reverse) or (self.bin.tell() < endoffset):
             record = self.bin.read(16)
             if not record:
-                return '', 0
+                return b'', 0
             record = struct.unpack('!BBIHIBBH', record)
             if record[0] > 16:
                 # Unsupported record, skip
@@ -97,10 +99,10 @@ class LogReplay(object):
                 if reverse and self.bin.tell() < endoffset:
                     output += txtout
                     continue
-                if '\x1b[2J' in txtout:
-                    self.cleardata = txtout.split('\x1b[2J')
+                if b'\x1b[2J' in txtout:
+                    self.cleardata = txtout.split(b'\x1b[2J')
                     for idx in range(1, len(self.cleardata)):
-                        self.cleardata[idx] = '\x1b[2J' + self.cleardata[idx]
+                        self.cleardata[idx] = b'\x1b[2J' + self.cleardata[idx]
                     self.clearidx = 0
                     if not self.cleardata[0]:
                         self.cleardata = self.cleardata[1:]
@@ -146,7 +148,10 @@ def main(txtfile, binfile):
                 writeout(newdata)
                 writeout('\x1b]0;[Time: {0}]\x07'.format(
                     time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
-                sys.stdout.flush()
+                try:
+                    sys.stdout.buffer.flush()
+                except IOError:
+                    pass
             while True:
                 select.select((sys.stdin,), (), (), 86400)
                 myinput = sys.stdin.read()
