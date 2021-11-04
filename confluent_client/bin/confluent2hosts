@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 import argparse
 import os
+import re
 import signal
 import sys
 try:
@@ -114,6 +115,7 @@ class HostMerger(object):
 def main():
     ap = argparse.ArgumentParser(description="Create/amend /etc/hosts file for given noderange")
     ap.add_argument('noderange', help='Noderange to generate/update /etc/hosts for')
+    ap.add_argument('-a', '--attrib', help='Pull ip addresses and hostnames from attribute database', action='store_true')
     ap.add_argument('-i', '--ip', help='Expression to generate addresses (e.g. 172.16.1.{n1} or fd2b:246f:8a50::{n1:x})')
     ap.add_argument('-n', '--name', help='Expression for name to add ({node}-compute, etc). If unspecified, "{node} {node}.{dns.domain}" will be used', action='append')
     args = ap.parse_args()
@@ -122,21 +124,71 @@ def main():
         names = ' '.join(args.name)
     else:
         names = '{node} {node}.{dns.domain}'
-    if not args.ip:
-        sys.stderr.write('-i is currently required\n')
-        sys.exit(1)
-    namesbynode = {}
-    ipbynode = {}
-    expurl = '/noderange/{0}/attributes/expression'.format(args.noderange)
-    expression = names
-    exitcode = 0
-    exitcode |= expand_expression(c, namesbynode, expurl, names)
-    exitcode |= expand_expression(c, ipbynode, expurl, args.ip)
-    if exitcode:
-        sys.exit(exitcode)
     merger = HostMerger()
-    for node in ipbynode:
-        merger.add_entry(ipbynode[node], namesbynode[node])
+    if not args.ip and not args.attrib:
+        sys.stderr.write('-a or -i is currently required\n')
+        sys.exit(1)
+    if args.attrib:
+        ip4bynode = {}
+        ip6bynode = {}
+        namesbynode = {}
+        domainsbynode = {}
+        for ent in c.read('/noderange/{0}/attributes/current'.format(args.noderange)):
+            ent = ent.get('databynode', {})
+            for node in ent:
+                for attrib in ent[node]:
+                    val = ent[node][attrib]
+                    if not isinstance(val, dict):
+                        continue
+                    val = val.get('value', None)
+                    if attrib == 'dns.domain':
+                        domainsbynode[node] = val
+                    if attrib.startswith('net.'):
+                        nameparts = attrib.split('.')
+                        if len(nameparts) == 2:
+                            currnet = None
+                        else:
+                            currnet = '.'.join(nameparts[1:-1])
+                        for currdict in (ip4bynode, ip6bynode, namesbynode):
+                            if node not in currdict:
+                                currdict[node] = {}
+                        if attrib.endswith('.ipv4_address') and val:
+                            ip4bynode[node][currnet] = val.split('/', 1)[0]
+                        elif attrib.endswith('.ipv6_address') and val:
+                            ip6bynode[node][currnet] = val.split('/', 1)[0]
+                        elif attrib.endswith('.hostname'):
+                            namesbynode[node][currnet] = re.split('\s+|,', val)
+        for node in ip4bynode:
+            mydomain = domainsbynode.get(node, None)
+            for ipdb in (ip4bynode, ip6bynode):
+                for currnet in ipdb[node]:
+                    if args.name:
+                        sys.stderr.write('Custom name and attribute addresses not currently supported together\n')
+                        sys.exit(1)
+                    else:
+                        names = list(namesbynode.get(node, {}).get(currnet, [node]))
+                        if mydomain:
+                            for name in names:
+                                if mydomain in names:
+                                    break
+                            else:
+                                for name in list(names):
+                                    names.append('{0}.{1}'.format(name, mydomain))
+                    names = ' '.join(names)
+                    merger.add_entry(ipdb[node][currnet], names)
+        merger.write_out('/etc/whatnowhosts')
+    else:
+        namesbynode = {}
+        ipbynode = {}
+        expurl = '/noderange/{0}/attributes/expression'.format(args.noderange)
+        expression = names
+        exitcode = 0
+        exitcode |= expand_expression(c, namesbynode, expurl, names)
+        exitcode |= expand_expression(c, ipbynode, expurl, args.ip)
+        if exitcode:
+            sys.exit(exitcode)
+        for node in ipbynode:
+            merger.add_entry(ipbynode[node], namesbynode[node])
     if os.path.exists('/etc/hosts'):
         merger.read_target('/etc/hosts')
         os.rename('/etc/hosts', '/etc/hosts.confluentbkup')
