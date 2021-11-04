@@ -17,9 +17,9 @@ import sys
 import struct
 import termios
 
-def get_screenwidth():
+def get_screengeom():
     return struct.unpack('hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ,
-                                           b'....'))[1]
+                                           b'....'))
 class ScreenPrinter(object):
 
     def __init__(self, noderange, client, textlen=4):
@@ -44,7 +44,7 @@ class ScreenPrinter(object):
         self.fieldwidth = maxlen + textlen + 1  # 1 for column
 
     def set_output(self, node, text):
-        if self.nodeoutput[node] == text:
+        if self.nodeoutput.get(node, None) == text:
             return
         self.nodeoutput[node] = text
         if len(text) >= self.textlen:
@@ -54,7 +54,8 @@ class ScreenPrinter(object):
 
     def drawscreen(self):
         if self.squeeze:
-            currwidth = get_screenwidth()
+            currheight, currwidth = get_screengeom()
+            currheight -= 1
             numfields = currwidth // self.fieldwidth
             fieldformat = '{{0:>{0}}}:{{1:{1}}}'.format(self.nodenamelen,
                                                         self.textlen)
@@ -63,6 +64,8 @@ class ScreenPrinter(object):
             numfields = 1
             fieldformat = '{0}: {1}'
         currfields = 0
+        if len(self.nodelist) < (numfields * currheight):
+            numfields = len(self.nodelist) // currheight + 1
         for node in self.nodelist:
             if currfields >= numfields:
                 sys.stdout.write('\n')
@@ -80,8 +83,8 @@ class ScreenPrinter(object):
 if __name__ == '__main__':
     import confluent.client as client
     c = client.Command()
-    p = ScreenPrinter('n1-n13', c)
-    p.set_output('n3', 'Upload: 67%')
+    p = ScreenPrinter('d1-d12', c)
+    p.set_output('d3', 'Upload: 67%')
 
 
 
