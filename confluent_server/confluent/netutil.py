@@ -395,6 +395,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     except socket.gaierror:
         pass
     if myaddrs:
+        foundaddr = False
         candgws = []
         candsrvs = []
         for myaddr in myaddrs:
@@ -434,7 +435,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                                 cfgdata['ipv{}_prefix'.format(nver)] = prefix
                             if candip in (ipbynodename, ip6bynodename):
                                 cfgdata['matchesnodename'] = True
-                            return cfgdata
+                            foundaddr = True
                     except Exception as e:
                         cfgdata['error_msg'] = "Error trying to evaluate net.*ipv4_address attribute value '{0}' on {1}: {2}".format(candip, node, str(e))
                 elif candgw:
@@ -442,6 +443,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                         candgwn = socket.inet_pton(fam, inf[-1][0])
                     if ipn_on_same_subnet(fam, svrip, candgwn, prefix):
                         candgws.append((fam, candgwn, prefix))
+        if foundaddr:
+            return cfgdata
         if dhcprequested:
             if not cfgdata.get('ipv4_method', None):
                 cfgdata['ipv4_method'] = 'dhcp'
