@@ -478,8 +478,9 @@ def resourcehandler(env, start_response):
         if 'HTTP_SEC_WEBSOCKET_VERSION' in env:
             for rsp in wsock_handler(env, start_response):
                 yield rsp
-        for rsp in resourcehandler_backend(env, start_response):
-            yield rsp
+        else:
+            for rsp in resourcehandler_backend(env, start_response):
+                yield rsp
     except Exception as e:
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                      event=log.Events.stacktrace)
