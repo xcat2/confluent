@@ -972,7 +972,7 @@ def consume_termdata(fh, bufferonly=False):
         data = None
     if type(data) == dict:
         updatestatus(data)
-        return
+        return ''
     if data is not None:
         data = client.stringify(data)
         if clearpowermessage:
@@ -1021,6 +1021,7 @@ def consume_termdata(fh, bufferonly=False):
             doexit = True
             inconsole = False
             sys.stdout.write("\r\n[remote disconnected]\r\n")
+    return ''
 
 if __name__ == '__main__':
     errcode = 0
