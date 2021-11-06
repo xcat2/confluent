@@ -424,10 +424,10 @@ class OsHandler(object):
             if not pkg:
                 continue
             if pkg[0] == '<':  # Include from specified file
-                pkgs.extend(self.list_packages(pkg[1:]))
+                retpkgs.extend(self.list_packages(pkg[1:]))
             else:
-                pkgs.append(pkg)
-        return pkgs
+                retpkgs.append(pkg)
+        return retpkgs
 
 class SuseHandler(OsHandler):
     def __init__(self, name, version, arch, args):
