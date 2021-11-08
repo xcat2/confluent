@@ -197,9 +197,9 @@ class NetworkManager(object):
         self.uuidbyname = {}
         self.uuidbydev = {}
         self.connectiondetail = {}
-        ci = subprocess.check_output(['nmcli', 'c']).decode('utf8')
+        ci = subprocess.check_output(['nmcli', '-t', 'c']).decode('utf8')
         for inf in ci.splitlines():
-            n, u, t, dev = inf.split()
+            n, u, t, dev = inf.split(':')
             if n == 'NAME':
                 continue
             if dev == '--':

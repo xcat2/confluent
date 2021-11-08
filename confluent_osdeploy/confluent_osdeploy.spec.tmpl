@@ -39,7 +39,7 @@ for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos el9; do
         cp -a ../opt .
     fi
     cp -a ../${os}/initramfs/* .
-    cp -a ../common/* .
+    cp -a ../common/initramfs/* .
     find . | cpio -H newc -o > ../addons.cpio
     mv ../addons.cpio .
     cd ..
@@ -53,7 +53,7 @@ for os in el8 suse15 el9; do
         cp -a ../opt .
     fi
     cp -a ../${os}-diskless/initramfs/* .
-    cp -a ../common/* .
+    cp -a ../common/initramfs/* .
     if [ -d ../${os}bin ]; then 
         cp -a ../${os}bin/stateless-bin/* opt/confluent/bin
     else
@@ -67,7 +67,7 @@ mkdir esxi7out
 cd esxi7out
 cp -a ../opt .
 cp -a ../esxi7/initramfs/* .
-cp -a ../common/* .
+cp -a ../common/initramfs/* .
 chmod +x bin/* opt/confluent/bin/*
 tar zcvf ../addons.tgz *
 mv ../addons.tgz .
@@ -81,11 +81,17 @@ for os in rhvh4 el7 el8 el9 genesis suse15 ubuntu20.04 esxi6 esxi7 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     cp -a $os/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
+    for targ in %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles/*; do
+        cp -a common/profile/* $targ
+    done
     if [ -d ${os}disklessout ]; then
         mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
         mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/profiles
         cp ${os}disklessout/addons.* %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
         cp -a ${os}-diskless/profiles/* %{buildroot}/opt/confluent/lib/osdeploy/$os-diskless/profiles
+        for targ in %{buildroot}/opt/confluent/lib/osdeploy/$os-diskless/profiles/*; do
+            cp -a common/profile/* $targ
+        done
     fi
 done
 find %{buildroot}/opt/confluent/lib/osdeploy/ -name .gitignore -exec rm -f {} +
