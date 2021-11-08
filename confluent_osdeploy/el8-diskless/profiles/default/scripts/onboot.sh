@@ -18,6 +18,7 @@ tail -f /var/log/confluent/confluent-onboot.log > /dev/console &
 logshowpid=$!
 
 run_remote_python syncfileclient
+run_remote_python confignet
 
 run_remote onboot.custom
 # onboot scripts may be placed into onboot.d, e.g. onboot.d/01-firstaction.sh, onboot.d/02-secondaction.sh

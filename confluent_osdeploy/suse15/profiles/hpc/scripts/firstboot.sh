@@ -28,6 +28,7 @@ for i in  /etc/ssh/ssh_host*key.pub; do
     curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$i https://$confluent_mgr/confluent-api/self/sshcert > $certname
 done
 systemctl restart sshd
+run_remote_python confignet
 run_remote firstboot.custom
 
 # Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
