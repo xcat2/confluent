@@ -34,7 +34,13 @@ For the `groups` attribute, it is possible to add a group by doing
 `groups,=<newgroup>` and to remove by doing `groups^=<oldgroup>`
 
 Note that `nodeattrib <group>` will likely not provide the expected behavior.
-See nodegroupattrib(8) command on how to manage attributes on a group level.
+See nodegroupattrib(8) command on how to manage attributes on a group level.  Running
+nodeattrib on a group will simply set node-specific attributes on each individual
+member of the group.
+
+Additionally, if wanting to change from a node level attribute value to inherit from a
+member group, it is required to use '-c' to clear the attribute.  Conversely, assigning
+to a blank value will allow masking a group defined attribute with an empty value.
 
 ## OPTIONS
 
