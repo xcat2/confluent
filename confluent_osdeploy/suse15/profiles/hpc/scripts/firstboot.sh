@@ -15,7 +15,7 @@ else
     confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
     confluent_mgr=${confluent_mgr#deploy_server: }
 fi
-confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 . /etc/confluent/functions
