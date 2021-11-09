@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 import pyghmi.util.webclient as webclient
 from xml.etree.ElementTree import fromstring
 import os
@@ -22,7 +22,7 @@ bdata = 'user={0}&password={1}'.format(os.environ['SMMUSER'], tmppassword)
 headers = {'Connection': 'keep-alive', 'Content-Type': 'application/x-www-form-urlencoded'}
 w.request('POST', '/data/login', adata, headers)
 rsp = w.getresponse()
-rspdata = rsp.read()
+rspdata = rsp.read().decode('utf8')
 restorepwd = False
 if 'authResult>1' in rspdata:
      restorepwd = True
@@ -44,7 +44,7 @@ if 'authResult>0' in rspdata:
      tokens = fromstring(rspdata)
      st2 = tokens.findall('st2')[0].text
      w.set_header('ST2', st2)
-     rules = 'set=passwordDurationDays:0,passwordExpireWarningDays:0,passwordChangeInterval:0'
+     rules = 'set=passwordDurationDays:0,passwordExpireWarningDays:0,passwordChangeInterval:0,passwordChangeInterval:0'
      w.request('POST', '/data', rules)
      rsp = w.getresponse()
      print(repr(rsp.read()))
