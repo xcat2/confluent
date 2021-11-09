@@ -28,7 +28,7 @@ if 'authResult>1' in rspdata:
      restorepwd = True
      w.request('POST', '/data/login', bdata, headers)
      rsp = w.getresponse()
-     rspdata = rsp.read()
+     rspdata = rsp.read().decode('utf8')
 if 'renew_account' in rspdata:
      restorepwd = True
      tokens = fromstring(rspdata)
@@ -36,10 +36,10 @@ if 'renew_account' in rspdata:
      w.set_header('ST2', st2)
      w.request('POST', '/data/changepwd', 'oripwd={0}&newpwd={1}'.format(os.environ['SMMPASS'], tmppassword))
      rsp = w.getresponse()
-     rspdata = rsp.read()
+     rspdata = rsp.read().decode('utf8')
      w.request('POST', '/data/login', bdata, headers)
      rsp = w.getresponse()
-     rspdata = rsp.read()
+     rspdata = rsp.read().decode('utf8')
 if 'authResult>0' in rspdata:
      tokens = fromstring(rspdata)
      st2 = tokens.findall('st2')[0].text
