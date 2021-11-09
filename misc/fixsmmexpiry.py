@@ -44,7 +44,7 @@ if 'authResult>0' in rspdata:
      tokens = fromstring(rspdata)
      st2 = tokens.findall('st2')[0].text
      w.set_header('ST2', st2)
-     rules = 'set=passwordDurationDays:0,passwordExpireWarningDays:0,passwordChangeInterval:0,passwordChangeInterval:0'
+     rules = 'set=passwordDurationDays:0,passwordExpireWarningDays:0,passwordChangeInterval:0,passwordReuseCheckNum:0,passwordFailAllowdNum:0,passwordLockoutTimePeriod:0'
      w.request('POST', '/data', rules)
      rsp = w.getresponse()
      print(repr(rsp.read()))
