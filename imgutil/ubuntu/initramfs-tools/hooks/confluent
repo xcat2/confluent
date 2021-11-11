@@ -1,0 +1,42 @@
+#!/bin/sh
+
+PREREQ=""
+
+prereqs()
+{
+        echo "$PREREQ"
+}
+
+case $1 in
+prereqs)
+        prereqs
+        exit 0
+        ;;
+esac
+
+. /usr/share/initramfs-tools/scripts/functions
+. /usr/share/initramfs-tools/hook-functions
+
+copy_exec /usr/bin/curl
+copy_exec /usr/bin/bash
+copy_exec /usr/bin/tpm2_startauthsession
+copy_exec /usr/bin/tpm2_policypcr
+copy_exec /usr/bin/tpm2_createprimary
+copy_exec /usr/bin/tpm2_create
+copy_exec /usr/bin/tpm2_load
+copy_exec /usr/bin/tpm2_evictcontrol
+copy_exec /usr/bin/tpm2_flushcontext
+copy_exec /usr/bin/tpm2_unseal
+copy_exec /usr/bin/tpm2_flushcontext
+copy_exec /usr/bin/tpm2_pcrextend
+copy_exec /usr/bin/ssh-keygen
+copy_exec /usr/sbin/sshd
+copy_exec /usr/sbin/mkfs.xfs
+manual_add_modules e1000 e1000e igb sfc mlx5_ib mlx5_core mlx4_en cxgb3 cxgb4
+manual_add_modules tg3 bnx2 bnx2x bna ixgb ixgbe qlge mptsas mpt2sas mpt3sas 
+manual_add_modules megaraid_sas ahci xhci-hcd sd_mod pmcraid be2net vfat ext3
+manual_add_modules ext4 usb_storage scsi_wait_scan ipmi_si ipmi_devintf qlcnic
+manual_add_modules xfs nvme cdc_ether mptctl mlx4_ib mlx5_ub ib_umad ib_ipoib
+manual_add_modules ice i40e hfi1 bnxt_en qed qede dm-mod dm-log raid0 raid1
+manual_add_modules raid10 raid456 dm-raid dm-thin-pool dm-crypt dm-snapshot
+manual_add_modules linear dm-era fuse overlay squashfs loop zram
