@@ -429,7 +429,7 @@ class OsHandler(object):
                     subfilename = subfilename[:-1]
                 if subfilename[0] != '/':
                     subfilename = os.path.join(os.path.dirname(pkglistfile), subfilename)
-                retpkgs.extend(self.list_packages(pkg[1:]))
+                retpkgs.extend(self.list_packages(subfilename)
             else:
                 retpkgs.append(pkg)
         return retpkgs
