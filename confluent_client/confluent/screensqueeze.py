@@ -65,15 +65,17 @@ class ScreenPrinter(object):
         else:
             numfields = 1
             fieldformat = '{0}: {1}'
-        currfields = 0
-        for node in self.nodelist:
-            if currfields >= numfields:
+        if self.squeeze:
+            columns = [self.nodelist[x:x+currheight] for x in range(0, len(self.nodelist), currheight)]
+            for currow in range(0, len(columns[0])):
+                for col in columns:
+                    node = col[currow]
+                    sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
                 sys.stdout.write('\n')
-                currfields = 1
-            else:
-                currfields += 1
-            sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
-        sys.stdout.write('\n')
+        else:
+            for node in self.nodelist:
+                sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
+                sys.stdout.write('\n')
         sys.stdout.flush()
 
 
