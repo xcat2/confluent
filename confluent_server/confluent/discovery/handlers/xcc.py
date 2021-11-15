@@ -148,12 +148,8 @@ class NodeHandler(immhandler.NodeHandler):
                             })
         headers = {'Connection': 'keep-alive',
                    'Content-Type': 'application/json'}
-        nonce = None
-        wc.request('POST', '/api/providers/get_nonce', '{}')
-        rsp = wc.getresponse()
-        tokbody = rsp.read()
-        if rsp.status == 200:
-             rsp = json.loads(tokbody)
+        rsp, status = wc.grab_json_response_with_status('/api/providers/get_nonce', {})
+        if status == 200:
              nonce = rsp.get('nonce', None)
              headers['Content-Security-Policy'] = 'nonce={0}'.format(nonce)
         wc.request('POST', '/api/login', adata, headers)
