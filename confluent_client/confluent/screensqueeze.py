@@ -60,12 +60,12 @@ class ScreenPrinter(object):
             fieldformat = '{{0:>{0}}}:{{1:{1}}}'.format(self.nodenamelen,
                                                         self.textlen)
             sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
+            if len(self.nodelist) < (numfields * currheight):
+                numfields = len(self.nodelist) // currheight + 1
         else:
             numfields = 1
             fieldformat = '{0}: {1}'
         currfields = 0
-        if len(self.nodelist) < (numfields * currheight):
-            numfields = len(self.nodelist) // currheight + 1
         for node in self.nodelist:
             if currfields >= numfields:
                 sys.stdout.write('\n')
