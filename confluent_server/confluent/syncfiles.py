@@ -47,7 +47,12 @@ def get_entries(filename):
         if ent in ('APPENDONCE:', 'MERGE:', 'REPLACE:'):
             secname = ent
         if ent[0] == '<':
-            for subent in get_entries(ent[1:]):
+            subfilename = ent[1:]
+            if subfilename[-1] == '>':
+                subfilename = subfilename[:-1]
+            if subfilename[0] != '/':
+                subfilename = os.path.join(os.path.dirname(filename), subfilename)
+            for subent in get_entries(subfilename):
                 yield subent
             yield secname
         else:

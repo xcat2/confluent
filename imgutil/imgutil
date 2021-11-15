@@ -424,6 +424,11 @@ class OsHandler(object):
             if not pkg:
                 continue
             if pkg[0] == '<':  # Include from specified file
+                subfilename = pkg[1:]
+                if subfilename[-1] == '>':
+                    subfilename = subfilename[:-1]
+                if subfilename[0] != '/':
+                    subfilename = os.path.join(os.path.dirname(pkglistfile), subfilename)
                 retpkgs.extend(self.list_packages(pkg[1:]))
             else:
                 retpkgs.append(pkg)
