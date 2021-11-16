@@ -532,8 +532,16 @@ class DebHandler(OsHandler):
         targdir = os.path.join(self.targpath, 'etc/initramfs-tools')
         shutil.copytree(srcdir, targdir)
         os.chmod(os.path.join(targdir, 'hooks/confluent'), 0o755)
-        cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
+        #cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
+        cmd = ['debootstrap', self.codename, self.targpath]
         subprocess.check_call(cmd)
+
+    def prep_root(self, args):
+        shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
+        args.cmd = ['apt-get', 'update']
+        run_constrainedx(fancy_chroot, (args, self.targpath))
+        args.cmd = ['apt-get', 'install'] + self.includepkgs
+        run_constrainedx(fancy_chroot, (args, self.targpath))
 
 
 class ElHandler(OsHandler):
@@ -636,6 +644,26 @@ def mkdirp(path):
             raise
 
 
+def run_constrainedx(function, args):
+    # first fork to avoid changing namespace of unconstrained environment
+    pid = os.fork()
+    if pid:
+        os.waitpid(pid, 0)
+        return
+    libc.unshare(CLONE_NEWNS|CLONE_NEWPID)
+    # must fork again due to CLONE_NEWPID, or else lose the ability to make
+    # subprocesses
+    pid = os.fork()
+    if pid:
+        os.waitpid(pid, 0)
+        os._exit(0)
+        return
+    # we are pid 1 now
+    _mount('none', '/', flags=MS_REC|MS_PRIVATE)
+    _mount('proc', '/proc', fstype='proc')
+    function(*args)
+    os._exit(0)
+
 def run_constrained(function, args):
     # first fork to avoid changing namespace of unconstrained environment
     pid = os.fork()
@@ -726,8 +754,11 @@ def _mount_file(source, dst):
 
 def exec_root_backend(args):
     installroot = args.scratchdir
-    imgname = os.path.basename(installroot)
     _mount_constrained_fs(args, installroot)
+    fancy_chroot(args, installroot)
+
+def fancy_chroot(args, installroot):
+    imgname = os.path.basename(installroot)
     sourceresolv = '/etc/resolv.conf'
     if os.path.islink(sourceresolv):
         sourceresolv = os.readlink(sourceresolv)
@@ -769,9 +800,9 @@ def _mount(src, dst, fstype=0, flags=0, options=0, mode=None):
 def build_root_backend(optargs):
     args, oshandler = optargs
     installroot = args.scratchdir
-    oshandler.prep_root_premount(optargs)
+    oshandler.prep_root_premount(args)
     _mount_constrained_fs(args, installroot)
-    oshandler.prep_root(optargs)
+    oshandler.prep_root(args)
     mkdirp(os.path.join(installroot, 'etc/'))
     with open(os.path.join(installroot, 'etc/confluentimg.buildinfo'), 'w') as imginfo:
         imginfo.write('BUILDDATE={}\n'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')))

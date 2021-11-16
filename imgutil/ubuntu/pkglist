@@ -42,3 +42,4 @@ bind9-dnsutils
 libmaxminddb0
 libuv1
 dbus-user-session
+tpm2-tools
