@@ -409,6 +409,12 @@ class OsHandler(object):
                 'version': odata[1], 'arch': odata[2], 'name': odata[3]}
         return json.dumps(info)
 
+    def prep_root_premount(self, args):
+        pass
+
+    def prep_root(self, args):
+        pass
+
     def list_packages(self, pkglistfile=None):
         if pkglistfile is None:
             pkglistfile = self.pkglist
@@ -503,6 +509,25 @@ class SuseHandler(OsHandler):
         subprocess.check_call(cmd)
         subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
         os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
+
+
+class DebHandler(OsHandler):
+    def __init__(self, name, version, arch, args, codename):
+        self.includepkgs = []
+        self.targpath = None
+        self.codename = codename
+        self.oscategory = name
+        super().__init__(name, version, arch, args)
+
+    def add_pkglists(self):
+        self.includepkgs.extend(self.list_packages())
+
+    def set_target(self, targpath):
+        self.targpath = targpath
+
+    def prep_root_premount(self, args):
+        cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
+        subprocess.check_call(cmd)
 
 
 class ElHandler(OsHandler):
@@ -738,6 +763,7 @@ def _mount(src, dst, fstype=0, flags=0, options=0, mode=None):
 def build_root_backend(optargs):
     args, oshandler = optargs
     installroot = args.scratchdir
+    oshandler.prep_root_premount(optargs)
     _mount_constrained_fs(args, installroot)
     oshandler.prep_root(optargs)
     mkdirp(os.path.join(installroot, 'etc/'))
@@ -851,6 +877,30 @@ def fingerprint_host_el(args, hostpath='/'):
         return ElHandler(osname, inf.version, os.uname().machine, args)
 
 
+def fingerprint_host_deb(args, hostpath='/'):
+    osrelfile = os.path.join(hostpath, 'etc/os-release')
+    osname = None
+    codename = None
+    try:
+        with open(osrelfile, 'r') as relfile:
+            relinfo = relfile.read().split('\n')
+            for inf in relinfo:
+                if '=' not in inf:
+                    continue
+                key, val = inf.split('=', 1)
+                if key == 'ID':
+                    if val.lower().replace('"', '') == 'ubuntu':
+                        osname = 'ubuntu'
+                elif 'VERSION_CODENAME' == key:
+                    codename = val.lower().replace('"', '')
+                elif key == 'VERSION_ID':
+                    vers = val.replace('"', '')
+    except IOError:
+        pass
+    if osname:
+        return DebHandler(osname, vers, os.uname().machine, args, codename)
+
+
 def fingerprint_host_suse(args, hostpath='/'):
     vers = None
     osname = None
@@ -876,7 +926,7 @@ def fingerprint_host_suse(args, hostpath='/'):
 
 def fingerprint_host(args, hostpath='/'):
     oshandler = None
-    for fun in [fingerprint_host_el, fingerprint_host_suse]:
+    for fun in [fingerprint_host_el, fingerprint_host_suse, fingerprint_host_deb]:
         oshandler = fun(args, hostpath)
         if oshandler is not None:
             return oshandler

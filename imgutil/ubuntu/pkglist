@@ -36,4 +36,9 @@ vim
 uuid-runtime
 wget
 xfsprogs
-
+bind9-host
+bind9-libs
+bind9-dnsutils
+libmaxminddb0
+libuv1
+dbus-user-session
