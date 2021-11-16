@@ -69,8 +69,11 @@ class ScreenPrinter(object):
             columns = [self.nodelist[x:x+currheight] for x in range(0, len(self.nodelist), currheight)]
             for currow in range(0, len(columns[0])):
                 for col in columns:
-                    node = col[currow]
-                    sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
+                    try:
+                        node = col[currow]
+                        sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
+                    except IndexError:
+                        break
                 sys.stdout.write('\n')
         else:
             for node in self.nodelist:
