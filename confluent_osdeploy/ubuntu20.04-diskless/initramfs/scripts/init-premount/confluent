@@ -1,0 +1,81 @@
+get_remote_apikey() {
+    while [ -z "$confluent_apikey" ]; do
+        /opt/confluent/bin/clortho $confluent_nodename $confluent_mgr > /etc/confluent/confluent.apikey
+        if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
+            # we don't support remote sealed api keys anymore
+            echo > /etc/confluent/confluent.apikey
+        fi
+        confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+        if [ -z "$confluent_apikey" ]; then
+            echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$confluent_nodename', retrying..."
+            sleep 10
+        elif [ -c /dev/tpm0 ]; then
+            tmpdir=$(mktemp -d)
+            cd $tmpdir
+            tpm2_startauthsession --session=session.ctx
+            tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+            tpm2_createprimary -G ecc -Q --key-context=prim.ctx
+            (echo -n "CONFLUENT_APIKEY:";cat /etc/confluent/confluent.apikey) | tpm2_create -Q --policy=pcr15.sha256.policy --public=data.pub --private=data.priv -i - -C prim.ctx
+            tpm2_load -Q --parent-context=prim.ctx --public=data.pub --private=data.priv --name=confluent.apikey --key-context=data.ctx
+            tpm2_evictcontrol -Q -c data.ctx
+            tpm2_flushcontext session.ctx
+            cd - > /dev/null
+            rm -rf $tmpdir
+        fi
+    done
+}
+
+cd /sys/class/net
+for nic in *; do
+    ip link set $nic up
+done
+cd -
+mkdir /etc/confluent
+/opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+TRIES=0
+while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 > /dev/null && [ "$TRIES" -lt 30 ]; do
+    TRIES=$((TRIES + 1))
+    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+    sleep 1
+done
+confluent_mgr=$(grep '^EXTMGRINFO:.*1$' /etc/confluent/confluent.info | head -n 1 | awk -F': ' '{print $2}' | awk -F'|' '{print $1}')
+if [ -z "$confluent_mgr" ]; then
+    confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info|head -n 1 | awk '{print $2}')
+fi
+confluent_nodename=$(grep ^NODENAME: /etc/confluent/confluent.info |awk '{print $NF}')
+hostname $confluent_nodename
+/opt/confluent/bin/clortho $confluent_nodename $confluent_mgr > /etc/confluent/confluent.apikey
+confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+while [ -z "$confluent_apikey" ]; do
+    echo "Retrying in 10 seconds..."
+    sleep 10
+    /opt/confluent/bin/clortho $confluent_nodename $confluent_mgr > /etc/confluent/confluent.apikey
+    confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+done
+cat /tls/*.pem > /etc/confluent/ca.pem
+if echo $confluent_mgr | grep : >/dev/null; then
+    confluent_mgr="[$confluent_mgr]"
+fi
+curl --cacert /etc/confluent/ca.pem  -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+mkdir -p /run/sshd
+echo sshd:x:65535:65535::/run/sshd: >> /etc/passwd
+mkdir /etc/ssh
+echo Port 2222 > /etc/ssh/sshd_config
+ssh-keygen -A
+for k in /etc/ssh/*key.pub; do
+    certfile=$(echo $k|sed -e s/.pub/-cert.pub/)
+    privkey=$(echo $k|sed -e s/.pub//)
+    curl --cacert /etc/confluent/ca.pem -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey"  -d @$k https://$confluent_mgr/confluent-api/self/sshcert >> $certfile
+    if [ -s $certfile ]; then
+        if ! grep $certfile /etc/ssh/sshd_config > /dev/null; then
+            echo HostCertificate $certfile >> /etc/ssh/sshd_config
+        fi
+        if ! grep "HostKey $privkey" /etc/ssh/sshd_config > /dev/null; then
+            echo HostKey $privkey >> /etc/ssh/sshd_config
+        fi
+    fi
+done
+/usr/sbin/sshd
+mkdir /root/.ssh
+cat /ssh/*pubkey > /root/.ssh/authorized_keys
+
