@@ -531,7 +531,7 @@ class DebHandler(OsHandler):
         srcdir = os.path.join(mydir, 'initramfs-tools')
         targdir = os.path.join(self.targpath, 'etc/initramfs-tools')
         shutil.copytree(srcdir, targdir)
-        os.chmod(0o755, os.path.join(targdir, 'hooks/confluent'))
+        os.chmod(os.path.join(targdir, 'hooks/confluent'), 0o755)
         cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
         subprocess.check_call(cmd)
 
