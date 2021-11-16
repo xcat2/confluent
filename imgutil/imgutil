@@ -526,6 +526,12 @@ class DebHandler(OsHandler):
         self.targpath = targpath
 
     def prep_root_premount(self, args):
+        mkdirp(os.path.join(self.targpath, 'etc'))
+        mydir = get_mydir(self.oscategory)
+        srcdir = os.path.join(mydir, 'initramfs-tools')
+        targdir = os.path.join(self.targpath, 'etc/initramfs-tools')
+        shutil.copytree(srcdir, targdir)
+        os.chmod(0o755, os.path.join(targdir, 'hooks/confluent'))
         cmd = ['debootstrap', '--include={0}'.format(','.join(self.includepkgs)), self.codename, self.targpath]
         subprocess.check_call(cmd)
 
