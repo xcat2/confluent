@@ -1,3 +1,29 @@
+get_tpm_apikey() {
+    lasthdl=""
+    if [ -c /dev/tpm0 ]; then
+        for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
+            tpm2_startauthsession --policy-session --session=session.ctx
+            tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
+            unsealeddata=$(tpm2_unseal --auth=session:session.ctx -Q -c $hdl 2>/dev/null)
+            tpm2_flushcontext session.ctx
+            if echo $unsealeddata | grep "^CONFLUENT_APIKEY:" > /dev/null; then
+                confluent_apikey=${unsealeddata#CONFLUENT_APIKEY:}
+                echo $confluent_apikey > /etc/confluent/confluent.apikey
+                if [ -n "$lasthdl" ]; then
+                    tpm2_evictcontrol -c $lasthdl
+                fi
+                lasthdl=$hdl
+            fi
+        done
+    fi
+    if [ ! -z "$confluent_apikey" ]; then
+        if ! curl --cacert /etc/confluent/ca.pem  -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey" https://${confluent_http_mgr}/confluent-api/self/myattribs > /dev/null; then
+            tpm2_evictcontrol -c $lasthdl
+            confluent_apikey=""
+        fi
+    fi
+}
+
 get_remote_apikey() {
     while [ -z "$confluent_apikey" ]; do
         /opt/confluent/bin/clortho $confluent_nodename $confluent_mgr > /etc/confluent/confluent.apikey
@@ -25,12 +51,19 @@ get_remote_apikey() {
     done
 }
 
+if ! grep console= /proc/cmdline >& /dev/null; then
+    autocons=$(/opt/confluent/bin/autocons)
+    autocons=${autocons##*/}
+    echo "Automatic console configured for $autocons"
+fi
+echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
 cd /sys/class/net
 for nic in *; do
     ip link set $nic up
 done
-cd -
 mkdir /etc/confluent
+cd - > /dev/null
+cat /tls/*.pem > /etc/confluent/ca.pem
 /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 TRIES=0
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 > /dev/null && [ "$TRIES" -lt 30 ]; do
@@ -42,30 +75,44 @@ confluent_mgr=$(grep '^EXTMGRINFO:.*1$' /etc/confluent/confluent.info | head -n 
 if [ -z "$confluent_mgr" ]; then
     confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info|head -n 1 | awk '{print $2}')
 fi
+if echo $confluent_mgr | grep : >/dev/null; then
+    confluent_http_mgr="[$confluent_mgr]"
+else
+    confluent_http_mgr=$confluent_mgr
+fi
 confluent_nodename=$(grep ^NODENAME: /etc/confluent/confluent.info |awk '{print $NF}')
 hostname $confluent_nodename
-/opt/confluent/bin/clortho $confluent_nodename $confluent_mgr > /etc/confluent/confluent.apikey
-confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-while [ -z "$confluent_apikey" ]; do
-    echo "Retrying in 10 seconds..."
-    sleep 10
-    /opt/confluent/bin/clortho $confluent_nodename $confluent_mgr > /etc/confluent/confluent.apikey
-    confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-done
-cat /tls/*.pem > /etc/confluent/ca.pem
-if echo $confluent_mgr | grep : >/dev/null; then
-    confluent_mgr="[$confluent_mgr]"
+get_tpm_apikey
+if [ ! -z "$confluent_apikey" ]; then
+    get_remote_apikey
 fi
-curl --cacert /etc/confluent/ca.pem  -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+if echo $confluent_mgr | grep '%' > /dev/null; then
+    echo $confluent_mgr | awk -F% '{print $2}' > /tmp/confluent.ifidx
+    ifidx=$(cat /tmp/confluent.ifidx)
+    ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+    ifname=${ifname%:}
+fi
+curl --cacert /etc/confluent/ca.pem  -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey" https://${confluent_http_mgr}/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+v6meth=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ "$v6meth" = static ]; then
+    v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+    v6prefix=$(grep ^ipv6_prefix: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+    ip addr add dev $ifname $v6addr/$v6prefix
+fi
+v4meth=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ "$v4meth" = static ]; then
+    v4addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+    v4prefix=$(grep ^ipv6_prefix: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+    ip addr add dev $ifname $v4addr/$v4prefix
+fi
 mkdir -p /run/sshd
-echo sshd:x:65535:65535::/run/sshd: >> /etc/passwd
 mkdir /etc/ssh
 echo Port 2222 > /etc/ssh/sshd_config
 ssh-keygen -A
 for k in /etc/ssh/*key.pub; do
     certfile=$(echo $k|sed -e s/.pub/-cert.pub/)
     privkey=$(echo $k|sed -e s/.pub//)
-    curl --cacert /etc/confluent/ca.pem -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey"  -d @$k https://$confluent_mgr/confluent-api/self/sshcert >> $certfile
+    curl --cacert /etc/confluent/ca.pem -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey"  -d @$k https://${confluent_http_mgr}/confluent-api/self/sshcert >> $certfile
     if [ -s $certfile ]; then
         if ! grep $certfile /etc/ssh/sshd_config > /dev/null; then
             echo HostCertificate $certfile >> /etc/ssh/sshd_config

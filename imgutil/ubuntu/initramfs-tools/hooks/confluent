@@ -35,6 +35,7 @@ copy_exec /usr/sbin/sshd
 copy_exec /usr/sbin/mkfs.xfs
 copy_exec /usr/lib/x86_64-linux-gnu/libfuse.so.2
 copy_exec /usr/bin/mktemp
+copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0
 manual_add_modules e1000 e1000e igb sfc mlx5_ib mlx5_core mlx4_en cxgb3 cxgb4
 manual_add_modules tg3 bnx2 bnx2x bna ixgb ixgbe qlge mptsas mpt2sas mpt3sas 
 manual_add_modules megaraid_sas ahci xhci-hcd sd_mod pmcraid be2net vfat ext3
