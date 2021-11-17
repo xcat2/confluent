@@ -1764,7 +1764,7 @@ class ConfigManager(object):
                 if attrib.startswith('crypted.'):
                     if not isinstance(curr[attrib], dict):
                         curr[attrib] = {'value': curr[attrib]}
-                    if 'hashvalue' not in curr[attrib]:
+                    if 'hashvalue' not in curr[attrib] and curr[attrib]['value']:
                         curr[attrib]['hashvalue'] = hashcrypt_value(
                             curr[attrib]['value'])
                         if 'grubhashvalue' not in curr[attrib]:
@@ -2186,7 +2186,7 @@ class ConfigManager(object):
                 if attrib.startswith('crypted.'):
                     if not isinstance(curr[attrib], dict):
                         curr[attrib] = {'value': curr[attrib]}
-                    if 'hashvalue' not in curr[attrib]:
+                    if 'hashvalue' not in curr[attrib] and curr[attrib]['value']:
                         curr[attrib]['hashvalue'] = hashcrypt_value(
                             curr[attrib]['value'])
                         if 'grubhashvalue' not in curr[attrib]:
