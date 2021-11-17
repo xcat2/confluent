@@ -44,7 +44,7 @@ for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 coreos el9; do
     mv ../addons.cpio .
     cd ..
 done
-for os in el8 suse15 el9; do
+for os in el8 suse15 el9 ubuntu20.04; do
     mkdir ${os}disklessout
     cd ${os}disklessout
     if [ -d ../${os}bin ]; then
