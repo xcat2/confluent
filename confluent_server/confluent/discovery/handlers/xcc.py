@@ -149,6 +149,7 @@ class NodeHandler(immhandler.NodeHandler):
         headers = {'Connection': 'keep-alive',
                    'Content-Type': 'application/json'}
         rsp, status = wc.grab_json_response_with_status('/api/providers/get_nonce', {})
+        nonce = None
         if status == 200:
              nonce = rsp.get('nonce', None)
              headers['Content-Security-Policy'] = 'nonce={0}'.format(nonce)
