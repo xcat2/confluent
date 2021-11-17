@@ -1368,11 +1368,12 @@ class IpmiHandler(object):
                 'directory {0}, check ownership and permissions'.format(
                     directory))
         for saved in self.ipmicmd.save_licenses(directory):
-            try:
-                pwent = pwd.getpwnam(self.current_user)
-                os.chown(saved, pwent.pw_uid, pwent.pw_gid)
-            except KeyError:
-                pass
+            if self.current_user:
+                try:
+                    pwent = pwd.getpwnam(self.current_user)
+                    os.chown(saved, pwent.pw_uid, pwent.pw_gid)
+                except KeyError:
+                    pass
             self.output.put(msg.SavedFile(self.node, saved))
 
     def handle_licenses(self):
