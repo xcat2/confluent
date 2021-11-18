@@ -64,6 +64,8 @@ for nic in *; do
 done
 mkdir -p /etc/confluent
 cd - > /dev/null
+mkdir -p /etc/ssl/certs
+cat /tls/*.pem > /etc/ssl/certs/ca-certificates.crt
 cat /tls/*.pem > /etc/confluent/ca.pem
 /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 TRIES=0

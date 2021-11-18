@@ -22,6 +22,7 @@ function set_confluent_vars() {
     if [ -z "$nodename" ]; then
         nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
     fi
+    confluent_nodename=$nodename
     if [[ "$confluent_mgr" == *"%"* ]]; then
         confluent_mgr=""
     fi
