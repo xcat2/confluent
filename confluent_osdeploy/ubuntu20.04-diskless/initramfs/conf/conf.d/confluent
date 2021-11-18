@@ -5,4 +5,4 @@ if ! grep console= /proc/cmdline > /dev/null; then
         echo "Auto-detected serial console: $cons" > ${cons%,*}
     fi
 fi
-echo /scripts/init-premount/confluent >> /scripts/init-premount/ORDER
+echo . /scripts/init-premount/confluent >> /scripts/init-premount/ORDER
