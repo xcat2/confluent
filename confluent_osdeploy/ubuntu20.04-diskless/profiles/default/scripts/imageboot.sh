@@ -1,6 +1,14 @@
 . /lib/dracut-lib.sh
+confluent_urls=""
+for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed -e s/%/%25/); do
+    if [[ $addr == *:* ]]; then
+        confluent_urls="$confluent_urls $confluent_proto://[$addr]/confluent-public/os/$confluent_profile/rootimg.sfs"
+    else
+        confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
+    fi
+done
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
+if grep confluennt_imagemethtod=untethered /proc/cmdline > /dev/null; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
