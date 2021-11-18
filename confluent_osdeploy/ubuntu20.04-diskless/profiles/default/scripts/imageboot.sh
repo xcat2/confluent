@@ -1,5 +1,5 @@
-. /lib/dracut-lib.sh
 confluent_urls=""
+confluent_proto=https
 for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed -e s/%/%25/); do
     if [[ $addr == *:* ]]; then
         confluent_urls="$confluent_urls $confluent_proto://[$addr]/confluent-public/os/$confluent_profile/rootimg.sfs"
@@ -20,7 +20,7 @@ loopdev=$(losetup -f)
 export mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
 if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
-    while ! curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
+    while ! curl -sf -H "CONFLUENT_NODENAME: $confluent_nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
         echo "Unable to retrieve private key from $conflunt_mgr (verify that confluent can access /var/lib/confluent/private/$confluent_profile/pending/rootimg.key)"
         sleep 1
     done
@@ -111,7 +111,7 @@ echo 'Host *' >> $sshconf
 echo '    HostbasedAuthentication yes' >> $sshconf
 echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
-curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
+curl -sf -H "CONFLUENT_NODENAME: $confluent_nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
 chmod 640 /sysroot/etc/ssh/*_key
 chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
