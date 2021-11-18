@@ -516,7 +516,7 @@ class DebHandler(OsHandler):
         self.includepkgs = []
         self.targpath = None
         self.codename = codename
-        self.oscategory = name
+        self.oscategory = name + version
         super().__init__(name, version, arch, args)
 
     def add_pkglists(self):
