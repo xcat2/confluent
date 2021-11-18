@@ -415,6 +415,9 @@ def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     req['rqtype'] = bytearray(rqv[:1])[0]
     if not disco.get('uuid', None) or not disco.get('arch', None):
         return
+    if disco['uuid'] == '03000200-0400-0500-0006-000700080009':
+        # Ignore common malformed dhcpv6 request from firmware
+        return
     mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
     if not mac:
         net.sendto(b'\x00', addr)
