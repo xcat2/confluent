@@ -540,7 +540,7 @@ class DebHandler(OsHandler):
         shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
         args.cmd = ['apt-get', 'update']
         run_constrainedx(fancy_chroot, (args, self.targpath))
-        args.cmd = ['apt-get', 'install'] + self.includepkgs
+        args.cmd = ['apt-get', '-y', 'install'] + self.includepkgs
         run_constrainedx(fancy_chroot, (args, self.targpath))
 
 
