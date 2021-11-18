@@ -141,7 +141,4 @@ confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg| awk '{pri
 confluent_proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
-. /etc/confluent/functions
-source_remote imageboot.sh
-
-
+exec /bin/bash /etc/confluent/functions source_remote imageboot.sh
