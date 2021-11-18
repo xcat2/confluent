@@ -84,7 +84,7 @@ fi
 confluent_nodename=$(grep ^NODENAME: /etc/confluent/confluent.info |awk '{print $NF}')
 hostname $confluent_nodename
 get_tpm_apikey
-if [ ! -z "$confluent_apikey" ]; then
+if [ -z "$confluent_apikey" ]; then
     get_remote_apikey
 fi
 if echo $confluent_mgr | grep '%' > /dev/null; then
