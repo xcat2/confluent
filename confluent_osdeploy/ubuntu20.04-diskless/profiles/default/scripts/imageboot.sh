@@ -26,7 +26,7 @@ if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
     done
     cipher=$(head -n 1 /tmp/rootimg.key)
     key=$(tail -n 1 /tmp/rootimg.key)
-    len=$(wc -c /mnt/remoteimg/rootimg.sfs | awk '{print $1}')
+    len=$(ls -l /mnt/remoteimg/rootimg.sfs | awk '{print $3}')
     len=$(((len-4096)/512))
     dmsetup create cryptimg --table "0 $len crypt $cipher $key 0 $loopdev 8"
     /opt/confluent/bin/confluent_imginfo /dev/mapper/cryptimg > /tmp/rootimg.info
@@ -48,6 +48,8 @@ modprobe zram
 memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
 memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
+modprobe xfs
+mkdir /sysroot
 mkfs.xfs /dev/zram0 > /dev/null
 mount -o discard /dev/zram0 /mnt/overlay
 if [ ! -f /tmp/mountparts.sh ]; then
@@ -81,7 +83,7 @@ if [ ! -z "$autocons" ]; then
     mkdir -p /run/systemd/generator/getty.target.wants
     ln -s /usr/lib/systemd/system/serial-getty@.service /run/systemd/generator/getty.target.wants/serial-getty@${autocons}.service
 fi
-while [ ! -e /sysroot/sbin/init ]; do
+while [ ! -e /sysroot/sbin/init ] && [ ! -h /sysroot/sbin/init ]; do
     echo "Failed to access root filesystem or it is missing /sbin/init"
     echo "System should be accessible through ssh at port 2222 with the appropriate key"
     while [ ! -e /sysroot/sbin/init ]; do
@@ -113,10 +115,11 @@ echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
 curl -sf -H "CONFLUENT_NODENAME: $confluent_nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
-chmod 640 /sysroot/etc/ssh/*_key
-chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
-cp /tls/*.pem /sysroot/etc/pki/ca-trust/source/anchors/
-chroot /sysroot/ update-ca-trust
+echo $confluent_nodename > /sysroot/etc/hostname
+chmod 600 /sysroot/etc/ssh/*_key
+mkdir -p /sysroot/usr/share/ca-certificates/confluent/
+cp /tls/*.pem /sysroot/usr/share/ca-certificates/confluent/
+chroot /sysroot/ update-ca-certificates
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
 mkdir -p /sysroot/opt/confluent/bin
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
