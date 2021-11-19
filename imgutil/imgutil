@@ -1206,7 +1206,7 @@ def gather_bootloader(outdir, rootpath='/'):
     if not grubbin:
         grubbin = os.path.join(rootpath, 'usr/lib64/efi/grub.efi')
     if not os.path.exists(grubbin):
-        grubbin = os.path.join(rootpath, 'usr/lib/grub/x86_64-efi/monolithic/grubx64.efi')
+        grubbin = os.path.join(rootpath, 'usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed')
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
 
