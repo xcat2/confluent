@@ -509,6 +509,8 @@ class SuseHandler(OsHandler):
         subprocess.check_call(cmd)
         subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
         os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
+        args.cmd = ['mkinitrd']
+        run_constrainedx(fancy_chroot, (args, self.targpath))
 
 
 class DebHandler(OsHandler):
