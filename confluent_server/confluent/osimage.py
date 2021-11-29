@@ -453,7 +453,7 @@ def check_coreos(isoinfo):
                 ver = inf.split('-')[1]
                 return {'name': 'rhcos-{0}-{1}'.format(ver, arch),
                         'method': EXTRACT, 'category': 'coreos'}
-            elif inf.startswith('coreos.liveiso=fedore-coreos-'):
+            elif inf.startswith('coreos.liveiso=fedora-coreos-'):
                 ver = inf.split('-')[2]
                 return {'name': 'fedoracoreos-{0}-{1}'.format(ver, arch),
                         'method': EXTRACT, 'category': 'coreos'}
