@@ -569,6 +569,7 @@ def import_image(filename, callback, backend=False, mfd=None):
     targpath = '/var/lib/confluent/distributions/' + targpath
     os.makedirs(targpath, 0o755)
     filename = os.path.abspath(filename)
+    identity['importedfile'] = filename
     os.chdir(targpath)
     if not backend:
         print('Importing OS to ' + targpath + ':')
