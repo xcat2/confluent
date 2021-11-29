@@ -99,7 +99,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                 yield msg.ListAttributes(
                     kv={attribute: currattr},
                     desc=desc)
-            else:
+            elif currattr:
                 print(attribute)
                 print(repr(currattr))
                 raise Exception("BUGGY ATTRIBUTE FOR NODEGROUP")
@@ -148,7 +148,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata):
                 elif isinstance(currattr, list):
                     yield msg.ListAttributes(
                         node, {attribute: currattr}, desc)
-                else:
+                elif currattr:
                     print(attribute)
                     print(repr(currattr))
                     raise Exception("BUGGY ATTRIBUTE FOR NODE")
