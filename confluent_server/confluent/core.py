@@ -948,14 +948,18 @@ def handle_node_request(configmanager, inputdata, operation,
     del pathcomponents[0:2]
     passvalues = queue.Queue()
     plugroute = routespec.routeinfo
-    msginputdata = msg.get_input_message(
-        pathcomponents, operation, inputdata, nodes, isnoderange,
-        configmanager)
+    _plugin = None
+
     if 'handler' in plugroute:  # fixed handler definition, easy enough
         if isinstance(plugroute['handler'], str):
             hfunc = getattr(pluginmap[plugroute['handler']], operation)
+            _plugin = pluginmap[plugroute['handler']]
         else:
             hfunc = getattr(plugroute['handler'], operation)
+            _plugin = plugroute['handler']
+        msginputdata = _get_input_data(_plugin, pathcomponents, operation,
+                                       inputdata, nodes, isnoderange,
+                                       configmanager)
         passvalue = hfunc(
             nodes=nodes, element=pathcomponents,
             configmanager=configmanager,
@@ -995,6 +999,7 @@ def handle_node_request(configmanager, inputdata, operation,
                     continue
             if plugpath:
                 try:
+                    _plugin = pluginmap[plugpath]
                     hfunc = getattr(pluginmap[plugpath], operation)
                 except KeyError:
                     nodesbyhandler[BadPlugin(node, plugpath).error] = [node]
@@ -1012,7 +1017,9 @@ def handle_node_request(configmanager, inputdata, operation,
             workers.spawn(addtoqueue, passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
                                            'element': pathcomponents,
                 'configmanager': configmanager,
-                'inputdata': msginputdata})
+                'inputdata': _get_input_data(_plugin, pathcomponents,
+                                             operation, inputdata,nodes,
+                                             isnoderange, configmanager)})
         for manager in nodesbymanager:
             numworkers += 1
             workers.spawn(addtoqueue, passvalues, dispatch_request, {
@@ -1031,6 +1038,17 @@ def handle_node_request(configmanager, inputdata, operation,
         #     return passvalues[0]
         # else:
         #     return stripnode(passvalues[0], nodes[0])
+
+
+def _get_input_data(plugin_ext, pathcomponents, operation, inputdata,
+                   nodes, isnoderange, configmanager):
+    if plugin_ext is not None and hasattr(plugin_ext, 'get_input_message'):
+        return plugin_ext.get_input_message(pathcomponents, operation,
+                                            inputdata, nodes, isnoderange,
+                                            configmanager)
+    else:
+        return msg.get_input_message(pathcomponents, operation, inputdata,
+                                     nodes, isnoderange,configmanager)
 
 
 def iterate_queue(numworkers, passvalues, strip=False):
