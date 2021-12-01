@@ -32,7 +32,7 @@ if path.startswith('/opt'):
 import confluent.client as client
 
 argparser = optparse.OptionParser(
-    usage='Usage: %prog [options] noderange [default|cd|network|setup|hd|usb|floppy]')
+    usage='Usage: %prog [options] <noderange> [default|cd|network|setup|hd|usb|floppy]')
 argparser.add_option('-b', '--bios', dest='biosmode',
                      action='store_true', default=False,
                      help='Request BIOS style boot (rather than UEFI)')
