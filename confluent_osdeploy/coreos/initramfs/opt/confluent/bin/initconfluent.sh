@@ -92,6 +92,9 @@ if [ -e /lib/nm-lib.sh ]; then
     . /lib/nm-lib.sh
     nm_generate_connections
     sed -i 's/method=disabled/method=link-local/' /run/NetworkManager/system-connections/*.nmconnection
+    if [ -f /run/NetworkManager/system-connections/$ifname.nmconnection ]; then
+        rm /run/NetworkManager/system-connections/default_connection.nmconnection
+    fi
     if [[ "$ifname" == ib* ]]; then
         sed -i s/type=ethernet/type=infiniband/ /run/NetworkManager/system-connections/$ifname.nmconnection
         if ! grep '\[infiniband\]' /run/NetworkManager/system-connections/$ifname.nmconnection > /dev/null; then
