@@ -14,7 +14,7 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
 done
 cd /
-grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
+grep ^EXTMGRINFO: /etc/confluent/confluent.info > /dev/null || return 0  # Do absolutely nothing if no data at all yet
 echo -n "" > /tmp/confluent.initq
 # restart cmdline
 echo -n "" > /etc/cmdline.d/01-confluent.conf
@@ -101,8 +101,8 @@ if [ -e /lib/nm-lib.sh ]; then
         fi
     fi
 fi
-cat /proc/cmdline /etc/cmdline.d/01-confluent.conf | tr '\n' ' ' > /run/fakecmdline
-chcon system_u:object_r:proc_t:s0 /run/fakecmdline
-mount -o bind /run/fakecmdline /proc/cmdline
+#cat /proc/cmdline /etc/cmdline.d/01-confluent.conf | tr '\n' ' ' > /run/fakecmdline
+#chcon system_u:object_r:proc_t:s0 /run/fakecmdline
+#mount -o bind /run/fakecmdline /proc/cmdline
 
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/rootfs.img | rdcore stream-hash /etc/coreos-live-want-rootfs | bsdtar -xf - -C /
