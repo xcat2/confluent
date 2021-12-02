@@ -71,31 +71,29 @@ def get_certificate_paths():
 
 def assure_tls_ca():
     keyout, certout = ('/etc/confluent/tls/cakey.pem', '/etc/confluent/tls/cacert.pem')
-    if os.path.exists(certout):
-        return
-    try:
-        os.makedirs('/etc/confluent/tls')
-    except OSError as e:
-        if e.errno != 17:
-            raise
-    sslcfg = get_openssl_conf_location()
-    tmpconfig = tempfile.mktemp()
-    shutil.copy2(sslcfg, tmpconfig)
-    subprocess.check_call(
-        ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
-         keyout])
-    try:
-        with open(tmpconfig, 'a') as cfgfile:
-            cfgfile.write('\n[CACert]\nbasicConstraints = CA:true\n')
-        subprocess.check_call([
-            'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
-            '27300', '-out', certout, '-subj',
-            '/CN=Confluent TLS Certificate authority ({0})'.format(socket.gethostname()),
-            '-extensions', 'CACert', '-config', tmpconfig
-        ])
-    finally:
-        os.remove(tmpconfig)
-    # Could restart the webserver now?
+    if not os.path.exists(certout):
+        try:
+            os.makedirs('/etc/confluent/tls')
+        except OSError as e:
+            if e.errno != 17:
+                raise
+        sslcfg = get_openssl_conf_location()
+        tmpconfig = tempfile.mktemp()
+        shutil.copy2(sslcfg, tmpconfig)
+        subprocess.check_call(
+            ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
+            keyout])
+        try:
+            with open(tmpconfig, 'a') as cfgfile:
+                cfgfile.write('\n[CACert]\nbasicConstraints = CA:true\n')
+            subprocess.check_call([
+                'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
+                '27300', '-out', certout, '-subj',
+                '/CN=Confluent TLS Certificate authority ({0})'.format(socket.gethostname()),
+                '-extensions', 'CACert', '-config', tmpconfig
+            ])
+        finally:
+            os.remove(tmpconfig)
     fname = '/var/lib/confluent/public/site/tls/{0}.pem'.format(
         collective.get_myname())
     try:
