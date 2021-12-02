@@ -21,6 +21,10 @@ import signal
 import sys
 
 try:
+    input = raw_input
+except NameError:
+    pass
+try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 except AttributeError:
     pass
@@ -195,6 +199,8 @@ def main():
                          help='Comma separated list of disks to use, or the '
                               'word "rest" to indicate use of all available '
                               'disks')
+    argparser.add_option('-i', '--interactive', default=False, action='store_true',
+                         help='Confirm any potentially destructive changes interactively')
     argparser.add_option('-s', '--size', type='str',
                          help='Comma separated list of sizes to use when '
                               'creating volumes.  The sizes may be absolute '
@@ -230,6 +236,13 @@ def main():
     except KeyError:
         argparser.print_help()
         sys.exit(1)
+    if options.interactive and operation != 'show':
+        showstorage(noderange, None, None)
+        sys.stdout.write('The above configuration will be changed by this action, do you wish to continue (y/N): ')
+        confirm = input()
+        if confirm and confirm.lower()[0] != 'y':
+            sys.stdout.write('Aborting\n')
+            sys.exit(1)
     handler(noderange, options, args[2:])
 
 
