@@ -94,7 +94,7 @@ node = {
                         'considered a member'),
     },
     'type': {
-        'description': ('Classification of node as server or switch'),
+        'description': ('Classification of node as server or switch.  By default a node is presumed to be a server.'),
         'validvalues': ('switch', 'server'),
     },
     'crypted.rootpassword': {
@@ -346,14 +346,15 @@ node = {
 #    },
     'console.logging': {
         'description': ('Indicate logging level to apply to console.  Valid '
-                        'values are currently "full", "interactive", and '
+                        'values are currently "full", "interactive", "memory", and '
                         '"none". Defaults to "full".'),
         'validvalues': ('full', 'memory', 'interactive', 'none'),
     },
     'console.method': {
         'description': ('Indicate the method used to access the console of '
                         'the managed node.  If not specified, then console '
-                        'is disabled'),
+                        'is disabled.  "ipmi" should be specified for most '
+                        'systems if console is desired.'),
         'validvalues': ('ssh', 'ipmi', 'tsmsol'),
     },
 #    'virtualization.host': {
@@ -576,11 +577,11 @@ node = {
     },
     'secret.hardwaremanagementuser': {
         'description': ('The username to use when connecting to the hardware '
-                        'manager'),
+                        'manager. Aliases for this attribute include bmcuser and switchuser'),
     },
     'secret.hardwaremanagementpassword': {
         'description': ('Password to use when connecting to the hardware '
-                        'manager'),
+                        'manager.  Aliases for this attribute include bmcpass and switchpass'),
     },
     'ssh.trustnodes': {
         'description': ('Nodes that are allowed to ssh into the node, '
