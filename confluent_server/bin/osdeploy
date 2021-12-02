@@ -278,14 +278,19 @@ def initialize(cmdset):
     topack = []
     opath = os.getcwd()
     os.chdir('/var/lib/confluent/public/site')
-    topack.append('ssh/')
-    for currd, _, files in os.walk('ssh'):
-        for fname in files:
-            topack.append(os.path.join(currd, fname))
-    topack.append('tls/')
-    for currd, _, files in os.walk('tls'):
-        for fname in files:
-            topack.append(os.path.join(currd, fname))
+    totar = []
+    if os.path.exists('ssh'):
+        totar.append('ssh')
+        topack.append('ssh/')
+        for currd, _, files in os.walk('ssh'):
+            for fname in files:
+                topack.append(os.path.join(currd, fname))
+    if os.path.exists('tls'):
+        totar.append('tls')
+        topack.append('tls/')
+        for currd, _, files in os.walk('tls'):
+            for fname in files:
+                topack.append(os.path.join(currd, fname))
     with open(tmpname, 'wb') as initramfs:
         packit = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
                                   stdout=initramfs, stdin=subprocess.PIPE)
@@ -302,11 +307,12 @@ def initialize(cmdset):
     os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
     if cmdset.g:
         updateboot('genesis-x86_64')
-    tmptarname = tmpname.replace('cpio', 'tgz')
-    tarcmd = ['tar', '-czf', tmptarname, 'ssh', 'tls']
-    subprocess.check_call(tarcmd)
+    if totar:
+        tmptarname = tmpname.replace('cpio', 'tgz')
+        tarcmd = ['tar', '-czf', tmptarname] + totar
+        subprocess.check_call(tarcmd)
+        os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
     os.chdir(opath)
-    os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
     print('Site initramfs content packed successfully')
 
     if not os.path.exists('/etc/confluent/srvcert.pem'):
