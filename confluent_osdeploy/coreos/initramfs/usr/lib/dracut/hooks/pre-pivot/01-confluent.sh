@@ -59,7 +59,7 @@ ln -s /etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd
 ln -s /etc/systemd/system/confluent-onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/
 
 
-cat > /sysroot/opt/confluennt/bin/onboot.sh << 'EOF'
+cat > /sysroot/opt/confluent/bin/onboot.sh << 'EOF'
 #!/bin/sh
 nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
 confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info| head -n 1| awk '{print $2}' | sed -e s/%/%25/)
