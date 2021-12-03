@@ -61,9 +61,9 @@ ln -s /etc/systemd/system/confluent-onboot.service /sysroot/etc/systemd/system/m
 
 cat > /sysroot/opt/confluent/bin/onboot.sh << 'EOF'
 #!/bin/sh
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
 confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info| head -n 1| awk '{print $2}' | sed -e s/%/%25/)
-confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [[ $confluent_mgr = *:* ]]; then
     confluent_mgr=[$confluent_mgr]
 fi
@@ -89,3 +89,5 @@ After=network-online.target
 EOF
 chcon -h system_u:object_r:systemd_unit_file_t:s0 /sysroot/etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd.service.wants/confluent-ssh.service /sysroot/etc/systemd/system/confluent-onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/confluent-onboot.service
 
+cp -a /opt/confluent/bin/* /sysroot/opt/confluent/bin/
+chcon system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/*
