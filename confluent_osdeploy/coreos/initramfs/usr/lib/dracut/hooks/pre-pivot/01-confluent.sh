@@ -86,5 +86,5 @@ After=sshd.service
 Requires=network-online.target
 After=network-online.target
 EOF
-chcon -h system_u:object_r:systemd_unit_file_t:s0 /sysroot/etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd.service.wants/confluent-ssh.service /sysroot/etc/systemd/system/confluent-onboot.service
+chcon -h system_u:object_r:systemd_unit_file_t:s0 /sysroot/etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd.service.wants/confluent-ssh.service /sysroot/etc/systemd/system/confluent-onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/confluent-onboot.service
 
