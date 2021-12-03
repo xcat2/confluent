@@ -53,6 +53,9 @@ if [ $needseal == 1 ]; then
     fi
 fi
 curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/profileprivate/pending/config.ign > /config.ign
+[ -s /config.ign ] || rm /config.ign
+
 umask $oldumask
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
