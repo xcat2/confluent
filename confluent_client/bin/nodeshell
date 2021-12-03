@@ -44,6 +44,8 @@ def run():
                "'ipmitool -H {hardwaremanagement.manager}' will be expanded.")
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of commands to run at a time')
+    argparser.add_option('-l', '--loginname', type='str',
+                         help='Username to use when connecting, defaults to current user.')
     argparser.add_option('-n', '--nonodeprefix', action='store_true',
                          help='Do not prefix output with node names')
     argparser.add_option('-p', '--port', type='int', default=0,
@@ -97,10 +99,12 @@ def run():
             sshnode = nodemap.get(node, node)
             if not isinstance(cmd, str) and not isinstance(cmd, bytes):
                 cmd = cmd.encode('utf-8')
+            cmdv = ['ssh']
             if options.port:
-                cmdv = ['ssh', '-p', '{0}'.format(options.port), sshnode, cmd]
-            else:
-                cmdv = ['ssh', sshnode, cmd]
+                cmdv += ['-p', '{0}'.format(options.port)]
+            if options.loginname:
+                cmdv += ['-l', options.loginname]
+            cmdv += [sshnode, cmd]
             if currprocs < concurrentprocs:
                 currprocs += 1
                 run_cmdv(node, cmdv, all, pipedesc)
