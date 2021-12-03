@@ -46,6 +46,9 @@ PartOf=sshd.service
 Before=sshd.service
 After=sshd-keygen.target
 Wants=sshd-keygen.target
+Requires=network-online.target
+After=network-online.target
+
 
 [Install]
 WantedBy=sshd.service
