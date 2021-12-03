@@ -56,4 +56,35 @@ EOF
 
 mkdir -p /sysroot/etc/systemd/system/sshd.service.wants
 ln -s /etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd.service.wants/
-chcon -h system_u:object_r:systemd_unit_file_t:s0 /sysroot/etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd.service.wants/confluent-ssh.service
+ln -s /etc/systemd/system/confluent-onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/
+
+
+cat > /sysroot/opt/confluennt/bin/onboot.sh << 'EOF'
+#!/bin/sh
+nodename=$(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
+confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info| head -n 1| awk '{print $2}' | sed -e s/%/%25/)
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+if [[ $confluent_mgr = *:* ]]; then
+    confluent_mgr=[$confluent_mgr]
+fi
+
+curl -sf https://$confluent_mgr/confluent-public/os/${confluent_profile}/scripts/onboot.sh > /tmp/onboot.sh
+[ -s /tmp/onboot.sh ] && . /tmp/onboot.sh
+EOF
+chmod 755 /sysroot/opt/confluent/bin/onboot.sh
+chcon system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot.sh
+
+
+cat > /sysroot/etc/systemd/system/confluent-onboot.service << EOF
+[Service]
+Type=oneshot
+ExecStart=/opt/confluent/bin/onboot.sh
+
+[Unit]
+Requires=sshd.service
+After=sshd.service
+Requires=network-online.target
+After=network-online.target
+EOF
+chcon -h system_u:object_r:systemd_unit_file_t:s0 /sysroot/etc/systemd/system/confluent-ssh.service /sysroot/etc/systemd/system/sshd.service.wants/confluent-ssh.service /sysroot/etc/systemd/system/confluent-onboot.service
+
