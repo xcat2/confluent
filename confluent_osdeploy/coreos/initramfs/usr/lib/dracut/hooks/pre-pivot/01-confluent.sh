@@ -70,6 +70,7 @@ fi
 
 curl -sf https://$confluent_mgr/confluent-public/os/${confluent_profile}/scripts/onboot.sh > /tmp/onboot.sh
 [ -s /tmp/onboot.sh ] && . /tmp/onboot.sh
+exit 0
 EOF
 chmod 755 /sysroot/opt/confluent/bin/onboot.sh
 chcon system_u:object_r:bin_t:s0 /sysroot/opt/confluent/bin/onboot.sh
