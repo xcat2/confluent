@@ -5,7 +5,9 @@ DefaultDependencies=false
 After=basic.target
 # Network is enabled here
 After=dracut-initqueue.service
+Before=ignition-setup-user.service
 Before=coreos-livepxe-rootfs.service
+
 
 
 # If we fail, the boot will fail.  Be explicit about it.
