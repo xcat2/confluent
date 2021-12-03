@@ -9,7 +9,7 @@ get_remote_apikey() {
         if [ -z "$confluent_apikey" ]; then
             echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$nodename', retrying..."
             sleep 10
-        elif [ -c /dev/tpm0 ]; then
+        elif [ -c /dev/tpmrm0 ]; then
             tmpdir=$(mktemp -d)
             cd $tmpdir
             tpm2_startauthsession --session=session.ctx
@@ -72,7 +72,7 @@ umask 0077
 tpmdir=$(mktemp -d)
 cd $tpmdir
 lasthdl=""
-if [ -c /dev/tpm0 ]; then
+if [ -c /dev/tpmrm0 ]; then
     for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
         tpm2_startauthsession --policy-session --session=session.ctx
         tpm2_policypcr -Q --session=session.ctx --pcr-list="sha256:15" --policy=pcr15.sha256.policy
@@ -134,7 +134,7 @@ while [ $ready = "0" ]; do
     fi
     rm $tmperr
 done
-if [ -c /dev/tpm0 ]; then
+if [ -c /dev/tpmrm0 ]; then
     tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 fi
 umask $oldumask
