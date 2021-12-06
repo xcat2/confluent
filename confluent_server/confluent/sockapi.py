@@ -34,6 +34,7 @@ import traceback
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
+import eventlet.support.greendns as greendns
 import eventlet
 
 import confluent.auth as auth
@@ -495,7 +496,21 @@ class SockApi(object):
             self.start_remoteapi()
         else:
             eventlet.spawn_n(self.watch_for_cert)
+        eventlet.spawn_n(self.watch_resolv)
         self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
+
+    def watch_resolv(self):
+        while True:
+            watcher = libc.inotify_init1(os.O_NONBLOCK)
+            if libc.inotify_add_watch(watcher, b'/etc/resolv.conf', 0xcda) <= -1:
+                break
+            select.select((watcher,), (), (), 86400)
+            try:
+                os.read(watcher, 1024)
+            except Exception:
+                pass
+            greendns.resolver = greendns.ResolverProxy(hosts_resolver=greendns.HostsResolver())
+            os.close(watcher)
 
     def watch_for_cert(self):
         watcher = libc.inotify_init1(os.O_NONBLOCK)
