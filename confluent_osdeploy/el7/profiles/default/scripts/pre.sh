@@ -13,6 +13,7 @@ if [ -f "/run/install/cmdline.d/01-autocons.conf" ]; then
 fi
 exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
+chmod 600 /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')

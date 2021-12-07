@@ -2,6 +2,7 @@
 mkdir -p /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
 exec 2>> /var/log/confluent/confluent-post.log
+chmod 600 /var/log/confluent/confluent-post.log
 tail -f /var/log/confluent/confluent-post.log > /dev/tty &
 logshowpid=$!
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')

@@ -12,6 +12,7 @@ export nodename confluent_mgr confluent_profile
 mkdir -p /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
 exec 2>> /var/log/confluent/confluent-post.log
+chmod 600 /var/log/confluent/confluent-post.log
 tail -f /var/log/confluent/confluent-post.log > /dev/console &
 logshowpid=$!
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.service > /etc/systemd/system/firstboot.service

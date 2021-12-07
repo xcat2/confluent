@@ -3,6 +3,7 @@
 # This script runs at the end of the final boot, updating status
 exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
+chmod 600 /var/log/confluent/confluent-firstboot.log
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 v6cfg=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg)

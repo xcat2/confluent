@@ -5,6 +5,7 @@
 
 exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
+chmod 600 /tmp/confluent-pre.log
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 rootpw=$(grep rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 if [ "$rootpw" = "null" ]; then

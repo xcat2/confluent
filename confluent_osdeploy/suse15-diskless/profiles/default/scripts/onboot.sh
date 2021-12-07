@@ -14,6 +14,7 @@ export nodename confluent_mgr confluent_profile
 mkdir -p /var/log/confluent
 exec >> /var/log/confluent/confluent-onboot.log
 exec 2>> /var/log/confluent/confluent-onboot.log
+chmod 600 /var/log/confluent/confluent-onboot.log
 tail -f /var/log/confluent/confluent-onboot.log > /dev/console &
 logshowpid=$!
 

@@ -24,6 +24,7 @@ function confluentpython() {
 }
 exec >> /tmp/confluent-pre.log
 exec 2>> /tmp/confluent-pre.log
+chmod 600 /tmp/confluent-pre.log
 tail -f /tmp/confluent-pre.log > /dev/tty &
 logshowpid=$!
 confluentpython /etc/confluent/apiclient >& /dev/null

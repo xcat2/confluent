@@ -16,6 +16,7 @@ while ! ping -c 1 $confluent_mgr >& /dev/null; do
 done
 exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
+chmod 600 /var/log/confluent/confluent-firstboot.log
 tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
 logshowpid=$!
 
