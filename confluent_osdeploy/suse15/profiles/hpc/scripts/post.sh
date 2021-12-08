@@ -9,6 +9,7 @@
 # If there are dependencies on the kernel (drivers or special filesystems)
 # then firstboot.sh would be the script to customize.
 
+chmod 700 /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
 exec 2>> /var/log/confluent/confluent-post.log
 chmod 600 /var/log/confluent/confluent-post.log

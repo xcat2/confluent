@@ -12,6 +12,7 @@ confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{prin
 export nodename confluent_mgr confluent_profile
 . /etc/confluent/functions
 mkdir -p /var/log/confluent
+chmod 700 /var/log/confluent
 exec >> /var/log/confluent/confluent-onboot.log
 exec 2>> /var/log/confluent/confluent-onboot.log
 chmod 600 /var/log/confluent/confluent-onboot.log

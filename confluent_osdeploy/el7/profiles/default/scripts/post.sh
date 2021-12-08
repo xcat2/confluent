@@ -1,5 +1,6 @@
 #!/bin/sh
 mkdir -p /var/log/confluent
+chmod 700 /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
 exec 2>> /var/log/confluent/confluent-post.log
 chmod 600 /var/log/confluent/confluent-post.log
