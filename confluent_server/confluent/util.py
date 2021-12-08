@@ -26,6 +26,17 @@ import re
 import socket
 import ssl
 import struct
+import subprocess
+
+
+def run(cmd):
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        stdout, stderr = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
+    return stdout, stderr
+
 
 def stringify(instr):
     # Normalize unicode and bytes to 'str', correcting for

@@ -19,7 +19,7 @@ import os
 import shutil
 import tempfile
 import confluent.sshutil as sshutil
-import eventlet.green.subprocess as subprocess
+import confluent.util as util
 import confluent.noderange as noderange
 import eventlet
 import pwd
@@ -168,12 +168,8 @@ def sync_list_to_node(sl, node, suffixes):
                 stage_ent(sl.appendoncemap, ent,
                           os.path.join(targdir, suffixes['appendonce']), True)
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
-        try:
-            output = subprocess.check_output(
-                ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(node)], timeout=86400)
-        except TypeError:
-            output = subprocess.check_output(
-                ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(node)])
+        output = util.run(
+            ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(node)])[0]
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
             # https://github.com/eventlet/eventlet/issues/413

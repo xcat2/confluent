@@ -3,6 +3,7 @@
 import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
+import confluent.util as util
 import eventlet.green.subprocess as subprocess
 import eventlet
 import glob
@@ -43,10 +44,7 @@ def assure_agent():
     if agent_pid is None:
         try:
             agent_starting = True
-            try:
-                sai = subprocess.check_output(['ssh-agent'], timeout=86400)
-            except TypeError:
-                sai = subprocess.check_output(['ssh-agent'])
+            sai = util.run(['ssh-agent'])[0]
             for line in sai.split(b'\n'):
                 if b';' not in line:
                     continue
