@@ -26,7 +26,7 @@ import re
 import socket
 import ssl
 import struct
-import subprocess
+import eventlet.green.subprocess as subprocess
 
 
 def run(cmd):
