@@ -6,21 +6,29 @@ mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
 cd /sys/class/net
-while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
-    TRIES=$((TRIES + 1))
-    for currif in *; do
-        ip link set $currif up
+echo "Searching for confluent deployment server...." > /dev/console
+while ! grep ^NODE /etc/confluent/confluent.info; do
+    while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+        TRIES=$((TRIES + 1))
+        for currif in *; do
+            ip link set $currif up
+        done
+        /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
     done
-    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+    if ! grep ^NODE /etc/confluent/confluent.info; then
+        echo 'Current net config:' > /dev/console
+        ip -br a > /dev/console
+    fi
 done
+echo "Found confluent deployment services on local network" > /dev/console
 cd /
-grep ^EXTMGRINFO: /etc/confluent/confluent.info > /dev/null || return 0  # Do absolutely nothing if no data at all yet
 echo -n "" > /tmp/confluent.initq
 # restart cmdline
 echo -n "" > /etc/cmdline.d/01-confluent.conf
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 cat /tls/*.pem > /etc/confluent/ca.pem
 confluent_mgr=$(grep ^MANAGER: /etc/confluent/confluent.info|head -n 1 | awk '{print $2}')
+echo "Connecting to confluent server: $confluent_mgr" > /dev/console
 if [[ $confluent_mgr == *%* ]]; then
     echo $confluent_mgr | awk -F% '{print $2}' > /tmp/confluent.ifidx
     ifidx=$(cat /tmp/confluent.ifidx)
@@ -33,13 +41,13 @@ umask 0077
 while [ -z "$confluent_apikey" ]; do
     /opt/confluent/bin/clortho $nodename $confluent_mgr > /etc/confluent/confluent.apikey
     if grep ^SEALED: /etc/confluent/confluent.apikey > /dev/null; then
-	needseal=0
+        needseal=0
         sed -e s/^SEALED:// /etc/confluent/confluent.apikey | clevis-decrypt-tpm2 > /etc/confluent/confluent.apikey.decrypt
         mv /etc/confluent/confluent.apikey.decrypt /etc/confluent/confluent.apikey
     fi
     confluent_apikey=$(cat /etc/confluent/confluent.apikey)
     if [ -z "$confluent_apikey" ]; then
-        echo "Unable to acquire node api key, no TPM2 sealed nor fresh token available, retrying..."
+        echo "Unable to acquire node api key, no TPM2 sealed nor fresh token available, retrying..." > /dev/console
         sleep 10
     fi
 done
@@ -95,7 +103,7 @@ if [ -e /lib/nm-lib.sh ]; then
     . /lib/nm-lib.sh
     nm_generate_connections
     sed -i 's/method=disabled/method=link-local/' /run/NetworkManager/system-connections/*.nmconnection
-    if [ -f /run/NetworkManager/system-connections/$ifname.nmconnection ]; then
+   if [ -f /run/NetworkManager/system-connections/$ifname.nmconnection ]; then
         rm /run/NetworkManager/system-connections/default_connection.nmconnection
     fi
     if [[ "$ifname" == ib* ]]; then
