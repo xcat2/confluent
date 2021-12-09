@@ -16,7 +16,7 @@ def get_openssl_conf_location():
         raise Exception("Cannot find openssl config file")
 
 def get_ip_addresses():
-    lines = util.run(['ip', 'addr'])
+    lines, _ = util.run(['ip', 'addr'])
     if not isinstance(lines, str):
         lines = lines.decode('utf8')
     for line in lines.split('\n'):
@@ -82,12 +82,14 @@ def assure_tls_ca():
             ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
             keyout])
         try:
+            subj = '/CN=Confluent TLS Certificate authority ({0})'.format(socket.gethostname())
+            if len(subj) > 68:
+                subj = subj[:68]
             with open(tmpconfig, 'a') as cfgfile:
                 cfgfile.write('\n[CACert]\nbasicConstraints = CA:true\n')
             subprocess.check_call([
                 'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
-                '27300', '-out', certout, '-subj',
-                '/CN=Confluent TLS Certificate authority ({0})'.format(socket.gethostname()),
+                '27300', '-out', certout, '-subj', subj,
                 '-extensions', 'CACert', '-config', tmpconfig
             ])
         finally:
@@ -100,7 +102,7 @@ def assure_tls_ca():
         if e.errno != 17:
             raise
     shutil.copy2('/etc/confluent/tls/cacert.pem', fname)
-    hv = util.run(
+    hv, _ = util.run(
         ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'])
     if not isinstance(hv, str):
         hv = hv.decode('utf8')
