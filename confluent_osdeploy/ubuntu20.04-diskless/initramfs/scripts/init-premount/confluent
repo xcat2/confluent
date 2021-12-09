@@ -96,6 +96,7 @@ if echo $confluent_mgr | grep '%' > /dev/null; then
     ifname=${ifname%:}
 fi
 curl --cacert /etc/confluent/ca.pem  -sSf -H "CONFLUENT_NODENAME: $confluent_nodename"  -H "CONFLUENT_APIKEY: $confluent_apikey" https://${confluent_http_mgr}/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+if [ ! -z "$autocons" ] && grep textconsole: true /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 v6meth=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 if [ "$v6meth" = static ]; then
     v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')

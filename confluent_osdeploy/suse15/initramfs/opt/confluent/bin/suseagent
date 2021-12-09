@@ -52,6 +52,7 @@ if [ -z "$mgtiface" ]; then
 else
     curl -H "CONFLUENT_MGTIFACE: $mgtiface" -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 fi
+if [ ! -z "$autocons" ] && grep textconsole: true /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 profilename=$(grep ^profile: /etc/confluent/confluent.deploycfg)
 profilename=${profilename#profile: }
 curl https://$mgr/confluent-public/os/$profilename/profile.yaml > /tmp/profile.yaml

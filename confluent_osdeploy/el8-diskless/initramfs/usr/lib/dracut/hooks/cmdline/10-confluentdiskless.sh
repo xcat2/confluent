@@ -134,6 +134,7 @@ while [ $ready = "0" ]; do
     fi
     rm $tmperr
 done
+if [ ! -z "$autocons" ] && grep textconsole: true /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 if [ -c /dev/tpmrm0 ]; then
     tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 fi
