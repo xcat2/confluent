@@ -185,6 +185,8 @@ class ConfluentMessage(object):
             if (isinstance(val, bool) or isinstance(val, bytes) or
                     isinstance(val, unicode)):
                 value = str(val)
+            elif isinstance(val, int):
+                value = '{0}'.format(int)
             elif val is not None and 'value' in val:
                 value = val['value']
                 if 'inheritedfrom' in val:
