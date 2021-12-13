@@ -658,6 +658,8 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
                 yout.write(profdata)
         for initrd in os.listdir('{0}/initramfs'.format(defprofile)):
             fullpath = '{0}/initramfs/{1}'.format(defprofile, initrd)
+            if os.path.isdir(fullpath):
+                continue
             os.symlink(fullpath,
                        '{0}/boot/initramfs/{1}'.format(dirname, initrd))
         os.symlink(
