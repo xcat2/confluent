@@ -114,7 +114,31 @@ def initialize_genesis():
         os._exit(retcode)
 
 
+mynamedone = False
+def init_confluent_myname():
+    global mynamedone
+    if mynamedone:
+        return
+    mynamedone = True
+    hasconfluentuser = None
+    try:
+        hasconfluentuser = pwd.getpwnam('confluent')
+    except KeyError:
+        pass
+    if hasconfluentuser:
+        print("Ok")
+        pid = os.fork()
+        if pid:
+            os.waitpid(pid, 0)
+        else:
+            os.setgid(hasconfluentuser.pw_gid)
+            os.setuid(hasconfluentuser.pw_uid)
+            collective.get_myname()
+            os._exit(0)
+
+
 def local_node_trust_setup():
+    init_confluent_myname()
     allnodes, domain = selfservice.get_cluster_list()
     myname = collective.get_myname()
     myprincipals = set([myname])
@@ -232,9 +256,11 @@ def initialize(cmdset):
                             'used. ssh-agent may be used to make use of a '
                             'passphrase protected ssh key easier.\n')
             sys.exit(1)
+        init_confluent_myname()
         sshutil.initialize_root_key(False)
     if cmdset.t:
         didsomething = True
+        init_confluent_myname()
         certutil.create_certificate()
         if os.path.exists('/usr/lib/systemd/system/httpd.service'):
             subprocess.check_call(['systemctl', 'try-restart', 'httpd'])
@@ -246,9 +272,11 @@ def initialize(cmdset):
             emprint('New HTTPS certificates generated, restart the web server manually')
     if cmdset.s:
         didsomething = True
+        init_confluent_myname()
         sshutil.initialize_ca()
     if cmdset.a:
         didsomething = True
+        init_confluent_myname()
         sshutil.initialize_root_key(True, True)
     if cmdset.p:
         install_tftp_content()
