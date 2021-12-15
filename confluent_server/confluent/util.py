@@ -34,7 +34,7 @@ def run(cmd):
     stdout, stderr = process.communicate()
     retcode = process.poll()
     if retcode:
-        raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
+        raise subprocess.CalledProcessError(retcode, process.args, output=stdout)
     return stdout, stderr
 
 
