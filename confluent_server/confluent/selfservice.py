@@ -235,7 +235,10 @@ def handle_request(env, start_response):
                         if ckeymap == 'n/a':
                             continue
                         keymap = ckeymap
-            tdc = util.run(['timedatectl'])[0].split(b'\n')
+            try:
+                tdc = util.run(['timedatectl'])[0].split(b'\n')
+            except subprocess.CalledProcessError:
+                tdc = []
             for ent in tdc:
                 ent = ent.strip()
                 if ent.startswith(b'Time zone:'):
