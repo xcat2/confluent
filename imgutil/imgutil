@@ -1104,6 +1104,9 @@ def pack_image(args):
         raise Exception('Full path not supported, supply only the profile name')
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
     outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
+    if os.path.exists(outdir):
+        sys.stderr.write('Profile already exists, select a different name or delete existing {0}\n'.format(outdir))
+        sys.exit(1)
     imginfofile = os.path.join(args.scratchdir, 'etc/confluentimg.buildinfo')
     distpath = None
     try:
