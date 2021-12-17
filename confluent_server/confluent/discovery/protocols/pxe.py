@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2017 Lenovo
+# Copyright 2017-2021 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -664,9 +664,13 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         clipn = socket.inet_aton(niccfg['ipv4_address'])
         repview[16:20] = clipn
         gateway = niccfg['ipv4_gateway']
+        netmask = niccfg['prefix']
         if gateway:
             gateway = socket.inet_aton(gateway)
-        netmask = niccfg['prefix']
+            if not netutil.ipn_on_same_subnet(socket.AF_INET, clipn, gateway, netmask):
+                log.log(
+                    {'warning': 'Ignoring gateway {0} due to mismatch with address {1}/{2}'.format(niccfg['ipv4_gateway'], niccfg['ipv4_address'], netmask)})
+                gateway = None
         netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
         netmask = struct.pack('!I', netmask)
     myipn = niccfg['deploy_server']
