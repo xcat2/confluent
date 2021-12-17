@@ -205,6 +205,7 @@ def uuid_is_valid(uuid):
     return uuid.lower() not in ('00000000-0000-0000-0000-000000000000',
                                 'ffffffff-ffff-ffff-ffff-ffffffffffff',
                                 '00112233-4455-6677-8899-aabbccddeeff',
+                                '03000200-0400-0500-0006-000700080009',
                                 '20202020-2020-2020-2020-202020202020')
 
 def _printable_ip(sa):
