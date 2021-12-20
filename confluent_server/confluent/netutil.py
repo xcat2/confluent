@@ -563,6 +563,8 @@ def get_my_addresses(idx=0, family=0, matchlla=None):
                         rta = v[nlhdrsz+ifaddrsz:length]
                         while len(rta):
                             rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                            if rtalen < 4:
+                                break
                             if rta[4:rtalen].tobytes() == matchlla:
                                 return get_my_addresses(idx=ridx)
                             rta = rta[rtalen:]
@@ -570,10 +572,10 @@ def get_my_addresses(idx=0, family=0, matchlla=None):
                     rta = v[nlhdrsz+ifaddrsz:length]
                     while len(rta):
                         rtalen, rtatyp = struct.unpack('HH', rta[:4])
+                        if rtalen < 4:
+                            break
                         if rtatyp == 1:
                             addrs.append((fam, rta[4:rtalen].tobytes(), plen, ridx))
-                        if not rtalen:
-                            break
                         rta = rta[rtalen:]
             v = v[length:]
     return addrs
