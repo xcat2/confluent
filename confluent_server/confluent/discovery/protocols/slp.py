@@ -112,7 +112,10 @@ def _parse_slp_packet(packet, peer, rsps, xidmap, defer=None, sock=None):
             identifier = addr
         else:
             probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
-            sock.sendto(b'\x00', probepeer)
+            try:
+                sock.sendto(b'\x00', probepeer)
+            except Exception:
+                return
             defer.append((packet, peer))
             return
     if (identifier, parsed['xid']) in rsps:
@@ -487,7 +490,10 @@ def snoop(handler, protocol=None):
                     mac = neighutil.get_hwaddr(peer[0])
                     if not mac:
                         probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
-                        s.sendto(b'\x00', probepeer)
+                        try:
+                            s.sendto(b'\x00', probepeer)
+                        except Exception:
+                            continue
                         deferpeers.append(peer)
                         continue
                     process_peer(newmacs, known_peers, peerbymacaddress, peer)

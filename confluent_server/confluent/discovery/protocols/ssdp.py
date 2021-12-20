@@ -167,7 +167,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                             continue
                         mac = neighutil.get_hwaddr(peer[0])
                         if not mac:
-                            s.sendto(b'\x00', peer)
+                            try:
+                                s.sendto(b'\x00', peer)
+                            except Exception:
+                                continue
                             deferrednotifies.append((peer, rsp))
                             continue
                         _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers)
@@ -311,8 +314,11 @@ def _find_service(service, target):
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
             if not neighutil.get_hwaddr(peer[0]):
+                try:
+                    s.sendto(b'\x00', peer)
+                except Exception:
+                    continue
                 deferparse.append((rsp, peer))
-                s.sendto(b'\x00', peer)
                 continue
             _parse_ssdp(peer, rsp, peerdata)
         timeout = deadline - util.monotonic_time()
