@@ -364,7 +364,7 @@ def oslist():
     print("Distributions:")
     for rsp in c.read('/deployment/distributions'):
         if 'error' in rsp:
-            sys.stderr.write(res['error'] + '\n')
+            sys.stderr.write(rsp['error'] + '\n')
             exitcode = 1
         else:
             print("  " + rsp['item']['href'].replace('/', ''))
@@ -373,7 +373,7 @@ def oslist():
     print("Profiles:")
     for rsp in c.read('/deployment/profiles'):
         if 'error' in rsp:
-            sys.stderr.write(res['error'] + '\n')
+            sys.stderr.write(rsp['error'] + '\n')
             exitcode = 1
         else:
             print("  " + rsp['item']['href'].replace('/', ''))
