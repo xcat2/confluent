@@ -398,15 +398,18 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         foundaddr = False
         candgws = []
         candsrvs = []
+        bestsrvbyfam = {}
         for myaddr in myaddrs:
             fam, svrip, prefix = myaddr[:3]
             candsrvs.append((fam, svrip, prefix))
             if fam == socket.AF_INET:
-                cfgdata['deploy_server'] = socket.inet_ntop(socket.AF_INET, svrip)
                 nver = '4'
+                srvkey = 'deploy_server'
             elif fam == socket.AF_INET6:
-                cfgdata['deploy_server_v6'] = socket.inet_ntop(socket.AF_INET6, svrip)
                 nver = '6'
+                srvkey = 'deploy_server_v6'
+            if fam not in bestsrvbyfam:
+                cfgdata[srvkey] = socket.inet_ntop(fam, svrip)
             for candidate in cfgbyname:
                 ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
                 if ipmethod == 'dhcp':
@@ -425,6 +428,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                         for inf in socket.getaddrinfo(candip, 0, fam, socket.SOCK_STREAM):
                             candipn = socket.inet_pton(fam, inf[-1][0])
                         if ipn_on_same_subnet(fam, svrip, candipn, prefix):
+                            bestsrvbyfam[fam] = svrip
                             cfgdata['ipv{}_address'.format(nver)] = candip
                             cfgdata['ipv{}_method'.format(nver)] = ipmethod
                             cfgdata['ipv{}_gateway'.format(nver)] = cfgbyname[candidate].get(
