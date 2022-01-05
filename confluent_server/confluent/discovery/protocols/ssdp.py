@@ -376,6 +376,7 @@ def check_fish(urldata):
             data['services'] = ['service:management-hardware.Lenovo:lenovo-xclarity-controller']
             return data
         except (IndexError, KeyError):
+            return None
             url = '/redfish/v1/'
             peerinfo = wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
