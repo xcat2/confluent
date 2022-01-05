@@ -105,16 +105,18 @@ class NodeHandler(immhandler.NodeHandler):
         if ff not in ('dense-computing', [u'dense-computing']):
             # skip preconfig for non-SD530 servers
             return
-        currfirm = self.info.get('attributes', {}).get('firmware-image-info', [''])[0]
-        if not currfirm.startswith('TEI'):
+        currfirm = self.info.get('attributes', {}).get('firmware-image-info', [{}])[0]
+        if not currfirm.get('build', '').startswith('TEI'):
             return
         self.trieddefault = None  # Reset state on a preconfig attempt
         # attempt to enable SMM
         #it's normal to get a 'not supported' (193) for systems without an SMM
         # need to branch on 3.00+ firmware
-        currfirm = currfirm.split(':')
-        if len(currfirm) > 1:
-            currfirm = float(currfirm[1])
+        currfirm = currfirm.get('version', '0.0')
+        if currfirm:
+            currfirm = float(currfirm)
+        else:
+            currfirm = 0
         disableipmi = False
         if currfirm >= 3:
             # IPMI is disabled and we need it, also we need to go to *some* password
