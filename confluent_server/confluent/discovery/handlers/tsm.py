@@ -50,7 +50,7 @@ class NodeHandler(generic.NodeHandler):
         i = c.grab_json_response('/redfish/v1/')
         uuid = i.get('UUID', None)
         if uuid:
-            self.info['uuid'] = uuid
+            self.info['uuid'] = uuid.lower()
 
     def validate_cert(self, certificate):
         # broadly speaking, merely checks consistency moment to moment,
