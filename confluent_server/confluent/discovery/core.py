@@ -635,18 +635,6 @@ def detected(info):
         eventlet.spawn_after(10, info['protocol'].fix_info, info,
                              safe_detected)
         return
-    try:
-        snum = info['attributes']['enclosure-serial-number'][0].strip()
-        if snum:
-            info['serialnumber'] = snum
-            known_serials[info['serialnumber']] = info
-    except (KeyError, IndexError):
-        pass
-    try:
-        info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
-        known_services[service].add(info['modelnumber'])
-    except (KeyError, IndexError):
-        pass
     if info['hwaddr'] in known_info and 'addresses' in info:
         # we should tee these up for parsing when an enclosure comes up
         # also when switch config parameters change, should discard
@@ -678,6 +666,22 @@ def detected(info):
     if handler:
         handler = handler.NodeHandler(info, cfg)
         handler.scan()
+    try:
+        if 'modelnumber' not in info:
+            info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
+    except (KeyError, IndexError):
+        pass
+    if 'modelnumber' in info:
+        known_services[service].add(info['modelnumber'])
+    try:
+        if 'serialnumber' not in info:
+            snum = info['attributes']['enclosure-serial-number'][0].strip()
+            if snum:
+                info['serialnumber'] = snum
+    except (KeyError, IndexError):
+        pass
+    if 'serialnumber' in info:
+        known_serials[info['serialnumber']] = info
     uuid = info.get('uuid', None)
     if uuid_is_valid(uuid):
         known_uuids[uuid][info['hwaddr']] = info
@@ -1340,7 +1344,7 @@ def start_detection():
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
         rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
-    eventlet.spawn_n(ssdp.snoop, None, None, ssdp, get_node_by_uuid_or_mac)
+    eventlet.spawn_n(ssdp.snoop, safe_detected, None, ssdp, get_node_by_uuid_or_mac)
 
 def stop_autosense():
     for watcher in list(autosensors):

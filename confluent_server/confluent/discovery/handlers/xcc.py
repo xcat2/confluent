@@ -30,15 +30,6 @@ import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
-def fixup_uuid(uuidprop):
-    baduuid = ''.join(uuidprop.split())
-    uuidprefix = (baduuid[:8], baduuid[8:12], baduuid[12:16])
-    a = codecs.encode(struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]), 'hex')
-    a = util.stringify(a)
-    uuid = (a[:8], a[8:12], a[12:16], baduuid[16:20], baduuid[20:])
-    return '-'.join(uuid).upper()
-
-
 class LockedUserException(Exception):
     pass
 
@@ -63,6 +54,9 @@ class NodeHandler(immhandler.NodeHandler):
         # This is not adequate for being satisfied
         return bool(info.get('attributes', {}))
 
+    def probe(self):
+        return None
+
     def scan(self):
         c = webclient.SecureHTTPConnection(self.ipaddr, 443,
             verifycallback=self.validate_cert)
@@ -70,7 +64,40 @@ class NodeHandler(immhandler.NodeHandler):
         modelname = i.get('items', [{}])[0].get('machine_name', None)
         if modelname:
             self.info['modelname'] = modelname
-        super(NodeHandler, self).scan()
+        for attrname in list(self.info.get('attributes', {})):
+            val = self.info['attributes'][attrname]
+            if '-uuid' == attrname[-5:] and len(val) == 32:
+                val = val.lower()
+                self.info['attributes'][attrname] = '-'.join([val[:8], val[8:12], val[12:16], val[16:20], val[20:]])
+        attrs = self.info.get('attributes', {})
+        room = attrs.get('room-id', None)
+        if room:
+            self.info['room'] = room
+        rack = attrs.get('rack-id', None)
+        if rack:
+            self.info['rack'] = rack
+        name = attrs.get('name', None)
+        if name:
+            self.info['hostname'] = name
+        unumber = attrs.get('lowest-u', None)
+        if unumber:
+            self.info['u'] = unumber
+        location = attrs.get('location', None)
+        if location:
+            self.info['location'] = location
+        mtm = attrs.get('enclosure-machinetype-model', None)
+        if mtm:
+            self.info['modelnumber'] = mtm.strip()
+        sn = attrs.get('enclosure-serial-number', None)
+        if sn:
+            self.info['serialnumber'] = sn.strip()
+        if attrs.get('enclosure-form-factor', None) == 'dense-computing':
+            encuuid = attrs.get('chassis-uuid', None)
+            if encuuid:
+                self.info['enclosure.uuid'] = encuuid
+            slot = int(attrs.get('slot', 0))
+            if slot != 0:
+                self.info['enclosure.bay'] = slot
 
     def preconfig(self, possiblenode):
         self.tmpnodename = possiblenode
@@ -499,7 +526,7 @@ class NodeHandler(immhandler.NodeHandler):
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
-        enclosureuuid = self.info.get('attributes', {}).get('chassis-uuid', [None])[0]
+        enclosureuuid = self.info.get('enclosure.uuid', None)
         if enclosureuuid:
             enclosureuuid = enclosureuuid.lower()
             em = self.configmanager.get_node_attributes(nodename,

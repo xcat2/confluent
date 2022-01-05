@@ -31,7 +31,7 @@ _slp_services = set([
     'service:lenovo-smm2',
     'service:ipmi',
     'service:lighttpd',
-    'service:management-hardware.Lenovo:lenovo-xclarity-controller',
+    #'service:management-hardware.Lenovo:lenovo-xclarity-controller',
     'service:management-hardware.IBM:chassis-management-module',
     'service:management-hardware.Lenovo:chassis-management-module',
     'service:io-device.Lenovo:management-module',

@@ -39,14 +39,12 @@ import eventlet
 import eventlet.green.select as select
 import eventlet.green.socket as socket
 import eventlet.greenpool as gp
+import os
 import time
-try:
-    from eventlet.green.urllib.request import urlopen
-except (ImportError, AssertionError):
-    from eventlet.green.urllib2 import urlopen
 import struct
 import traceback
 
+webclient = eventlet.import_patched('pyghmi.util.webclient')
 mcastv4addr = '239.255.255.250'
 mcastv6addr = 'ff02::c'
 
@@ -123,6 +121,11 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     # dabbling in multicast wizardry here, such sockets can cause big problems,
     # so we will have two distinct sockets
     tracelog = log.Logger('trace')
+    try:
+        active_scan(handler, protocol)
+    except Exception as e:
+        tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                    event=log.Events.stacktrace)
     known_peers = set([])
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -167,8 +170,9 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                             continue
                         mac = neighutil.get_hwaddr(peer[0])
                         if not mac:
+                            probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
                             try:
-                                s.sendto(b'\x00', peer)
+                                s.sendto(b'\x00', probepeer)
                             except Exception:
                                 continue
                             deferrednotifies.append((peer, rsp))
@@ -244,6 +248,8 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     r = r[0]
             if deferrednotifies:
                 eventlet.sleep(2.2)
+            for peerrsp in deferrednotifies:
+                peer, rsp = peerrsp
                 mac = neighutil.get_hwaddr(peer[0])
                 if not mac:
                     continue
@@ -256,6 +262,12 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                              event=log.Events.stacktrace)
 
+
+def _get_svrip(peerdata):
+    for addr in peerdata['addresses']:
+        if addr[0].startswith('fe80::'):
+            return addr[0]
+    return peerdata['addresses'][0][0]
 
 def _find_service(service, target):
     net4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -314,8 +326,9 @@ def _find_service(service, target):
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
             if not neighutil.get_hwaddr(peer[0]):
+                probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
                 try:
-                    s.sendto(b'\x00', peer)
+                    s.sendto(b'\x00', probepeer)
                 except Exception:
                     continue
                 deferparse.append((rsp, peer))
@@ -333,24 +346,44 @@ def _find_service(service, target):
     querypool = gp.GreenPool()
     pooltargs = []
     for nid in peerdata:
-        for url in peerdata[nid].get('urls', ()):
-            if url.endswith('/desc.tmpl'):
-                pooltargs.append((url, peerdata[nid]))
-    for pi in querypool.imap(check_cpstorage, pooltargs):
+        if '/redfish/v1/' not in peerdata[nid].get('urls', ()):
+            break
+        if '/DeviceDescription.json' in peerdata[nid]['urls']:
+            pooltargs.append(('/DeviceDescription.json', peerdata[nid]))
+        # For now, don't interrogate generic redfish bmcs
+        # This is due to a need to deduplicate from some supported SLP
+        # targets (IMM, TSM, others)
+        # activate this else once the core filters/merges duplicate uuid
+        # or we drop support for those devices
+        #else:
+        #    pooltargs.append(('/redfish/v1/', peerdata[nid]))
+    for pi in querypool.imap(check_fish, pooltargs):
         if pi is not None:
             yield pi
 
-def check_cpstorage(urldata):
+def check_fish(urldata):
     url, data = urldata
-    try:
-        info = urlopen(url, timeout=1).read()
-        if b'<friendlyName>Athena</friendlyName>' in info:
-            data['services'] = ['service:thinkagile-storage']
+    wc = webclient.SecureHTTPConnection(_get_svrip(data), 443, verifycallback=lambda x: True)
+    peerinfo = wc.grab_json_response(url)
+    if url == '/DeviceDescription.json':
+        try:
+            peerinfo = peerinfo[0]
+            myuuid = peerinfo['node-uuid'].lower()
+            if '-' not in myuuid:
+                myuuid = '-'.join([myuuid[:8], myuuid[8:12], myuuid[12:16], myuuid[16:20], myuuid[20:]])
+            data['uuid'] = myuuid
+            data['attributes'] = peerinfo
+            data['services'] = ['service:management-hardware.Lenovo:lenovo-xclarity-controller']
             return data
-    except Exception:
-        pass
+        except (IndexError, KeyError):
+            url = '/redfish/v1/'
+            peerinfo = wc.grab_json_response('/redfish/v1/')
+    if url == '/redfish/v1/':
+        if 'UUID' in peerinfo:
+            data['services'] = ['service:redfish-bmc']
+            data['uuid'] = peerinfo['UUID'].lower()
+            return data
     return None
-
 
 def _parse_ssdp(peer, rsp, peerdata):
     nid = peer[0]
@@ -378,9 +411,11 @@ def _parse_ssdp(peer, rsp, peerdata):
             if not headline:
                 continue
             header, _, value = headline.partition(b':')
-            header = header.strip()
-            value = value.strip()
+            header = header.strip().decode('utf8')
+            value = value.strip().decode('utf8')
             if header == 'AL' or header == 'LOCATION':
+                value = value[value.index('://')+3:]
+                value = value[value.index('/'):]
                 if 'urls' not in peerdatum:
                     peerdatum['urls'] = [value]
                 elif value not in peerdatum['urls']:
