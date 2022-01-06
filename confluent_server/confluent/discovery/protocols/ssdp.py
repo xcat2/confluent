@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2017 Lenovo
+# Copyright 2017-2022 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,10 +78,10 @@ def scan(services, target=None):
             yield rply
 
 
-def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers):
+def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler):
     known_peers.add(peer)
     newmacs.add(mac)
-    if mac in peerbymacaddress:
+    if mac in peerbymacaddress and peer not in peerbymacaddress[mac]['addresses']:
         peerbymacaddress[mac]['addresses'].append(peer)
     else:
         peerbymacaddress[mac] = {
@@ -97,12 +97,24 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
             header = header.strip()
             value = value.strip()
             if header == 'NT':
-                peerdata['service'] = value
+                if 'redfish-rest' not in value:
+                    return
             elif header == 'NTS':
                 if value == 'ssdp:byebye':
-                    machandlers[mac] = byehandler
-                elif value == 'ssdp:alive':
-                    machandlers[mac] = None # handler
+                    handler = byehandler
+                elif value != 'ssdp:alive':
+                    handler = None
+            elif header == 'AL':
+                if not value.endswith('/redfish/v1/'):
+                    return
+            elif header == 'LOCATION':
+                if not value.endswith('/DeviceDescription.json'):
+                    return
+        if handler:
+            retdata = check_fish(('/DeviceDescription.json', peerdata))
+            if retdata:
+                handler(retdata)
+
 
 def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for SSDP notify messages
@@ -177,7 +189,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                 continue
                             deferrednotifies.append((peer, rsp))
                             continue
-                        _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers)
+                        _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
                     elif method == b'M-SEARCH':
                         if not uuidlookup:
                             continue
@@ -253,7 +265,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 mac = neighutil.get_hwaddr(peer[0])
                 if not mac:
                     continue
-                _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers)
+                _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
             for mac in newmacs:
                 thehandler = machandlers.get(mac, None)
                 if thehandler:
