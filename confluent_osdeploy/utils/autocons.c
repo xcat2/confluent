@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
     if (ws.ws_row < 24) { ws.ws_col = 24; }
     ioctl(ttyf, TIOCSWINSZ, &ws);
     tcsetattr(ttyf, TCSANOW, &tty);
-    if (argc > 1 && (strcmp(argv[1], '-c') == 0)) {
+    if (argc > 1 && (strcmp(argv[1], "-c") == 0)) {
         ioctl(ttyf, TIOCCONS, 0);
     }
 }
