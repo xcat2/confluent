@@ -112,8 +112,8 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
             if retdata:
                 known_peers.add(peer)
                 newmacs.add(mac)
-                peerbymacaddress[mac] = peerdata
-                handler(retdata)
+                peerbymacaddress[mac] = retdata
+                machandlers[mac] = handler
 
 
 def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
