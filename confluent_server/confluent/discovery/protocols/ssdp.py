@@ -375,8 +375,11 @@ def _find_service(service, target):
 
 def check_fish(urldata):
     url, data = urldata
-    wc = webclient.SecureHTTPConnection(_get_svrip(data), 443, verifycallback=lambda x: True)
-    peerinfo = wc.grab_json_response(url)
+    try:
+        wc = webclient.SecureHTTPConnection(_get_svrip(data), 443, verifycallback=lambda x: True)
+        peerinfo = wc.grab_json_response(url)
+    except socket.error:
+        return None
     if url == '/DeviceDescription.json':
         try:
             peerinfo = peerinfo[0]
