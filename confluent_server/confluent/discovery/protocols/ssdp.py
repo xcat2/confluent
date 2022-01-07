@@ -79,16 +79,13 @@ def scan(services, target=None):
 
 
 def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler):
-    known_peers.add(peer)
-    newmacs.add(mac)
     if mac in peerbymacaddress and peer not in peerbymacaddress[mac]['addresses']:
         peerbymacaddress[mac]['addresses'].append(peer)
     else:
-        peerbymacaddress[mac] = {
+        peerdata = {
             'hwaddr': mac,
             'addresses': [peer],
         }
-        peerdata = peerbymacaddress[mac]
         for headline in rsp[1:]:
             if not headline:
                 continue
@@ -113,6 +110,9 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
         if handler:
             retdata = check_fish(('/DeviceDescription.json', peerdata))
             if retdata:
+                known_peers.add(peer)
+                newmacs.add(mac)
+                peerbymacaddress[mac] = peerdata
                 handler(retdata)
 
 
