@@ -534,7 +534,10 @@ def process_peer(newmacs, known_peers, peerbymacaddress, peer):
     if mac in peerbymacaddress:
         peerbymacaddress[mac]['addresses'].append(peer)
     else:
-        q = query_srvtypes(peer)
+        try:
+            q = query_srvtypes(peer)
+        except Exception as e:
+            q = None
         if not q or not q[0]:
             # SLP might have started and not ready yet
             # ignore for now
