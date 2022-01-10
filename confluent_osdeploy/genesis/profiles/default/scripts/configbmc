@@ -165,9 +165,18 @@ def set_port(s, port, vendor, model):
         return 1
 
 
-def get_remote_config_mod(vendor, model):
+def get_remote_config_mod(vendor, model, waiters):
     if vendor in ('IBM', 'Lenovo'):
         if _is_tsm(model):
+            for waiter in waiters:
+                if waiter:
+                    sys.stdout.write('Waiting for TSM network to activate')
+                    for x in range(0, 90):
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                        time.sleep(1)
+                    sys.stdout.write('Complete\n')
+                    break
             return 'tsm'
         else:
             return 'xcc'
@@ -415,7 +424,7 @@ def main():
         dotwait()
     sys.stdout.write('done\n')
     sys.stdout.flush()
-    cfgmod = get_remote_config_mod(vendor, model)
+    cfgmod = get_remote_config_mod(vendor, model, (awaitip, awaitvlan, awaitprefix, awaitgw))
     if cfgmod:
         with open('configbmc.configmod', 'w+') as cm:
             cm.write('configmod: {0}\n'.format(cfgmod))
