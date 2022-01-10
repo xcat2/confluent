@@ -267,7 +267,7 @@ def get_lan_channel(s):
         medtype = int(rsp[1]) & 0b1111111
         if medtype not in (4, 6):
             continue
-        rsp = s.raw_command(0xc, 2, bytearray([2, chan, 5, 0, 0]))
+        rsp = s.raw_command(0xc, 2, bytearray([chan, 5, 0, 0]))
         if rsp.get('code', 1) == 0:
             return chan
     return 1
