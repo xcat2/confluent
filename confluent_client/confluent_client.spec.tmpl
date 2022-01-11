@@ -27,14 +27,22 @@ a confluent server.
 %if "%{dist}" == ".el8"
 python3 setup.py build
 %else
+%if "%{dist}" == ".el9"
+python3 setup.py build
+%else
 python2 setup.py build
+%endif
 %endif
 
 %install
 %if "%{dist}" == ".el8"
 python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
 %else
+%if "%{dist}" == ".el9"
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
+%else
 python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
+%endif
 %endif
 
 
