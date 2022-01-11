@@ -358,8 +358,8 @@ def _find_service(service, target):
     querypool = gp.GreenPool()
     pooltargs = []
     for nid in peerdata:
-        if '/redfish/v1/' not in peerdata[nid].get('urls', ()):
-            break
+        if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
+            continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
             pooltargs.append(('/DeviceDescription.json', peerdata[nid]))
         # For now, don't interrogate generic redfish bmcs
