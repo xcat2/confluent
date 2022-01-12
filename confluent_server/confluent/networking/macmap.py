@@ -320,11 +320,11 @@ def _map_switch_backend(args):
                 if onode:
                     errstr = 'Mac address {2} may match either {0} or {1} according to net.*switch* attributes.'.format(nodename, onode, mac)
                     if onummacs > 2 or nummacs > 2:
-                        errstr += ' ({0} may match a switch trunk)'.format(nodename if nummacs > onummacs else onode)
+                        errstr += ' ({0} may match a link between switches)'.format(nodename if nummacs > onummacs else onode)
                 else:
                     errstr = 'Mac address {1} may match either {0} or a node previously reported as ambiguous according to net.*switch* attributes.'.format(nodename, mac)
                     if nummacs > 2:
-                        errstr += ' ({0} may match a switch trunk)'.format(nodename)
+                        errstr += ' ({0} may match a link between switches)'.format(nodename)
                 log.log({'error': errstr})
                 
                 _nodesbymac[mac] = (None, None)
