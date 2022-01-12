@@ -170,9 +170,17 @@ def _affluent_map_switch(args):
                 if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
                     # For example, listed on both a real edge port
                     # and by accident a trunk port
-                    log.log({'error': '{0} and {1} described by ambiguous'
-                                    ' switch topology values'.format(
-                                        nodename, _nodesbymac[mac][0])})
+                    onummacs = _nodesbymac[mac][1]
+                    onode = _nodesbymac[mac][0]
+                    if onode:
+                        errstr = 'Mac address {2} may match either {0} or {1} according to net.*switch* attributes.'.format(nodename, onode, mac)
+                        if onummacs > 2 or nummacs > 2:
+                            errstr += ' ({0} may match a switch trunk)'.format(nodename if nummacs > onummacs else onode)
+                    else:
+                        errstr = 'Mac address {1} may match either {0} or a node previously reported as ambiguous according to net.*switch* attributes.'.format(nodename, mac)
+                        if nummacs > 2:
+                            errstr += ' ({0} may match a switch trunk)'.format(nodename)
+                    log.log({'error': errstr})
                     _nodesbymac[mac] = (None, None)
                 else:
                     _nodesbymac[mac] = (nodename, nummacs)
@@ -306,9 +314,19 @@ def _map_switch_backend(args):
             if mac in _nodesbymac and _nodesbymac[mac][0] != nodename:
                 # For example, listed on both a real edge port
                 # and by accident a trunk port
-                log.log({'error': '{0} and {1} described by ambiguous'
-                                  ' switch topology values'.format(
-                                      nodename, _nodesbymac[mac][0])})
+                nummacs = maccounts[ifname]
+                onummacs = _nodesbymac[mac][1]
+                onode = _nodesbymac[mac][0]
+                if onode:
+                    errstr = 'Mac address {2} may match either {0} or {1} according to net.*switch* attributes.'.format(nodename, onode, mac)
+                    if onummacs > 2 or nummacs > 2:
+                        errstr += ' ({0} may match a switch trunk)'.format(nodename if nummacs > onummacs else onode)
+                else:
+                    errstr = 'Mac address {1} may match either {0} or a node previously reported as ambiguous according to net.*switch* attributes.'.format(nodename, mac)
+                    if nummacs > 2:
+                        errstr += ' ({0} may match a switch trunk)'.format(nodename)
+                log.log({'error': errstr})
+                
                 _nodesbymac[mac] = (None, None)
             else:
                 _nodesbymac[mac] = (nodename, maccounts[ifname])
