@@ -345,7 +345,11 @@ def snoop(handler, protocol=None, nodeguess=None):
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     net4.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
-    net4.bind(('', 67))
+    try:
+        net4.bind(('', 67))
+    except Exception:
+        log.log({'error': 'Unable to bind DHCP server port, if using dnsmasq, specify bind-dynamic in dnsmasq.conf and restart dnsmasq and then confluent'})
+        return
     v6addr = socket.inet_pton(socket.AF_INET6, mcastv6addr)
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
