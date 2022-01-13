@@ -243,6 +243,8 @@ def mkpathorlink(source, destination, appendexist=False):
                     realdest.write(sourcedata.read())
             os.remove(tmpnam)
         else:
+            if os.path.islink(destination):
+                os.remove(destination)
             os.symlink(source, destination)
 
 
