@@ -261,7 +261,11 @@ def update_nodes(nodes, element, configmanager, inputdata):
             for attrib in list(updatenode):
                 if updatenode[attrib] is None:
                     del updatenode[attrib]
-                    if attrib in allattributes.node  or attrib.startswith('custom.') or attrib.startswith('net.'):
+                    if '*' in attrib:
+                        currnodeattrs = configmanager.get_node_attributes(node, attrib)
+                        for matchattrib in currnodeattrs.get(node, {}):
+                            clearattribs.append(matchattrib)
+                    elif attrib in allattributes.node  or attrib.startswith('custom.') or attrib.startswith('net.'):
                         clearattribs.append(attrib)
                     else:
                         foundattrib = False
@@ -271,6 +275,11 @@ def update_nodes(nodes, element, configmanager, inputdata):
                                 foundattrib = True
                         if not foundattrib:
                             raise exc.InvalidArgumentException("No attribute matches '" + attrib + "' (try wildcard if trying to clear a group)")
+                elif '*' in attrib:
+                    currnodeattrs = configmanager.get_node_attributes(node, attrib)
+                    for matchattrib in currnodeattrs.get(node, {}):
+                        updatenode[matchattrib] = updatenode[attrib]
+                    del updatenode[attrib]
             if len(clearattribs) > 0:
                 configmanager.clear_node_attributes([node], clearattribs)
             updatedict[node] = updatenode
