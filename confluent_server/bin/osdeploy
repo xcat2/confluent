@@ -409,6 +409,11 @@ def osimport(imagefile):
                         sys.stdout.write('\n')
                         for profile in rsp['profiles']:
                             print('Deployment profile created: {0}'.format(profile))
+                    if rsp['phase'] == 'error':
+                        sys.stderr.write('{0}\n'.format(rsp['error']))
+                        if 'Permission denied' in rsp['error']:
+                            sys.stderr.write('Confluent service unable to write to destination, check that confluent user has access to target\n')
+                        return
                     sys.stdout.flush()
                 else:
                     print(repr(rsp))

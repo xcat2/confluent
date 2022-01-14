@@ -567,7 +567,10 @@ def import_image(filename, callback, backend=False, mfd=None):
     if identity.get('subname', None):
         targpath += '/' + identity['subname']
     targpath = '/var/lib/confluent/distributions/' + targpath
-    os.makedirs(targpath, 0o755)
+    try:
+        os.makedirs(targpath, 0o755)
+    except Exception as e:
+        sys.stdout.write('ERROR:{0}\r'.format(str(e)))
     filename = os.path.abspath(filename)
     identity['importedfile'] = filename
     os.chdir(targpath)
@@ -716,6 +719,7 @@ class MediaImporter(object):
             raise Exception('{0} already exists'.format(self.targpath))
         self.filename = os.path.abspath(media)
         self.medfile = medfile
+        self.error = ''
         self.importer = eventlet.spawn(self.importmedia)
 
     def stop(self):
@@ -724,7 +728,7 @@ class MediaImporter(object):
 
     @property
     def progress(self):
-        return {'phase': self.phase, 'progress': self.percent, 'profiles': self.profiles}
+        return {'phase': self.phase, 'progress': self.percent, 'profiles': self.profiles, 'error': self.error}
 
     def importmedia(self):
         os.environ['PYTHONPATH'] = ':'.join(sys.path)
@@ -738,24 +742,44 @@ class MediaImporter(object):
         while wkr.poll() is None:
             currline += wkr.stdout.read(1)
             if b'\r' in currline:
-                val = currline.split(b'%')[0].strip()
-                if val:
-                    self.percent = float(val)
+                if b'%' in currline:
+                    val = currline.split(b'%')[0].strip()
+                    if val:
+                        self.percent = float(val)
+                elif b'ERROR:' in currline:
+                    self.error = currline.replace(b'ERROR:', b'')
+                    if not isinstance(self.error, str):
+                        self.error = self.error.decode('utf8')
+                    self.phase = 'error'
+                    self.percent = 100.0
+                    return
                 currline = b''
         a = wkr.stdout.read(1)
         while a:
             currline += a
             if b'\r' in currline:
-                val = currline.split(b'%')[0].strip()
-                if val:
-                    self.percent = float(val)
+                if b'%' in currline:
+                    val = currline.split(b'%')[0].strip()
+                    if val:
+                        self.percent = float(val)
+                elif b'ERROR:' in currline:
+                    self.error = currline.replace(b'ERROR:', b'')
+                    if not isinstance(self.error, str):
+                        self.error = self.error.decode('utf8')
+                    self.phase = 'error'
+                    return
             currline = b''
             a = wkr.stdout.read(1)
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(
                 self.oscategory)
-            generate_stock_profiles(defprofile, self.distpath, self.targpath,
-                                    self.osname, self.profiles)
+            try:
+                generate_stock_profiles(defprofile, self.distpath, self.targpath,
+                                        self.osname, self.profiles)
+            except Exception as e:
+                self.phase = 'error'
+                self.error = str(e)
+                raise
         self.phase = 'complete'
         self.percent = 100.0
 
