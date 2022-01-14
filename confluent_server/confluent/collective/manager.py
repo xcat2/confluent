@@ -71,7 +71,7 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
              'subsystem': 'collective'})
     try:
         remote = connect_to_collective(cert, leader, remote)
-    except socket.error as e:
+    except Exception as e:
         log.log({'error': 'Collective connection attempt to {0} failed: {1}'
                           ''.format(leader, str(e)),
                  'subsystem': 'collective'})
