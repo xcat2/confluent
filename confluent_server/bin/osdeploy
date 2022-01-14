@@ -258,6 +258,14 @@ def initialize(cmdset):
             sys.exit(1)
         init_confluent_myname()
         sshutil.initialize_root_key(False)
+    if cmdset.t or cmdset.s or cmdset.a or cmdset.u:
+        neededuid = os.stat('/etc/confluent').st_uid
+        try:
+            os.makedirs('/var/lib/confluent')
+            os.chown('/var/lib/confluent', neededuid, -1)
+        except OSError as e:
+            if e.errno != 17:
+                raise
     if cmdset.t:
         didsomething = True
         init_confluent_myname()

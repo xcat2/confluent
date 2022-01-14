@@ -89,11 +89,14 @@ def initialize_ca():
         ['ssh-keygen', '-C', comment, '-t', 'ed25519', '-f',
          '/etc/confluent/ssh/ca', '-N', get_passphrase()],
          preexec_fn=normalize_uid)
+    ouid = normalize_uid()
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
     except OSError as e:
         if e.errno != 17:
             raise
+    finally:
+        os.seteuid(ouid)
     cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
     shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
     #    newent = '@cert-authority * ' + capub.read()
@@ -167,16 +170,14 @@ def initialize_root_key(generate, automation=False):
             '-C', 'Confluent Automation by {}'.format(myname)],
             preexec_fn=normalize_uid)
         authorized = ['/etc/confluent/ssh/automation.pub']
+    ouid = normalize_uid()
     try:
         os.makedirs('/var/lib/confluent/public/site/ssh', mode=0o755)
-        neededuid = os.stat('/etc/confluent').st_uid
-        os.chown('/var/lib/confluent', neededuid, -1)
-        os.chown('/var/lib/confluent/public', neededuid, -1)
-        os.chown('/var/lib/confluent/public/site', neededuid, -1)
-        os.chown('/var/lib/confluent/public/site/ssh', neededuid, -1)
     except OSError as e:
         if e.errno != 17:
             raise
+    finally:
+        os.seteuid(ouid)
     neededuid = os.stat('/etc/confluent').st_uid
     if automation:
         suffix = 'automationpubkey'

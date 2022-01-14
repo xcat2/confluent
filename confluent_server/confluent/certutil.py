@@ -15,6 +15,15 @@ def get_openssl_conf_location():
     else:
         raise Exception("Cannot find openssl config file")
 
+def normalize_uid():
+    curruid = os.geteuid()
+    neededuid = os.stat('/etc/confluent').st_uid
+    if curruid != neededuid:
+        os.seteuid(neededuid)
+    if os.geteuid() != neededuid:
+        raise Exception('Need to run as root or owner of /etc/confluent')
+    return curruid
+
 def get_ip_addresses():
     lines, _ = util.run(['ip', 'addr'])
     if not isinstance(lines, str):
@@ -96,11 +105,14 @@ def assure_tls_ca():
             os.remove(tmpconfig)
     fname = '/var/lib/confluent/public/site/tls/{0}.pem'.format(
         collective.get_myname())
+    ouid = normalize_uid()
     try:
         os.makedirs(os.path.dirname(fname))
     except OSError as e:
         if e.errno != 17:
             raise
+    finally:
+        os.seteuid(ouid)
     shutil.copy2('/etc/confluent/tls/cacert.pem', fname)
     hv, _ = util.run(
         ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'])
