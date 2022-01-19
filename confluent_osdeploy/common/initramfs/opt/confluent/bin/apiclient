@@ -18,6 +18,9 @@ import time
 class InvalidApiKey(Exception):
     pass
 
+def msg_align(len):
+    return (len + 3) & ~3
+
 cryptname = ctypes.util.find_library('crypt')
 if not cryptname:
     if os.path.exists('/usr/lib64/libcrypt.so.1'):
@@ -59,8 +62,8 @@ def get_my_addresses():
                             break
                         if rtatyp == 1:
                             addrs.append((fam, rta[4:rtalen], plen, ridx))
-                        rta = rta[rtalen:]
-            v = v[length:]
+                        rta = rta[msg_align(rtalen):]
+            v = v[msg_align(length):]
     return addrs
 
 

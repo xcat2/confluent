@@ -22,6 +22,11 @@ import eventlet.semaphore as semaphore
 import eventlet.green.socket as socket
 import struct
 
+
+def msg_align(len):
+    return (len + 3) & ~3
+
+
 neightable = {}
 neightime = 0
 
@@ -65,12 +70,12 @@ def _update_neigh():
                                     curraddr = curraddr[12:]
                             elif rtatyp == 1:  # ip address
                                 currip = rta[4:rtalen].tobytes()
-                            rta = rta[rtalen:]
+                            rta = rta[msg_align(rtalen):]
                             if not rtalen:
                                 break
                         if curraddr and currip:
                             neightable[currip] = curraddr
-                v = v[length:]
+                v = v[msg_align(length):]
     finally:
         s.close()
 

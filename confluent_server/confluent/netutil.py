@@ -25,6 +25,8 @@ import eventlet.support.greendns
 import os
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
+def msg_align(len):
+    return (len + 3) & ~3
 
 def mask_to_cidr(mask):
     maskn = socket.inet_pton(socket.AF_INET, mask)
@@ -571,7 +573,7 @@ def get_my_addresses(idx=0, family=0, matchlla=None):
                                 break
                             if rta[4:rtalen].tobytes() == matchlla:
                                 return get_my_addresses(idx=ridx)
-                            rta = rta[rtalen:]
+                            rta = rta[msg_align(rtalen):]
                 elif (ridx == idx or not idx) and scope == 0:
                     rta = v[nlhdrsz+ifaddrsz:length]
                     while len(rta):
@@ -580,8 +582,8 @@ def get_my_addresses(idx=0, family=0, matchlla=None):
                             break
                         if rtatyp == 1:
                             addrs.append((fam, rta[4:rtalen].tobytes(), plen, ridx))
-                        rta = rta[rtalen:]
-            v = v[length:]
+                        rta = rta[msg_align(rtalen):]
+            v = v[msg_align(length):]
     return addrs
 
 
