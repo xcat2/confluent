@@ -205,6 +205,8 @@ def stage_ent(currmap, ent, targdir, appendexist=False):
     allfents = ent.split()
     for tmpent in allfents:
         fents = glob.glob(tmpent)
+        if not fents:
+            raise Exception('No matching files for "{}"'.format(tmpent))
         everyfent.extend(fents)
     if not everyfent:
         raise Exception('No matching files for "{}"'.format(ent))
