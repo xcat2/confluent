@@ -88,9 +88,9 @@ client.check_globbing(noderange)
 
 def get_update_progress(session, url):
     for res in session.read(url):
-        status = res['phase']
-        percent = res['progress']
-        detail = res['detail']
+        status = res.get('phase', 'error')
+        percent = res.get('progress', None)
+        detail = res.get('detail', repr(res)),
         if status == 'error':
             text = 'error!'
         else:
