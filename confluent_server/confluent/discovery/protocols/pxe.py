@@ -494,6 +494,10 @@ def new_nodes(added, deleting, renamed, configmanager):
     configmanager.remove_watcher(attribwatcher)
     alldeleting = set(deleting) | set(renamed)
     clear_nodes(alldeleting)
+    alladding = set(added)
+    for oldname in renamed:
+        alladding.add(renamed[oldname])
+    remap_nodes(alladding, configmanager)
     attribwatcher = configmanager.watch_attributes(configmanager.list_nodes(),
                                                    ('id.uuid', 'net.*hwaddr'), remap_nodes)
 
