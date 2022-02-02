@@ -141,7 +141,7 @@ def get_net_apikey(nodename, mgr):
     newpass = newpass.encode('utf8')
     salt = salt.encode('utf8')
     crypted = c_crypt(newpass, salt)
-    for addrinfo in socket.getaddrinfo(mgr, 13001, type=socket.SOCK_STREAM):
+    for addrinfo in socket.getaddrinfo(mgr, 13001, 0, socket.SOCK_STREAM):
         try:
             clisock = socket.socket(addrinfo[0], addrinfo[1])
             clisock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
