@@ -5,9 +5,11 @@ if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
     confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
+    modprobe fuse
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 fi
 /opt/confluent/bin/confluent_imginfo /mnt/remoteimg/rootimg.sfs > /tmp/rootimg.info
+modprobe loop
 loopdev=$(losetup -f)
 export mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs

@@ -221,7 +221,7 @@ ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
-    curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d @$pubkey  https://$confluent_mgr/confluent-api/self/sshcert > $certfile
+    curl -gsf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d @$pubkey  https://$confluent_mgr/confluent-api/self/sshcert > $certfile
     if [ -s $certfile ]; then
         echo HostCertificate $certfile >> /etc/ssh/sshd_config
     fi
@@ -240,6 +240,6 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
 done
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 mkdir -p /etc/confluent
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
+curl -gsf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
 source_remote imageboot.sh
