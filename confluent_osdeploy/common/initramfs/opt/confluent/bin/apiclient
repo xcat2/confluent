@@ -20,9 +20,9 @@ class InvalidApiKey(Exception):
 
 cryptname = ctypes.util.find_library('crypt')
 if not cryptname:
-    if os.path.exists('/usr/lib64/libcrypt.so.1'):
+    if os.path.exists('/lib64/libcrypt.so.1'):
         cryptname = 'libcrypt.so.1'
-    elif os.path.exists('/usr/lib64/libcrypt.so.2'):
+    elif os.path.exists('/lib64/libcrypt.so.2'):
         cryptname = 'libcrypt.so.2'
 c_libcrypt = ctypes.CDLL(cryptname)
 c_crypt = c_libcrypt.crypt
