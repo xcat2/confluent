@@ -340,7 +340,10 @@ def create_yumconf(sourcedir, addrepos):
     if '/' not in sourcedir:
         sourcedir = os.path.join('/var/lib/confluent/distributions', sourcedir)
     if os.path.exists(sourcedir + '/repodata'):
-        pass
+        yumconf.write('[genimage-topdir]\n')
+        yumconf.write('name=Local install repository\n')
+        yumconf.write('baseurl={0}\n'.format(sourcedir))
+        yumconf.write('enabled=1\ngpgcheck=0\n\n')
     else:
         c = configparser.ConfigParser()
         c.read(sourcedir + '/.treeinfo')
@@ -548,7 +551,7 @@ class DebHandler(OsHandler):
 
 class ElHandler(OsHandler):
     def __init__(self, name, version, arch, args):
-        self.oscategory = 'el8'
+        self.oscategory = 'el{0}'.format(version.split('.')[0])
         self.yumargs = []
         super().__init__(name, version, arch, args)
 
@@ -876,7 +879,7 @@ def fingerprint_source_suse(files, sourcepath, args):
 
 def fingerprint_source_el(files, sourcepath, args):
     for filen in files:
-        if '-release-8' in filen:
+        if '-release-8' in filen or '-release-7' in filen:
             parts = filen.split('-')
             osname = '_'.join(parts[:-3])
             if osname == 'centos_linux':
@@ -908,7 +911,7 @@ def fingerprint_host_el(args, hostpath='/'):
     ts = rpm.TransactionSet(hostpath)
     rpms = ts.dbMatch('provides', 'system-release')
     for inf in rpms:
-        if 'el8' not in inf.release:
+        if 'el8' not in inf.release and 'el7' not in inf.release:
             continue
         osname = inf.name.replace('-release', '').replace('-', '_')
         if osname == 'centos_linux':
