@@ -9,3 +9,4 @@ instmods ice i40e hfi1 bnxt_en qed qede
 instmods dm-mod dm-log raid0 raid1 raid10 raid456 dm-raid dm-thin-pool dm-crypt dm-snapshot linear dm-era
 # nfs root and optionally gocryptfs
 instmods fuse overlay squashfs loop zram
+instmods aesni_intel drbg
