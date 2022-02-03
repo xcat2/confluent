@@ -96,14 +96,20 @@ def scan_confluents():
         if addr[0] == socket.AF_INET6:
             if addr[-1] in doneidxs:
                 continue
-            s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, addr[-1])
+            try:
+                s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, addr[-1])
+            except TypeError:
+                s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, addr[-1].tobytes())
             try:
                 s6.sendto(msg, ('ff02::c', 1900))
             except OSError:
                 pass
             doneidxs.add(addr[-1])
         elif addr[0] == socket.AF_INET:
-            s4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, addr[1])
+            try:
+                s4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, addr[1])
+            except TypeError:
+                s4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, addr[1].tobytes())
             try:
                 s4.sendto(msg, ('239.255.255.250', 1900))
             except OSError:
