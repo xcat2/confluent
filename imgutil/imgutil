@@ -908,6 +908,8 @@ def fingerprint_host_el(args, hostpath='/'):
         import rpm
     except ImportError:
         return None
+    if hostpath[0] != '/':
+         hostpath = os.path.join(os.getcwd(), hostpath)
     ts = rpm.TransactionSet(hostpath)
     rpms = ts.dbMatch('provides', 'system-release')
     for inf in rpms:
