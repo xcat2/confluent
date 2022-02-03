@@ -317,7 +317,7 @@ if __name__ == '__main__':
             myname = myname[0]
             myname = socket.inet_pton(socket.AF_INET, myname)
             for addr in myaddrs:
-                if myname == bytes(addr[1]):
+                if myname == addr[1].tobytes():
                     curridx = addr[-1]
         if curridx in doneidxs:
             continue
