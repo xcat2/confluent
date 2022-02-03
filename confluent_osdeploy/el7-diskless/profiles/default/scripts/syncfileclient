@@ -6,11 +6,18 @@ import os
 import shutil
 import pwd
 import grp
-from importlib.machinery import SourceFileLoader
 try:
-    apiclient = SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient').load_module()
-except FileNotFoundError:
-    apiclient = SourceFileLoader('apiclient', '/etc/confluent/apiclient').load_module()
+    from importlib.machinery import SourceFileLoader
+    def load_source(mod, path):
+        return SourceFileLoader(mod, path).load_module()
+except ImportError:
+    from imp import load_source
+
+try:
+    apiclient = load_source('apiclient', '/opt/confluent/bin/apiclient')
+except IOError:
+    apiclient = load_source('apiclient', '/etc/confluent/apiclient')
+
 
 
 def partitionhostsline(line):
