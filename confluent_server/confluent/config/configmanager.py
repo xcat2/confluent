@@ -1795,7 +1795,7 @@ class ConfigManager(object):
                         group))
             if not autocreate and group not in self._cfgstore['nodegroups']:
                 raise ValueError("{0} group does not exist".format(group))
-            for attr in attribmap[group]:
+            for attr in list(attribmap[group]):
                 # first do a pass to normalize out any aliased attribute names
                 if attr in _attraliases:
                     newattr = _attraliases[attr]
