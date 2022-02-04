@@ -21,6 +21,6 @@ tar cvzf ${DPKGNAME}_${VERSION}.orig.tar.gz $DPKGNAME-${VERSION}
 cd $DPKGNAME-${VERSION}
 debuild --no-lintian -us -uc
 if [ ! -z "$1" ]; then
-    mv /tmp/confluent/$DPKGNAME-${VERSION}*.deb $1/
+    mv /tmp/confluent/${DPKGNAME}_${VERSION}*.deb $1/
 fi
 exit 0
