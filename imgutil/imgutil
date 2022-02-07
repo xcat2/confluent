@@ -342,7 +342,7 @@ def create_yumconf(sourcedir, addrepos):
     if os.path.exists(sourcedir + '/repodata'):
         yumconf.write('[genimage-topdir]\n')
         yumconf.write('name=Local install repository\n')
-        yumconf.write('baseurl={0}\n'.format(sourcedir))
+        yumconf.write('baseurl=file://{0}\n'.format(sourcedir))
         yumconf.write('enabled=1\ngpgcheck=0\n\n')
     else:
         c = configparser.ConfigParser()
