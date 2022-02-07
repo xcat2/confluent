@@ -904,21 +904,43 @@ def fingerprint_source(sourcepath, args):
     return oshandler
 
 def fingerprint_host_el(args, hostpath='/'):
-    try:
-        import rpm
-    except ImportError:
-        return None
     if hostpath[0] != '/':
          hostpath = os.path.join(os.getcwd(), hostpath)
-    ts = rpm.TransactionSet(hostpath)
-    rpms = ts.dbMatch('provides', 'system-release')
-    for inf in rpms:
-        if 'el8' not in inf.release and 'el7' not in inf.release:
-            continue
-        osname = inf.name.replace('-release', '').replace('-', '_')
-        if osname == 'centos_linux':
-            osname = 'centos'
-        return ElHandler(osname, inf.version, os.uname().machine, args)
+    try:
+        import rpm
+        ts = rpm.TransactionSet(hostpath)
+        rpms = ts.dbMatch('provides', 'system-release')
+        for inf in rpms:
+            if 'el8' not in inf.release and 'el7' not in inf.release:
+                continue
+            osname = inf.name
+            version = inf.version
+            relese = inf.release
+    except ImportError:
+        try:
+            rver = subprocess.check_output('rpm --root {0} -q --whatprovides system-release'.format(hostpath).split())
+            if not isinstance(rver, str):
+                rver = rver.decode('utf8')
+            for infline in subprocess.check_output('rpm -qi {0}'.format(rver).split()).decode('utf8').split('\n'):
+                if ':' not in infline:
+                    continue
+                k, v = infline.split(':', 1)
+                k = k.strip()
+                v = v.strip()
+                if k == 'Name':
+                    osname = v
+                elif k == 'Release':
+                    release = v
+                elif k == 'Version':
+                    version = v
+        except subprocess.SubprocessError:
+            return None
+    if 'el8' not in release and 'el7' not in release:
+        return None
+    osname = osname.replace('-release', '').replace('-', '_')
+    if osname == 'centos_linux':
+        osname = 'centos'
+    return ElHandler(osname, version, os.uname().machine, args)
 
 
 def fingerprint_host_deb(args, hostpath='/'):
