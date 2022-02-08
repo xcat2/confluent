@@ -315,6 +315,16 @@ def initialize(cmdset):
     opath = os.getcwd()
     os.chdir('/var/lib/confluent/public/site')
     totar = []
+    if not os.path.exists('confluent_uuid'):
+        c = client.Command()
+        for rsp in c.read('/uuid'):
+            uuid = rsp.get('uuid', {}}).get('value', None)
+            if uuid:
+                with open('confluent_uuid') as uuidout:
+                    uuidout.write(uuid)
+                    uuidout.write('\n')
+    totar.append('confluent_uuid')
+    topack.append('confluent_uuid')
     if os.path.exists('ssh'):
         totar.append('ssh')
         topack.append('ssh/')
