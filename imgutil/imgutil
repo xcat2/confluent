@@ -915,7 +915,7 @@ def fingerprint_host_el(args, hostpath='/'):
                 continue
             osname = inf.name
             version = inf.version
-            relese = inf.release
+            release = inf.release
     except ImportError:
         try:
             rver = subprocess.check_output('rpm --root {0} -q --whatprovides system-release'.format(hostpath).split())
