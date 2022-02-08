@@ -318,7 +318,7 @@ def initialize(cmdset):
     if not os.path.exists('confluent_uuid'):
         c = client.Command()
         for rsp in c.read('/uuid'):
-            uuid = rsp.get('uuid', {}}).get('value', None)
+            uuid = rsp.get('uuid', {}).get('value', None)
             if uuid:
                 with open('confluent_uuid') as uuidout:
                     uuidout.write(uuid)
