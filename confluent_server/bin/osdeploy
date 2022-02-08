@@ -320,7 +320,7 @@ def initialize(cmdset):
         for rsp in c.read('/uuid'):
             uuid = rsp.get('uuid', {}).get('value', None)
             if uuid:
-                with open('confluent_uuid') as uuidout:
+                with open('confluent_uuid', 'w') as uuidout:
                     uuidout.write(uuid)
                     uuidout.write('\n')
     totar.append('confluent_uuid')
