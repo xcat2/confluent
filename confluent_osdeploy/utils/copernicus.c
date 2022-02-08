@@ -119,9 +119,9 @@ int main(int argc, char* argv[]) {
     inet_pton(AF_INET, "239.255.255.250", &dst4.sin_addr);
     strncpy(msg,  "M-SEARCH * HTTP/1.1\r\nST: urn:xcat.org:service:confluent:", 1024);
     offset = strnlen(msg, 1024);
-    add_uuid(msg + offset, 1024 - offset);
-    offset = strnlen(msg, 1024);
     add_confluent_uuid(msg + offset, 1024 - offset);
+    offset = strnlen(msg, 1024);
+    add_uuid(msg + offset, 1024 - offset);
     offset = strnlen(msg, 1024);
     add_macs(msg + offset, 1024 - offset);
     offset = strnlen(msg, 1024);
