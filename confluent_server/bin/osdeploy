@@ -121,6 +121,9 @@ def init_confluent_myname():
         return
     mynamedone = True
     hasconfluentuser = None
+    neededuid = os.stat('/etc/confluent').st_uid
+    if neededuid == 0:
+        return
     try:
         hasconfluentuser = pwd.getpwnam('confluent')
     except KeyError:
@@ -247,6 +250,17 @@ def initialize(cmdset):
                 'subject.')
     else:
         didsomething = False
+    if not os.path.exists('/etc/confluent'):
+        sys.stderr.write('Start confluent service prior to initializng OS deployment\n')
+        sys.exit(1)
+    if cmdset.t or cmdset.s or cmdset.a or cmdset.u:
+        neededuid = os.stat('/etc/confluent').st_uid
+        try:
+            os.makedirs('/var/lib/confluent')
+            os.chown('/var/lib/confluent', neededuid, -1)
+        except OSError as e:
+            if e.errno != 17:
+                raise
     if cmdset.u:
         didsomething = True
         if not glob.glob('/root/.ssh/*.pub'):
@@ -258,14 +272,6 @@ def initialize(cmdset):
             sys.exit(1)
         init_confluent_myname()
         sshutil.initialize_root_key(False)
-    if cmdset.t or cmdset.s or cmdset.a or cmdset.u:
-        neededuid = os.stat('/etc/confluent').st_uid
-        try:
-            os.makedirs('/var/lib/confluent')
-            os.chown('/var/lib/confluent', neededuid, -1)
-        except OSError as e:
-            if e.errno != 17:
-                raise
     if cmdset.t:
         didsomething = True
         init_confluent_myname()

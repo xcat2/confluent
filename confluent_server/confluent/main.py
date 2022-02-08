@@ -272,6 +272,8 @@ def run(args):
     if not confluentuuid:
         confluentuuid = str(uuid.uuid4())
         configmanager.set_global('confluent_uuid', confluentuuid)
+    if not configmanager._masterkey:
+        configmanager.init_masterkey()
     if dbgif:
         oumask = os.umask(0o077)
         try:
