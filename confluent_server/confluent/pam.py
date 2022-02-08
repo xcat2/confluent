@@ -242,10 +242,10 @@ if __name__ == "__main__":
         readline.set_pre_input_hook(hook)
 
         if sys.version_info >= (3,):
-            result = input(prompt)
+            getinput = input
         else:
-            result = raw_input(prompt)
-
+            getinput = raw_input
+        result = getinput(prompt)
         readline.set_pre_input_hook()
         return result
 
