@@ -196,6 +196,7 @@ class NodeRange(object):
                 leftnum = int(leftbits[idx])
                 rightnum = int(rightbits[idx])
                 if leftnum > rightnum:
+                    return self.failorreturn(seqrange)
                     width = len(rightbits[idx])
                     minnum = rightnum
                     maxnum = leftnum + 1  # range goes to n-1...
