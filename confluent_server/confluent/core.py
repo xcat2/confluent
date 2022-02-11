@@ -158,7 +158,7 @@ def _merge_dict(original, custom):
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
                    'noderange/', 'nodes/', 'nodegroups/', 'usergroups/' ,
-                   'users/', 'version']
+                   'users/', 'uuid', 'version']
 
 
 class PluginRoute(object):
@@ -1216,6 +1216,8 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
             configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'version':
         return (msg.Attributes(kv={'version': confluent.__version__}),)
+    elif pathcomponents[0] == 'uuid':
+        return (msg.Attributes(kv={'uuid': cfm.get_global('confluent_uuid')}),)
     elif pathcomponents[0] == 'usergroups':
         # TODO: when non-administrator accounts exist,
         # they must only be allowed to see their own user

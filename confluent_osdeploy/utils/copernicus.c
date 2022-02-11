@@ -27,6 +27,20 @@ int add_uuid(char* destination, int maxsize) {
     return  uuidsize + 6;
 }
 
+int add_confluent_uuid(char* destination, int maxsize) {
+    int uuidf;
+    int uuidsize;
+    uuidf = open("/confluent_uuid", O_RDONLY);
+    if (uuidf < 1) { return 0; }
+    strncpy(destination, "/confluentuuid=", maxsize);
+    uuidsize = read(uuidf, destination + 15, maxsize - 15);
+    close(uuidf);
+    if (destination[uuidsize + 14] == '\n') {
+        destination[uuidsize + 14] = 0;
+    }
+    return uuidsize + 15;
+}
+
 void add_macs(char* destination, int maxsize) {
     struct ifaddrs *ifc, *ifa;
     struct sockaddr_ll *lla;
@@ -104,6 +118,8 @@ int main(int argc, char* argv[]) {
     dst4.sin_port = htons(1900);
     inet_pton(AF_INET, "239.255.255.250", &dst4.sin_addr);
     strncpy(msg,  "M-SEARCH * HTTP/1.1\r\nST: urn:xcat.org:service:confluent:", 1024);
+    offset = strnlen(msg, 1024);
+    add_confluent_uuid(msg + offset, 1024 - offset);
     offset = strnlen(msg, 1024);
     add_uuid(msg + offset, 1024 - offset);
     offset = strnlen(msg, 1024);

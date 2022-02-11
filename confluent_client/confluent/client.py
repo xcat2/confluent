@@ -42,9 +42,9 @@ _attraliases = {
 }
 
 try:
-    input = raw_input
+    getinput = raw_input
 except NameError:
-    pass
+    getinput = input
 
 
 class NestedDict(dict):
@@ -284,9 +284,9 @@ class Command(object):
                 nodename = list(self.read(
                     '/noderange/{0}/nodes/'.format(noderange)))[0].get('item', {}).get('href', None)
                 nodename = nodename[:-1]
-                p = input('Command is about to affect node {0}, continue (y/n)? '.format(nodename))
+                p = getinput('Command is about to affect node {0}, continue (y/n)? '.format(nodename))
             else:
-                p = input('Command is about to affect {0} nodes, continue (y/n)? '.format(nsize))
+                p = getinput('Command is about to affect {0} nodes, continue (y/n)? '.format(nsize))
             if p.lower() != 'y':
                 sys.stderr.write('Aborting at user request\n')
                 sys.exit(1)
@@ -401,7 +401,7 @@ class Command(object):
                 if fingerprint == khf[hostid]:
                     return
                 else:
-                    replace = input(
+                    replace = getinput(
                         "MISMATCHED CERTIFICATE DATA, ACCEPT NEW? (y/n):")
                     if replace not in ('y', 'Y'):
                         raise Exception("BAD CERTIFICATE")

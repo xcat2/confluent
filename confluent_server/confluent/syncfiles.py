@@ -128,15 +128,34 @@ class SyncList(object):
                         try:
                             uid = pwd.getpwnam(optval).pw_uid
                         except KeyError:
-                            uid = None
-                        optval = {'name': optval, 'id': uid}
+                            try:
+                                uid = int(optval)
+                                optval = None
+                            except ValueError:
+                                uid = None
+                        if optval:
+                            optval = {'name': optval}
+                        else:
+                            optval = {}
+                        if uid is not None:
+                            optval['id'] = uid
                     elif optname == 'group':
                         try:
                             gid = grp.getgrnam(optval).gr_gid
                         except KeyError:
-                            gid = None
-                        optval = {'name': optval, 'id': gid}
-                    entopts[optname] = optval
+                            try:
+                                gid = int(optval)
+                                optval = None
+                            except ValueError:
+                                gid = None
+                        if optval:
+                            optval = {'name': optval}
+                        else:
+                            optval = {}
+                        if gid is not None:
+                            optval['id'] = gid
+                    if optval:
+                        entopts[optname] = optval
             currmap[k] = v
             targ = v if v else k
             for f in targ.split():
