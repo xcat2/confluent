@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ast
 import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.config.attributes as allattributes
@@ -188,6 +189,12 @@ def update_nodegroup(group, element, configmanager, inputdata):
         for attrib in inputdata.attribs:
             if inputdata.attribs[attrib] is None:
                 clearattribs.append(attrib)
+            else:
+                try:
+                    ast.parse(attrib)
+                except SyntaxError as e:
+                    markup = (e.text[:e.offset-1] + '-->' + e.text[e.offset-1] + '<--' + e.text[e.offset:]).strip()
+                    raise exc.InvalidArgumentException('Syntax error in attribute name: "{0}"'.format(markup))
         for attrib in clearattribs:
             del inputdata.attribs[attrib]
         if clearattribs:
@@ -280,6 +287,12 @@ def update_nodes(nodes, element, configmanager, inputdata):
                     for matchattrib in currnodeattrs.get(node, {}):
                         updatenode[matchattrib] = updatenode[attrib]
                     del updatenode[attrib]
+                else:
+                    try:
+                        ast.parse(attrib)
+                    except SyntaxError as e:
+                        markup = (e.text[:e.offset-1] + '-->' + e.text[e.offset-1] + '<--' + e.text[e.offset:]).strip()
+                        raise exc.InvalidArgumentException('Syntax error in attribute name: "{0}"'.format(markup))
             if len(clearattribs) > 0:
                 configmanager.clear_node_attributes([node], clearattribs)
             updatedict[node] = updatenode
