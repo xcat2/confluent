@@ -105,7 +105,10 @@ if len(args) > 1:
             requestargs=args[1:]
     except:
         pass
-
+elif options.clear or options.environment or options.prompt:
+    sys.stderr.write('Attribute names required with specified options\n')
+    argparser.print_help()
+    exitcode = 400
 if exitcode != 0:
     sys.exit(exitcode)
 
