@@ -85,7 +85,8 @@ def assure_tls_ca():
             if e.errno != 17:
                 raise
         sslcfg = get_openssl_conf_location()
-        tmpconfig = tempfile.mktemp()
+        tmphdl, tmpconfig = tempfile.mkstemp()
+        os.close(tmphdl)
         shutil.copy2(sslcfg, tmpconfig)
         subprocess.check_call(
             ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
@@ -151,9 +152,12 @@ def create_certificate(keyout=None, certout=None):
     #san.append('DNS:{0}'.format(longname))
     san = ','.join(san)
     sslcfg = get_openssl_conf_location()
-    tmpconfig = tempfile.mktemp()
-    extconfig = tempfile.mktemp()
-    csrout = tempfile.mktemp()
+    tmphdl, tmpconfig = tempfile.mkstemp()
+    os.close(tmphdl)
+    tmphdl, extconfig = tempfile.mkstemp()
+    os.close(tmphdl)
+    tmphdl, csrout = tempfile.mkstemp()
+    os.close(tmphdl)
     shutil.copy2(sslcfg, tmpconfig)
     serialnum = '0x' + ''.join(['{:02x}'.format(x) for x in bytearray(os.urandom(20))])
     try:

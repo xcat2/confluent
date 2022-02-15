@@ -254,8 +254,11 @@ def mkpathorlink(source, destination, appendexist=False):
         else:
             mkdirp(os.path.dirname(destination))
         if appendexist and os.path.exists(destination):
-            tmpnam = tempfile.mktemp()
-            shutil.copy(destination, tmpnam)
+            tmphdl, tmpnam = tempfile.mkstemp()
+            try:
+                shutil.copy(destination, tmpnam)
+            finally:
+                os.close(tmphdl)
             os.remove(destination)
             with open(destination, 'w') as realdest:
                 with open(tmpnam) as olddest:
