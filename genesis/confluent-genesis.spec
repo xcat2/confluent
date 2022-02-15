@@ -1,6 +1,6 @@
 %define arch x86_64
-Version: 3.3.0
-Release:  2
+Version: 3.4.0
+Release:  1
 Name: confluent-genesis-%{arch}
 BuildArch: noarch
 Summary: Genesis servicing image for confluent
