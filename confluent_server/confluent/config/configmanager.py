@@ -546,15 +546,17 @@ def _load_dict_from_dbm(dpath, tdb):
             if elem not in currdict:
                 currdict[elem] = {}
             currdict = currdict[elem]
+        # Pickle is used as the first choice. It is a local self-owned file
+        # and thus not a significant security risk
         try:
             for tk in dbe.keys():
                 tks = confluent.util.stringify(tk)
-                currdict[tks] = cPickle.loads(dbe[tk])
+                currdict[tks] = cPickle.loads(dbe[tk]) # nosec
         except AttributeError:
             tk = dbe.firstkey()
             while tk != None:
                 tks = confluent.util.stringify(tk)
-                currdict[tks] = cPickle.loads(dbe[tk])
+                currdict[tks] = cPickle.loads(dbe[tk]) # nosec
                 tk = dbe.nextkey(tk)
     except dbm.error:
         return

@@ -31,7 +31,14 @@ if 'authResult>1' in rspdata:
      rspdata = rsp.read().decode('utf8')
 if 'renew_account' in rspdata:
      restorepwd = True
-     tokens = fromstring(rspdata)
+     if isinstance(rspdata, bytes):
+         if b'!entity' in rspdata.lower():
+             raise Exception('Unexpected material')
+     else:
+        if '!entity' in rspdata.lower():
+             raise Exception('Unexpected material')
+     # the troublesome entity tag is guarded above
+     tokens = fromstring(rspdata)  # nosec
      st2 = tokens.findall('st2')[0].text
      w.set_header('ST2', st2)
      w.request('POST', '/data/changepwd', 'oripwd={0}&newpwd={1}'.format(os.environ['SMMPASS'], tmppassword))
@@ -41,7 +48,14 @@ if 'renew_account' in rspdata:
      rsp = w.getresponse()
      rspdata = rsp.read().decode('utf8')
 if 'authResult>0' in rspdata:
-     tokens = fromstring(rspdata)
+     if isinstance(rspdata, bytes):
+        if b'!entity' in rspdata.lower():
+            raise Exception('Unexpected material')
+     else:
+        if '!entity' in rspdata.lower():
+             raise Exception('Unexpected material')
+     # the risky xml entity feature is filtered out above
+     tokens = fromstring(rspdata)  # nosec
      st2 = tokens.findall('st2')[0].text
      w.set_header('ST2', st2)
      rules = 'set=passwordDurationDays:0,passwordExpireWarningDays:0,passwordChangeInterval:0,passwordReuseCheckNum:0,passwordFailAllowdNum:0,passwordLockoutTimePeriod:0'

@@ -36,7 +36,9 @@ def fromstring(inputdata):
         cmpstr = '!entity'
     if cmpstr in inputdata.lower():
         raise Exception('!ENTITY not supported in this interface')
-    return rfromstring(inputdata)
+    # The measures above should filter out the risky facets of xml
+    # We don't need sophisticated feature support
+    return rfromstring(inputdata)  # nosec
 
 def fixuuid(baduuid):
     # SMM dumps it out in hex

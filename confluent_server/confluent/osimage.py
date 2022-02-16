@@ -212,7 +212,8 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
                 write_data_block(write_p, buff, size, offset)
             write_finish_entry(write_p)
             if os.path.isdir(str(entry)):
-                os.chmod(str(entry), 0o755)
+                # This directory must be world accessible for web server
+                os.chmod(str(entry), 0o755)  # nosec
             else:
                 os.chmod(str(entry), 0o644)
     if callback:
