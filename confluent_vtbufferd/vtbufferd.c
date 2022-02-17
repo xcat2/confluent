@@ -178,22 +178,22 @@ int main(int argc, char* argv[]) {
         length = cmd & 536870911;
         cmd = cmd >> 29;
         if (cmd == SETNODE) {
-            currnode[length] = 0;
             cmd = fread(currnode, 1, length, stdin);
+            currnode[length] = 0;
             if (cmd < 0)
                 continue;
             currvt = set_termentbyname(currnode);
         } else if (cmd == WRITE) {
             if (currvt == NULL)
                 currvt = set_termentbyname("");
-            cmdbuf[length] = 0;
             cmd = fread(cmdbuf, 1, length, stdin);
+            cmdbuf[length] = 0;
             if (cmd < 0)
                 continue;
             tmt_write(currvt, cmdbuf, length);
         } else if (cmd == READBUFF) {
-            cmdbuf[length] = 0;
             cmd = fread(cmdbuf, 1, length, stdin);
+            cmdbuf[length] = 0;
             if (cmd < 0)
                 continue;
             outvt = get_termentbyname(cmdbuf);
