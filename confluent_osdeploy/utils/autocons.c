@@ -62,6 +62,10 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
     ttyf = open(buff, O_RDWR | O_NOCTTY);
+    if (ttyf < 0) {
+        fprintf(stderr, "Unable to open tty\n");
+        exit(1);
+    }
     if (currspeed == SPEED9600) {
         cspeed = B9600;
         strcpy(offset, ",9600");
@@ -87,7 +91,9 @@ int main(int argc, char* argv[]) {
     cfmakeraw(&tty2);
     tcsetattr(ttyf, TCSANOW, &tty2);
     flags = fcntl(ttyf, F_GETFL, 0);
-    fcntl(ttyf, F_SETFL, flags | O_NONBLOCK);
+    if (fcntl(ttyf, F_SETFL, flags | O_NONBLOCK) < 0) {
+        fprintf(stderr, "Failed setting flags on tty\n");
+    }
     while (read(ttyf, buff, 64) > 0) {
         // Drain any pending reads
     }

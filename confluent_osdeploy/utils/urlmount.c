@@ -39,9 +39,9 @@ typedef struct downloadbuffer {
 
 #define MAX_FILE_LEN 1024
 #define MAX_URL_PATHS 512
-static char filename[MAX_FILE_LEN];
+static char filename[MAX_FILE_LEN + 1];
 static int urlidx, newidx;
-static char* urls[MAX_URL_PATHS];
+static char* urls[MAX_URL_PATHS + 1];
 
 
 void *http_rechecker(void *argp) {
@@ -50,21 +50,36 @@ void *http_rechecker(void *argp) {
     tmpidx = open("/dev/urandom", O_RDONLY);
     if (tmpidx <= 0 || read(tmpidx, (char*)&tmpval, 4) < 0)
         tmpval = time(NULL);
-    if (tmpidx > 0)
+    if (tmpidx >= 0)
         close(tmpidx);
     srand(tmpval);
     checkurl = curl_easy_init();
-    curl_easy_setopt(checkurl, CURLOPT_ERRORBUFFER, curlerror);
+    if (curl_easy_setopt(checkurl, CURLOPT_ERRORBUFFER, curlerror) != CURLE_OK) {
+        fprintf(stderr, "Error buffer\n");
+        exit(1);
+    }
     //We want to consider error conditions fatal, rather than
     //passing error text as data
-    curl_easy_setopt(checkurl, CURLOPT_FAILONERROR, 1L);
-    curl_easy_setopt(checkurl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(checkurl, CURLOPT_NOBODY, 1);
+    if (curl_easy_setopt(checkurl, CURLOPT_FAILONERROR, 1L) != CURLE_OK) {
+        fprintf(stderr, "Fail on error\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(checkurl, CURLOPT_TIMEOUT, 10L) != CURLE_OK) {
+        fprintf(stderr, "Error setting timeout\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(checkurl, CURLOPT_NOBODY, 1) != CURLE_OK) {
+        fprintf(stderr, "Error setting nobody\n");
+        exit(1);
+    }
     while (1) {
-        sleep(25 + rand() % 10);  // Spread out retries across systems
+        sleep(25 + tmpval % 10);  // Spread out retries across systems
         tmpidx = 0;
         while (tmpidx < urlidx && tmpidx < newidx && urls[tmpidx] != NULL) {
-            curl_easy_setopt(checkurl, CURLOPT_URL, urls[tmpidx]);
+            if (curl_easy_setopt(checkurl, CURLOPT_URL, urls[tmpidx]) != CURLE_OK) {
+                tmpidx++;
+                continue;
+            }
             if (curl_easy_perform(checkurl) == CURLE_OK)
                 newidx = tmpidx;
             else
@@ -120,8 +135,14 @@ static int http_read(const char *path, char *buf, size_t size, off_t offset,
     if (offset >= filesize) return 0;
     if (offset + size - 1 >= filesize) size = filesize - offset - 1;
     snprintf(headbuffer, 512, "%ld-%ld", offset, offset + size - 1);
-    curl_easy_setopt(curl, CURLOPT_RANGE, headbuffer);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &dlbuf);
+    if (curl_easy_setopt(curl, CURLOPT_RANGE, headbuffer) != CURLE_OK) {
+        fprintf(stderr, "Error setting range\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&dlbuf) != CURLE_OK) {
+        fprintf(stderr, "Error setting writedata\n");
+        exit(1);
+    }
     if (newidx < MAX_URL_PATHS) {
         reconnecting = 1;
         urlidx = newidx;
@@ -129,7 +150,8 @@ static int http_read(const char *path, char *buf, size_t size, off_t offset,
         fd = fopen("/dev/kmsg", "w+");
         fprintf(fd, "<5>urlmount: Connecting to %s\n", urls[urlidx]);
         fclose(fd);
-        curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
+        // if fail, carry on and take the error in curl_easy_perform instead
+        if (curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]) != CURLE_OK) {}
     }
     while (curl_easy_perform(curl) != CURLE_OK) {
         reconnecting = 1;
@@ -138,6 +160,8 @@ static int http_read(const char *path, char *buf, size_t size, off_t offset,
         fprintf(fd, "<4>urlmount: error while communicating with %s: %s\n", urls[urlidx], curlerror);
         fclose(fd);
         urlidx++;
+        if (urlidx > MAX_URL_PATHS)
+            urlidx = 0;
         if (urls[urlidx] == NULL)
             urlidx = 0;
         if (urlidx == startidx) {
@@ -149,7 +173,12 @@ static int http_read(const char *path, char *buf, size_t size, off_t offset,
         fd = fopen("/dev/kmsg", "w+");
         fprintf(fd, "<5>urlmount: Connecting to %s\n", urls[urlidx]);
         fclose(fd);
-        curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
+        if (urlidx > MAX_URL_PATHS) {
+            fprintf(stderr, "Maximum url path exceeded\n");
+            exit(1);
+        }
+        // ignore, let the curl_easy_perform get the error
+        if (curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]) != CURLE_OK) {}
     }
     if (reconnecting) {
         fd = fopen("/dev/kmsg", "w+");
@@ -180,13 +209,28 @@ static void* http_init(struct fuse_conn_info *conn) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
     pthread_create(&tid, NULL, http_rechecker, NULL);
     curl = curl_easy_init();
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlerror);
+    if (curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlerror) != CURLE_OK) {
+        fprintf(stderr, "Failure initializing libcurl error buffor\n");
+        exit(1);
+    }
     //We want to consider error conditions fatal, rather than
     //passing error text as data
-    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fill_buffer);
+    if (curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L) != CURLE_OK) {
+        fprintf(stderr, "Failure initializing libcurl failonerror\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L) != CURLE_OK) {
+        fprintf(stderr, "Failure initializing libcurl timeout\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]) != CURLE_OK) {
+        fprintf(stderr, "Failure initializing url\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fill_buffer) != CURLE_OK) {
+        fprintf(stderr, "Failure initializing libcurl fill buffer\n");
+        exit(1);
+    }
     return NULL;
 }
 
@@ -225,11 +269,20 @@ int main(int argc, char* argv[]) {
     newidx = MAX_URL_PATHS;
     curl_global_init(CURL_GLOBAL_DEFAULT);
     curl = curl_easy_init();
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlerror);
+    if (curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curlerror) != CURLE_OK) {
+        fprintf(stderr, "Unable to set error buffer\n");
+        exit(1);
+    }
     //We want to consider error conditions fatal, rather than
     //passing error text as data
-    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+    if (curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L) != CURLE_OK) {
+        fprintf(stderr, "Unable to set fail on error\n");
+        exit(1);
+    }
+    if (curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L) != CURLE_OK) {
+        fprintf(stderr, "Unable to setup curl timeout\n");
+        exit(1);
+    }
     memset(filename, 0, MAX_FILE_LEN);
     for (i=0; i < argc; i++) {
         if (strstr(argv[i], ":") > 0) {
@@ -252,8 +305,12 @@ int main(int argc, char* argv[]) {
     }
     j = urlidx;
     printf("Connecting to %s\n", urls[urlidx]);
-    curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
-    curl_easy_setopt(curl, CURLOPT_NOBODY, 1);
+    if (curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]) != CURLE_OK) {
+        fprintf(stderr, "Unable to set url\n");
+    }
+    if (curl_easy_setopt(curl, CURLOPT_NOBODY, 1) != CURLE_OK) {
+        fprintf(stderr, "Failure setting no body\n");
+    }
     while (curl_easy_perform(curl) != CURLE_OK) {
         fprintf(stderr, "urlmount: error while communicating with %s: %s\n", urls[urlidx++], curlerror);
         if (urls[urlidx] == NULL)
@@ -263,12 +320,20 @@ int main(int argc, char* argv[]) {
             exit(1);
         }
         printf("Connecting to %s\n", urls[urlidx]);
-        curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]);
+        if (curl_easy_setopt(curl, CURLOPT_URL, urls[urlidx]) != CURLE_OK) {
+            fprintf(stderr, "Unable to set url\n");
+        }
     }
     printf("Successfully connected to %s\n", urls[urlidx]);
-    curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &fsize);
+    if (curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &fsize) != CURLE_OK) {
+        fprintf(stderr, "Failed getting content length\n");
+        exit(1);
+    }
     filesize = round(fsize);
-    curl_easy_setopt(curl, CURLOPT_NOBODY, 0);
+    if (curl_easy_setopt(curl, CURLOPT_NOBODY, 0) != CURLE_OK) {
+        fprintf(stderr, "Failed setting nobody\n");
+        exit(1);
+    }
     if (filesize < 1) {
         fprintf(stderr, "Unable to reach designated URL\n");
         exit(1);

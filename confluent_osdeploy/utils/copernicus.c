@@ -13,11 +13,21 @@
 #include <sys/time.h>
 #include <net/if.h>
 
+typedef struct sockaddr_llib {
+    unsigned short int sll_family;
+    unsigned short int sll_protocol;
+    int sll_ifindex;
+    unsigned short int sll_hatype;
+    unsigned char sll_pkttype;
+    unsigned char sll_halen;
+    unsigned char sll_addr[20];
+} sockaddr_llib;
+
 int add_uuid(char* destination, int maxsize) {
     int uuidf;
     int uuidsize;
     uuidf = open("/sys/devices/virtual/dmi/id/product_uuid", O_RDONLY);
-    if (uuidf < 1) { return 0; }
+    if (uuidf < 0) { return 0; }
     strncpy(destination, "/uuid=", maxsize);
     uuidsize = read(uuidf, destination + 6, maxsize - 6);
     close(uuidf);
@@ -31,7 +41,7 @@ int add_confluent_uuid(char* destination, int maxsize) {
     int uuidf;
     int uuidsize;
     uuidf = open("/confluent_uuid", O_RDONLY);
-    if (uuidf < 1) { return 0; }
+    if (uuidf < 0) { return 0; }
     strncpy(destination, "/confluentuuid=", maxsize);
     uuidsize = read(uuidf, destination + 15, maxsize - 15);
     close(uuidf);
@@ -43,7 +53,7 @@ int add_confluent_uuid(char* destination, int maxsize) {
 
 void add_macs(char* destination, int maxsize) {
     struct ifaddrs *ifc, *ifa;
-    struct sockaddr_ll *lla;
+    struct sockaddr_llib *lla;
     int offset;
     char macaddr[32];
 
@@ -52,7 +62,7 @@ void add_macs(char* destination, int maxsize) {
     for (ifc = ifa; ifc != NULL; ifc = ifc->ifa_next) {
         if (ifc->ifa_addr->sa_family != AF_PACKET)
             continue;
-        lla = (struct sockaddr_ll *)ifc->ifa_addr;
+        lla = (struct sockaddr_llib *)ifc->ifa_addr;
         if (lla->sll_hatype == ARPHRD_INFINIBAND) {
             snprintf(macaddr, 32, "/mac=%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
                 lla->sll_addr[12], lla->sll_addr[13], lla->sll_addr[14],
@@ -127,12 +137,30 @@ int main(int argc, char* argv[]) {
     offset = strnlen(msg, 1024);
     ns = socket(AF_INET6, SOCK_DGRAM, 0);
     n4 = socket(AF_INET, SOCK_DGRAM, 0);
+    if (ns < 0) {
+        fprintf(stderr, "Error opening IPv6 socket\n");
+        exit(1);
+    }
+    if (n4 < 0) {
+        fprintf(stderr, "Error opening IPv4 socket\n");
+        exit(1);
+    }
     ifidx = 1; /* reuse ifidx because it's an unused int here */
-    setsockopt(n4, SOL_SOCKET, SO_BROADCAST, &ifidx, sizeof(ifidx));
-    setsockopt(ns, IPPROTO_IPV6, IPV6_V6ONLY, &ifidx, sizeof(ifidx));
+    if (setsockopt(n4, SOL_SOCKET, SO_BROADCAST, &ifidx, sizeof(ifidx)) != 0) {
+        fprintf(stderr, "Unable to set broadcast on socket\n");
+    }
+    if (setsockopt(ns, IPPROTO_IPV6, IPV6_V6ONLY, &ifidx, sizeof(ifidx)) != 0) {
+        fprintf(stderr, "Unable to limit socket to IPv6 only\n");
+    }
     /* For now, bind to 190 to prove we are a privileged process */
-    bind(n4, (const struct sockaddr *)&addr4, sizeof(addr4));
-    bind(ns, (const struct sockaddr *)&addr, sizeof(addr));
+    if (bind(n4, (const struct sockaddr *)&addr4, sizeof(addr4)) < 0) {
+        fprintf(stderr, "Eror binding privilged port!\n");
+        exit(1);
+    }
+    if (bind(ns, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "Error binding ipv6 privileged port!\n");
+        exit(1);
+    }
     getifaddrs(&ifa);
     for (ifc = ifa; ifc != NULL; ifc = ifc->ifa_next) {
         if (!ifc->ifa_addr) continue;
@@ -143,15 +171,23 @@ int main(int argc, char* argv[]) {
             if (in6->sin6_scope_id == 0)
                 continue;
             ifidx = in6->sin6_scope_id;
-            setsockopt(ns, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifidx, sizeof(ifidx));
-            sendto(ns, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst, sizeof(dst));
+            if (setsockopt(ns, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifidx, sizeof(ifidx)) != 0)
+                continue;
+            if (sendto(ns, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst, sizeof(dst)) < 0) {
+                continue;
+            }
         } else if (ifc->ifa_addr->sa_family == AF_INET) {
             in = (struct sockaddr_in *)ifc->ifa_addr;
             bin = (struct sockaddr_in *)ifc->ifa_ifu.ifu_broadaddr;
             bin->sin_port = htons(1900);
-            setsockopt(n4, IPPROTO_IP, IP_MULTICAST_IF, &in->sin_addr, sizeof(in->sin_addr));
-            sendto(n4, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst4, sizeof(dst4));
-            sendto(n4, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)bin, sizeof(*bin));
+            if (setsockopt(n4, IPPROTO_IP, IP_MULTICAST_IF, &in->sin_addr, sizeof(in->sin_addr)) != 0)
+                continue;
+            if (sendto(n4, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)&dst4, sizeof(dst4)) < 0) {
+                // ignore failure to send, we are trying to be opportunistic
+            }
+            if (sendto(n4, msg, strnlen(msg, 1024), 0, (const struct sockaddr *)bin, sizeof(*bin)) < 0) {
+                continue;
+            }
         }
     }
     FD_ZERO(&rfds);

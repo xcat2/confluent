@@ -4,42 +4,90 @@
 #include <string.h>
 
 int read_part(FILE* img, long int imgsize) {
-    char mountpath[65537];
-    char devpath[65537];
-    char fstype[65537];
+    char * mountpath;
+    char * devpath;
+    char * fstype;
     uint16_t shortlength;
     uint32_t length;
     uint64_t longlength;
-    fread(&shortlength, 2, 1, img);
+    if (fread(&shortlength, 2, 1, img) < 2) {
+        fprintf(stderr, "Error reading section\n");
+        exit(1);
+    }
     shortlength = be16toh(shortlength);
-    fread(mountpath, 1, shortlength, img);
+    mountpath = (char*)malloc(shortlength + 1);
+    if (fread(mountpath, 1, shortlength, img) < shortlength) {
+        fprintf(stderr, "Failure reading segment\n");
+        exit(1);
+    }
     mountpath[shortlength] = 0;
-    fread(&length, 4, 1, img);
+    if (fread(&length, 4, 1, img) < 4) {
+        fprintf(stderr, "Failure reading segment\n");
+        exit(1);
+    }
     length = be32toh(length);
-    fseek(img, length, SEEK_CUR); // skip json section that we don't support
-    fread(&longlength, 8, 1, img); // minimum size in bytes
+    if (fseek(img, length, SEEK_CUR) != 0) { // skip json section that we don't support
+        fprintf(stderr, "Error skipping json segment");
+        exit(1);
+    }
+    if (fread(&longlength, 8, 1, img) < 8) { // minimum size in bytes
+        fprintf(stderr, "Failure reading segment\n");
+        exit(1);
+    }
     longlength = be64toh(longlength);
     printf("%ld\t", longlength);
-    fread(&longlength, 8, 1, img); // default size in bytes
+    if (fread(&longlength, 8, 1, img) < 8) { // default size in bytes
+        fprintf(stderr, "Error reading segment\n");
+        exit(1);
+    }
     longlength = be64toh(longlength);
     printf("%ld\t", longlength);
-    fread(&shortlength, 2, 1, img); // length of filesystem type
+    if (fread(&shortlength, 2, 1, img) < 2) { // length of filesystem type
+        fprintf(stderr, "Error reading segment\n");
+        exit(1);
+    }
     shortlength = be16toh(shortlength);
-    fread(fstype, 1, shortlength, img);
+    fstype = (char*)malloc(shortlength + 1);
+    if (fread(fstype, 1, shortlength, img) < shortlength) {
+        fprintf(stderr, "Error reading segment\n");
+        exit(1);
+    }
     fstype[shortlength] = 0;
-    fread(&shortlength, 2, 1, img); // length of DEVICE
+    if (fread(&shortlength, 2, 1, img) < 2) { // length of DEVICE
+        fprintf(stderr, "Error reading segment\n");
+        exit(1);
+    }
     shortlength = be16toh(shortlength);
-    fread(devpath, 1, shortlength, img);
+    devpath = (char*)malloc(shortlength + 1);
+    if (fread(devpath, 1, shortlength, img) < shortlength) {
+        fprintf(stderr, "Error reading segment\n");
+        exit(1);
+    }
     devpath[shortlength] = 0;
-    fread(&shortlength, 2, 1, img);
+    if (fread(&shortlength, 2, 1, img) < 2) {
+        fprintf(stderr, "Error reading segment\n");
+        exit(1);
+    }
     shortlength = be16toh(shortlength);
-    fseek(img, shortlength, SEEK_CUR); // Skip the padding
-    fread(&longlength, 8, 1, img);
+    if (fseek(img, shortlength, SEEK_CUR) != 0) { // Skip the padding
+        fprintf(stderr, "Failure skipping padding\n");
+        exit(1);
+    }
+    if (fread(&longlength, 8, 1, img) < 8) {
+        fprintf(stderr, "Error reading section\n");
+        exit(1);
+    }
     longlength = be64toh(longlength);
     printf("%ld\t", ftell(img) / 512);
     printf("%ld\t", longlength / 512);
     printf("%s\t%s\t%s\n", fstype, devpath, mountpath);
-    fseek(img, longlength, SEEK_CUR);
+    free(mountpath);
+    free(devpath);
+    free(fstype);
+    if (fseek(img, longlength, SEEK_CUR) != 0) {
+        fprintf(stderr, "Error restoring seek\n");
+        exit(1);
+    }
     return (ftell(img) < imgsize);
 }
 
@@ -62,15 +110,30 @@ int main(int argc, char* argv[]) {
     }
     if (memcmp(buffer, "\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1", 16) == 0) {
         printf("Format: confluent_multisquash\nminsize\tdefsize\toffset\tsize\tfstype\torigdev\tmount\n");
-        fread(buffer, 1, 1, img);
-        fseek(img, buffer[0], SEEK_CUR);
+        if (fread(buffer, 1, 1, img) < 1) {
+            fprintf(stderr, "Error reading image\n");
+            exit(1);
+        }
+        if (fseek(img, buffer[0], SEEK_CUR) != 0) {
+            fprintf(stderr, "Error seeking in image\n");
+            exit(1);
+        }
         while (read_part(img, imgsize));
         exit(0);
     }
     if (memcmp(buffer, "\xaa\xd5\x0f\x7e\x5d\xfb\x4b\x7c\xa1\x2a\xf4\x0b\x6d\x94\xf7\xfc", 16) == 0) {
-        fread(buffer, 1, 1, img);
-        fseek(img, buffer[0], SEEK_CUR);
-        fread(buffer, 1, 1, img);
+        if (fread(buffer, 1, 1, img) < 1) {
+            fprintf(stderr, "Error reading image\n");
+            exit(1);
+        }
+        if (fseek(img, buffer[0], SEEK_CUR) != 0) {
+            fprintf(stderr, "Error reading image\n");
+            exit(1);
+        }
+        if (fread(buffer, 1, 1, img) < 1) {
+            fprintf(stderr, "Error reading image\n");
+            exit(1);
+        }
         if (buffer[0] == 0) {
             printf("Format: confluent_crypted\n");
             exit(0);
