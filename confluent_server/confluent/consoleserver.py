@@ -190,12 +190,13 @@ class ConsoleHandler(object):
         if self.pendingbytes is not None:
             self.pendingbytes += data
         self.pendingbytes = b''
+        nodeid = self._plugin_path.format(self.node)
         try:
-            send_output(self.node, data)
+            send_output(nodeid, data)
             data = self.pendingbytes
             self.pendingbytes = None
             if data:
-                send_output(self.node, data)
+                send_output(nodeid, data)
         except Exception:
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
@@ -547,7 +548,8 @@ class ConsoleHandler(object):
             'connectstate': self.connectstate,
             'clientcount': len(self.livesessions),
         }
-        retdata = get_buffer_output(self.node)
+        nodeid = self._plugin_path.format(self.node)
+        retdata = get_buffer_output(nodeid)
         return retdata, connstate
 
     def write(self, data):
