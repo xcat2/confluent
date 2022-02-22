@@ -37,6 +37,10 @@ class _ShellHandler(consoleserver.ConsoleHandler):
         # suppress logging through proving a stub 'log' function
         return
 
+    def feedbuffer(self, data):
+        return
+        #return super().feedbuffer(data)
+
     def _got_disconnected(self):
         self.connectstate = 'closed'
         self._send_rcpts({'connectstate': self.connectstate})

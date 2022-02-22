@@ -126,6 +126,7 @@ class ConsoleHandler(object):
                                   'collective.manager'))
 
     def __init__(self, node, configmanager, width=80, height=24):
+        self.termprefix = 'c_'
         self.clearpending = False
         self.clearerror = False
         self.initsize = (width, height)
@@ -190,7 +191,7 @@ class ConsoleHandler(object):
         if self.pendingbytes is not None:
             self.pendingbytes += data
         self.pendingbytes = b''
-        nodeid = self._plugin_path.format(self.node)
+        nodeid = self.termprefix + self.node
         try:
             send_output(nodeid, data)
             data = self.pendingbytes
@@ -548,7 +549,7 @@ class ConsoleHandler(object):
             'connectstate': self.connectstate,
             'clientcount': len(self.livesessions),
         }
-        nodeid = self._plugin_path.format(self.node)
+        nodeid = self.termprefix + self.node
         retdata = get_buffer_output(nodeid)
         return retdata, connstate
 
