@@ -25,7 +25,7 @@ currtzvintage = None
 def yamldump(input):
     return yaml.safe_dump(input, default_flow_style=False)
 
-def get_extra_names(nodename, cfg):
+def get_extra_names(nodename, cfg, myip=None):
     names = set([])
     dnsinfo = cfg.get_node_attributes(nodename, ('dns.*', 'net.*hostname'))
     dnsinfo = dnsinfo.get(nodename, {})
@@ -41,6 +41,17 @@ def get_extra_names(nodename, cfg):
                     names.add(currname)
                     if domain and domain not in currname:
                         names.add('{0}.{1}'.format(currname, domain))
+    if myip:
+        ncfgs = [netutil.get_nic_config(cfg, nodename, serverip=myip)]
+        fncfg = netutil.get_full_net_config(cfg, nodename, serverip=myip)
+        ncfgs.append(fncfg['default'])
+        for ent in fncfg['extranets']:
+            ncfgs.append(fncfg['extranets'][ent])
+        for ncfg in ncfgs:
+            for nip in (ncfg.get('ipv4_address', None), ncfg.get('ipv6_address', None)):
+                if nip:
+                    nip = nip.split('/', 1)[0]
+                    names.add(nip)
     return names
 
 def handle_request(env, start_response):
@@ -70,6 +81,13 @@ def handle_request(env, start_response):
         return
     if ea.get(nodename, {}).get('deployment.apiarmed', {}).get('value', None) == 'once':
         cfg.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
+    myip = env.get('HTTP_X_FORWARDED_HOST', None)
+    if myip and ']' in myip:
+        myip = myip.split(']', 1)[0]
+    elif myip:
+        myip = myip.split(':', 1)[0]
+    if myip:
+        myip = myip.replace('[', '').replace(']', '')
     retype = env.get('HTTP_ACCEPT', 'application/yaml')
     isgeneric = False
     if retype == '*/*':
@@ -118,12 +136,6 @@ def handle_request(env, start_response):
         start_response('200 OK', (('Conntent-Type', retype),))
         yield dumper(rsp)
     elif env['PATH_INFO'] == '/self/netcfg':
-        myip = env.get('HTTP_X_FORWARDED_HOST', None)
-        if ']' in myip:
-            myip = myip.split(']', 1)[0]
-        else:
-            myip = myip.split(':', 1)[0]
-        myip = myip.replace('[', '').replace(']', '')
         ncfg = netutil.get_full_net_config(cfg, nodename, myip)
         start_response('200 OK', (('Content-Type', retype),))
         yield dumper(ncfg)
@@ -137,12 +149,6 @@ def handle_request(env, start_response):
                     ifidx = int(nici.read())
             ncfg = netutil.get_nic_config(cfg, nodename, ifidx=ifidx)
         else:
-            myip = env.get('HTTP_X_FORWARDED_HOST', None)
-            if ']' in myip:
-                myip = myip.split(']', 1)[0]
-            else:
-                myip = myip.split(':', 1)[0]
-            myip = myip.replace('[', '').replace(']', '')
             ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
         if env['PATH_INFO'] == '/self/deploycfg':
             for key in list(ncfg):
@@ -270,7 +276,7 @@ def handle_request(env, start_response):
             start_response('500 Unconfigured', ())
             yield 'CA is not configured on this system (run ...)'
             return
-        pals = get_extra_names(nodename, cfg)
+        pals = get_extra_names(nodename, cfg, myip)
         cert = sshutil.sign_host_key(reqbody, nodename, pals)
         start_response('200 OK', (('Content-Type', 'text/plain'),))
         yield cert
