@@ -44,8 +44,8 @@ def get_extra_names(nodename, cfg, myip=None):
     if myip:
         ncfgs = [netutil.get_nic_config(cfg, nodename, serverip=myip)]
         fncfg = netutil.get_full_net_config(cfg, nodename, serverip=myip)
-        ncfgs.append(fncfg['default'])
-        for ent in fncfg['extranets']:
+        ncfgs.append(fncfg.get('default', {}))
+        for ent in fncfg.get('extranets', []):
             ncfgs.append(fncfg['extranets'][ent])
         for ncfg in ncfgs:
             for nip in (ncfg.get('ipv4_address', None), ncfg.get('ipv6_address', None)):
