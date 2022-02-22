@@ -6,6 +6,7 @@ After=basic.target
 # Network is enabled here
 After=dracut-initqueue.service
 Before=ignition-setup-user.service
+Before=coreos-ignition-setup-user.service
 Before=coreos-livepxe-rootfs.service
 
 
