@@ -42,6 +42,7 @@ cd /sys/class/net
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
     TRIES=$((TRIES + 1))
     for currif in *; do
+        echo 0 > /proc/sys/net/ipv6/conf/${currif}/autoconf
         ip link set $currif up
     done
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
