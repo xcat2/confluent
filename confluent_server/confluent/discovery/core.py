@@ -1192,7 +1192,7 @@ def discover_node(cfg, handler, info, nodename, manual):
         return True
     if info['handler'] == pxeh:
         olduuid = dp.get(nodename, {}).get('id.uuid', {}).get(
-            'value', None)
+            'value', '')
         if olduuid.lower() != info['uuid']:
             log.log({'info': 'Detected {0}, but discovery.policy is not set to a '
                             'value allowing discovery (open, permissive, or pxe)'.format(
