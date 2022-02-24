@@ -1,5 +1,6 @@
 #!/bin/bash
 echo -n "" >> /tmp/net.ifaces
+echo -n "" > /tmp/01-autocons.devnode
 cat /tls/*.0 >> /etc/pki/tls/certs/ca-bundle.crt
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)

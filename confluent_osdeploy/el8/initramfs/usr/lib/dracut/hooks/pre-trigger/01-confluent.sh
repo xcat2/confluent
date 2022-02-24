@@ -57,8 +57,12 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
 cat /tls/*.pem > /etc/confluent/ca.pem
-while ! confluentpython /opt/confluent/bin/apiclient /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
-	/opt/confluent/bin/autocons -c > /dev/null
+autocons=$(cat /tmp/01-autocons.devnode)
+errout=""
+if [ ! -z "$autocons" ]; then
+    errout="-e $autocons"
+fi
+while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
 	sleep 1
 done
 ifidx=$(cat /tmp/confluent.ifidx)
@@ -96,7 +100,7 @@ if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null; the
 	if [ ! -z "$autocons" ]; then
 	    echo Auto-configuring installed system to use text console
 	    echo Auto-configuring installed system to use text console > $autocons
-        /opt/confluent/bin/autocons -c > /dev/null
+            /opt/confluent/bin/autocons -c > /dev/null
 	    cp /tmp/01-autocons.conf /etc/cmdline.d/
 	else
 	    echo "Unable to automatically detect requested text console"

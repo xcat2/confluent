@@ -183,7 +183,7 @@ def get_net_apikey(nodename, mgr):
     return ''
 
 
-def get_apikey(nodename, hosts):
+def get_apikey(nodename, hosts, errout=None):
     apikey = ""
     if os.path.exists('/etc/confluent/confluent.apikey'):
         apikey = open('/etc/confluent/confluent.apikey').read().strip()
@@ -207,8 +207,10 @@ def get_apikey(nodename, hosts):
                 if apikey:
                     break
         if not apikey:
-            sys.stderr.write(
-                "Failed getting API token, check deployment.apiarmed attribute on {}\n".format(nodename))
+            errmsg = "Failed getting API token, check deployment.apiarmed attribute on {}\n".format(nodename)
+            sys.stderr.write(errmsg)
+            if errout:
+                errout.write(errmsg)
             time.sleep(10)
     with open('/etc/confluent/confluent.apikey', 'w+') as apiout:
         apiout.write(apikey)
@@ -217,7 +219,10 @@ def get_apikey(nodename, hosts):
     return apikey
 
 class HTTPSClient(client.HTTPConnection, object):
-    def __init__(self, usejson=False, port=443, host=None):
+    def __init__(self, usejson=False, port=443, host=None, errout=None):
+        self.errout = None
+        if errout:
+            self.errout = open(errout, 'w')
         self.stdheaders = {}
         mgtiface = None
         if usejson:
@@ -331,7 +336,10 @@ class HTTPSClient(client.HTTPConnection, object):
         try:
             self.sock = ctx.wrap_socket(psock, server_hostname=host)
         except ssl.SSLError:
-            sys.stderr.write('Error validating certificate on deployer (try `osdeploy initialize -t` on the deployment server {0})\n'.format(host))
+            errmsg = 'Error validating certificate on deployer (try `osdeploy initialize -t` on the deployment server {0})\n'.format(host)
+            sys.stderr.write(errmsg)
+            if self.errout:
+                self.errout.write(errmsg)
             sys.exit(1)
 
     def grab_url(self, url, data=None, returnrsp=False):
@@ -387,9 +395,15 @@ if __name__ == '__main__':
         data = sys.argv.pop(data)
     except ValueError:
         data = None
+    try:
+        errout = sys.argv.index('-e')
+        sys.argv.pop(errout)
+        errout = sys.argv.pop(errout)
+    except ValueError:
+        errout = None
     if outbin:
         with open(outbin, 'ab+') as outf:
-            reader = HTTPSClient(usejson=usejson).grab_url(
+            reader = HTTPSClient(usejson=usejson, errout=errout).grab_url(
                 sys.argv[1], data, returnrsp=True)
             chunk = reader.read(16384)
             while chunk:
@@ -399,10 +413,10 @@ if __name__ == '__main__':
     if len(sys.argv) > 2 and os.path.exists(sys.argv[-1]):
         data = open(sys.argv[-1]).read()
     if waitfor:
-        client = HTTPSClient(usejson)
+        client = HTTPSClient(usejson, errout=errout)
         status = 201
         while status != waitfor:
             status, rsp = client.grab_url_with_status(sys.argv[1], data)
             sys.stdout.write(rsp.decode())
     else:
-        sys.stdout.write(HTTPSClient(usejson).grab_url(sys.argv[1], data).decode())
+        sys.stdout.write(HTTPSClient(usejson, errout=errout).grab_url(sys.argv[1], data).decode())

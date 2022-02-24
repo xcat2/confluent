@@ -8,6 +8,7 @@ get_remote_apikey() {
         confluent_apikey=$(cat /etc/confluent/confluent.apikey)
         if [ -z "$confluent_apikey" ]; then
             echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$nodename', retrying..."
+            if [ ! -z "$autocons" ]; then echo "Unable to acquire node api key, set deployment.apiarmed=once on node '$nodename', retrying..." > $autocons; fi
             sleep 10
         elif [ -c /dev/tpmrm0 ]; then
             tmpdir=$(mktemp -d)
@@ -132,8 +133,8 @@ while [ $ready = "0" ]; do
     elif grep 'SSL' $tmperr > /dev/null; then
         confluent_mgr=${confluent_mgr#[}
         confluent_mgr=${confluent_mgr%]}
-    	/opt/confluent/bin/autocons -c > /dev/null
     	echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
+	if [ ! -z "$autocons" ]; then echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)' > $autocons; fi
     	sleep 1
     else
         ready=1
