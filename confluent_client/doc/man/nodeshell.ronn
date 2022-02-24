@@ -17,6 +17,9 @@ as stderr, unlike psh which combines all stdout and stderr into stdout.
 * `-c COUNT`, `-f COUNT`, `--count=COUNT`
   Specify the maximum number of instances to run concurrently
 
+* `-l LOGINNAME`, `--loginname=LOGINNAME`
+  Username to use when connecting, defaults to current user.
+
 * `-m MAXNODES`, `--maxnodes=MAXNODES`
   Specify a maximum number of nodes to run remote ssh command to, prompting
   if over the threshold
