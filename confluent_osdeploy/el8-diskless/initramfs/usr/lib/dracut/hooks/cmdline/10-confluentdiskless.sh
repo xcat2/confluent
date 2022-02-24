@@ -129,6 +129,12 @@ while [ $ready = "0" ]; do
         fi
         confluent_mgr=${confluent_mgr#[}
         confluent_mgr=${confluent_mgr%]}
+    elif grep 'SSL' $tmperr > /dev/null; then
+        confluent_mgr=${confluent_mgr#[}
+        confluent_mgr=${confluent_mgr%]}
+	sleep 1
+	/opt/confluent/bin/autocons -c
+	echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
     else
         ready=1
     fi

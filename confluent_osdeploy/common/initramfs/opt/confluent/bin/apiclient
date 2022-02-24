@@ -328,7 +328,11 @@ class HTTPSClient(client.HTTPConnection, object):
             self.stdheaders['Host'] = '{0}'.format(host)
         ctx.verify_mode = ssl.CERT_REQUIRED
         ctx.check_hostname = True
-        self.sock = ctx.wrap_socket(psock, server_hostname=host)
+        try:
+            self.sock = ctx.wrap_socket(psock, server_hostname=host)
+        except ssl.SSLError:
+            sys.stderr.write('Error validating certificate on deployer (try `osdeploy initialize -t` on the deployment server {0})\n'.format(host))
+            sys.exit(1)
 
     def grab_url(self, url, data=None, returnrsp=False):
         return self.grab_url_with_status(url, data, returnrsp)[1]

@@ -76,8 +76,10 @@ for hdl in $(tpm2_getcap handles-persistent|awk '{print $2}'); do
 done
 cd - > /dev/null
 rm -rf $tpmdir
-/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
-if [ ! -z "$autocons" ] && grep textconsole: true /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
+while ! /usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
+	sleep 1
+done
+if [ ! -z "$autocons" ] && grep "textconsole: true" /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 umask $oldumask
 new_apikey=$(cat /etc/confluent/confluent.apikey)
 if [ "$new_apikey" != "$confluent_apikey" ]; then
