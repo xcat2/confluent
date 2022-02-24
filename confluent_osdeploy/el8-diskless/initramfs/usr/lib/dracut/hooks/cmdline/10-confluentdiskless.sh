@@ -132,15 +132,15 @@ while [ $ready = "0" ]; do
     elif grep 'SSL' $tmperr > /dev/null; then
         confluent_mgr=${confluent_mgr#[}
         confluent_mgr=${confluent_mgr%]}
-	sleep 1
-	/opt/confluent/bin/autocons -c
-	echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
+    	/opt/confluent/bin/autocons -c > /dev/null
+    	echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
+    	sleep 1
     else
         ready=1
     fi
     rm $tmperr
 done
-if [ ! -z "$autocons" ] && grep textconsole: true /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
+if [ ! -z "$autocons" ] && grep "textconsole: true" /etc/confluent/confluent.deploycfg > /dev/null; then /opt/confluent/bin/autocons -c > /dev/null; fi
 if [ -c /dev/tpmrm0 ]; then
     tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 fi

@@ -58,7 +58,7 @@ nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 
 cat /tls/*.pem > /etc/confluent/ca.pem
 while ! confluentpython /opt/confluent/bin/apiclient /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
-	/opt/confluent/bin/autocons -c
+	/opt/confluent/bin/autocons -c > /dev/null
 	sleep 1
 done
 ifidx=$(cat /tmp/confluent.ifidx)
@@ -95,8 +95,8 @@ if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null; the
 	autocons=$(cat /tmp/01-autocons.devnode)
 	if [ ! -z "$autocons" ]; then
 	    echo Auto-configuring installed system to use text console
-            /opt/confluent/bin/autocons -c
 	    echo Auto-configuring installed system to use text console > $autocons
+        /opt/confluent/bin/autocons -c > /dev/null
 	    cp /tmp/01-autocons.conf /etc/cmdline.d/
 	else
 	    echo "Unable to automatically detect requested text console"
