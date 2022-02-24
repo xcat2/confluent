@@ -1824,9 +1824,13 @@ class ConfigManager(object):
                         if attribmap[group][attr].get('prepend', False):
                             newnodes = noderange.NodeRange(attribmap[group][attr][
                                 'prepend'], config=self).nodes
+                            pendingnodes = set([])
                             for newnode in newnodes:
                                 if newnode in currnodes:
                                     raise ValueError('{0} is already in group {1}'.format(newnode, group))
+                                if newnode in pendingnodes:
+                                    raise ValueError('{0} is listed multiple times')
+                                pendingnodes.add(newnode)
                             attribmap[group][attr] = list(
                                 newnodes) + currnodes
                         elif attribmap[group][attr].get('remove', False):
@@ -2248,9 +2252,13 @@ class ConfigManager(object):
                         if attribmap[node]['groups'].get('prepend', False):
                             newgroups = attribmap[node]['groups'][
                                 'prepend'].split(',')
+                            pendinggroups = set([])
                             for newgroup in newgroups:
                                 if newgroup in currgroups:
                                     raise ValueError('Node {0} is already in group {1}'.format(node, newgroup))
+                                if newgroup in pendinggroups:
+                                    raise ValueError('Group {0} has been specified multiple times'.format(newgroup))
+                                pendinggroups.add(newgroup)
                             attribmap[node]['groups'] = newgroups + currgroups
                         elif attribmap[node]['groups'].get('remove', False):
                             delgroups = attribmap[node]['groups'][
