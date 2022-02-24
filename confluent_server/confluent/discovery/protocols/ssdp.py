@@ -388,7 +388,7 @@ def check_fish(urldata):
                 myuuid = '-'.join([myuuid[:8], myuuid[8:12], myuuid[12:16], myuuid[16:20], myuuid[20:]])
             data['uuid'] = myuuid
             data['attributes'] = peerinfo
-            data['services'] = ['service:management-hardware.Lenovo:lenovo-xclarity-controller']
+            data['services'] = ['lenovo-xcc']
             return data
         except (IndexError, KeyError):
             return None
