@@ -63,7 +63,7 @@ if [ ! -z "$autocons" ]; then
     errout="-e $autocons"
 fi
 while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
-	sleep 1
+	sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')

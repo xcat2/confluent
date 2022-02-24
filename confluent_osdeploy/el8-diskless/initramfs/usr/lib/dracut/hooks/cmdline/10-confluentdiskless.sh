@@ -136,7 +136,7 @@ while [ $ready = "0" ]; do
         confluent_mgr=${confluent_mgr%]}
     	echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)'
 	if [ ! -z "$autoconsdev" ]; then echo 'Failure establishing TLS conneection to '$confluent_mgr' (try `osdeploy initialize -t` on the deployment server)' > $autoconsdev; fi
-    	sleep 1
+    	sleep 10
     else
         ready=1
     fi
