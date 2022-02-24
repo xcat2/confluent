@@ -223,6 +223,7 @@ class HTTPSClient(client.HTTPConnection, object):
         self.errout = None
         if errout:
             self.errout = open(errout, 'w')
+            self.errout.flush()
         self.stdheaders = {}
         mgtiface = None
         if usejson:
@@ -340,6 +341,7 @@ class HTTPSClient(client.HTTPConnection, object):
             sys.stderr.write(errmsg)
             if self.errout:
                 self.errout.write(errmsg)
+                self.errout.flush()
             sys.exit(1)
 
     def grab_url(self, url, data=None, returnrsp=False):
