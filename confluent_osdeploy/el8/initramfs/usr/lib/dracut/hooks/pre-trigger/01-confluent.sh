@@ -161,6 +161,11 @@ done < /etc/confluent/confluent.deploycfg
 if [ -e /lib/nm-lib.sh ]; then
     . /lib/nm-lib.sh
     nm_generate_connections
+    if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
+        sed -i s/dns-search=/dns-search=$dnsdomain/ /run/NetworkManager/system-connections/$ifname.nmconnection
+
+    fi
+
     if [[ "$ifname" == ib* ]]; then
         sed -i s/type=ethernet/type=infiniband/ /run/NetworkManager/system-connections/$ifname.nmconnection
         if ! grep '\[infiniband\]' /run/NetworkManager/system-connections/$ifname.nmconnection > /dev/null; then
