@@ -170,13 +170,17 @@ if [ -e /lib/nm-lib.sh ]; then
         mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
         if [ "$v4dns" = 1 ]; then
             awk '/^\[ipv4\]/ {print;print "dns-search='"$dnsdomain"'";next}1' /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
-            mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
+        else
+            awk '/^\[ipv4\]/ {print;print "dns-search=";next}1' /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
         fi
+        mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
         if [ "$v6dns" = 1 ]; then
             awk '/^\[ipv6\]/ {print;print "dns-search='"$dnsdomain"'";next}1' /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
-            mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
+        else
+            awk '/^\[ipv6\]/ {print;print "dns-search=";next}1' /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
         fi
-        sed -i s/dns-search=/dns-search=$dnsdomain/ /run/NetworkManager/system-connections/$ifname.nmconnection
+        mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
+        chmod 600 /run/NetworkManager/system-connections/$ifname.nmconnection
     fi
 
     if [[ "$ifname" == ib* ]]; then
