@@ -145,10 +145,14 @@ if [ "$v6cfg" = "static" ]; then
     echo ip=$v6addr::$v6gw:$v6nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
 fi
 nameserversec=0
+v4dns=0
+v6dns=0
 while read -r entry; do
     if [ $nameserversec = 1 ]; then
         if [[ $entry == "-"* ]] && [[ $entry != "- ''" ]]; then
             echo nameserver=${entry#- } >> /etc/cmdline.d/01-confluent.conf
+            [[ "$entry" == *:* ]] && v6dns=1
+            [[ "$entry" == *.* ]] && v4dns=1
             continue
         fi
     fi
@@ -162,8 +166,17 @@ if [ -e /lib/nm-lib.sh ]; then
     . /lib/nm-lib.sh
     nm_generate_connections
     if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
+        grep -v ^dns-search= /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
+        mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
+        if [ "$v4dns" = 1 ]; then
+            awk '/^\[ipv4\]/ {print;print "dns-search='"$dnsdomain"'";next}1' /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
+            mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
+        fi
+        if [ "$v6dns" = 1 ]; then
+            awk '/^\[ipv6\]/ {print;print "dns-search='"$dnsdomain"'";next}1' /run/NetworkManager/system-connections/$ifname.nmconnection > /run/NetworkManager/system-connections/$ifname.nmconnection.new
+            mv /run/NetworkManager/system-connections/$ifname.nmconnection.new /run/NetworkManager/system-connections/$ifname.nmconnection
+        fi
         sed -i s/dns-search=/dns-search=$dnsdomain/ /run/NetworkManager/system-connections/$ifname.nmconnection
-
     fi
 
     if [[ "$ifname" == ib* ]]; then
