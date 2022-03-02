@@ -94,6 +94,7 @@ chmod +x /mnt/sysimage/opt/confluent/bin/firstboot.sh
 
 %post
 cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
+cp /etc/confluent/tls/*.pem /etc/pki/ca-trust/source/anchors
 systemctl enable firstboot
 chgrp ssh_keys /etc/ssh/ssh*key
 restorecon /etc/ssh/ssh*key /root/.shosts /etc/ssh/shosts.equiv /etc/ssh/ssh_config.d/* /opt/confluent/bin/firstboot.sh
