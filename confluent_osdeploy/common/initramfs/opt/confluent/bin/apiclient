@@ -403,6 +403,8 @@ if __name__ == '__main__':
         errout = sys.argv.pop(errout)
     except ValueError:
         errout = None
+    if len(sys.argv) > 2 and os.path.exists(sys.argv[-1]):
+        data = open(sys.argv[-1]).read()
     if outbin:
         with open(outbin, 'ab+') as outf:
             reader = HTTPSClient(usejson=usejson, errout=errout).grab_url(
@@ -412,8 +414,6 @@ if __name__ == '__main__':
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
-    if len(sys.argv) > 2 and os.path.exists(sys.argv[-1]):
-        data = open(sys.argv[-1]).read()
     if waitfor:
         client = HTTPSClient(usejson, errout=errout)
         status = 201
