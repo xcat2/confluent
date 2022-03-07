@@ -294,7 +294,7 @@ def get_full_net_config(configmanager, node, serverip=None):
             if iface not in attribs:
                 attribs[iface] = {}
             attribs[iface][attrib] = val
-    myaddrs = None
+    myaddrs = []
     if serverip:
         myaddrs = get_addresses_by_serverip(serverip)
     nm = NetManager(myaddrs, node, configmanager)
