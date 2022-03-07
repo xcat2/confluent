@@ -49,8 +49,9 @@ fi
 mkdir -p /opt/confluent/bin
 mkdir -p /etc/confluent
 cp -a /target/etc/confluent/* /etc/confluent
+mkdir -p /target/opt/confluent/bin
 cp /custom-installation/confluent/bin/apiclient /opt/confluent/bin/
-cp /custom-installation/confluent/bin/apiclient /target/etc/confluent/
+cp /custom-installation/confluent/bin/apiclient /target/opt/confluent/bin
 
 mount -o bind /dev /target/dev
 mount -o bind /proc /target/proc

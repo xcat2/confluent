@@ -1,5 +1,5 @@
 #!/bin/sh
-. /tmp/functions
+. /etc/confluent/functions
 # This runs whenever this genesis profile boots for customization
 # purposes
 

@@ -18,4 +18,5 @@ mkdir -p /sysroot/etc/ssh/
 for i in /ssh/*.ca; do
     echo '@cert-authority *' $(cat $i) >> /sysroot/etc/ssh/ssh_known_hosts
 done
-cp /opt/confluent/bin/apiclient /sysroot/etc/confluent
+mkdir -p /sysroot/opt/confluent/bin
+cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin

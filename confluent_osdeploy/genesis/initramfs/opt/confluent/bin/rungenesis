@@ -155,8 +155,8 @@ done
 /usr/sbin/sshd
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 export confluent_profile
-/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
-. /tmp/functions
+/usr/libexec/platform-python /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
+. /etc/confluent/functions
 set_confluent_vars
 export confluent_mgr
 echo "Running https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh"

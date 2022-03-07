@@ -297,9 +297,29 @@ def initialize(cmdset):
     if cmdset.l:
         local_node_trust_setup()
     if cmdset.k:
-        with open('/etc/ssh/ssh_known_hosts', 'a+b') as skh:
+        cas = set([])
+        cakeys = set([])
+        try:
+            with open('/etc/ssh/ssh_known_hosts', 'rb') as skh:
+                for line in skh.read().split(b'\n'):
+                    try:
+                        cakey = line.split()[3]
+                        cakeys.add(cakey)
+                    except IndexError:
+                        pass
+                    if line:
+                        cas.add(line)
+        except IOError:
+            pass
+        with open('/etc/ssh/ssh_known_hosts', 'wb') as skh:
+            for ca in cas:
+                skh.write(ca)
+                skh.write(b'\n')
             for cafile in glob.glob('/var/lib/confluent/public/site/ssh/*.ca'):
                 cacert = open(cafile, 'rb').read()
+                cakey = cacert.split()[1]
+                if cakey in cakeys:
+                    continue
                 cacert = b'@cert-authority * ' + cacert
                 skh.write(cacert)
     if cmdset.g:
