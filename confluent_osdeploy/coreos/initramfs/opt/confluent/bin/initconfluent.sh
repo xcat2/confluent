@@ -65,7 +65,7 @@ curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_api
 [ -s /config.ign ] || rm /config.ign
 
 umask $oldumask
-autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
+autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg)
 confluent_profile=${confluent_profile#profile: }
