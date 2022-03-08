@@ -21,6 +21,8 @@ import datetime
 import eventlet
 import eventlet.green.socket as socket
 import eventlet.greenpool
+import hashlib
+import hmac
 import os
 import struct
 
@@ -31,6 +33,7 @@ import struct
 # 3, len, token - echo reply
 # 4, len, crypted - crypted apikey
 # 5, 0, accept key
+# 6, len, hmac - hmac of crypted key using shared secret for long-haul support
 # 128, len, len, key - sealed key
 
 class CredServer(object):
@@ -39,9 +42,9 @@ class CredServer(object):
 
     def handle_client(self, client, peer):
         try:
-            if not netutil.address_is_local(peer[0]):
-                client.close()
-                return
+            apiarmed = None
+            hmackey = None
+            hmacval = None
             client.send(b'\xc2\xd1-\xa8\x80\xd8j\xba')
             tlv = bytearray(client.recv(2))
             if tlv[0] != 1:
@@ -49,28 +52,39 @@ class CredServer(object):
                 return
             nodename = util.stringify(client.recv(tlv[1]))
             tlv = bytearray(client.recv(2))  # should always be null
-            apimats = self.cfm.get_node_attributes(nodename,
-                ['deployment.apiarmed', 'deployment.sealedapikey'])
-            apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
-                'value', None)
-            if not apiarmed:
-                if apimats.get(nodename, {}).get(
-                    'deployment.sealedapikey', {}).get('value', None):
-                    sealed = apimats[nodename]['deployment.sealedapikey'][
-                        'value']
-                    if not isinstance(sealed, bytes):
-                        sealed = sealed.encode('utf8')
-                    reply = b'\x80' + struct.pack('>H', len(sealed) + 1) + sealed + b'\x00'
-                    client.send(reply)
-                client.close()
-                return
-            if apiarmed not in ('once', 'continuous'):
-                now = datetime.datetime.utcnow()
-                expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
-                if now > expiry:
-                    self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
+            onlylocal = True
+            if tlv[0] == 6:
+                hmacval = client.recv(tlv[1])
+                hmackey = self.cfm.get_node_attributes(nodename, ['secret.selfapiarmtoken'], decrypt=True)
+                hmackey = hmackey.get(nodename, {}).get('secret.selfapiarmtoken', {}).get('value', None)
+            elif tlv[1]:
+                client.recv(tlv[1])
+            if not hmackey:
+                if not netutil.address_is_local(peer[0]):
                     client.close()
                     return
+                apimats = self.cfm.get_node_attributes(nodename,
+                    ['deployment.apiarmed', 'deployment.sealedapikey'])
+                apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
+                    'value', None)
+                if not apiarmed:
+                    if apimats.get(nodename, {}).get(
+                        'deployment.sealedapikey', {}).get('value', None):
+                        sealed = apimats[nodename]['deployment.sealedapikey'][
+                            'value']
+                        if not isinstance(sealed, bytes):
+                            sealed = sealed.encode('utf8')
+                        reply = b'\x80' + struct.pack('>H', len(sealed) + 1) + sealed + b'\x00'
+                        client.send(reply)
+                    client.close()
+                    return
+                if apiarmed not in ('once', 'continuous'):
+                    now = datetime.datetime.utcnow()
+                    expiry = datetime.datetime.strptime(apiarmed, "%Y-%m-%dT%H:%M:%SZ")
+                    if now > expiry:
+                        self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
+                        client.close()
+                        return
             client.send(b'\x02\x20')
             rttoken = os.urandom(32)
             client.send(rttoken)
@@ -88,7 +102,14 @@ class CredServer(object):
                 client.close()
                 return
             echotoken = util.stringify(client.recv(tlv[1]))
+            if hmackey:
+                etok = echotoken.encode('utf8')
+                if hmacval != hmac.new(hmackey, etok, hashlib.sha256).digest():
+                    client.close()
+                    return
             cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}, 'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
+            if hmackey:
+                self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
             if apiarmed == 'continuous':
                 del cfgupdate[nodename]['deployment.apiarmed']
             self.cfm.set_node_attributes(cfgupdate)

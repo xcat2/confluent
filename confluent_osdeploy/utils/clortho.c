@@ -1,4 +1,6 @@
-/* Copyright 2019 Lenovo */
+/* Copyright 2019-2021 Lenovo */
+
+#include "sha-256.h"
 #include <arpa/inet.h>
 #include <crypt.h>
 #include <net/if.h>
@@ -52,6 +54,10 @@ int main(int argc, char* argv[]) {
         struct addrinfo *curr;
         struct sockaddr_in net4bind;
         struct sockaddr_in6 net6bind;
+        FILE *hmackeyfile;
+        uint8_t hmackey[64];
+        uint8_t hmac[32];
+        int hmackeysize = 0;
         unsigned char buffer[MAXPACKET];
         memset(&hints, 0, sizeof(struct addrinfo));
         memset(&net4bind, 0, sizeof(struct sockaddr_in));
@@ -76,6 +82,12 @@ int main(int argc, char* argv[]) {
         if (argc < 3) {
             fprintf(stderr, "Missing node name and manager\n");
             exit(1);
+        }
+        if (argc == 4) {
+            hmackeyfile = fopen(argv[3], "r");
+            hmackeysize = fread(hmackey, 1, 64, hmackeyfile);
+            fclose(hmackeyfile);
+            hmac_sha256(hmac, cryptedpass, strlen(cryptedpass), hmackey, hmackeysize);
         }
         sock = getaddrinfo(argv[2], "13001", &hints, &addrs);
         if (sock != 0) {
@@ -118,7 +130,11 @@ int main(int argc, char* argv[]) {
         }
         slen = strlen(argv[1]) & 0xff;
         dprintf(sock, "\x01%c%s", slen, argv[1]);
-        ret = write(sock, "\x00\x00", 2);
+        if (hmackeysize) {
+            ret = write(sock, "\x06\x20", 2);
+            ret = write(sock, hmac, 32);
+        } else
+            ret = write(sock, "\x00\x00", 2);
         memset(buffer, 0, MAXPACKET);
         ret = read(sock, buffer, 2);
         while (buffer[0] != 255) {

@@ -549,6 +549,9 @@ node = {
 #    'secret.snmppassword': {
 #        'description': 'The password to use for SNMPv3 access to this node',
 #    },
+    'secret.selfapiarmtoken': {
+        'description': 'A one-time use shared secret to authenticate a node api token',
+    },
     'secret.snmpcommunity': {
         'description': ('SNMPv1 community string, it is highly recommended to'
                         'step up to SNMPv3'),
