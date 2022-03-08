@@ -66,6 +66,10 @@ def handle_request(env, start_response):
         start_response('401 Unauthorized', [])
         yield 'Unauthorized'
         return
+    if len(apikey) > 48:
+        start_response('401', [])
+        yield 'Unauthorized'
+        return
     cfg = configmanager.ConfigManager(None)
     ea = cfg.get_node_attributes(nodename, ['crypted.selfapikey', 'deployment.apiarmed'])
     eak = ea.get(
