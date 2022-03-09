@@ -39,6 +39,42 @@ unsigned char* genpasswd(int len) {
 
 }
 
+int getpasshmac(int argc, char* argv[]) {
+    FILE *outfile;
+    uint8_t *passwd;
+    uint8_t *buffer;
+    uint8_t *tmps;
+    uint8_t *cryptpass;
+    uint8_t hmac[32];
+    uint8_t hmackey[64];
+    int hmackeysize;
+    if (argc < 5) {
+        fprintf(stderr, "Usage: %s passfile cryptfile hmacfile hmackey\n", argv[0]);
+        exit(1);
+    }
+    outfile = fopen(argv[4], "r");
+    hmackeysize = fread(hmackey, 1, 64, outfile);
+    fclose(outfile);
+    passwd = genpasswd(48);
+    outfile = fopen(argv[1], "w");
+    buffer = malloc(20);
+    tmps = genpasswd(16);
+    memcpy(buffer, "$5$", 3);
+    memcpy(buffer + 3, tmps, 16);
+    buffer[19] = 0;
+    fwrite(passwd, 1, 48, outfile);
+    fclose(outfile);
+    cryptpass = crypt(passwd, buffer);
+    outfile = fopen(argv[2], "w");
+    fwrite(cryptpass, 1, strlen(cryptpass), outfile);
+    fclose(outfile);
+    hmac_sha256(hmac, cryptpass, strlen(cryptpass), hmackey, hmackeysize);
+    outfile = fopen(argv[3], "w");
+    fwrite(hmac, 1, 32, outfile);
+    fclose(outfile);
+    free(passwd);
+    free(buffer);
+}
 
 int main(int argc, char* argv[]) {
         int sock, ret;
@@ -64,6 +100,9 @@ int main(int argc, char* argv[]) {
         memset(&net6bind, 0, sizeof(struct sockaddr_in6));
         memset(&buffer, 0, MAXPACKET);
         memset(&timeout, 0, sizeof(struct timeval));
+        if (strstr(argv[0], "genpasshmac") != NULL) {
+            return getpasshmac(argc, argv);
+        }
         timeout.tv_sec = 10;
         net4bind.sin_port = htons(302);
         net4bind.sin_family = AF_INET;
