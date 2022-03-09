@@ -323,7 +323,11 @@ def _find_service(service, target):
             msg = smsg.format(mcastv4addr, service)
             if not isinstance(msg, bytes):
                 msg = msg.encode('utf8')
-            net4.sendto(msg, (mcastv4addr, 1900))
+            try:
+                net4.sendto(msg, (mcastv4addr, 1900))
+            except socket.error as se:
+                if se.errno != 101:
+                    raise
             msg = smsg.format(bcast, service)
             if not isinstance(msg, bytes):
                 msg = msg.encode('utf8')
