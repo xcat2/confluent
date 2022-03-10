@@ -18,7 +18,7 @@
 
 #define MAXPACKET 1024
 
-static const char cryptalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./";
+static const char cryptalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 unsigned char* genpasswd(int len) {
         unsigned char * passwd;
@@ -39,6 +39,34 @@ unsigned char* genpasswd(int len) {
 
 }
 
+char * b64e(uint8_t * data, uint32_t datalen) {
+    uint8_t * currptr;
+    uint8_t * currout;
+    uint8_t currchunk[4];
+    uint8_t * retval;
+    uint32_t neededlen;
+    int32_t remaining = datalen;
+    neededlen = (datalen - 1) / 3 * 4 + 4;
+    retval = malloc(neededlen + 1);
+    currout = retval;
+    currptr = data;
+    currchunk[3] = 0;
+    while (remaining > 0) {
+        currchunk[0] = currptr[0];
+        currchunk[1] = remaining > 1 ? currptr[1] : 0;
+        currchunk[2] = remaining > 2 ? currptr[2] : 0;
+        currptr += 3;
+        currout[0] = cryptalpha[currchunk[0] >> 2];
+        currout[1] = cryptalpha[(currchunk[0] << 4 | currchunk[1] >> 4) & 0x3f];
+        currout[2] = remaining > 1 ? cryptalpha[(currchunk[1] << 2 | currchunk[2] >> 6) & 0x3f] : '=';
+        currout[3] = remaining > 2 ? cryptalpha[currchunk[2] & 0x3f] : '=';
+        remaining -= 3;
+        currout += 4;
+    }
+    retval[neededlen] = 0;
+    return retval;
+}
+
 int getpasshmac(int argc, char* argv[]) {
     FILE *outfile;
     uint8_t *passwd;
@@ -46,6 +74,7 @@ int getpasshmac(int argc, char* argv[]) {
     uint8_t *tmps;
     uint8_t *cryptpass;
     uint8_t hmac[32];
+    uint8_t *hmac64;
     uint8_t hmackey[64];
     int hmackeysize;
     if (argc < 5) {
@@ -69,9 +98,11 @@ int getpasshmac(int argc, char* argv[]) {
     fwrite(cryptpass, 1, strlen(cryptpass), outfile);
     fclose(outfile);
     hmac_sha256(hmac, cryptpass, strlen(cryptpass), hmackey, hmackeysize);
+    hmac64 = b64e(hmac);
     outfile = fopen(argv[3], "w");
-    fwrite(hmac, 1, 32, outfile);
+    fwrite(hmac64, 1, strlen(hmac64), outfile);
     fclose(outfile);
+    free(hmac64);
     free(passwd);
     free(buffer);
 }
