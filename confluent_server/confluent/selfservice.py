@@ -10,6 +10,9 @@ import eventlet.green.socket as socket
 import eventlet.green.subprocess as subprocess
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.tsm as tsm
+import base64
+import hmac
+import hashlib
 import crypt
 import json
 import os
@@ -60,7 +63,46 @@ def handle_request(env, start_response):
     global currlocale
     global currtzvintage
     configmanager.check_quorum()
+    cfg = configmanager.ConfigManager(None)
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
+    if env['PATH_INFO'] == '/self/registerapikey':
+        crypthmac = env.get('HTTP_CONFLUENT_CRYPTHMAC', None)
+        if int(env.get('CONTENT_LENGTH', 65)) > 64:
+            start_response('400 Bad Request', [])
+            yield 'Bad Request'
+            return
+        cryptkey = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
+        if not (crypthmac and cryptkey):
+            start_response('401 Unauthorized', [])
+            yield 'Unauthorized'
+            return
+        hmackey = cfg.get_node_attributes(nodename, ['secret.selfapiarmtoken'], decrypt=True)
+        hmackey = hmackey.get(nodename, {}).get('secret.selfapiarmtoken', {}).get('value', None)
+        if not hmackey:
+            start_response('401 Unauthorized', [])
+            yield 'Unauthorized'
+            return
+        if not isinstance(hmackey, bytes):
+            hmackey = hmackey.encode('utf8')
+        if not isinstance(cryptkey, bytes):
+            cryptkey = cryptkey.encode('utf8')
+        try:
+            crypthmac = base64.b64decode(crypthmac)
+        except Exception:
+            start_response('400 Bad Request', [])
+            yield 'Bad Request'
+            return
+        righthmac = hmac.new(hmackey, cryptkey, hashlib.sha256).digest()
+        if righthmac == crypthmac:
+            cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': cryptkey}}}
+            cfg.set_node_attributes(cfgupdate)
+            cfg.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
+            start_response('200 OK', [])
+            yield 'Accepted'
+            return
+        start_response('401 Unauthorized', [])
+        yield 'Unauthorized'
+        return
     apikey = env.get('HTTP_CONFLUENT_APIKEY', None)
     if not (nodename and apikey):
         start_response('401 Unauthorized', [])
@@ -70,7 +112,7 @@ def handle_request(env, start_response):
         start_response('401', [])
         yield 'Unauthorized'
         return
-    cfg = configmanager.ConfigManager(None)
+    
     ea = cfg.get_node_attributes(nodename, ['crypted.selfapikey', 'deployment.apiarmed'])
     eak = ea.get(
         nodename, {}).get('crypted.selfapikey', {}).get('hashvalue', None)
