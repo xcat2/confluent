@@ -98,7 +98,7 @@ int getpasshmac(int argc, char* argv[]) {
     fwrite(cryptpass, 1, strlen(cryptpass), outfile);
     fclose(outfile);
     hmac_sha256(hmac, cryptpass, strlen(cryptpass), hmackey, hmackeysize);
-    hmac64 = b64e(hmac);
+    hmac64 = b64e(hmac, 32);
     outfile = fopen(argv[3], "w");
     fwrite(hmac64, 1, strlen(hmac64), outfile);
     fclose(outfile);
