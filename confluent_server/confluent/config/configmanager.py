@@ -1011,8 +1011,17 @@ class _ExpressionFormat(string.Formatter):
         self._numbers = None
 
     def get_field(self, field_name, args, kwargs):
+        return field_name, field_name
+
+    def format_field(self, val, format_spec):
+        if ']' in format_spec:
+            field_name = val + ':' + format_spec
+            format_spec = ''
+        else:
+            field_name = val
         parsed = ast.parse(field_name)
-        return self._handle_ast_node(parsed.body[0].value), field_name
+        val = self._handle_ast_node(parsed.body[0].value)
+        return format(val, format_spec)
 
     def _handle_ast_node(self, node):
         if isinstance(node, ast.Num):
@@ -1061,8 +1070,6 @@ class _ExpressionFormat(string.Formatter):
             op = self._supported_ops[optype]
             return op(int(self._handle_ast_node(node.left)),
                       int(self._handle_ast_node(node.right)))
-        elif isinstance(node, ast.Constant):
-            return node.value
         elif isinstance(node, ast.Index):
             return self._handle_ast_node(node.value)
         elif isinstance(node, ast.UnaryOp):
@@ -1087,6 +1094,8 @@ class _ExpressionFormat(string.Formatter):
             else:
                 index = self._handle_ast_node(node.slice)
                 return strval[index]
+        elif isinstance(node, ast.Constant):
+            return node.value
         else:
             raise ValueError("Unrecognized expression syntax")
 
