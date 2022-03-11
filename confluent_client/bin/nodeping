@@ -46,7 +46,6 @@ def run():
                          help='Use a different name other than the nodename for ping')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
     # processes can be unkind for the unaware on memory pressure and such...
-    argparser.disable_interspersed_args()
     (options, args) = argparser.parse_args()
     if len(args) < 1:
         argparser.print_help()
