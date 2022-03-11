@@ -1061,6 +1061,34 @@ class _ExpressionFormat(string.Formatter):
             op = self._supported_ops[optype]
             return op(int(self._handle_ast_node(node.left)),
                       int(self._handle_ast_node(node.right)))
+        elif isinstance(node, ast.Constant):
+            return node.value
+        elif isinstance(node, ast.Index):
+            return self._handle_ast_node(node.value)
+        elif isinstance(node, ast.UnaryOp):
+            if isinstance(node.op, ast.USub):
+                return 0 - self._handle_ast_node(node.operand)
+            else:
+                raise ValueError("Invalid operation in expression")
+        elif isinstance(node, ast.Subscript):
+            strval = self._handle_ast_node(node.value)
+            if isinstance(node.slice, ast.Slice):
+                lower = node.slice.lower
+                if lower is None:
+                    lower = 0
+                else:
+                    lower = self._handle_ast_node(lower)
+                upper = node.slice.upper
+                if upper is None:
+                    return strval[lower:]
+                else:
+                    upper = self._handle_ast_node(upper)
+                    return strval[lower:upper]
+            else:
+                index = self._handle_ast_node(node.slice)
+                return strval[index]
+        else:
+            raise ValueError("Unrecognized expression syntax")
 
     def _expand_attribute(self, key):
         if '_expressionkeys' not in self._nodeobj:
