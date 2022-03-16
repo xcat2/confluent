@@ -250,7 +250,7 @@ def initialize(cmdset):
                 'subject.')
     else:
         didsomething = False
-    if not os.path.exists('/etc/confluent'):
+    if not os.path.exists('/etc/confluent/cfg'):
         sys.stderr.write('Start confluent service prior to initializng OS deployment\n')
         sys.exit(1)
     if cmdset.t or cmdset.s or cmdset.a or cmdset.u:
