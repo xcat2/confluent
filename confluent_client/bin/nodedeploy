@@ -85,6 +85,18 @@ def main(args):
         sys.stderr.write('Unrecognized arguments: ' + repr(extra) + '\n')
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
+    errnodes = set([])
+    if not args.clear and args.network and not args.prepareonly:
+        rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
+                                        bootmode='uefi',
+                                        persistent=False,
+                                        errnodes=errnodes)
+        if errnodes:
+            sys.stderr.write(
+                'Unable to set boot device for following nodes: {0}\n'.format(
+                    ','.join(errnodes)))
+            return 1
+        rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
     if args.clear:
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
@@ -139,18 +151,7 @@ def main(args):
                 armed = ''
             print('{0}: {1}{2}'.format(node, profile, armed))
         sys.exit(0)
-    errnodes = set([])
     if args.network and not args.prepareonly:
-        rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
-                                        bootmode='uefi',
-                                        persistent=False,
-                                        errnodes=errnodes)
-        if errnodes:
-            sys.stderr.write(
-                'Unable to set boot device for following nodes: {0}\n'.format(
-                    ','.join(errnodes)))
-            return 1
-        rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
         return rc
     return 0
 
