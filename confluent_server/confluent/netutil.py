@@ -274,6 +274,19 @@ class NetManager(object):
             myattribs['current_nic'] = False
 
 
+def get_flat_net_config(configmanager, node):
+    fnc = get_full_net_config(configmanager, node)
+    dft = fnc.get('default', {})
+    if dft:
+        ret = [dft]
+    else:
+        ret = []
+    for nc in fnc.get('extranets', {}):
+        nc = fnc['extranets'][nc]
+        if nc:
+            ret.append(nc)
+    return ret
+
 def get_full_net_config(configmanager, node, serverip=None):
     cfd = configmanager.get_node_attributes(node, ['net.*'])
     cfd = cfd.get(node, {})

@@ -526,6 +526,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
         return InputLicense(path, nodes, inputdata, configmanager)
+    elif path == ['deployment', 'ident_image']:
+        return InputIdentImage(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException(
             'No known input handler for request')
@@ -886,6 +888,12 @@ class ConfluentInputMessage(ConfluentMessage):
 
     def is_valid_key(self, key):
         return key in self.valid_values
+
+
+class InputIdentImage(ConfluentInputMessage):
+    keyname = 'ident_image'
+    valid_values = ['create']
+
 
 class InputIdentifyMessage(ConfluentInputMessage):
     valid_values = set([

@@ -382,6 +382,11 @@ def _init_core():
             'pluginattrs': ['hardwaremanagement.method'],
             'default': 'ipmi',
         }),
+        'deployment': {
+            'ident_img': PluginRoute({
+                'handler': 'identimage'
+            })
+        },
         'events': {
             'hardware': {
                 'log': PluginRoute({
