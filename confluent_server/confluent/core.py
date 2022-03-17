@@ -383,7 +383,7 @@ def _init_core():
             'default': 'ipmi',
         }),
         'deployment': {
-            'ident_img': PluginRoute({
+            'ident_image': PluginRoute({
                 'handler': 'identimage'
             })
         },
