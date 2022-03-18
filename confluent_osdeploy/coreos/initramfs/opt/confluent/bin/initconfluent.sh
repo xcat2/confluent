@@ -32,16 +32,17 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     NetworkManager --configure-and-quit=initrd --no-daemon
     hmackeyfile=$(mktemp)
     echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
+    cd -
+    umount $tmnt
     passfile=$(mktemp)
     passcrypt=$(mktemp)
     hmacfile=$(mktemp)
     ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
     /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
-    echo /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
     for deployer in $deploysrvs; do
         if curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt -k https://$deployer/confluent-api/self/registerapikey; then
             cp $passfile /etc/confluent/confluent.apikey
-            $confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+            confluent_apikey=$(cat /etc/confluent/confluent.apikey)
             curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
             curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/profileprivate/pending/config.ign > /config.ign
             [ -s /config.ign ] || rm /config.ign
