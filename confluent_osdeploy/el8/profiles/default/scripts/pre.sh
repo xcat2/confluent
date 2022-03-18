@@ -88,7 +88,7 @@ fi
 export confluent_mgr confluent_profile nodename
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /tmp/functions
 . /tmp/functions
-confluentpython /opt/confluent/confluent/bin/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
+confluentpython /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 run_remote pre.custom
 run_remote_parts pre.d
 confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart -o /tmp/kickstart.base
