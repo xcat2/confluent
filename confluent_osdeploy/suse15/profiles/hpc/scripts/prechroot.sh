@@ -19,7 +19,7 @@ cp -a /tls/* /mnt/var/lib/ca-certificates/pem
 cp -a /tls/*.pem /mnt/etc/pki/trust/anchors
 cat /tls/*.pem > /mnt/etc/confluent/ca.pem
 mkdir -p /mnt/opt/confluent/bin
-cp /opt/confluent/bin/apiclient /opt/confluent/bin/
+cp /opt/confluent/bin/apiclient /mnt/opt/confluent/bin/
 
 run_remote setupssh.sh
 
