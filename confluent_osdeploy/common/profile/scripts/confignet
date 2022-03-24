@@ -325,18 +325,20 @@ if __name__ == '__main__':
         nc = json.loads(nc)
         iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
         if iname:
-            if 'default' in netname_to_interfaces:
-                netname_to_interfaces['default']['interfaces'].add(iname)
-            else:
-                netname_to_interfaces['default'] = {'interfaces': set([iname]), 'settings': nc['default']}
+            for iname in iname.split(','):
+                if 'default' in netname_to_interfaces:
+                    netname_to_interfaces['default']['interfaces'].add(iname)
+                else:
+                    netname_to_interfaces['default'] = {'interfaces': set([iname]), 'settings': nc['default']}
         for netname in nc.get('extranets', {}):
             uname = '_' + netname
             iname = get_interface_name(idxmap[curridx], nc['extranets'][netname])
             if iname:
-                if uname in netname_to_interfaces:
-                    netname_to_interfaces[uname]['interfaces'].add(iname)
-                else:
-                    netname_to_interfaces[uname] = {'interfaces': set([iname]), 'settings': nc['extranets'][netname]}
+                for iname in iname.split(','):
+                    if uname in netname_to_interfaces:
+                        netname_to_interfaces[uname]['interfaces'].add(iname)
+                    else:
+                        netname_to_interfaces[uname] = {'interfaces': set([iname]), 'settings': nc['extranets'][netname]}
         doneidxs.add(curridx)
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/bin/nmcli'):
