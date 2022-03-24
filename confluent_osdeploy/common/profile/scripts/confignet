@@ -154,12 +154,14 @@ class WickedManager(object):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
                 return
             if not stgs.get('connection_name', None):
-                stgs['connection_name'] = 'team{0}'.format(self.teamidx)
+                stgs['connection_name'] = 'bond{0}'.format(self.teamidx)
                 self.teamidx += 1
             cname = stgs['connection_name']
             with open('/etc/sysconfig/network/ifcfg-{0}'.format(cname), 'w') as teamout:
                 teamout.write(ipcfg)
-                teamout.write('TEAM_RUNNER={0}\n'.format(stgs['team_mode']))
+                if stgs['team_mode'] == 'lacp':
+                    stgs['team_mode'] = '802.3ad'
+                teamout.write("BONDING_MODULE_OPTS='mode={0} miimon=100'\nBONDING_MASTER=yes\n".format(stgs['team_mode']))
                 idx = 1
                 for iface in cfg['interfaces']:
                     subprocess.call(['wicked', 'ifdown', iface])
@@ -168,7 +170,7 @@ class WickedManager(object):
                         os.remove('/etc/sysconfig/network/ifroute-{0}'.format(iface))
                     except OSError:
                         pass
-                    teamout.write('TEAM_PORT_DEVICE_{0}={1}\n'.format(idx, iface))
+                    teamout.write('BONDING_SLAVE{0}={1}\n'.format(idx, iface))
                     idx += 1
         else:
             cname = list(cfg['interfaces'])[0]
