@@ -324,6 +324,11 @@ def get_full_net_config(configmanager, node, serverip=None):
     return retattrs
 
 
+def noneify(cfgdata):
+    for key in cfgdata:
+        if cfgdata[key] == '':
+            cfgdata[key] = None
+    return cfgdata
 
 # TODO(jjohnson2): have a method to arbitrate setting methods, to aid
 # in correct matching of net.* based on parameters, mainly for pxe
@@ -463,15 +468,15 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     if ipn_on_same_subnet(fam, svrip, candgwn, prefix):
                         candgws.append((fam, candgwn, prefix))
         if foundaddr:
-            return cfgdata
+            return noneify(cfgdata)
         if dhcprequested:
             if not cfgdata.get('ipv4_method', None):
                 cfgdata['ipv4_method'] = 'dhcp'
             if not cfgdata.get('ipv6_method', None):
                 cfgdata['ipv6_method'] = 'dhcp'
-            return cfgdata
+            return noneify(cfgdata)
         if ipbynodename == None and ip6bynodename == None:
-            return cfgdata
+            return noneify(cfgdata)
         for myaddr in myaddrs:
             fam, svrip, prefix = myaddr[:3]
             if fam == socket.AF_INET:
@@ -518,7 +523,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 bynodenamn = socket.inet_pton(fam, bynodename)
                 if ipn_on_same_subnet(fam, candgwn, bynodenamn, prefix):
                     cfgdata['ipv{}_gateway'.format(nver)] = socket.inet_ntop(fam, candgwn)
-        return cfgdata
+        return noneify(cfgdata)
     if ip is not None:
         for prefixinfo in get_prefix_len_for_ip(ip):
             fam, prefix = prefixinfo
@@ -539,7 +544,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 if ipn_on_same_subnet(fam, ipn, gwn, prefix):
                     cfgdata['ipv{}_gateway'.format(nver)] = gw
                     break
-    return cfgdata
+    return noneify(cfgdata)
 
 def get_addresses_by_serverip(serverip):
     if '.' in serverip:
