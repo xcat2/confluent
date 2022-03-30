@@ -228,6 +228,20 @@ class NodeHandler(immhandler.NodeHandler):
             if '_csrf_token' in wc.cookies:
                 wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
             if rspdata.get('pwchg_required', None) == 'true':
+                if newpassword is None:
+                    # a normal login hit expired condition
+                    tmppassword = 'Tmp42' + password[5:]
+                    wc.request('POST', '/api/function', json.dumps(
+                        {'USER_UserPassChange': '1,{0}'.format(tmppassword)}))
+                    rsp = wc.getresponse()
+                    rsp.read()
+                    # We must step down change interval and reusecycle to restore password
+                    wc.grab_json_response('/api/dataset', {'USER_GlabalMinPassChgInt': '0', 'USER_GlobalMinPassReuseCycle': '0'})
+                    wc.request('POST', '/api/function', json.dumps(
+                        {'USER_UserPassChange': '1,{0}'.format(password)}))
+                    rsp = wc.getresponse()
+                    rsp.read()
+                    return (wc, {})
                 wc.request('POST', '/api/function', json.dumps(
                     {'USER_UserPassChange': '1,{0}'.format(newpassword)}))
                 rsp = wc.getresponse()
