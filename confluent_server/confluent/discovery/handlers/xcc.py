@@ -236,7 +236,7 @@ class NodeHandler(immhandler.NodeHandler):
                     rsp = wc.getresponse()
                     rsp.read()
                     # We must step down change interval and reusecycle to restore password
-                    wc.grab_json_response('/api/dataset', {'USER_GlabalMinPassChgInt': '0', 'USER_GlobalMinPassReuseCycle': '0'})
+                    wc.grab_json_response('/api/dataset', {'USER_GlobalMinPassChgInt': '0', 'USER_GlobalMinPassReuseCycle': '0'})
                     wc.request('POST', '/api/function', json.dumps(
                         {'USER_UserPassChange': '1,{0}'.format(password)}))
                     rsp = wc.getresponse()
