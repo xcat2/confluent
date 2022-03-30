@@ -153,7 +153,28 @@ class NodeHandler(bmchandler.NodeHandler):
             rsp = wc.getresponse()
             rspdata = util.stringify(rsp.read())
             if 'renew_account' in rspdata:
-                raise Exception('Configured password has expired')
+                tmppassword = 'Tmp42' + password[5:]
+                tokens = fromstring(rspdata)
+                st2 = tokens.findall('st2')[0].text
+                wc.set_header('ST2', st2)
+                wc.request('POST', '/data/changepwd', 'oripwd={0}&newpwd={1}'.format(password, tmppassword))
+                rsp = wc.getresponse()
+                rspdata = rsp.read().decode('utf8')
+                bdata = 'user={0}&password={1}'.format(username, tmppassword)
+                wc.request('POST', '/data/login', bdata, headers)
+                rsp = wc.getresponse()
+                rspdata = rsp.read().decode('utf8')
+                tokens = fromstring(rspdata)
+                st2 = tokens.findall('st2')[0].text
+                wc.set_header('ST2', st2)
+                rules = 'set=passwordChangeInterval:0,passwordReuseCheckNum:0'
+                wc.request('POST', '/data', rules)
+                wc.getresponse().read()
+                wc.request('POST', '/data/changepwd', 'oripwd={0}&newpwd={1}'.format(tmppassword, password))
+                wc.getresponse().read()
+                wc.request('POST', '/data/login', urlencode(authdata), headers)
+                rsp = wc.getresponse()
+                rspdata = util.stringify(rsp.read())
             if 'authResult>0' not in rspdata:
                 raise Exception('Unknown username/password on SMM')
             tokens = fromstring(rspdata)
