@@ -10,7 +10,7 @@ int read_part(FILE* img, long int imgsize) {
     uint16_t shortlength;
     uint32_t length;
     uint64_t longlength;
-    if (fread(&shortlength, 2, 1, img) < 2) {
+    if (fread(&shortlength, 2, 1, img) < 1) {
         fprintf(stderr, "Error reading section\n");
         exit(1);
     }
@@ -21,7 +21,7 @@ int read_part(FILE* img, long int imgsize) {
         exit(1);
     }
     mountpath[shortlength] = 0;
-    if (fread(&length, 4, 1, img) < 4) {
+    if (fread(&length, 4, 1, img) < 1) {
         fprintf(stderr, "Failure reading segment\n");
         exit(1);
     }
@@ -30,19 +30,19 @@ int read_part(FILE* img, long int imgsize) {
         fprintf(stderr, "Error skipping json segment");
         exit(1);
     }
-    if (fread(&longlength, 8, 1, img) < 8) { // minimum size in bytes
+    if (fread(&longlength, 8, 1, img) < 1) { // minimum size in bytes
         fprintf(stderr, "Failure reading segment\n");
         exit(1);
     }
     longlength = be64toh(longlength);
     printf("%ld\t", longlength);
-    if (fread(&longlength, 8, 1, img) < 8) { // default size in bytes
+    if (fread(&longlength, 8, 1, img) < 1) { // default size in bytes
         fprintf(stderr, "Error reading segment\n");
         exit(1);
     }
     longlength = be64toh(longlength);
     printf("%ld\t", longlength);
-    if (fread(&shortlength, 2, 1, img) < 2) { // length of filesystem type
+    if (fread(&shortlength, 2, 1, img) < 1) { // length of filesystem type
         fprintf(stderr, "Error reading segment\n");
         exit(1);
     }
@@ -53,7 +53,7 @@ int read_part(FILE* img, long int imgsize) {
         exit(1);
     }
     fstype[shortlength] = 0;
-    if (fread(&shortlength, 2, 1, img) < 2) { // length of DEVICE
+    if (fread(&shortlength, 2, 1, img) < 1) { // length of DEVICE
         fprintf(stderr, "Error reading segment\n");
         exit(1);
     }
@@ -64,7 +64,7 @@ int read_part(FILE* img, long int imgsize) {
         exit(1);
     }
     devpath[shortlength] = 0;
-    if (fread(&shortlength, 2, 1, img) < 2) {
+    if (fread(&shortlength, 2, 1, img) < 1) {
         fprintf(stderr, "Error reading segment\n");
         exit(1);
     }
@@ -73,7 +73,7 @@ int read_part(FILE* img, long int imgsize) {
         fprintf(stderr, "Failure skipping padding\n");
         exit(1);
     }
-    if (fread(&longlength, 8, 1, img) < 8) {
+    if (fread(&longlength, 8, 1, img) < 1) {
         fprintf(stderr, "Error reading section\n");
         exit(1);
     }
