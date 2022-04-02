@@ -99,10 +99,8 @@ class LogReplay(object):
                 if reverse and self.bin.tell() < endoffset:
                     output += txtout
                     continue
-                if b'\x1b[2J' in txtout:
-                    self.cleardata = txtout.split(b'\x1b[2J')
-                    for idx in range(1, len(self.cleardata)):
-                        self.cleardata[idx] = b'\x1b[2J' + self.cleardata[idx]
+                self.paginate(txtout)
+                if self.cleardata:
                     self.clearidx = 0
                     if not self.cleardata[0]:
                         self.cleardata = self.cleardata[1:]
@@ -119,6 +117,21 @@ class LogReplay(object):
         if endoffset is not None and endoffset >= 0:
             self.bin.seek(endoffset)
         return output, 1
+
+    def paginate(self, txtout):
+        cleardata = [txtout]
+        nextcleardata = []
+        for sep in (b'\x1b[2J', b'\x1b[H\x1b[J'):
+            for txtout in cleardata:
+                nextcleardata = cleardata.split(sep)
+                if len(nextcleardata) > 1:
+                    for idx in range(1, len(nextcleardata)):
+                        nextcleardata[idx] = sep + nextcleardata[idx]
+                cleardata = nextcleardata
+                nextcleardata = []
+        if len(cleardata) > 1:
+            self.cleardata = cleardata
+        return
 
     def begin(self):
         self.needclear = True
