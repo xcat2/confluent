@@ -255,12 +255,8 @@ def initialize(cmdset):
         sys.exit(1)
     if cmdset.t or cmdset.s or cmdset.a or cmdset.u:
         neededuid = os.stat('/etc/confluent').st_uid
-        try:
-            os.makedirs('/var/lib/confluent')
-            os.chown('/var/lib/confluent', neededuid, -1)
-        except OSError as e:
-            if e.errno != 17:
-                raise
+        util.mkdirp('/var/lib/confluent')
+        os.chown('/var/lib/confluent', neededuid, -1)
     if cmdset.u:
         didsomething = True
         if not glob.glob('/root/.ssh/*.pub'):
