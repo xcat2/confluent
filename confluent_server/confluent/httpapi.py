@@ -395,6 +395,8 @@ def _assign_consessionid(consolesession):
     supported_protocols=['confluent.console', 'confluent.asyncweb'])
 def wsock_handler(ws):
     sessid = ws.wait()
+    if not sessid:
+        return
     sessid = sessid.replace('ConfluentSessionId:', '')
     sessid = sessid[:-1]
     currsess = httpsessions.get(sessid, None)
@@ -415,7 +417,8 @@ def wsock_handler(ws):
         def asyncwscallback(rsp):
             rsp = json.dumps(rsp.raw())
             ws.send(u'!' + rsp)
-        for res in confluent.asynchttp.handle_async({}, {}, None, asyncwscallback, ws):
+        for res in confluent.asynchttp.handle_async(
+                {}, {}, currsess['inflight'], asyncwscallback, ws):
             pass
         return
     if '/console/session' in ws.path or '/shell/sessions/' in ws.path:
@@ -460,6 +463,8 @@ def wsock_handler(ws):
                 )
         except exc.NotFoundException:
             return
+        mythreadid = greenlet.getcurrent()
+        currsess['inflight'].add(mythreadid)
         clientmsg = ws.wait()
         try:
             while clientmsg is not None:
@@ -477,6 +482,7 @@ def wsock_handler(ws):
                     ws.send(u'?')
                 clientmsg = ws.wait()
         finally:
+            currsess['inflight'].discard(mythreadid)
             consession.destroy()
 
 

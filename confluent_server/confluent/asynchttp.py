@@ -81,7 +81,8 @@ class AsyncSession(object):
         self._evt = None
         self.termrelations = []
         self.consoles = set([])
-        self.reaper = eventlet.spawn_after(15, self.destroy)
+        if not wshandler:
+            self.reaper = eventlet.spawn_after(15, self.destroy)
 
     def add(self, requestid, rsp):
         if self.wshandler:
@@ -172,6 +173,8 @@ def handle_async(env, querydict, threadset, wshandler=None, wsin=None):
         currsess = AsyncSession(wshandler)
         if wshandler:  # websocket mode, block until exited
             # just stay alive until client goes away
+            mythreadid = greenlet.getcurrent()
+            threadset.add(mythreadid)
             wsin.send(' ASYNCID: {0}'.format(currsess.asyncid))
             clientmsg = True
             while clientmsg:
@@ -182,6 +185,7 @@ def handle_async(env, querydict, threadset, wshandler=None, wsin=None):
                 elif clientmsg:
                     print(repr(clientmsg))
             currsess.destroy()
+            threadset.discard(mythreadid)
             return
         yield messages.AsyncSession(currsess.asyncid)
         return
