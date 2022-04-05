@@ -392,7 +392,7 @@ def _assign_consessionid(consolesession):
     return sessid
 
 @eventlet.websocket.WebSocketWSGI.configured(
-    supported_protocols=['confluent.console'])
+    supported_protocols=['confluent.console', 'confluent.asyncweb'])
 def wsock_handler(ws):
     sessid = ws.wait()
     sessid = sessid.replace('ConfluentSessionId:', '')
@@ -410,6 +410,13 @@ def wsock_handler(ws):
     name = httpsessions[sessid]['name']
     authdata = auth.authorize(name, ws.path)
     if not authdata:
+        return
+    if ws.path == '/sessions/current/async':
+        def asyncwscallback(rsp):
+            rsp = json.dumps(rsp.raw())
+            ws.send(u'!' + rsp)
+        for res in confluent.asynchttp.handle_async({}, {}, None, asyncwscallback, ws):
+            pass
         return
     if '/console/session' in ws.path or '/shell/sessions/' in ws.path:
         #hard bake JSON into this path, do not support other incarnations
