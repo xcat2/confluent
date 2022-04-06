@@ -10,12 +10,13 @@ import termios
 import tty
 
 def writeout(data):
-    done = False
     if isinstance(data, str) and not isinstance(data, bytes):
         data = data.encode('utf8')
     try:
-        sys.stdout.buffer.write(data)
-        done = True
+        if hasattr(sys.stdout, 'buffer'):
+            sys.stdout.buffer.write(data)
+        else:
+            sys.stdout.write(data)
     except IOError:
         time.sleep(0.1)
         pass
@@ -122,13 +123,15 @@ class LogReplay(object):
         cleardata = [txtout]
         nextcleardata = []
         for sep in (b'\x1b[2J', b'\x1b[H\x1b[J'):
+            replacementcleardata = []
             for txtout in cleardata:
-                nextcleardata = cleardata.split(sep)
+                nextcleardata = txtout.split(sep)
                 if len(nextcleardata) > 1:
                     for idx in range(1, len(nextcleardata)):
                         nextcleardata[idx] = sep + nextcleardata[idx]
-                cleardata = nextcleardata
+                replacementcleardata.extend(nextcleardata)
                 nextcleardata = []
+            cleardata = replacementcleardata
         if len(cleardata) > 1:
             self.cleardata = cleardata
         return
@@ -162,7 +165,10 @@ def main(txtfile, binfile):
                 writeout('\x1b]0;[Time: {0}]\x07'.format(
                     time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
                 try:
-                    sys.stdout.buffer.flush()
+                    if hasattr(sys.stdout, 'buffer'):
+                        sys.stdout.buffer.flush()
+                    else:
+                        sys.stdout.flush()
                 except IOError:
                     pass
             while True:
@@ -186,7 +192,10 @@ def main(txtfile, binfile):
                     break
                 elif myinput.lower() == 'd':
                     writeout('\x1b];{0}\x07'.format(replay.debuginfo()))
-                    sys.stdout.flush()
+                    if hasattr(sys.stdout, 'buffer'):
+                        sys.stdout.buffer.flush()
+                    else:
+                        sys.stdout.flush()
                 else:
                     pass # print(repr(myinput))
     except Exception:
