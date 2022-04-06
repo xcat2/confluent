@@ -32,6 +32,7 @@ class LogReplay(object):
         self.priordata = collections.deque([])
         self.laststamp = None
         self.needclear = False
+        self.lasttxt = ''
 
     def _rewind(self, datasize=None):
         curroffset = self.bin.tell() - 16
@@ -117,6 +118,7 @@ class LogReplay(object):
                 break
         if endoffset is not None and endoffset >= 0:
             self.bin.seek(endoffset)
+        self.lasttxt = output
         return output, 1
 
     def paginate(self, txtout):
@@ -143,6 +145,30 @@ class LogReplay(object):
     def end(self):
         self.bin.seek(0, 2)
 
+    def search(self, searchstr, skipfirst=False):
+        overlap = len(searchstr)
+        firstoffset = self.bin.tell()
+        lastoffset = firstoffset
+        output = self.lasttxt
+        while searchstr not in output:
+            output, delay = self.get_output()
+            if not self.cleardata and lastoffset == self.bin.tell():
+                self.bin.seek(firstoffset)
+                return b'', 0
+            lastoffset = self.bin.tell()
+        if skipfirst:
+            output, delay = self.get_output()
+            while searchstr not in output:
+                output, delay = self.get_output()
+                if not self.cleardata and lastoffset == self.bin.tell():
+                    self.bin.seek(firstoffset)
+                    return b'', 0
+                lastoffset = self.bin.tell()
+        clear = b'\x1b[2J\x1b[H'
+        first, high, last = self.lasttxt.partition(searchstr)
+        output = clear + first + b'\x1b[7m' + high + b'\x1b[27m' + last
+        return output, 0
+
 
 def main(txtfile, binfile):
     replay = LogReplay(txtfile, binfile)
@@ -153,6 +179,7 @@ def main(txtfile, binfile):
     reverse = False
     skipnext = False
     quitit = False
+    searchstr = None
     writeout('\x1b[2J\x1b[;H')
     try:
         while not quitit:
@@ -162,6 +189,7 @@ def main(txtfile, binfile):
             reverse = False
             if newdata:
                 writeout(newdata)
+                newdata = ''
                 writeout('\x1b]0;[Time: {0}]\x07'.format(
                     time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))))
                 try:
@@ -196,6 +224,25 @@ def main(txtfile, binfile):
                         sys.stdout.buffer.flush()
                     else:
                         sys.stdout.flush()
+                elif myinput.lower() == '/':
+                    searchstr = ''
+                    nxtchr = '/'
+                    while '\r' not in searchstr:
+                        sys.stdout.write(nxtchr)
+                        sys.stdout.flush()
+                        select.select((sys.stdin,), (), (), 86400)
+                        nxtchr = sys.stdin.read(1)
+                        searchstr += nxtchr
+                    if not isinstance(searchstr, bytes):
+                        searchstr = searchstr.encode('utf8')
+                    searchstr = searchstr[:-1]
+                    newdata, delay = replay.search(searchstr)
+                    skipnext = True
+                    break
+                elif myinput.lower() == 'n' and searchstr:
+                    newdata, delay = replay.search(searchstr, True)
+                    skipnext = True
+                    break
                 else:
                     pass # print(repr(myinput))
     except Exception:
@@ -224,3 +271,4 @@ if __name__ == '__main__':
                 sys.stderr.write('Unable to locate cbl file\n')
                 sys.exit(1)
     main(txtfile, binfile)
+
