@@ -165,8 +165,12 @@ class LogReplay(object):
                     return b'', 0
                 lastoffset = self.bin.tell()
         clear = b'\x1b[2J\x1b[H'
-        first, high, last = self.lasttxt.partition(searchstr)
-        output = clear + first + b'\x1b[7m' + high + b'\x1b[27m' + last
+        txtchunks = self.lasttxt.split(searchstr)
+        output = clear + txtchunks[0]
+        txtchunks = txtchunks[1:]
+        while txtchunks:
+            output += b'\x1b[7m' + searchstr + b'\x1b[27m' + txtchunks[0]
+            txtchunks = txtchunks[1:]
         return output, 0
 
 
@@ -232,7 +236,11 @@ def main(txtfile, binfile):
                         sys.stdout.flush()
                         select.select((sys.stdin,), (), (), 86400)
                         nxtchr = sys.stdin.read(1)
-                        searchstr += nxtchr
+                        if nxtchr in ('\x08', '\x7f'):
+                            searchstr = searchstr[:-1]
+                            nxtchr = '\x08 \x08'
+                        else:
+                            searchstr += nxtchr
                     if not isinstance(searchstr, bytes):
                         searchstr = searchstr.encode('utf8')
                     searchstr = searchstr[:-1]
@@ -249,12 +257,12 @@ def main(txtfile, binfile):
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
         termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
-        writeout('\x1b[m')
+        writeout('\x1b[m\x1b[?25h\n')
         raise
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl ^ os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
-    writeout('\x1b[m')
+    writeout('\x1b[m\x1b[?25h\n')
 
 if __name__ == '__main__':
     txtfile = sys.argv[1]
