@@ -1,0 +1,148 @@
+<?xml version="1.0"?>
+<!DOCTYPE profile>
+<!--
+This autoyast file will be processed by pre.sh before applying. See pre.sh for
+info on modifying its behavior, and also search and replace '%%' to remove
+dynamic behavior and replace with static configuration.
+--> 
+<profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
+    <timezone>
+      <hwclock>UTC</hwclock>
+      <!--INSERT:/tmp/timezone-->
+    </timezone>
+    <general>
+      <self_update config:type="boolean">false</self_update>
+      <mode>
+	      <confirm config:type="boolean">false</confirm>
+      </mode>
+    </general>
+    %%IFSLE%%
+    <add-on>
+      <add_on_products config:type="list">
+        <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-basesystem</product><product_dir>/Module-Basesystem</product_dir></listentry>
+  	    <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-server-applications</product><product_dir>/Module-Server-Applications</product_dir></listentry>
+	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-containers</product><product_dir>/Module-Containers</product_dir></listentry>
+	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>SLES</product><product_dir>/Product-SLES</product_dir></listentry>
+	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>Legacy-Module</product><product_dir>/Module-Legacy</product_dir></listentry>
+      </add_on_products>
+    </add-on>
+    %%ENDIFSLE%%
+    <!--INSERT:/tmp/bootloader.xml-->
+    <software>
+       %%IFSLE%%
+       <products config:type="list">
+          <product>SLES</product>
+      </products>
+       %%ENDIFSLE%%
+      <patterns config:type="list">
+        <pattern>base</pattern>
+      </patterns>
+      <packages config:type="list">
+	<package>openssh</package>
+	<package>iputils</package>
+        <package>python3</package>
+        <package>openssl</package>
+        <package>chrony</package>
+        <package>rsync</package>
+        <package>screen</package>
+        <package>vim</package>
+        <package>binutils</package>
+        <package>pciutils</package>
+        <package>usbutils</package>
+        <package>nfs-client</package>
+        <package>ethtool</package>
+      </packages>
+    </software>
+  <partitioning config:type="list">
+	  <drive>
+		  <device>%%INSTDISK%%</device>
+		  <initialize config:type="boolean">true</initialize>
+		  <use>all</use>
+                  <partitions config:type="list">
+                         <partition>
+                                 <filesystem config:type="symbol">xfs</filesystem>
+                                 <mount>/</mount>
+                                 <size>max</size>
+                         </partition>
+                         <partition>
+                                 <mount>swap</mount>
+                                 <size>auto</size>
+                         </partition>
+                         <partition>
+                                 <mount>/boot</mount>
+                                 <size>500M</size>
+                         </partition>
+                 </partitions>
+          </drive>
+ </partitioning>
+    <users config:type="list">
+      <user>
+        <username>root</username>
+        <user_password>%%ROOTPASSWORD%%</user_password>
+        <encrypted config:type="boolean">true</encrypted>
+	<!--INSERT:/tmp/rootkeys.xml-->
+      </user>
+    </users>
+    <networking>
+	    <dns>
+		    <hostname>%%NODENAME%%</hostname>
+            </dns>
+	    <keep_install_network config:type="boolean">true</keep_install_network>
+    </networking>
+    <services-manager>
+	    <services>
+		    <enable config:type="list">
+			    <service>sshd</service>
+			</enable>
+		</services>
+	</services-manager>
+    <scripts>
+         <pre-scripts config:type="list">
+        <script>
+          <filename>preinstall.sh</filename>
+          <source>
+<![CDATA[
+#!/bin/sh
+confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+curl $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/pre.sh > /tmp/pre.sh
+. /tmp/pre.sh
+]]>
+          </source>
+        </script>
+      </pre-scripts>
+         <chroot-scripts config:type="list">
+        <script>
+          <filename>chroot.sh</filename>
+          <source>
+<![CDATA[
+#!/bin/sh
+confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
+proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+curl $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/prechroot.sh > /tmp/prechroot.sh
+. /tmp/prechroot.sh
+curl -f $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /mnt/etc/confluent/firstboot.sh
+curl -f $proto://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/post.sh > /mnt/etc/confluent/post.sh
+chmod +x /mnt/etc/confluent/firstboot.sh
+chmod +x /mnt/etc/confluent/post.sh
+cp /mnt/etc/confluent/post.sh /mnt/var/adm/autoinstall/scripts/
+]]>
+          </source>
+        </script>
+        <script>
+          <chrooted config:type="boolean">true</chrooted>
+          <filename>post.sh</filename>
+          <location>file:///etc/confluent/post.sh</location>
+        </script>
+      </chroot-scripts>
+      <init-scripts config:type="list">
+        <script>
+          <filename>firstboot.sh</filename>
+          <location>file:///etc/confluent/firstboot.sh</location>
+        </script>
+     </init-scripts> 
+
+    </scripts>
+</profile>
