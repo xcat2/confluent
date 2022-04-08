@@ -52,6 +52,8 @@ def run():
                          help='Specify a custom port for ssh')
     argparser.add_option('-s', '--substitutename',
                          help='Use a different name other than the nodename for ssh')
+    argparser.add_option('-x', '--noexpression', action='store_true',
+                         help='Suppress expression expansion of command')
     argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to run remote ssh command to, '
@@ -88,28 +90,39 @@ def run():
             ex = exp.get('databynode', ())
             for node in ex:
                 nodemap[node] = ex[node]['value']
-    for exp in c.create('/noderange/{0}/attributes/expression'.format(args[0]),
-                        {'expression': cmdstr}):
-        if 'error' in exp:
-            sys.stderr.write(exp['error'] + '\n')
-            exitcode |= exp.get('errorcode', 1)
-        ex = exp.get('databynode', ())
-        for node in ex:
-            cmd = ex[node]['value']
-            sshnode = nodemap.get(node, node)
-            if not isinstance(cmd, str) and not isinstance(cmd, bytes):
-                cmd = cmd.encode('utf-8')
-            cmdv = ['ssh']
-            if options.port:
-                cmdv += ['-p', '{0}'.format(options.port)]
-            if options.loginname:
-                cmdv += ['-l', options.loginname]
-            cmdv += [sshnode, cmd]
-            if currprocs < concurrentprocs:
-                currprocs += 1
-                run_cmdv(node, cmdv, all, pipedesc)
-            else:
-                pendingexecs.append((node, cmdv))
+    cmdparms = []
+    if options.noexpression:
+        for res in c.read('/noderange/{0}/nodes/'.format(args[0])):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
+                exitcode |= res.get('errorcode', 1)
+                break
+            node = res['item']['href'][:-1]
+            cmdparms.append((node, cmdstr))
+    else:
+        for exp in c.create('/noderange/{0}/attributes/expression'.format(args[0]),
+                            {'expression': cmdstr}):
+            if 'error' in exp:
+                sys.stderr.write(exp['error'] + '\n')
+                exitcode |= exp.get('errorcode', 1)
+            ex = exp.get('databynode', ())
+            for node in ex:
+                cmdparms.append((node, ex[node]['value']))
+    for node, cmd in cmdparms:
+        sshnode = nodemap.get(node, node)
+        if not isinstance(cmd, str) and not isinstance(cmd, bytes):
+            cmd = cmd.encode('utf-8')
+        cmdv = ['ssh']
+        if options.port:
+            cmdv += ['-p', '{0}'.format(options.port)]
+        if options.loginname:
+            cmdv += ['-l', options.loginname]
+        cmdv += [sshnode, cmd]
+        if currprocs < concurrentprocs:
+            currprocs += 1
+            run_cmdv(node, cmdv, all, pipedesc)
+        else:
+            pendingexecs.append((node, cmdv))
     if not all or exitcode:
         sys.exit(exitcode)
     rdy, _, _ = select.select(all, [], [], 10)
