@@ -251,7 +251,7 @@ def _replay_to_console(txtfile, binfile):
                     searchstr = searchstr[:-1]
                     newdata, delay = replay.search(searchstr)
                     if not newdata:
-                        sys.stdout.write('\x1b[1K\rNo match found!')
+                        sys.stdout.write('\x1b[1K\rNo match found')
                         prepend = b'\x1b[1K\x1b8'
                     else:
                         sys.stdout.write('\x1b[1K\x1b8')
@@ -260,6 +260,10 @@ def _replay_to_console(txtfile, binfile):
                     break
                 elif myinput.lower() == 'n' and searchstr:
                     newdata, delay = replay.search(searchstr, True)
+                    if not newdata:
+                        sys.stdout.write('\x1b7\x1b[99999;0H\x1b[2KNo more matches found')
+                        sys.stdout.flush()
+                        prepend = b'\x1b[1K\x1b8'
                     skipnext = True
                     break
                 else:
