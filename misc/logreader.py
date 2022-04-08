@@ -185,6 +185,7 @@ def main(txtfile, binfile):
     quitit = False
     searchstr = None
     writeout('\x1b[2J\x1b[;H')
+    prepend = ''
     try:
         while not quitit:
             if not skipnext:
@@ -192,6 +193,9 @@ def main(txtfile, binfile):
             skipnext = False
             reverse = False
             if newdata:
+                if prepend:
+                    newdata = prepend + newdata
+                    prepend = b''
                 writeout(newdata)
                 newdata = ''
                 writeout('\x1b]0;[Time: {0}]\x07'.format(
@@ -229,6 +233,7 @@ def main(txtfile, binfile):
                     else:
                         sys.stdout.flush()
                 elif myinput.lower() == '/':
+                    sys.stdout.write('\x1b7\x1b[99999;0H\x1b[2K')
                     searchstr = ''
                     nxtchr = '/'
                     while '\r' not in searchstr:
@@ -245,6 +250,12 @@ def main(txtfile, binfile):
                         searchstr = searchstr.encode('utf8')
                     searchstr = searchstr[:-1]
                     newdata, delay = replay.search(searchstr)
+                    if not newdata:
+                        sys.stdout.write('\x1b[1K\rNo match found!')
+                        prepend = b'\x1b[1K\x1b8'
+                    else:
+                        sys.stdout.write('\x1b[1K\x1b8')
+                    sys.stdout.flush()
                     skipnext = True
                     break
                 elif myinput.lower() == 'n' and searchstr:
