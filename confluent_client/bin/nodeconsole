@@ -25,6 +25,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 import confluent.client as client
 import confluent.sortutil as sortutil
+import confluent.logreader as logreader
 
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
@@ -35,10 +36,21 @@ argparser = optparse.OptionParser(
            "console")
 argparser.add_option('-t', '--tile', action='store_true', default=False,
                      help='Tile console windows in the terminal')
+argparser.add_option('-l', '--log', action='store_true', default=False,
+                     help='Enter log replay mode instead of showing a live console')
 (options, args) = argparser.parse_args()
 if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
+if options.log:
+    logname = args[0]
+    if not os.path.exists(logname) and logname[0] != '/':
+        logname = os.path.join('/var/log/confluent/consoles', logname)
+    if not os.path.exists(logname):
+        sys.stderr.write('Unable to locate {0} on local system\n'.format(logname))
+        sys.exit(1)
+    logreader.replay_to_console(logname)
+    sys.exit(0)
 if options.tile:
     null = open('/dev/null', 'w')
     nodes = []

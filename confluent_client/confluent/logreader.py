@@ -174,7 +174,7 @@ class LogReplay(object):
         return output, 0
 
 
-def main(txtfile, binfile):
+def _replay_to_console(txtfile, binfile):
     replay = LogReplay(txtfile, binfile)
     oldtcattr = termios.tcgetattr(sys.stdin.fileno())
     tty.setraw(sys.stdin.fileno())
@@ -275,19 +275,17 @@ def main(txtfile, binfile):
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
     writeout('\x1b[m\x1b[?25h\n')
 
-if __name__ == '__main__':
-    txtfile = sys.argv[1]
-    if len(sys.argv) > 2:
-        binfile = sys.argv[2]
+def replay_to_console(txtfile):
+    if os.path.exists(txtfile + '.cbl'):
+        binfile = txtfile + '.cbl'
     else:
-        if os.path.exists(txtfile + '.cbl'):
-            binfile = txtfile + '.cbl'
-        else:
-            fileparts = txtfile.split('.')
-            prefix = '.'.join(fileparts[:-1])
-            binfile = prefix + '.cbl.' + fileparts[-1]
-            if not os.path.exists(binfile):
-                sys.stderr.write('Unable to locate cbl file\n')
-                sys.exit(1)
-    main(txtfile, binfile)
+        fileparts = txtfile.split('.')
+        prefix = '.'.join(fileparts[:-1])
+        binfile = prefix + '.cbl.' + fileparts[-1]
+        if not os.path.exists(binfile):
+            sys.stderr.write('Unable to locate cbl file\n')
+            sys.exit(1)
+    _replay_to_console(txtfile, binfile)
 
+if __name__ == '__main__':
+    replay_to_console(sys.argv[1])
