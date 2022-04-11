@@ -1059,7 +1059,7 @@ def prep_decrypt(indir):
     tempfile.mktemp()
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {0} crypt {1} {2} 0 {3} 8'.format(
         imglen, cipher, key, loopdev)])
-    return '/dev/mapper/{0}'.format(dmname)
+    return '/dev/mapper/{0}'.format(dmname), loopdev
 
 
 def unpack_image(args):
@@ -1070,13 +1070,14 @@ def unpack_image(args):
     if os.path.isdir(indir):
         indir = os.path.join(indir, 'rootimg.sfs')
     cleandmtable = None
+    loopdev = None
     prepped = False
     try:
         while not prepped:
             with open(indir, 'rb') as inpack:
                 hdr = inpack.read(16)
                 if hdr == b'\xaa\xd5\x0f\x7e\x5d\xfb\x4b\x7c\xa1\x2a\xf4\x0b\x6d\x94\xf7\xfc':
-                    indir = prep_decrypt(indir)
+                    indir, loopdev = prep_decrypt(indir)
                     cleandmtable = os.path.basename(indir)
                     continue
                 if hdr == b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1':
@@ -1104,6 +1105,8 @@ def unpack_image(args):
                     mounted = False
                 except subprocess.CalledProcessError:
                     time.sleep(0.1)
+        if loopdev:
+            subprocess.check_call(['losetup', '-d', loopdev])
 
 
 def recursecp(source, targ):
