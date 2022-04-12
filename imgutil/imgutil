@@ -425,11 +425,13 @@ class OsHandler(object):
         if pkglistfile[-1] == '>':
             pkglistfile = pkglistfile[:-1]
         with open(pkglistfile, 'r') as pkglist:
-            pkgs = pkglist.read()
+            pkgs = ''
+            for line in pkglist.readlines():
+                line = line.split('#', 1)[0].strip()
+                pkgs += line + ' '
             pkgs = pkgs.split()
         retpkgs = []
         for pkg in pkgs:
-            pkg = pkg.split('#', 1)[0].strip()
             if not pkg:
                 continue
             if pkg[0] == '<':  # Include from specified file
@@ -707,7 +709,7 @@ def main():
     sps = parser.add_subparsers(dest='subcommand')
     buildp = sps.add_parser('build', help='Build a new diskless image from scratch')
     buildp.add_argument('-r', '--addrepos', help='Repositories to add in addition to the main source', default=[], action='append')
-    buildp.add_argument('-p', '--packagelist', help='Filename of package list', default='')
+    buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist', default='')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
