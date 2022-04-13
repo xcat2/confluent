@@ -53,9 +53,12 @@ class TermHandler(object):
             connection = None
             try:
                 connection, address = self.socket.accept()
-                connection.sendall("confetty control v1--\n")
+                connection.sendall(b"confetty control v1--\n")
                 cmd = connection.recv(8)
-                if 'GETWINID' == cmd:
+                if b'GETWINID' == cmd:
+                    winid = os.environ['WINDOWID']
+                    if not isinstance(winid, bytes):
+                        winid = winid.encode('utf8')
                     connection.sendall(os.environ['WINDOWID'])
                 connection.close()
             except BaseException:
