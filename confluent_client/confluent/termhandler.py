@@ -59,7 +59,7 @@ class TermHandler(object):
                     winid = os.environ['WINDOWID']
                     if not isinstance(winid, bytes):
                         winid = winid.encode('utf8')
-                    connection.sendall(os.environ['WINDOWID'])
+                    connection.sendall(winid)
                 connection.close()
             except BaseException:
                 pass
