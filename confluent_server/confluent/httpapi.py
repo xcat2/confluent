@@ -492,7 +492,11 @@ def wsock_handler(ws):
                                             datacallback=datacallback,
                                             width=width, height=height)
                                     myconsoles[clientsessid] = consession
-
+                            elif action == 'stop':
+                                sessid = '{0}'.format(msg.get('sessid', None))
+                                if sessid in myconsoles:
+                                    myconsoles[sessid].destroy()
+                                    del myconsoles[sessid]
                         else:
                             print(repr(clientmsg))
         finally:
