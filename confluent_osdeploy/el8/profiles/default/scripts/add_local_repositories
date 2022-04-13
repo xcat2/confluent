@@ -5,7 +5,7 @@ except ImportError:
     import cStringIO
 import imp
 import sys
-apiclient = imp.load_source('apiclient', '/etc/confluent/apiclient')
+apiclient = imp.load_source('apiclient', '/opt/confluent/bin/apiclient')
 repo = None
 server = None
 profile = None
