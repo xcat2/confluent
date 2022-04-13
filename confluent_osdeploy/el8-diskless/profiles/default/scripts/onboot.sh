@@ -19,6 +19,9 @@ chmod 600 /var/log/confluent/confluent-onboot.log
 tail -f /var/log/confluent/confluent-onboot.log > /dev/console &
 logshowpid=$!
 
+rpm --import /etc/pki/rpm-gpg/*
+
+run_remote_python add_local_repositories
 run_remote_python syncfileclient
 run_remote_python confignet
 
