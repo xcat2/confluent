@@ -163,7 +163,7 @@ def get_async(env, querydict):
     return _asyncsessions[env['HTTP_CONFLUENTASYNCID']]['asyncsession']
 
 
-def handle_async(env, querydict, threadset, wshandler=None, wsin=None):
+def handle_async(env, querydict, threadset, wshandler=None):
     global _cleanthread
     # This may be one of two things, a request for a new async stream
     # or a request for next data from async stream
@@ -171,21 +171,8 @@ def handle_async(env, querydict, threadset, wshandler=None, wsin=None):
     if 'asyncid' not in querydict or not querydict['asyncid']:
         # This is a new request, create a new multiplexer
         currsess = AsyncSession(wshandler)
-        if wshandler:  # websocket mode, block until exited
-            # just stay alive until client goes away
-            mythreadid = greenlet.getcurrent()
-            threadset.add(mythreadid)
-            wsin.send(' ASYNCID: {0}'.format(currsess.asyncid))
-            clientmsg = True
-            while clientmsg:
-                # get input from ws...
-                clientmsg = wsin.wait()
-                if clientmsg and clientmsg[0] == '?':
-                    wsin.send('?')
-                elif clientmsg:
-                    print(repr(clientmsg))
-            currsess.destroy()
-            threadset.discard(mythreadid)
+        if wshandler:
+            yield currsess
             return
         yield messages.AsyncSession(currsess.asyncid)
         return
