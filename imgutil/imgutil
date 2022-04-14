@@ -590,10 +590,18 @@ class ElHandler(OsHandler):
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
         subprocess.check_call(['yum'] + self.yumargs)
-        # note that in some cases, may need to fix labels for function even without selinux
-        # for now a TODO, but note the command to repair a scratch directery if needed
-        # can be done by unpack, setfiles, then pack again too
-        #setfiles -r buildscratch /etc/selinux/targeted/contexts/files/file_contexts buildscratch
+        with open('/proc/mounts') as mountinfo:
+            for line in mountinfo.readlines():
+                if line.startswith('selinuxfs '):
+                    break
+            else:
+                self.relabel_targdir()
+
+    def relabel_targdir(self):
+        subprocess.check_call(
+            ['setfiles', '-r', self.targpath, 
+             '/etc/selinux/targeted/contexts/files/file_contexts',
+             self.targpath])
 
 
 def versionize_string(key):
