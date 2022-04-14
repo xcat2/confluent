@@ -123,4 +123,5 @@ if grep installtodisk /proc/cmdline > /dev/null; then
 fi
 mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
+kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
 exec /opt/confluent/bin/start_root
