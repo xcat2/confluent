@@ -390,6 +390,11 @@ class OsHandler(object):
             pkglist = args.packagelist
         except AttributeError:
             pkglist = ''
+        self.addpkglists = []
+        for plist in args.addpackagelist:
+            if os.path.exists(os.path.abspath(plist)):
+                plist = os.path.abspath(plist)
+            self.addpkglists.append(plist)
         if pkglist:
             if os.path.exists(os.path.abspath(pkglist)):
                 pkglist = os.path.abspath(pkglist)
@@ -419,8 +424,10 @@ class OsHandler(object):
         pass
 
     def list_packages(self, pkglistfile=None):
+        addpkgs = []
         if pkglistfile is None:
             pkglistfile = self.pkglist
+            addpkgs = self.addpkglists
         pkglistfile = pkglistfile.strip()
         if pkglistfile[-1] == '>':
             pkglistfile = pkglistfile[:-1]
@@ -443,6 +450,8 @@ class OsHandler(object):
                 retpkgs.extend(self.list_packages(subfilename))
             else:
                 retpkgs.append(pkg)
+        for addpkglist in addpkgs:
+            retpkgs.extend(self.list_packages(addpkglist))
         return retpkgs
 
 class SuseHandler(OsHandler):
@@ -718,6 +727,8 @@ def main():
     buildp = sps.add_parser('build', help='Build a new diskless image from scratch')
     buildp.add_argument('-r', '--addrepos', help='Repositories to add in addition to the main source', default=[], action='append')
     buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist', default='')
+    buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
+                        help='A list of additional packages to include, may be specified multiple times')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
