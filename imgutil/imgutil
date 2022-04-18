@@ -97,7 +97,10 @@ class FileMasker():
                 filename = filename[1:]
             filename = os.path.join('/run/imgutil/capin/', filename)
             for tfilename in glob.glob(filename):
-                secontext = os.getxattr(tfilename, 'security.selinux')
+                try:
+                    secontext = os.getxattr(tfilename, 'security.selinux')
+                except OSError:
+                    secontext = None
                 if maskwith is None:
                     tmaskwith = tempfile.mkstemp()
                     os.close(tmaskwith[0])
