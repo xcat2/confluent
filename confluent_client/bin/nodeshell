@@ -162,6 +162,7 @@ def run():
                 if options.nonodeprefix:
                     sys.stdout.write(line)
                 else:
+                    line = line.lstrip('\x08')
                     sys.stdout.write('{0}: {1}'.format(node, line))
         sys.stdout.flush()
         if all:
