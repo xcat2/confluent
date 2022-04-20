@@ -671,6 +671,8 @@ def create_group(inputdata, configmanager):
 def create_node(inputdata, configmanager):
     try:
         nodename = inputdata['name']
+        if ' ' in nodename:
+            raise exc.InvalidArgumentException('Name "{0}" is not supported'.format(nodename))
         del inputdata['name']
         attribmap = {nodename: inputdata}
     except KeyError:
