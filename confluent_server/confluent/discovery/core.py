@@ -429,6 +429,8 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         return (msg.KeyValueData({'rescan': 'started'}),)
 
     elif operation in ('update', 'create'):
+        if pathcomponents == ['discovery', 'register']:
+            return
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
         mac = _get_mac_from_query(pathcomponents)
