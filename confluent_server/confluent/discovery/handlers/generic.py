@@ -35,6 +35,8 @@ class NodeHandler(object):
         self.ipaddr = None
         self.relay_url = None
         self.relay_server = None
+        self.web_ip = None
+        self.web_port = None
         # if this is a remote registered component, prefer to use the agent forwarder
         if info.get('forwarder_url', False):
             self.relay_url = info['forwarder_url']
@@ -113,6 +115,28 @@ class NodeHandler(object):
     def https_cert(self):
         if self._fp:
             return self._fp
+        ip, port = self.get_web_port_and_ip()
+        wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert, port=port)
+        try:
+            wc.connect()
+        except IOError as ie:
+            if ie.errno == errno.ECONNREFUSED:
+                self._certfailreason = 1
+                return None
+            elif ie.errno == errno.EHOSTUNREACH:
+                self._certfailreason = 2
+                return None
+            self._certfailreason = 2
+            return None
+        except Exception:
+            self._certfailreason = 2
+            return None
+        return self._fp
+
+    def get_web_port_and_ip(self):
+        if self.web_ip:
+            return self.web_ip, self.web_port
+        # get target ip and port, either direct or relay as applicable
         if self.relay_url:
             kv = util.TLSCertVerifier(self.configmanager, self.relay_server,
                                   'pubkeys.tls_hardwaremanager').verify_cert
@@ -131,27 +155,9 @@ class NodeHandler(object):
             if r.code != 302:
                 raise Exception('Unexpected return from forwarder')
             newurl = r.getheader('Location')
-            port = int(newurl.rsplit(':', 1)[-1][:-1])
-            ip = self.relay_server
+            self.web_port = int(newurl.rsplit(':', 1)[-1][:-1])
+            self.web_ip = self.relay_server
         else:
-            port = 443
-            if ':' in self.ipaddr:
-                ip = '[{0}]'.format(self.ipaddr)
-            else:
-                ip = self.ipaddr
-        wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert, port=port)
-        try:
-            wc.connect()
-        except IOError as ie:
-            if ie.errno == errno.ECONNREFUSED:
-                self._certfailreason = 1
-                return None
-            elif ie.errno == errno.EHOSTUNREACH:
-                self._certfailreason = 2
-                return None
-            self._certfailreason = 2
-            return None
-        except Exception:
-            self._certfailreason = 2
-            return None
-        return self._fp
+            self.web_port = 443
+            self.web_ip = self.ipaddr
+        return self.web_ip, self.web_port
