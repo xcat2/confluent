@@ -21,9 +21,10 @@ for r in $(cat rpmlist); do
 	#rpm -qi $r | grep ^License|sed -e 's/^.*:/${r}:/' >> licenselist
 	for l in $(rpm -qL $r); do
 		lo=${l#/usr/share/}
+		lo=${l#licenses/}
 		mkdir -p licenses/$(dirname $lo)
-		cp $l $lo
-		echo /opt/confluent/genesis/x86_64/$lo >> confluent-genesis-out.spec
+		cp $l licenses/$lo
+		echo /opt/confluent/genesis/%{arch}/$lo >> confluent-genesis-out.spec
 	done
 done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
