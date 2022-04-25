@@ -23,14 +23,14 @@ for r in $(cat rpmlist); do
 		lo=${l#/usr/share/}
 		mkdir -p licenses/$(dirname $lo)
 		cp $l $lo
-		echo $lo >> confluent-genesis-out.spec
+		echo /opt/confluent/genesis/x86_64/$lo >> confluent-genesis-out.spec
 	done
 done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
 mkdir -p ~/rpmbuild/SOURCES/
-tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist
+tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist licenses
 rpmbuild -bb confluent-genesis-out.spec
 rm -rf /usr/lib/dracut/modules.d/97genesis
 popd
