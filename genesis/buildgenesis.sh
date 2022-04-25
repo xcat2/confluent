@@ -8,11 +8,11 @@ dracut --no-early-microcode --xz -N -m "genesis base" -f boot/initramfs/distribu
 tdir=$(mktemp -d)
 tfile=$(mktemp)
 cp boot/initramfs/distribution $tdir
-cd $tdir
+pushd $tdir
 xzcat distribution|cpio -dumi
 rm distribution
 find . -type f -exec rpm -qf /{} \; 2> /dev/null | grep -v 'not owned' | sort -u > $tfile
-cd -
+popd
 rm -rf $tdir
 cp $tfile rpmlist
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
