@@ -15,12 +15,23 @@ find . -type f -exec rpm -qf /{} \; 2> /dev/null | grep -v 'not owned' | sort -u
 popd
 rm -rf $tdir
 cp $tfile rpmlist
+cp confluent-genesis.spec confluent-genesis-out.spec
+echo %license >> confluent-genesis-out.spec
+for r in $(cat rpmlist); do
+	#rpm -qi $r | grep ^License|sed -e 's/^.*:/${r}:/' >> licenselist
+	for l in $(rpm -qL $r); do
+		lo=${l#/usr/share/}
+		mkdir -p licenses/$(dirname $lo)
+		cp $l $lo
+		echo $lo >> confluent-genesis-out.spec
+	done
+done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
 mkdir -p ~/rpmbuild/SOURCES/
 tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist
-rpmbuild -bb confluent-genesis.spec
+rpmbuild -bb confluent-genesis-out.spec
 rm -rf /usr/lib/dracut/modules.d/97genesis
 popd
 # getting src rpms would be nice, but centos isn't consistent..
