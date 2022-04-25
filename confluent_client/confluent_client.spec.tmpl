@@ -50,4 +50,5 @@ python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUI
 rm -rf $RPM_BUILD_ROOT
 
 %files -f INSTALLED_FILES
+%license /opt/confluent/share/licenses/confluent_client/LICENSE
 %defattr(-,root,root)
