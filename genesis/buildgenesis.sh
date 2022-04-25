@@ -5,11 +5,21 @@ chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/9
 mkdir -p boot/initramfs
 mkdir -p boot/efi/boot
 dracut --no-early-microcode --xz -N -m "genesis base" -f boot/initramfs/distribution $(uname -r)
+tdir=$(mktemp -d)
+tfile=$(mktemp)
+cp boot/initramfs/distribution $tdir
+cd $tdir
+xzcat distribution|cpio -dumi
+rm distribution
+find . -type f -exec rpm -qf /{} \; 2> /dev/null | grep -v 'not owned' | sort -u > $tfile
+cd -
+rm -rf $tdir
+cp $tfile rpmlist
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
 mkdir -p ~/rpmbuild/SOURCES/
-tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot
+tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist
 rpmbuild -bb confluent-genesis.spec
 rm -rf /usr/lib/dracut/modules.d/97genesis
 cd -
