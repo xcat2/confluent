@@ -1,4 +1,5 @@
 pushd $(dirname $0)
+rm -rf licenses
 cp -a 97genesis /usr/lib/dracut/modules.d/
 cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97genesis/install
 chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/97genesis/installkernel
@@ -21,10 +22,10 @@ for r in $(cat rpmlist); do
 	#rpm -qi $r | grep ^License|sed -e 's/^.*:/${r}:/' >> licenselist
 	for l in $(rpm -qL $r); do
 		lo=${l#/usr/share/}
-		lo=${l#licenses/}
+		lo=${lo#licenses/}
 		mkdir -p licenses/$(dirname $lo)
 		cp $l licenses/$lo
-		echo /opt/confluent/genesis/%{arch}/$lo >> confluent-genesis-out.spec
+		echo /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
 	done
 done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
