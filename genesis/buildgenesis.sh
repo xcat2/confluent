@@ -1,4 +1,4 @@
-cd $(dirname $0)
+pushd $(dirname $0)
 cp -a 97genesis /usr/lib/dracut/modules.d/
 cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97genesis/install
 chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/97genesis/installkernel
@@ -22,7 +22,7 @@ mkdir -p ~/rpmbuild/SOURCES/
 tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist
 rpmbuild -bb confluent-genesis.spec
 rm -rf /usr/lib/dracut/modules.d/97genesis
-cd -
+popd
 # getting src rpms would be nice, but centos isn't consistent..
 # /usr/lib/dracut/skipcpio /opt/confluent/genesis/x86_64/boot/initramfs/distribution | xzcat | cpio -dumiv
 # rpm -qf $(find . -type f | sed -e 's/^.//') |sort -u|grep -v 'not owned' > ../rpmlist
