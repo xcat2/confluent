@@ -21,6 +21,8 @@ mkdir -p opt/confluent/bin
 mv imgutil opt/confluent/bin/
 chmod a+x opt/confluent/bin/imgutil
 mv ubuntu suse15 el7 el8 opt/confluent/lib/imgutil/
+mkdir -p opt/confluent/share/licenses/confluent_imgutil
+cp LICENSE opt/confluent/share/licenses/confluent_imgutil
 
 %install
 cp -a opt %{buildroot}/
@@ -28,3 +30,4 @@ cp -a opt %{buildroot}/
 %files
 /opt/confluent/bin/imgutil
 /opt/confluent/lib/imgutil
+%license /opt/confluent/share/licenses/confluent_imgutil/LICENSE
