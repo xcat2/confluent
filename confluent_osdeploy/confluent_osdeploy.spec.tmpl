@@ -76,6 +76,8 @@ cp -a esxi7out esxi6out
 cp -a esxi7 esxi6
 
 %install
+mkdir -p %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
+cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
 for os in rhvh4 el7 el8 el9 genesis suse15 ubuntu20.04 esxi6 esxi7 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
@@ -98,3 +100,4 @@ find %{buildroot}/opt/confluent/lib/osdeploy/ -name .gitignore -exec rm -f {} +
 
 %files
 /opt/confluent/lib/osdeploy
+%license /opt/confluent/share/licenses/confluent_osdeploy/LICENSE
