@@ -48,6 +48,7 @@ columnmapping = {
     'Advertised IP': 'otheripaddrs',
     'Other IP': 'otheripaddrs',
 }
+#TODO: add chassis uuid
 
 
 def print_disco(options, session, currmac, outhandler, columns):
