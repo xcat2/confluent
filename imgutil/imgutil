@@ -394,10 +394,11 @@ class OsHandler(object):
         except AttributeError:
             pkglist = ''
         self.addpkglists = []
-        for plist in args.addpackagelist:
-            if os.path.exists(os.path.abspath(plist)):
-                plist = os.path.abspath(plist)
-            self.addpkglists.append(plist)
+        if hasattr(args, 'addpackagelist'):
+            for plist in args.addpackagelist:
+                if os.path.exists(os.path.abspath(plist)):
+                    plist = os.path.abspath(plist)
+                self.addpkglists.append(plist)
         if pkglist:
             if os.path.exists(os.path.abspath(pkglist)):
                 pkglist = os.path.abspath(pkglist)
