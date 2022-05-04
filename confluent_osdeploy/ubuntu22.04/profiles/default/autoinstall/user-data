@@ -1,0 +1,17 @@
+#cloud-config
+autoinstall:
+  version: 1
+  early-commands:
+    - /custom-installation/pre.sh
+  late-commands:
+    - /custom-installation/post.sh
+  ssh:
+    install-server: true
+  storage:
+    layout:
+      name: lvm
+      match:
+        path: "%%INSTALLDISK%%"
+  user-data:
+    runcmd:
+      - /etc/confluent/firstboot.sh

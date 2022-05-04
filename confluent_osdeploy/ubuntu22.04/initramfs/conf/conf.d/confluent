@@ -1,0 +1,8 @@
+if ! grep console= /proc/cmdline > /dev/null; then
+    /opt/confluent/bin/autocons > /custom-installation/autocons.info
+    cons=$(cat /custom-installation/autocons.info)
+    if [ ! -z "$cons" ]; then
+        echo "Auto-detected serial console: $cons" > ${cons%,*}
+    fi
+fi
+echo /scripts/init-premount/confluent >> /scripts/init-premount/ORDER
