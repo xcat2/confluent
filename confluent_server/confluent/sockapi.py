@@ -502,8 +502,17 @@ class SockApi(object):
     def watch_resolv(self):
         while True:
             watcher = libc.inotify_init1(os.O_NONBLOCK)
-            if libc.inotify_add_watch(watcher, b'/etc/resolv.conf', 0xcda) <= -1:
-                break
+            resolvpath = '/etc/resolv.conf'
+            while True:
+                try:
+                    resolvpath = os.readlink(resolvpath)
+                except Exception:
+                    break
+            if not isinstance(resolvpath, bytes):
+                resolvpath = resolvpath.encode('utf8')
+            if libc.inotify_add_watch(watcher, resolvpath, 0xcc2) <= -1:
+                eventlet.sleep(15)
+                continue
             select.select((watcher,), (), (), 86400)
             try:
                 os.read(watcher, 1024)
