@@ -1,7 +1,9 @@
 from setuptools import setup
 import os
 
-data_files = [('/etc/profile.d', ['confluent_env.sh', 'confluent_env.csh'])]
+data_files = [('/etc/profile.d', ['confluent_env.sh', 'confluent_env.csh']),
+              ('/opt/confluent/share/licenses/confluent_client/', ['LICENSE'])
+              ]
 try:
     scriptlist = ['bin/{0}'.format(d) for d in os.listdir('bin/')]
     data_files.append(('/opt/confluent/share/man/man1', ['man/man1/' + x for x in os.listdir('man/man1')]))

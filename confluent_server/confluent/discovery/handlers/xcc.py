@@ -30,6 +30,15 @@ import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
+def fixuuid(baduuid):
+    # SMM dumps it out in hex
+    uuidprefix = (baduuid[:8], baduuid[9:13], baduuid[14:18])
+    a = codecs.encode(struct.pack('<IHH', *[int(x, 16) for x in uuidprefix]),
+        'hex')
+    a = util.stringify(a)
+    uuid = (a[:8], a[8:12], a[12:16], baduuid[19:23], baduuid[24:])
+    return '-'.join(uuid).lower()
+
 class LockedUserException(Exception):
     pass
 
@@ -95,7 +104,7 @@ class NodeHandler(immhandler.NodeHandler):
         if attrs.get('enclosure-form-factor', None) == 'dense-computing':
             encuuid = attrs.get('chassis-uuid', None)
             if encuuid:
-                self.info['enclosure.uuid'] = encuuid
+                self.info['enclosure.uuid'] = fixuuid(encuuid)
             slot = int(attrs.get('slot', 0))
             if slot != 0:
                 self.info['enclosure.bay'] = slot

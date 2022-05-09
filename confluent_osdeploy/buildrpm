@@ -5,6 +5,7 @@ if [ "$NUMCOMMITS" != "$VERSION"  ]; then
 fi
 sed -e "s/#VERSION#/$VERSION/" confluent_osdeploy.spec.tmpl > confluent_osdeploy.spec
 cd ..
+cp ../LICENSE .
 tar Jcvf confluent_osdeploy.tar.xz confluent_osdeploy
 mv confluent_osdeploy.tar.xz ~/rpmbuild/SOURCES/
 cd -

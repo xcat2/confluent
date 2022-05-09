@@ -949,7 +949,9 @@ def get_node_by_uuid_or_mac(uuidormac):
 
 def get_nodename_from_enclosures(cfg, info):
     nodename = None
-    cuuid = info.get('attributes', {}).get('chassis-uuid', [None])[0]
+    cuuid = info.get('enclosure.uuid', None)
+    if not cuuid:
+        cuuid = info.get('attributes', {}).get('chassis-uuid', [None])[0]
     if cuuid and cuuid in nodes_by_uuid:
         encl = nodes_by_uuid[cuuid]
         bay = info.get('enclosure.bay', None)

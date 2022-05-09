@@ -197,7 +197,7 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
         for entry in entries:
             if str(entry).endswith('TRANS.TBL'):
                 continue
-            if extractlist and str(entry) not in extractlist:
+            if extractlist and str(entry).lower() not in extractlist:
                 continue
             write_header(write_p, entry._entry_p)
             read_p = entry._archive_p
@@ -250,6 +250,11 @@ def check_rocky(isoinfo):
             arch = entry.split('.')[-2]
             cat = 'el8'
             break
+        if 'rocky-release-9' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el9'
+            break
     else:
         return None
     if arch == 'noarch' and '.discinfo' in isoinfo[1]:
@@ -269,6 +274,11 @@ def check_alma(isoinfo):
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
             cat = 'el8'
+            break
+        elif 'almalinux-release-9' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el9'
             break
     else:
         return None
@@ -369,7 +379,7 @@ def check_ubuntu(isoinfo):
         return {'name': 'ubuntu-{0}-{1}'.format(ver, arch),
                 'method': EXTRACT|COPY,
                 'extractlist': ['casper/vmlinuz', 'casper/initrd',
-                'EFI/BOOT/BOOTx64.EFI', 'EFI/BOOT/grubx64.efi'
+                'efi/boot/bootx64.efi', 'efi/boot/grubx64.efi'
                 ],
                 'copyto': 'install.iso',
                 'category': 'ubuntu{0}'.format(major)}

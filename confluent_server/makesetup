@@ -9,3 +9,4 @@ sed -e "s/#VERSION#/$VERSION/" setup.py.tmpl > setup.py
 if [ -f confluent/client.py ]; then 
     echo '__version__ = "'$VERSION'"' > confluent/__init__.py
 fi
+cp ../LICENSE .

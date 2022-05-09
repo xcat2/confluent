@@ -1,4 +1,5 @@
-cd $(dirname $0)
+pushd $(dirname $0)
+rm -rf licenses
 cp -a 97genesis /usr/lib/dracut/modules.d/
 cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97genesis/install
 chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/97genesis/installkernel
@@ -15,14 +16,25 @@ find . -type f -exec rpm -qf /{} \; 2> /dev/null | grep -v 'not owned' | sort -u
 popd
 rm -rf $tdir
 cp $tfile rpmlist
+cp confluent-genesis.spec confluent-genesis-out.spec
+for r in $(cat rpmlist); do
+	#rpm -qi $r | grep ^License|sed -e 's/^.*:/${r}:/' >> licenselist
+	for l in $(rpm -qL $r); do
+		lo=${l#/usr/share/}
+		lo=${lo#licenses/}
+		mkdir -p licenses/$(dirname $lo)
+		cp $l licenses/$lo
+		echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
+	done
+done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
 mkdir -p ~/rpmbuild/SOURCES/
-tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist
-rpmbuild -bb confluent-genesis.spec
+tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist licenses
+rpmbuild -bb confluent-genesis-out.spec
 rm -rf /usr/lib/dracut/modules.d/97genesis
-cd -
+popd
 # getting src rpms would be nice, but centos isn't consistent..
 # /usr/lib/dracut/skipcpio /opt/confluent/genesis/x86_64/boot/initramfs/distribution | xzcat | cpio -dumiv
 # rpm -qf $(find . -type f | sed -e 's/^.//') |sort -u|grep -v 'not owned' > ../rpmlist
