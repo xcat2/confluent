@@ -13,7 +13,11 @@ Requires: squashfs-tools
 %if "%{dist}" == ".el9"
 Requires: squashfs-tools
 %else
+%if "%{dist}" == ".el7"
+Requires: squashfs-tools
+%else
 Requires: squashfs
+%endif
 %endif
 %endif
 
