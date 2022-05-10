@@ -40,7 +40,7 @@ def retrieve(nodes, element, configmanager, inputdata):
                 pdu = outlets[node][pgroup]['pdu']
                 outlet = outlets[node][pgroup]['outlet']
                 for rsp in core.handle_path(
-                        '/nodes/{0}/_pdu/outlets/{1}'.format(pdu, outlet),
+                        '/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
                         'retrieve', configmanager):
                     yield msg.KeyValueData({pgroup: rsp.kvpairs['state']['value']}, node)
 
