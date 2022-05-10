@@ -485,7 +485,7 @@ def attribute_is_invalid(attrname, attrval):
 
 
 def _get_valid_attrname(attrname):
-    if attrname.startswith('net.'):
+    if attrname.startswith('net.') or attrname.startswith('power.'):
         # For net.* attribtues, split on the dots and put back together
         # longer term we might want a generic approach, but
         # right now it's just net. attributes

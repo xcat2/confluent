@@ -21,6 +21,10 @@ try:
     import Cookie
 except ModuleNotFoundError:
     import http.cookies as Cookie
+try:
+    import pywarp
+except ImportError:
+    pywarp = None
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver

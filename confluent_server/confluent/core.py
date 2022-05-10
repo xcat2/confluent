@@ -360,6 +360,10 @@ def _init_core():
                 {'pluginattrs': ['hardwaremanagement.method'],
                  'default': 'ipmi'}),
         },
+        '_pdu': {
+            'outlets': PluginCollection(
+                {'pluginattrs': ['hardwaremanagement.method']}),
+        },
         'shell': {
             # another special case similar to console
             'sessions': PluginCollection({
@@ -457,6 +461,7 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'inlets': PluginCollection({'handler': 'pdu'}),
             'reseat':  PluginRoute({'handler': 'enclosure'}),
         },
         'sensors': {
