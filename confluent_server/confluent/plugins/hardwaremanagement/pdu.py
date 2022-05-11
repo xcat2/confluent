@@ -68,26 +68,12 @@ def get_outlets(nodes, emebs, inletname):
 def update(nodes, element, configmanager, inputdata):
     emebs = configmanager.get_node_attributes(
         nodes, (u'power.*pdu', u'power.*outlet'))
-    for node in nodes:
-        for attrib in emebs[node]:
-            print(repr(attrib))
-        try:
-            em = emebs[node]['enclosure.manager']['value']
-            eb = emebs[node]['enclosure.bay']['value']
-        except KeyError:
-            em = node
-            eb = -1
-        if not em:
-            em = node
-        if not eb:
-            eb = -1
-        try:
-            for rsp in core.handle_path(
-                    '/nodes/{0}/_enclosure/reseat_bay'.format(em),
-                    'update', configmanager,
-                    inputdata={'reseat': int(eb)}):
-                yield rsp
-        except pygexc.UnsupportedFunctionality as uf:
-            yield msg.ConfluentNodeError(node, str(uf))
-        except exc.TargetEndpointUnreachable as uf:
-            yield msg.ConfluentNodeError(node, str(uf))
+    inletname = element[-1]
+    outlets = get_outlets(nodes, emebs, inletname)
+    for node in outlets:
+        for pgroup in outlets[node]:
+            pdu = outlets[node][pgroup]['pdu']
+            outlet = outlets[node][pgroup]['outlet']
+            for rsp in core.handle_path('/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
+                                        'update', configmanager, inputdata={'state': inputdata.powerstate(node)}):
+                yield msg.KeyValueData({pgroup: rsp.kvpairs['state']['value']}, node)

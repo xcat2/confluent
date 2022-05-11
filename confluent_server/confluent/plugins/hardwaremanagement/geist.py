@@ -54,15 +54,20 @@ class GeistClient(object):
                                             ['secret.hardwaremanagementuser',
                                              'secret.hardwaremanagementpassword'],
                                             decrypt=True)
+        credcfg = credcfg.get(self.node, {})
         username = credcfg.get(
             'secret.hardwaremanagementuser', {}).get('value', None)
         passwd = credcfg.get(
             'secret.hardwaremanagementpassword', {}).get('value', None)
+        if not isinstance(username, str):
+            username = username.decode('utf8')
+        if not isinstance(passwd, str):
+            passwd = passwd.decode('utf8')
         if not username or not passwd:
             raise Exception('Missing username or password')
         self.username = username
         rsp = self.wc.grab_json_response(
-            '/api/auth/{0]'.format(username),
+            '/api/auth/{0}'.format(username),
             {'cmd': 'login', 'data': {'password': passwd}})
         token = rsp['data']['token']
         return token
@@ -85,7 +90,7 @@ class GeistClient(object):
 
     def set_outlet(self, outlet, state):
         rsp = self.wc.grab_json_response('/api/dev')
-        if len(rsp['data'] != 1):
+        if len(rsp['data']) != 1:
             self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
         pdu = list(rsp['data'])[0]
@@ -101,3 +106,10 @@ def retrieve(nodes, element, configmanager, inputdata):
         gc = GeistClient(node, configmanager)
         state = gc.get_outlet(element[-1])
         yield msg.PowerState(node=node, state=state)
+
+def update(nodes, element, configmanager, inputdata):
+    for node in nodes:
+        gc = GeistClient(node, configmanager)
+        newstate = inputdata.powerstate(node)
+        gc.set_outlet(element[-1], newstate)
+    return retrieve(nodes, element, configmanager, inputdata)

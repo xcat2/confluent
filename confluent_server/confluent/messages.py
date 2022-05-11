@@ -515,6 +515,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputVolumes(path, nodes, inputdata)
     elif 'inventory/firmware/updates/active' in '/'.join(path) and inputdata:
         return InputFirmwareUpdate(path, nodes, inputdata, configmanager)
+    elif ('/'.join(path).startswith('power/inlets/') or '/'.join(path).startswith('power/outlets/')) and inputdata:
+        return InputPowerMessage(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/detach'):
         return DetachMedia(path, nodes, inputdata)
     elif '/'.join(path).startswith('media/') and inputdata:
