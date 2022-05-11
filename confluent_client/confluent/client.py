@@ -208,7 +208,7 @@ class Command(object):
     def add_precede_dict(self, dict):
         self._prevdict = dict
 
-    def handle_results(self, ikey, rc, res, errnodes=None):
+    def handle_results(self, ikey, rc, res, errnodes=None, outhandler=None):
         if 'error' in res:
             if errnodes is not None:
                 errnodes.add(self._currnoderange)
@@ -245,13 +245,12 @@ class Command(object):
                         node, val, self._prevdict[node]))
                 else:
                     cprint('{0}: {1}'.format(node, val))
-            elif ikey == 'state':
-                for k in res[node]:
-                    cprint('{0}: {1}: {2}'.format(node, k, res[node][k]))
+            elif outhandler:
+                outhandler(node, res)
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,
-                                 key=None, errnodes=None, promptover=None, **kwargs):
+                                 key=None, errnodes=None, promptover=None, outhandler=None, **kwargs):
         try:
             self._currnoderange = noderange
             rc = 0
@@ -265,13 +264,13 @@ class Command(object):
             if input is None:
                 for res in self.read('/noderange/{0}/{1}'.format(
                         noderange, resource)):
-                    rc = self.handle_results(ikey, rc, res, errnodes)
+                    rc = self.handle_results(ikey, rc, res, errnodes, outhandler)
             else:
                 self.stop_if_noderange_over(noderange, promptover)
                 kwargs[ikey] = input
                 for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
-                    rc = self.handle_results(ikey, rc, res, errnodes)
+                    rc = self.handle_results(ikey, rc, res, errnodes, outhandler)
             self._currnoderange = None
             return rc
         except KeyboardInterrupt:

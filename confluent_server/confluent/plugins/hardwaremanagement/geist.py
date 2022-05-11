@@ -15,6 +15,7 @@
 import pyghmi.util.webclient as wc
 import confluent.util as util
 import confluent.messages as msg
+import confluent.exceptions as exc
 
 
 class GeistClient(object):
@@ -102,12 +103,16 @@ class GeistClient(object):
 
 
 def retrieve(nodes, element, configmanager, inputdata):
+    if 'outlets' not in element:
+        raise exc.NotImplementedException('Not implemented')
     for node in nodes:
         gc = GeistClient(node, configmanager)
         state = gc.get_outlet(element[-1])
         yield msg.PowerState(node=node, state=state)
 
 def update(nodes, element, configmanager, inputdata):
+    if 'outlets' not in element:
+        raise exc.NotImplementedException('Not implemented')
     for node in nodes:
         gc = GeistClient(node, configmanager)
         newstate = inputdata.powerstate(node)
