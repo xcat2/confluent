@@ -24,6 +24,9 @@ respond.
 * `reset`:  Request immediate reset of nodes of the noderange.  Nodes that are
 off will not react to this request.
 * `status`:  Behave identically to having no argument passed at all.
+* `pdu_status`: Query state of associated PDU outlets, if configured.
+* `pdu_on`: Energize all PDU outlets associated with the noderange.
+* `pdu_off`: De-energize all PDU outlets associated with the noderange.
 
 ## OPTIONS
 

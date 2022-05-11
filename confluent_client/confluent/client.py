@@ -245,6 +245,9 @@ class Command(object):
                         node, val, self._prevdict[node]))
                 else:
                     cprint('{0}: {1}'.format(node, val))
+            elif ikey == 'state':
+                for k in res[node]:
+                    cprint('{0}: {1}: {2}'.format(node, k, res[node][k]))
         return rc
 
     def simple_noderange_command(self, noderange, resource, input=None,

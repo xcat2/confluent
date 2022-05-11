@@ -85,7 +85,7 @@ class GeistClient(object):
             raise Exception('Multiple PDUs not supported per pdu')
         pduname = list(rsp)[0]
         outlet = rsp[pduname]['outlet'][str(int(outlet) - 1)]
-        state = outlet['state']
+        state = outlet['state'].split('2')[-1]
         return state
 
     def set_outlet(self, outlet, state):
