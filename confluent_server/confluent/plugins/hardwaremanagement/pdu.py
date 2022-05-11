@@ -58,7 +58,7 @@ def get_outlets(nodes, emebs, inletname):
                 pgroup = 'inlet_' + attrib[0]
             else:
                 pgroup = 'default'
-            if inletname == 'all' or pgroup == 'inletname':
+            if inletname == 'all' or pgroup == inletname:
                 if pgroup not in outlets[node]:
                     outlets[node][pgroup] = {}
                 outlets[node][pgroup][attrib[-1]] = v
