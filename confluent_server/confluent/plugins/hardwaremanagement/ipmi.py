@@ -482,7 +482,7 @@ class IpmiHandler(object):
         self.tenant = cfg.tenant
         tenant = cfg.tenant
         while ((node, tenant) not in persistent_ipmicmds or
-                not persistent_ipmicmds[(node, tenant)].ipmi_session.logged or
+                not (persistent_ipmicmds[(node, tenant)].ipmi_session.logged or persistent_ipmicmds[(node, tenant)].ipmi_session.logging) or
                 persistent_ipmicmds[(node, tenant)].ipmi_session.broken):
             try:
                 persistent_ipmicmds[(node, tenant)].close_confluent()
@@ -514,6 +514,8 @@ class IpmiHandler(object):
                     raise exc.TargetEndpointUnreachable(ge.strerror)
                 raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
+        while not self.ipmicmd.ipmi_session.broken and not self.ipmicmd.ipmi_session.logged:
+            self.ipmicmd.ipmi_session.wait_for_rsp(3)
 
     bootdevices = {
         'optical': 'cd'
