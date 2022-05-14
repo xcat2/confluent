@@ -381,7 +381,6 @@ def snoop(handler, protocol=None, nodeguess=None):
             if not ready or not ready[0]:
                 continue
             for netc in ready[0]:
-                rawbuffer[:] = b'\x00' * 2048
                 idx = None
                 if netc == net4:
                     i = recvmsg(netc.fileno(), ctypes.pointer(msg), 0)
@@ -394,7 +393,7 @@ def snoop(handler, protocol=None, nodeguess=None):
                     if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
                         idx, recv = struct.unpack('II', cmsgarr[16:24])
                         recv = ipfromint(recv)
-                    rqv = memoryview(rawbuffer)
+                    rqv = memoryview(rawbuffer)[:i]
                     if rawbuffer[0] == 1:  # Boot request
                         process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv)
                 elif netc == net6:
