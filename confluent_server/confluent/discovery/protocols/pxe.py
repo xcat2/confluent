@@ -381,6 +381,7 @@ def snoop(handler, protocol=None, nodeguess=None):
             if not ready or not ready[0]:
                 continue
             for netc in ready[0]:
+                rawbuffer[:] = b'\x00' * 2048
                 idx = None
                 if netc == net4:
                     i = recvmsg(netc.fileno(), ctypes.pointer(msg), 0)
