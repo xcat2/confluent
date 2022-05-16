@@ -1,0 +1,38 @@
+nodeping(8) -- Pings a node or a noderange.
+==============================
+## SYNOPSIS
+`nodeping [options] noderange`  
+
+## DESCRIPTION  
+**nodeping** is a command that pings the default NIC on a node.
+It can also be used with the `-s` flag to change the ping location to something that is 'non primary'
+
+
+## OPTIONS
+* ` -f` COUNT, `-c` COUNT, --count=COUNT  
+   Number of commands to run at a time  
+* `-h`, `--help`:  
+  Show help message and exit      
+* `-s` SUBSTITUTENAME, --substitutename=SUBSTITUTENAME  
+                        Use a different name other than the nodename for ping  
+   
+## EXAMPLES
+ * Pinging a node :  
+  `# nodeping <node>`  
+  `node : ping`    
+    
+* Pinging a group:  
+  `# nodeping <groupname>`    
+  `Node1 : ping  
+    Node2 : ping  
+    Node3 : ping`  
+
+* Pinging BMC on a node:  
+  `# nodeping -s {bmc} <noderange>`  
+  ` Node-bmc : ping`  
+
+* Fail to ping node:  
+  `# nodeping <node>`  
+  `node : no_ping`  
+ 
+
