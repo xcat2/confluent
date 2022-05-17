@@ -43,6 +43,20 @@ mkdir -p /etc/pki/tls/certs
 cat /tls/*.pem > /etc/pki/tls/certs/ca-bundle.crt
 TRIES=0
 touch /etc/confluent/confluent.info
+if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    mkdir -p /media/ident
+    mount /dev/disk/by-label/CNFLNT_IDNT /media/ident
+    if [ -e /media/ident/genesis_bootstrap.sh ]; then
+        exec sh /media/ident/genesis_bootstrap.sh
+    fi
+fi
+if [ -e /dev/disk/by-label/GENESIS-X86 ]; then
+    mkdir -p /media/genesis
+    mount /dev/disk/by-label/GENESIS-X86 /media/genesis
+    if [ -e /media/genesis/genesis_bootstrap.sh ]; then
+        exec sh /media/genesis/genesis_bootstrap.sh
+    fi
+fi
 cd /sys/class/net
 echo -n "Scanning for network configuration..."
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 30 ]; do
