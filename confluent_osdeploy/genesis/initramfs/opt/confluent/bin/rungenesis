@@ -155,6 +155,23 @@ elif [ "$autoconfigmethod" = "static" ]; then
         ip route add default via $v4gw
     fi
 fi
+nameserversec=0
+while read -r entry; do
+    if [ $nameserversec = 1 ]; then
+        if [[ $entry == "-"* ]] && [[ $entry != "- ''" ]]; then
+            echo nameserver ${entry#- } >> /etc/resolv.conf
+            continue
+        fi
+    fi
+    nameserversec=0
+    if [ "${entry%:*}" = "nameservers" ]; then
+        nameserversec=1
+        continue
+    fi
+done < /etc/confluent/confluent.deploycfg
+dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
+dnsdomain=${dnsdomain#dnsdomain: }
+echo search $dnsdomain >> /etc/resolv.conf
 echo -n "Initializing ssh..."
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
