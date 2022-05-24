@@ -22,6 +22,8 @@ import confluent.util as util
 import confluent.client as client
 import confluent.sshutil as sshutil
 import confluent.certutil as certutil
+import confluent.netutil as netutil
+import socket
 try:
     input = raw_input
 except NameError:
@@ -149,10 +151,13 @@ def local_node_trust_setup():
     neededlines = set([
         'HostbasedAuthentication yes', 'HostbasedUsesNameFromPacketOnly yes',
         'IgnoreRhosts no'])
-    if domain and not myname.endswith(domain):
-        myprincipals.add('{0}.{1}'.format(myname, domain))
-    if domain and '.' in myname and myname.endswith(domain):
-        myprincipals.add(myname.split('.')[0])
+    myshortname = myname.split('.')[0]
+    myprincipals.add(myshortname)
+    if domain:
+        myprincipals.add('{0}.{1}'.format(myshortname, domain))
+    for addr in netutil.get_my_addresses():
+        addr = socket.inet_ntop(addr[0], addr[1])
+        myprincipals.add(addr)
     for pubkey in glob.glob('/etc/ssh/ssh_host_*_key.pub'):
         currpubkey = open(pubkey, 'rb').read()
         cert = sshutil.sign_host_key(currpubkey, myname, myprincipals)
