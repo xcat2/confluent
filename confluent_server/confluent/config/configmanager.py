@@ -113,7 +113,7 @@ _attraliases = {
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
 }
-_validroles = ('Administrator', 'Operator', 'Monitor')
+_validroles = ('Administrator', 'Operator', 'Monitor', 'Stub')
 
 membership_callback = None
 
@@ -2777,8 +2777,8 @@ def dump_db_to_directory(location, password, redact=None, skipkeys=False):
             cfgfile.write('\n')
     bkupglobals = get_globals()
     if bkupglobals:
-        json.dump(bkupglobals, open(os.path.join(location, 'globals.json'),
-                                    'w'))
+        with open(os.path.join(location, 'globals.json'), 'w') as globout:
+            json.dump(bkupglobals, globout)
     try:
         for tenant in os.listdir(
                 os.path.join(ConfigManager._cfgdir, '/tenants/')):

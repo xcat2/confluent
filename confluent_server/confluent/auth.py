@@ -162,6 +162,8 @@ def authorize(name, element, tenant=False, operation='create',
         return False
     manager = configmanager.ConfigManager(tenant, username=user)
     userobj = manager.get_user(user)
+    if userobj and userobj.get('role', None) == 'Stub':
+        userobj = None
     if not userobj:
         for group in userutil.grouplist(user):
             userobj = manager.get_usergroup(group)

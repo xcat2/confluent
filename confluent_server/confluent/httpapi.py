@@ -22,9 +22,9 @@ try:
 except ModuleNotFoundError:
     import http.cookies as Cookie
 try:
-    import pywarp
+    import confluent.webauthn as webauthn
 except ImportError:
-    pywarp = None
+    webauthn = None
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
@@ -833,6 +833,14 @@ def resourcehandler_backend(env, start_response):
                 sessinfo['sessionid'] = authorized['sessionid']
             tlvdata.unicode_dictvalues(sessinfo)
             yield json.dumps(sessinfo)
+            return
+        elif url.startswith('/sessions/current/webauthn/'):
+            if not webauthn:
+                start_response('501 Not Implemented', headers)
+                yield ''
+                return
+            for rsp in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers):
+                yield rsp
             return
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
