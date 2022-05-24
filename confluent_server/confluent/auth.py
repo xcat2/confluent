@@ -162,6 +162,8 @@ def authorize(name, element, tenant=False, operation='create',
         return False
     manager = configmanager.ConfigManager(tenant, username=user)
     userobj = manager.get_user(user)
+    if element in ('/sessions/current/webauthn/registered_credentials', '/sessions/current/webauthn/validate'):
+        return userobj, manager, user, tenant, skipuserobj
     if userobj and userobj.get('role', None) == 'Stub':
         userobj = None
     if not userobj:

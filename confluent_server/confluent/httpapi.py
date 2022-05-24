@@ -211,6 +211,8 @@ def _should_skip_authlog(env):
     if '/sessions/current/async' in env['PATH_INFO']:
         # this is effectively invisible
         return True
+    if '/sessions/current/webauthn/registered_credentials' in env['PATH_INFO']:
+        return True
     if (env['REQUEST_METHOD'] == 'GET' and
             ('/sensors/' in env['PATH_INFO'] or
              '/health/' in env['PATH_INFO'] or
@@ -274,11 +276,18 @@ def _authorize_request(env, operation):
     authdata = None
     name = ''
     sessionid = None
+    sessid = None
     cookie = Cookie.SimpleCookie()
     element = env['PATH_INFO']
     if element.startswith('/sessions/current/'):
-        element = None
-    if 'HTTP_COOKIE' in env:
+        if (element.startswith('/sessions/current/webauthn/registered_credentials/')
+                or element.startswith('/sessions/current/webauthn/validate/')):
+            username = element.rsplit('/')[-1]
+            element = element.replace('/' + username, '')
+            authdata = auth.authorize(name, element=element, operation=operation)
+        else:
+            element = None
+    if (not authdata) and 'HTTP_COOKIE' in env:
         cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
         if cidx >= 0:
             sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
@@ -356,11 +365,11 @@ def _authorize_request(env, operation):
         auditmsg['user'] = util.stringify(authdata[2])
         if sessid is not None:
             authinfo['sessionid'] = sessid
+            if 'csrftoken' in httpsessions[sessid]:
+                authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
+            httpsessions[sessid]['cfgmgr'] = authdata[1]
         if not skiplog:
             auditlog.log(auditmsg)
-        if 'csrftoken' in httpsessions[sessid]:
-            authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
-        httpsessions[sessid]['cfgmgr'] = authdata[1]
         return authinfo
     elif authdata is None:
         return {'code': 401}
@@ -636,7 +645,7 @@ def resourcehandler_backend(env, start_response):
         raise Exception("Unrecognized code from auth engine")
     headers.extend(
         ("Set-Cookie", m.OutputString())
-        for m in authorized['cookie'].values())
+        for m in authorized.get('cookie', {}).values())
     cfgmgr = authorized['cfgmgr']
     if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
         pagecontent = ""
@@ -839,7 +848,7 @@ def resourcehandler_backend(env, start_response):
                 start_response('501 Not Implemented', headers)
                 yield ''
                 return
-            for rsp in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers):
+            for rsp in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody):
                 yield rsp
             return
         resource = '.' + url[url.rindex('/'):]
