@@ -120,4 +120,5 @@ def update(nodes, element, configmanager, inputdata):
         gc = GeistClient(node, configmanager)
         newstate = inputdata.powerstate(node)
         gc.set_outlet(element[-1], newstate)
-    return retrieve(nodes, element, configmanager, inputdata)
+    for res in retrieve(nodes, element, configmanager, inputdata):
+        yield res
