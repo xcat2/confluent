@@ -1,34 +1,51 @@
 import base64
+import confluent.tlvdata as tlvdata
 import confluent.util as util
 import json
 import pywarp
 import pywarp.backends
+import pywarp.credentials
 
 creds = {}
 challenges = {}
 
 class TestBackend(pywarp.backends.CredentialStorageBackend):
     def __init__(self):
-        pass
+        global creds
+        try:
+            with open('/tmp/mycreds.json', 'r') as ji:
+                creds = json.load(ji)
+        except Exception:
+            pass
 
     def get_credential_by_email(self, email):
         if not isinstance(email, str):
             email = email.decode('utf8')
-        return creds[email]
+        cred = creds[email]
+        cid = base64.b64decode(cred['cid'])
+        cpk = base64.b64decode(cred['cpk'])
+        return pywarp.credentials.Credential(credential_id=cid, credential_public_key=cpk)
 
     def save_credential_for_user(self, email, credential):
         if not isinstance(email, str):
             email = email.decode('utf8')
+        credential = {'cid': base64.b64encode(credential.id).decode('utf8'), 'cpk': base64.b64encode(bytes(credential.public_key)).decode('utf8')}
         creds[email] = credential
+        with open('/tmp/mycreds.json', 'w') as jo:
+            json.dump(creds, jo)
 
     def save_challenge_for_user(self, email, challenge, type):
+        if not isinstance(email, str):
+            email = email.decode('utf8')
         challenges[email] = challenge
 
     def get_challenge_for_user(self, email, type):
+        if not isinstance(email, str):
+            email = email.decode('utf8')
         return challenges[email]
 
 
-def handle_api_request(url, env, start_response, username, cfm, headers, reqbody):
+def handle_api_request(url, env, start_response, username, cfm, headers, reqbody, authorized):
     if env['REQUEST_METHOD'] != 'POST':
         raise Exception('Only POST supported for webauthn operations')
     url = url.replace('/sessions/current/webauthn', '')
@@ -72,8 +89,17 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             req[x] = base64.b64decode(req[x].replace('-', '+').replace('_', '/'))
         req['email'] = username
         rsp = rp.verify(**req)
-        start_response('200 OK')
-        yield json.dumps(rsp)
+        if start_response:
+            start_response('200 OK', headers)
+            sessinfo = {'username': username}
+            if 'authtoken' in authorized:
+                sessinfo['authtoken'] = authorized['authtoken']
+            if 'sessionid' in authorized:
+                sessinfo['sessionid'] = authorized['sessionid']
+            tlvdata.unicode_dictvalues(sessinfo)
+            yield json.dumps(sessinfo)
+        else:
+            yield rsp
     elif url == '/register_credential':
         rp = pywarp.RelyingPartyManager('Confluent Web UI', credential_storage_backend=TestBackend(), require_attestation=False)
         req = json.loads(reqbody)

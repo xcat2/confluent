@@ -269,7 +269,7 @@ def _csrf_valid(env, session):
             env['HTTP_CONFLUENTAUTHTOKEN'] == session['csrftoken'])
 
 
-def _authorize_request(env, operation):
+def _authorize_request(env, operation, reqbody):
     """Grant/Deny access based on data from wsgi env
 
     """
@@ -282,8 +282,7 @@ def _authorize_request(env, operation):
     if element.startswith('/sessions/current/'):
         if (element.startswith('/sessions/current/webauthn/registered_credentials/')
                 or element.startswith('/sessions/current/webauthn/validate/')):
-            username = element.rsplit('/')[-1]
-            element = element.replace('/' + username, '')
+            name = element.rsplit('/')[-1]
             authdata = auth.authorize(name, element=element, operation=operation)
         else:
             element = None
@@ -335,18 +334,13 @@ def _authorize_request(env, operation):
             return {'code': 403}
         elif not authdata:
             return {'code': 401}
-        sessid = util.randomstring(32)
-        while sessid in httpsessions:
-            sessid = util.randomstring(32)
-        httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
-                                'skipuserobject': authdata[4],
-                                'inflight': set([])}
-        if 'HTTP_CONFLUENTAUTHTOKEN' in env:
-            httpsessions[sessid]['csrftoken'] = util.randomstring(32)
-        cookie['confluentsessionid'] = util.stringify(sessid)
-        cookie['confluentsessionid']['secure'] = 1
-        cookie['confluentsessionid']['httponly'] = 1
-        cookie['confluentsessionid']['path'] = '/'
+        sessid = _establish_http_session(env, authdata, name, cookie)
+    if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
+        if webauthn:
+            for rsp in webauthn.handle_api_request(element, env, None, authdata[2], authdata[1], None, reqbody, None):
+                if rsp['verified']:
+                    sessid = _establish_http_session(env, authdata, name, cookie)
+                    break
     skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
@@ -375,6 +369,21 @@ def _authorize_request(env, operation):
         return {'code': 401}
     else:
         return {'code': 403}
+
+def _establish_http_session(env, authdata, name, cookie):
+    sessid = util.randomstring(32)
+    while sessid in httpsessions:
+        sessid = util.randomstring(32)
+    httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
+                                'skipuserobject': authdata[4],
+                                'inflight': set([])}
+    if 'HTTP_CONFLUENTAUTHTOKEN' in env:
+        httpsessions[sessid]['csrftoken'] = util.randomstring(32)
+    cookie['confluentsessionid'] = util.stringify(sessid)
+    cookie['confluentsessionid']['secure'] = 1
+    cookie['confluentsessionid']['httponly'] = 1
+    cookie['confluentsessionid']['path'] = '/'
+    return sessid
 
 
 def _pick_mimetype(env):
@@ -616,7 +625,7 @@ def resourcehandler_backend(env, start_response):
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
-    authorized = _authorize_request(env, operation)
+    authorized = _authorize_request(env, operation, reqbody)
     if 'logout' in authorized:
         start_response('200 Successful logout', headers)
         yield('{"result": "200 - Successful logout"}')
@@ -848,7 +857,7 @@ def resourcehandler_backend(env, start_response):
                 start_response('501 Not Implemented', headers)
                 yield ''
                 return
-            for rsp in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody):
+            for rsp in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody, authorized):
                 yield rsp
             return
         resource = '.' + url[url.rindex('/'):]
