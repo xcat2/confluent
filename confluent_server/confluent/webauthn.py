@@ -62,7 +62,10 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
         opts['challenge'] = base64.b64encode(opts['challenge']).decode('utf8')
         start_response('200 OK', headers)
         yield json.dumps(opts)
-    elif url == '/validate':
+    elif url.startswith('/validate/'):
+        username = url.rsplit('/', 1)[-1]
+        if not isinstance(username, bytes):
+            username = username.encode('utf8')
         rp = pywarp.RelyingPartyManager('Confluent Web UI', credential_storage_backend=TestBackend())
         req = json.loads(reqbody)
         for x in req:
