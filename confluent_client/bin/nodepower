@@ -55,7 +55,7 @@ if len(args) > 1:
     if setstate == 'softoff':
         setstate = 'shutdown'
 
-if setstate not in (None, 'on', 'off', 'shutdown', 'boot', 'reset', 'pdu_status', 'pdu_stat', 'pdu_on', 'pdu_off'):
+if setstate not in (None, 'on', 'off', 'shutdown', 'boot', 'reset', 'pdu_status', 'pdu_stat', 'pdu_on', 'pdu_off', 'status', 'stat', 'state'):
     argparser.print_help()
     sys.exit(1)
 session = client.Command()
