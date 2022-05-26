@@ -2447,10 +2447,10 @@ class ConfigManager(object):
                     uid = tmpconfig[confarea].get('id', None)
                     displayname = tmpconfig[confarea].get('displayname', None)
                     self.create_user(user, uid=uid, displayname=displayname)
-                    if 'cryptpass' in tmpconfig[confarea][user]:
-                        self._cfgstore['users'][user]['cryptpass'] = \
-                            tmpconfig[confarea][user]['cryptpass']
-                        _mark_dirtykey('users', user, self.tenant)
+                    for attrname in ('authid', 'authenticators', 'cryptpass'):
+                        if attrname in tmpconfig[confarea][user]:
+                            self._cfgstore['users'][user][attrname] = tmpconfig[confarea][user][attrname]
+                            _mark_dirtykey('users', user, self.tenant)
         if sync:
             self._bg_sync_to_file()
 
