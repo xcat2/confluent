@@ -514,10 +514,10 @@ class IpmiHandler(object):
                     raise exc.TargetEndpointUnreachable(ge.strerror)
                 raise
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
-        giveup = util._monotonic_time() + 60
+        giveup = util.monotonic_time() + 60
         while not self.ipmicmd.ipmi_session.broken and not self.ipmicmd.ipmi_session.logged:
             self.ipmicmd.ipmi_session.wait_for_rsp(3)
-            if util._monotonic_time() > giveup:
+            if util.monotonic_time() > giveup:
                 self.ipmicmd.ipmi_session.broken = True
 
     bootdevices = {
