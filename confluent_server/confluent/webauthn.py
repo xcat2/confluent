@@ -18,6 +18,20 @@ class TestBackend(pywarp.backends.CredentialStorageBackend):
         except Exception:
             pass
 
+    def get_credential_ids_by_email(self, email):
+        if not isinstance(email, str):
+            email = email.decode('utf8')
+        for cid in creds[email]:
+            yield base64.b64decode(cid)
+
+    def get_credential_by_email_id(self, email, id):
+        if not isinstance(email, str):
+            email = email.decode('utf8')
+        cid = base64.b64encode(id).decode('utf8')
+        pk = creds[email][cid]['cpk']
+        pk = base64.b64decode(pk)
+        return pywarp.credentials.Credential(credential_id=id, credential_public_key=pk)
+
     def get_credential_by_email(self, email):
         if not isinstance(email, str):
             email = email.decode('utf8')
@@ -29,8 +43,11 @@ class TestBackend(pywarp.backends.CredentialStorageBackend):
     def save_credential_for_user(self, email, credential):
         if not isinstance(email, str):
             email = email.decode('utf8')
-        credential = {'cid': base64.b64encode(credential.id).decode('utf8'), 'cpk': base64.b64encode(bytes(credential.public_key)).decode('utf8')}
-        creds[email] = credential
+        cid = base64.b64encode(credential.id).decode('utf8')
+        credential = {'cid': cid, 'cpk': base64.b64encode(bytes(credential.public_key)).decode('utf8')}
+        if email not in creds:
+            creds[email] = {}
+        creds[email][cid] = credential
         with open('/tmp/mycreds.json', 'w') as jo:
             json.dump(creds, jo)
 
