@@ -281,6 +281,8 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
 def _get_svrip(peerdata):
     for addr in peerdata['addresses']:
         if addr[0].startswith('fe80::'):
+            if '%' not in addr[0]:
+                return addr[0] + '%{0}'.format(addr[3])
             return addr[0]
     return peerdata['addresses'][0][0]
 

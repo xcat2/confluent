@@ -21,6 +21,10 @@ try:
     import Cookie
 except ModuleNotFoundError:
     import http.cookies as Cookie
+try:
+    import confluent.webauthn as webauthn
+except ImportError:
+    webauthn = None
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.consoleserver as consoleserver
@@ -207,6 +211,8 @@ def _should_skip_authlog(env):
     if '/sessions/current/async' in env['PATH_INFO']:
         # this is effectively invisible
         return True
+    if '/sessions/current/webauthn/registered_credentials' in env['PATH_INFO']:
+        return True
     if (env['REQUEST_METHOD'] == 'GET' and
             ('/sensors/' in env['PATH_INFO'] or
              '/health/' in env['PATH_INFO'] or
@@ -263,18 +269,24 @@ def _csrf_valid(env, session):
             env['HTTP_CONFLUENTAUTHTOKEN'] == session['csrftoken'])
 
 
-def _authorize_request(env, operation):
+def _authorize_request(env, operation, reqbody):
     """Grant/Deny access based on data from wsgi env
 
     """
     authdata = None
     name = ''
     sessionid = None
+    sessid = None
     cookie = Cookie.SimpleCookie()
     element = env['PATH_INFO']
     if element.startswith('/sessions/current/'):
-        element = None
-    if 'HTTP_COOKIE' in env:
+        if (element.startswith('/sessions/current/webauthn/registered_credentials/')
+                or element.startswith('/sessions/current/webauthn/validate/')):
+            name = element.rsplit('/')[-1]
+            authdata = auth.authorize(name, element=element, operation=operation)
+        else:
+            element = None
+    if (not authdata) and 'HTTP_COOKIE' in env:
         cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
         if cidx >= 0:
             sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
@@ -322,18 +334,13 @@ def _authorize_request(env, operation):
             return {'code': 403}
         elif not authdata:
             return {'code': 401}
-        sessid = util.randomstring(32)
-        while sessid in httpsessions:
-            sessid = util.randomstring(32)
-        httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
-                                'skipuserobject': authdata[4],
-                                'inflight': set([])}
-        if 'HTTP_CONFLUENTAUTHTOKEN' in env:
-            httpsessions[sessid]['csrftoken'] = util.randomstring(32)
-        cookie['confluentsessionid'] = util.stringify(sessid)
-        cookie['confluentsessionid']['secure'] = 1
-        cookie['confluentsessionid']['httponly'] = 1
-        cookie['confluentsessionid']['path'] = '/'
+        sessid = _establish_http_session(env, authdata, name, cookie)
+    if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
+        if webauthn:
+            for rsp in webauthn.handle_api_request(element, env, None, authdata[2], authdata[1], None, reqbody, None):
+                if rsp['verified']:
+                    sessid = _establish_http_session(env, authdata, name, cookie)
+                    break
     skiplog = _should_skip_authlog(env)
     if authdata:
         auditmsg = {
@@ -352,16 +359,31 @@ def _authorize_request(env, operation):
         auditmsg['user'] = util.stringify(authdata[2])
         if sessid is not None:
             authinfo['sessionid'] = sessid
+            if 'csrftoken' in httpsessions[sessid]:
+                authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
+            httpsessions[sessid]['cfgmgr'] = authdata[1]
         if not skiplog:
             auditlog.log(auditmsg)
-        if 'csrftoken' in httpsessions[sessid]:
-            authinfo['authtoken'] = httpsessions[sessid]['csrftoken']
-        httpsessions[sessid]['cfgmgr'] = authdata[1]
         return authinfo
     elif authdata is None:
         return {'code': 401}
     else:
         return {'code': 403}
+
+def _establish_http_session(env, authdata, name, cookie):
+    sessid = util.randomstring(32)
+    while sessid in httpsessions:
+        sessid = util.randomstring(32)
+    httpsessions[sessid] = {'name': name, 'expiry': time.time() + 90,
+                                'skipuserobject': authdata[4],
+                                'inflight': set([])}
+    if 'HTTP_CONFLUENTAUTHTOKEN' in env:
+        httpsessions[sessid]['csrftoken'] = util.randomstring(32)
+    cookie['confluentsessionid'] = util.stringify(sessid)
+    cookie['confluentsessionid']['secure'] = 1
+    cookie['confluentsessionid']['httponly'] = 1
+    cookie['confluentsessionid']['path'] = '/'
+    return sessid
 
 
 def _pick_mimetype(env):
@@ -603,7 +625,7 @@ def resourcehandler_backend(env, start_response):
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
         del querydict['restexplorerop']
-    authorized = _authorize_request(env, operation)
+    authorized = _authorize_request(env, operation, reqbody)
     if 'logout' in authorized:
         start_response('200 Successful logout', headers)
         yield('{"result": "200 - Successful logout"}')
@@ -632,7 +654,7 @@ def resourcehandler_backend(env, start_response):
         raise Exception("Unrecognized code from auth engine")
     headers.extend(
         ("Set-Cookie", m.OutputString())
-        for m in authorized['cookie'].values())
+        for m in authorized.get('cookie', {}).values())
     cfgmgr = authorized['cfgmgr']
     if (operation == 'create') and env['PATH_INFO'] == '/sessions/current/async':
         pagecontent = ""
@@ -829,6 +851,14 @@ def resourcehandler_backend(env, start_response):
                 sessinfo['sessionid'] = authorized['sessionid']
             tlvdata.unicode_dictvalues(sessinfo)
             yield json.dumps(sessinfo)
+            return
+        elif url.startswith('/sessions/current/webauthn/'):
+            if not webauthn:
+                start_response('501 Not Implemented', headers)
+                yield ''
+                return
+            for rsp in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody, authorized):
+                yield rsp
             return
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)

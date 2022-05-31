@@ -113,7 +113,7 @@ _attraliases = {
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
 }
-_validroles = ('Administrator', 'Operator', 'Monitor')
+_validroles = ('Administrator', 'Operator', 'Monitor', 'Stub')
 
 membership_callback = None
 
@@ -485,7 +485,7 @@ def attribute_is_invalid(attrname, attrval):
 
 
 def _get_valid_attrname(attrname):
-    if attrname.startswith('net.'):
+    if attrname.startswith('net.') or attrname.startswith('power.'):
         # For net.* attribtues, split on the dots and put back together
         # longer term we might want a generic approach, but
         # right now it's just net. attributes
@@ -2447,10 +2447,10 @@ class ConfigManager(object):
                     uid = tmpconfig[confarea].get('id', None)
                     displayname = tmpconfig[confarea].get('displayname', None)
                     self.create_user(user, uid=uid, displayname=displayname)
-                    if 'cryptpass' in tmpconfig[confarea][user]:
-                        self._cfgstore['users'][user]['cryptpass'] = \
-                            tmpconfig[confarea][user]['cryptpass']
-                        _mark_dirtykey('users', user, self.tenant)
+                    for attrname in ('authid', 'authenticators', 'cryptpass'):
+                        if attrname in tmpconfig[confarea][user]:
+                            self._cfgstore['users'][user][attrname] = tmpconfig[confarea][user][attrname]
+                            _mark_dirtykey('users', user, self.tenant)
         if sync:
             self._bg_sync_to_file()
 
@@ -2548,8 +2548,13 @@ class ConfigManager(object):
         if statelessmode:
             return
         with cls._syncstate:
-            if (cls._syncrunning and cls._cfgwriter is not None and
-                    cls._cfgwriter.isAlive()):
+            isalive = False
+            if cls._cfgwriter is not None:
+                try:
+                    isalive = cls._cfgwriter.isAlive()
+                except AttributeError:
+                    isalive = cls._cfgwriter.is_alive()
+            if (cls._syncrunning and isalive):
                 cls._writepending = True
                 return
             if cls._syncrunning:  # This suggests an unclean write attempt,
@@ -2777,8 +2782,8 @@ def dump_db_to_directory(location, password, redact=None, skipkeys=False):
             cfgfile.write('\n')
     bkupglobals = get_globals()
     if bkupglobals:
-        json.dump(bkupglobals, open(os.path.join(location, 'globals.json'),
-                                    'w'))
+        with open(os.path.join(location, 'globals.json'), 'w') as globout:
+            json.dump(bkupglobals, globout)
     try:
         for tenant in os.listdir(
                 os.path.join(ConfigManager._cfgdir, '/tenants/')):

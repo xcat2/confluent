@@ -457,6 +457,8 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'inlets': PluginCollection({'handler': 'pdu'}),
+            'outlets': PluginCollection({'pluginattrs': ['hardwaremanagement.method']}),
             'reseat':  PluginRoute({'handler': 'enclosure'}),
         },
         'sensors': {

@@ -534,6 +534,12 @@ node = {
                        'To support this scenario, the switch should be set up to allow independent operation of member ports123654 (e.g. lacp bypass mode or fallback mode).',
         'validvalues': ('lacp', 'loadbalance', 'roundrobin', 'activebackup', 'none')
     },
+    'power.pdu': {
+        'description': 'Specifies the managed PDU associated with a power input on the node'
+    },
+    'power.outlet': {
+        'description': 'Species the outlet identifier on the PDU associoted with a power input on the node'
+    },
 #    'id.modelnumber': {
 #        'description': 'The manufacturer dictated  model number for the node',
 #    },

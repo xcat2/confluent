@@ -33,7 +33,7 @@ import confluent.client as client
 
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] <noderange> "
-          "([status|on|off|shutdown|boot|reset])")
+          "([status|on|off|shutdown|boot|reset|pdu_status|pdu_off|pdu_on])")
 argparser.add_option('-p', '--showprevious', dest='previous',
                      action='store_true', default=False,
                      help='Show previous power state')
@@ -51,22 +51,27 @@ except IndexError:
 client.check_globbing(noderange)
 setstate = None
 if len(args) > 1:
+    setstate = args[1]
     if setstate == 'softoff':
         setstate = 'shutdown'
-    elif not args[1] in ('stat', 'state', 'status'):
-        setstate = args[1]
 
-if setstate not in (None, 'on', 'off', 'shutdown', 'boot', 'reset'):
+if setstate not in (None, 'on', 'off', 'shutdown', 'boot', 'reset', 'pdu_status', 'pdu_stat', 'pdu_on', 'pdu_off', 'status', 'stat', 'state'):
     argparser.print_help()
     sys.exit(1)
 session = client.Command()
 exitcode = 0
 session.add_precede_key('oldstate')
+powurl = 'state'
+if setstate and setstate.startswith('pdu_'):
+    setstate = setstate.replace('pdu_', '')
+    powurl = 'inlets/all'
+if setstate in ('status', 'state', 'stat'):
+    setstate = None
 
 if options.previous:
     # get previous states
     prev = {}
-    for rsp in session.read("/noderange/{0}/power/state".format(noderange)):
+    for rsp in session.read("/noderange/{0}/power/{1}".format(noderange, powurl)):
         # gets previous (current) states
 
         databynode = rsp["databynode"]
@@ -77,4 +82,7 @@ if options.previous:
     # add dictionary to session
     session.add_precede_dict(prev)
 
-sys.exit(session.simple_noderange_command(noderange, '/power/state', setstate, promptover=options.maxnodes))
+def outhandler(node, res):
+    for k in res[node]:
+        client.cprint('{0}: {1}: {2}'.format(node, k.replace('inlet_', ''), res[node][k]))
+sys.exit(session.simple_noderange_command(noderange, '/power/{0}'.format(powurl), setstate, promptover=options.maxnodes, key='state', outhandler=outhandler))

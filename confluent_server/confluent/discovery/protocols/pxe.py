@@ -393,7 +393,7 @@ def snoop(handler, protocol=None, nodeguess=None):
                     if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
                         idx, recv = struct.unpack('II', cmsgarr[16:24])
                         recv = ipfromint(recv)
-                    rqv = memoryview(rawbuffer)
+                    rqv = memoryview(rawbuffer)[:i]
                     if rawbuffer[0] == 1:  # Boot request
                         process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv)
                 elif netc == net6:
