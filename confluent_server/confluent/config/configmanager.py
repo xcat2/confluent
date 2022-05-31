@@ -2548,12 +2548,13 @@ class ConfigManager(object):
         if statelessmode:
             return
         with cls._syncstate:
-            try:
-                isalive = cls._cfgwriter.isAlive()
-            except AttributeError:
-                isalive = cls._cfgwriter.is_alive()
-            if (cls._syncrunning and cls._cfgwriter is not None and
-                    isalive):
+            isalive = False
+            if cls._cfgwriter is not None:
+                try:
+                    isalive = cls._cfgwriter.isAlive()
+                except AttributeError:
+                    isalive = cls._cfgwriter.is_alive()
+            if (cls._syncrunning and isalive):
                 cls._writepending = True
                 return
             if cls._syncrunning:  # This suggests an unclean write attempt,
