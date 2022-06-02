@@ -43,7 +43,7 @@ def run():
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of commands to run at a time')
     argparser.add_option('-s', '--substitutename',
-                         help='Use a different name other than the nodename for ping')
+                         help='Use a different name other than the nodename for ping, with {}, it is the entire name evaluated as an expression, otherwise it is used as a suffix')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
     # processes can be unkind for the unaware on memory pressure and such...
     (options, args) = argparser.parse_args()
@@ -83,9 +83,9 @@ def run():
             cmdv = ['ping', '-c', '1', '-W', '1', pingnode]
             if currprocs < concurrentprocs:
                 currprocs += 1
-                run_cmdv(node, cmdv, all, pipedesc)
+                run_cmdv(pingnode, cmdv, all, pipedesc)
             else:
-                pendingexecs.append((node, cmdv))
+                pendingexecs.append((pingnode, cmdv))
     if not all or exitcode:
         sys.exit(exitcode)
     rdy, _, _ = select.select(all, [], [], 10)

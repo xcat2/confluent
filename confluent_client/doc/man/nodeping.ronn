@@ -14,7 +14,9 @@ It can also be used with the `-s` flag to change the ping location to something 
 * `-h`, `--help`:  
   Show help message and exit      
 * `-s` SUBSTITUTENAME, --substitutename=SUBSTITUTENAME  
-                        Use a different name other than the nodename for ping  
+  Use a different name other than the nodename for ping. This may be a 
+  expression, such as {bmc} or, if no { character is present, it is treated as a suffix.  -s -eth1 would make n1 become n1-eth1, for example. 
+
    
 ## EXAMPLES
  * Pinging a node :  
@@ -30,6 +32,13 @@ It can also be used with the `-s` flag to change the ping location to something 
 * Pinging BMC on a node:  
   `# nodeping -s {bmc} <noderange>`  
   ` Node-bmc : ping`  
+
+* Pinging by specifying a suffix:
+  `# nodeping d1-d4 -s -eth1`  
+  `d2-eth1: no_ping`  
+  `d1-eth1: no_ping`  
+  `d3-eth1: no_ping`  
+  `d4-eth1: no_ping`  
 
 * Fail to ping node:  
   `# nodeping <node>`  
