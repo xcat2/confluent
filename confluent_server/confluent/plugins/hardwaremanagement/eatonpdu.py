@@ -177,30 +177,31 @@ class PDUClient(object):
 
     def logout(self):
         print(repr(self.do_request('cgi_logout')))
-        #print(repr(self.wc.grab_response('/config/gateway?page=cgi_logout&sessionId={}&_dc={}'.format(self.sessid, int(time.time())))))
 
     def get_outlet(self, outlet):
         rsp = self.do_request('cgi_pdu_outlets')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
-        from pprint import pprint
-        pprint(data)
-        #self.wc.grab_response('/config/gateway?page=pdu_outlets&sessionId={}&_dc={}'.format(self.sessid, int(time.time())))
+        data = data['data'][0]
+        for outdata in data:
+            outdata = outdata[0]
+            if outdata[0] == outlet:
+                return 'on' if outdata[3] else 'off'
         return
-        rsp = self.wc.grab_response('/setting_admin4.xml')
-        xd = fromstring(rsp[0])
-        for ch in xd:
-            if 'relay' not in ch.tag:
-                continue
-            outnum = ch.tag.split('relay')[-1]
-            if outnum == outlet:
-                return ch.text.lower()
 
     def set_outlet(self, outlet, state):
-        state = 0 if state == 'off' else 1
-        outlet = int(outlet)
-        sitem = '/SetParm?item=s4r{:02d}?content={}'.format(outlet, state)
-        self.wc.grab_response(sitem)
+        rsp = self.do_request('cgi_pdu_outlets')
+        data = sanitize_json(rsp[0])
+        data = json.loads(data)
+        data = data['data'][0]
+        idx = 1
+        for outdata in data:
+            outdata = outdata[0]
+            if outdata[0] == outlet:
+                payload = "<SET_OBJECT><OBJECT name='PDU.OutletSystem.Outlet[{}].DelayBefore{}'>0</OBJECT>".format(idx, 'Startup' if state == 'on' else 'Shutdown')
+                rsp = self.wc.grab_response('/config/set_object_mass.xml?sessionId={}'.format(self.sessid), payload)
+                return
+            idx += 1
 
 def retrieve(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
@@ -211,7 +212,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         gc = PDUClient(node, configmanager)
         try:
             state = gc.get_outlet(element[-1])
-        #yield msg.PowerState(node=node, state=state)
+            yield msg.PowerState(node=node, state=state)
         finally:
             gc.logout()
 
@@ -222,8 +223,10 @@ def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         gc = PDUClient(node, configmanager)
         newstate = inputdata.powerstate(node)
-        gc.set_outlet(element[-1], newstate)
-        gc.logout()
+        try:
+            gc.set_outlet(element[-1], newstate)
+        finally:
+            gc.logout()
     eventlet.sleep(2)
     for res in retrieve(nodes, element, configmanager, inputdata):
         yield res
