@@ -66,6 +66,7 @@ while ! grep ^NODE /etc/confluent/confluent.info; do
     if ! grep ^NODE /etc/confluent/confluent.info; then
         echo 'Current net config:' > /dev/console
         ip -br a > /dev/console
+        exit 1
     fi
 done
 echo "Found confluent deployment services on local network" > /dev/console
