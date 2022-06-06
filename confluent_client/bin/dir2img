@@ -21,17 +21,17 @@ def create_image(directory, image, label=None):
             currsz = (currsz // 512 +1) * 512
             datasz += currsz
     datasz += ents * 32768
-    datasz = datasz // 512 + 1
+    datasz = datasz // 4096 + 1
     with open(image, 'wb') as imgfile:
-        imgfile.seek(datasz * 512 - 1)
+        imgfile.seek(datasz * 4096 - 1)
         imgfile.write(b'\x00')
     if label:
         subprocess.check_call(['mformat', '-i', image, '-v', label,
                                '-r', '16', '-d', '1', '-t', str(datasz),
-                               '-s', '1','-h', '1', '::'])
+                               '-s', '4','-h', '2', '::'])
     else:
         subprocess.check_call(['mformat', '-i', image, '-r', '16', '-d', '1', '-t',
-                                str(datasz), '-s', '1','-h', '1', '::'])
+                                str(datasz), '-s', '4','-h', '2', '::'])
     # Some clustered filesystems will have the lock from mformat
     # linger after close (mformat doesn't unlock)
     # do a blocking wait for shared lock and then explicitly
