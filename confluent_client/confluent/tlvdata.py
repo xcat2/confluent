@@ -240,8 +240,12 @@ def recv(handle):
         cdata = cmsgarr[CMSG_LEN(0).value:]
         data = rawbuffer[:i]
         if cmsg.cmsg_level == socket.SOL_SOCKET and cmsg.cmsg_type == SCM_RIGHTS:
-            filehandles.fromstring(bytes(
-                cdata[:len(cdata) - len(cdata) % filehandles.itemsize]))
+            try:
+                filehandles.fromstring(bytes(
+                    cdata[:len(cdata) - len(cdata) % filehandles.itemsize]))
+            except AttributeError:
+                filehandles.frombytes(bytes(
+                    cdata[:len(cdata) - len(cdata) % filehandles.itemsize]))
         data = json.loads(bytes(data))
         return ClientFile(data['filename'], data['mode'], filehandles[0])
     else:
