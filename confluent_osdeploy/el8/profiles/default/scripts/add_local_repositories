@@ -3,9 +3,13 @@ try:
 except ImportError:
     import ConfigParser as configparser
     import cStringIO
-import imp
+import importlib.util
+import importlib.machinery
 import sys
-apiclient = imp.load_source('apiclient', '/opt/confluent/bin/apiclient')
+modloader = importlib.machinery.SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient')
+modspec = importlib.util.spec_from_file_location('apiclient', '/opt/confluent/bin/apiclient', loader=modloader)
+apiclient = importlib.util.module_from_spec(modspec)
+modspec.loader.exec_module(apiclient)
 repo = None
 server = None
 profile = None
