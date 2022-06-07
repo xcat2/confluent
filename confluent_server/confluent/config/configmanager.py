@@ -1167,6 +1167,18 @@ def hook_new_configmanagers(callback):
         pass
 
 
+def attribute_name_is_invalid(attrname):
+    if attrname.startswith('custom.') or attrname.startswith('net.') or attrname.startswith('power.'):
+        return False
+    if '?' in attrname or '*' in attrname:
+        for attr in allattributes.node:
+            if fnmatch.fnmatch(attr, attrname):
+                return False
+        return True
+    attrname = _get_valid_attrname(attrname)
+    return attrname not in allattributes.node
+
+
 class ConfigManager(object):
     if os.name == 'nt':
         _cfgdir = os.path.join(
@@ -1275,6 +1287,9 @@ class ConfigManager(object):
             raise Exception('Invalid Expression')
         if attribute.startswith('secret.'):
             raise Exception('Filter by secret attributes is not supported')
+        if attribute_name_is_invalid(attribute):
+            raise ValueError(
+                '{0} is not a valid attribute name'.format(attribute))
         for node in nodes:
             try:
                 currvals = [self._cfgstore['nodes'][node][attribute]['value']]
