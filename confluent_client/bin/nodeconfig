@@ -289,13 +289,11 @@ else:
     for path in queryparms:
         if options.comparedefault:
             continue
-        rc = client.print_attrib_path(path, session, list(queryparms[path]),
+        rcode |= client.print_attrib_path(path, session, list(queryparms[path]),
                                       NullOpt(), queryparms[path])
-        if rc:
-            sys.exit(rc)
     if printsys == 'all' or printextbmc or printbmc or printallbmc:
         if printbmc or not printextbmc:
-         rcode = client.print_attrib_path(
+         rcode |= client.print_attrib_path(
                         '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
                         session, printbmc, options, attrprefix='bmc.')
         if options.extra:
