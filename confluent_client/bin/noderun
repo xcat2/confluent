@@ -35,9 +35,12 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 import confluent.sortutil as sortutil
+devnull = None
 
 
 def run():
+    global devnull
+    devnull = open(os.devnull, 'rb')
     argparser = optparse.OptionParser(
         usage="Usage: %prog [options] <noderange> <command expression>",
         epilog="Expressions are the same as in attributes, e.g. "
@@ -133,7 +136,7 @@ def run():
 def run_cmdv(node, cmdv, all, pipedesc):
     try:
         nopen = subprocess.Popen(
-            cmdv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            cmdv, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except OSError as e:
         if e.errno == 2:
             sys.stderr.write('{0}: Unable to find local executable file "{1}"'.format(node, cmdv[0]))
