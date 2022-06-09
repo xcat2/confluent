@@ -69,6 +69,7 @@ if args[0] == 'restore':
     if options.interactivepassword:
         password = getpass.getpass('Enter password to restore backup: ')
     try:
+        cfm.init(True)
         cfm.statelessmode = True
         cfm.restore_db_from_directory(dumpdir, password)
         cfm.statelessmode = False

@@ -565,6 +565,8 @@ def _load_dict_from_dbm(dpath, tdb):
                 currdict[tks] = cPickle.loads(dbe[tk]) # nosec
                 tk = dbe.nextkey(tk)
     except dbm.error:
+        if os.path.exists(tdb):
+            raise
         return
 
 

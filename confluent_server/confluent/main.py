@@ -29,6 +29,10 @@ import atexit
 import confluent.auth as auth
 import confluent.config.conf as conf
 import confluent.config.configmanager as configmanager
+try:
+    import anydbm as dbm
+except ModuleNotFoundError:
+    import dbm
 import confluent.consoleserver as consoleserver
 import confluent.core as confluentcore
 import confluent.httpapi as httpapi
@@ -62,8 +66,10 @@ import os
 import glob
 import signal
 import socket
+import subprocess
 import time
 import traceback
+import tempfile
 import uuid
 
 
@@ -232,8 +238,20 @@ def sanity_check():
     assure_ownership('/etc/confluent/srvcert.pem')
 
 
+def migrate_db():
+    tdir = tempfile.mkdtemp()
+    subprocess.check_call(['python2', '/opt/confluent/bin/confluentdbutil', 'dump', '-u', tdir])
+    subprocess.check_call(['python3', '/opt/confluent/bin/confluentdbutil', 'restore', '-u', tdir])
+    subprocess.check_call(['rm', '-rf', tdir])
+    configmanager.init()
+
+
 def run(args):
     setlimits()
+    try:
+        configmanager.ConfigManager(None)
+    except dbm.error:
+        migrate_db()
     try:
         signal.signal(signal.SIGUSR1, dumptrace)
     except AttributeError:
