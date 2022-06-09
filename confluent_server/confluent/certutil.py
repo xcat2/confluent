@@ -169,7 +169,7 @@ def create_full_ca(certout):
     subprocess.check_call(
         ['openssl', 'ca', '-config', newcfg, '-batch', '-selfsign',
         '-extensions', 'CACert', '-extfile', newcfg, 
-        '-startdate',
+        '-startdate', '-notext',
          '19700101010101Z', '-enddate', '21000101010101Z', '-keyfile',
          keyout, '-out', '/etc/confluent/tls/ca/cacert.pem', '-in', csrout]
     )
