@@ -22,7 +22,10 @@
 import confluent.config.configmanager as configmanager
 import eventlet
 import eventlet.tpool
-import Cryptodome.Protocol.KDF as KDF
+try:
+    import Cryptodome.Protocol.KDF as KDF
+except ImportError:
+    import Crypto.Protocol.KDF as KDF
 from fnmatch import fnmatch
 import hashlib
 import hmac

@@ -42,10 +42,16 @@
 # by passphrase and optionally TPM
 
 
-import Cryptodome.Protocol.KDF as KDF
-from Cryptodome.Cipher import AES
-from Cryptodome.Hash import HMAC
-from Cryptodome.Hash import SHA256
+try:
+    import Cryptodome.Protocol.KDF as KDF
+    from Cryptodome.Cipher import AES
+    from Cryptodome.Hash import HMAC
+    from Cryptodome.Hash import SHA256
+except ImportError:
+    import Crypto.Protocol.KDF as KDF
+    from Crypto.Cipher import AES
+    from Crypto.Hash import HMAC
+    from Crypto.Hash import SHA256
 try:
     import anydbm as dbm
 except ModuleNotFoundError:
