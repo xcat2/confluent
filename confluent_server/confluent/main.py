@@ -240,6 +240,7 @@ def sanity_check():
 
 def migrate_db():
     tdir = tempfile.mkdtemp()
+    subprocess.check_call(['python3', '-c', 'pass'])
     subprocess.check_call(['python2', '/opt/confluent/bin/confluentdbutil', 'dump', '-u', tdir])
     subprocess.check_call(['python3', '/opt/confluent/bin/confluentdbutil', 'restore', '-u', tdir])
     subprocess.check_call(['rm', '-rf', tdir])
