@@ -30,7 +30,7 @@ python3 setup.py build
 %if "%{dist}" == ".el9"
 python3 setup.py build
 %else
-python2 setup.py build
+python3 setup.py build
 %endif
 %endif
 
@@ -41,7 +41,7 @@ python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUI
 %if "%{dist}" == ".el9"
 python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
 %else
-python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
 %endif
 %endif
 
