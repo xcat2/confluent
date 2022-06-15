@@ -565,6 +565,8 @@ def _load_dict_from_dbm(dpath, tdb):
                 currdict[tks] = cPickle.loads(dbe[tk]) # nosec
                 tk = dbe.nextkey(tk)
     except dbm.error:
+        if os.path.exists(tdb):
+            raise
         return
 
 
@@ -2604,7 +2606,13 @@ class ConfigManager(object):
                     with _dirtylock:
                         dirtyglobals = copy.deepcopy(_cfgstore['dirtyglobals'])
                         del _cfgstore['dirtyglobals']
-                globalf = dbm.open(os.path.join(cls._cfgdir, "globals"), 'c', 384)  # 0600
+                try:
+                    globalf = dbm.open(os.path.join(cls._cfgdir, "globals"), 'c', 384)  # 0600
+                except dbm.error:
+                    if not fullsync:
+                        raise
+                    os.remove(os.path.join(cls._cfgdir, "globals"))
+                    globalf = dbm.open(os.path.join(cls._cfgdir, "globals"), 'c', 384)  # 0600
                 try:
                     for globalkey in dirtyglobals:
                         if globalkey in _cfgstore['globals']:
@@ -2617,8 +2625,15 @@ class ConfigManager(object):
                     globalf.close()
             if fullsync or 'collectivedirty' in _cfgstore:
                 if len(_cfgstore.get('collective', ())) > 1:
-                    collectivef = dbm.open(os.path.join(cls._cfgdir, "collective"),
-                                        'c', 384)
+                    try:
+                        collectivef = dbm.open(os.path.join(cls._cfgdir, 'collective'),
+                                            'c', 384)
+                    except dbm.error:
+                        if not fullsync:
+                            raise
+                        os.remove(os.path.join(cls._cfgdir, 'collective'))
+                        collectivef = dbm.open(os.path.join(cls._cfgdir, 'collective'),
+                                            'c', 384)
                     try:
                         if fullsync:
                             colls = _cfgstore['collective']
@@ -2645,7 +2660,13 @@ class ConfigManager(object):
                 currdict = _cfgstore['main']
                 for category in currdict:
                     _mkpath(pathname)
-                    dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
+                    try:
+                        dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
+                    except dbm.error:
+                        if not fullsync:
+                            raise
+                        os.remove(os.path.join(pathname, category))
+                        dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
                     try:
                         for ck in currdict[category]:
                             dbf[ck] = cPickle.dumps(currdict[category][ck], protocol=cPickle.HIGHEST_PROTOCOL)
@@ -2665,7 +2686,13 @@ class ConfigManager(object):
                         currdict = _cfgstore['tenant'][tenant]
                     for category in dkdict:
                         _mkpath(pathname)
-                        dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
+                        try:
+                            dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
+                        except dbm.error:
+                            if not fullsync:
+                                raise
+                            os.remove(os.path.join(pathname, category))
+                            dbf = dbm.open(os.path.join(pathname, category), 'c', 384)  # 0600
                         try:
                             for ck in dkdict[category]:
                                 if ck not in currdict[category]:

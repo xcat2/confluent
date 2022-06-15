@@ -69,7 +69,11 @@ if args[0] == 'restore':
     if options.interactivepassword:
         password = getpass.getpass('Enter password to restore backup: ')
     try:
+        cfm.init(True)
+        cfm.statelessmode = True
         cfm.restore_db_from_directory(dumpdir, password)
+        cfm.statelessmode = False
+        cfm.ConfigManager.wait_for_sync(True)
         if owner != 0:
             for targdir in os.walk('/etc/confluent'):
                 os.chown(targdir[0], owner, group)
