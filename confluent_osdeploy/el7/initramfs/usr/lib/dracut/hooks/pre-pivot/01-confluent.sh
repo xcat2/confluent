@@ -20,3 +20,4 @@ for i in /ssh/*.ca; do
 done
 mkdir -p /sysroot/opt/confluent/bin
 cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
+cp /opt/confluent/bin/apiclient /sysroot/etc/confluent/
