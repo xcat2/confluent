@@ -41,6 +41,10 @@ class _ShellHandler(consoleserver.ConsoleHandler):
         return
         #return super().feedbuffer(data)
 
+    def get_recent(self):
+        retdata, connstate = super(_ShellHandler, self).get_recent()
+        return '', connstate
+
     def _got_disconnected(self):
         self.connectstate = 'closed'
         self._send_rcpts({'connectstate': self.connectstate})
