@@ -124,19 +124,21 @@ class SshShell(conapi.Console):
         self.ssh.set_missing_host_key_policy(
                 HostKeyHandler(self.nodeconfig, self.node))
         try:
+            self.datacallback('\r\nConnecting to {}...'.format(self.node))
             self.ssh.connect(self.node, username=self.username,
                              password=self.password, allow_agent=False,
                              look_for_keys=False)
-        except paramiko.AuthenticationException:
+        except paramiko.AuthenticationException as e:
             self.ssh.close()
             self.inputmode = 0
             self.username = b''
             self.password = b''
+            self.datacallback('\r\nError connecting to {0}:\r\n {1}\r\n'.format(self.node, str(e)))
             self.datacallback('\r\nlogin as: ')
             return
         except paramiko.ssh_exception.NoValidConnectionsError as e:
             self.ssh.close()
-            self.datacallback(str(e))
+            self.datacallback('\r\nError connecting to {0}:\r\n {1}\r\n'.format(self.node, str(e)))
             self.inputmode = 0
             self.username = b''
             self.password = b''
@@ -162,10 +164,20 @@ class SshShell(conapi.Console):
                         'and permissions on /etc/ssh/*key)\r\n' \
                         'Press Enter to close...'
             self.datacallback('\r\n' + warn)
-
+            return
+        except Exception as e:
+            self.ssh.close()
+            self.ssh.close()
+            self.inputmode = 0
+            self.username = b''
+            self.password = b''
+            warn = 'Error connecting to {0}:\r\n {1}\r\n'.format(self.node, str(e))
+            self.datacallback('\r\n' + warn)
+            self.datacallback('\r\nlogin as: ')
             return
         self.inputmode = 2
         self.connected = True
+        self.datacallback('Connected\r\n')
         self.shell = self.ssh.invoke_shell(width=self.width,
                                            height=self.height)
         self.rxthread = eventlet.spawn(self.recvdata)
