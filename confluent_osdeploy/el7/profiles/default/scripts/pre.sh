@@ -81,7 +81,7 @@ if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
 fi
 if [ -f /opt/confluent/bin/apiclient ]; then
     python /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
-else:
+else
     python /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart.custom -o /tmp/kickstart.custom
 fi
 kill $logshowpid
