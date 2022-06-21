@@ -12,7 +12,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     cd $tmnt
     deploysrvs=$(sed -n '/^deploy_servers:/, /^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
     nodename=$(grep ^nodename: cnflnt.yml|awk '{print $2}')
-    sed -n '/^net_cfgs:/, /^[^- ]/p' cnflnt.yml |grep '^[ -]'|sed -n '/^-/, /^-/p'|head -n -1 | sed -e 's/^[- ]*//'> $tcfg
+    sed -n '/^net_cfgs:/, /^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/, /^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
     autoconfigmethod=$(grep ^ipv4_method: $tcfg)
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
     if [ "$autoconfigmethod" = "dhcp" ]; then
@@ -66,6 +66,7 @@ while ! grep ^NODE /etc/confluent/confluent.info; do
     if ! grep ^NODE /etc/confluent/confluent.info; then
         echo 'Current net config:' > /dev/console
         ip -br a > /dev/console
+        exit 1
     fi
 done
 echo "Found confluent deployment services on local network" > /dev/console

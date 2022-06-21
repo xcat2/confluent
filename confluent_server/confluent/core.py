@@ -811,9 +811,17 @@ def handle_dispatch(connection, cert, dispatch, peername):
     operation = dispatch['operation']
     pathcomponents = dispatch['path']
     routespec = nested_lookup(noderesources, pathcomponents)
-    inputdata = msg.get_input_message(
-        pathcomponents, operation, inputdata, nodes, dispatch['isnoderange'],
-        configmanager)
+    try:
+        inputdata = msg.get_input_message(
+            pathcomponents, operation, inputdata, nodes, dispatch['isnoderange'],
+            configmanager)
+    except Exception as res:
+        with xmitlock:
+            _forward_rsp(connection, res)
+        keepalive.kill()
+        connection.sendall('\x00\x00\x00\x00\x00\x00\x00\x00')
+        connection.close()
+        return
     plugroute = routespec.routeinfo
     plugpath = None
     nodesbyhandler = {}

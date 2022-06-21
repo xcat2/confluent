@@ -22,6 +22,11 @@ a new session.
   Use tmux to arrange consoles of the given noderange into a tiled layout on
   the terminal screen
 
+* `-l`, `--log`:
+  Perform a log reply on the current, local log in /var/log/confluent/consoles.
+  If in collective mode, this only makes sense to use on the current collective
+  manager at this time.
+
 ## ESCAPE SEQUENCE COMMANDS
 
 While connected to a console, a number of commands may be performed through escape

@@ -132,8 +132,11 @@ def scan_confluents():
                     current['mgtiface'] = line.replace(b'MGTIFACE: ', b'').strip().decode('utf8')
             if len(peer) > 2:
                 current['myidx'] = peer[-1]
-            srvs[peer[0]] = current
-            srvlist.append(peer[0])
+            currip = peer[0]
+            if currip.startswith('fe80::') and '%' not in currip:
+                currip = '{0}%{1}'.format(currip, peer[-1])
+            srvs[currip] = current
+            srvlist.append(currip)
         r = select.select((s4, s6), (), (), 2)
         if r:
             r = r[0]

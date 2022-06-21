@@ -24,25 +24,17 @@ a confluent server.
 %setup -n %{name}-%{version} -n %{name}-%{version}
 
 %build
-%if "%{dist}" == ".el8"
-python3 setup.py build
-%else
-%if "%{dist}" == ".el9"
-python3 setup.py build
-%else
+%if "%{dist}" == ".el7"
 python2 setup.py build
-%endif
+%else
+python3 setup.py build
 %endif
 
 %install
-%if "%{dist}" == ".el8"
-python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
-%else
-%if "%{dist}" == ".el9"
-python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
-%else
+%if "%{dist}" == ".el7"
 python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
-%endif
+%else
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES --install-scripts=/opt/confluent/bin --install-purelib=/opt/confluent/lib/python
 %endif
 
 
@@ -52,3 +44,4 @@ rm -rf $RPM_BUILD_ROOT
 %files -f INSTALLED_FILES
 %license /opt/confluent/share/licenses/confluent_client/LICENSE
 %defattr(-,root,root)
+/opt/confluent

@@ -42,11 +42,20 @@ echo lang $locale > /tmp/langinfo
 echo keyboard --vckeymap=$keymap >> /tmp/langinfo
 tz=$(grep ^timezone: /etc/confluent/confluent.deploycfg)
 tz=${tz#timezone: }
+MVER=$(grep VERSION_ID /etc/os-release|cut -d = -f 2 |cut -d . -f 1|cut -d '"' -f 2)
 ntpsrvs=""
-if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
-    ntpsrvs="--ntpservers="$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //' | paste -sd,)
+if [ "$MVER" -ge 9 ]; then
+    if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
+	for ntpsrv in $(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //'); do
+	    echo timesource --ntp-server $ntpsrv >> /tmp/timezone
+        done
+    fi
+else
+    if grep ^ntpservers: /etc/confluent/confluent.deploycfg > /dev/null; then
+        ntpsrvs="--ntpservers="$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|sed 1d|sed '$d' | sed -e 's/^- //' | paste -sd,)
+    fi
 fi
-echo timezone $ntpsrvs $tz --utc > /tmp/timezone
+echo timezone $ntpsrvs $tz --utc >> /tmp/timezone
 rootpw=$(grep ^rootpassword /etc/confluent/confluent.deploycfg | awk '{print $2}')
 if [ "$rootpw" = null ]; then
     echo "rootpw --lock" > /tmp/rootpw

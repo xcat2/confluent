@@ -119,6 +119,9 @@ proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
 proto=${proto#protocol: }
 
 append=$(grep ^installedargs: /tmp/profile.yaml | sed -e 's/^installedargs: //' -e 's/#.*//')
+if grep console= /etc/fakecmdline >& /dev/null &&  [[ "$append" != *console=* ]]; then
+	append="$append console=${autocons#*/dev/}"
+fi
 if [ -z "$append" ]; then
     echo "<bootloader/>" > /tmp/bootloader.xml
 else

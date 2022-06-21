@@ -120,6 +120,8 @@ def handle_request(env, start_response):
         start_response('401 Unauthorized', [])
         yield 'Unauthorized'
         return
+    if not isinstance(eak, str):
+        eak = eak.decode('utf8')
     salt = '$'.join(eak.split('$', 3)[:-1]) + '$'
     if crypt.crypt(apikey, salt) != eak:
         start_response('401 Unauthorized', [])

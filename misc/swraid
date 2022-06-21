@@ -1,0 +1,18 @@
+DEVICES="/dev/sda /dev/sdb"
+RAIDLEVEL=1
+mdadm --detail /dev/md*|grep 'Version : 1.0' >& /dev/null && exit 0
+lvm vgchange -a n
+mdadm -S -s
+NUMDEVS=$(for dev in $DEVICES; do
+   echo wipefs -a $dev
+done|wc -l)
+for dev in $DEVICES; do
+   wipefs -a $dev
+done
+# must use older metadata format to leave disks looking normal for uefi
+mdadm -C /dev/md/raid $DEVICES -n $NUMDEVS -e 1.0 -l $RAIDLEVEL
+# shut and restart array to prime things for anaconda
+mdadm -S -s
+mdadm --assemble --scan
+readlink /dev/md/raid|sed -e 's/.*\///' > /tmp/installdisk
+

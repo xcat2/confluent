@@ -13,13 +13,17 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Requires: confluent_vtbufferd
+%if "%{dist}" == ".el7"
+Requires: python-pyghmi >= 1.0.34, python-eventlet, python-greenlet, python-pycryptodomex >= 3.4.7, confluent_client == %{version}, python-pyparsing, python-paramiko, python-dnspython, python-netifaces, python2-pyasn1 >= 0.2.3, python-pysnmp >= 4.3.4, python-lxml, python-eficompressor, python-setuptools, python-dateutil, python2-websocket-client python2-msgpack python-libarchive-c python-yaml python-monotonic
+%else
 %if "%{dist}" == ".el8"
 Requires: python3-pyghmi >= 1.0.34, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-enum34, python3-asn1crypto, python3-cffi, python3-pyOpenSSL, python3-monotonic, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
 %else
 %if "%{dist}" == ".el9"
 Requires: python3-pyghmi >= 1.0.34, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
 %else
-Requires: python-pyghmi >= 1.0.34, python-eventlet, python-greenlet, python-pycryptodomex >= 3.4.7, confluent_client == %{version}, python-pyparsing, python-paramiko, python-dnspython, python-netifaces, python2-pyasn1 >= 0.2.3, python-pysnmp >= 4.3.4, python-lxml, python-eficompressor, python-setuptools, python-dateutil, python2-websocket-client python2-msgpack python-libarchive-c python-yaml python-monotonic
+Requires: python3-pyghmi >= 1.0.34, python3-eventlet, python3-greenlet, python3-pycryptodome >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dnspython, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-PyYAML openssl iproute
+%endif
 %endif
 %endif
 Vendor: Jarrod Johnson <jjohnson2@lenovo.com>
@@ -32,25 +36,17 @@ Server for console management and systems management aggregation
 %setup -n %{name}-%{version} -n %{name}-%{version}
 
 %build
-%if "%{dist}" == ".el8"
-python3 setup.py build
-%else
-%if "%{dist}" == ".el9"
-python3 setup.py build
-%else
+%if "%{dist}" == ".el7"
 python2 setup.py build
-%endif
+%else
+python3 setup.py build
 %endif
 
 %install
-%if "%{dist}" == ".el8"
-python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
-%else
-%if "%{dist}" == ".el9"
-python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
-%else
+%if "%{dist}" == ".el7"
 python2 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
-%endif
+%else
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES.bare --install-purelib=/opt/confluent/lib/python --install-scripts=/opt/confluent/bin
 %endif
 for file in $(grep confluent/__init__.py INSTALLED_FILES.bare); do
     rm $RPM_BUILD_ROOT/$file
@@ -101,3 +97,4 @@ rm -rf $RPM_BUILD_ROOT
 %files -f INSTALLED_FILES
 %license /opt/confluent/share/licenses/confluent_server/LICENSE
 %defattr(-,root,root)
+/opt/confluent
