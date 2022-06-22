@@ -10,6 +10,7 @@ import eventlet.green.socket as socket
 import eventlet.green.subprocess as subprocess
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.tsm as tsm
+import confluent.discovery.core as disco
 import base64
 import hmac
 import hashlib
@@ -112,7 +113,6 @@ def handle_request(env, start_response):
         start_response('401', [])
         yield 'Unauthorized'
         return
-    
     ea = cfg.get_node_attributes(nodename, ['crypted.selfapikey', 'deployment.apiarmed'])
     eak = ea.get(
         nodename, {}).get('crypted.selfapikey', {}).get('hashvalue', None)
@@ -152,6 +152,16 @@ def handle_request(env, start_response):
     operation = env['REQUEST_METHOD']
     if operation not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
+    if env['PATH_INFO'] == '/self/register_discovered':
+        rb = json.loads(reqbody)
+        addrs = rb.get('addresses', [])
+        rb['addresses'] = []
+        for addr in addrs:
+            rb['addresses'].append(tuple(addr))
+        disco.detected(rb)
+        start_response('200 OK', [])
+        yield 'Registered'
+        return
     if env['PATH_INFO'] == '/self/bmcconfig':
         hmattr = cfg.get_node_attributes(nodename, 'hardwaremanagement.*')
         hmattr = hmattr.get(nodename, {})
