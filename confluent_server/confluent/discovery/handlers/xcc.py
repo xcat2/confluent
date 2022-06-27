@@ -411,7 +411,21 @@ class NodeHandler(immhandler.NodeHandler):
                 rsp, status = wc.grab_json_response_with_status(
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,,,'.format(uid, username)})
+                if status == 200 and rsp.get('return', 0) == 13:
+                    wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
+                    status = 503
+                    while status != 200:
+                        rsp, status = wc.grab_json_response_with_status(
+                            '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
+                            {'UserName': username}, method='PATCH')
+                        if status != 200:
+                            rsp = json.loads(rsp)
+                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError'):
+                                eventlet.sleep(10)
+                            else:
+                                break
             self.tmppasswd = None
+        wc.grab_json_response('/api/providers/logout')
         self._currcreds = (username, passwd)
 
     def _convert_sha256account(self, user, passwd, wc):
@@ -503,6 +517,7 @@ class NodeHandler(immhandler.NodeHandler):
                     'Request to use default credentials, but refused by target after it has been changed to {0}'.format(self.tmppasswd))
             if not isdefault:
                 self._setup_xcc_account(user, passwd, wc)
+                wc = self.wc
         self._convert_sha256account(user, passwd, wc)
         cd = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
