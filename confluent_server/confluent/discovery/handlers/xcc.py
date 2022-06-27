@@ -534,6 +534,20 @@ class NodeHandler(immhandler.NodeHandler):
                 _, _ = nwc.grab_json_response_with_status(
                         '/redfish/v1/Managers/1/NetworkProtocol',
                         {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
+                rsp, status = nwc.grab_json_response_with_status(
+                    '/redfish/v1/AccountService/Accounts/1')
+                if status == 200:
+                    allowable = rsp.get('AccountTypes@Redfish.AllowableValues', [])
+                    current = rsp.get('AccountTypes', [])
+                    if 'IPMI' in allowable and 'IPMI' not in current:
+                        current.append('IPMI')
+                        updateinf = {
+                            'AccountTypes': current,
+                            'Password': self._currcreds[1]
+                        }
+                        rsp, status = nwc.grab_json_response_with_status(
+                            '/redfish/v1/AccountService/Accounts/1',
+                            updateinf, method='PATCH')
         if ('hardwaremanagement.manager' in cd and
                 cd['hardwaremanagement.manager']['value'] and
                 not cd['hardwaremanagement.manager']['value'].startswith(
