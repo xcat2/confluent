@@ -1600,6 +1600,7 @@ class Disk(ConfluentMessage):
         'hotspare',
         'rebuilding',
         'online',
+        'offline',
     ])
     state_aliases = {
         'unconfigured bad': 'fault',
