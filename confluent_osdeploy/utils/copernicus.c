@@ -154,7 +154,7 @@ int main(int argc, char* argv[]) {
     }
     /* For now, bind to 190 to prove we are a privileged process */
     if (bind(n4, (const struct sockaddr *)&addr4, sizeof(addr4)) < 0) {
-        fprintf(stderr, "Eror binding privilged port!\n");
+        fprintf(stderr, "Error binding privilged port!\n");
         exit(1);
     }
     if (bind(ns, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {

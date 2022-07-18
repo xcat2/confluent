@@ -260,6 +260,11 @@ def _map_switch_backend(args):
     if switch not in noaffluent:
         try:
             return _affluent_map_switch(args)
+        except exc.PubkeyInvalid:
+            log.log({'error': 'While trying to gather ethernet mac addresses '
+                              'from {0}, the TLS certificate failed validation. '
+                              'Clear pubkeys.tls_hardwaremanager if this was '
+                              'expected due to reinstall or new certificate'.format(switch)})
         except Exception:
             pass
     mactobridge, ifnamemap, bridgetoifmap = _offload_map_switch(

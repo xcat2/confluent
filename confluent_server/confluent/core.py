@@ -71,7 +71,8 @@ import struct
 import sys
 
 pluginmap = {}
-dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol')
+dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos')
+
 PluginCollection = plugin.PluginCollection
 
 try:
@@ -823,17 +824,17 @@ def handle_dispatch(connection, cert, dispatch, peername):
         connection.close()
         return
     plugroute = routespec.routeinfo
-    plugpath = None
     nodesbyhandler = {}
     passvalues = []
     nodeattr = configmanager.get_node_attributes(
         nodes, plugroute['pluginattrs'])
     for node in nodes:
+        plugpath = None
         for attrname in plugroute['pluginattrs']:
             if attrname in nodeattr[node]:
                 plugpath = nodeattr[node][attrname]['value']
-            elif 'default' in plugroute:
-                plugpath = plugroute['default']
+            if not plugpath and 'default' in plugroute:
+                plugpath = plugroute['default'] 
         if plugpath:
             try:
                 hfunc = getattr(pluginmap[plugpath], operation)
@@ -990,15 +991,15 @@ def handle_node_request(configmanager, inputdata, operation,
     elif 'pluginattrs' in plugroute:
         nodeattr = configmanager.get_node_attributes(
             nodes, plugroute['pluginattrs'] + ['collective.manager'])
-        plugpath = None
         nodesbymanager = {}
         nodesbyhandler = {}
         badcollnodes = []
         for node in nodes:
+            plugpath = None
             for attrname in plugroute['pluginattrs']:
                 if attrname in nodeattr[node]:
                     plugpath = nodeattr[node][attrname]['value']
-                elif 'default' in plugroute:
+                if not plugpath and 'default' in plugroute:
                     plugpath = plugroute['default']
             if plugpath in dispatch_plugins:
                 cfm.check_quorum()

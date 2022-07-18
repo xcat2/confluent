@@ -78,7 +78,10 @@ def execupdate(handler, filename, updateobj, type, owner, node, datfile):
                 completion = 'complete'
             if owner:
                 pwent = pwd.getpwnam(owner)
-                os.chown(filename, pwent.pw_uid, pwent.pw_gid)
+                try:
+                    os.chown(filename, pwent.pw_uid, pwent.pw_gid)
+                except:
+                    raise Exception('Error changing ownership of {} to {}, file is complete but owned by confluent instead'.format(filename, owner))
             updateobj.handle_progress({'phase': completion, 'progress': 100.0})
         except exc.PubkeyInvalid as pi:
             errstr = 'Certificate mismatch detected, does not match value in ' \

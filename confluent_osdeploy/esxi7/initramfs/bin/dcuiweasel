@@ -8,6 +8,7 @@ mkdir -p /etc/confluent
 localcli network firewall unload
 touch /etc/confluent/confluent.info
 begin=$(date +%s)
+localcli system secpolicy domain set -n appDom -l disabled
 while ! grep NODENAME /etc/confluent/confluent.info; do
     echo "Searching for deployment service on local network..."
     /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
@@ -27,7 +28,7 @@ done
 node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
 cp /opt/confluent/bin/clortho /clortho
-/clortho $node $mgr > /etc/confluent/confluent.apikey
+(/clortho $node $mgr || /opt/confluent/bin/clortho $node $mgr) > /etc/confluent/confluent.apikey
 APIKEY=$(cat /etc/confluent/confluent.apikey)
 while [ -z "$APIKEY" ]; do
     if [ ! -f /var/run/vmware/show-esx-shell-login ]; then
@@ -38,7 +39,7 @@ while [ -z "$APIKEY" ]; do
     fi
     echo "Deployment server failed to grant node deployment token, retrying token retrieval"
     echo "A debug session has been made available on Alt-F1"
-    /clortho $node $mgr > /etc/confluent/confluent.apikey
+    (/clortho $node $mgr || /opt/confluent/bin/clortho $node $mgr) > /etc/confluent/confluent.apikey
     APIKEY=$(cat /etc/confluent/confluent.apikey)
 done
 cat /tls/*.pem > /etc/confluent/ca.pem

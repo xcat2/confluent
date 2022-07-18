@@ -2,7 +2,6 @@
 [ -f /etc/confluent/functions ] && . /etc/confluent/functions
 [ -f /opt/confluent/bin/apiclient ] && confapiclient=/opt/confluent/bin/apiclient
 [ -f /etc/confluent/apiclient ] && confapiclient=/etc/confluent/apiclient
-nodename=$(grep ^NODENAME: /etc/confluent.info|awk '{print $NF}')
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     rm $certfile
