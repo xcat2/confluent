@@ -25,7 +25,7 @@ export nodename confluent_mgr confluent_profile
 exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 chmod 600 /var/log/confluent/confluent-firstboot.log
-tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
+tail -n 0 -f /var/log/confluent/confluent-firstboot.log > /dev/console &
 logshowpid=$!
 while ! ping -c 1 $confluent_pingtarget >& /dev/null; do
 	sleep 1
