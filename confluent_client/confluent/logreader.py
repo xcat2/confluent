@@ -282,12 +282,17 @@ def _replay_to_console(txtfile, binfile):
 def replay_to_console(txtfile):
     if os.path.exists(txtfile + '.cbl'):
         binfile = txtfile + '.cbl'
+    elif '.' not in txtfile:
+        if '/' not in txtfile:
+            txtfile = os.getcwd() + '/' + txtfile
+        sys.stderr.write('Unable to locate cbl file: "{0}"\n'.format(txtfile + '.cbl'))
+        sys.exit(1)
     else:
         fileparts = txtfile.split('.')
         prefix = '.'.join(fileparts[:-1])
         binfile = prefix + '.cbl.' + fileparts[-1]
         if not os.path.exists(binfile):
-            sys.stderr.write('Unable to locate cbl file\n')
+            sys.stderr.write('Unable to locate cbl file: "{0}"\n'.format(binfile))
             sys.exit(1)
     _replay_to_console(txtfile, binfile)
 
