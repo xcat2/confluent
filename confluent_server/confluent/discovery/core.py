@@ -1153,7 +1153,15 @@ def discover_node(cfg, handler, info, nodename, manual):
                          'pubkeys.tls_hardwaremanager attribute is cleared '
                          'first'.format(nodename)})
         return False  # With a permissive policy, do not discover new
-    elif policies & set(('open', 'permissive')) or manual:
+    elif policies & set(('open', 'permissive', 'verified')) or manual:
+        if 'verified' in policies:
+            if not handler.https_supported or not util.cert_matches(info['fingerprint'], handler.https_cert):
+                log.log({'info': 'Detected replacement of {0} without verified '
+                         'fingerprint and discovery policy is setto verified, not '
+                         'doing discovery unless discovery.policy=open or '
+                         'pubkeys.tls_hardwaremanager attribute is cleared '
+                         'first'.format(nodename)})
+                return False
         info['nodename'] = nodename
         if info['handler'] == pxeh:
             return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)

@@ -256,7 +256,7 @@ node = {
                         'so long as the node has no existing public key. '
                         '"open" allows discovery even if a known public key '
                         'is already stored',
-        'validlist': ('manual', 'permissive', 'pxe', 'open'),
+        'validlist': ('manual', 'permissive', 'pxe', 'open', 'verified'),
     },
     'info.note': {
         'description':  'A field used for administrators to make arbitrary '
