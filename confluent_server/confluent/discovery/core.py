@@ -217,7 +217,12 @@ def send_discovery_datum(info):
     if info['handler'] == pxeh:
         enrich_pxe_info(info)
     yield msg.KeyValueData({'nodename': info.get('nodename', '')})
-    yield msg.KeyValueData({'ipaddrs': [_printable_ip(x) for x in addresses]})
+    if not info.get('forwarder_server', None):
+        yield msg.KeyValueData({'ipaddrs': [_printable_ip(x) for x in addresses]})
+    switch = info.get('forwarder_server', None)
+    if switch:
+        yield msg.KeyValueData({'switch': switch})
+        yield msg.KeyValueData({'switchport': info['port']})
     sn = info.get('serialnumber', '')
     mn = info.get('modelnumber', '')
     uuid = info.get('uuid', '')
@@ -429,6 +434,8 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         return (msg.KeyValueData({'rescan': 'started'}),)
 
     elif operation in ('update', 'create'):
+        if pathcomponents == ['discovery', 'register']:
+            return
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
         mac = _get_mac_from_query(pathcomponents)
@@ -687,6 +694,8 @@ def detected(info):
         known_uuids[uuid][info['hwaddr']] = info
     info['otheraddresses'] = set([])
     for i4addr in info.get('attributes', {}).get('ipv4-address', []):
+        info['otheraddresses'].add(i4addr)
+    for i4addr in info.get('attributes', {}).get('ipv4-addresses', []):
         info['otheraddresses'].add(i4addr)
     if handler and handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':
@@ -1144,7 +1153,15 @@ def discover_node(cfg, handler, info, nodename, manual):
                          'pubkeys.tls_hardwaremanager attribute is cleared '
                          'first'.format(nodename)})
         return False  # With a permissive policy, do not discover new
-    elif policies & set(('open', 'permissive')) or manual:
+    elif policies & set(('open', 'permissive', 'verified')) or manual:
+        if 'verified' in policies:
+            if not handler.https_supported or not util.cert_matches(info['fingerprint'], handler.https_cert):
+                log.log({'info': 'Detected replacement of {0} without verified '
+                         'fingerprint and discovery policy is setto verified, not '
+                         'doing discovery unless discovery.policy=open or '
+                         'pubkeys.tls_hardwaremanager attribute is cleared '
+                         'first'.format(nodename)})
+                return False
         info['nodename'] = nodename
         if info['handler'] == pxeh:
             return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)

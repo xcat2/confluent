@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import confluent.util as util
 import errno
 import eventlet
 import socket
@@ -31,6 +32,16 @@ class NodeHandler(object):
         self.info = info
         self.configmanager = configmanager
         targsa = [None]
+        self.ipaddr = None
+        self.relay_url = None
+        self.relay_server = None
+        self.web_ip = None
+        self.web_port = None
+        # if this is a remote registered component, prefer to use the agent forwarder
+        if info.get('forwarder_url', False):
+            self.relay_url = info['forwarder_url']
+            self.relay_server = info['forwarder_server']
+            return
         # first let us prefer LLA if possible, since that's most stable
         for sa in info['addresses']:
             if sa[0].startswith('fe80'):
@@ -103,11 +114,8 @@ class NodeHandler(object):
     def https_cert(self):
         if self._fp:
             return self._fp
-        if ':' in self.ipaddr:
-            ip = '[{0}]'.format(self.ipaddr)
-        else:
-            ip = self.ipaddr
-        wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert)
+        ip, port = self.get_web_port_and_ip()
+        wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert, port=port)
         try:
             wc.connect()
         except IOError as ie:
@@ -123,3 +131,32 @@ class NodeHandler(object):
             self._certfailreason = 2
             return None
         return self._fp
+
+    def get_web_port_and_ip(self):
+        if self.web_ip:
+            return self.web_ip, self.web_port
+        # get target ip and port, either direct or relay as applicable
+        if self.relay_url:
+            kv = util.TLSCertVerifier(self.configmanager, self.relay_server,
+                                  'pubkeys.tls_hardwaremanager').verify_cert
+            w = webclient.SecureHTTPConnection(self.relay_server, verifycallback=kv)
+            relaycreds = self.configmanager.get_node_attributes(self.relay_server, 'secret.*', decrypt=True)
+            relaycreds = relaycreds.get(self.relay_server, {})
+            relayuser = relaycreds.get('secret.hardwaremanagementuser', {}).get('value', None)
+            relaypass = relaycreds.get('secret.hardwaremanagementpassword', {}).get('value', None)
+            if not relayuser or not relaypass:
+                raise Exception('No credentials for {0}'.format(self.relay_server))
+            w.set_basic_credentials(relayuser, relaypass)
+            w.connect()
+            w.request('GET', self.relay_url)
+            r = w.getresponse()
+            rb = r.read()
+            if r.code != 302:
+                raise Exception('Unexpected return from forwarder')
+            newurl = r.getheader('Location')
+            self.web_port = int(newurl.rsplit(':', 1)[-1][:-1])
+            self.web_ip = self.relay_server
+        else:
+            self.web_port = 443
+            self.web_ip = self.ipaddr
+        return self.web_ip, self.web_port

@@ -67,7 +67,8 @@ class NodeHandler(immhandler.NodeHandler):
         return None
 
     def scan(self):
-        c = webclient.SecureHTTPConnection(self.ipaddr, 443,
+        ip, port = self.get_web_port_and_ip()
+        c = webclient.SecureHTTPConnection(ip, port,
             verifycallback=self.validate_cert)
         i = c.grab_json_response('/api/providers/logoninfo')
         modelname = i.get('items', [{}])[0].get('machine_name', None)
@@ -279,8 +280,9 @@ class NodeHandler(immhandler.NodeHandler):
         isdefault = True
         errinfo = {}
         if self._wc is None:
+            ip, port = self.get_web_port_and_ip()
             self._wc = webclient.SecureHTTPConnection(
-                self.ipaddr, 443, verifycallback=self.validate_cert)
+                ip, port, verifycallback=self.validate_cert)
             self._wc.connect()
         nodename = None
         if self.nodename:

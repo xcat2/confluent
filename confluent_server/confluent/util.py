@@ -146,12 +146,24 @@ def get_fingerprint(certificate, algo='sha512'):
         return 'sha256$' + hashlib.sha256(certificate).hexdigest()
     elif algo == 'sha512':
         return 'sha512$' + hashlib.sha512(certificate).hexdigest()
+    elif algo == 'sha384':
+        return 'sha384$' + hashlib.sha384(certificate).hexdigest()
     raise Exception('Unsupported fingerprint algorithm ' + algo)
 
+
+hashlens = {
+    48: hashlib.sha384,
+    64: hashlib.sha512,
+    32: hashlib.sha256
+}
 
 def cert_matches(fingerprint, certificate):
     if not fingerprint or not certificate:
         return False
+    if '$' not in fingerprint:
+        fingerprint = base64.b64decode(certificate)
+        algo = hashlens[len(fingerprint)]
+        return algo(certificate).digest() == fingerprint
     algo, _, fp = fingerprint.partition('$')
     newfp = None
     if algo in ('sha512', 'sha256'):

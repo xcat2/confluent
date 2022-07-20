@@ -10,6 +10,7 @@ import eventlet.green.socket as socket
 import eventlet.green.subprocess as subprocess
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.tsm as tsm
+import confluent.discovery.core as disco
 import base64
 import hmac
 import hashlib
@@ -18,6 +19,10 @@ import json
 import os
 import time
 import yaml
+import confluent.discovery.protocols.ssdp as ssdp
+import eventlet
+webclient = eventlet.import_patched('pyghmi.util.webclient')
+
 
 currtz = None
 keymap = 'us'
@@ -112,7 +117,6 @@ def handle_request(env, start_response):
         start_response('401', [])
         yield 'Unauthorized'
         return
-    
     ea = cfg.get_node_attributes(nodename, ['crypted.selfapikey', 'deployment.apiarmed'])
     eak = ea.get(
         nodename, {}).get('crypted.selfapikey', {}).get('hashvalue', None)
@@ -152,6 +156,42 @@ def handle_request(env, start_response):
     operation = env['REQUEST_METHOD']
     if operation not in ('HEAD', 'GET') and 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
+    if env['PATH_INFO'] == '/self/register_discovered':
+        rb = json.loads(reqbody)
+        if not rb.get('path', None):
+            start_response('400 Bad Requst', [])
+            yield 'Missing Path'
+            return
+        targurl = '/hubble/systems/by-port/{0}/webaccess'.format(rb['path'])
+        tlsverifier = util.TLSCertVerifier(cfg, nodename, 'pubkeys.tls_hardwaremanager')
+        wc = webclient.SecureHTTPConnection(nodename, 443, verifycallback=tlsverifier.verify_cert)
+        relaycreds = cfg.get_node_attributes(nodename, 'secret.*', decrypt=True)
+        relaycreds = relaycreds.get(nodename, {})
+        relayuser = relaycreds.get('secret.hardwaremanagementuser', {}).get('value', None)
+        relaypass = relaycreds.get('secret.hardwaremanagementpassword', {}).get('value', None)
+        if not relayuser or not relaypass:
+            raise Exception('No credentials for {0}'.format(nodename))
+        wc.set_basic_credentials(relayuser, relaypass)
+        wc.request('GET', targurl)
+        rsp = wc.getresponse()
+        _ = rsp.read()
+        if rsp.status == 302:
+            newurl = rsp.headers['Location']
+            newhost, newport = newurl.replace('https://', '').split('/')[0].split(':')
+            def verify_cert(certificate):
+                hashval = base64.b64decode(rb['fingerprint'])
+                if len(hashval) == 48:
+                    return hashlib.sha384(certificate).digest() == hashval
+                raise Exception('Certificate validation failed')
+            rb['addresses'] = [(newhost, newport)]
+            rb['forwarder_url'] = targurl
+            rb['forwarder_server'] = nodename
+            rb['']
+            ssdp.check_fish(('/DeviceDescription.json', rb), newport, verify_cert)
+        disco.detected(rb)
+        start_response('200 OK', [])
+        yield 'Registered'
+        return
     if env['PATH_INFO'] == '/self/bmcconfig':
         hmattr = cfg.get_node_attributes(nodename, 'hardwaremanagement.*')
         hmattr = hmattr.get(nodename, {})
