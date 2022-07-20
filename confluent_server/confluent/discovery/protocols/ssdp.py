@@ -382,10 +382,12 @@ def _find_service(service, target):
         if pi is not None:
             yield pi
 
-def check_fish(urldata):
+def check_fish(urldata, port=443, verifycallback=None):
+    if not verifycallback:
+        verifycallback = lambda x: True
     url, data = urldata
     try:
-        wc = webclient.SecureHTTPConnection(_get_svrip(data), 443, verifycallback=lambda x: True)
+        wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback)
         peerinfo = wc.grab_json_response(url)
     except socket.error:
         return None

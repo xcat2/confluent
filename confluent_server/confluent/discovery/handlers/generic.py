@@ -41,7 +41,6 @@ class NodeHandler(object):
         if info.get('forwarder_url', False):
             self.relay_url = info['forwarder_url']
             self.relay_server = info['forwarder_server']
-            self.relay_token = info['forwarder_token']
             return
         # first let us prefer LLA if possible, since that's most stable
         for sa in info['addresses']:
@@ -144,7 +143,7 @@ class NodeHandler(object):
             relaycreds = self.configmanager.get_node_attributes(self.relay_server, 'secret.*', decrypt=True)
             relaycreds = relaycreds.get(self.relay_server, {})
             relayuser = relaycreds.get('secret.hardwaremanagementuser', {}).get('value', None)
-            relaypass = relaycreds.get('secret.hardwaremanegementpassword', {}).get('value', None)
+            relaypass = relaycreds.get('secret.hardwaremanagementpassword', {}).get('value', None)
             if not relayuser or not relaypass:
                 raise Exception('No credentials for {0}'.format(self.relay_server))
             w.set_basic_credentials(relayuser, relaypass)

@@ -217,7 +217,12 @@ def send_discovery_datum(info):
     if info['handler'] == pxeh:
         enrich_pxe_info(info)
     yield msg.KeyValueData({'nodename': info.get('nodename', '')})
-    yield msg.KeyValueData({'ipaddrs': [_printable_ip(x) for x in addresses]})
+    if not info.get('forwarder_server', None):
+        yield msg.KeyValueData({'ipaddrs': [_printable_ip(x) for x in addresses]})
+    switch = info.get('forwarder_server', None)
+    if switch:
+        yield msg.KeyValueData({'switch': switch})
+        yield msg.KeyValueData({'switchport': info['port']})
     sn = info.get('serialnumber', '')
     mn = info.get('modelnumber', '')
     uuid = info.get('uuid', '')
@@ -689,6 +694,8 @@ def detected(info):
         known_uuids[uuid][info['hwaddr']] = info
     info['otheraddresses'] = set([])
     for i4addr in info.get('attributes', {}).get('ipv4-address', []):
+        info['otheraddresses'].add(i4addr)
+    for i4addr in info.get('attributes', {}).get('ipv4-addresses', []):
         info['otheraddresses'].add(i4addr)
     if handler and handler.https_supported and not handler.https_cert:
         if handler.cert_fail_reason == 'unreachable':

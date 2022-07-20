@@ -57,12 +57,15 @@ def print_disco(options, session, currmac, outhandler, columns):
 
         procinfo.update(tmpinfo)
     if 'Switch' in columns or 'Port' in columns:
-        for tmpinfo in session.read(
-                '/networking/macs/by-mac/{0}'.format(currmac)):
-            if 'ports' in tmpinfo:
-                # The api sorts so that the most specific available value
-                # is last
-                procinfo.update(tmpinfo['ports'][-1])
+        if 'switch' in procinfo:
+            procinfo['port'] = procinfo['switchport']
+        else:
+            for tmpinfo in session.read(
+                    '/networking/macs/by-mac/{0}'.format(currmac)):
+                if 'ports' in tmpinfo:
+                    # The api sorts so that the most specific available value
+                    # is last
+                    procinfo.update(tmpinfo['ports'][-1])
     record = []
     for col in columns:
         rawcol = columnmapping[col]
