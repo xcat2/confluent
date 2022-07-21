@@ -1158,7 +1158,7 @@ def discover_node(cfg, handler, info, nodename, manual):
         if 'verified' in policies:
             if not handler.https_supported or not util.cert_matches(info['fingerprint'], handler.https_cert):
                 log.log({'info': 'Detected replacement of {0} without verified '
-                         'fingerprint and discovery policy is setto verified, not '
+                         'fingerprint and discovery policy is set to verified, not '
                          'doing discovery unless discovery.policy=open or '
                          'pubkeys.tls_hardwaremanager attribute is cleared '
                          'first'.format(nodename)})
