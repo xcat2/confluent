@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2017 Lenovo
+# Copyright 2017,2022 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -527,6 +527,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     if ip is not None:
         for prefixinfo in get_prefix_len_for_ip(ip):
             fam, prefix = prefixinfo
+            ip = ip.split('/', 1)[0]
             if fam == socket.AF_INET:
                 cfgdata['prefix'] = prefix
                 nver = '4'
@@ -609,6 +610,7 @@ def get_prefix_len_for_ip(ip):
     plen = None
     if '/' in ip:
         ip, plen = ip.split('/', 1)
+        plen = int(plen)
     myaddrs = get_my_addresses()
     found = False
     for inf in socket.getaddrinfo(ip, 0, 0, socket.SOCK_DGRAM):
