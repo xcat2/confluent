@@ -186,7 +186,6 @@ def handle_request(env, start_response):
             rb['addresses'] = [(newhost, newport)]
             rb['forwarder_url'] = targurl
             rb['forwarder_server'] = nodename
-            rb['']
             ssdp.check_fish(('/DeviceDescription.json', rb), newport, verify_cert)
         disco.detected(rb)
         start_response('200 OK', [])
