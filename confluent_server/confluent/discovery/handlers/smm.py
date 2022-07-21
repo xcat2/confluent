@@ -104,6 +104,8 @@ class NodeHandler(bmchandler.NodeHandler):
         cd = cfg.get_node_attributes(
             nodename, ['hardwaremanagement.manager'])
         smmip = cd.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', None)
+        if smmip:
+            smmip = smmip.split('/', 1)[0]
         if smmip and ':' not in smmip:
             smmip = getaddrinfo(smmip, 0)[0]
             smmip = smmip[-1][0]

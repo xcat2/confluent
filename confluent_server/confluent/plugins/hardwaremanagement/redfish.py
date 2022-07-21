@@ -236,6 +236,7 @@ def get_conn_params(node, configdata):
         bmc = configdata['hardwaremanagement.manager']['value']
     else:
         bmc = node
+    bmc = bmc.split('/', 1)[0]
     # TODO(jbjohnso): check if the end has some number after a : without []
     # for non default port
     return {

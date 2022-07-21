@@ -64,6 +64,7 @@ def node_by_manager(manager):
                                         ('hardwaremanagement.manager',))
     for node in hmattribs:
         currhm = hmattribs[node]['hardwaremanagement.manager']['value']
+        currhm = currhm.split('/', 1)[0]
         if currhm in manageraddresses:
             manager_to_nodemap[manager] = node
             return node

@@ -160,6 +160,7 @@ class NodeHandler(generic.NodeHandler):
                 not cd['hardwaremanagement.manager']['value'].startswith(
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
+            newip = newip.split('/', 1)[0]
             newipinfo = getaddrinfo(newip, 0)[0]
             # This getaddrinfo is repeated in get_nic_config, could be
             # optimized, albeit with a more convoluted api..

@@ -687,6 +687,7 @@ def resourcehandler_backend(env, start_response):
             start_response('404 Not Found', headers)
             yield 'No hardwaremanagement.manager defined for node'
             return
+        targip = targip.split('/', 1)[0]
         funport = forwarder.get_port(targip, env['HTTP_X_FORWARDED_FOR'],
                                      authorized['sessionid'])
         host = env['HTTP_X_FORWARDED_HOST']

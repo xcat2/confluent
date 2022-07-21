@@ -380,7 +380,9 @@ node = {
 #    },
     'hardwaremanagement.manager': {
         'description': 'The management address dedicated to this node.  This '
-                       'is the address of, for example, the Lenovo IMM.',
+                       'is the address of, for example, the Lenovo XCC.  It may optionally '
+                       'include /<prefixlen> CIDR suffix to indicate subnet length, which is '
+                       'autodetected by default where possible.',
     },
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '

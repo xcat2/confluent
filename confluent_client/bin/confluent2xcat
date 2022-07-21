@@ -79,6 +79,8 @@ def collect_attribute_data(databynode, node):
     xcatattrs['groups'] = ','.join(data.get('groups', []))
     xcatattrs['bmc'] = data.get('hardwaremanagement.manager', {}).get(
         'value', None)
+    if xcatattrs['bmc']:
+        xcatattrs['bmc'] = xcatattrs['bmc'].split('/', 1)[0]
     xcatattrs['mpa'] = data.get('enclosure.manager', {}).get(
         'value', None)
     xcatattrs['slotid'] = data.get('enclosure.bay', {}).get(

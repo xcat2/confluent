@@ -204,6 +204,7 @@ def handle_request(env, start_response):
             res['bmcvlan'] = vlan
         bmcaddr = hmattr.get('hardwaremanagement.manager', {}).get('value',
                                                                    None)
+        bmcaddr = bmcaddr.split('/', 1)[0]
         bmcaddr = socket.getaddrinfo(bmcaddr, 0)[0]
         bmcaddr = bmcaddr[-1][0]
         if '.' in bmcaddr:  # ipv4 is allowed

@@ -44,6 +44,7 @@ class GeistClient(object):
             'hardwaremanagement.manager', {}).get('value', None)
         if not target:
             target = self.node
+        target = target.split('/', 1)[0]
         cv = util.TLSCertVerifier(
             self.configmanager, self.node,
             'pubkeys.tls_hardwaremanager').verify_cert

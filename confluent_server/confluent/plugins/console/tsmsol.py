@@ -46,6 +46,7 @@ def get_conn_params(node, configdata):
         bmc = configdata['hardwaremanagement.manager']['value']
     else:
         bmc = node
+    bmc = bmc.split('/', 1)[0]
     return {
         'username': username,
         'passphrase': passphrase,

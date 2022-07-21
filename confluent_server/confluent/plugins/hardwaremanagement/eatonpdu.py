@@ -131,6 +131,7 @@ class PDUClient(object):
             'hardwaremanagement.manager', {}).get('value', None)
         if not target:
             target = self.node
+        target = target.split('/', 1)[0]
         self._wc = WebConnection(target)
         self.login(self.configmanager)
         return self._wc

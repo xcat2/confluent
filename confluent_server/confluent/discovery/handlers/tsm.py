@@ -198,6 +198,7 @@ class NodeHandler(generic.NodeHandler):
                 not cd['hardwaremanagement.manager']['value'].startswith(
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
+            newip = newip.split('/', 1)[0]
             newipinfo = getaddrinfo(newip, 0)[0]
             newip = newipinfo[-1][0]
             if ':' in newip:
@@ -234,9 +235,10 @@ def remote_nodecfg(nodename, cfm):
             nodename, 'hardwaremanagement.manager')
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
+    ipaddr = ipaddr.split('/', 1)[0]
     ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
     if not ipaddr:
-        raise Excecption('Cannot remote configure a system without known '
+        raise Exception('Cannot remote configure a system without known '
                          'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)

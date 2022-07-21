@@ -256,6 +256,7 @@ def get_conn_params(node, configdata):
         bmc = configdata['hardwaremanagement.manager']['value']
     else:
         bmc = node
+    bmc = bmc.split('/', 1)[0]
     if 'secret.ipmikg' in configdata:
         kg = configdata['secret.ipmikg']['value']
     else:
