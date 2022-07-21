@@ -554,13 +554,13 @@ class NodeHandler(immhandler.NodeHandler):
                 cd['hardwaremanagement.manager']['value'] and
                 not cd['hardwaremanagement.manager']['value'].startswith(
                     'fe80::')):
-            newip = cd['hardwaremanagement.manager']['value']
-            newip = newip.split('/', 1)[0]
+            rawnewip = cd['hardwaremanagement.manager']['value']
+            newip = rawnewip.split('/', 1)[0]
             newipinfo = getaddrinfo(newip, 0)[0]
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=newip)
+            netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=rawnewip)
             newmask = netutil.cidr_to_mask(netconfig['prefix'])
             currinfo = wc.grab_json_response('/api/providers/logoninfo')
             currip = currinfo.get('items', [{}])[0].get('ipv4_address', '')

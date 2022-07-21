@@ -606,9 +606,15 @@ def get_my_addresses(idx=0, family=0, matchlla=None):
 
 
 def get_prefix_len_for_ip(ip):
+    plen = None
+    if '/' in ip:
+        ip, plen = ip.split('/', 1)
     myaddrs = get_my_addresses()
     found = False
     for inf in socket.getaddrinfo(ip, 0, 0, socket.SOCK_DGRAM):
+        if plen:
+            yield (inf[0], plen)
+            return
         for myaddr in myaddrs:
             if inf[0] != myaddr[0]:
                 continue
