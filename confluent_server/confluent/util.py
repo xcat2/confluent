@@ -161,7 +161,7 @@ def cert_matches(fingerprint, certificate):
     if not fingerprint or not certificate:
         return False
     if '$' not in fingerprint:
-        fingerprint = base64.b64decode(certificate)
+        fingerprint = base64.b64decode(fingerprint)
         algo = hashlens[len(fingerprint)]
         return algo(certificate).digest() == fingerprint
     algo, _, fp = fingerprint.partition('$')
