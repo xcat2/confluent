@@ -59,6 +59,24 @@ class NodeHandler(immhandler.NodeHandler):
 
     @property
     def ipaddr(self):
+        if not self._ipaddr:
+            lla = self.info.get('linklocal', '')
+            tmplla = None
+            if lla:
+                for idx in util.list_interface_indexes():
+                    tmplla = '{0}%{1}'.format(lla, idx)
+                    addr = socket.getaddrinfo(tmplla, 443, 0, socket.SOCK_STREAM)[0][4]
+                    try:
+                        tsock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+                        tsock.settimeout(1)
+                        tsock.connect(addr)
+                        tsock.close()
+                        break
+                    except Exception:
+                        continue
+                else:
+                    return ''
+                return tmplla
         return self._ipaddr if self._ipaddr else ''
 
     @classmethod
