@@ -24,7 +24,7 @@ class NodeHandler(generic.NodeHandler):
     devname = 'PXE'
 
     def __init__(self, info, configmanager):
-        self.ipaddr = ''
+        self._ipaddr = ''
         self.cfm = configmanager
 
     @property

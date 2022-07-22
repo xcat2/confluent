@@ -32,7 +32,7 @@ class NodeHandler(object):
         self.info = info
         self.configmanager = configmanager
         targsa = [None]
-        self.ipaddr = None
+        self._ipaddr = None
         self.relay_url = None
         self.relay_server = None
         self.web_ip = None
@@ -50,7 +50,7 @@ class NodeHandler(object):
         else:
             if info.get('addresses', False):
                 targsa = info['addresses'][0]
-        self.ipaddr = socket.getnameinfo(
+        self._ipaddr = socket.getnameinfo(
             targsa, socket.NI_NUMERICHOST|socket.NI_NUMERICSERV)[0]
 
     @classmethod
@@ -102,6 +102,10 @@ class NodeHandler(object):
             passwd = defpass
         return user, passwd, not havecustomcreds
 
+
+    @property
+    def ipaddr(self):
+        return self._ipaddr
 
     @property
     def cert_fail_reason(self):
