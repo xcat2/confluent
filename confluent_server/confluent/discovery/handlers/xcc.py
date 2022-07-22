@@ -57,6 +57,10 @@ class NodeHandler(immhandler.NodeHandler):
         self._currcreds = (None, None)
         super(NodeHandler, self).__init__(info, configmanager)
 
+    @property
+    def ipaddr(self):
+        return self._ipaddr if self._ipaddr else ''
+
     @classmethod
     def adequate(cls, info):
         # We can sometimes receive a partially initialized SLP packet
