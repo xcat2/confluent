@@ -9,6 +9,52 @@ localcli network firewall unload
 touch /etc/confluent/confluent.info
 begin=$(date +%s)
 localcli system secpolicy domain set -n appDom -l disabled
+personality=''
+for maydev in /dev/disks/mpx.vmhba*; do 
+    if mdir -i $usb |grep CNFLNT_IDNT > /dev/null; then
+	personality=$usb
+	break
+    fi
+done
+if [ ! -z "$personality" ]; then
+    mkdir -p /tmp/confluentident
+    mcopy -i $personality ::* /tmp/confluentident/
+fi
+if [ -e /tmp/confluentident/cnflnt.yml ]; then
+    cat /tls/*.pem >> /etc/confluent/ca.pem
+    deploysrvs=$(sed -n '/^deploy_servers:/,/^[^-]/p' /tmp/confluentident/cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+    nodename=$(grep ^nodename: /tmp/confluentident/cnflnt.yml|sed -e 's/nodename: //')
+    echo 'NODENAME: '$nodename > /etc/confluent/confluent.info
+    for deploysrv in $deploysrvs; do
+        echo 'MANAGER: '$deploysrv >> /etc/confluent/confluent.info
+    done
+    tcfg=$(mktemp)
+    sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' /tmp/confluentident/cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
+    autoconfigmethod=$(grep ^ipv4_method: $tcfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+    if [ "$autoconfigmethod" = "static" ]; then
+        v4addr=$(grep ^ipv4_address: $tcfg)
+        v4addr=${v4addr#ipv4_address: }
+        v4gw=$(grep ^ipv4_gateway: $tcfg)
+        v4gw=${v4gw#ipv4_gateway: }
+        if [ "$v4gw" = "null" ]; then
+            v4gw=""
+        fi
+        v4nm=$(grep ipv4_netmask: $tcfg)
+        v4nm=${v4nm#ipv4_netmask: }
+        localcli network ip interface ipv4 set -i vmk0 -I $v4addr -N $v4nm -g $v4gw -t static
+        localcli network ip route ipv4 add -n default -g $v4gw
+    fi
+    hmackeyfile=$(mktemp)
+    echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
+    cd -
+    passfile=$(mktemp)
+    passcrypt=$(mktemp)
+    hmacfile=$(mktemp)
+    ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
+    /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+
+fi
 while ! grep NODENAME /etc/confluent/confluent.info; do
     echo "Searching for deployment service on local network..."
     /opt/confluent/bin/copernicus > /etc/confluent/confluent.info

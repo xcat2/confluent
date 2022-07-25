@@ -222,7 +222,8 @@ def get_apikey(nodename, hosts, errout=None):
     return apikey
 
 class HTTPSClient(client.HTTPConnection, object):
-    def __init__(self, usejson=False, port=443, host=None, errout=None):
+    def __init__(self, usejson=False, port=443, host=None, errout=None, phmac=None):
+        self.phmac = phmac
         self.errout = None
         if errout:
             self.errout = open(errout, 'w')
@@ -269,7 +270,11 @@ class HTTPSClient(client.HTTPConnection, object):
                 for line in info:
                     if line.startswith('deploy_server: ') or line.startswith('deploy_server_v6: '):
                         self.hosts.append(line.split(': ', 1)[1])
-        self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(node, self.hosts, errout=self.errout)
+        if self.phmac:
+            with open(phmac, 'r') as hmacin:
+                self.stdheaders['CONFLUENT_CRYPTHMAC'] = hmacin.read()
+        else:
+            self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(node, self.hosts, errout=self.errout)
         if mgtiface:
             self.stdheaders['CONFLUENT_MGTIFACE'] = mgtiface
         self.port = port
@@ -406,6 +411,12 @@ if __name__ == '__main__':
         errout = sys.argv.pop(errout)
     except ValueError:
         errout = None
+    try:
+        phmac = sys.argv.index('-p')
+        sys.argv.pop(phmac)
+        phmac = sys.argv.pop(phmac)
+    except ValueError:
+        phmac = None
     if len(sys.argv) > 2 and os.path.exists(sys.argv[-1]):
         data = open(sys.argv[-1]).read()
     if outbin:
@@ -424,4 +435,4 @@ if __name__ == '__main__':
             status, rsp = client.grab_url_with_status(sys.argv[1], data)
             sys.stdout.write(rsp.decode())
     else:
-        sys.stdout.write(HTTPSClient(usejson, errout=errout).grab_url(sys.argv[1], data).decode())
+        sys.stdout.write(HTTPSClient(usejson, errout=errout).grab_url(sys.argv[1], data, phmac=phmac).decode())
