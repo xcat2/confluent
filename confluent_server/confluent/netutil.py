@@ -287,6 +287,11 @@ def get_flat_net_config(configmanager, node):
             ret.append(nc)
     return ret
 
+def add_netmask(ncfg):
+    if '/' in ncfg['ipv4_address']:
+        plen = ncfg['ipv4_address'].split('/', 1)[1]
+        ncfg['ipv4_netmask'] = cidr_to_mask(int(plen))
+
 def get_full_net_config(configmanager, node, serverip=None):
     cfd = configmanager.get_node_attributes(node, ['net.*'])
     cfd = cfd.get(node, {})
@@ -319,8 +324,11 @@ def get_full_net_config(configmanager, node, serverip=None):
     retattrs = {}
     if None in nm.myattribs:
         retattrs['default'] = nm.myattribs[None]
+        add_netmask(retattrs['default'])
         del nm.myattribs[None]
     retattrs['extranets'] = nm.myattribs
+    for attri in retattrs['extranets']:
+        add_netmask(retattrs['extranets'][attri])
     return retattrs
 
 
