@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import re
 import subprocess
-
+import yaml
 uplinkmatch = re.compile('^\s*Uplinks:\s*(.*)')
 nodename = None
 for inf in open('/etc/confluent/confluent.info', 'r').read().split('\n'):
@@ -33,6 +33,16 @@ for info in vswinfo.split('\n'):
     upinfo = uplinkmatch.match(info)
     if upinfo:
         vmnic = upinfo.group(1)
+try:
+    with open('/tmp/confluentident/cnflnt.yml') as identin:
+        identcfg = yaml.safe_load(identin)
+        ncfg = identcfg['netcfgs'][0]
+        cfg['ipv4_method'] = ncfg['ipv4_method']
+        cfg['ipv4_address'] = ncfg['ipv4_address'].split('/')[0]
+        cfg['ipv4_netmask'] = ncfg['ipv4_netmask']
+        cfg['ipv4_gateway'] = ncfg['ipv4_gateway']
+except Exception:
+    pass
 netline = 'network --hostname={0} --bootproto={1}'.format(nodename, cfg['ipv4_method'])
 if vmnic:
     netline += ' --device={0}'.format(vmnic)
