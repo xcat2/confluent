@@ -36,7 +36,7 @@ for info in vswinfo.split('\n'):
 try:
     with open('/tmp/confluentident/cnflnt.yml') as identin:
         identcfg = yaml.safe_load(identin)
-        ncfg = identcfg['netcfgs'][0]
+        ncfg = identcfg['net_cfgs'][0]
         cfg['ipv4_method'] = ncfg['ipv4_method']
         cfg['ipv4_address'] = ncfg['ipv4_address'].split('/')[0]
         cfg['ipv4_netmask'] = ncfg['ipv4_netmask']
@@ -53,4 +53,3 @@ if cfg['ipv4_method'] == 'static':
     if cfg['nameservers']:
         netline += ' --nameserver={0}'.format(cfg['nameservers'])
 print(netline)
-    
