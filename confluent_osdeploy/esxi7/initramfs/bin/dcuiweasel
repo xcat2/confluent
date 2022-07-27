@@ -10,7 +10,7 @@ touch /etc/confluent/confluent.info
 begin=$(date +%s)
 localcli system secpolicy domain set -n appDom -l disabled
 personality=''
-for maydev in /dev/disks/mpx.vmhba*; do 
+for usb in /dev/disks/mpx.vmhba*; do 
     if mdir -i $usb |grep CNFLNT_IDNT > /dev/null; then
 	personality=$usb
 	break
