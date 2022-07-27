@@ -20,6 +20,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     else
         v4addr=$(grep ^ipv4_address: $tcfg)
         v4addr=${v4addr#ipv4_address: }
+        v4addr=${v4addr%/*}
         v4gw=$(grep ^ipv4_gateway: $tcfg)
         v4gw=${v4gw#ipv4_gateway: }
         if [ "$v4gw" = "null" ]; then

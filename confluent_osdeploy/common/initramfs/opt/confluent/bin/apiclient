@@ -435,4 +435,4 @@ if __name__ == '__main__':
             status, rsp = client.grab_url_with_status(sys.argv[1], data)
             sys.stdout.write(rsp.decode())
     else:
-        sys.stdout.write(HTTPSClient(usejson, errout=errout).grab_url(sys.argv[1], data, phmac=phmac).decode())
+        sys.stdout.write(HTTPSClient(usejson, errout=errout, phmac=phmac).grab_url(sys.argv[1], data).decode())
