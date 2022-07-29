@@ -206,6 +206,13 @@ def v6opts_to_dict(rq):
             optidx += optlen + 4
     except IndexError:
         pass
+    reqdict['vci'] = None
+    if 16 in reqdict:
+        vco = reqdict[16]
+        iananum, vlen = struct.unpack('!IH', vco[:6])
+        vci = vco[6:vlen + 6]
+        if vci.startswith(b'HTTPClient:Arch') or vci.startswith(b'PXEClient:Arch:'):
+            reqdict['vci'] = vci.decode('utf8')
     if 1 in reqdict:
         duid = reqdict[1]
         if struct.unpack('!H', duid[:2])[0] == 4:
@@ -237,9 +244,12 @@ def opts_to_dict(rq, optidx, expectype=1):
         vci = stringify(reqdict.get(60, b''))
     except UnicodeDecodeError:
         vci = ''
+    reqdict['vci'] = None
     if vci.startswith('cumulus-linux'):
         disco['arch'] = vci.replace('cumulus-linux', '').strip()
         iscumulus = True
+    elif vci.startswith('HTTPClient:Arch') or vci.startswith('PXEClient:Arch:'):
+        reqdict['vci'] = vci
     if reqdict.get(93, None):
         disco['arch'] = pxearchs.get(bytes(reqdict[93]), None)
     if reqdict.get(97, None):
@@ -542,7 +552,7 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr):
             )})
         return
     if addr:
-        if not httpboot:
+        if packet['vci'] and packet['vci'].startswith('PXEClient'):
             log.log({'info': 'IPv6 PXE boot attempt by {0}, but IPv6 PXE is not supported, try IPv6 HTTP boot or IPv4 boot'.format(node)})
             return
         return reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
@@ -582,6 +592,8 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
         ipass[4:16] = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x18'
         ipass[16:32] = socket.inet_pton(socket.AF_INET6, ipv6addr)
         ipass[32:40] = b'\x00\x00\x00\x78\x00\x00\x01\x2c'
+    elif (not packet['vci']) or not packet['vci'].startswith('HTTPClient:Arch:'):
+        return # do not send ip-less replies to anything but HTTPClient specifically
     #1 msgtype
     #3 txid
     #22 - server ident
@@ -681,6 +693,8 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
                 gateway = None
         netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
         netmask = struct.pack('!I', netmask)
+    elif (not packet['vci']) or not (packet['vci'].startswith('HTTPClient:Arch:') or packet['vci'].startswith('PXEClient:Arch:')):
+        return  # do not send ip-less replies to anything but netboot specifically
     myipn = niccfg['deploy_server']
     if not myipn:
         myipn = info['netinfo']['recvip']
