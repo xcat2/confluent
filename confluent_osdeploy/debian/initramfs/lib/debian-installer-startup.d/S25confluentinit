@@ -9,6 +9,10 @@ reverse_uuid() {
     echo $1 | head -c 16 | tail -c 2
     echo $1 | tail -c 18 | sed -e s/-//
 }
+setdebopt() {
+    debconf-set $1 $2
+    echo d-i $1 $3 $2 >> /preseed.cfg
+}
 
 dhuuid=$(reverse_uuid $(cat /sys/devices/virtual/dmi/id/product_uuid))
 dhcpid=$(mktemp)
@@ -38,55 +42,55 @@ cd $predir
 profile=$(grep ^profile: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 wget https://$mgr/confluent-public/os/$profile/scripts/pre.sh
 chmod u+x pre.sh
-debconf-set preseed/early_command  $predir/pre.sh
+setdebopt preseed/early_command  $predir/pre.sh string
 wget https://$mgr/confluent-public/os/$profile/preseed.cfg
 mv preseed.cfg /
-debconf-set auto-install/enable true
+setdebopt auto-install/enable true boolean
 cd -
 ip -4 a flush dev $nic
-debconf-set netcfg/choose_interface $nic
-debconf-set netcfg/get_hostanme $nodename
+setdebopt netcfg/choose_interface $nic select
+setdebopt netcfg/get_hostname $nodename string
 v4cfgmeth=$(grep ipv4_method: /etc/confluent/deploycfg |cut -d: -f 2|sed -e 's/ //')
 if [ "$v4cfgmeth" = "static" ]; then
-    debconf-set netcfg/disable_dhcp true
+    setdebopt netcfg/disable_dhcp true boolean
     v4addr=$(grep ^ipv4_address: /etc/confluent/deploycfg|cut -d: -f 2|sed -e 's/ //')
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/deploycfg|cut -d: -f 2| sed -e 's/ //')
     if [ "$v4gw" = "null" ]; then
         v4gw=""
     fi
     v4nm=$(grep ^ipv4_netmask: /etc/confluent/deploycfg|cut -d: -f 2|sed -e 's/ //')
-    debconf-set netcfg/get_netmask $v4nm
-    debconf-set netcfg/get_ipaddress $v4addr
-    debconf-set netcfg/confirm_static true
+    setdebopt netcfg/get_netmask $v4nm string
+    setdebopt netcfg/get_ipaddress $v4addr string
+    setdebopt netcfg/confirm_static true boolean
     if [ ! -z "$v4gw" ]; then
-        debconf-set netcfg/get_gateway $v4gw
+        setdebopt netcfg/get_gateway $v4gw string
     fi
     namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
     for namesrv in "$namesrvs"; do
-        debconf-set netcfg/get_nameservers $namesrv
+        setdebopt netcfg/get_nameservers $namesrv string
     done
 elif [ "$vpcfgmeth" = "dhcp" ]; then
-    debconf-set netcfg/disable_dhcp false
-    debconf-set netcfg/confirm_static false
+    setdebopt netcfg/disable_dhcp false boolean
+    setdebopt netcfg/confirm_static false boolean
 fi
 rootpass=$(grep ^rootpassword: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //')
 if [ "$rootpass" = null ] || [ -z "$rootpass" ]; then
-    debconf-set passwd/root-login false
+    setdebopt passwd/root-login false boolean
 else
-    debconf-set passwd/root-login true
-    debconf-set passwd/root-password-crypted $rootpass
+    setdebopt passwd/root-login true boolean
+    setdebopt passwd/root-password-crypted $rootpass string
 fi
-debconf-set time/zone $(grep ^timezone: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //')
+setdebopt time/zone $(grep ^timezone: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //') string
 ntpsrvs=$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
 for ntpsrv in "$ntpsrvs"; do
-    debconf-set clock-setup/ntp true
-    debconf-set clock-setup/ntep-server $ntpsrv
+    setdebopt clock-setup/ntp true boolean
+    setdebopt clock-setup/ntep-server $ntpsrv string
 done
-debconf-set console-setup/layoutcode $(grep ^keymap: /etc/confluent/deploycfg|cut -d ' ' -f 2)
-debconf-set debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2)
+#setdebopt console-setup/layoutcode $(grep ^keymap: /etc/confluent/deploycfg|cut -d ' ' -f 2) string
+setdebopt debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2) select
 domainname=$(grep ^dnsdomain: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 if [ ! -z "$domainname" ] && [ "$domainname" != "null" ]; then
-    debconf-set netcfg/get_domain $domainname
+    setdebopt netcfg/get_domain $domainname string
 fi
 
 
