@@ -32,8 +32,20 @@ nodename=$(grep ^NODENAME: /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|
 apikey=$(cat /etc/confluent/confluent.apikey)
 cd /etc/confluent
 wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg
+cd -
+predir=$(mktemp -d)
+cd $predir
+profile=$(grep ^profile: /etc/confluent/deploycfg|cut -d ' ' -f 2)
+wget https://$mgr/confluent-public/os/$profile/scripts/pre.sh
+chmod u+x pre.sh
+debconf-set preseed/early_command  $predir/pre.sh
+wget https://$mgr/confluent-public/os/$profile/preseed.cfg
+mv preseed.cfg /
+debconf-set auto-install/enable true
+cd -
 ip -4 a flush dev $nic
 debconf-set netcfg/choose_interface $nic
+debconf-set netcfg/get_hostanme $nodename
 v4cfgmeth=$(grep ipv4_method: /etc/confluent/deploycfg |cut -d: -f 2|sed -e 's/ //')
 if [ "$v4cfgmeth" = "static" ]; then
     debconf-set netcfg/disable_dhcp true
@@ -54,6 +66,28 @@ if [ "$v4cfgmeth" = "static" ]; then
         debconf-set netcfg/get_nameservers $namesrv
     done
 elif [ "$vpcfgmeth" = "dhcp" ]; then
-    udhcpc -i $nic
+    debconf-set netcfg/disable_dhcp false
+    debconf-set netcfg/confirm_static false
 fi
+rootpass=$(grep ^rootpassword: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //')
+if [ "$rootpass" = null ] || [ -z "$rootpass" ]; then
+    debconf-set passwd/root-login false
+else
+    debconf-set passwd/root-login true
+    debconf-set passwd/root-password-crypted $rootpass
+fi
+debconf-set time/zone $(grep ^timezone: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //')
+ntpsrvs=$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
+for ntpsrv in "$ntpsrvs"; do
+    debconf-set clock-setup/ntp true
+    debconf-set clock-setup/ntep-server $ntpsrv
+done
+debconf-set console-setup/layoutcode $(grep ^keymap: /etc/confluent/deploycfg|cut -d ' ' -f 2)
+debconf-set debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2)
+domainname=$(grep ^dnsdomain: /etc/confluent/deploycfg|cut -d ' ' -f 2)
+if [ ! -z "$domainname" ] && [ "$domainname" != "null" ]; then
+    debconf-set netcfg/get_domain $domainname
+fi
+
+
 
