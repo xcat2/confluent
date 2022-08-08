@@ -81,7 +81,9 @@ import confluent.noderange as noderange
 import confluent.util as util
 import eventlet
 import traceback
+import shlex
 import socket as nsocket
+import eventlet.green.subprocess as subprocess
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
@@ -1180,6 +1182,10 @@ def discover_node(cfg, handler, info, nodename, manual):
                              nodename, str(e))})
                 traceback.print_exc()
                 return False
+            nodeconfig = cfg.get_node_attributes(nodename, 'discovery.nodeconfig')
+            nodeconfig = nodeconfig.get(nodename, {}).get('discovery.nodeconfig', {}).get('value', None)
+            if nodeconfig:
+                nodeconfig = shlex.split(nodeconfig)
             newnodeattribs = {}
             if list(cfm.list_collective()):
                 # We are in a collective, check collective.manager
@@ -1202,6 +1208,11 @@ def discover_node(cfg, handler, info, nodename, manual):
                 cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
+            if nodeconfig:
+                subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
+                log.log({'info': 'Configured {0} ({1})'.format(nodename,
+                                                          handler.devname)})
+
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):
             eventlet.spawn_n(_recheck_single_unknown_info, cfg, i)

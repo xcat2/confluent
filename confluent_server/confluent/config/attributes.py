@@ -247,6 +247,10 @@ node = {
                         'and any restrictions around reusing an old password.',
         'validlistkeys': ('expiration', 'loginfailures', 'complexity', 'reuse'),
     },
+    'discovery.nodeconfig': {
+        'description':  'Set of nodeconfig arguments to apply after automatic discovery'
+
+    },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
                         'and identified nodes. Valid values are "manual", '
