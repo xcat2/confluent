@@ -75,7 +75,7 @@ while ! grep NODENAME /etc/confluent/confluent.info; do
     fi
 done
 node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
-mgr=$(grep MANAGER: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
+mgr=$(python /opt/confluent/bin/apiclient -c)
 APIKEY=$(cat /etc/confluent/confluent.apikey)
 
 if [ -z "$APIKEY" ]; then

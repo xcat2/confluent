@@ -245,6 +245,7 @@ class HTTPSClient(client.HTTPConnection, object):
             info = open('/etc/confluent/confluent.info').read().split('\n')
             havedefault = '0'
             for line in info:
+                host = ''
                 if line.startswith('NODENAME:'):
                     node = line.split(' ')[1]
                     self.stdheaders['CONFLUENT_NODENAME'] = node
@@ -257,11 +258,12 @@ class HTTPSClient(client.HTTPConnection, object):
                         host, mgtiface, havedefault = extinfo[:3]
                     if havedefault == '0' and extinfo[2] == '1':
                         host, mgtiface, havedefault = extinfo[:3]
-            if '%' in host:
-                ifidx = host.split('%', 1)[1]
-                with open('/tmp/confluent.ifidx', 'w+') as ifout:
-                    ifout.write(ifidx)
-            self.hosts.append(host)
+                if '%' in host:
+                    ifidx = host.split('%', 1)[1]
+                    with open('/tmp/confluent.ifidx', 'w+') as ifout:
+                        ifout.write(ifidx)
+                if host:
+                    self.hosts.append(host)
             try:
                 info = open('/etc/confluent/confluent.deploycfg').read().split('\n')
             except Exception:
@@ -417,6 +419,13 @@ if __name__ == '__main__':
         phmac = sys.argv.pop(phmac)
     except ValueError:
         phmac = None
+    try:
+        checkonly = False
+        idxit = sys.argv.index('-c')
+        sys.argv.pop(idxit)
+        checkonly = True
+    except Exception:
+        pass
     if len(sys.argv) > 2 and os.path.exists(sys.argv[-1]):
         data = open(sys.argv[-1]).read()
     if outbin:
@@ -428,11 +437,13 @@ if __name__ == '__main__':
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
+    client = HTTPSClient(usejson, errout=errout, phmac=phmac)
     if waitfor:
-        client = HTTPSClient(usejson, errout=errout)
         status = 201
         while status != waitfor:
             status, rsp = client.grab_url_with_status(sys.argv[1], data)
             sys.stdout.write(rsp.decode())
+    elif checkonly:
+        sys.stdout.write(client.check_connections())
     else:
-        sys.stdout.write(HTTPSClient(usejson, errout=errout, phmac=phmac).grab_url(sys.argv[1], data).decode())
+        sys.stdout.write(client.grab_url(sys.argv[1], data).decode())
