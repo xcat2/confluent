@@ -42,10 +42,10 @@ cd $predir
 profile=$(grep ^profile: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 wget https://$mgr/confluent-public/os/$profile/scripts/pre.sh
 chmod u+x pre.sh
-setdebopt preseed/early_command  $predir/pre.sh string
 wget https://$mgr/confluent-public/os/$profile/preseed.cfg
 mv preseed.cfg /
 setdebopt auto-install/enable true boolean
+setdebopt partman/early_command  $predir/pre.sh string
 cd -
 ip -4 a flush dev $nic
 setdebopt netcfg/choose_interface $nic select
