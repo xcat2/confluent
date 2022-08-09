@@ -82,6 +82,7 @@ import confluent.util as util
 import eventlet
 import traceback
 import shlex
+import eventlet.green.socket as socket
 import socket as nsocket
 import eventlet.green.subprocess as subprocess
 webclient = eventlet.import_patched('pyghmi.util.webclient')
@@ -1209,8 +1210,15 @@ def discover_node(cfg, handler, info, nodename, manual):
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
             if nodeconfig:
-                subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
-                log.log({'info': 'Configured {0} ({1})'.format(nodename,
+                bmcaddr = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
+                bmcaddr = bmcaddr.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
+                if not bmcaddr:
+                    log.log({'error': 'Unable to get BMC address for {0]'.format(nodename)})
+                else:
+                    wait_for_connection(bmcaddr)
+                    socket.getaddrinfo(bmcaddr, 443)
+                    subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
+                    log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
 
         info['discostatus'] = 'discovered'
@@ -1236,6 +1244,18 @@ def discover_node(cfg, handler, info, nodename, manual):
         info['discofailure'] = 'policy'
     return False
 
+def wait_for_connection(bmcaddr):
+    expiry = 75 + util.monotonic_time()
+    while util.monotonic_time() < expiry:
+        for addrinf in socket.getaddrinfo(bmcaddr, 443, proto=socket.IPPROTO_TCP):
+            try:
+                tsock = socket.socket(addrinf[0])
+                tsock.settimeout(1)
+                tsock.connect(addrinf[4])
+                return
+            except OSError:
+                continue
+        eventlet.sleep(1)
 
 def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
     # use uuid based scheme in lieu of tls cert, ideally only
