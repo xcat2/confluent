@@ -35,6 +35,8 @@ for rpm in rpmlist:
     for relrpm in srpmtorpm[srpm]:
         liclist = runcmd(f'rpm -qL {relrpm}')
         for lic in liclist:
+            if lic == '(contains no files)':
+                continue
             licenses.add(lic)
 for lic in sorted(licenses):
     print(lic)
