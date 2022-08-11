@@ -17,15 +17,12 @@ popd
 rm -rf $tdir
 cp $tfile rpmlist
 cp confluent-genesis.spec confluent-genesis-out.spec
-for r in $(cat rpmlist); do
-	#rpm -qi $r | grep ^License|sed -e 's/^.*:/${r}:/' >> licenselist
-	for l in $(rpm -qL $r); do
-		lo=${l#/usr/share/}
-		lo=${lo#licenses/}
-		mkdir -p licenses/$(dirname $lo)
-		cp $l licenses/$lo
-		echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
-	done
+for lic in $(python3 getlicenses.py rpmlist); do
+	lo=${lic#/usr/share/}
+	lo=${lo#licenses/}
+	mkdir -p licenses/$(dirname $lo)
+	cp $lic licenses/$lo
+	echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
 done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
