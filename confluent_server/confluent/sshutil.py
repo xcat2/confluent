@@ -35,8 +35,6 @@ def normalize_uid():
 
 agent_starting = False
 def assure_agent():
-    if sshver() <= 7.6:
-        return False
     global agent_starting
     global agent_pid
     while agent_starting:
