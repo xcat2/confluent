@@ -98,6 +98,7 @@ class PDUClient(object):
     def __init__(self, pdu, configmanager):
         self.node = pdu
         self.configmanager = configmanager
+        self._outletmap = {}
         self._token = None
         self._wc = None
         self.username = None
@@ -118,6 +119,24 @@ class PDUClient(object):
         self._wc = WebConnection(target)
         self.login(self.configmanager)
         return self._wc
+
+    @property
+    def map_outlets(self):
+        if not self._outletmap:
+            rsp, status = self.wc.grab_response('/setting_admin.htm')
+            if not isinstance(rsp, str):
+                rsp = rsp.decode('utf8')
+            for line in rsp.split('\n'):
+                if 'ibmsys_info_relay' in line and 'onClick="set(' in line:
+                    line = line.partition('onClick="set(\'')[-1]
+                    ident, label = line.split(',')[:2]
+                    ident = ident.replace('\'', '')
+                    label = label.replace('\'', '')
+                    label = label.replace('ibmsys_info_relay', '')
+                    idx = int(label)
+                    self._outletmap[idx] = ident
+        return self._outletmap
+
 
     def login(self, configmanager):
         credcfg = configmanager.get_node_attributes(self.node,
@@ -155,7 +174,8 @@ class PDUClient(object):
     def set_outlet(self, outlet, state):
         state = 0 if state == 'off' else 1
         outlet = int(outlet)
-        sitem = '/SetParm?item=s4r{:02d}?content={}'.format(outlet, state)
+        ident = self.map_outlets[outlet]
+        sitem = '/SetParm?item={}?content={}'.format(ident, state)
         self.wc.grab_response(sitem)
 
 def retrieve(nodes, element, configmanager, inputdata):
