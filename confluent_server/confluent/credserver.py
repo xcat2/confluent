@@ -108,7 +108,7 @@ class CredServer(object):
                     client.close()
                     return
             cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}, 'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
-            if hmackey:
+            if hmackey and apiarmed != 'continuous':
                 self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
             if apiarmed == 'continuous':
                 del cfgupdate[nodename]['deployment.apiarmed']

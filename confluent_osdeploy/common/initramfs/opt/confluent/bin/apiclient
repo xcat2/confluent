@@ -159,6 +159,7 @@ def get_net_apikey(nodename, mgr):
             else:
                 cliaddr = ('::', 302)
             clisock.bind(cliaddr)
+            clisock.settimeout(1)
             clisock.connect(addrinfo[-1])
             rsp = clisock.recv(8)
             if rsp != b'\xc2\xd1-\xa8\x80\xd8j\xba':
