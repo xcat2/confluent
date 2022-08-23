@@ -27,10 +27,10 @@ make
 %install
 mkdir -p $RPM_BUILD_ROOT/opt/confluent/bin $RPM_BUILD_ROOT/opt/confluent/share/licenses/vtbufferd
 cp vtbufferd $RPM_BUILD_ROOT/opt/confluent/bin/
-cp COPYING.tmt $RPM_BUILD_ROOT/opt/confluent/share/licenses/vtbufferd
+cp NOTICE $RPM_BUILD_ROOT/opt/confluent/share/licenses/vtbufferd
 cp LICENSE $RPM_BUILD_ROOT/opt/confluent/share/licenses/vtbufferd
 
 %files
 /opt/confluent/bin/vtbufferd
-%license /opt/confluent/share/licenses/vtbufferd/COPYING.tmt
+%license /opt/confluent/share/licenses/vtbufferd/NOTICE
 %license /opt/confluent/share/licenses/vtbufferd/LICENSE
