@@ -4,7 +4,7 @@ if [ "$NUMCOMMITS" != "$VERSION"  ]; then
     VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
 fi
 mkdir -p dist/confluent_vtbufferd-$VERSION
-cp ../LICENSE COPYING.tmt *.c *.h Makefile dist/confluent_vtbufferd-$VERSION
+cp ../LICENSE NOTICE *.c *.h Makefile dist/confluent_vtbufferd-$VERSION
 cd dist
 tar czf confluent_vtbufferd-$VERSION.tar.gz confluent_vtbufferd-$VERSION
 cd -
