@@ -645,6 +645,24 @@ def get_profile_label(profile):
 importing = {}
 
 
+def get_hashes(dirname):
+    hashmap = {}
+    for dname, _, fnames in os.walk(dirname):
+        for fname in fnames:
+            if fname == 'profile.yaml':
+                continue
+            fullname = os.path.join(dname, fname)
+            currhash = hashlib.sha512()
+            with open(fullname, 'rb') as currf:
+                currd = currf.read(2048)
+                while currd:
+                    currhash.update(currd)
+                    currd = currf.read(2048)
+                subname = fullname.replace(dirname + '/', '')
+                hashmap[subname] = currhash.hexdigest()
+    return hashmap
+
+
 def generate_stock_profiles(defprofile, distpath, targpath, osname,
                             profilelist):
     osd, osversion, arch = osname.split('-')
@@ -657,6 +675,7 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
             continue
         oumask = os.umask(0o22)
         shutil.copytree(srcname, dirname)
+        hmap = get_hashes(dirname)            
         profdata = None
         try:
             os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
@@ -674,6 +693,9 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
         if profdata:
             with open('{0}/profile.yaml'.format(dirname), 'w') as yout:
                 yout.write(profdata)
+                yout.write('# The data below facilitates detecting customization during osdeploy rebase\n')
+                manifestdata = {'distdir': srcname, 'disthashes': hmap}
+                yout.write(yaml.dump(manifestdata, default_flow_style=False))
         for initrd in os.listdir('{0}/initramfs'.format(defprofile)):
             fullpath = '{0}/initramfs/{1}'.format(defprofile, initrd)
             if os.path.isdir(fullpath):
