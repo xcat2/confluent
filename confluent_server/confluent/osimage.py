@@ -693,9 +693,10 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
         if profdata:
             with open('{0}/profile.yaml'.format(dirname), 'w') as yout:
                 yout.write(profdata)
-                yout.write('# The data below facilitates detecting customization during osdeploy rebase\n')
-                manifestdata = {'distdir': srcname, 'disthashes': hmap}
-                yout.write(yaml.dump(manifestdata, default_flow_style=False))
+        with open('{0}/manifest.yaml'.format(dirname), 'w') as yout:
+            yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
+            manifestdata = {'distdir': srcname, 'disthashes': hmap}
+            yout.write(yaml.dump(manifestdata, default_flow_style=False))
         for initrd in os.listdir('{0}/initramfs'.format(defprofile)):
             fullpath = '{0}/initramfs/{1}'.format(defprofile, initrd)
             if os.path.isdir(fullpath):
