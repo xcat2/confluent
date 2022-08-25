@@ -56,6 +56,8 @@ def main(args):
         help='Push profile.yaml of the named profile data into boot assets as appropriate')
     upb.add_argument('profile', help='Profile to update boot assets')
     osls = sp.add_parser('list', help='List OS images available for deployment')
+    ubp = sp.add_parser('rebase', help='Update stock profile content from packaged updates')
+    ubp.add_argument('profile', help='Profile to rebase from packaged content')
     cmdset = ap.parse_args()
 
     if cmdset.command == 'list':
@@ -66,6 +68,8 @@ def main(args):
         return initialize(cmdset)
     if cmdset.command == 'updateboot':
         return updateboot(cmdset.profile)
+    if cmdset.command == 'rebase':
+        return rebase(cmdset.profile)
     ap.print_help()
 
 
@@ -403,6 +407,19 @@ def updateboot(profilename):
         else:
             print(repr(rsp))
 
+
+def rebase(profilename):
+    c = client.Command()
+    for rsp in c.update('/deployment/profiles/{0}'.format(profilename), {'rebase': 1}):
+        if 'updated' in rsp:
+            print('Updated: {0}'.format(rsp['updated']))
+        elif 'customized' in rsp:
+            print('Skipping update of {0} as current copy was customized or no manifest data was available'.format(rsp['customized']))
+        elif 'error' in rsp:
+            sys.stderr.write(rsp['error'] + '\n')
+            sys.exit(rsp['errorcode'])
+        else:
+            print(repr(rsp))
 
 def oslist():
     c = client.Command()

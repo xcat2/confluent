@@ -44,7 +44,7 @@ def relax_umask():
 
 def makedirs(path, mode):
     try:
-        os.makedirs(path, 0o755)
+        os.makedirs(path, mode)
     except OSError as e:
         if e.errno != 17:
             raise
@@ -645,6 +645,78 @@ def get_profile_label(profile):
 importing = {}
 
 
+class ManifestMissing(Exception):
+    pass
+
+def copy_file(src, dst):
+    newdir = os.path.dirname(dst)
+    makedirs(newdir, 0o755)
+    shutil.copy2(src, dst)
+
+def get_hash(fname):
+    currhash = hashlib.sha512()
+    with open(fname, 'rb') as currf:
+        currd = currf.read(2048)
+        while currd:
+            currhash.update(currd)
+            currd = currf.read(2048)
+    return currhash.hexdigest()
+
+
+def rebase_profile(dirname):
+    if dirname.startswith('/var/lib/confluent/public'):
+        profiledir = dirname
+    else:
+        profiledir = '/var/lib/confluent/public/os/{0}'.format(dirname)
+    currhashes = get_hashes(profiledir)
+    festfile = os.path.join(profiledir, 'manifest.yaml')
+    try:
+        with open(festfile, 'r') as festfile:
+            manifest = yaml.safe_load(festfile)
+    except IOError:
+        raise ManifestMissing()
+    distdir = manifest['distdir']
+    newdisthashes = get_hashes(distdir)
+    olddisthashes = manifest['disthashes']
+    customized = []
+    newmanifest = []
+    updated = []
+    for updatecandidate in newdisthashes:
+        newfilename = os.path.join(profiledir, updatecandidate)
+        distfilename = os.path.join(distdir, updatecandidate)
+        newdisthash = newdisthashes[updatecandidate]
+        currhash = currhashes.get(updatecandidate, None)
+        olddisthash = olddisthashes.get(updatecandidate, None)
+        if not currhash:  # file does not exist yet
+            copy_file(distfilename, newfilename)
+            newmanifest.append(updatecandidate)
+            updated.append(updatecandidate)
+        elif currhash == newdisthash:
+            newmanifest.append(updatecandidate)
+        elif currhash != olddisthash:
+            customized.append(updatecandidate)
+        else:
+            copy_file(distfilename, newfilename)
+            updated.append(updatecandidate)
+            newmanifest.append(updatecandidate)
+    for nf in newmanifest:
+        nfname = os.path.join(profiledir, nf)
+        currhash = get_hash(nfname)
+        manifest['disthashes'][nf] = currhash
+    with open('{0}/manifest.yaml'.format(profiledir), 'w') as yout:
+            yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
+            yout.write(yaml.dump(manifest, default_flow_style=False))
+    return updated, customized
+
+    # if currhash == disthash:
+    #      no update required, update manifest
+    # elif currhash != olddisthash:
+    #      customization detected, skip
+    # else
+    #      update required, manifest update
+    
+    
+        
 def get_hashes(dirname):
     hashmap = {}
     for dname, _, fnames in os.walk(dirname):
@@ -653,13 +725,8 @@ def get_hashes(dirname):
                 continue
             fullname = os.path.join(dname, fname)
             currhash = hashlib.sha512()
-            with open(fullname, 'rb') as currf:
-                currd = currf.read(2048)
-                while currd:
-                    currhash.update(currd)
-                    currd = currf.read(2048)
-                subname = fullname.replace(dirname + '/', '')
-                hashmap[subname] = currhash.hexdigest()
+            subname = fullname.replace(dirname + '/', '')
+            hashmap[subname] = get_hash(fullname)
     return hashmap
 
 

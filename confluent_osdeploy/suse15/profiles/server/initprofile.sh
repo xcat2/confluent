@@ -17,7 +17,7 @@ ln -s $1/boot/x86_64/loader/initrd $2/boot/initramfs/distribution && \
 mkdir -p $2/boot/efi/boot && \
 ln -s $1/EFI/BOOT/bootx64.efi $1/EFI/BOOT/grub.efi $2/boot/efi/boot/
 if [[ $profile =~ ^sle.* ]]; then
-	sed -i 's/%%IFSLE%%//;s/%%ENDIFSLE%%//' $2/autoyast
+	ln -s autoyast.sle $2/autoyast
 else
-	sed -i '/%%IFSLE%%/,/%%ENDIFSLE%%/d' $2/autoyast
+	ln -s autoyast.leap $2/autoyast
 fi

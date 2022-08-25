@@ -16,25 +16,20 @@ dynamic behavior and replace with static configuration.
 	      <confirm config:type="boolean">false</confirm>
       </mode>
     </general>
-    %%IFSLE%%
     <add-on>
       <add_on_products config:type="list">
         <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-basesystem</product><product_dir>/Module-Basesystem</product_dir></listentry>
-	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-hpc</product><product_dir>/Module-HPC</product_dir></listentry>
   	    <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-server-applications</product><product_dir>/Module-Server-Applications</product_dir></listentry>
 	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>sle-module-containers</product><product_dir>/Module-Containers</product_dir></listentry>
-	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>SLE_HPC</product><product_dir>/Product-HPC</product_dir></listentry>
+	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>SLES</product><product_dir>/Product-SLES</product_dir></listentry>
 	      <listentry><media_url/><!--INSERT:/tmp/pkgurl--><product>Legacy-Module</product><product_dir>/Module-Legacy</product_dir></listentry>
       </add_on_products>
     </add-on>
-    %%ENDIFSLE%%
     <!--INSERT:/tmp/bootloader.xml-->
     <software>
-       %%IFSLE%%
        <products config:type="list">
-          <product>SLE_HPC</product>
+          <product>SLES</product>
       </products>
-       %%ENDIFSLE%%
       <patterns config:type="list">
         <pattern>base</pattern>
       </patterns>

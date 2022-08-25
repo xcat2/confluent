@@ -192,10 +192,21 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
             return
         if len(pathcomponents) == 3:
             profname = pathcomponents[-1]
-            if operation == 'update' and 'updateboot' in inputdata:
-                osimage.update_boot(profname)
-                yield msg.KeyValueData({'updated': profname})
-                return
+            if operation == 'update':
+                if 'updateboot' in inputdata:
+                    osimage.update_boot(profname)
+                    yield msg.KeyValueData({'updated': profname})
+                    return
+                elif 'rebase' in inputdata:
+                    try:
+                        updated, customized = osimage.rebase_profile(profname)
+                    except osimage.ManifestMissing:
+                        raise exc.InvalidArgumentException('Specified profile {0} does not have a manifest.yaml for rebase'.format(profname))
+                    for upd in updated:
+                        yield msg.KeyValueData({'updated': upd})                        
+                    for cust in customized:
+                        yield msg.KeyValueData({'customized': cust})
+                    return
     if pathcomponents[1] == 'importing':
         if len(pathcomponents) == 2 or not pathcomponents[-1]:
             if operation == 'retrieve':
