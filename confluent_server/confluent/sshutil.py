@@ -78,7 +78,10 @@ class AlreadyExists(Exception):
 def initialize_ca():
     ouid = normalize_uid()
     # if already there, skip, make warning
+    myname = collective.get_myname()
     if os.path.exists('/etc/confluent/ssh/ca.pub'):
+        cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
+        shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
         raise AlreadyExists()
     try:
         os.makedirs('/etc/confluent/ssh', mode=0o700)
@@ -87,7 +90,6 @@ def initialize_ca():
             raise
     finally:
         os.seteuid(ouid)
-    myname = collective.get_myname()
     comment = '{0} SSH CA'.format(myname)
     subprocess.check_call(
         ['ssh-keygen', '-C', comment, '-t', 'ed25519', '-f',
@@ -161,6 +163,7 @@ def sign_host_key(pubkey, nodename, principals=()):
 def initialize_root_key(generate, automation=False):
     authorized = []
     myname = collective.get_myname()
+    alreadyexist = False
     for currkey in glob.glob('/root/.ssh/*.pub'):
         authorized.append(currkey)
     if generate and not authorized and not automation:
@@ -169,12 +172,13 @@ def initialize_root_key(generate, automation=False):
             authorized.append(currkey)
     if automation and generate:
         if os.path.exists('/etc/confluent/ssh/automation'):
-            raise AlreadyExists()
-        subprocess.check_call(
-            ['ssh-keygen', '-t', 'ed25519',
-            '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
-            '-C', 'Confluent Automation by {}'.format(myname)],
-            preexec_fn=normalize_uid)
+            alreadyexist = True
+        else:
+            subprocess.check_call(
+                ['ssh-keygen', '-t', 'ed25519',
+                '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
+                '-C', 'Confluent Automation by {}'.format(myname)],
+                preexec_fn=normalize_uid)
         authorized = ['/etc/confluent/ssh/automation.pub']
     ouid = normalize_uid()
     try:
@@ -198,6 +202,9 @@ def initialize_root_key(generate, automation=False):
                 myname, suffix), 0o644)
         os.chown('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
                 myname, suffix), neededuid, -1)
+    if alreadyexist:
+        raise AlreadyExists()
+
 
 
 def ca_exists():
