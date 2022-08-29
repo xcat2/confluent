@@ -295,7 +295,7 @@ def initialize(cmdset):
         try:
             sshutil.initialize_ca()
         except sshutil.AlreadyExists:
-            emprint('Skipping generation of SSH CA, already present and would likely be more problematic to regenerate than to reuse (if absolutely sure you want to discard old CA, then delete /etc/confluent/ssh/ca*')
+            emprint('Skipping generation of SSH CA, already present and would likely be more problematic to regenerate than to reuse (if absolutely sure you want to discard old CA, then delete /etc/confluent/ssh/ca*)')
     if cmdset.a:
         didsomething = True
         init_confluent_myname()
