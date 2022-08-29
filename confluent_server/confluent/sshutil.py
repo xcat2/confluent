@@ -72,8 +72,14 @@ def get_passphrase():
         phrase = phrase.decode('utf8')
     return phrase
 
+class AlreadyExists(Exception):
+    pass
+
 def initialize_ca():
     ouid = normalize_uid()
+    # if already there, skip, make warning
+    if os.path.exists('/etc/confluent/ssh/ca.pub'):
+        raise AlreadyExists()
     try:
         os.makedirs('/etc/confluent/ssh', mode=0o700)
     except OSError as e:
@@ -162,6 +168,8 @@ def initialize_root_key(generate, automation=False):
         for currkey in glob.glob('/root/.ssh/*.pub'):
             authorized.append(currkey)
     if automation and generate:
+        if os.path.exists('/etc/confluent/ssh/automation'):
+            raise AlreadyExists()
         subprocess.check_call(
             ['ssh-keygen', '-t', 'ed25519',
             '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
