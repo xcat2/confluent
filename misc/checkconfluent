@@ -1,0 +1,114 @@
+#!/usr/bin/python3
+# frequent problems to check/repair
+# confluent_uuid mismatch from /var/lib/confluent/public/site
+# repair would be to set the uuid global to match filesystem for least disruptive change
+# local certificate is missing some addresses
+# repair is osdeploy initialize -t
+
+# automation and/or ca certificates are somehow not viable
+# This may be simple as file not exist or exist but can't be decrypted, or something about the ssh-agent in confluent isn't working
+
+# avoid regenerating ssh ca when not needed, people tend to repeat initialize and this needs to be made harmless.  Instruct user to delete the file if they truly
+#want to start over.
+#
+#
+import os
+import socket
+import glob
+import ssl
+import sys
+import confluent.certutil as certutil
+import confluent.config.configmanager as configmanager
+
+def emprint(txt):
+    if sys.stdout.isatty():
+        print('\x1b[1m\x1b[4m' + txt + '\x1b[0m')
+    else:
+        print(txt)
+
+def deployment_configured():
+    return os.path.exists('/var/lib/confluent/public/site/confluent_uuid')
+
+def webserver_listening():
+    try:
+        conn = socket.create_connection(('localhost', 443))
+        return conn
+    except Exception:
+        return False
+
+
+def certificates_missing_ips(conn):
+    # check if the tls can verify by the right CAs, then further
+    # check if all ip addresses are in the certificate offered
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    for cacert in glob.glob('/var/lib/confluent/public/site/tls/*.pem'):
+        ctx.load_verify_locations(cacert)
+    sock = ctx.wrap_socket(conn)
+    crt = sock.getpeercert()
+    sans = crt.get('subjectAltName', [])
+    ips = certutil.get_ip_addresses()
+    missing_ips = []
+    for ip in ips:
+        for san in sans:
+            field, val = san
+            if val[-1] == '\n':
+                val = val[:-1]
+            if ':' in val:
+                # must normalize ipv6 to a sane value
+                val = socket.getaddrinfo(val, 443, type=socket.SOCK_STREAM)[0][-1][0]
+            if ip == 'val':
+                break
+        else:
+            missing_ips.append(ip)
+    return missing_ips
+
+            
+
+def is_ipv6_enabled():
+    # check for ability to create AF_INET6, for kernel disabled ipv6
+    pass
+    # for every interface with an ipv4 address, check if there's an fe80 as well
+    # warn that os deployment and  discovery services may be impacted for afflicted
+    # interface
+
+# check ssh sanity, are there automation keys and ca keys? can the configmanager
+# keys unlock them?
+
+# check for pxe support, tftp transfer of ipxe file
+
+# check for http access to confluent-public, use site.cpio as file to check?
+
+# check for deployment.useinsecureprotocols=firmware
+
+def uuid_matches():
+    with open('/var/lib/confluent/public/site/confluent_uuid', 'r') as uuidf:
+        fsuuid = uuidf.read()
+    dbuuid = configmanger.get_global('confluent_uuid')
+    return dbuuid == fsuuid:
+    
+    #TODO: osdeploy initialize needs to resync from filesystem at some point,
+
+    #if not confluentuuid:
+    #    confluentuuid = str(uuid.uuid4())
+    #    configmanager.set_global('confluent_uuid', confluentuuid)
+
+if __name__ == '__main__':
+    if deployment_configured():
+        print("OS Deployment: Initialized")
+        if not uuid_matches():
+            #TODO: need a resolution to suggest
+            emprint('UUID inconsistent between confluent database and /var/lib/confluent')
+        conn = webserver_listening()
+        if conn:
+            cert = certificates_missing_ips(conn)
+            if cert:
+                for addr in cert:
+                    emprint('Address missing from certificate: {0}'.format(addr))
+                emprint('Example resolution: osdeploy initialize -t')
+        else:
+            emprint("Web Server: Not Running")
+            emprint("Example resolution: systemctl enable httpd --now")
+    else:
+        print("OS Deployment: Uninitialized")
+    print()
