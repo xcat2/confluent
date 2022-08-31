@@ -125,7 +125,7 @@ def prep_ssh_key(keyname):
     try:
         askpass = os.path.join(tmpdir, 'askpass.sh')
         with open(askpass, 'w') as ap:
-            ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\n')
+            ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\n;rm {0}\n'.format(askpass))
         os.chmod(askpass, 0o700)
         os.environ['CONFLUENT_SSH_PASSPHRASE'] = get_passphrase()
         os.environ['DISPLAY'] = 'NONE'
