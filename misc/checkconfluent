@@ -1,15 +1,7 @@
 #!/usr/bin/python3
 # frequent problems to check/repair
-# confluent_uuid mismatch from /var/lib/confluent/public/site
 # repair would be to set the uuid global to match filesystem for least disruptive change
-# local certificate is missing some addresses
-# repair is osdeploy initialize -t
 
-# automation and/or ca certificates are somehow not viable
-# This may be simple as file not exist or exist but can't be decrypted, or something about the ssh-agent in confluent isn't working
-
-# avoid regenerating ssh ca when not needed, people tend to repeat initialize and this needs to be made harmless.  Instruct user to delete the file if they truly
-#want to start over.
 #
 #
 import os
@@ -17,8 +9,24 @@ import socket
 import glob
 import ssl
 import sys
+import confluent.sshutil as sshutil
 import confluent.certutil as certutil
 import confluent.config.configmanager as configmanager
+import subprocess
+import tempfile
+import shutil
+
+def fprint(txt):
+    sys.stdout.write(txt)
+    sys.stdout.flush()
+
+
+def tftp_works():
+    try:
+        subprocess.check_call(['curl', '--connect-timeout', '2', '-sf', 'tftp://localhost/confluent/x86_64/ipxe.efi', '-o', '/dev/null'])
+        return True
+    except Exception:
+        return False
 
 def emprint(txt):
     if sys.stdout.isatty():
@@ -57,7 +65,7 @@ def certificates_missing_ips(conn):
             if ':' in val:
                 # must normalize ipv6 to a sane value
                 val = socket.getaddrinfo(val, 443, type=socket.SOCK_STREAM)[0][-1][0]
-            if ip == 'val':
+            if ip == val:
                 break
         else:
             missing_ips.append(ip)
@@ -72,43 +80,61 @@ def is_ipv6_enabled():
     # warn that os deployment and  discovery services may be impacted for afflicted
     # interface
 
-# check ssh sanity, are there automation keys and ca keys? can the configmanager
-# keys unlock them?
-
-# check for pxe support, tftp transfer of ipxe file
-
 # check for http access to confluent-public, use site.cpio as file to check?
 
 # check for deployment.useinsecureprotocols=firmware
 
 def uuid_matches():
     with open('/var/lib/confluent/public/site/confluent_uuid', 'r') as uuidf:
-        fsuuid = uuidf.read()
-    dbuuid = configmanger.get_global('confluent_uuid')
-    return dbuuid == fsuuid:
-    
-    #TODO: osdeploy initialize needs to resync from filesystem at some point,
-
-    #if not confluentuuid:
-    #    confluentuuid = str(uuid.uuid4())
-    #    configmanager.set_global('confluent_uuid', confluentuuid)
+        fsuuid = uuidf.read().strip()
+    dbuuid = configmanager.get_global('confluent_uuid')
+    return dbuuid == fsuuid
 
 if __name__ == '__main__':
+    sys.stdout.write('OS Deployment: ')
+    sys.stdout.flush()
     if deployment_configured():
-        print("OS Deployment: Initialized")
-        if not uuid_matches():
+        print("Initialized")
+        sys.stdout.write('Confluent UUID: ')
+        sys.stdout.flush()
+        if uuid_matches():
+            print('Consistent')
+        else:
             #TODO: need a resolution to suggest
-            emprint('UUID inconsistent between confluent database and /var/lib/confluent')
+            emprint('Inconsistent between confluent database and /var/lib/confluent')
+        fprint('Web Server: ')
         conn = webserver_listening()
         if conn:
+            print('Running')
+            fprint('Web Certificate: ')
             cert = certificates_missing_ips(conn)
             if cert:
-                for addr in cert:
-                    emprint('Address missing from certificate: {0}'.format(addr))
-                emprint('Example resolution: osdeploy initialize -t')
+                cert = ', '.join(cert)
+                emprint('Addresses missing from certificate: {0} (Example resolution: osdeploy initialize -t)'.format(cert))
+            else:
+                print('OK')
         else:
-            emprint("Web Server: Not Running")
-            emprint("Example resolution: systemctl enable httpd --now")
+            emprint('Not Running (Example resolution: systemctl enable httpd --now)')
+        fprint('TFTP Status: ')
+        if tftp_works():
+            print('OK')
+        else:
+            emprint('TFTP failure, PXE will not work, though media and HTTP boot can still work. (Example resolution: osdeploy initialize -p)')
+        fprint('SSH root user public key: ')
+        if glob.glob('/var/lib/confluent/public/site/ssh/*.rootpubkey'):
+            print('OK')
+        else:
+            emprint('No trusted ssh keys for root user, passwordless SSH from managers to nodes may not work (Example resolution: osdeploy initialize -u)')
+        if sshutil.sshver() > 7.6:
+            fprint('Checking SSH Certificate authority: ')
+            try:
+                sshutil.prep_ssh_key('/etc/confluent/ssh/ca')
+            except Exception:
+                emprint('Failed to load SSH authority key, deployed servers will not have host certificates for known_hosts and users may be unable to ssh between nodes without a password (Example resolution: osdeploy initialize -s)')            
+            fprint('Checking confluent SSH automation key: ')
+            try:
+                sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+            except subprocess.CalledProcessError:
+                emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
     else:
-        print("OS Deployment: Uninitialized")
-    print()
+        print("Uninitialized, further OS deployment checks skipped, see `osdeploy initialize` to set up OS deployment feature")
