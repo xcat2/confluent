@@ -125,13 +125,13 @@ def prep_ssh_key(keyname):
     try:
         askpass = os.path.join(tmpdir, 'askpass.sh')
         with open(askpass, 'w') as ap:
-            ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\n;rm {0}\n'.format(askpass))
+            ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\nrm {0}\n'.format(askpass))
         os.chmod(askpass, 0o700)
         os.environ['CONFLUENT_SSH_PASSPHRASE'] = get_passphrase()
         os.environ['DISPLAY'] = 'NONE'
         os.environ['SSH_ASKPASS'] = askpass
         with open(os.devnull, 'wb') as devnull:
-            subprocess.check_call(['ssh-add', keyname], stdin=devnull)
+            subprocess.check_output(['ssh-add', keyname], stdin=devnull, stderr=devnull)
         del os.environ['CONFLUENT_SSH_PASSPHRASE']
         ready_keys[keyname] = 1
     finally:
