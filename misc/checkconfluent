@@ -2,8 +2,6 @@
 # frequent problems to check/repair
 # repair would be to set the uuid global to match filesystem for least disruptive change
 
-#
-#
 import os
 import socket
 import glob
@@ -74,7 +72,7 @@ def certificates_missing_ips(conn):
 
 def web_download_works():
     try:
-        subprocess.check_call(['curl', '-skf', 'https://localhost/confluent-public/site/confluent_uuid'])
+        subprocess.check_call(['curl', '-skf', 'https://localhost/confluent-public/site/confluent_uuid', '-o', '/dev/null'])
     except Exception:
         return False
     return True
@@ -122,9 +120,6 @@ def insecure_boot_attempts():
             return True
     return False
 
-# check for http access to confluent-public, use site.cpio as file to check?
-
-# check for deployment.useinsecureprotocols=firmware
 
 def uuid_matches():
     with open('/var/lib/confluent/public/site/confluent_uuid', 'r') as uuidf:
@@ -155,6 +150,11 @@ if __name__ == '__main__':
                 emprint('Addresses missing from certificate: {0} (Example resolution: osdeploy initialize -t)'.format(cert))
             else:
                 print('OK')
+                fprint('Checking web download: ')
+                if web_download_works():
+                    print('OK')
+                else:
+                    emprint('Failed to download /confluent-public/site/confluent_uuid')
         else:
             emprint('Not Running (Example resolution: systemctl enable httpd --now)')
         fprint('TFTP Status: ')
