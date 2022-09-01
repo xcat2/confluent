@@ -1,6 +1,4 @@
 #!/usr/bin/python3
-# frequent problems to check/repair
-# repair would be to set the uuid global to match filesystem for least disruptive change
 
 import os
 import socket
@@ -137,8 +135,7 @@ if __name__ == '__main__':
         if uuid_matches():
             print('Consistent')
         else:
-            #TODO: need a resolution to suggest
-            emprint('Inconsistent between confluent database and /var/lib/confluent')
+            emprint('Inconsistent between confluent database and /var/lib/confluent (Example resolution: confetty set /uuid resync=1)')
         fprint('Web Server: ')
         conn = webserver_listening()
         if conn:

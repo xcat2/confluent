@@ -1246,6 +1246,10 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     elif pathcomponents[0] == 'version':
         return (msg.Attributes(kv={'version': confluent.__version__}),)
     elif pathcomponents[0] == 'uuid':
+        if operation == 'update':
+             with open('/var/lib/confluent/public/site/confluent_uuid', 'r') as uuidf:
+                fsuuid = uuidf.read().strip()
+                cfm.set_global('confluent_uuid', fsuuid)
         return (msg.Attributes(kv={'uuid': cfm.get_global('confluent_uuid')}),)
     elif pathcomponents[0] == 'usergroups':
         # TODO: when non-administrator accounts exist,
