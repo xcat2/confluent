@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -52,7 +52,7 @@ class GetInput(threading.Thread):
         global pendingoutput
         while True:
             try:
-                 pendingoutput = raw_input('')
+                 pendingoutput = input('')
             except EOFError:
                  pendingoutput = False
                  break
@@ -66,12 +66,12 @@ while True:
     except select.error:
         continue
     if conn in r:
-        sys.stdout.write(conn.recv(1))
+        sys.stdout.write(conn.recv(1).decode('utf8'))
     if pendingoutput is not None:
         if pendingoutput is False:
             conn.shutdown(socket.SHUT_WR)
             sys.exit(1)
         else:
-            conn.sendall(pendingoutput + '\n')
+            conn.sendall((pendingoutput + '\n').encode('utf8'))
         pendingoutput = None
     sys.stdout.flush()
