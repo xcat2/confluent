@@ -189,6 +189,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                             continue
                         recent_peers.add(peer)
                         mac = neighutil.get_hwaddr(peer[0])
+                        if mac == False:
+                            # neighutil determined peer ip is not local, skip attempt
+                            # to probe and critically, skip growing deferrednotifiers
+                            continue
                         if not mac:
                             probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
                             try:
