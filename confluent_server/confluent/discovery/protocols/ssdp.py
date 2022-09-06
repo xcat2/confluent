@@ -142,6 +142,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                     event=log.Events.stacktrace)
     known_peers = set([])
+    recent_peers = set([])
     net6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     for ifidx in util.list_interface_indexes():
@@ -171,10 +172,13 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             r = select.select((net4, net6), (), (), 60)
             if r:
                 r = r[0]
+            recent_peers = set([])
             while r:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
                     if rsp[:4] == b'PING':
+                        continue
+                    if peer in recent_peers:
                         continue
                     rsp = rsp.split(b'\r\n')
                     if b' ' not in rsp[0]:
@@ -183,6 +187,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     if method == b'NOTIFY':
                         if peer in known_peers:
                             continue
+                        recent_peers.add(peer)
                         mac = neighutil.get_hwaddr(peer[0])
                         if not mac:
                             probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]

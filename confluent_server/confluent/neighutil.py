@@ -16,6 +16,7 @@
 
 # A consolidated manage of neighbor table information management.
 
+import confluent.netutil as netutil
 import confluent.util as util
 import os
 import eventlet.semaphore as semaphore
@@ -96,7 +97,7 @@ def get_hwaddr(ipaddr):
             _update_neigh()
             updated = True
         hwaddr = neightable.get(ipaddr, None)
-        if not hwaddr and not updated:
+        if not hwaddr and not updated and netutil.ip_is_local(ipaddr):
             _update_neigh()
             hwaddr = neightable.get(ipaddr, None)
     if hwaddr:

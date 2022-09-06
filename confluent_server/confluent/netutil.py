@@ -84,6 +84,19 @@ def ip_on_same_subnet(first, second, prefix):
     return ip & mask == oip & mask
 
 
+def ip_is_local(ipaddr):
+    fam, _, _, _, ainfo = socket.getaddrinfo(ipaddr, 0, proto=socket.IPPROTO_UDP)[0]
+    ipn = socket.inet_pton(fam, ainfo[0])
+    if fam == socket.AF_INET6 and ipn.startswith(b'\xfe\x80'):
+        return True
+    for addr in get_my_addresses():
+        if fam != addr[0]:
+            continue
+        if ipn_on_same_subnet(addr[0], ipn, addr[1], addr[2]):
+            return True
+    return False
+
+
 def address_is_local(address):
     for iface in netifaces.interfaces():
         for i4 in netifaces.ifaddresses(iface).get(2, []):
