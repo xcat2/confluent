@@ -173,7 +173,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             if r:
                 r = r[0]
             recent_peers = set([])
-            while r:
+            while r and len(deferrednotifies) < 256:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
                     if rsp[:4] == b'PING':

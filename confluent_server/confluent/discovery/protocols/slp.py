@@ -482,7 +482,7 @@ def snoop(handler, protocol=None):
             known_peers = set([])
             peerbymacaddress = {}
             deferpeers = []
-            while r:
+            while r and len(deferpeers) < 256:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
                     if peer in known_peers:
