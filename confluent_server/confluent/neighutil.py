@@ -97,7 +97,7 @@ def get_hwaddr(ipaddr):
             _update_neigh()
             updated = True
         hwaddr = neightable.get(ipaddr, None)
-        if not hwaddr and not netutil.ip_is_local(ipaddr):
+        if not hwaddr and not netutil.ipn_is_local(ipaddr):
             hwaddr = False
         if hwaddr == None and not updated:
             _update_neigh()
