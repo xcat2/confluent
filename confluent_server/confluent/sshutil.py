@@ -82,6 +82,7 @@ def initialize_ca():
     if os.path.exists('/etc/confluent/ssh/ca.pub'):
         cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
         shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
+        os.seteuid(ouid)
         raise AlreadyExists()
     try:
         os.makedirs('/etc/confluent/ssh', mode=0o700)
