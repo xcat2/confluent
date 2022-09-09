@@ -1,0 +1,21 @@
+Name: confluent-client
+Project: https://hpc.lenovo.com/users/
+Source: https://github.com/lenovo/confluent
+
+Files: *
+Copyright: 2014-2019 Lenovo
+License: Apache-2.0
+
+File: client.py:
+Copyright: 2014 IBM Corporation
+           2015-2019 Lenovo
+License: Apache-2.0
+
+File: sortutil.py
+Copyright: 2014 IBM Corporation
+           2015-2016 Lenovo
+License: Apache-2.0
+
+File: tlv.py
+Copyright: 2014 IBM Corporation
+License: Apache-2.0

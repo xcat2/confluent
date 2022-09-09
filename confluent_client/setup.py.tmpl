@@ -2,7 +2,7 @@ from setuptools import setup
 import os
 
 data_files = [('/etc/profile.d', ['confluent_env.sh', 'confluent_env.csh']),
-              ('/opt/confluent/share/licenses/confluent_client/', ['LICENSE'])
+              ('/opt/confluent/share/licenses/confluent_client/', ['LICENSE', 'COPYRIGHT'])
               ]
 try:
     scriptlist = ['bin/{0}'.format(d) for d in os.listdir('bin/')]
