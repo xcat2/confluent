@@ -79,14 +79,14 @@ class NodeHandler(generic.NodeHandler):
                 self.trieddefault = True
                 if '555' in rsp:
                     passchange = {
-                        'Password': self.targpass, 
+                        'Password': self.targpass,
                         'RetypePassword': self.targpass,
                         'param': 4,
                         'default_password': self.DEFAULT_PASS,
                         'username': self.DEFAULT_USER
                         }
                     if authmode == 2:
-                        passchange = {
+                        rpasschange = {
                             'Password': self.targpass,
                         }
                         rwc =  webclient.SecureHTTPConnection(
@@ -98,12 +98,15 @@ class NodeHandler(generic.NodeHandler):
                         rwc.set_header('Content-Type', 'application/json')
                         rsp, status = rwc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/1',
-                            passchange, method='PATCH')
+                            rpasschange, method='PATCH')
                         if status >= 200 and status < 300:
                             authdata['password'] = self.targpass
                             eventlet.sleep(10)
                         else:
-                            raise Exception("Redfish may not have been ready yet")
+                            if b'[web.lua] Error in RequestHandler, thread' in rsp:
+                                rsp, status = wc.grab_json_response_with_status('/api/reset-pass', passchange)
+                            else:
+                                raise Exception("Redfish may not have been ready yet" + repr(rsp))
                     else:
                         rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
                     authdata['password'] = self.targpass
