@@ -186,7 +186,14 @@ def handle_request(env, start_response):
             rb['addresses'] = [(newhost, newport)]
             rb['forwarder_url'] = targurl
             rb['forwarder_server'] = nodename
-            ssdp.check_fish(('/DeviceDescription.json', rb), newport, verify_cert)
+            if rb['type'] == 'lenovo-xcc':
+                ssdp.check_fish(('/DeviceDescription.json', rb), newport, verify_cert)
+            elif rb['type'] == 'lenovo-smm2':
+                rb['services'] = ['service:lenovo-smm2']
+            else:
+                start_response('400 Unsupported Device', [])
+                yield 'Unsupported device for remote discovery registration'
+                return
         disco.detected(rb)
         start_response('200 OK', [])
         yield 'Registered'
