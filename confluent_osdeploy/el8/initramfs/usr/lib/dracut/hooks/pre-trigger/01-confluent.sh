@@ -38,6 +38,55 @@ umask 0077
 mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
+if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    tmnt=$(mktemp -d)
+    tcfg=$(mktemp)
+    mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
+    cd $tmnt
+    deploysrvs=$(sed -n '/^deploy_servers:/, /^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+    nodename=$(grep ^nodename: cnflnt.yml|awk '{print $2}')
+    sed -n '/^net_cfgs:/, /^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/, /^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
+    autoconfigmethod=$(grep ^ipv4_method: $tcfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+    if [ "$autoconfigmethod" = "dhcp" ]; then
+        /usr/libexec/nm-initrd-generator ip=:dhcp
+    else
+        v4addr=$(grep ^ipv4_address: $tcfg)
+        v4addr=${v4addr#ipv4_address: }
+        v4addr=${v4addr%/*}
+        v4gw=$(grep ^ipv4_gateway: $tcfg)
+        v4gw=${v4gw#ipv4_gateway: }
+        if [ "$v4gw" = "null" ]; then
+            v4gw=""
+        fi
+        v4nm=$(grep ipv4_netmask: $tcfg)
+        v4nm=${v4nm#ipv4_netmask: }
+        /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname::none
+    fi
+    NetworkManager --configure-and-quit=initrd --no-daemon
+    hmackeyfile=$(mktemp)
+    echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
+    cd -
+    umount $tmnt
+    passfile=$(mktemp)
+    passcrypt=$(mktemp)
+    hmacfile=$(mktemp)
+    ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
+    /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+    for deployer in $deploysrvs; do
+        if curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt -k https://$deployer/confluent-api/self/registerapikey; then
+            cp $passfile /etc/confluent/confluent.apikey
+            confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+            curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+            curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/profileprivate/pending/config.ign > /config.ign
+            [ -s /config.ign ] || rm /config.ign
+            confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg)
+            confluent_profile=${confluent_profile#profile: }
+            curl -sf https://$deployer/confluent-public/os/$confluent_profile/rootfs.img | rdcore stream-hash /etc/coreos-live-want-rootfs | bsdtar -xf - -C /
+            exit 0
+        fi
+    done
+fi
 cd /sys/class/net
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
     TRIES=$((TRIES + 1))
