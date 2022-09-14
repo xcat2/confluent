@@ -38,6 +38,9 @@ umask 0077
 mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
+while [ ! -e /dev/disk ]; do
+    sleep 2
+done
 if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     tmnt=/tmp/idntmnt
     mkdir -p $tmnt
@@ -90,16 +93,18 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     done
 fi
 cd /sys/class/net
-while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
-    TRIES=$((TRIES + 1))
-    for currif in *; do
-        echo 0 > /proc/sys/net/ipv6/conf/${currif}/autoconf
-        ip link set $currif up
+if ! grep MANAGER: /etc/confluent/confluent.info; then
+    while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+        TRIES=$((TRIES + 1))
+        for currif in *; do
+            echo 0 > /proc/sys/net/ipv6/conf/${currif}/autoconf
+            ip link set $currif up
+        done
+        /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
     done
-    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
-done
+    grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
+fi
 cd /
-grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
 echo -n "" > /tmp/confluent.initq
 # restart cmdline
 echo -n "" > /etc/cmdline.d/01-confluent.conf
