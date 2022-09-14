@@ -85,7 +85,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         if curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt -k https://$deployer/confluent-api/self/registerapikey; then
             cp $passfile /etc/confluent/confluent.apikey
             confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-            curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+            curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
             confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg)
             confluent_profile=${confluent_profile#profile: }
             break
@@ -122,10 +122,15 @@ while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self
 	sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx)
-ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
-ifname=${ifname%:}
-ifname=${ifname%@*}
-echo $ifname > /tmp/net.ifaces
+if [ ! -z "$ifidx" ]; then
+    ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+    ifname=${ifname%:}
+    ifname=${ifname%@*}
+    echo $ifname > /tmp/net.ifaces
+else
+    ip -br a|grep UP|awk '{print $1}' > /tmp/net.ifaces
+    ifname=$(cat /tmp/net.ifaces)
+fi
 
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
