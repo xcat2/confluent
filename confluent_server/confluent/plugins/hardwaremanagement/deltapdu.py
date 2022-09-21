@@ -155,7 +155,9 @@ class PDUClient(object):
         if not username or not passwd:
             raise Exception('Missing username or password')
         body = 'User={0}&Password={1}&B1=Login'.format(username, passwd)
-        self.wc.grab_response('/login.htm', body)
+        rsp = self.wc.grab_response('/login.htm', body)
+        if b'Incorrect User Name' in rsp[0]:
+            raise exc.TargetEndpointBadCredentials()
 
 
     def logout(self):
@@ -184,8 +186,12 @@ def retrieve(nodes, element, configmanager, inputdata):
             yield  msg.ConfluentResourceUnavailable(node, 'Not implemented')
         return
     for node in nodes:
-        gc = PDUClient(node, configmanager)
-        state = gc.get_outlet(element[-1])
+        try:
+            gc = PDUClient(node, configmanager)
+            state = gc.get_outlet(element[-1])
+        except exc.TargetEndpointBadCredentials:
+            yield msg.ConfluentTargetInvalidCredentials(node)
+            continue
         yield msg.PowerState(node=node, state=state)
         gc.logout()
 

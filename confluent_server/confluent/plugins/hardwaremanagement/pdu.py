@@ -39,10 +39,13 @@ def retrieve(nodes, element, configmanager, inputdata):
             for pgroup in outlets[node]:
                 pdu = outlets[node][pgroup]['pdu']
                 outlet = outlets[node][pgroup]['outlet']
-                for rsp in core.handle_path(
-                        '/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
-                        'retrieve', configmanager):
-                    yield msg.KeyValueData({pgroup: rsp.kvpairs['state']['value']}, node)
+                try:
+                    for rsp in core.handle_path(
+                            '/nodes/{0}/power/outlets/{1}'.format(pdu, outlet),
+                            'retrieve', configmanager):
+                        yield msg.KeyValueData({pgroup: rsp.kvpairs['state']['value']}, node)
+                except exc.TargetEndpointBadCredentials:
+                    yield msg.ConfluentTargetInvalidCredentials(pdu)
 
 def get_outlets(nodes, emebs, inletname):
     outlets = {}
