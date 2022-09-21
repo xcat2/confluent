@@ -1,0 +1,11 @@
+TPM 2 DA (Dictionary Attack) protection triggers on 'unclean' reboots.
+
+If it has been tripped already:
+echo 5 > /sys/class/tpm/tpm0/ppi/request
+
+Then reboot to resume normal operation
+
+To configure DA:
+tpm2_dictionarylockout --setup-parameters --max-tries=4294967295 --clear-lockout 
+
+Further, TPMA_OBJECT_NODA attribute may be useful, see https://github.com/systemd/systemd/issues/20668
