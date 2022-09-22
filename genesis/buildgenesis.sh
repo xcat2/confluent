@@ -18,11 +18,26 @@ rm -rf $tdir
 cp $tfile rpmlist
 cp confluent-genesis.spec confluent-genesis-out.spec
 for lic in $(python3 getlicenses.py rpmlist); do
-	lo=${lic#/usr/share/}
-	lo=${lo#licenses/}
-	mkdir -p licenses/$(dirname $lo)
-	cp $lic licenses/$lo
-	echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
+    lo=${lic#/usr/share/}
+    lo=${lo#licenses/}
+    fname=$(basename $lo)
+    if [[ "$lo" == *"-lib"* ]]; then
+        lo=${lo/-*}
+    elif [[ "$lo" == "device-mapper-"* ]]; then
+	lo=${lo/-*}-mapper
+    elif [[ "$lo" == "bind-"* ]]; then
+	lo=${lo/-*}
+    elif [[ "$lo" == "iproute-"* ]]; then
+	lo=${lo/-*}
+    fi
+    dlo=$(dirname $lo)
+    mkdir -p licenses/$dlo
+    cp $lic licenses/$lo
+    if [ "$fname" == "lgpl-2.1.txt" ]; then
+        mv licenses/$lo licenses/$dlo/COPYING.LIB
+        lo=$dlo/COPYING.LIB
+    fi
+    echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
 done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
