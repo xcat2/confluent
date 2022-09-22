@@ -21,22 +21,22 @@ for lic in $(python3 getlicenses.py rpmlist); do
     lo=${lic#/usr/share/}
     lo=${lo#licenses/}
     fname=$(basename $lo)
-    if [[ "$lo" == *"-lib"* ]]; then
-        lo=${lo/-*}
-    elif [[ "$lo" == "device-mapper-"* ]]; then
-	lo=${lo/-*}-mapper
-    elif [[ "$lo" == "bind-"* ]]; then
-	lo=${lo/-*}
-    elif [[ "$lo" == "iproute-"* ]]; then
-	lo=${lo/-*}
-    fi
     dlo=$(dirname $lo)
-    mkdir -p licenses/$dlo
-    cp $lic licenses/$lo
-    if [ "$fname" == "lgpl-2.1.txt" ]; then
-        mv licenses/$lo licenses/$dlo/COPYING.LIB
-        lo=$dlo/COPYING.LIB
+    if [[ "$dlo" == *"-lib"* ]]; then
+        dlo=${dlo/-*}
+    elif [[ "$dlo" == "device-mapper-"* ]]; then
+	dlo=${dlo/-*}-mapper
+    elif [[ "$dlo" == "bind-"* ]]; then
+	dlo=${dlo/-*}
+    elif [[ "$dlo" == "iproute-"* ]]; then
+	dlo=${dlo/-*}
     fi
+    mkdir -p licenses/$dlo
+    if [ "$fname" == "lgpl-2.1.txt" ]; then
+	fname=COPYING.LIB
+    fi
+    cp $lic licenses/$dlo/$fname
+    lo=$dlo/$fname
     echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
 done
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
