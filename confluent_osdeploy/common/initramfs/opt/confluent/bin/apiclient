@@ -259,12 +259,17 @@ class HTTPSClient(client.HTTPConnection, object):
                         host, mgtiface, havedefault = extinfo[:3]
                     if havedefault == '0' and extinfo[2] == '1':
                         host, mgtiface, havedefault = extinfo[:3]
-                if '%' in host:
-                    ifidx = host.split('%', 1)[1]
-                    with open('/tmp/confluent.ifidx', 'w+') as ifout:
-                        ifout.write(ifidx)
-                if host:
-                    self.hosts.append(host)
+                        if '%' in host:
+                            ifidx = host.split('%', 1)[1]
+                            with open('/tmp/confluent.ifidx', 'w+') as ifout:
+                                ifout.write(ifidx)    
+                    if host:
+                        if havedefault == '0':
+                            if '%' in host:
+                                ifidx = host.split('%', 1)[1]
+                                with open('/tmp/confluent.ifidx', 'w+') as ifout:
+                                    ifout.write(ifidx)
+                        self.hosts.append(host)
             try:
                 info = open('/etc/confluent/confluent.deploycfg').read().split('\n')
             except Exception:
