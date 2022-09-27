@@ -560,6 +560,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 if gw is None or not gw:
                     continue
                 gwn = socket.inet_pton(fam, gw)
+                ip = socket.getaddrinfo(ip, 0, proto=socket.IPPROTO_TCP, family=fam)[-1][-1][0]
                 ipn = socket.inet_pton(fam, ip)
                 if ipn_on_same_subnet(fam, ipn, gwn, prefix):
                     cfgdata['ipv{}_gateway'.format(nver)] = gw
