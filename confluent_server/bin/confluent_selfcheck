@@ -217,13 +217,15 @@ if __name__ == '__main__':
         print("Uninitialized, further OS deployment checks skipped, see `osdeploy initialize` to set up OS deployment feature")
     if args.node:
         print("Performing node checks for '{}'".format(args.node))
-        print("Checking node attributes in confluent: ")
+        print("Checking node attributes in confluent...")
         sess = client.Command()
+        allok = True
         uuidok = False
         macok = False
         for rsp in sess.read(f'/nodes/{args.node}/attributes/all'):
             if rsp.get('errorcode', None) == 404:
                 emprint(f'There is no node named "{args.node}"')
+                allok = False
                 uuidok = True  # not really, but suppress the spurious error
             uuid = rsp.get('id.uuid', {}).get('value', None)
             if uuid:
@@ -234,7 +236,10 @@ if __name__ == '__main__':
                     if mac:
                         macok = trusted
         if not uuidok and not macok:
+            allok = False
             emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
+        if allok:
+            print(f'No issues detected with attributes of {args.node}')
         fprint("Checking name resolution: ")
         lk = eventlet.spawn(lookup_node, args.node)
         eventlet.sleep(0.1)
