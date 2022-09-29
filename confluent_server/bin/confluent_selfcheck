@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import os
 import socket
 import glob
@@ -16,6 +17,9 @@ import confluent.config.configmanager as configmanager
 import subprocess
 import tempfile
 import shutil
+import eventlet.green.socket as socket
+import eventlet
+import greenlet
 
 def fprint(txt):
     sys.stdout.write(txt)
@@ -130,7 +134,21 @@ def uuid_matches():
     dbuuid = configmanager.get_global('confluent_uuid')
     return dbuuid == fsuuid
 
+def lookup_node(node):
+    try:
+        return socket.getaddrinfo(node, 0)
+    except greenlet.GreenletExit:
+        return None
+    except Exception:
+        return None
+
 if __name__ == '__main__':
+    ap = argparse.ArgumentParser(description='Run configuration checks for a system running confluent service')
+    ap.add_argument('-n', '--node', help='A node name to run node specific checks against')
+    args, extra = ap.parse_known_args(sys.argv)
+    if len(extra) > 1:
+        ap.print_help()
+        sys.exit(1)
     sys.stdout.write('OS Deployment: ')
     sys.stdout.flush()
     if deployment_configured():
@@ -196,3 +214,24 @@ if __name__ == '__main__':
             print('OK')
     else:
         print("Uninitialized, further OS deployment checks skipped, see `osdeploy initialize` to set up OS deployment feature")
+    if args.node:
+        print("Performing node checks for '{}'".format(args.node))
+        fprint("Checking name resolution: ")
+        lk = eventlet.spawn(lookup_node, args.node)
+        eventlet.sleep(0.1)
+        tries = 5
+        while not lk.dead and tries > 0:
+            eventlet.sleep(1)
+            tries -= 1
+        deaddns = False
+        if not tries:
+            emprint('Name resolution takes too long, check state of /etc/resolv.conf and indicated nameservers, this can produce failure to netboot or failure to commence installation')
+            lk.kill()
+            deaddns = True
+        result = lk.wait()
+        if not result and not deaddns:
+            emprint('Name resolution failed for node, it is normally a good idea for the node name to resolve to an IP')
+        if result:
+            print("OK")
+    else:
+        print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
