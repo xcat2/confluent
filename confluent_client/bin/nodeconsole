@@ -55,7 +55,6 @@ if options.log:
     sys.exit(0)
 #added functionality for wcons
 if options.wcons:
-    null = open('/dev/null', 'w')
     nodes = []
     sess = client.Command()
     for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
