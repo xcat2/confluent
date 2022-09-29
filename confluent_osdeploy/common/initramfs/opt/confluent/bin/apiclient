@@ -255,14 +255,14 @@ class HTTPSClient(client.HTTPConnection, object):
                 if line.startswith('EXTMGRINFO:'):
                     extinfo = line.split(' ')[1]
                     extinfo = extinfo.split('|')
-                    if not mgtiface:
-                        host, mgtiface, havedefault = extinfo[:3]
                     if havedefault == '0' and extinfo[2] == '1':
                         host, mgtiface, havedefault = extinfo[:3]
                         if '%' in host:
                             ifidx = host.split('%', 1)[1]
                             with open('/tmp/confluent.ifidx', 'w+') as ifout:
                                 ifout.write(ifidx)    
+                    if not mgtiface:
+                        host, mgtiface, havedefault = extinfo[:3]
                     if host:
                         if havedefault == '0':
                             if '%' in host:
