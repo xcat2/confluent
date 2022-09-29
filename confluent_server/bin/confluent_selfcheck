@@ -13,6 +13,7 @@ if path.startswith('/opt'):
     sys.path.append(path)
 import confluent.sshutil as sshutil
 import confluent.certutil as certutil
+import confluent.client as client
 import confluent.config.configmanager as configmanager
 import subprocess
 import tempfile
@@ -69,7 +70,7 @@ def certificates_missing_ips(conn):
                 val = val[:-1]
             if ':' in val:
                 # must normalize ipv6 to a sane value
-                val = socket.getaddrinfo(val, 443, type=socket.SOCK_STREAM)[0][-1][0]
+                val = socket.getaddrinfo(val, 443, proto=socket.IPPROTO_TCP)[0][-1][0]
             if ip == val:
                 break
         else:
@@ -216,6 +217,24 @@ if __name__ == '__main__':
         print("Uninitialized, further OS deployment checks skipped, see `osdeploy initialize` to set up OS deployment feature")
     if args.node:
         print("Performing node checks for '{}'".format(args.node))
+        print("Checking node attributes in confluent: ")
+        sess = client.Command()
+        uuidok = False
+        macok = False
+        for rsp in sess.read(f'/nodes/{args.node}/attributes/all'):
+            if rsp.get('errorcode', None) == 404:
+                emprint(f'There is no node named "{args.node}"')
+                uuidok = True  # not really, but suppress the spurious error
+            uuid = rsp.get('id.uuid', {}).get('value', None)
+            if uuid:
+                uuidok = True
+            for key in rsp:
+                if key.endswith('.hwaddr'):
+                    mac = rsp[key].get('value', None)
+                    if mac:
+                        macok = trusted
+        if not uuidok and not macok:
+            emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
         fprint("Checking name resolution: ")
         lk = eventlet.spawn(lookup_node, args.node)
         eventlet.sleep(0.1)
