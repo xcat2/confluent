@@ -85,6 +85,16 @@ def web_download_works():
         return False
     return True
             
+def web_api_works():
+    try:
+        res = subprocess.check_output(['curl', '-X', 'GET', '-Isk', 'https://localhost/confluent-api/'])
+        res = res.split(b'\n')[0]
+        if b'401' in res:
+            return True
+        return False
+    except Exception:
+        return False
+    return True
 
 def nics_missing_ipv6():
     # check for ability to create AF_INET6, for kernel disabled ipv6
@@ -176,6 +186,11 @@ if __name__ == '__main__':
                     print('OK')
                 else:
                     emprint('Failed to download /confluent-public/site/confluent_uuid')
+                fprint('Checking web API access: ')
+                if web_api_works():
+                    print('OK')
+                else:
+                    emprint('Failed access, if selinux is enabled, `setsebool -P httpd_can_network_connect=1`, otherwise check web proxy configuration')
         else:
             emprint('Not Running (Example resolution: systemctl enable httpd --now)')
         fprint('TFTP Status: ')
