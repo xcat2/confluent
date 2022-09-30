@@ -245,6 +245,10 @@ if __name__ == '__main__':
             uuid = rsp.get('id.uuid', {}).get('value', None)
             if uuid:
                 uuidok = True
+            if 'deployment.useinsecureprotocols' in rsp:
+                insec = rsp.get('deployment.useinsecureprotocols', {}).get('value', None):
+                if insec != 'firmware':
+                    emprint(f'{args.node} does not have deployment.useinsecureprotocols set to firmware. This is fine for USB boot. HTTP boot can work, but requires the deployment server CA certificates be provisioned to the UEFI first.  PXE and HTTP boot without preprovisioned certificates will fail.')
             for key in rsp:
                 if key.endswith('.hwaddr'):
                     mac = rsp[key].get('value', None)
