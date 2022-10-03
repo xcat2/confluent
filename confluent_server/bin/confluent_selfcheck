@@ -253,7 +253,7 @@ if __name__ == '__main__':
                 if key.endswith('.hwaddr'):
                     mac = rsp[key].get('value', None)
                     if mac:
-                        macok = trusted
+                        macok = True
         if not uuidok and not macok:
             allok = False
             emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
@@ -278,3 +278,6 @@ if __name__ == '__main__':
             print("OK")
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
+# possible checks:
+# arping on the node, check for dupes/against nodeinventory?
+# arping -D for mgt own ip addresses? check for dupes, also check for bleed through from one nic to another
