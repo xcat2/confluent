@@ -38,8 +38,10 @@ umask 0077
 mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
-while [ ! -e /dev/disk ]; do
+TRIES=5
+while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
     sleep 2
+    TRIES=$((TRIES - 1))
 done
 if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     tmnt=/tmp/idntmnt
