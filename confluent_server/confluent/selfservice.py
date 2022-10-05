@@ -70,6 +70,7 @@ def handle_request(env, start_response):
     configmanager.check_quorum()
     cfg = configmanager.ConfigManager(None)
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
+    clientip = env.get('HTTP_X_FORWARDED_FOR', None)
     if env['PATH_INFO'] == '/self/registerapikey':
         crypthmac = env.get('HTTP_CONFLUENT_CRYPTHMAC', None)
         if int(env.get('CONTENT_LENGTH', 65)) > 64:
@@ -459,8 +460,11 @@ def handle_request(env, start_response):
             return
     elif env['PATH_INFO'].startswith('/self/remotesyncfiles'):
         if 'POST' == operation:
+            pals = get_extra_names(nodename, cfg, myip)
+            if clientip not in pals:
+                clientip = None
             result = syncfiles.start_syncfiles(
-                nodename, cfg, json.loads(reqbody))
+                nodename, cfg, json.loads(reqbody), clientip)
             start_response(result, ())
             yield ''
             return

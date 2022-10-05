@@ -281,3 +281,4 @@ if __name__ == '__main__':
 # possible checks:
 # arping on the node, check for dupes/against nodeinventory?
 # arping -D for mgt own ip addresses? check for dupes, also check for bleed through from one nic to another
+# iterate through profiles, use mtools to extract site initramfs, check if outdated

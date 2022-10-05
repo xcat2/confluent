@@ -162,7 +162,7 @@ class SyncList(object):
                 self.optmap[f] = entopts
 
 
-def sync_list_to_node(sl, node, suffixes):
+def sync_list_to_node(sl, node, suffixes, peerip=None):
     targdir = tempfile.mkdtemp('.syncto{}'.format(node))
     output = ''
     try:
@@ -187,8 +187,11 @@ def sync_list_to_node(sl, node, suffixes):
                 stage_ent(sl.appendoncemap, ent,
                           os.path.join(targdir, suffixes['appendonce']), True)
         sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+        targip = node
+        if peerip:
+            targip = peerip
         output = util.run(
-            ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(node)])[0]
+            ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(targip)])[0]
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
             # https://github.com/eventlet/eventlet/issues/413
@@ -275,7 +278,7 @@ def mkpathorlink(source, destination, appendexist=False):
 syncrunners = {}
 
 
-def start_syncfiles(nodename, cfg, suffixes):
+def start_syncfiles(nodename, cfg, suffixes, peerip=None):
     deployinfo = cfg.get_node_attributes(
         nodename, ('deployment.*',))
     deployinfo = deployinfo.get(nodename, {})
@@ -296,7 +299,7 @@ def start_syncfiles(nodename, cfg, suffixes):
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
         return '200 OK'  # the synclist has no actual entries
     syncrunners[nodename] = eventlet.spawn(
-        sync_list_to_node, sl, nodename, suffixes)
+        sync_list_to_node, sl, nodename, suffixes, peerip)
     return '202 Queued' # backgrounded
 
 def get_syncresult(nodename):
