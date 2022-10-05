@@ -3,9 +3,9 @@ import importlib
 import tempfile
 import json
 import os
+import shutil
 import pwd
 import grp
-import shutil
 try:
     from importlib.machinery import SourceFileLoader
     def load_source(mod, path):
@@ -17,6 +17,7 @@ try:
     apiclient = load_source('apiclient', '/opt/confluent/bin/apiclient')
 except IOError:
     apiclient = load_source('apiclient', '/etc/confluent/apiclient')
+
 
 
 def partitionhostsline(line):
@@ -271,6 +272,7 @@ def synchronize():
                         os.chown(fname, uid, gid)
     finally:
         shutil.rmtree(tmpdir)
+        shutil.rmtree(appendoncedir)
 
 
 if __name__ == '__main__':
