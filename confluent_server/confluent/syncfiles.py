@@ -278,7 +278,15 @@ def mkpathorlink(source, destination, appendexist=False):
 syncrunners = {}
 
 
-def start_syncfiles(nodename, cfg, suffixes, peerip=None):
+def start_syncfiles(nodename, cfg, suffixes, principals=[]):
+    peerip = None
+    if 'myips' in suffixes:
+        targips = suffixes['myips']
+        del suffixes['myips']
+        for targip in targips:
+            if targip in principals:
+                peerip = targip
+                break
     deployinfo = cfg.get_node_attributes(
         nodename, ('deployment.*',))
     deployinfo = deployinfo.get(nodename, {})

@@ -461,10 +461,8 @@ def handle_request(env, start_response):
     elif env['PATH_INFO'].startswith('/self/remotesyncfiles'):
         if 'POST' == operation:
             pals = get_extra_names(nodename, cfg, myip)
-            if clientip not in pals:
-                clientip = None
             result = syncfiles.start_syncfiles(
-                nodename, cfg, json.loads(reqbody), clientip)
+                nodename, cfg, json.loads(reqbody), pals)
             start_response(result, ())
             yield ''
             return

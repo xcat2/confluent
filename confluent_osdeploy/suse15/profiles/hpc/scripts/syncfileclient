@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/python3
+import subprocess
 import importlib
 import tempfile
 import json
@@ -211,7 +212,20 @@ def synchronize():
     appendoncedir = tempfile.mkdtemp()
     try:
         ac = apiclient.HTTPSClient()
-        data = json.dumps({'merge': tmpdir, 'appendonce': appendoncedir})
+        myips = []
+        ipaddrs = subprocess.check_output(['ip', '-br', 'a']).split(b'\n')
+        for line in ipaddrs:
+            isa = line.split()
+            if len(isa) < 3 or isa[1] != b'UP':
+                continue
+            for addr in isa[2:]:
+                if addr.startswith(b'fe80::') or addr.startswith(b'169.254'):
+                    continue
+                addr = addr.split(b'/')[0]
+                if not isinstance(addr, str):
+                    addr = addr.decode('utf8')
+                myips.append(addr)
+        data = json.dumps({'merge': tmpdir, 'appendonce': appendoncedir, 'myips': myips})
         status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles', data)
         if status == 202:
             lastrsp = ''
