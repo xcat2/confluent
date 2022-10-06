@@ -451,7 +451,7 @@ def wsock_handler(ws):
     mythreadid = greenlet.getcurrent()
     httpsessions[sessid]['inflight'].add(mythreadid)
     name = httpsessions[sessid]['name']
-    authdata = auth.authorize(name, ws.path)
+    authdata = auth.authorize(name, ws.path, operation='start')
     if not authdata:
         return
     cfgmgr = httpsessions[sessid]['cfgmgr']
@@ -481,8 +481,12 @@ def wsock_handler(ws):
                         elif clientmsg[0] == '!':
                             msg = json.loads(clientmsg[1:])
                             action = msg.get('operation', None)
+                            targ = msg.get('target', None)
+                            if targ:
+                                authdata = auth.authorize(name, targ, operation=action)
+                                if not authdata:
+                                    continue
                             if action == 'start':
-                                targ = msg['target']
                                 if '/console/session' in targ or '/shell/sessions' in targ:
                                     width = msg['width']
                                     height = msg['height']

@@ -75,6 +75,7 @@ _allowedbyrole = {
             '/node*/configuration/*',
         ],
         'start': [
+            '/sessions/current/async',
             '/nodes/*/console/session*',
             '/nodes/*/shell/sessions*',
         ],
@@ -84,10 +85,16 @@ _allowedbyrole = {
         ],
     },
     'Monitor': {
+        'start': [
+            '/sessions/current/async',
+        ],
         'retrieve': [
             '/node*/health/hardware',
             '/node*/power/state',
             '/node*/sensors/*',
+            '/node*/attributes/current',
+            '/node*/description',
+            '/noderange/*/nodes/',
             '/nodes/',
             '/',
         ],
