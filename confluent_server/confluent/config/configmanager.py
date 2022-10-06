@@ -2464,12 +2464,15 @@ class ConfigManager(object):
                 self.set_group_attributes(tmpconfig[confarea], True)
             elif confarea == 'usergroups':
                 for usergroup in tmpconfig[confarea]:
-                    self.create_usergroup(usergroup)
+                    role = tmpconfig[confarea][usergroup].get('role', 'Administrator')
+                    self.create_usergroup(usergroup, role=role)
             elif confarea == 'users':
                 for user in tmpconfig[confarea]:
-                    uid = tmpconfig[confarea].get('id', None)
-                    displayname = tmpconfig[confarea].get('displayname', None)
-                    self.create_user(user, uid=uid, displayname=displayname)
+                    ucfg = tmpconfig[confarea][user]
+                    uid = ucfg.get('id', None)
+                    displayname = ucfg.get('displayname', None)
+                    role = ucfg.get('role', None)
+                    self.create_user(user, uid=uid, displayname=displayname, role=role)
                     for attrname in ('authid', 'authenticators', 'cryptpass'):
                         if attrname in tmpconfig[confarea][user]:
                             self._cfgstore['users'][user][attrname] = tmpconfig[confarea][user][attrname]
