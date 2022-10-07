@@ -63,6 +63,8 @@ def list_interface_indexes():
         for iface in os.listdir('/sys/class/net/'):
             if not os.path.exists('/sys/class/net/{0}/ifindex'.format(iface)):
                 continue
+            if os.path.exists('/sys/class/net/{0}/bonding_slave'.format(iface)):
+                continue
             ifile = open('/sys/class/net/{0}/ifindex'.format(iface), 'r')
             intidx = int(ifile.read())
             ifile.close()
