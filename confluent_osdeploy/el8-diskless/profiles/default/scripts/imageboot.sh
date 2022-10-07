@@ -13,7 +13,7 @@ export mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
 if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
     while ! curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
-        echo "Unable to retrieve private key from $confluent_mgr (verify that confluent can access /var/lib/confluent/private/$confluent_profile/pending/rootimg.key)"
+        echo "Unable to retrieve private key from $confluent_mgr (verify that confluent can access /var/lib/confluent/private/os/$confluent_profile/pending/rootimg.key)"
         sleep 1
     done
     cipher=$(head -n 1 /tmp/rootimg.key)
