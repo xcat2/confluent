@@ -52,4 +52,12 @@ if cfg['ipv4_method'] == 'static':
         netline += ' --gateway={0}'.format(cfg['ipv4_gateway'])
     if cfg['nameservers']:
         netline += ' --nameserver={0}'.format(cfg['nameservers'])
+vlanid = None
+try:
+    with open('/tmp/confluent.vlanid', 'r') as vlanin:
+        vlanid = vlanin.read()
+except Exception:
+    pass
+if vlanid:
+    netline += ' --vlanid={0}'.format(vlanid)
 print(netline)

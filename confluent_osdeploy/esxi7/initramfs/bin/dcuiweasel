@@ -8,6 +8,17 @@ if [ ! -f /var/run/vmware/show-esx-shell-login ]; then
 fi
 uuid=$(vsish -e get /hardware/bios/dmiInfo|grep -A15 UUID|sed -e 's/.*://'|sed -e ':a;N;$!ba;s/\n//g' | sed -e 's/ *0x//g')
 uuid=${uuid:0:8}-${uuid:8:4}-${uuid:12:4}-${uuid:16:4}-${uuid:20:12}
+kargs=$(vsish -e get /system/bootCmdLine|grep "command line:")
+vlanid=""
+for karg in $kargs; do
+    if [ ${karg%=*} = "vlanid" ]; then
+        vlanid=${karg/*=}
+    fi
+done
+if [ ! -z "$vlanid" ]; then
+    echo $vlanid > /tmp/confluent.vlanid
+    localcli network  vswitch standard portgroup set -p "Management Network" -v $vlanid
+fi
 mkdir -p /sys/devices/virtual/dmi/id/
 echo $uuid > /sys/devices/virtual/dmi/id/product_uuid
 mkdir -p /etc/confluent
