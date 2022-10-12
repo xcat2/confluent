@@ -64,7 +64,8 @@ if options.windowed:
             sys.exit(1)
         nodes.append(node)
     for node in sortutil.natural_sort(nodes):
-        subprocess.call(['xterm', '-e', 'nodeconsole', node])
+        sub = subprocess.Popen(['xterm', '-e', 'nodeconsole', node])
+        out,err = sub.communicate()
 #end of wcons
 if options.tile:
     null = open('/dev/null', 'w')
