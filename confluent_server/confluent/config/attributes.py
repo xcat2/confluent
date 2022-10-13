@@ -456,10 +456,10 @@ node = {
     },
     'net.interface_names': {
         'description': 'Interface name or comma delimited list of names to match for this interface. It is generally recommended '
-                        'to leave this blank unless needing to set up interfaces that are not on a common subnet with a confluent server, '
-                        'as confluent servers provide autodetection for matching the correct network definition to an interface.'
-                        'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
-                        'a team'
+                       'to leave this blank unless needing to set up interfaces that are not on a common subnet with a confluent server, '
+                       'as confluent servers provide autodetection for matching the correct network definition to an interface.'
+                       'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
+                       'a team'
     },
     'net.ipv4_address': {
         'description': 'When configuring static, use this address.  If '

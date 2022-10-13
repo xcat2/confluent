@@ -583,7 +583,7 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     if not isinstance(bootfile, bytes):
         bootfile = bootfile.encode('utf8')
     ipass = []
-    if ipv6method == 'firmwarenone:'
+    if ipv6method == 'firmwarenone':
         return
     if ipv6method not in ('dhcp', 'firmwaredhcp') and ipv6addr:
         if not ipv6prefix:
