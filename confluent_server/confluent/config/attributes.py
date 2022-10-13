@@ -473,8 +473,10 @@ node = {
         'description': 'Whether to use static or dhcp when configuring this '
                        'interface for IPv4. "firmwaredhcp" means to defer to '
                        'external DHCP server during firmware execution, but '
-                       'use static for OS',
-        'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'none')
+                       'use static for OS. "firmwarenone" means to suppress '
+                       'even the no-IP dhcp offers, to fully delegate to an external
+                       'dhcp/pxe configuration, even for confluent deployment.',
+        'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'firmwarenone', 'none')
     },
     'net.ipv4_gateway': {
         'description':  'The IPv4 gateway to use if applicable.  As is the '
@@ -493,8 +495,10 @@ node = {
         'description': 'Whether to use static or dhcp when configuring this '
                        'interface for IPv6. "firmwaredhcp" means to defer to '
                        'external DHCP server during firmware execution, but '
-                       'use static for OS',
-        'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'none')
+                       'use static for OS. "firmwarenone" means to suppress '
+                       'even the no-IP dhcp offers, to fully delegate to an external
+                       'dhcp/pxe configuration, even for confluent deployment',
+        'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'firmwarenone', 'none')
     },
     'net.ipv6_gateway': {
         'description':  'The IPv6 gateway to use if applicable.  As is the '

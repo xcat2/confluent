@@ -583,6 +583,8 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     if not isinstance(bootfile, bytes):
         bootfile = bootfile.encode('utf8')
     ipass = []
+    if ipv6method == 'firmwarenone:'
+        return
     if ipv6method not in ('dhcp', 'firmwaredhcp') and ipv6addr:
         if not ipv6prefix:
             log.log({'info': 'Unable to determine prefix to serve to address {} for node {}'.format(ipv6addr, node)})
@@ -680,6 +682,8 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system'.format(node)})
         return
     clipn = None
+    if niccfg['ipv4_method'] == 'firmwarenone':
+        return
     if niccfg['ipv4_address'] and niccfg['ipv4_method'] != 'firmwaredhcp':
         clipn = socket.inet_aton(niccfg['ipv4_address'])
         repview[16:20] = clipn
