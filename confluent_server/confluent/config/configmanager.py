@@ -2470,6 +2470,11 @@ class ConfigManager(object):
                 for user in tmpconfig[confarea]:
                     ucfg = tmpconfig[confarea][user]
                     uid = ucfg.get('id', None)
+                    if uid is not None and not isinstance(uid, str):
+                        if isinstance(uid, bytes):
+                            uid = uid.decode('utf8')
+                        else:
+                            uid = uid.encode('utf8')
                     displayname = ucfg.get('displayname', None)
                     role = ucfg.get('role', None)
                     self.create_user(user, uid=uid, displayname=displayname, role=role)
