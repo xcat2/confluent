@@ -27,6 +27,7 @@ except ImportError:
     webauthn = None
 import confluent.auth as auth
 import confluent.config.attributes as attribs
+import confluent.config.configmanager as configmanager
 import confluent.consoleserver as consoleserver
 import confluent.forwarder as forwarder
 import confluent.exceptions as exc
@@ -620,6 +621,28 @@ def resourcehandler_backend(env, start_response):
     if env.get('PATH_INFO', '').startswith('/self/'):
         for res in selfservice.handle_request(env, start_response):
             yield res
+        return
+    if env.get('PATH_INFO', '').startswith('/booturl/by-node/'):
+        request = env['PATH_INFO'].split('/')
+        if not request[0]:
+            request = request[1:]
+        if len(request) != 4:
+            start_response('400 Bad Request', headers)
+            yield ''
+            return
+        nodename = request[2]
+        bootfile = request[3]
+        cfg = configmanager.ConfigManager(None)
+        nodec = cfg.get_node_attributes(nodename, 'deployment.pendingprofile')
+        pprofile = nodec.get(nodename, {}).get('deployment.pendingprofile', {}).get('value', None)
+        if not pprofile:
+            start_response('404 Not Found', headers)
+            yield ''
+            return
+        redir = '/confluent-public/os/{0}/{1}'.format(pprofile, bootfile)
+        headers.append(('Location', redir))
+        start_response('302 Found', headers)
+        yield ''
         return
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
