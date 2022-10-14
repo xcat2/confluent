@@ -54,6 +54,7 @@ if options.log:
     logreader.replay_to_console(logname)
     sys.exit(0)
 #added functionality for wcons
+
 if options.windowed:
     nodes = []
     sess = client.Command()
@@ -65,7 +66,8 @@ if options.windowed:
         nodes.append(node)
     for node in sortutil.natural_sort(nodes):
         sub = subprocess.Popen(['xterm', '-e', 'nodeconsole', node])
-        out,err = sub.communicate()
+    sys.exit(0)
+    
 #end of wcons
 if options.tile:
     null = open('/dev/null', 'w')
