@@ -496,7 +496,7 @@ node = {
                        'interface for IPv6. "firmwaredhcp" means to defer to '
                        'external DHCP server during firmware execution, but '
                        'use static for OS. "firmwarenone" means to suppress '
-                       'even the no-IP dhcp offers, to fully delegate to an external
+                       'even the no-IP dhcp offers, to fully delegate to an external '
                        'dhcp/pxe configuration, even for confluent deployment',
         'validvalues': ('dhcp', 'static', 'firmwaredhcp', 'firmwarenone', 'none')
     },
