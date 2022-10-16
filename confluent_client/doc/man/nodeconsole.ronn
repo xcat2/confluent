@@ -28,17 +28,25 @@ a new session.
   manager at this time.
   
 * `-w`, `--windowed`:
-  Open terminal windows for each node.  The environment variable
-  NODECONSOLE_WINDOWED_COMMAND must be set, which should be a text string
-  corresponding to a command that can be used to open a windowed console,
-  omitting the "nodeconsole <noderange>" part of the command, for example, to
-  open a set of consoles for a range of nodes in separate xterm windows, set
-  NODECONSOLE_WINDOWED_COMMAND to "xterm -e", or in a WSL environment, to open
-  a set of consoles for a range of nodes in separate Windows Terminal windows,
-  with the title set for each node, set NODECONSOLE_WINDOWED_COMMAND to "wt.exe
-  --title node wsl.exe -d AlmaLinux-8 --shell-type login".  Note that "node" when
-  in the NODECONSOLE_WINDOWED_COMMAND environment variable is treated as a keyword,
-  not a literal.
+  Open terminal windows for each node.  The
+  environment variable **NODECONSOLE_WINDOWED_COMMAND**
+  must be set, which should be a text string corresponding
+  to a command that can be used to open a windowed console,
+  omitting the `nodeconsole <noderange>` part of the
+  command, for example, to open a set of consoles for a
+  range of nodes in separate xterm windows, set
+  **NODECONSOLE_WINDOWED_COMMAND** to `xterm -e`.  To open a
+  set of consoles for a range of nodes in separate
+  GNOME Terminal windows with a size of 100 columns and
+  31 rows, set **NODECONSOLE_WINDOWED_COMMAND**
+  to `gnome-terminal --geometry 100x31 --` or in a WSL
+  environment, to open a set of consoles for a range of
+  nodes in separate Windows Terminal windows, with the
+  title set for each node, set **NODECONSOLE_WINDOWED_COMMAND**
+  to `wt.exe --title node wsl.exe -d AlmaLinux-8
+  --shell-type login`.  Note that **"node"** when in the
+  NODECONSOLE_WINDOWED_COMMAND environment variable is
+  treated as a keyword, not a literal.
 
 ## ESCAPE SEQUENCE COMMANDS
 
