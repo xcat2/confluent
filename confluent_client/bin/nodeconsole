@@ -39,7 +39,25 @@ argparser.add_option('-t', '--tile', action='store_true', default=False,
 argparser.add_option('-l', '--log', action='store_true', default=False,
                      help='Enter log replay mode instead of showing a live console')
 argparser.add_option('-w','--windowed', action='store_true', default=False,
-                     help='Open terminal windows for each node.  The environment variable NODECONSOLE_WINDOWED_COMMAND must be set, which should be a text string corresponding to a command that can be used to open a windowed console, omitting the "nodeconsole <noderange>" part of the command, for example, to open a set of consoles for a range of nodes in separate xterm windows, set NODECONSOLE_WINDOWED_COMMAND to "xterm -e", or in a WSL environment, to open a set of consoles for a range of nodes in separate Windows Terminal windows, with the title set for each node, set NODECONSOLE_WINDOWED_COMMAND to "wt.exe --title node wsl.exe -d AlmaLinux-8 --shell-type login".  Note that "node" when in the NODECONSOLE_WINDOWED_COMMAND environment variable is treated as a keyword, not a literal.')
+                     help='Open terminal windows for each node.  The '
+                          'environment variable NODECONSOLE_WINDOWED_COMMAND '
+                          'must be set, which should be a text string corresponding '
+                          'to a command that can be used to open a windowed console,'
+                          ' omitting the "nodeconsole <noderange>" part of the '
+                          'command, for example, to open a set of consoles for a '
+                          'range of nodes in separate xterm windows, set '
+                          'NODECONSOLE_WINDOWED_COMMAND to "xterm -e".  To open a '
+                          'set of consoles for a range of nodes in separate '
+                          'GNOME Terminal windows with a size of 100 columns and '
+                          '31 rows, set NODECONSOLE_WINDOWED_COMMAND '
+                          'to "gnome-terminal --geometry 100x31 --" or in a WSL '
+                          'environment, to open a set of consoles for a range of '
+                          'nodes in separate Windows Terminal windows, with the '
+                          'title set for each node, set NODECONSOLE_WINDOWED_COMMAND'
+                          ' to "wt.exe --title node wsl.exe -d AlmaLinux-8 '
+                          '--shell-type login".  Note that "node" when in the '
+                          'NODECONSOLE_WINDOWED_COMMAND environment variable is '
+                          'treated as a keyword, not a literal.')
 (options, args) = argparser.parse_args()
 if len(args) != 1:
     argparser.print_help()
@@ -55,6 +73,10 @@ if options.log:
     sys.exit(0)
 #added functionality for wcons
 if options.windowed:
+    envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
+    if not envstring:
+        print("NODECONSOLE_WINDOWED_COMMAND not defined and -w specified.  Exiting...\n")
+        sys.exit(1)
     envlist=os.environ.get('NODECONSOLE_WINDOWED_COMMAND').split(' ')
     nodes = []
     sess = client.Command()
