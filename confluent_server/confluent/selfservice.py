@@ -71,6 +71,22 @@ def handle_request(env, start_response):
     cfg = configmanager.ConfigManager(None)
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
     clientip = env.get('HTTP_X_FORWARDED_FOR', None)
+    if env['PATH_INFO'] == '/self/whoami':
+        clientids = env.get('HTTP_CONFLUENT_IDS', None)
+        if not clientids:
+            start_response('400 Bad Request', [])
+            yield 'Bad Request'
+            return
+        for ids in clientids.split('/'):
+            _, v = ids.split('=', 1)
+            repname = disco.get_node_by_uuid_or_mac(v)
+            if repname:
+                start_response('200 OK', [])
+                yield repname
+                return
+        start_response('404 Unknown', [])
+        yield ''
+        return
     if env['PATH_INFO'] == '/self/registerapikey':
         crypthmac = env.get('HTTP_CONFLUENT_CRYPTHMAC', None)
         if int(env.get('CONTENT_LENGTH', 65)) > 64:

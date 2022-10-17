@@ -96,6 +96,25 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
 fi
 cd /sys/class/net
 if ! grep MANAGER: /etc/confluent/confluent.info; then
+    confluentsrv=$(getarg confluent)
+    if [ ! -z "$confluentsrv" ]; then
+        if [[ "$confluentsrv" = *":"* ]]; then
+            /usr/libexec/nm-initrd-generator ip=:dhcp6
+        else
+            /usr/libexec/nm-initrd-generator ip=:dhcp
+        fi
+        NetworkManager --configure-and-quit=initrd --no-daemon
+        myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
+        for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
+            myids=$myids"/mac="$mac
+        done
+        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluentsrv/confluent-api/self/whoami)
+        if [ ! -z "$myname" ]; then
+            echo NODENAME: $myname > /etc/confluent/confluent.info
+            echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
+            echo EXTMGRINFO: $confluentsrv'||1' >> /etc/confluent/confluent.info
+        fi
+    fi
     while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
         TRIES=$((TRIES + 1))
         for currif in *; do
