@@ -169,7 +169,8 @@ v4cfg=${v4cfg#ipv4_method: }
 if [ "$v4cfg" = "static" ] || [ "$v4cfg" = "dhcp" ]; then
     mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
     mgr=${mgr#deploy_server: }
-else
+fi
+if [ -z "$mgr" ]; then
     mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
     mgr=${mgr#deploy_server_v6: }
     mgr="[$mgr]"
