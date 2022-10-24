@@ -1,5 +1,6 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
+. /lib/dracut-lib.sh
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
