@@ -100,8 +100,10 @@ if ! grep MANAGER: /etc/confluent/confluent.info; then
     confluentsrv=$(getarg confluent)
     if [ ! -z "$confluentsrv" ]; then
         if [[ "$confluentsrv" = *":"* ]]; then
+            confluenthttpsrv=[$confluentsrv]
             /usr/libexec/nm-initrd-generator ip=:dhcp6
         else
+            confluenthttpsrv=$confluentsrv
             /usr/libexec/nm-initrd-generator ip=:dhcp
         fi
         NetworkManager --configure-and-quit=initrd --no-daemon
@@ -109,7 +111,7 @@ if ! grep MANAGER: /etc/confluent/confluent.info; then
         for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
             myids=$myids"/mac="$mac
         done
-        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluentsrv/confluent-api/self/whoami)
+        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
         if [ ! -z "$myname" ]; then
             echo NODENAME: $myname > /etc/confluent/confluent.info
             echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
