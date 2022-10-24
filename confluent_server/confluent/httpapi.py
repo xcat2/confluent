@@ -633,7 +633,7 @@ def resourcehandler_backend(env, start_response):
             yield ''
             return
         if request[1] == 'by-mac':
-            mac = request[2].replace(':', '-')
+            mac = request[2].replace('-', ':')
             nodename = disco.get_node_by_uuid_or_mac(mac)
         elif request[1] == 'by-uuid':
             uuid = request[2]
