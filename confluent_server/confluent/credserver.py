@@ -19,6 +19,7 @@ import confluent.netutil as netutil
 import confluent.util as util
 import datetime
 import eventlet
+import eventlet.green.select as select
 import eventlet.green.socket as socket
 import eventlet.greenpool
 import hashlib
@@ -71,7 +72,7 @@ def watch_trusted():
                     '# when a node has deployment API armed\n')
         try:
             read_authnets(cfgpath)
-        except Exceptien:
+        except Exception:
             eventlet.sleep(15)
             continue
         if libc.inotify_add_watch(watcher, bcfgpath, 0xcc2) <= -1:
