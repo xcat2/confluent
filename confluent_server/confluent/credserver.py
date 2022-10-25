@@ -43,28 +43,38 @@ libc = ctypes.CDLL(ctypes.util.find_library('c'))
 _semitrusted = []
 
 def read_authnets(cfgpath):
+    global _semitrusted
     with open(cfgpath, 'r') as cfgin:
             _semitrusted = []
-            for line in cfgin.readlines:
+            for line in cfgin.readlines():
                 line = line.split('#', 1)[0].strip()
                 if '/' not in line:
                     continue
                 subnet, prefix = line.split('/')
+                prefix = int(prefix)
                 _semitrusted.append((subnet, prefix))
 
 
 def watch_trusted():
+    cfgpath = '/etc/confluent/auth_nets'
+    if isinstance(cfgpath, bytes):
+        bcfgpath = cfgpath
+    else:
+        bcfgpath = cfgpath.encode('utf8')
     while True:
         watcher = libc.inotify_init1(os.O_NONBLOCK)
-        cfgpath = '/etc/confluent/auth_nets'
         if not os.path.exists(cfgpath):
             with open(cfgpath, 'w') as cfgout:
                 cfgout.write(
                     '# This is a list of networks in addition to local\n'
                     '# networks to allow grant of initial deployment token,\n'
                     '# when a node has deployment API armed\n')
-        read_authnets(cfgpath)
-        if libc.inotify_add_watch(watcher, cfgpath, 0xcc2) <= -1:
+        try:
+            read_authnets(cfgpath)
+        except Exceptien:
+            eventlet.sleep(15)
+            continue
+        if libc.inotify_add_watch(watcher, bcfgpath, 0xcc2) <= -1:
             eventlet.sleep(15)
             continue
         select.select((watcher,), (), (), 86400)
