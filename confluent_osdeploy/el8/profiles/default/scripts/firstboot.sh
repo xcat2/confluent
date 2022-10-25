@@ -13,7 +13,8 @@ if [ "$v4cfg" = "static" ] || [ "$v4cfg" = "dhcp" ]; then
     confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
     confluent_mgr=${confluent_mgr#deploy_server: }
     confluent_pingtarget=$confluent_mgr
-else
+fi
+if [ -z "$confluent_mgr" ]; then
     confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
     confluent_mgr=${confluent_mgr#deploy_server_v6: }
     confluent_pingtarget=$confluent_mgr
