@@ -179,7 +179,7 @@ def handle_request(env, start_response):
             start_response('400 Bad Requst', [])
             yield 'Missing Path'
             return
-        targurl = '/hubble/systems/by-port/{0}/webaccess'.format(rb['path'])
+        targurl = '/affluent/systems/by-port/{0}/webaccess'.format(rb['path'])
         tlsverifier = util.TLSCertVerifier(cfg, nodename, 'pubkeys.tls_hardwaremanager')
         wc = webclient.SecureHTTPConnection(nodename, 443, verifycallback=tlsverifier.verify_cert)
         relaycreds = cfg.get_node_attributes(nodename, 'secret.*', decrypt=True)
