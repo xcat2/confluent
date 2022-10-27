@@ -203,6 +203,8 @@ def handle_request(env, start_response):
             rb['addresses'] = [(newhost, newport)]
             rb['forwarder_url'] = targurl
             rb['forwarder_server'] = nodename
+            if 'bay' in rb:
+                rb['enclosure.bay'] = rb['bay']
             if rb['type'] == 'lenovo-xcc':
                 ssdp.check_fish(('/DeviceDescription.json', rb), newport, verify_cert)
             elif rb['type'] == 'lenovo-smm2':

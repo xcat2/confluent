@@ -855,6 +855,47 @@ def get_smm_neighbor_fingerprints(smmaddr, cv):
             continue
         yield 'sha256$' + b64tohex(neigh['sha256'])
 
+def get_nodename_sysdisco(cfg, handler, info):
+    switchname = info['forwarder_server']
+    switchnode = None
+    nl = cfg.filter_node_attributes('net.*switch=' + switchname)
+    brokenattrs = False
+    for n in nl:
+        na = cfg.get_node_attributes(n, 'net.*switchport').get(n, {})
+        for sp in na:
+            pv = na[sp].get('value', '')
+            if pv and macmap._namesmatch(info['port'], pv):
+                if switchnode:
+                    log.log({'error': 'Ambiguous port information between {} and {}'.format(switchnode, n)})
+                    brokenattrs = True
+                else:
+                    switchnode = n
+                break
+    if brokenattrs or not switchnode:
+        return None
+    if 'enclosure_num' not in info:
+        return switchnode
+    chainlen = info['enclosure_num']
+    currnode = switchnode
+    while chainlen > 1:
+        nl = list(cfg.filter_node_attributes('enclosure.extends=' + currnode))
+        if len(nl) > 1:
+            log.log({'error': 'Multiple enclosures specify extending ' + currnode})
+            return None
+        if len(nl) == 0:
+            log.log({'error': 'No enclosures specify extending ' + currnode + ' but an enclosure seems to be extending it'})
+            return None
+        currnode = nl[0]
+        chainlen -= 1
+    if info['type'] == 'lenovo-smm2':
+        return currnode
+    else:
+        baynum = info['bay']
+        nl = cfg.filter_node_attributes('enclosure.manager=' + currnode)
+        nl = list(cfg.filter_node_attributes('enclosure.bay={0}'.format(baynum), nl))
+        if len(nl) == 1:
+            return nl[0]
+
 
 def get_nodename(cfg, handler, info):
     nodename = None
@@ -883,6 +924,10 @@ def get_nodename(cfg, handler, info):
     if not nodename and info['handler'] == pxeh:
         enrich_pxe_info(info)
         nodename = info.get('nodename', None)
+    if 'forwarder_server' in info:
+        # this has been registered by a remote discovery registry,
+        # thus verification and specific location is fixed
+        return get_nodename_sysdisco(cfg, handler, info), None
     if not nodename:
         # Ok, see if it is something with a chassis-uuid and discover by
         # chassis
