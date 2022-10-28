@@ -424,7 +424,7 @@ def handle_autosense_config(operation, inputdata):
             stop_autosense()
 
 
-def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+def handle_api_request(configmanager, inputdata, operation, pathcomponents, affluent=None):
     if pathcomponents == ['discovery', 'autosense']:
         return handle_autosense_config(operation, inputdata)
     if operation == 'retrieve':
@@ -435,7 +435,15 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             raise exc.InvalidArgumentException()
         rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
-
+    elif operation in ('update', 'create') and pathcomponents == ['discovery', 'remote']:
+        if 'subscribe' in inputdata:
+            target = inputdata['subscribe']
+            affluent.subscribe_discovery(target, configmanager, collective.get_myname())
+            return (msg.KeyValueData({'status': 'subscribed'}),)
+        if 'unsubscribe' in inputdata:
+            target = inputdata['unsubscribe']
+            affluent.unsubscribe_discovery(target, configmanager, collective.get_myname())
+            return (msg.KeyValueData({'status': 'unsubscribed'}),)
     elif operation in ('update', 'create'):
         if pathcomponents == ['discovery', 'register']:
             return
@@ -487,6 +495,7 @@ def handle_read_api_request(pathcomponents):
         dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
         dirlist.append(msg.ChildCollection('rescan'))
         dirlist.append(msg.ChildCollection('autosense'))
+        dirlist.append(msg.ChildCollection('remote'))
         return dirlist
     if not coll:
         return show_info(queryparms['by-mac'])
