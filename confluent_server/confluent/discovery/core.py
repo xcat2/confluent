@@ -435,7 +435,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents, affl
             raise exc.InvalidArgumentException()
         rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
-    elif operation in ('update', 'create') and pathcomponents == ['discovery', 'remote']:
+    elif operation in ('update', 'create') and pathcomponents == ['discovery', 'subscription']:
         if 'subscribe' in inputdata:
             target = inputdata['subscribe']
             affluent.subscribe_discovery(target, configmanager, collective.get_myname())
@@ -495,7 +495,7 @@ def handle_read_api_request(pathcomponents):
         dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
         dirlist.append(msg.ChildCollection('rescan'))
         dirlist.append(msg.ChildCollection('autosense'))
-        dirlist.append(msg.ChildCollection('remote'))
+        dirlist.append(msg.ChildCollection('subscription'))
         return dirlist
     if not coll:
         return show_info(queryparms['by-mac'])
