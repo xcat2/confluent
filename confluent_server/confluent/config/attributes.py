@@ -124,10 +124,13 @@ node = {
     'deployment.apiarmed': {
         'description': ('Indicates whether the node authentication token interface '
                         'is armed.  If set to once, it will grant only the next '
-                        'request. If set to continuous, will allow many requests.'
-                        'Should not be set unless an OS deployment is pending. '
+                        'request. If set to continuous, will allow many requests, '
+                        'which greatly reduces security, particularly when connected to '
+                        'untrusted networks. '
+                        'Should not be set unless an OS deployment is pending on the node. '
                         'Generally this is not directly modified, but is modified '
                         'by the "nodedeploy" command'),
+        'validvalues': ('once', 'continuous', ''),
     },
     'deployment.sealedapikey': {
         'description': 'This attribute is used by some images to save a sealed '
