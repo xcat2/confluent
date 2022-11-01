@@ -520,6 +520,16 @@ class NodeHandler(immhandler.NodeHandler):
 
     def config(self, nodename, reset=False):
         self.nodename = nodename
+        cd = self.configmanager.get_node_attributes(
+            nodename, ['secret.hardwaremanagementuser',
+                       'secret.hardwaremanagementpassword',
+                       'hardwaremanagement.manager', 'hardwaremanagement.method', 'console.method'],
+                       True)
+        cd = cd.get(nodename, {})
+        targbmc = cd.get('hardwaremanagement.manager', {}).get('value', '')
+        if not self.ipaddr.startswith('fe80::') and (targbmc.startswith('fe80::') or not targbmc):
+            raise exc.TargetEndpointUnreachable(
+                'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
@@ -541,12 +551,6 @@ class NodeHandler(immhandler.NodeHandler):
                 self._setup_xcc_account(user, passwd, wc)
                 wc = self.wc
         self._convert_sha256account(user, passwd, wc)
-        cd = self.configmanager.get_node_attributes(
-            nodename, ['secret.hardwaremanagementuser',
-                       'secret.hardwaremanagementpassword',
-                       'hardwaremanagement.manager', 'hardwaremanagement.method', 'console.method'],
-                       True)
-        cd = cd.get(nodename, {})
         if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
                 or cd.get('console.method', {}).get('value', None) == 'ipmi'):
             nwc = wc.dupe()
@@ -572,17 +576,13 @@ class NodeHandler(immhandler.NodeHandler):
                     rsp, status = nwc.grab_json_response_with_status(
                         '/redfish/v1/AccountService/Accounts/1',
                         updateinf, method='PATCH')
-        if ('hardwaremanagement.manager' in cd and
-                cd['hardwaremanagement.manager']['value'] and
-                not cd['hardwaremanagement.manager']['value'].startswith(
-                    'fe80::')):
-            rawnewip = cd['hardwaremanagement.manager']['value']
-            newip = rawnewip.split('/', 1)[0]
+        if targbmc and not targbmc.startswith('fe80::'):
+            newip = targbmc.split('/', 1)[0]
             newipinfo = getaddrinfo(newip, 0)[0]
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=rawnewip)
+            netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=targbmc)
             newmask = netutil.cidr_to_mask(netconfig['prefix'])
             currinfo = wc.grab_json_response('/api/providers/logoninfo')
             currip = currinfo.get('items', [{}])[0].get('ipv4_address', '')

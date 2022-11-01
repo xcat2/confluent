@@ -11,11 +11,10 @@ confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{pr
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export nodename confluent_mgr confluent_profile
 . /etc/confluent/functions
+(
 exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 chmod 600 /var/log/confluent/confluent-firstboot.log
-tail -f /var/log/confluent/confluent-firstboot.log > /dev/console &
-logshowpid=$!
 while ! ping -c 1 $confluent_mgr >& /dev/null; do
 	sleep 1
 done
@@ -37,4 +36,5 @@ curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLU
 systemctl disable firstboot
 rm /etc/systemd/system/firstboot.service
 rm /etc/confluent/firstboot.ran
-kill $logshowpid
+) &
+tail --pid  $! -F /var/log/confluent/confluent-firstboot.log > /dev/console

@@ -25,6 +25,8 @@ def add_lla(iface, mac):
     initbyte = int(pieces[0], 16) ^ 2
     lla = 'fe80::{0:x}{1}:{2}ff:fe{3}:{4}{5}/64'.format(initbyte, pieces[1], pieces[2], pieces[3], pieces[4], pieces[5])
     try:
+        with open('/proc/sys/net/ipv6/conf/{0}/disable_ipv6'.format(iface), 'w') as setin:
+            setin.write('0')
         subprocess.check_call(['ip', 'addr', 'add', 'dev', iface, lla, 'scope', 'link'])
     except Exception:
         return None

@@ -282,11 +282,17 @@ def initialize(cmdset):
         init_confluent_myname()
         certutil.create_certificate()
         if os.path.exists('/usr/lib/systemd/system/httpd.service'):
-            subprocess.check_call(['systemctl', 'try-restart', 'httpd'])
-            print('HTTP server has been restarted if it was running')
+            try:
+                subprocess.check_call(['systemctl', 'try-restart', 'httpd'])
+                print('HTTP server has been restarted if it was running')
+            except subprocess.CalledProcessError:
+                emprint('New HTTPS certificates generated, restart the web server manually')
         elif os.path.exists('/usr/lib/systemd/system/apache2.service'):
-            subprocess.check_call(['systemctl', 'try-restart', 'apache2'])
-            print('HTTP server has been restarted if it was running')
+            try:
+                subprocess.check_call(['systemctl', 'try-restart', 'apache2'])
+                print('HTTP server has been restarted if it was running')
+            except subprocess.CalledProcessError:
+                emprint('New HTTPS certificates generated, restart the web server manually')
         else:
             emprint('New HTTPS certificates generated, restart the web server manually')
     if cmdset.s:

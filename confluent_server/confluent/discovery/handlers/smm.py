@@ -219,6 +219,17 @@ class NodeHandler(bmchandler.NodeHandler):
 
     def config(self, nodename):
         # SMM for now has to reset to assure configuration applies
+        cd = self.configmanager.get_node_attributes(
+            nodename, ['secret.hardwaremanagementuser',
+                       'secret.hardwaremanagementpassword',
+                       'hardwaremanagement.manager', 'hardwaremanagement.method', 'console.method'],
+                       True)
+        cd = cd.get(nodename, {})
+        targbmc = cd.get('hardwaremanagement.manager', {}).get('value', '')
+        currip = self.ipaddr if self.ipaddr else ''
+        if not currip.startswith('fe80::') and (targbmc.startswith('fe80::') or not targbmc):
+            raise exc.TargetEndpointUnreachable(
+                'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
         dpp = self.configmanager.get_node_attributes(
             nodename, 'discovery.passwordrules')
         self.ruleset = dpp.get(nodename, {}).get(

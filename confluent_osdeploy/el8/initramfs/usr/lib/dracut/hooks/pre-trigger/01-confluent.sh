@@ -1,5 +1,6 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
+. /lib/dracut-lib.sh
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
@@ -96,6 +97,27 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
 fi
 cd /sys/class/net
 if ! grep MANAGER: /etc/confluent/confluent.info; then
+    confluentsrv=$(getarg confluent)
+    if [ ! -z "$confluentsrv" ]; then
+        if [[ "$confluentsrv" = *":"* ]]; then
+            confluenthttpsrv=[$confluentsrv]
+            /usr/libexec/nm-initrd-generator ip=:dhcp6
+        else
+            confluenthttpsrv=$confluentsrv
+            /usr/libexec/nm-initrd-generator ip=:dhcp
+        fi
+        NetworkManager --configure-and-quit=initrd --no-daemon
+        myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
+        for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
+            myids=$myids"/mac="$mac
+        done
+        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+        if [ ! -z "$myname" ]; then
+            echo NODENAME: $myname > /etc/confluent/confluent.info
+            echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
+            echo EXTMGRINFO: $confluentsrv'||1' >> /etc/confluent/confluent.info
+        fi
+    fi
     while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
         TRIES=$((TRIES + 1))
         for currif in *; do
@@ -147,7 +169,8 @@ v4cfg=${v4cfg#ipv4_method: }
 if [ "$v4cfg" = "static" ] || [ "$v4cfg" = "dhcp" ]; then
     mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
     mgr=${mgr#deploy_server: }
-else
+fi
+if [ -z "$mgr" ]; then
     mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
     mgr=${mgr#deploy_server_v6: }
     mgr="[$mgr]"

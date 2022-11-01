@@ -237,6 +237,8 @@ class NetManager(object):
             if ipv6addr:
                 myattribs['ipv6_method'] = 'static'
                 myattribs['ipv6_address'] = ipv6addr
+        else:
+            myattribs['ipv6_method'] = 'dhcp'
         if attribs.get('ipv6_gateway', None) and 'ipv6_method' in myattribs:
             myattribs['ipv6_gateway'] = attribs['ipv6_gateway']
         if 'ipv4_method' not in myattribs and 'ipv6_method' not in myattribs:

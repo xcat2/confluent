@@ -71,6 +71,22 @@ def handle_request(env, start_response):
     cfg = configmanager.ConfigManager(None)
     nodename = env.get('HTTP_CONFLUENT_NODENAME', None)
     clientip = env.get('HTTP_X_FORWARDED_FOR', None)
+    if env['PATH_INFO'] == '/self/whoami':
+        clientids = env.get('HTTP_CONFLUENT_IDS', None)
+        if not clientids:
+            start_response('400 Bad Request', [])
+            yield 'Bad Request'
+            return
+        for ids in clientids.split('/'):
+            _, v = ids.split('=', 1)
+            repname = disco.get_node_by_uuid_or_mac(v)
+            if repname:
+                start_response('200 OK', [])
+                yield repname
+                return
+        start_response('404 Unknown', [])
+        yield ''
+        return
     if env['PATH_INFO'] == '/self/registerapikey':
         crypthmac = env.get('HTTP_CONFLUENT_CRYPTHMAC', None)
         if int(env.get('CONTENT_LENGTH', 65)) > 64:
@@ -163,7 +179,7 @@ def handle_request(env, start_response):
             start_response('400 Bad Requst', [])
             yield 'Missing Path'
             return
-        targurl = '/hubble/systems/by-port/{0}/webaccess'.format(rb['path'])
+        targurl = '/affluent/systems/by-port/{0}/webaccess'.format(rb['path'])
         tlsverifier = util.TLSCertVerifier(cfg, nodename, 'pubkeys.tls_hardwaremanager')
         wc = webclient.SecureHTTPConnection(nodename, 443, verifycallback=tlsverifier.verify_cert)
         relaycreds = cfg.get_node_attributes(nodename, 'secret.*', decrypt=True)
@@ -187,6 +203,8 @@ def handle_request(env, start_response):
             rb['addresses'] = [(newhost, newport)]
             rb['forwarder_url'] = targurl
             rb['forwarder_server'] = nodename
+            if 'bay' in rb:
+                rb['enclosure.bay'] = rb['bay']
             if rb['type'] == 'lenovo-xcc':
                 ssdp.check_fish(('/DeviceDescription.json', rb), newport, verify_cert)
             elif rb['type'] == 'lenovo-smm2':

@@ -16,6 +16,16 @@ import subprocess
 import sys
 import tempfile
 import time
+import yaml
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+try:
+    import confluent.osimage as osimage
+except ImportError:
+    osimage = None
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 CLONE_NEWNS = 0x00020000
@@ -194,8 +204,14 @@ def capture_remote(args):
     confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
     os.symlink('{}/initramfs/addons.cpio'.format(confdir),
             os.path.join(outdir, 'boot/initramfs/addons.cpio'))
-    if os.path.exists('{}/profiles/default'.format(confdir)):
-            copy_tree('{}/profiles/default'.format(confdir), outdir)
+    indir = '{}/profiles/default'.format(confdir)
+    if os.path.exists(indir):
+        copy_tree(indir, outdir)
+        hmap = osimage.get_hashes(outdir)
+        with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
+            yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
+            manifestdata = {'distdir': indir, 'disthashes': hmap}
+            yout.write(yaml.dump(manifestdata, default_flow_style=False))
     label = '{0} {1} ({2})'.format(finfo['name'], finfo['version'], profname)
     with open(os.path.join(outdir, 'profile.yaml'), 'w') as profileout:
         profileout.write('label: {}\n'.format(label))
@@ -1239,8 +1255,14 @@ def pack_image(args):
             confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
             os.symlink('{}/initramfs/addons.cpio'.format(confdir),
                 os.path.join(outdir, 'boot/initramfs/addons.cpio'))
-            if os.path.exists('{}/profiles/default'.format(confdir)):
-                copy_tree('{}/profiles/default'.format(confdir), outdir)
+            indir = '{}/profiles/default'.format(confdir)
+            if os.path.exists(indir):
+                copy_tree(indir, outdir)
+                hmap = osimage.get_hashes(outdir)
+                with open('{0}/manifest.yaml'.format(outdir), 'w') as yout:
+                    yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
+                    manifestdata = {'distdir': indir, 'disthashes': hmap}
+                    yout.write(yaml.dump(manifestdata, default_flow_style=False))
             tryupdate = True
     try:
         pwd.getpwnam('confluent')

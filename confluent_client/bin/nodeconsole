@@ -72,6 +72,7 @@ if options.log:
     logreader.replay_to_console(logname)
     sys.exit(0)
 #added functionality for wcons
+
 if options.windowed:
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
     if not envstring:

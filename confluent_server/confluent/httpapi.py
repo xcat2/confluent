@@ -29,6 +29,7 @@ import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
 import confluent.consoleserver as consoleserver
+import confluent.discovery.core as disco
 import confluent.forwarder as forwarder
 import confluent.exceptions as exc
 import confluent.log as log
@@ -591,7 +592,7 @@ def wsock_handler(ws):
 
 def resourcehandler(env, start_response):
     try:
-        if 'HTTP_SEC_WEBSOCKET_VERSION' in env:
+        if 'HTTP_SEC_WEBSOCKET_VERSION' in env: 
             for rsp in wsock_handler(env, start_response):
                 yield rsp
         else:
@@ -622,7 +623,8 @@ def resourcehandler_backend(env, start_response):
         for res in selfservice.handle_request(env, start_response):
             yield res
         return
-    if env.get('PATH_INFO', '').startswith('/booturl/by-node/'):
+    reqpath = env.get('PATH_INFO', '')
+    if reqpath.startswith('/boot/'):
         request = env['PATH_INFO'].split('/')
         if not request[0]:
             request = request[1:]
@@ -630,7 +632,14 @@ def resourcehandler_backend(env, start_response):
             start_response('400 Bad Request', headers)
             yield ''
             return
-        nodename = request[2]
+        if request[1] == 'by-mac':
+            mac = request[2].replace('-', ':')
+            nodename = disco.get_node_by_uuid_or_mac(mac)
+        elif request[1] == 'by-uuid':
+            uuid = request[2]
+            nodename = disco.get_node_by_uuid_or_mac(uuid)
+        elif request[1] == 'by-node':
+            nodename = request[2]
         bootfile = request[3]
         cfg = configmanager.ConfigManager(None)
         nodec = cfg.get_node_attributes(nodename, 'deployment.pendingprofile')
@@ -639,7 +648,7 @@ def resourcehandler_backend(env, start_response):
             start_response('404 Not Found', headers)
             yield ''
             return
-        redir = '/confluent-public/os/{0}/{1}'.format(pprofile, bootfile)
+        redir = '/confluent-public/os/{0}/boot.{1}'.format(pprofile, bootfile)
         headers.append(('Location', redir))
         start_response('302 Found', headers)
         yield ''

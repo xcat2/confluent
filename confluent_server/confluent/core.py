@@ -1239,7 +1239,7 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
                                    operation, pathcomponents, autostrip)
     elif pathcomponents[0] == 'discovery':
         return disco.handle_api_request(
-            configmanager, inputdata, operation, pathcomponents)
+            configmanager, inputdata, operation, pathcomponents, pluginmap['affluent'])
     elif pathcomponents[0] == 'networking':
         return macmap.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
