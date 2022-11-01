@@ -54,10 +54,8 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'environment, to open a set of consoles for a range of '
                           'nodes in separate Windows Terminal windows, with the '
                           'title set for each node, set NODECONSOLE_WINDOWED_COMMAND'
-                          ' to "wt.exe --title node wsl.exe -d AlmaLinux-8 '
-                          '--shell-type login".  Note that "node" when in the '
-                          'NODECONSOLE_WINDOWED_COMMAND environment variable is '
-                          'treated as a keyword, not a literal.')
+                          ' to "wt.exe wsl.exe -d AlmaLinux-8 '
+                          '--shell-type login".')
 (options, args) = argparser.parse_args()
 if len(args) != 1:
     argparser.print_help()
@@ -86,12 +84,9 @@ if options.windowed:
             sys.stderr.write(res.get('error', repr(res)) + '\n')
             sys.exit(1)
         nodes.append(node)
-    # Hack to deal with messed up terminal after starting wt.exe using subprocess.Popen in WSL - AHW 10/15/22
-    sttyg = subprocess.run(['stty', '-g'], stdout=subprocess.PIPE, universal_newlines=True)
     for node in sortutil.natural_sort(nodes):
-        subprocess.Popen(envlist + [confettypath, '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)])
-    # Hack to deal with messed up terminal after starting wt.exe using subprocess.Popen in WSL - AHW 10/15/22
-    subprocess.run(['stty', '{0}'.format(sttyg.stdout.strip("\n"))])
+        with open(os.devnull, 'wb') as devnull:
+            subprocess.Popen(envlist + [confettypath, '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)], stdin=devnull)
     sys.exit(0)
 #end of wcons
 if options.tile:

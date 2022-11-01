@@ -43,10 +43,8 @@ a new session.
   environment, to open a set of consoles for a range of
   nodes in separate Windows Terminal windows, with the
   title set for each node, set **NODECONSOLE_WINDOWED_COMMAND**
-  to `wt.exe --title node wsl.exe -d AlmaLinux-8
-  --shell-type login`.  Note that **"node"** when in the
-  NODECONSOLE_WINDOWED_COMMAND environment variable is
-  treated as a keyword, not a literal.
+  to `wt.exe wsl.exe -d AlmaLinux-8
+  --shell-type login`.
 
 ## ESCAPE SEQUENCE COMMANDS
 
