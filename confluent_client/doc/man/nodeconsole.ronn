@@ -28,8 +28,24 @@ a new session.
   manager at this time.
   
 * `-w`, `--windowed`:
-  Openes separate xterm windows for each console in the node range provided. This 
-  works for xterm only.
+  Open terminal windows for each node.  The
+  environment variable **NODECONSOLE_WINDOWED_COMMAND**
+  should be set, which should be a text string corresponding
+  to a command that can be used to open a windowed console,
+  omitting the `nodeconsole <noderange>` part of the
+  command, for example, to open a set of consoles for a
+  range of nodes in separate xterm windows, set
+  **NODECONSOLE_WINDOWED_COMMAND** to `xterm -e`.  To open a
+  set of consoles for a range of nodes in separate
+  GNOME Terminal windows with a size of 100 columns and
+  31 rows, set **NODECONSOLE_WINDOWED_COMMAND**
+  to `gnome-terminal --geometry 100x31 --` or in a WSL
+  environment, to open a set of consoles for a range of
+  nodes in separate Windows Terminal windows, with the
+  title set for each node, set **NODECONSOLE_WINDOWED_COMMAND**
+  to `wt.exe wsl.exe -d AlmaLinux-8 --shell-type login.  If the
+  NODECONSOLE_WINDOWED_COMMAND environment variable isn't set,
+  xterm will be used bydefault.
 
 ## ESCAPE SEQUENCE COMMANDS
 
