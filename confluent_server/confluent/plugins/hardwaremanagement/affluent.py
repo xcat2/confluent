@@ -71,6 +71,7 @@ def subscribe_discovery(node, configmanager, myname):
     if status == 200:
         agentkey = res['cryptkey']
         configmanager.set_node_attributes({node: {'crypted.selfapikey': {'hashvalue': agentkey}}})
+    res, status = wc.wc.grab_json_response_with_status('/affluent/systems/renotify', {'subscriber': myname})
 
 def unsubscribe_discovery(node, configmanager, myname):
     creds = configmanager.get_node_attributes(
