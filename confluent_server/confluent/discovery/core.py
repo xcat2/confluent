@@ -518,7 +518,7 @@ def handle_read_api_request(pathcomponents):
         dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
         dirlist.append(msg.ChildCollection('rescan'))
         dirlist.append(msg.ChildCollection('autosense'))
-        dirlist.append(msg.ChildCollection('subscription'))
+        dirlist.append(msg.ChildCollection('subscriptions/'))
         return dirlist
     if not coll:
         return show_info(queryparms['by-mac'])

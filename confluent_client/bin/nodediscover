@@ -53,9 +53,14 @@ columnmapping = {
 def subscribe_discovery(options, session, subscribe):
     keyn = 'subscribe' if subscribe else 'unsubscribe'
     payload = {keyn: options.node}
-    for rsp in session.update('/discovery/subscription', payload):
-        if 'status' in rsp:
-            print(rsp['status'])
+    if subscribe:
+        for rsp in session.update('/discovery/subscriptions/{0}'.format(options.node), payload):
+            if 'status' in rsp:
+                print(rsp['status'])
+    else:
+        for rsp in session.delete('/discovery/subscriptions/{0}'.format(options.node)):
+            if 'status' in rsp:
+                print(rsp['status'])
     
 def print_disco(options, session, currmac, outhandler, columns):
     procinfo = {}
