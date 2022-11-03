@@ -1446,14 +1446,17 @@ def _periodic_recheck(configmanager):
 def rescan():
     _map_unique_ids()
     global scanner
-    mycfm = cfm.ConfigManager(None)
-    myname = collective.get_myname()
     if scanner:
         return
     else:
         scanner = eventlet.spawn(blocking_scan)
+    remotescan()
+
+def remotescan():
+    mycfm = cfm.ConfigManager(None)
+    myname = collective.get_myname()
     for remagent in get_subscriptions():
-        affluent.renotify_my(remagent, mycfm, myname)
+        affluent.renotify_me(remagent, mycfm, myname)
 
 
 def blocking_scan():
@@ -1492,6 +1495,7 @@ def stop_autosense():
 def start_autosense():
     autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
     autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
+    remotescan()
 
 
 nodes_by_fprint = {}
