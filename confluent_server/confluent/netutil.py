@@ -301,7 +301,7 @@ def get_flat_net_config(configmanager, node):
     return ret
 
 def add_netmask(ncfg):
-    if '/' in ncfg['ipv4_address']:
+    if '/' in ncfg.get('ipv4_address', ''):
         plen = ncfg['ipv4_address'].split('/', 1)[1]
         ncfg['ipv4_netmask'] = cidr_to_mask(int(plen))
 
