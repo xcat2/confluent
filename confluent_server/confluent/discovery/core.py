@@ -1446,13 +1446,14 @@ def _periodic_recheck(configmanager):
 def rescan():
     _map_unique_ids()
     global scanner
+    mycfm = cfm.ConfigManager(None)
+    myname = collective.get_myname()
     if scanner:
         return
     else:
         scanner = eventlet.spawn(blocking_scan)
     for remagent in get_subscriptions():
-        affluent.
-
+        affluent.renotify_my(remagent, mycfm, myname)
 
 
 def blocking_scan():
