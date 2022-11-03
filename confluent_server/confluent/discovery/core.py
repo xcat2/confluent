@@ -79,6 +79,7 @@ import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.util as util
+import json
 import eventlet
 import traceback
 import shlex
@@ -430,7 +431,8 @@ def get_subscriptions():
             if dst:
                 return json.loads(dst)
     except Exception:
-        return {}
+        pass
+    return {}
 
 def save_subscriptions(subs):
     with open('/etc/confluent/discovery_subscriptions.json', 'w') as dso:
