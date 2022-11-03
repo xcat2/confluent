@@ -186,6 +186,10 @@ pending_nodes = {}
 pending_by_uuid = {}
 
 
+def register_affluent(affluenthdl):
+    global affluent
+    affluent = affluenthdl
+
 def enrich_pxe_info(info):
     sn = None
     mn = None
@@ -438,7 +442,7 @@ def save_subscriptions(subs):
     with open('/etc/confluent/discovery_subscriptions.json', 'w') as dso:
         dso.write(json.dumps(subs))
 
-def handle_api_request(configmanager, inputdata, operation, pathcomponents, affluent=None):
+def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if pathcomponents == ['discovery', 'autosense']:
         return handle_autosense_config(operation, inputdata)
     if operation == 'retrieve' and pathcomponents[:2] == ['discovery', 'subscriptions']:
@@ -1446,6 +1450,9 @@ def rescan():
         return
     else:
         scanner = eventlet.spawn(blocking_scan)
+    for remagent in get_subscriptions():
+        affluent.
+
 
 
 def blocking_scan():

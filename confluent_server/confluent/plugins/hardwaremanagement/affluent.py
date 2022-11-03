@@ -54,6 +54,12 @@ class WebClient(object):
         return rsp
     
 
+def renotify_me(node, configmanager, myname):
+    creds = configmanager.get_node_attributes(
+        node, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
+    wc = WebClient(node, configmanager, creds)
+    wc.wc.grab_json_response('/affluent/cert_authorities/{0}'.format(myname), cacert)
+
 def subscribe_discovery(node, configmanager, myname):
     creds = configmanager.get_node_attributes(
         node, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)

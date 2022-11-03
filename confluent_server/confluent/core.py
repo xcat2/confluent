@@ -138,6 +138,7 @@ def load_plugins():
         plugins.clear()
         # restore path to not include the plugindir
         sys.path.pop(1)
+    disco.register_affluent(pluginmap['affluent'])
 
 
 def _register_resource(plugin):
@@ -1239,7 +1240,7 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
                                    operation, pathcomponents, autostrip)
     elif pathcomponents[0] == 'discovery':
         return disco.handle_api_request(
-            configmanager, inputdata, operation, pathcomponents, pluginmap['affluent'])
+            configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'networking':
         return macmap.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
