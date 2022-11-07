@@ -174,7 +174,9 @@ if [ "$autoconfigmethod" = "dhcp" ]; then
     dhclient $ifname
     echo "Complete:"
     ip addr show dev $ifname
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 elif [ "$autoconfigmethod" = "static" ]; then
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
@@ -223,8 +225,9 @@ method=auto
 
 EOC
 elif [ "$auto6configmethod" = "static" ]; then
+    confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg| awk '{print $2}')
     v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
-    v6addr=${ipaddr#ipv6_address: }
+    v6addr=${v6addr#ipv6_address: }
     v6gw=$(grep ^ipv6_gateway: /etc/confluent/confluent.deploycfg)
     v6gw=${v6gw#ipv6_gateway: }
     if [ "$v6gw" = "null" ]; then
@@ -295,7 +298,6 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
         confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
     fi
 done
-confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 mkdir -p /etc/confluent
 curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
