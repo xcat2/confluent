@@ -299,6 +299,10 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
     fi
 done
 mkdir -p /etc/confluent
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
+confluent_websrv=$confluent_mgr
+if [[ $confluent_websrv == *:* ]]; then
+    confluent_websrv="[$confluent_websrv]"
+fi
+curl -sf https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
 source_remote imageboot.sh
