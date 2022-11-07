@@ -66,6 +66,8 @@ def ip_on_same_subnet(first, second, prefix):
         second = second.replace('::ffff:', '')
     addrinf = socket.getaddrinfo(first, None, 0, socket.SOCK_STREAM)[0]
     fam = addrinf[0]
+    if '%' in addrinf[-1][0]:
+        return False
     ip = socket.inet_pton(fam, addrinf[-1][0])
     ip = int(codecs.encode(bytes(ip), 'hex'), 16)
     addrinf = socket.getaddrinfo(second, None, 0, socket.SOCK_STREAM)[0]
