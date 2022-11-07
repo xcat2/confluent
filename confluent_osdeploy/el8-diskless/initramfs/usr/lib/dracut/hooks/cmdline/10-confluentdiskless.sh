@@ -147,13 +147,34 @@ if [ -c /dev/tpmrm0 ]; then
     tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 fi
 umask $oldumask
+mkdir -p /run/NetworkManager/system-connections
+cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+[connection]
+EOC
+echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
+echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
+cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+type=ethernet
+autoconnect-retries=1
+EOC
+echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
+cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+multi-connect=1
+permissions=
+wait-device-timeout=60000
+
+[ethernet]
+mac-address-blacklist=
+
+EOC
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+auto6configmethod=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
     dhclient $ifname
     echo "Complete:"
     ip addr show dev $ifname
-else
+elif [ "$autoconfigmethod" = "static" ]; then
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
@@ -167,28 +188,8 @@ else
     ip addr add dev $ifname $v4addr/$v4nm
     if [ ! -z "$v4gw" ]; then
         ip route add default via $v4gw
-    fi
-    mkdir -p /run/NetworkManager/system-connections
-    cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-[connection]
-EOC
-    echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
-    echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
-    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-type=ethernet
-autoconnect-retries=1
-EOC
-    echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
-    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-multi-connect=1
-permissions=
-wait-device-timeout=60000
-
-[ethernet]
-mac-address-blacklist=
-
-[ipv4]
-EOC
+    fi    
+    echo '[ipv4]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
     echo address1=$v4addr/$v4nm >> /run/NetworkManager/system-connections/$ifname.nmconnection
     if [ ! -z "$v4gw" ]; then
         echo gateway=$v4gw >> /run/NetworkManager/system-connections/$ifname.nmconnection
@@ -197,7 +198,7 @@ EOC
     nameservers=""
     while read -r entry; do
         if [ $nameserversec = 1 ]; then
-            if [[ $entry == "-"* ]]; then
+            if [[ $entry == "-"*.* ]]; then
                 nameservers="$nameservers"${entry#- }";"
                 continue
             fi
@@ -220,9 +221,57 @@ method=manual
 addr-gen-mode=eui64
 method=auto
 
-[proxy]
 EOC
+elif [ "$auto6configmethod" = "static" ]; then
+    v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
+    v6addr=${ipaddr#ipv6_address: }
+    v6gw=$(grep ^ipv6_gateway: /etc/confluent/confluent.deploycfg)
+    v6gw=${v6gw#ipv6_gateway: }
+    if [ "$v6gw" = "null" ]; then
+        v6gw=""
+    fi
+    v6nm=$(grep ^ipv6_prefix: /etc/confluent/confluent.deploycfg)
+    v6nm=${v6nm#ipv6_prefix: }
+    echo "Setting up $ifname as static at $v6addr/$v6nm"
+    ip addr add dev $ifname $v6addr/$v6nm
+    
+    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+[ipv4]
+dhcp-timeout=90
+dhcp-vendor-class-identifier=anaconda-Linux
+method=disabled
+
+[ipv6]
+addr-gen-mode=eui64
+method=manual
+may-fail=false
+EOC
+    echo address1=$v6addr/$v6nm >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    if [ ! -z "$v6gw" ]; then
+        ip route add default via $v6gw
+        echo gateway=$v6gw >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    fi
+    nameserversec=0
+    nameservers=""
+    while read -r entry; do
+        if [ $nameserversec = 1 ]; then
+            if [[ $entry == "-"*:* ]]; then
+                nameservers="$nameservers"${entry#- }";"
+                continue
+            fi
+        fi
+        nameserversec=0
+        if [ "${entry%:*}" = "nameservers" ]; then
+            nameserversec=1
+            continue
+        fi
+    done < /etc/confluent/confluent.deploycfg
+    echo dns=$nameservers >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
+    dnsdomain=${dnsdomain#dnsdomain: }
+    echo dns-search=$dnsdomain >> /run/NetworkManager/system-connections/$ifname.nmconnection
 fi
+echo '[proxy]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
 chmod 600 /run/NetworkManager/system-connections/*.nmconnection
 echo -n "Initializing ssh..."
 ssh-keygen -A
