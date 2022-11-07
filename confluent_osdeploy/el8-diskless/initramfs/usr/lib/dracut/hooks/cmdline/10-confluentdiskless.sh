@@ -123,7 +123,7 @@ while [ $ready = "0" ]; do
         confluent_mgr="[$confluent_mgr]"
     fi
     tmperr=$(mktemp)
-    curl -sSf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg 2> $tmperr
+    curl -sSf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg 2> $tmperr
     if grep 401 $tmperr > /dev/null; then
         confluent_apikey=""
         if [ -n "$lasthdl" ]; then
