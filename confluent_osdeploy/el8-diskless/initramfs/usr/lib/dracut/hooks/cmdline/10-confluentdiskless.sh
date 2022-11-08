@@ -276,6 +276,7 @@ EOC
 fi
 echo '[proxy]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
 chmod 600 /run/NetworkManager/system-connections/*.nmconnection
+confluent_websrv=$confluent_mgr
 if [[ $confluent_websrv == *:* ]]; then
     confluent_websrv="[$confluent_websrv]"
 fi
@@ -302,7 +303,6 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
     fi
 done
 mkdir -p /etc/confluent
-confluent_websrv=$confluent_mgr
 curl -sf https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
 source_remote imageboot.sh
