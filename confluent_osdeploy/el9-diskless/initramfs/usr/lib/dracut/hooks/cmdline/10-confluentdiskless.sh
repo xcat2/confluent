@@ -28,7 +28,7 @@ get_remote_apikey() {
 root=1
 rootok=1
 netroot=confluent
-#clear
+echo -ne '\033[H\033[2J\033[3J'
 mkdir -p /etc/ssh
 mkdir -p /var/tmp/
 mkdir -p /var/empty/sshd
