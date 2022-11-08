@@ -276,12 +276,15 @@ EOC
 fi
 echo '[proxy]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
 chmod 600 /run/NetworkManager/system-connections/*.nmconnection
+if [[ $confluent_websrv == *:* ]]; then
+    confluent_websrv="[$confluent_websrv]"
+fi
 echo -n "Initializing ssh..."
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
-    curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d @$pubkey  https://$confluent_mgr/confluent-api/self/sshcert > $certfile
+    curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d @$pubkey  https://$confluent_websrv/confluent-api/self/sshcert > $certfile
     if [ -s $certfile ]; then
         echo HostCertificate $certfile >> /etc/ssh/sshd_config
     fi
@@ -300,9 +303,6 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
 done
 mkdir -p /etc/confluent
 confluent_websrv=$confluent_mgr
-if [[ $confluent_websrv == *:* ]]; then
-    confluent_websrv="[$confluent_websrv]"
-fi
 curl -sf https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
 source_remote imageboot.sh
