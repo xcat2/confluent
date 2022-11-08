@@ -1,10 +1,14 @@
 . /lib/dracut-lib.sh
+confluent_whost=$confluent_mgr
+if [[ "$confluent_whost" == *:* ]]; then
+    confluent_whost="[$confluent_mgr]"
+fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
 if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
-    curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
+    curl https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
-    confluent_urls="$confluent_urls https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs"
+    confluent_urls="$confluent_urls https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 fi
 /opt/confluent/bin/confluent_imginfo /mnt/remoteimg/rootimg.sfs > /tmp/rootimg.info
@@ -12,7 +16,7 @@ loopdev=$(losetup -f)
 export mountsrc=$loopdev
 losetup -r $loopdev /mnt/remoteimg/rootimg.sfs
 if grep '^Format: confluent_crypted' /tmp/rootimg.info > /dev/null; then
-    while ! curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
+    while ! curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_whost/confluent-api/self/profileprivate/pending/rootimg.key > /tmp/rootimg.key; do
         echo "Unable to retrieve private key from $confluent_mgr (verify that confluent can access /var/lib/confluent/private/os/$confluent_profile/pending/rootimg.key)"
         sleep 1
     done
@@ -103,15 +107,15 @@ echo 'Host *' >> $sshconf
 echo '    HostbasedAuthentication yes' >> $sshconf
 echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
-curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_mgr/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
+curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" https://$confluent_whost/confluent-api/self/nodelist > /sysroot/etc/ssh/shosts.equiv
 cp /sysroot/etc/ssh/shosts.equiv /sysroot/root/.shosts
 chmod 640 /sysroot/etc/ssh/*_key
 chroot /sysroot chgrp ssh_keys /etc/ssh/*_key
 cp /tls/*.pem /sysroot/etc/pki/ca-trust/source/anchors/
 chroot /sysroot/ update-ca-trust
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
+curl -sf https://$confluent_whost/confluent-public/os/$confluent_profile/scripts/onboot.service > /sysroot/etc/systemd/system/onboot.service
 mkdir -p /sysroot/opt/confluent/bin
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
+curl -sf https://$confluent_whost/confluent-public/os/$confluent_profile/scripts/onboot.sh > /sysroot/opt/confluent/bin/onboot.sh
 chmod +x /sysroot/opt/confluent/bin/onboot.sh
 cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
