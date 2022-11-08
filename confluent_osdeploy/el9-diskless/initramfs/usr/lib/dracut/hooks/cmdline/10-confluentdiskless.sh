@@ -124,7 +124,7 @@ while [ $ready = "0" ]; do
         confluent_mgr="[$confluent_mgr]"
     fi
     tmperr=$(mktemp)
-    curl -sSf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg 2> $tmperr
+    curl -sSf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg 2> $tmperr
     if grep 401 $tmperr > /dev/null; then
         confluent_apikey=""
         if [ -n "$lasthdl" ]; then
@@ -148,13 +148,36 @@ if [ -c /dev/tpmrm0 ]; then
     tpm2_pcrextend 15:sha256=2fbe96c50dde38ce9cd2764ddb79c216cfbcd3499568b1125450e60c45dd19f2
 fi
 umask $oldumask
+mkdir -p /run/NetworkManager/system-connections
+cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+[connection]
+EOC
+echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
+echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
+cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+type=ethernet
+autoconnect-retries=1
+EOC
+echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
+cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+multi-connect=1
+permissions=
+wait-device-timeout=60000
+
+[ethernet]
+mac-address-blacklist=
+
+EOC
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+auto6configmethod=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
     echo -n "Attempting to use dhcp to bring up $ifname..."
     dhclient $ifname
     echo "Complete:"
     ip addr show dev $ifname
-else
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
+elif [ "$autoconfigmethod" = "static" ]; then
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
     v4addr=${v4addr#ipv4_address: }
     v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
@@ -169,27 +192,7 @@ else
     if [ ! -z "$v4gw" ]; then
         ip route add default via $v4gw
     fi
-    mkdir -p /run/NetworkManager/system-connections
-    cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-[connection]
-EOC
-    echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
-    echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
-    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-type=ethernet
-autoconnect-retries=1
-EOC
-    echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
-    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-multi-connect=1
-permissions=
-wait-device-timeout=60000
-
-[ethernet]
-mac-address-blacklist=
-
-[ipv4]
-EOC
+    echo '[ipv4]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
     echo address1=$v4addr/$v4nm >> /run/NetworkManager/system-connections/$ifname.nmconnection
     if [ ! -z "$v4gw" ]; then
         echo gateway=$v4gw >> /run/NetworkManager/system-connections/$ifname.nmconnection
@@ -198,7 +201,7 @@ EOC
     nameservers=""
     while read -r entry; do
         if [ $nameserversec = 1 ]; then
-            if [[ $entry == "-"* ]]; then
+            if [[ $entry == "-"*.* ]]; then
                 nameservers="$nameservers"${entry#- }";"
                 continue
             fi
@@ -221,16 +224,69 @@ method=manual
 addr-gen-mode=eui64
 method=auto
 
-[proxy]
 EOC
+elif [ "$auto6configmethod" = "static" ]; then
+    confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg| awk '{print $2}')
+    v6addr=$(grep ^ipv6_address: /etc/confluent/confluent.deploycfg)
+    v6addr=${v6addr#ipv6_address: }
+    v6gw=$(grep ^ipv6_gateway: /etc/confluent/confluent.deploycfg)
+    v6gw=${v6gw#ipv6_gateway: }
+    if [ "$v6gw" = "null" ]; then
+        v6gw=""
+    fi
+    v6nm=$(grep ^ipv6_prefix: /etc/confluent/confluent.deploycfg)
+    v6nm=${v6nm#ipv6_prefix: }
+    echo "Setting up $ifname as static at $v6addr/$v6nm"
+    ip addr add dev $ifname $v6addr/$v6nm
+
+    cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+[ipv4]
+dhcp-timeout=90
+dhcp-vendor-class-identifier=anaconda-Linux
+method=disabled
+
+[ipv6]
+addr-gen-mode=eui64
+method=manual
+may-fail=false
+EOC
+    echo address1=$v6addr/$v6nm >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    if [ ! -z "$v6gw" ]; then
+        ip route add default via $v6gw
+        echo gateway=$v6gw >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    fi
+    nameserversec=0
+    nameservers=""
+    while read -r entry; do
+        if [ $nameserversec = 1 ]; then
+            if [[ $entry == "-"*:* ]]; then
+                nameservers="$nameservers"${entry#- }";"
+                continue
+            fi
+        fi
+        nameserversec=0
+        if [ "${entry%:*}" = "nameservers" ]; then
+            nameserversec=1
+            continue
+        fi
+    done < /etc/confluent/confluent.deploycfg
+    echo dns=$nameservers >> /run/NetworkManager/system-connections/$ifname.nmconnection
+    dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
+    dnsdomain=${dnsdomain#dnsdomain: }
+    echo dns-search=$dnsdomain >> /run/NetworkManager/system-connections/$ifname.nmconnection
 fi
+echo '[proxy]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
 chmod 600 /run/NetworkManager/system-connections/*.nmconnection
+confluent_websrv=$confluent_mgr
+if [[ $confluent_websrv == *:* ]]; then
+    confluent_websrv="[$confluent_websrv]"
+fi
 echo -n "Initializing ssh..."
 ssh-keygen -A
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
-    curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d @$pubkey  https://$confluent_mgr/confluent-api/self/sshcert > $certfile
+    curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -d @$pubkey  https://$confluent_websrv/confluent-api/self/sshcert > $certfile
     if [ -s $certfile ]; then
         echo HostCertificate $certfile >> /etc/ssh/sshd_config
     fi
@@ -247,8 +303,7 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
         confluent_urls="$confluent_urls $confluent_proto://$addr/confluent-public/os/$confluent_profile/rootimg.sfs"
     fi
 done
-confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 mkdir -p /etc/confluent
-curl -sf https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
+curl -sf https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
 source_remote imageboot.sh
