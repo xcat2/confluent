@@ -48,7 +48,7 @@ class GeistClient(object):
         cv = util.TLSCertVerifier(
             self.configmanager, self.node,
             'pubkeys.tls_hardwaremanager').verify_cert
-        self._wc = wc.SecureHTTPConnection(target, verifycallback=cv)
+        self._wc = wc.SecureHTTPConnection(target, port=443, verifycallback=cv)
         return self._wc
 
     def login(self, configmanager):
