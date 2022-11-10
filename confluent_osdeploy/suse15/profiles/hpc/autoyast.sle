@@ -8,7 +8,7 @@ dynamic behavior and replace with static configuration.
 <profile xmlns="http://www.suse.com/1.0/yast2ns" xmlns:config="http://www.suse.com/1.0/configns">
     <timezone>
       <hwclock>UTC</hwclock>
-      <!--INSERT:/tmp/timezone-->
+      <timezone>%%TIMEZONE%%</timezone>
     </timezone>
     <general>
       <self_update config:type="boolean">false</self_update>

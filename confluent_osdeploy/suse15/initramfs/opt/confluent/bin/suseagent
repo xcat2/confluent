@@ -81,6 +81,7 @@ fi
 
 tz=$(grep timezone: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 echo "<timezone>${tz}</timezone>" > /tmp/timezone
+echo "${tz}" > /tmp/timezone.txt
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
