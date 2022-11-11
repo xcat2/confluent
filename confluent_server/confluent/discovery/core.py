@@ -484,8 +484,10 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             sd['hwaddr'] = sd['attributes']['mac-address']
             if not sd:
                 raise exc.Unsupported('Target address is not a supported device for remote discovery registration')
-            detected(sd)
-            return msg.CreatedResource(inputdata['address'])
+            nh = xcc.NodeHandler(sd, configmanager)
+            nh.scan()
+            detected(nh.info)
+            return [msg.CreatedResource(inputdata['address'])]
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
         mac = _get_mac_from_query(pathcomponents)
