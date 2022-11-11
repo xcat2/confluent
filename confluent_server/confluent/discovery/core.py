@@ -481,9 +481,9 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
                 'addresses': [(inputdata['address'], 443)]
             }
             sd = ssdp.check_fish(('/DeviceDescription.json', nd))
-            sd['hwaddr'] = sd['attributes']['mac-address']
             if not sd:
-                raise exc.Unsupported('Target address is not a supported device for remote discovery registration')
+                raise exc.InvalidArgumentException('Target address is not detected or is not a supported device for remote discovery registration')
+            sd['hwaddr'] = sd['attributes']['mac-address']
             nh = xcc.NodeHandler(sd, configmanager)
             nh.scan()
             detected(nh.info)
