@@ -475,10 +475,10 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         return (msg.KeyValueData({'status': 'unsubscribed'}),)
     elif operation in ('update', 'create'):
         if pathcomponents == ['discovery', 'register']:
-            if 'address' not in inputdata:
+            if 'addresses' not in inputdata:
                 raise exc.InvalidArgumentException('Missing address in input')
             nd = {
-                'addresses': [(inputdata['address'], 443)]
+                'addresses': [(inputdata['addresses'], 443)]
             }
             sd = ssdp.check_fish(('/DeviceDescription.json', nd))
             if not sd:

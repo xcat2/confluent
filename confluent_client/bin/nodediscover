@@ -50,6 +50,14 @@ columnmapping = {
 }
 #TODO: add chassis uuid
 
+def register_endpoint(options, session, addr):
+    for rsp in session.update('/discovery/register', {'addresses': addr}):
+        if 'created' in rsp:
+            print('Registered: {0}'.format(rsp['created']))
+        else:
+            sys.stderr.write(repr(rsp))
+            sys.stderr.write('\n')
+
 def subscribe_discovery(options, session, subscribe):
     keyn = 'subscribe' if subscribe else 'unsubscribe'
     payload = {keyn: options.node}
@@ -372,7 +380,7 @@ def main():
     parser.add_option('-o', '--order', dest='order',
                       help='Order output by given field', metavar='ORDER')
     (options, args) = parser.parse_args()
-    if len(args) == 0 or args[0] not in ('list', 'assign', 'reassign', 'rescan', 'clear', 'subscribe', 'unsubscribe'):
+    if len(args) == 0 or args[0] not in ('list', 'assign', 'reassign', 'rescan', 'clear', 'subscribe', 'unsubscribe', 'register'):
         parser.print_help()
         sys.exit(1)
     session = client.Command()
@@ -384,6 +392,8 @@ def main():
         assign_discovery(options, session)
     if args[0] == 'reassign':
         assign_discovery(options, session, False)
+    if args[0] == 'register':
+        register_endpoint(options, session, args[1])
     if args[0] == 'subscribe':
         subscribe_discovery(options, session, True)
     if args[0] == 'unsubscribe':
