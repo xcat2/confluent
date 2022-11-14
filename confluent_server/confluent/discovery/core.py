@@ -977,6 +977,8 @@ def get_nodename(cfg, handler, info):
     if 'forwarder_server' in info:
         # this has been registered by a remote discovery registry,
         # thus verification and specific location is fixed
+        if nodename:
+            return nodename, None
         return get_nodename_sysdisco(cfg, handler, info), None
     if not nodename:
         # Ok, see if it is something with a chassis-uuid and discover by
