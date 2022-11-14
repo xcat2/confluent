@@ -39,6 +39,9 @@ for lic in $(python3 getlicenses.py rpmlist); do
     lo=$dlo/$fname
     echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
 done
+mkdir -p licenses/ipmitool
+cp /usr/share/doc/ipmitool/COPYING  licenses/ipmitool
+echo %license /opt/confluent/genesis/%{arch}/licenses/ipmitool/COPYING >> confluent-genesis-out.spec
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
