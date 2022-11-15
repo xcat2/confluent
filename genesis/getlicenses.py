@@ -32,6 +32,8 @@ for rpm in rpmlist:
     if not rpm:
         continue
     srpm = rpmtosrpm[rpm]
+    if srpm.startswith('linux-firmware'):
+        continue
     for relrpm in srpmtorpm[srpm]:
         liclist = runcmd(f'rpm -qL {relrpm}')
         for lic in liclist:

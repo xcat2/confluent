@@ -13,6 +13,7 @@ pushd $tdir
 xzcat distribution|cpio -dumi
 rm distribution
 find . -type f -exec rpm -qf /{} \; 2> /dev/null | grep -v 'not owned' | sort -u > $tfile
+find . -type f -printf "%p: " -exec rpm -qf /{} \; 2> /dev/null | grep -v 'not owned' > /tmp/attributedrpmlist
 popd
 rm -rf $tdir
 cp $tfile rpmlist
