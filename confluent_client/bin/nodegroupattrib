@@ -60,10 +60,12 @@ nodetype="nodegroups"
 
 try:
     nodegroups = args[0]
+    client.check_globbing(nodegroups)
     nodelist = '/{0}/{1}/'.format(nodetype,nodegroups)
 except IndexError:
+    argparser.print_help()
+    sys.exit(1)
     nodelist = '/nodegroups/'
-client.check_globbing(nodegroups)
 session = client.Command()
 exitcode = 0
 
