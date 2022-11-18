@@ -51,16 +51,27 @@ columnmapping = {
 #TODO: add chassis uuid
 
 def register_endpoint(options, session, addr):
+    neednewline = False
+    current = 0
     for rsp in session.update('/discovery/register', {'addresses': addr}):
+        if 'count' in rsp:
+            total = rsp['count']
+        elif total > 1:
+            current += 1
+            sys.stdout.write('\x1b[2K\r{0:.1f}% Scanned'.format(100 * current / total))
+            sys.stdout.flush()
+            neednewline = True
         if 'created' in rsp:
+            if neednewline:
+                print('')
+                neednewline = False
             print('Registered: {0}'.format(rsp['created']))
-        else:
-            sys.stderr.write(repr(rsp))
-            sys.stderr.write('\n')
+    if neednewline:
+        print('')
 
-def subscribe_discovery(options, session, subscribe):
+def subscribe_discovery(options, session, subscribe, targ):
     keyn = 'subscribe' if subscribe else 'unsubscribe'
-    payload = {keyn: options.node}
+    payload = {keyn: targ}
     if subscribe:
         for rsp in session.update('/discovery/subscriptions/{0}'.format(options.node), payload):
             if 'status' in rsp:
@@ -383,6 +394,12 @@ def main():
     if len(args) == 0 or args[0] not in ('list', 'assign', 'reassign', 'rescan', 'clear', 'subscribe', 'unsubscribe', 'register'):
         parser.print_help()
         sys.exit(1)
+    if args[0] == 'register' and len(args) != 2:
+        sys.stderr.write('Register requires target address or range (e.g. 192.168.2.30, 192.168.2.0/24, or 192.168.2.1-192.168.2.30)')
+        sys.exit(1)
+    if 'subscribe' in args[0] and len(args) != 2:
+        sys.stderr.write('subscribe/unsubscribe subcommands require switch name as argument')
+        sys.exit(1)
     session = client.Command()
     if args[0] == 'list':
         list_discovery(options, session)
@@ -395,9 +412,9 @@ def main():
     if args[0] == 'register':
         register_endpoint(options, session, args[1])
     if args[0] == 'subscribe':
-        subscribe_discovery(options, session, True)
+        subscribe_discovery(options, session, True, args[1])
     if args[0] == 'unsubscribe':
-        subscribe_discovery(options, session, False)
+        subscribe_discovery(options, session, False, args[1])
     if args[0] == 'rescan':
         blocking_scan(session)
         print("Rescan complete")

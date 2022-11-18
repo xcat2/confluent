@@ -309,6 +309,29 @@ class DeletedResource(ConfluentMessage):
         pass
 
 
+class ConfluentResourceNotFound(ConfluentMessage):
+    notnode = True
+    apicode = 404
+
+    def __init__(self, resource):
+        self.myargs = [resource]
+        self.desc = 'Not Found'
+        self.kvpairs = {'missing': resource}
+
+    def strip_node(self, node):
+        pass
+
+class ConfluentResourceCount(ConfluentMessage):
+    notnode = True
+
+    def __init__(self, count):
+        self.myargs = [count]
+        self.desc = 'Resource Count'
+        self.kvpairs = {'count': count}
+    
+    def strip_node(self, node):
+        pass
+    
 class CreatedResource(ConfluentMessage):
     notnode = True
     readonly = True

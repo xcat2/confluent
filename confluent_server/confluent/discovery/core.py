@@ -83,6 +83,7 @@ import json
 import eventlet
 import traceback
 import shlex
+import struct
 import eventlet.green.socket as socket
 import socket as nsocket
 import eventlet.green.subprocess as subprocess
@@ -385,6 +386,59 @@ single_selectors = set([
 ])
 
 
+def addr_to_number(addr):
+    addr = socket.inet_pton(socket.AF_INET, addr)
+    num = struct.unpack('!I', addr)[0]
+    return num
+
+def number_to_addr(number):
+    addr = struct.pack('!I', number)
+    addr = socket.inet_ntop(socket.AF_INET, addr)
+    return addr
+
+def iterate_addrs(addrs, countonly=False):
+    if '.' not in addrs:
+        raise exc.InvalidArgumentException('IPv4 only supported')
+    if '-' in addrs:
+        first, last = addrs.split('-', 1)
+        currn = addr_to_number(first)
+        last = addr_to_number(last)
+        if last < currn:
+            tm = currn
+            currn = last
+            currn = tm
+        if (last - currn) > 65538:
+            raise exc.InvalidArgumentException("Too many ip addresses")
+        if countonly:
+            yield last - currn + 1
+            return
+        while currn <= last:
+            yield number_to_addr(currn)
+            currn += 1
+    elif '/' in addrs:
+        first, plen = addrs.split('/', 1)
+        plen = int(plen)
+        if plen > 32:
+            raise exc.InvalidArgumentException("Invalid prefix length")
+        mask = (2**32 - 1) ^ (2**(32 - plen) - 1)
+        currn = addr_to_number(first)
+        currn = currn & mask
+        numips = 2**(32 - plen)
+        if numips > 65538:
+            raise exc.InvalidArgumentException("Too many ip addresses")
+        if countonly:
+            yield numips
+            return
+        while numips > 0:
+            yield number_to_addr(currn)
+            currn += 1
+            numips -= 1
+    else:
+        if countonly:
+            yield 1
+            return
+        yield addrs
+    
 def _parameterize_path(pathcomponents):
     listrequested = False
     childcoll = True
@@ -442,6 +496,30 @@ def save_subscriptions(subs):
     with open('/etc/confluent/discovery_subscriptions.json', 'w') as dso:
         dso.write(json.dumps(subs))
 
+
+def register_remote_addrs(addresses, configmanager):
+    def register_remote_addr(addr):
+        nd = {
+            'addresses': [(addr, 443)]
+        }
+        sd = ssdp.check_fish(('/DeviceDescription.json', nd))
+        if not sd:
+            return addr, False
+        sd['hwaddr'] = sd['attributes']['mac-address']
+        nh = xcc.NodeHandler(sd, configmanager)
+        nh.scan()
+        detected(nh.info)
+        return addr, True
+    rpool = eventlet.greenpool.GreenPool(512)
+    for count in iterate_addrs(addresses, True):
+        yield msg.ConfluentResourceCount(count)
+    for result in rpool.imap(register_remote_addr, iterate_addrs(addresses)):
+        if result[1]:
+            yield msg.CreatedResource(result[0])
+        else:
+            yield msg.ConfluentResourceNotFound(result[0])
+
+
 def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if pathcomponents == ['discovery', 'autosense']:
         return handle_autosense_config(operation, inputdata)
@@ -477,17 +555,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         if pathcomponents == ['discovery', 'register']:
             if 'addresses' not in inputdata:
                 raise exc.InvalidArgumentException('Missing address in input')
-            nd = {
-                'addresses': [(inputdata['addresses'], 443)]
-            }
-            sd = ssdp.check_fish(('/DeviceDescription.json', nd))
-            if not sd:
-                raise exc.InvalidArgumentException('Target address is not detected or is not a supported device for remote discovery registration')
-            sd['hwaddr'] = sd['attributes']['mac-address']
-            nh = xcc.NodeHandler(sd, configmanager)
-            nh.scan()
-            detected(nh.info)
-            return [msg.CreatedResource(inputdata['address'])]
+            return register_remote_addrs(inputdata['addresses'], configmanager)
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
         mac = _get_mac_from_query(pathcomponents)
