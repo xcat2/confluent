@@ -401,7 +401,7 @@ def check_fish(urldata, port=443, verifycallback=None):
         verifycallback = lambda x: True
     url, data = urldata
     try:
-        wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=3)
+        wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)
         peerinfo = wc.grab_json_response(url)
     except socket.error:
         return None
