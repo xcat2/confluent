@@ -73,11 +73,11 @@ def subscribe_discovery(options, session, subscribe, targ):
     keyn = 'subscribe' if subscribe else 'unsubscribe'
     payload = {keyn: targ}
     if subscribe:
-        for rsp in session.update('/discovery/subscriptions/{0}'.format(options.node), payload):
+        for rsp in session.update('/discovery/subscriptions/{0}'.format(targ), payload):
             if 'status' in rsp:
                 print(rsp['status'])
     else:
-        for rsp in session.delete('/discovery/subscriptions/{0}'.format(options.node)):
+        for rsp in session.delete('/discovery/subscriptions/{0}'.format(targ)):
             if 'status' in rsp:
                 print(rsp['status'])
     
@@ -395,10 +395,10 @@ def main():
         parser.print_help()
         sys.exit(1)
     if args[0] == 'register' and len(args) != 2:
-        sys.stderr.write('Register requires target address or range (e.g. 192.168.2.30, 192.168.2.0/24, or 192.168.2.1-192.168.2.30)')
+        sys.stderr.write('Register requires target address or range (e.g. 192.168.2.30, 192.168.2.0/24, or 192.168.2.1-192.168.2.30)\n')
         sys.exit(1)
     if 'subscribe' in args[0] and len(args) != 2:
-        sys.stderr.write('subscribe/unsubscribe subcommands require switch name as argument')
+        sys.stderr.write('subscribe/unsubscribe subcommands require switch name as argument\n')
         sys.exit(1)
     session = client.Command()
     if args[0] == 'list':
