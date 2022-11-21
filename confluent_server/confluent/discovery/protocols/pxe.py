@@ -278,25 +278,45 @@ def proxydhcp():
     net4011.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4011.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
     net4011.bind(('', 4011))
+    rp = bytearray(300)
+    rpv = memoryview(rp)
+    rq = bytearray(2048)
+    data = pkttype.from_buffer(rq)
+    msg = msghdr()
+    cmsgarr = bytearray(cmsgsize)
+    cmsg = cmsgtype.from_buffer(cmsgarr)
+    iov = iovec()
+    iov.iov_base = ctypes.addressof(data)
+    iov.iov_len = 2048
+    msg.msg_iov = ctypes.pointer(iov)
+    msg.msg_iovlen = 1
+    msg.msg_control = ctypes.addressof(cmsg)
+    msg.msg_controllen = ctypes.sizeof(cmsg)
+    clientaddr = sockaddr_in()
+    msg.msg_name = ctypes.addressof(clientaddr)
+    msg.msg_namelen = ctypes.sizeof(clientaddr)
     cfg = cfm.ConfigManager(None)
     while True:
         ready = select.select([net4011], [], [], None)
         if not ready or not ready[0]:
             continue
-        rq = bytearray(1024)
-        rqv = memoryview(rq)
-        nb, client = net4011.recvfrom_into(rq)
-        if nb < 240:
+        i = recvmsg(net4011.fileno(), ctypes.pointer(msg), 0)
+        #nb, client = net4011.recvfrom_into(rq)
+        if i < 240:
             continue
-        rp = bytearray(1024)
-        rpv = memoryview(rp)
+        rqv = memoryview(rq)[:i]
+        client = (ipfromint(clientaddr.sin_addr.s_addr), socket.htons(clientaddr.sin_port))
+        _, level, typ = struct.unpack('QII', cmsgarr[:16])
+        if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
+            idx, recv = struct.unpack('II', cmsgarr[16:24])
+            recv = ipfromint(recv)
         try:
-            optidx = rq.index(b'\x63\x82\x53\x63') + 4
+            optidx = rqv.tobytes().index(b'\x63\x82\x53\x63') + 4
         except ValueError:
             continue
-        hwlen = rq[2]
-        opts, disco = opts_to_dict(rq, optidx, 3)
-        disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rq[28:28+hwlen]])
+        hwlen = rqv[2]
+        opts, disco = opts_to_dict(rqv, optidx, 3)
+        disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rqv[28:28+hwlen]])
         node = None
         if disco.get('hwaddr', None) in macmap:
             node = macmap[disco['hwaddr']]
@@ -304,10 +324,9 @@ def proxydhcp():
             node = uuidmap[disco['uuid']]
         if not node:
             continue
-
         myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
         if not myipn:
-            continue
+            myipn = socket.inet_aton(recv)
         if opts.get(77, None) == b'iPXE':
             profile = get_deployment_profile(node, cfg)
             if not profile:

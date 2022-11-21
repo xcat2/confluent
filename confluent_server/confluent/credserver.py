@@ -52,7 +52,7 @@ def address_is_somewhat_trusted(address, nodename, cfm):
             for anet in authnet.split():
                 na, plen = anet.split('/')
                 plen = int(plen)
-                if netutil.ip_on_same_subnet(address, no, plen):
+                if netutil.ip_on_same_subnet(address, na, plen):
                     return True
     return False
 
