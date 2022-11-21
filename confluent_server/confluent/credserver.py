@@ -41,58 +41,19 @@ libc = ctypes.CDLL(ctypes.util.find_library('c'))
 # 6, len, hmac - hmac of crypted key using shared secret for long-haul support
 # 128, len, len, key - sealed key
 
-_semitrusted = []
 
-def read_authnets(cfgpath):
-    global _semitrusted
-    with open(cfgpath, 'r') as cfgin:
-            _semitrusted = []
-            for line in cfgin.readlines():
-                line = line.split('#', 1)[0].strip()
-                if '/' not in line:
-                    continue
-                subnet, prefix = line.split('/')
-                prefix = int(prefix)
-                _semitrusted.append((subnet, prefix))
-
-
-def watch_trusted():
-    cfgpath = '/etc/confluent/auth_nets'
-    if isinstance(cfgpath, bytes):
-        bcfgpath = cfgpath
-    else:
-        bcfgpath = cfgpath.encode('utf8')
-    while True:
-        watcher = libc.inotify_init1(os.O_NONBLOCK)
-        if not os.path.exists(cfgpath):
-            with open(cfgpath, 'w') as cfgout:
-                cfgout.write(
-                    '# This is a list of networks in addition to local\n'
-                    '# networks to allow grant of initial deployment token,\n'
-                    '# when a node has deployment API armed\n')
-        try:
-            read_authnets(cfgpath)
-        except Exception:
-            eventlet.sleep(15)
-            continue
-        if libc.inotify_add_watch(watcher, bcfgpath, 0xcc2) <= -1:
-            eventlet.sleep(15)
-            continue
-        select.select((watcher,), (), (), 86400)
-        try:
-            os.read(watcher, 1024)
-        except Exception:
-            pass
-        os.close(watcher)
-
-
-
-def address_is_somewhat_trusted(address):
-    for authnet in _semitrusted:
-        if netutil.ip_on_same_subnet(address, authnet[0], authnet[1]):
-            return True
+def address_is_somewhat_trusted(address, nodename, cfm):
     if netutil.address_is_local(address):
         return True
+    authnets = cfm.get_node_attributes(nodename, 'trusted.subnets')
+    authnets = authnets.get(nodename, {}).get('trusted.subnets', {}).get('value', None)
+    if authnets:
+        for authnet in authnets.split(','):
+            for anet in authnet.split():
+                na, plen = anet.split('/')
+                plen = int(plen)
+                if netutil.ip_on_same_subnet(address, no, plen):
+                    return True
     return False
 
 class CredServer(object):
@@ -119,7 +80,7 @@ class CredServer(object):
             elif tlv[1]:
                 client.recv(tlv[1])
             if not hmackey:
-                if not address_is_somewhat_trusted(peer[0]):
+                if not address_is_somewhat_trusted(peer[0], nodename, self.cfm):
                     client.close()
                     return
                 apimats = self.cfm.get_node_attributes(nodename,

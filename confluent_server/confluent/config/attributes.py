@@ -110,6 +110,9 @@ node = {
     'crypted.selfapikey': {
         'description': ('Crypt of api key for self api requests by node'),
     },
+    'trusted.subnets': {
+        'description': 'Remote subnets in CIDR notation that should be considered as trusted as local networks'
+    }
     'deployment.encryptboot': {
         'description': ('Specify a strategy for encrypting the volume. Support '
                         'for this setting is currently only enabled for '

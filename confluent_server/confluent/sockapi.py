@@ -496,7 +496,6 @@ class SockApi(object):
             self.start_remoteapi()
         else:
             eventlet.spawn_n(self.watch_for_cert)
-        eventlet.spawn_n(credserver.watch_trusted)
         eventlet.spawn_n(self.watch_resolv)
         self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
 
