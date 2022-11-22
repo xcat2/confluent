@@ -739,7 +739,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         return  # do not send ip-less replies to anything but netboot specifically
     myipn = niccfg['deploy_server']
     if not myipn:
-        myipn = info['netinfo']['recvip']address
+        myipn = info['netinfo']['recvip']
     if httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
