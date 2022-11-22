@@ -248,7 +248,7 @@ def opts_to_dict(rq, optidx, expectype=1):
     if vci.startswith('cumulus-linux'):
         disco['arch'] = vci.replace('cumulus-linux', '').strip()
         iscumulus = True
-    elif vci.startswith('HTTPClient:Arch') or vci.startswith('PXEClient:Arch:'):
+    elif vci.startswith('HTTPClient:Arch') or vci.startswith('PXEClient'):
         reqdict['vci'] = vci
     if reqdict.get(93, None):
         disco['arch'] = pxearchs.get(bytes(reqdict[93]), None)
@@ -322,30 +322,40 @@ def proxydhcp(handler, nodeguess):
             node = macmap[disco['hwaddr']]
         elif disco.get('uuid', None) in uuidmap:
             node = uuidmap[disco['uuid']]
+        myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
+        skiplogging = True
+        netaddr = disco['hwaddr']
+        if time.time() > ignoredisco.get(netaddr, 0) + 90:
+            skiplogging = False
+            ignoredisco[netaddr] = time.time()
         if not myipn:
-            netaddr = disco['hwadr']
             info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
                             'architecture': disco['arch'],
                             'netinfo': {'ifidx': idx, 'recvip': recv},
                             'services': ('pxe-client',)}
-            if (disco['uuid']
-                    and time.time() > ignoredisco.get(netaddr, 0) + 90):
-                ignoredisco[netaddr] = time.time()
+            if not skiplogging:
                 handler(info)
         if not node:
-            if not myipn:
+            if not myipn and not skiplogging:
                 log.log(
                         {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
                             disco.get('uuid', 'unknown'), disco.get('hwaddr', 'unknown')
                 )})
             continue
-        myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
+        profile = None
         if not myipn:
             myipn = socket.inet_aton(recv)
-            log.log({
-                'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
-        if opts.get(77, None) == b'iPXE':
             profile = get_deployment_profile(node, cfg)
+            if profile:
+                log.log({
+                    'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
+            else:
+                if not skiplogging:
+                    log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
+                continue
+        if opts.get(77, None) == b'iPXE':
+            if not profile:
+                profile = get_deployment_profile(node, cfg)
             if not profile:
                 log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 continue
@@ -735,7 +745,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
                 gateway = None
         netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
         netmask = struct.pack('!I', netmask)
-    elif (not packet['vci']) or not (packet['vci'].startswith('HTTPClient:Arch:') or packet['vci'].startswith('PXEClient:Arch:')):
+    elif (not packet['vci']) or not (packet['vci'].startswith('HTTPClient:Arch:') or packet['vci'].startswith('PXEClient')):
         return  # do not send ip-less replies to anything but netboot specifically
     myipn = niccfg['deploy_server']
     if not myipn:
