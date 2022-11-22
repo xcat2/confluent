@@ -594,6 +594,8 @@ class NodeHandler(immhandler.NodeHandler):
                     }
                 if netconfig['ipv4_gateway']:
                     statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
+                elif not netutil.address_is_local(newip):
+                    raise exc.InvalidArgumentException('Will not remotely configure a device with no gateway')
                 wc.grab_json_response('/api/dataset', statargs)
         elif self.ipaddr.startswith('fe80::'):
             self.configmanager.set_node_attributes(
