@@ -326,7 +326,6 @@ def run(args):
         except Exception:
             eventlet.sleep(0.5)
     disco.start_detection()
-    pxe.start_proxydhcp()
     eventlet.sleep(1)
     consoleserver.start_console_sessions()
     while 1:

@@ -273,7 +273,7 @@ def opts_to_dict(rq, optidx, expectype=1):
 def ipfromint(numb):
     return socket.inet_ntoa(struct.pack('I', numb))
 
-def proxydhcp():
+def proxydhcp(handler, nodeguess):
     net4011 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4011.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     net4011.setsockopt(socket.IPPROTO_IP, IP_PKTINFO, 1)
@@ -322,14 +322,32 @@ def proxydhcp():
             node = macmap[disco['hwaddr']]
         elif disco.get('uuid', None) in uuidmap:
             node = uuidmap[disco['uuid']]
+        if not myipn:
+            netaddr = disco['hwadr']
+            info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
+                            'architecture': disco['arch'],
+                            'netinfo': {'ifidx': idx, 'recvip': recv},
+                            'services': ('pxe-client',)}
+            if (disco['uuid']
+                    and time.time() > ignoredisco.get(netaddr, 0) + 90):
+                ignoredisco[netaddr] = time.time()
+                handler(info)
         if not node:
+            if not myipn:
+                log.log(
+                        {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
+                            disco.get('uuid', 'unknown'), disco.get('hwaddr', 'unknown')
+                )})
             continue
         myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
         if not myipn:
             myipn = socket.inet_aton(recv)
+            log.log({
+                'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
         if opts.get(77, None) == b'iPXE':
             profile = get_deployment_profile(node, cfg)
             if not profile:
+                log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                 continue
             myip = socket.inet_ntoa(myipn)
             bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
@@ -355,8 +373,8 @@ def proxydhcp():
         net4011.sendto(rpv[:281], client)
 
 
-def start_proxydhcp():
-    eventlet.spawn_n(proxydhcp)
+def start_proxydhcp(handler, nodeguess=None):
+    eventlet.spawn_n(proxydhcp, handler, nodeguess)
 
 
 def snoop(handler, protocol=None, nodeguess=None):
@@ -364,6 +382,7 @@ def snoop(handler, protocol=None, nodeguess=None):
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
     # injection into the neigh table before OFFER or using SOCK_RAW.
+    start_proxydhcp(handler, nodeguess)
     tracelog = log.Logger('trace')
     global attribwatcher
     cfg = cfm.ConfigManager(None)
@@ -720,7 +739,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         return  # do not send ip-less replies to anything but netboot specifically
     myipn = niccfg['deploy_server']
     if not myipn:
-        myipn = info['netinfo']['recvip']
+        myipn = info['netinfo']['recvip']address
     if httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
@@ -736,6 +755,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
                     node, profile, len(bootfile) - 127)})
             return
         repview[108:108 + len(bootfile)] = bootfile
+    myip = myipn
     myipn = socket.inet_aton(myipn)
     orepview[12:16] = myipn
     repview[20:24] = myipn
@@ -798,7 +818,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     if clipn:
         ipinfo = 'with static address {0}'.format(niccfg['ipv4_address'])
     else:
-        ipinfo = 'without address'
+        ipinfo = 'without address, served from {0}'.format(myip)
     log.log({
         'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
     send_raw_packet(repview, replen + 28, reqview, info)
