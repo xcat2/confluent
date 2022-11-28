@@ -112,8 +112,17 @@ def get_port(addr, clientip, sessionid):
     if sessionid not in forwardersbyclient:
         forwardersbyclient[sessionid] = {}
     if addr not in forwardersbyclient[sessionid]:
-        newsock = eventlet.listen(('::', 0, 0, 0),
-                  family=socket.AF_INET6)
+        newsock = socket.socket(socket.AF_INET6)
+        newport = 3901
+        while newport:
+            try:
+                newsock.bind(('::', newport, 0, 0))
+                newsock.listen(50)
+                break
+            except OSError as e:
+                if e.errno == 98:
+                    newport += 1
+                    continue
         forwardersbyclient[sessionid][addr] = newsock
         sockhandler[newsock] = eventlet.spawn(forward_port, newsock, addr,
                                               clientip, sessionid)
