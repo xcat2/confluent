@@ -845,8 +845,9 @@ class InputCredential(ConfluentMessage):
             inputdata['uid'] = int(inputdata['uid'])
         if ('privilege_level' in inputdata and
               inputdata['privilege_level'] not in self.valid_privilege_levels):
-            raise exc.InvalidArgumentException('privilege_level is not one of '
-                                        + ','.join(self.valid_privilege_levels))
+            if not inputdata['privilege_level'].startswith('custom.'):
+                raise exc.InvalidArgumentException('privilege_level is not one of '
+                                            + ','.join(self.valid_privilege_levels))
         if ('enabled' in inputdata and
             inputdata['enabled'] not in self.valid_enabled_values):
             raise exc.InvalidArgumentException('valid values for enabled are '
