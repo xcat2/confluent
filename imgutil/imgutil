@@ -805,6 +805,20 @@ def exec_root_backend(args):
 
 def fancy_chroot(args, installroot):
     imgname = os.path.basename(installroot)
+    oshandler = fingerprint_host(args, args.scratchdir)
+    if oshandler:
+        with open(os.path.join(installroot, 'etc/confluentimg.buildinfo')) as binfo:
+            for line in binfo.readlines():
+                if '=' in line:
+                    k, v = line.split('=', 1)
+                    if k == 'BUILDSRC':
+                        dst = os.path.join(installroot, 'run/confluentdistro')
+                        dst = os.path.abspath(dst)
+                        os.makedirs(dst)
+                        _mount(v.strip(), dst, flags=MS_BIND|MS_RDONLY)
+                        break
+            else:
+                oshandler = None
     sourceresolv = '/etc/resolv.conf'
     if os.path.islink(sourceresolv):
         sourceresolv = os.readlink(sourceresolv)
@@ -821,6 +835,8 @@ def fancy_chroot(args, installroot):
     _mount('/', '/', flags=MS_BIND)  # Make / manifest as a mounted filesystem in exec
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
     os.environ['CONFLUENT_IMGUTIL_MODE'] = 'exec'
+    if oshandler:
+        oshandler.set_source('/run/confluentdistro')
     if args.cmd:
         if not args.cmd[0].startswith('/'):
             args.cmd[0] = shutil.which(args.cmd[0])
