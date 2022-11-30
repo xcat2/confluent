@@ -12,5 +12,5 @@ c = cmd.Command(args.xcc, os.environ['XCCUSER'], os.environ['XCCPASS'],
                 verifycallback=lambda x: True)
 wc = c.oem.wc
 cert = open(args.cert, 'rb').read()
-res = wc.grab_json_response_with_status('/api/function', {'Sec_ImportCert': '0,1,0,0,,{0}'.format(cert)
+res = wc.grab_json_response_with_status('/api/function', {'Sec_ImportCert': '0,1,0,0,,{0}'.format(cert)})
 print(repr(res))
