@@ -86,6 +86,10 @@ def main(args):
     c = client.Command()
     c.stop_if_noderange_over(args.noderange, args.maxnodes)
     errnodes = set([])
+    for rsp in c.read('/noderange/{0}/nodes/'.format(args.noderange)):
+        if 'error' in rsp:
+            sys.stderr.write(rsp['error'] + '\n')
+            sys.exit(1)
     if not args.clear and args.network and not args.prepareonly:
         rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
                                         bootmode='uefi',
