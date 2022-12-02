@@ -5,6 +5,7 @@ osdeploy(8) --- Configure general OS deployment facilities of confluent
 
 `osdeploy import <iso>`  
 `osdeploy updateboot <profile>`  
+`osdeploy rebase <profile>`  
 `osdeploy initialize [-h] [-g] [-u] [-s] [-k] [-t] [-p] [-i] [-l] [-a]`  
 
 ## DESCRIPTION
@@ -13,5 +14,6 @@ osdeploy(8) --- Configure general OS deployment facilities of confluent
 `import` subcommand will generate profiles from an iso image. `updateboot` will take any
 changes in the specified update that need to be pushed into boot configuration and/or images
 and ensure those needed changes are performed. `initialize` provides assistance in setting
-up the most commonly required facilities. Run `osdeploy initialize -h` for more detail
-on the options offered by `osdeploy initialize`
+up the most commonly required facilities. `rebase` has confluent attempt to update profile
+content that came from /opt/confluent in an rpm update, if profile supports it. 
+Run `osdeploy initialize -h` for more detail on the options offered by `osdeploy initialize`.
