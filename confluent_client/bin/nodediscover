@@ -353,7 +353,7 @@ def blocking_scan(session):
 
 def main():
     parser = optparse.OptionParser(
-        usage='Usage: %prog [list|assign|rescan|clear] [options]')
+        usage='Usage: %prog [list|assign|rescan|clear|subscribe|unsubscribe|register] [options]')
     # -a for 'address' maybe?
     # order by
     # show state (discovered or..
