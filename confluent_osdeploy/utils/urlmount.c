@@ -49,7 +49,7 @@ void *http_rechecker(void *argp) {
     int tmpidx, tmpval;
     tmpidx = open("/dev/urandom", O_RDONLY);
     if (tmpidx <= 0 || read(tmpidx, (char*)&tmpval, 4) < 0)
-        tmpval = time(NULL);
+        tmpval = time(NULL) & 0xffffffff;
     if (tmpidx >= 0)
         close(tmpidx);
     srand(tmpval);

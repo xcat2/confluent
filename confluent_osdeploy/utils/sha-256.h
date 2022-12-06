@@ -61,7 +61,7 @@ void calc_sha_256(uint8_t hash[SIZE_OF_SHA_256_HASH], const void *input, size_t 
  *
  * @note If either of the passed pointers is NULL, the results are unpredictable.
  */
-void hmac_sha256(uint8_t* hmac, char* msg, int msglen, char* key, int keylen);
+void hmac_sha256(uint8_t* hmac, char* msg, int msglen, char* key, unsigned int keylen);
 void sha_256_init(struct Sha_256 *sha_256, uint8_t hash[SIZE_OF_SHA_256_HASH]);
 
 /*

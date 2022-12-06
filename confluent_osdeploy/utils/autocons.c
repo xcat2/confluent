@@ -68,16 +68,16 @@ int main(int argc, char* argv[]) {
     }
     if (currspeed == SPEED9600) {
         cspeed = B9600;
-        strcpy(offset, ",9600");
+        strncpy(offset, ",9600", 6);
     } else if (currspeed == SPEED19200) {
         cspeed = B19200;
-        strcpy(offset, ",19200");
+        strncpy(offset, ",19200", 7);
     } else if (currspeed == SPEED57600) {
         cspeed = B57600;
-        strcpy(offset, ",57600");
+        strncpy(offset, ",57600", 7);
     } else if (currspeed == SPEED115200) {
         cspeed = B115200;
-        strcpy(offset, ",115200");
+        strncpy(offset, ",115200", 8);
     } else {
         exit(0);
     }
@@ -86,6 +86,7 @@ int main(int argc, char* argv[]) {
         cfsetospeed(&tty, cspeed);
         cfsetispeed(&tty, cspeed);
     }
+    buff[127] = 0;
     printf("%s\n", buff);
     tcgetattr(ttyf, &tty2);
     cfmakeraw(&tty2);

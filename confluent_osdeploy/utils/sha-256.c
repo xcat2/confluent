@@ -3,7 +3,7 @@
 
 #define TOTAL_LEN_LEN 8
 
-void hmac_sha256(uint8_t* hmac, char* msg, int msglen, char* key, int keylen) {
+void hmac_sha256(uint8_t* hmac, char* msg, int msglen, char* key, unsigned int keylen) {
     uint8_t *scratch;
     uint8_t keyprime[SIZE_OF_SHA_256_CHUNK];
     uint8_t keymod[SIZE_OF_SHA_256_CHUNK];
@@ -15,7 +15,7 @@ void hmac_sha256(uint8_t* hmac, char* msg, int msglen, char* key, int keylen) {
         memcpy(keyprime, key, keylen);
     }
     padneeded = SIZE_OF_SHA_256_CHUNK - keylen;
-    if (padneeded) {
+    if (keylen < SIZE_OF_SHA_256_CHUNK) {
         memset(keyprime + keylen, 0, padneeded);
     }
     for (padneeded=0; padneeded < SIZE_OF_SHA_256_CHUNK; padneeded++) {

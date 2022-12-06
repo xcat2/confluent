@@ -90,6 +90,7 @@ int getpasshmac(int argc, char* argv[]) {
     tmps = genpasswd(16);
     memcpy(buffer, "$5$", 3);
     memcpy(buffer + 3, tmps, 16);
+    free(tmps);
     buffer[19] = 0;
     fwrite(passwd, 1, 48, outfile);
     fclose(outfile);
@@ -105,6 +106,7 @@ int getpasshmac(int argc, char* argv[]) {
     free(hmac64);
     free(passwd);
     free(buffer);
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
