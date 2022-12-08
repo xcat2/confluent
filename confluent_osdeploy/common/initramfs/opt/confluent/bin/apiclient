@@ -245,6 +245,7 @@ class HTTPSClient(client.HTTPConnection, object):
             self.hosts = []
             info = open('/etc/confluent/confluent.info').read().split('\n')
             havedefault = '0'
+            plainhost = ''
             for line in info:
                 host = ''
                 if line.startswith('NODENAME:'):
@@ -252,6 +253,8 @@ class HTTPSClient(client.HTTPConnection, object):
                     self.stdheaders['CONFLUENT_NODENAME'] = node
                 if line.startswith('MANAGER:') and not host:
                     host = line.split(' ')[1]
+                    if not plainhost:
+                        plainhost = host
                 if line.startswith('EXTMGRINFO:'):
                     extinfo = line.split(' ')[1]
                     extinfo = extinfo.split('|')
@@ -278,6 +281,8 @@ class HTTPSClient(client.HTTPConnection, object):
                 for line in info:
                     if line.startswith('deploy_server: ') or line.startswith('deploy_server_v6: '):
                         self.hosts.append(line.split(': ', 1)[1])
+            if plainhost and not self.hosts:
+                self.hosts.append(plainhost)
         if self.phmac:
             with open(phmac, 'r') as hmacin:
                 self.stdheaders['CONFLUENT_CRYPTHMAC'] = hmacin.read()
