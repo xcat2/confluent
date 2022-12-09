@@ -93,7 +93,6 @@ if [ -z "$confluent_mgr" ]; then
     else
         confluent_mgr="[$confluent_mgr]"
     fi
-    confluent_mgr="[$confluent_mgr]"
 fi
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/prechroot.sh > /tmp/postinst.sh
 . /tmp/postinst.sh
@@ -127,7 +126,6 @@ if [ -z "$confluent_mgr" ]; then
     else
         confluent_mgr="[$confluent_mgr]"
     fi
-    confluent_mgr="[$confluent_mgr]"
 fi
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/post.sh > /tmp/postinst.sh
 . /tmp/postinst.sh
