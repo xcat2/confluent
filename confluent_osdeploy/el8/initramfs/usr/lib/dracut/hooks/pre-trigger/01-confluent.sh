@@ -91,6 +91,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
             confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg)
             confluent_profile=${confluent_profile#profile: }
+            mgr=$deployer
             break
         fi
     done
