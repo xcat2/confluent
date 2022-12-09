@@ -110,7 +110,7 @@ if [ ! -z "$confluentsrv" ]; then
         ifname=$(ip -br link|grep LOWER_UP|grep -v UNKNOWN|head -n 1|awk '{print $1}')
         echo -n "Attempting to use dhcp to bring up $ifname..."
         dhclient $ifname
-        while ! ip -br addr show dev $ifname | grep \\ . > /dev/null; do
+        while ! ip -br addr show dev $ifname | grep \\. > /dev/null; do
             echo -n "Still waiting for IPv4 address on: "
             ip -br link show dev $ifname 
             sleep 1
@@ -209,7 +209,7 @@ if [ "$autoconfigmethod" = "dhcp" ]; then
     if [ "$DIDDHCP" = "0" ]; then
         echo -n "Attempting to use dhcp to bring up $ifname..."
         dhclient $ifname
-        while ! ip -br addr show dev $ifname | grep \\ . > /dev/null; do
+        while ! ip -br addr show dev $ifname | grep \\. > /dev/null; do
             echo -n "Still waiting for IPv4 address on: "
             ip -br link show dev $ifname 
             sleep 1
