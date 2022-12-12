@@ -50,9 +50,9 @@ class ScreenPrinter(object):
         if len(text) >= self.textlen:
             self.textlen = len(text) + 1
             self.fieldwidth = self.textlen + self.nodenamelen + 1
-        self.drawscreen()
+        self.drawscreen(node)
 
-    def drawscreen(self):
+    def drawscreen(self, node=None):
         if self.squeeze:
             currheight, currwidth = get_screengeom()
             currheight -= 1
@@ -76,7 +76,11 @@ class ScreenPrinter(object):
                         break
                 sys.stdout.write('\n')
         else:
-            for node in self.nodelist:
+            if node:
+                nodes = [node]
+            else:
+                nodes = self.nodelist
+            for node in nodes:
                 sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
                 sys.stdout.write('\n')
         sys.stdout.flush()
