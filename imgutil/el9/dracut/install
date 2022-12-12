@@ -23,8 +23,8 @@ dracut_install /lib64/libpthread.so.0
 dracut_install losetup # multipart support
 
 #this would be nfs with lock, but not needed, go nolock
-#dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify
-#dracut_install mount.nfs  /etc/netconfig
+dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify
+dracut_install mount.nfs  /etc/netconfig
 inst /usr/lib/dracut/modules.d/40network/net-lib.sh /lib/net-lib.sh
 
 

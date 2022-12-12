@@ -22,8 +22,8 @@ dracut_install /usr/lib/udev/rules.d/60-net.rules /lib/udev/rename_device /usr/l
 dracut_install losetup # multipart support
 
 #this would be nfs with lock, but not needed, go nolock
-#dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify
-#dracut_install mount.nfs  /etc/netconfig
+dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify
+dracut_install mount.nfs  /etc/netconfig
 inst /usr/lib/dracut/modules.d/40network/net-lib.sh /lib/net-lib.sh
 
 
