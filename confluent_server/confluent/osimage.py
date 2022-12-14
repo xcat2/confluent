@@ -726,7 +726,8 @@ def get_hashes(dirname):
             fullname = os.path.join(dname, fname)
             currhash = hashlib.sha512()
             subname = fullname.replace(dirname + '/', '')
-            hashmap[subname] = get_hash(fullname)
+            if os.path.isfile(fullname):
+                hashmap[subname] = get_hash(fullname)
     return hashmap
 
 
