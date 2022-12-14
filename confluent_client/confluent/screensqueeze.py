@@ -100,6 +100,7 @@ class ScreenPrinter(object):
                     sys.stdout.write('\n')
                     column = 0
                     self.lastrows += 1
+                sys.stdout.write('\x1b[J')
         else:
             if node:
                 nodes = [node]
