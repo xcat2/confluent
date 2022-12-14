@@ -29,6 +29,9 @@ class ScreenPrinter(object):
         self.client = client
         self.nodeoutput = {}
         self.nodelist = []
+        self.nodepos = {}
+        self.lastrows = 0
+        self.fieldchanged = False
         maxlen = 0
         for ans in self.client.read('/noderange/{0}/nodes/'.format(noderange)):
             if 'error' in ans:
@@ -50,16 +53,19 @@ class ScreenPrinter(object):
         if len(text) >= self.textlen:
             self.textlen = len(text) + 1
             self.fieldwidth = self.textlen + self.nodenamelen + 1
+            self.fieldchanged = True
         self.drawscreen(node)
 
     def drawscreen(self, node=None):
         if self.squeeze:
             currheight, currwidth = get_screengeom()
-            currheight -= 1
+            currheight -= 2
+            if currheight < 1:
+                currheight = 1
             numfields = currwidth // self.fieldwidth
             fieldformat = '{{0:>{0}}}:{{1:{1}}}'.format(self.nodenamelen,
                                                         self.textlen)
-            sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
+            #sys.stdout.write('\x1b[2J\x1b[;H')  # clear screen
             if len(self.nodelist) < (numfields * currheight):
                 numfields = len(self.nodelist) // currheight + 1
         else:
@@ -67,14 +73,33 @@ class ScreenPrinter(object):
             fieldformat = '{0}: {1}'
         if self.squeeze:
             columns = [self.nodelist[x:x+currheight] for x in range(0, len(self.nodelist), currheight)]
-            for currow in range(0, len(columns[0])):
-                for col in columns:
-                    try:
-                        node = col[currow]
-                        sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
-                    except IndexError:
-                        break
-                sys.stdout.write('\n')
+            if self.lastrows:
+                sys.stdout.write('\x1b[{0}A'.format(self.lastrows))
+            if node and self.lastrows == len(columns[0]) and not self.fieldchanged:
+                targline, targcol = self.nodepos[node]
+                if targline:
+                    sys.stdout.write('\x1b[{0}B'.format(targline))
+                if targcol:
+                    sys.stdout.write('\x1b[{0}C'.format(targcol))
+                sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
+                sys.stdout.write('\r\x1b[{0}B'.format(self.lastrows - targline))
+            else:
+                self.lastrows = 0
+                self.fieldchanged = False
+                column = 0
+                for currow in range(0, len(columns[0])):
+                    sys.stdout.write('\x1b[2K')
+                    for col in columns:
+                        try:
+                            node = col[currow]
+                            self.nodepos[node] = (currow, column)
+                            sys.stdout.write(fieldformat.format(node, self.nodeoutput[node]))
+                            column += len(fieldformat.format(node, self.nodeoutput[node]))
+                        except IndexError:
+                            break
+                    sys.stdout.write('\n')
+                    column = 0
+                    self.lastrows += 1
         else:
             if node:
                 nodes = [node]
