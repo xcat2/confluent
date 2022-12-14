@@ -77,7 +77,7 @@ if [ ! -z "$blargs" ]; then
     echo "bootloader $blargs" > /tmp/grubpw
 fi
 ssh-keygen -A
-rm ssh_host_dsa_key*
+rm /etc/ssh/ssh_host_dsa_key*
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     curl -sf -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$pubkey https://$confluent_mgr/confluent-api/self/sshcert > $certfile
