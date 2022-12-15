@@ -2186,6 +2186,8 @@ class ConfigManager(object):
                     ','.join(missingnodes)))
         newnames = set([])
         for name in renamemap:
+            if renamemap[name] in newnames:
+                raise ValueError('Requested to rename multiple nodes to the same name: {0}'.format(renamemap[name]))
             newnames.add(renamemap[name])
         if newnames & currnodes:
             raise ValueError(
@@ -2230,6 +2232,8 @@ class ConfigManager(object):
                     ','.join(missinggroups)))
         newnames = set([])
         for name in renamemap:
+            if renamemap[name] in newnames:
+                raise ValueError('Requested to rename multiple groups to the same name: {0}'.format(name))
             newnames.add(renamemap[name])
         if newnames & currgroups:
             raise ValueError(
