@@ -191,7 +191,7 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
         if peerip:
             targip = peerip
         output = util.run(
-            ['rsync', '-rvLD', targdir + '/', 'root@{}:/'.format(targip)])[0]
+            ['rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip)])[0]
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
             # https://github.com/eventlet/eventlet/issues/413
