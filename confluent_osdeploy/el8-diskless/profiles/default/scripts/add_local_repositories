@@ -7,15 +7,26 @@ import imp
 import sys
 apiclient = imp.load_source('apiclient', '/opt/confluent/bin/apiclient')
 repo = None
+server4 = None
 server = None
+server6 = None
 profile = None
+v4cfg = None
 with open('/etc/confluent/confluent.deploycfg') as dplcfgfile:
     lines = dplcfgfile.read().split('\n')
     for line in lines:
         if line.startswith('deploy_server:'):
-           _, server = line.split(' ', 1)
+           _, server4 = line.split(' ', 1)
+        if line.startswith('deploy_server_v6:'):
+           _, server6 = line.split(' ', 1)
         if line.startswith('profile: '):
            _, profile = line.split(' ', 1)
+	if line.startswith('ipv4_method: '):
+           _, v4cfg = line.split(' ', 1)
+if v4cfg == 'static' or v4cfg =='dhcp':
+    server = server4
+if not server:
+    server = '[{}]'.format(server6)
 
 path = '/confluent-public/os/{0}/distribution/'.format(profile)
 clnt = apiclient.HTTPSClient()
