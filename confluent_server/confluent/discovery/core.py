@@ -1380,6 +1380,7 @@ def discover_node(cfg, handler, info, nodename, manual):
                 if not bmcaddr:
                     log.log({'error': 'Unable to get BMC address for {0]'.format(nodename)})
                 else:
+                    bmcaddr = bmcaddr.split('/', 1)[0]
                     wait_for_connection(bmcaddr)
                     socket.getaddrinfo(bmcaddr, 443)
                     subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
