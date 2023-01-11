@@ -25,7 +25,7 @@ with open('/etc/confluent/confluent.deploycfg') as dplcfgfile:
            _, server6 = line.split(' ', 1)
         if line.startswith('profile: '):
            _, profile = line.split(' ', 1)
-	if line.startswith('ipv4_method: '):
+        if line.startswith('ipv4_method: '):
            _, v4cfg = line.split(' ', 1)
 if v4cfg == 'static' or v4cfg =='dhcp':
     server = server4
