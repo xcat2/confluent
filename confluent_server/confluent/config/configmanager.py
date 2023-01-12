@@ -1625,6 +1625,8 @@ class ConfigManager(object):
         name = confluent.util.stringify(name)
         if name in self._cfgstore['users']:
             raise Exception("Duplicate username requested")
+        if role is None:
+            role = 'Administrator'
         for candrole in _validroles:
             if candrole.lower().startswith(role.lower()):
                 role = candrole
