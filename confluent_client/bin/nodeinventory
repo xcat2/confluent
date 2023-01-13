@@ -99,6 +99,7 @@ usedprefixes = set([])
 argparser = optparse.OptionParser(
     usage="Usage: %prog <noderange> [serial|model|uuid|mac]")
 argparser.add_option('-j', '--json', action='store_true', help='Output JSON')
+argparser.add_option('-s', '--store', action='store_true', help='Store serial, model, and uuid into id.serial, id.model, and id.uuid')
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -126,17 +127,36 @@ if len(args) > 1:
 try:
     if options.json:
         databynode = {}
+    if options.store and len(args) <= 1:
+        url = '/noderange/{0}/inventory/hardware/all/system'
+    pushattribs = {}
     session = client.Command()
     for res in session.read(url.format(noderange)):
         printerror(res)
         if 'databynode' not in res:
             continue
         for node in res['databynode']:
+            if options.store and node not in pushattribs:
+                pushattribs[node] = {}
             printerror(res['databynode'][node], node)
             if 'inventory' not in res['databynode'][node]:
                 continue
             for inv in res['databynode'][node]['inventory']:
                 prefix = inv['name']
+                if options.store and prefix == 'System':
+                    currinfo = inv.get('information', {})
+                    curruuid = currinfo.get('UUID', '')
+                    if curruuid:
+                        curruuid = curruuid.lower()
+                        pushattribs[node]['id.uuid'] = curruuid
+                    currserial = currinfo.get('Serial Number', '')
+                    if currserial:
+                        currserial = currserial.strip()
+                        pushattribs[node]['id.serial'] = currserial
+                    currmodelnum = currinfo.get('Model', '')
+                    if currmodelnum:
+                        currmodelnum = currmodelnum.strip()
+                        pushattribs[node]['id.model'] = currmodelnum
                 idx = 2
                 while (node, prefix) in usedprefixes:
                     prefix = '{0} {1}'.format(inv['name'], idx)
@@ -148,7 +168,7 @@ try:
                             if node not in databynode:
                                 databynode[node] = {}
                             databynode[node][prefix] = inv
-                        else:
+                        elif not options.store:
                             print('{0}: {1}: Not Present'.format(node, prefix))
                     continue
                 info = inv['information']
@@ -179,12 +199,18 @@ try:
                             databynode[node] = {}
                         databynode[node][prefix] = inv
                         break
-                    print(u'{0}: {1} {2}: {3}'.format(node, prefix,
-                                                     pretty(datum),
-                                                     info[datum]))
+                    elif not options.store:
+                        print(u'{0}: {1} {2}: {3}'.format(node, prefix,
+                                                         pretty(datum),
+                                                         info[datum]))
     if options.json:
         print(json.dumps(databynode, sort_keys=True, indent=4,
                          separators=(',', ': ')))
+    if pushattribs:
+        for node in pushattribs:
+            for rsp in session.update('/nodes/{0}/attributes/current'.format(node), pushattribs[node]):
+                if 'error' in rsp:
+                    sys.stderr.write(rsp['error'] + '\n')
 except KeyboardInterrupt:
     print('')
 sys.exit(exitcode)
