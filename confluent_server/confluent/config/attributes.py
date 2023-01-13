@@ -233,6 +233,12 @@ node = {
                         'a stateless profile would be both after first boot.')
 
     },
+    'deployment.state': {
+        'description': ('Profiles may push more specific state, for example, it may set the state to "failed" or "succeded"'),
+    },
+    'deployment.state_detail': {
+        'description': ('Detailed state information as reported by an OS profile, when available'),
+    },
     'deployment.useinsecureprotocols': {
         'description': ('What phase(s) of boot are permitted to use insecure protocols '
                         '(TFTP and HTTP without TLS.  By default, only HTTPS is used.  However '

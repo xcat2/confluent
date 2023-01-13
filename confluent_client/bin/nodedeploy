@@ -49,7 +49,7 @@ def armonce(nr, cli):
 
 
 def setpending(nr, profile, cli):
-    args = {'deployment.pendingprofile': profile}
+    args = {'deployment.pendingprofile': profile, 'deployment.state': '', 'deployment.state_detail': ''}
     if not profile.startswith('genesis-'):
         args['deployment.stagedprofile'] = ''
         args['deployment.profile'] = ''

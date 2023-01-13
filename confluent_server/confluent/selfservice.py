@@ -420,6 +420,19 @@ def handle_request(env, start_response):
         yield 'complete'
     elif env['PATH_INFO'] == '/self/updatestatus' and reqbody:
         update = yaml.safe_load(reqbody)
+        statusstr = update.get('state', None)
+        statusdetail = update.get('state_detail', None)
+        didstateupdate = False
+        if statusstr:
+            cfg.set_node_attributes({nodename: {'deployment.state': statusstr}})
+            didstateupdate = True
+        if statusdetail:
+            cfg.set_node_attributes({nodename: {'deployment.state_detail': statusdetail}})
+            didstateupdate = True
+        if 'status' not in update and didstateupdate:
+            start_response('200 Ok', ())
+            yield 'Accepted'
+            return
         if update['status'] == 'staged':
             targattr = 'deployment.stagedprofile'
         elif update['status'] == 'complete':
