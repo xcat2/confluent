@@ -77,6 +77,7 @@ if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null && [
 	sed -e s'/$/ 'console=${autocons#*/dev/}/ /proc/cmdline > /etc/fakecmdline
 	mount -o bind /etc/fakecmdline /proc/cmdline
 	echo "ConsoleDevice: ${autocons%,*}" >> /etc/linuxrc.d/01-confluent
+	echo "Textmode: 1" >> /etc/linuxrc.d/01-confluent
 fi
 
 tz=$(grep timezone: /etc/confluent/confluent.deploycfg | awk '{print $2}')
