@@ -132,7 +132,7 @@ def main(args):
                 if node not in databynode:
                     databynode[node] = {}
                 for attr in dbn[node]:
-                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed', 'deployment.stagedprofile', 'deployment.profile'):
+                    if attr in ('deployment.pendingprofile', 'deployment.apiarmed', 'deployment.stagedprofile', 'deployment.profile', 'deployment.state', 'deployment.state_detail'):
                         databynode[node][attr] = dbn[node][attr].get('value', '')
         for node in sortutil.natural_sort(databynode):
             profile = databynode[node].get('deployment.pendingprofile', '')
@@ -153,7 +153,18 @@ def main(args):
                 armed = ' (node authentication armed)'
             else:
                 armed = ''
-            print('{0}: {1}{2}'.format(node, profile, armed))
+            stateinfo = ''
+            deploymentstate = databynode[node].get('deployment.state', '')
+            if deploymentstate:
+                statedetails = databynode[node].get('deployment.state_detail', '')
+                if statedetails:
+                    stateinfo = '{}: {}'.format(deploymentstate, statedetails)
+                else:
+                    stateinfo = deploymentstate
+            if stateinfo:
+                print('{0}: {1} ({2})'.format(node, profile, stateinfo))
+            else:
+                print('{0}: {1}{2}'.format(node, profile, armed))
         sys.exit(0)
     if args.network and not args.prepareonly:
         return rc
