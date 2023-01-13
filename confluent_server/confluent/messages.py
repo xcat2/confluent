@@ -1682,16 +1682,19 @@ class NetworkConfiguration(ConfluentMessage):
     desc = 'Network configuration'
 
     def __init__(self, name=None, ipv4addr=None, ipv4gateway=None,
-                 ipv4cfgmethod=None, hwaddr=None):
+                 ipv4cfgmethod=None, hwaddr=None, staticv6addrs=(), staticv6gateway=None):
         self.myargs = (name, ipv4addr, ipv4gateway, ipv4cfgmethod, hwaddr)
         self.notnode = name is None
         self.stripped = False
+        v6addrs = ','.join(staticv6addrs)
 
         kvpairs = {
             'ipv4_address': {'value': ipv4addr},
             'ipv4_gateway': {'value': ipv4gateway},
             'ipv4_configuration': {'value': ipv4cfgmethod},
             'hw_addr': {'value': hwaddr},
+            'static_v6_addresses': {'value': v6addrs},
+            'static_v6_gateway': {'value': staticv6gateway}
         }
         if self.notnode:
             self.kvpairs = kvpairs

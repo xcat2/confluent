@@ -90,6 +90,12 @@ cfgpaths = {
     'bmc.ipv4_gateway': (
         'configuration/management_controller/net_interfaces/management',
         'ipv4_gateway'),
+    'bmc.static_ipv6_addresses': (
+        'configuration/management_controller/net_interfaces/management',
+        'static_v6_addresses'),
+    'bmc.static_ipv6_gateway': (
+        'configuration/management_controller/net_interfaces/management',
+        'static_v6_gateway'),
     'bmc.hostname': (
         'configuration/management_controller/hostname', 'hostname'),
 }

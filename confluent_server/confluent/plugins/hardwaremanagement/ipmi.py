@@ -735,11 +735,14 @@ class IpmiHandler(object):
         elif len(self.element) == 4 and self.element[-1] == 'management':
             if self.op == 'read':
                 lancfg = self.ipmicmd.get_net_configuration()
+                v6cfg = self.ipmicmd.get_net6_configuration()
                 self.output.put(msg.NetworkConfiguration(
                     self.node, ipv4addr=lancfg['ipv4_address'],
                     ipv4gateway=lancfg['ipv4_gateway'],
                     ipv4cfgmethod=lancfg['ipv4_configuration'],
-                    hwaddr=lancfg['mac_address']
+                    hwaddr=lancfg['mac_address'],
+                    staticv6addrs=v6cfg['static_addrs'],
+                    staticv6gateway=v6cfg['static_gateway'],
                 ))
             elif self.op == 'update':
                 config = self.inputdata.netconfig(self.node)
@@ -748,6 +751,11 @@ class IpmiHandler(object):
                         ipv4_address=config['ipv4_address'],
                         ipv4_configuration=config['ipv4_configuration'],
                         ipv4_gateway=config['ipv4_gateway'])
+                    v6addrs = config.get('static_v6_addresses', None)
+                    if v6addrs is not None:
+                        v6addrs = v6addrs.split(',')
+                    v6gw = config.get('static_v6_gateway', None)
+                    self.ipmicmd.set_net6_configuration(static_addressess=v6addrs, static_gateway=v6gw)
                 except socket.error as se:
                     self.output.put(msg.ConfluentNodeError(self.node,
                                                            se.message))
