@@ -1515,6 +1515,8 @@ class ConfigManager(object):
         groupname = confluent.util.stringify(groupname)
         if groupname in self._cfgstore['usergroups']:
             raise Exception("Duplicate groupname requested")
+        if role is None:
+            role = 'Administrator'
         for candrole in _validroles:
             if candrole.lower().startswith(role.lower()):
                 role = candrole
