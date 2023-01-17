@@ -58,7 +58,7 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
 
 def active_scan(handler, protocol=None):
     known_peers = set([])
-    for scanned in scan(['urn:dmtf-org:service:redfish-rest:1']):
+    for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
@@ -381,6 +381,24 @@ def _find_service(service, target):
     querypool = gp.GreenPool()
     pooltargs = []
     for nid in peerdata:
+        if peerdata[nid].get('services', [None])[0] == 'urn::service:affluent:1':
+            peerdata[nid]['attributes'] = {
+                'type': 'affluent-switch',
+            }
+            peerdata[nid]['services'] = ['affluent-switch']
+            mya = peerdata[nid]['attributes']
+            usn = peerdata[nid]['usn']
+            idinfo = usn.split('::')
+            for idi in idinfo:
+                key, val = idi.split(':', 1)
+                if key == 'uuid':
+                    peerdata[nid]['uuid'] = val
+                elif key == 'serial':
+                    mya['enclosure-serial-number'] = [val]
+                elif key == 'model':
+                    mya['enclosure-machinetype-model'] = [val]
+            yield peerdata[nid]
+            continue
         if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
             continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
@@ -466,6 +484,10 @@ def _parse_ssdp(peer, rsp, peerdata):
                     peerdatum['services'] = [value]
                 elif value not in peerdatum['services']:
                     peerdatum['services'].append(value)
+            elif header == 'USN':
+                peerdatum['usn'] = value
+            elif header == 'MODELNAME':
+                peerdatum['modelname'] = value
 
 
 
