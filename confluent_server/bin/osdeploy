@@ -291,7 +291,7 @@ def initialize(cmdset):
             try:
                 subprocess.check_call(['systemctl', 'try-restart', 'apache2'])
                 print('HTTP server has been restarted if it was running')
-            except subprocess.CalledProcessError:
+            except Exception:
                 emprint('New HTTPS certificates generated, restart the web server manually')
         else:
             emprint('New HTTPS certificates generated, restart the web server manually')
