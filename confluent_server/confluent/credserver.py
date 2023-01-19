@@ -79,14 +79,14 @@ class CredServer(object):
                 hmackey = hmackey.get(nodename, {}).get('secret.selfapiarmtoken', {}).get('value', None)
             elif tlv[1]:
                 client.recv(tlv[1])
+            apimats = self.cfm.get_node_attributes(nodename,
+                    ['deployment.apiarmed', 'deployment.sealedapikey'])
+            apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
+                    'value', None)
             if not hmackey:
                 if not address_is_somewhat_trusted(peer[0], nodename, self.cfm):
                     client.close()
                     return
-                apimats = self.cfm.get_node_attributes(nodename,
-                    ['deployment.apiarmed', 'deployment.sealedapikey'])
-                apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
-                    'value', None)
                 if not apiarmed:
                     if apimats.get(nodename, {}).get(
                         'deployment.sealedapikey', {}).get('value', None):
