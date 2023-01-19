@@ -18,7 +18,7 @@
 
 #define MAXPACKET 1024
 
-static const char cryptalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const char cryptalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./";
 
 unsigned char* genpasswd(int len) {
         unsigned char * passwd;
