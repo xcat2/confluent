@@ -121,7 +121,7 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
             if 'events' in thisdata:
                 evtdata = thisdata['events']
                 if options.lines:
-                    event_dict[node].append(evtdata)
+                    event_dict[node].extend(evtdata)
                 else:
                     for evt in evtdata:
                         print('{0}: {1}'.format(node, format_event(evt)))
@@ -130,8 +130,8 @@ if options.lines:
     for node in nodes:
         evtdata_list = event_dict[node]
         if len(evtdata_list) != 0:
-            evtdata = evtdata_list[-1]
-            if len(evtdata) > options.lines:
-                evtdata = evtdata[-abs(options.lines):]
-            for evt in evtdata:
+            if len(evtdata_list) > options.lines:
+                evtdata_list = evtdata_list[-abs(options.lines):]
+            for evt in evtdata_list:
                 print('{0}: {1}'.format(node, format_event(evt)))
+                
