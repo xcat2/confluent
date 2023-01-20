@@ -15,6 +15,10 @@ noderange.
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to clear if clearing log, prompting if 
   over the threshold 
+
+* `-l LINES`, `--lines=LINES`:
+    return the last <n> entries for each node in the eventlog. 
+                           
   
 * `-h`, `--help`:
   Show help message and exit  
