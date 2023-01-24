@@ -84,7 +84,7 @@ if options.windowed:
 
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
     if not envstring:
-        sizegeometry='75x30'
+        sizegeometry='100x31'
         envlist=['xterm', '-bg', 'black', '-fg', 'white', '-geometry', '{sizegeometry}+0+0'.format(sizegeometry=sizegeometry), '-e']
     else:
         envlist=os.environ.get('NODECONSOLE_WINDOWED_COMMAND').split(' ')
@@ -100,7 +100,7 @@ if options.windowed:
 
             else:
                 envlist.insert(1, '-geometry')
-                envlist.insert(2, '75x30+0+0')
+                envlist.insert(2, '100x31+0+0')
                 g_index = 1          
     nodes = []
     sess = client.Command()
@@ -179,7 +179,7 @@ if options.windowed:
                 if g_index:    
                     envlist[g_index+1] = xgeometry
         elif envlist[0] == 'xterm':
-            envlist=['xterm','-bg', 'black', '-fg', 'white', '-geometry',  '75x30+{0}+{1}'.format(side_pad, top_pad), '-e']
+            envlist=['xterm','-bg', 'black', '-fg', 'white', '-geometry',  '100x31+{0}+{1}'.format(side_pad, top_pad), '-e']
             side_pad+=side_pad
             top_pad+=top_pad
         else:
