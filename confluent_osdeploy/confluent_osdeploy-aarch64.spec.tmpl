@@ -1,0 +1,94 @@
+Name: confluent_osdeploy-aarch64
+Version: #VERSION#
+Release: 1
+Summary: OS Deployment support for confluent
+
+License: Apache2
+URL: https://hpc.lenovo.com/
+Source0: confluent_osdeploy.tar.xz
+Source1: confluent_el9bin.tar.xz
+BuildArch: noarch
+Requires: confluent_ipxe mtools tar
+BuildRoot: /tmp
+
+%description
+This contains support utilities for enabling deployment of aarch64 architecture systems
+
+
+%define debug_package %{nil}
+
+%prep
+%setup -n confluent_osdeploy -a 1
+
+%build
+mkdir -p opt/confluent/bin
+mkdir -p stateless-bin
+cd utils
+make all
+cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
+cp start_root urlmount ../stateless-bin/
+cd ..
+ln -s el8 el9
+for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 coreos el9; do
+    mkdir ${os}out
+    cd ${os}out
+    if [ -d ../${os}bin ]; then 
+        cp -a ../${os}bin/opt .
+    else
+        cp -a ../opt .
+    fi
+    cp -a ../${os}/initramfs/* .
+    cp -a ../common/initramfs/* .
+    find . | cpio -H newc -o > ../addons-aarch64.cpio
+    mv ../addons-aarch64.cpio .
+    cd ..
+done
+for os in el7 el8 suse15 el9 ubuntu20.04; do
+    mkdir ${os}disklessout
+    cd ${os}disklessout
+    if [ -d ../${os}bin ]; then
+        cp -a ../${os}bin/opt .
+    else
+        cp -a ../opt .
+    fi
+    cp -a ../${os}-diskless/initramfs/* .
+    cp -a ../common/initramfs/* .
+    if [ -d ../${os}bin ]; then 
+        cp -a ../${os}bin/stateless-bin/* opt/confluent/bin
+    else
+        cp -a ../stateless-bin/* opt/confluent/bin
+    fi
+    find . | cpio -H newc -o > ../addons-aarch64.cpio
+    mv ../addons-aarch64.cpio .
+    cd ..
+done
+mkdir esxi7out
+cd esxi7out
+cp -a ../opt .
+cp -a ../esxi7/initramfs/* .
+cp -a ../common/initramfs/* .
+chmod +x bin/* opt/confluent/bin/*
+tar zcvf ../addons-aarch64.tgz *
+mv ../addons-aarch64.tgz .
+cd ..
+cp -a esxi7out esxi6out
+cp -a esxi7 esxi6
+cp -a esxi7out esxi8out
+cp -a esxi7 esxi8
+
+%install
+mkdir -p %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
+cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
+for os in rhvh4 el7 el8 el9 genesis suse15 ubuntu20.04 ubuntu22.04 esxi6 esxi7 esxi8 coreos; do
+    mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
+    cp ${os}out/addons-aarch64.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
+    if [ -d ${os}disklessout ]; then
+        mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
+        cp ${os}disklessout/addons-aarch64.* %{buildroot}/opt/confluent/lib/osdeploy/${os}-diskless/initramfs
+    fi
+done
+find %{buildroot}/opt/confluent/lib/osdeploy/ -name .gitignore -exec rm -f {} +
+
+%files
+/opt/confluent/lib/osdeploy
+%license /opt/confluent/share/licenses/confluent_osdeploy/LICENSE
