@@ -359,6 +359,14 @@ def show_info(mac):
     for i in send_discovery_datum(known_info[mac]):
         yield i
 
+def dump_discovery():
+    infobymac = {}
+    for mac in known_info:
+        infobymac[mac] = {}
+        for i in send_discovery_datum(known_info[mac]):
+            for kn in i.kvpairs:
+                infobymac[mac][kn] = i.kvpairs[kn]
+    yield msg.KeyValueData(infobymac)
 
 list_info = {
     'by-node': list_matching_nodes,
@@ -602,11 +610,14 @@ def handle_read_api_request(pathcomponents):
     # starting at 2 are parameters to previous index
     if pathcomponents == ['discovery', 'rescan']:
         return (msg.KeyValueData({'scanning': bool(scanner)}),)
+    if pathcomponents == ['discovery', 'alldata']:
+        return dump_discovery()
     subcats, queryparms, indexof, coll = _parameterize_path(pathcomponents[1:])
     if len(pathcomponents) == 1:
         dirlist = [msg.ChildCollection(x + '/') for x in sorted(list(subcats))]
         dirlist.append(msg.ChildCollection('rescan'))
         dirlist.append(msg.ChildCollection('autosense'))
+        dirlist.append(msg.ChildCollection('alldata'))
         dirlist.append(msg.ChildCollection('subscriptions/'))
         return dirlist
     if not coll:

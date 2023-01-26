@@ -661,6 +661,8 @@ def addresses_match(addr1, addr2):
     :param addr2:
     :return: True if the given addresses refer to the same thing
     """
+    if '%' in addr1 or '%' in addr2:
+        return False
     for addrinfo in socket.getaddrinfo(addr1, 0, 0, socket.SOCK_STREAM):
         rootaddr1 = socket.inet_pton(addrinfo[0], addrinfo[4][0])
         if addrinfo[0] == socket.AF_INET6 and rootaddr1[:12] == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff':

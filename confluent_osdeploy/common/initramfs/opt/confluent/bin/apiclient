@@ -304,6 +304,10 @@ class HTTPSClient(client.HTTPConnection, object):
     def check_connections(self):
         foundsrv = None
         hosts = self.hosts
+        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx.load_verify_locations('/etc/confluent/ca.pem')
+        ctx.verify_mode = ssl.CERT_REQUIRED
+        ctx.check_hostname = True
         for timeo in (0.1, 5):
             for host in hosts:
                 try:
@@ -311,10 +315,13 @@ class HTTPSClient(client.HTTPConnection, object):
                     psock = socket.socket(addrinf[0])
                     psock.settimeout(timeo)
                     psock.connect(addrinf[4])
+                    ctx.wrap_socket(psock, server_hostname=host)
                     foundsrv = host
                     psock.close()
                     break
                 except OSError:
+                    continue
+                except ssl.SSLError:
                     continue
             else:
                 continue

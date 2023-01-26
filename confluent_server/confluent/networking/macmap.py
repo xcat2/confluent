@@ -601,7 +601,7 @@ def handle_read_api_request(pathcomponents, configmanager):
     elif len(pathcomponents) == 2:
         if pathcomponents[-1] == 'macs':
             return [msg.ChildCollection(x) for x in (# 'by-node/',
-                                                     'by-mac/', 'by-switch/',
+                                                     'alldata', 'by-mac/', 'by-switch/',
                                                      'rescan')]
         elif pathcomponents[-1] == 'neighbors':
             return [msg.ChildCollection('by-switch/')]
@@ -616,6 +616,8 @@ def handle_read_api_request(pathcomponents, configmanager):
         elif len(pathcomponents) == 4:
             macaddr = pathcomponents[-1].replace('-', ':')
             return dump_macinfo(macaddr)
+    elif pathcomponents[2] == 'alldata':
+        return [msg.KeyValueData(_apimacmap)]
     elif pathcomponents[2] == 'by-mac':
         if len(pathcomponents) == 3:
             return [msg.ChildCollection(x.replace(':', '-'))
