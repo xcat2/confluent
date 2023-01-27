@@ -58,7 +58,14 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           '--shell-type login".  If the NODECONSOLE_WINDOWED_COMMAND '
                           'environment variable isn\'t set, xterm will be used by'
                           'default.')
+
 (options, args) = argparser.parse_args()
+
+pass_through_args = []
+if len(args) > 1:
+   pass_through_args = args[1:]
+   args = args[:1]
+
 if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
@@ -71,14 +78,59 @@ if options.log:
         sys.exit(1)
     logreader.replay_to_console(logname)
     sys.exit(0)
-#added functionality for wcons
 
+
+def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):    
+    if '-geometry' in envlist:
+        g_index = envlist.index('-geometry')
+    elif '-g' in envlist:
+        g_index = envlist.index('-g')
+    else:
+        g_index = 0
+    if g_index:   
+        if first:
+             envlist[g_index+1] = '{0}+{1}+{2}'.format(envlist[g_index+1],side_pad, top_pad)
+        else:
+            envlist[g_index+1] = '{0}+{1}+{2}'.format(sizegeometry,side_pad, top_pad)
+    else:
+        envlist.insert(1, '-geometry')
+        envlist.insert(2, '{0}+{1}+{2}'.format(sizegeometry,side_pad, top_pad))
+        g_index = 1
+    return envlist     
+
+#added functionality for wcons
 if options.windowed:
+    result=subprocess.Popen(['xwininfo', '-root'], stdout=subprocess.PIPE)
+    rootinfo=result.communicate()[0]
+    result.wait()
+    for line in rootinfo.decode('utf-8').split('\n'):
+        if 'Width' in line:
+            screenwidth = int(line.split(':')[1])
+        if 'Height' in line:
+            screenheight = int(line.split(':')[1])
+
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
     if not envstring:
-        envlist=["xterm", "-e"]
+        sizegeometry='100x31'
+        corrected_x, corrected_y = (13,84)
+        envlist = handle_geometry(['xterm'] + pass_through_args + ['-e'],sizegeometry, first=True)
     else:
         envlist=os.environ.get('NODECONSOLE_WINDOWED_COMMAND').split(' ')
+        if envlist[0] == 'xterm':
+            if '-geometry' in envlist:
+                g_index = envlist.index('-geometry')
+            elif '-g' in envlist:
+                g_index = envlist.index('-g')
+            else:
+                g_index = 0
+            if g_index:    
+                envlist[g_index+1] = envlist[g_index+1] + '+0+0'
+
+            else:
+                envlist.insert(1, '-geometry')
+                envlist.insert(2, '100x31+0+0')
+                g_index = 1
+            
     nodes = []
     sess = client.Command()
     for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
@@ -87,9 +139,87 @@ if options.windowed:
             sys.stderr.write(res.get('error', repr(res)) + '\n')
             sys.exit(1)
         nodes.append(node)
+
+    if options.tile and not envlist[0] == 'xterm':
+        sys.stderr.write('[ERROR] UNSUPPORTED OPTIONS. \nWindowed and tiled consoles are only supported when using xterm \n')
+        sys.exit(1)
+    firstnode=nodes[0]
+    nodes.pop(0)
+    with open(os.devnull, 'wb') as devnull:
+        xopen=subprocess.Popen(envlist + [confettypath, '-c', '/tmp/controlpath-{0}'.format(firstnode), '-m', '5', 'start', '/nodes/{0}/console/session'.format(firstnode) ] , stdin=devnull)
+        time.sleep(2)
+        s=socket.socket(socket.AF_UNIX)
+        winid=''
+        try:
+            s.connect('/tmp/controlpath-{firstnode}'.format(firstnode=firstnode))
+            s.recv(64)
+            s.send(b'GETWINID')
+            winid=s.recv(64).decode('utf-8')
+
+        except:
+            time.sleep(2)
+            # try to get id of first panel/xterm window using name
+            win=subprocess.Popen(['xwininfo', '-tree', '-root'], stdout=subprocess.PIPE)
+            wintr=win.communicate()[0]
+            for line in wintr.decode('utf-8').split('\n'):
+                if 'console: {firstnode}'.format(firstnode=firstnode) in line or 'confetty' in line:
+                    win_obj = [ele for ele in line.split(' ') if ele.strip()]
+                    winid = win_obj[0]
+    if winid:
+        firstnode_window=subprocess.Popen(['xwininfo', '-id', '{winid}'.format(winid=winid)], stdout=subprocess.PIPE)
+        xinfo=firstnode_window.communicate()[0]
+        xinfl = xinfo.decode('utf-8').split('\n')
+        for line in xinfl:
+            if 'Absolute upper-left X:' in line:
+                side_pad = int(line.split(':')[1])
+            elif 'Absolute upper-left Y:' in line:
+                top_pad = int(line.split(':')[1])
+
+            elif 'Width:' in line:
+                window_width = int(line.split(':')[1])
+            elif 'Height' in line:
+                window_height = int(line.split(':')[1])
+            elif '-geometry' in line:
+                l = re.split(' |x|\+', line)
+                l_nosp = [ele for ele in l if ele.strip()]
+                wmxo = int(l_nosp[1])
+                wmyo = int(l_nosp[2])
+                sizegeometry = str(wmxo) + 'x' + str(wmyo)
+            else:
+                pass
+
+        window_width += side_pad*2
+        window_height += side_pad+top_pad
+        screenwidth -= wmxo
+        screenheight -= wmyo
+        currx = window_width
+        curry = 0
+        maxcol = int(screenwidth/window_width)
+
     for node in sortutil.natural_sort(nodes):
+        if options.tile and envlist[0] == 'xterm':
+            corrected_x = currx
+            corrected_y = curry
+            xgeometry = '{0}+{1}+{2}'.format(sizegeometry, corrected_x, corrected_y)
+            currx += window_width
+            if currx >= screenwidth:
+                currx=0
+                curry += window_height
+                if curry > screenheight:
+                    curry =top_pad
+            if not envstring:        
+                envlist= handle_geometry(envlist, sizegeometry, corrected_x, corrected_y)
+            else:
+                if g_index:    
+                    envlist[g_index+1] = xgeometry
+        elif envlist[0] == 'xterm':
+            envlist=handle_geometry(envlist, sizegeometry, side_pad, top_pad)
+            side_pad+=(side_pad+1)
+            top_pad+=(top_pad+30)
+        else:
+            pass 
         with open(os.devnull, 'wb') as devnull:
-            subprocess.Popen(envlist + [confettypath, '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)], stdin=devnull)
+            xopen=subprocess.Popen(envlist + [confettypath, '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)] , stdin=devnull)
     sys.exit(0)
 #end of wcons
 if options.tile:

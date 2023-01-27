@@ -17,6 +17,7 @@
 
 import codecs
 from datetime import datetime as dt
+from datetime import timedelta
 import optparse
 import os
 import signal
@@ -45,7 +46,14 @@ argparser.add_option('-m', '--maxnodes', type='int',
 argparser.add_option('-l', '--lines', type='int',
                      help='return the last <n> entries  '
                           'for each node in the eventlog. '
-                          )           
+                          )
+argparser.add_option('-t', '--timeframe', type='string',
+                     help='return entries within a specified timeframe  '
+                          'for each node in the eventlog. This will return '
+                          'entries from the last hours or days. '
+                          '1h would be one hour, 4d would be four days. '
+                          'format <num>h or <num>d'
+                          )  
 (options, args) = argparser.parse_args()
 try:
     noderange = args[0]
@@ -93,12 +101,26 @@ def format_event(evt):
         msg = ''
     return ' '.join(retparts) + msg
 
-
 if deletemode:
     func = session.delete
     session.stop_if_noderange_over(noderange, options.maxnodes)
 else:
     func = session.read
+
+if options.timeframe:
+    try:
+        delta = int(options.timeframe[:-1])
+    except ValueError:
+        argparser.print_help()
+        sys.exit(1)
+    if options.timeframe[-1].lower() == 'd':
+        tdelta = timedelta(days=delta)
+    elif options.timeframe[-1].lower() == 'h':
+        tdelta = timedelta(hours=delta)
+    else:
+        argparser.print_help()
+        sys.exit(1)
+    timeframe = dt.now() - tdelta
 
 event_dict = {}
 nodes = []
@@ -124,7 +146,14 @@ for rsp in func('/noderange/{0}/events/hardware/log'.format(noderange)):
                     event_dict[node].extend(evtdata)
                 else:
                     for evt in evtdata:
-                        print('{0}: {1}'.format(node, format_event(evt)))
+                        if options.timeframe:
+                            # check if line is in timeframe 
+                            if 'timestamp' in evt and evt['timestamp'] is not None:
+                                display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
+                                if display > timeframe:                          
+                                    print('{0}: {1}'.format(node, format_event(evt))) 
+                        else:
+                            print('{0}: {1}'.format(node, format_event(evt))) 
 
 if options.lines:
     for node in nodes:
@@ -133,5 +162,10 @@ if options.lines:
             if len(evtdata_list) > options.lines:
                 evtdata_list = evtdata_list[-abs(options.lines):]
             for evt in evtdata_list:
-                print('{0}: {1}'.format(node, format_event(evt)))
-                
+                if options.timeframe:
+                    if 'timestamp' in evt and evt['timestamp'] is not None:
+                        display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
+                        if display > timeframe:                          
+                            print('{0}: {1}'.format(node, format_event(evt)))
+                else:
+                    print('{0}: {1}'.format(node, format_event(evt)))

@@ -18,6 +18,11 @@ noderange.
 
 * `-l LINES`, `--lines=LINES`:
     return the last <n> entries for each node in the eventlog. 
+
+* `-t TIMEFRAME`, `--timeframe=TIMEFRAME`:
+   return entries within a specified timeframe for each node's event log. 
+   This will return entries from the last <n> hours or days. 1h would be 
+   entries from with the last one hour. 
                            
   
 * `-h`, `--help`:
