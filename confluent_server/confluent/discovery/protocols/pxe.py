@@ -365,6 +365,8 @@ def proxydhcp(handler, nodeguess):
             bootfile = b'confluent/x86_64/ipxe.efi'
         elif disco['arch'] == 'bios-x86':
             bootfile = b'confluent/x86_64/ipxe.kkpxe'
+        elif disco['arch'] == 'uefi-aarch64':
+            bootfile = b'confluent/aarch64/ipxe.efi'
         if len(bootfile) > 127:
             log.log(
                 {'info': 'Boot offer cannot be made to {0} as the '

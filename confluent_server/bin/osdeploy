@@ -223,8 +223,17 @@ def install_tftp_content():
     except OSError as e:
         if e.errno != 17:
             raise
+    armtftplocation = '{0}/confluent/aarch64'.format(tftplocation)
+    try:
+        os.makedirs(armtftplocation)
+    except OSError as e:
+        if e.errno != 17:
+            raise
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
+    if os.path.exists('/opt/confluent/lib/ipxe/ipxe-aarch64.efi')
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64.efi', armtftplocation)
+
 
 
 def initialize(cmdset):

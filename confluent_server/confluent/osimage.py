@@ -376,6 +376,14 @@ def check_ubuntu(isoinfo):
         if not isinstance(arch, str):
             arch = arch.decode('utf8')
         major = '.'.join(ver.split('.', 2)[:2])
+        if 'efi/boot/bootaa64.efi' in isoinfo[0]:
+            exlist = ['casper/vmlinuz', 'casper/initrd',
+                    'efi/boot/bootaa64.efi', 'efi/boot/grubaa64.efi'
+                    ]
+        else:
+            exlist = ['casper/vmlinuz', 'casper/initrd',
+                    'efi/boot/bootx64.efi', 'efi/boot/grubx64.efi'
+                    ]
         return {'name': 'ubuntu-{0}-{1}'.format(ver, arch),
                 'method': EXTRACT|COPY,
                 'extractlist': ['casper/vmlinuz', 'casper/initrd',
