@@ -58,7 +58,14 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           '--shell-type login".  If the NODECONSOLE_WINDOWED_COMMAND '
                           'environment variable isn\'t set, xterm will be used by'
                           'default.')
+
 (options, args) = argparser.parse_args()
+
+pass_through_args = []
+if len(args) > 1:
+   pass_through_args = args[1:]
+   args = args[:1]
+
 if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
@@ -71,6 +78,26 @@ if options.log:
         sys.exit(1)
     logreader.replay_to_console(logname)
     sys.exit(0)
+
+
+def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):    
+    if '-geometry' in envlist:
+        g_index = envlist.index('-geometry')
+    elif '-g' in envlist:
+        g_index = envlist.index('-g')
+    else:
+        g_index = 0
+    if g_index:   
+        if first:
+             envlist[g_index+1] = '{0}+{1}+{2}'.format(envlist[g_index+1],side_pad, top_pad)
+        else:
+            envlist[g_index+1] = '{0}+{1}+{2}'.format(sizegeometry,side_pad, top_pad)
+    else:
+        envlist.insert(1, '-geometry')
+        envlist.insert(2, '{0}+{1}+{2}'.format(sizegeometry,side_pad, top_pad))
+        g_index = 1
+    return envlist     
+
 #added functionality for wcons
 if options.windowed:
     result=subprocess.Popen(['xwininfo', '-root'], stdout=subprocess.PIPE)
@@ -85,7 +112,8 @@ if options.windowed:
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
     if not envstring:
         sizegeometry='100x31'
-        envlist=['xterm', '-bg', 'black', '-fg', 'white', '-geometry', '{sizegeometry}+0+0'.format(sizegeometry=sizegeometry), '-e']
+        corrected_x, corrected_y = (13,84)
+        envlist = handle_geometry(['xterm'] + pass_through_args + ['-e'],sizegeometry, first=True)
     else:
         envlist=os.environ.get('NODECONSOLE_WINDOWED_COMMAND').split(' ')
         if envlist[0] == 'xterm':
@@ -101,7 +129,8 @@ if options.windowed:
             else:
                 envlist.insert(1, '-geometry')
                 envlist.insert(2, '100x31+0+0')
-                g_index = 1          
+                g_index = 1
+            
     nodes = []
     sess = client.Command()
     for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
@@ -110,6 +139,7 @@ if options.windowed:
             sys.stderr.write(res.get('error', repr(res)) + '\n')
             sys.exit(1)
         nodes.append(node)
+
     if options.tile and not envlist[0] == 'xterm':
         sys.stderr.write('[ERROR] UNSUPPORTED OPTIONS. \nWindowed and tiled consoles are only supported when using xterm \n')
         sys.exit(1)
@@ -125,6 +155,7 @@ if options.windowed:
             s.recv(64)
             s.send(b'GETWINID')
             winid=s.recv(64).decode('utf-8')
+
         except:
             time.sleep(2)
             # try to get id of first panel/xterm window using name
@@ -143,6 +174,7 @@ if options.windowed:
                 side_pad = int(line.split(':')[1])
             elif 'Absolute upper-left Y:' in line:
                 top_pad = int(line.split(':')[1])
+
             elif 'Width:' in line:
                 window_width = int(line.split(':')[1])
             elif 'Height' in line:
@@ -155,6 +187,7 @@ if options.windowed:
                 sizegeometry = str(wmxo) + 'x' + str(wmyo)
             else:
                 pass
+
         window_width += side_pad*2
         window_height += side_pad+top_pad
         screenwidth -= wmxo
@@ -162,6 +195,7 @@ if options.windowed:
         currx = window_width
         curry = 0
         maxcol = int(screenwidth/window_width)
+
     for node in sortutil.natural_sort(nodes):
         if options.tile and envlist[0] == 'xterm':
             corrected_x = currx
@@ -174,14 +208,14 @@ if options.windowed:
                 if curry > screenheight:
                     curry =top_pad
             if not envstring:        
-                envlist=['xterm','-bg', 'black', '-fg', 'white', '-geometry',  '{0}'.format(xgeometry), '-e']
+                envlist= handle_geometry(envlist, sizegeometry, corrected_x, corrected_y)
             else:
                 if g_index:    
                     envlist[g_index+1] = xgeometry
         elif envlist[0] == 'xterm':
-            envlist=['xterm','-bg', 'black', '-fg', 'white', '-geometry',  '100x31+{0}+{1}'.format(side_pad, top_pad), '-e']
-            side_pad+=side_pad
-            top_pad+=top_pad
+            envlist=handle_geometry(envlist, sizegeometry, side_pad, top_pad)
+            side_pad+=(side_pad+1)
+            top_pad+=(top_pad+30)
         else:
             pass 
         with open(os.devnull, 'wb') as devnull:
