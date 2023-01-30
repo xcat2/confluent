@@ -253,6 +253,7 @@ class HTTPSClient(client.HTTPConnection, object):
                     self.stdheaders['CONFLUENT_NODENAME'] = node
                 if line.startswith('MANAGER:') and not host:
                     host = line.split(' ')[1]
+                    self.hosts.append(host)
                     if not plainhost:
                         plainhost = host
                 if line.startswith('EXTMGRINFO:'):
@@ -315,13 +316,16 @@ class HTTPSClient(client.HTTPConnection, object):
                     psock = socket.socket(addrinf[0])
                     psock.settimeout(timeo)
                     psock.connect(addrinf[4])
-                    ctx.wrap_socket(psock, server_hostname=host)
+                    chost = host.split('%', 1)[0]
+                    ctx.wrap_socket(psock, server_hostname=chost)
                     foundsrv = host
                     psock.close()
                     break
                 except OSError:
                     continue
                 except ssl.SSLError:
+                    continue
+                except ssl.CertificateError:
                     continue
             else:
                 continue

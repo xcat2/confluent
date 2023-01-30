@@ -7,6 +7,7 @@ License: Apache2
 URL: https://hpc.lenovo.com/
 Source0: confluent_osdeploy.tar.xz
 Source1: confluent_el9bin.tar.xz
+Source2: confluent_el8bin.tar.xz
 BuildArch: noarch
 Requires: confluent_ipxe mtools tar
 BuildRoot: /tmp
@@ -18,16 +19,12 @@ This contains support utilities for enabling deployment of aarch64 architecture 
 %define debug_package %{nil}
 
 %prep
-%setup -n confluent_osdeploy -a 1
+%setup -n confluent_osdeploy -a 2
 
 %build
 mkdir -p opt/confluent/bin
 mkdir -p stateless-bin
-cd utils
-make all
-cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
-cp start_root urlmount ../stateless-bin/
-cd ..
+cp -a el8bin/* .
 ln -s el8 el9
 for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 coreos el9; do
     mkdir ${os}out
@@ -78,7 +75,7 @@ cp -a esxi7 esxi8
 
 %install
 mkdir -p %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
-cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
+#cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
 for os in rhvh4 el7 el8 el9 genesis suse15 ubuntu20.04 ubuntu22.04 esxi6 esxi7 esxi8 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     cp ${os}out/addons-aarch64.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
@@ -91,4 +88,4 @@ find %{buildroot}/opt/confluent/lib/osdeploy/ -name .gitignore -exec rm -f {} +
 
 %files
 /opt/confluent/lib/osdeploy
-%license /opt/confluent/share/licenses/confluent_osdeploy/LICENSE
+#%license /opt/confluent/share/licenses/confluent_osdeploy/LICENSE

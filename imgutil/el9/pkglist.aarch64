@@ -1,0 +1,20 @@
+dnf
+hostname
+irqbalance
+less
+sssd-client
+NetworkManager
+nfs-utils
+numactl-libs
+passwd
+rootfiles
+sudo
+tuned
+yum
+initscripts
+tpm2-tools
+xfsprogs
+e2fsprogs
+fuse-libs
+libnl3
+chrony kernel net-tools nfs-utils openssh-server rsync tar util-linux python3 tar dracut dracut-network ethtool parted openssl dhclient openssh-clients bash vim-minimal rpm iputils lvm2 efibootmgr shim-aa64 grub2-efi-aa64 attr

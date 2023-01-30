@@ -217,14 +217,24 @@ def install_tftp_content():
     else:
         emprint(
             'Detected {0} as tftp directory, but unable to determine tftp service, ensure that a tftp server is installed and enabled manually'.format(tftplocation))
+    otftplocation = tftplocation
     tftplocation = '{0}/confluent/x86_64'.format(tftplocation)
     try:
         os.makedirs(tftplocation)
     except OSError as e:
         if e.errno != 17:
             raise
+    armtftplocation = '{0}/confluent/aarch64'.format(otftplocation)
+    try:
+        os.makedirs(armtftplocation)
+    except OSError as e:
+        if e.errno != 17:
+            raise
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.efi', tftplocation)
     shutil.copy('/opt/confluent/lib/ipxe/ipxe.kkpxe', tftplocation)
+    if os.path.exists('/opt/confluent/lib/ipxe/ipxe-aarch64.efi'):
+        shutil.copy('/opt/confluent/lib/ipxe/ipxe-aarch64.efi', os.path.join(armtftplocation, 'ipxe.efi'))
+
 
 
 def initialize(cmdset):

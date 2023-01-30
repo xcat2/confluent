@@ -1,0 +1,32 @@
+VERSION=`git describe|cut -d- -f 1`
+NUMCOMMITS=`git describe|cut -d- -f 2`
+if [ "$NUMCOMMITS" != "$VERSION"  ]; then
+    VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
+fi
+sed -e "s/#VERSION#/$VERSION/" confluent_osdeploy-aarch64.spec.tmpl > confluent_osdeploy-aarch64.spec
+cd ..
+cp ../LICENSE .
+tar Jcvf confluent_osdeploy.tar.xz confluent_osdeploy
+mv confluent_osdeploy.tar.xz ~/rpmbuild/SOURCES/
+cd -
+mkdir -p el9bin/opt/confluent/bin
+mkdir -p el9bin/stateless-bin
+mkdir -p el8bin/opt/confluent/bin
+mkdir -p el8bin/stateless-bin
+podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t el9builder make -C /buildutils
+cd utils
+mv confluent_imginfo copernicus clortho autocons ../el9bin/opt/confluent/bin
+mv start_root urlmount ../el9bin/stateless-bin/
+cd ..
+podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t el8builder make -C /buildutils
+cd utils
+mv confluent_imginfo copernicus clortho autocons ../el8bin/opt/confluent/bin
+mv start_root urlmount ../el8bin/stateless-bin/
+cd ..
+tar Jcvf confluent_el9bin.tar.xz el9bin/
+tar Jcvf confluent_el8bin.tar.xz el8bin/
+mv confluent_el8bin.tar.xz ~/rpmbuild/SOURCES/
+mv confluent_el9bin.tar.xz ~/rpmbuild/SOURCES/
+rm -rf el9bin
+rm -rf el8bin
+rpmbuild -ba confluent_osdeploy-aarch64.spec
