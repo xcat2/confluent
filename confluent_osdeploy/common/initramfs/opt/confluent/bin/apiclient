@@ -253,6 +253,7 @@ class HTTPSClient(client.HTTPConnection, object):
                     self.stdheaders['CONFLUENT_NODENAME'] = node
                 if line.startswith('MANAGER:') and not host:
                     host = line.split(' ')[1]
+                    self.hosts.append(host)
                     if not plainhost:
                         plainhost = host
                 if line.startswith('EXTMGRINFO:'):
