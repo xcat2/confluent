@@ -26,6 +26,9 @@ if path.startswith('/opt'):
 import confluent.client as client
 import confluent.sortutil as sortutil
 import confluent.logreader as logreader
+import time
+import socket
+import re
 
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
@@ -114,6 +117,7 @@ if options.windowed:
         sizegeometry='100x31'
         corrected_x, corrected_y = (13,84)
         envlist = handle_geometry(['xterm'] + pass_through_args + ['-e'],sizegeometry, first=True)
+        #envlist=['xterm', '-bg', 'black', '-fg', 'white', '-geometry', '{sizegeometry}+0+0'.format(sizegeometry=sizegeometry), '-e']
     else:
         envlist=os.environ.get('NODECONSOLE_WINDOWED_COMMAND').split(' ')
         if envlist[0] == 'xterm':
