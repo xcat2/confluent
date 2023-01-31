@@ -55,6 +55,7 @@ tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist licenses
 rpmbuild -bb confluent-genesis-out.spec
 rm -rf /usr/lib/dracut/modules.d/97genesis
 popd
+# for rpm in $(cat ../rpmlist); do dnf download --source $rpm; done
 # getting src rpms would be nice, but centos isn't consistent..
 # /usr/lib/dracut/skipcpio /opt/confluent/genesis/x86_64/boot/initramfs/distribution | xzcat | cpio -dumiv
 # rpm -qf $(find . -type f | sed -e 's/^.//') |sort -u|grep -v 'not owned' > ../rpmlist
