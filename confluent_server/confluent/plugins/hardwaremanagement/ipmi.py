@@ -755,7 +755,7 @@ class IpmiHandler(object):
                     if v6addrs is not None:
                         v6addrs = v6addrs.split(',')
                     v6gw = config.get('static_v6_gateway', None)
-                    self.ipmicmd.set_net6_configuration(static_addressess=v6addrs, static_gateway=v6gw)
+                    self.ipmicmd.set_net6_configuration(static_addresses=v6addrs, static_gateway=v6gw)
                 except socket.error as se:
                     self.output.put(msg.ConfluentNodeError(self.node,
                                                            se.message))
