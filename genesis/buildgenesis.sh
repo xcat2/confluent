@@ -18,7 +18,7 @@ popd
 rm -rf $tdir
 cp $tfile rpmlist
 cp confluent-genesis.spec confluent-genesis-out.spec
-python3 getlicenses.py > /tmp/tmpliclist
+python3 getlicenses.py rpmlist > /tmp/tmpliclist
 if [ $? -ne 0 ]; then
     exit 1
 fi
