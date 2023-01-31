@@ -18,7 +18,11 @@ popd
 rm -rf $tdir
 cp $tfile rpmlist
 cp confluent-genesis.spec confluent-genesis-out.spec
-for lic in $(python3 getlicenses.py rpmlist); do
+python3 getlicenses.py > /tmp/tmpliclist
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+for lic in $(cat /tmp/tmpliclist); do
     lo=${lic#/usr/share/}
     lo=${lo#licenses/}
     fname=$(basename $lo)
@@ -45,7 +49,7 @@ cp /usr/share/doc/ipmitool/COPYING  licenses/ipmitool
 echo %license /opt/confluent/genesis/%{arch}/licenses/ipmitool/COPYING >> confluent-genesis-out.spec
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
-cp /boot/efi/EFI/centos/grubx64.efi boot/efi/boot/grubx64.efi
+find /boot/efi -name grubx64.efi -exec cp {} boot/efi/boot/grubx64.efi \;
 mkdir -p ~/rpmbuild/SOURCES/
 tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist licenses
 rpmbuild -bb confluent-genesis-out.spec
