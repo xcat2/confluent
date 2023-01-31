@@ -8,6 +8,7 @@ import glob
 import json
 import argparse
 import os
+import platform
 import pwd
 import re
 import shutil
@@ -202,8 +203,12 @@ def capture_remote(args):
     os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
                os.path.join(outdir, 'boot/initramfs/site.cpio'))
     confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
-    os.symlink('{}/initramfs/addons.cpio'.format(confdir),
-            os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+    archaddon = '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/{}/addons.cpio'.format(oscat, platform.machine())
+    if os.path.exists(archaddon):
+        os.symlink(archaddon, os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+    else:
+        os.symlink('{}/initramfs/addons.cpio'.format(confdir),
+                os.path.join(outdir, 'boot/initramfs/addons.cpio'))
     indir = '{}/profiles/default'.format(confdir)
     if os.path.exists(indir):
         copy_tree(indir, outdir)
@@ -1281,8 +1286,12 @@ def pack_image(args):
                 profiley.write('label: {0}\nkernelargs: quiet # confluent_imagemethod=untethered|tethered # tethered is default when unspecified to save on memory, untethered will use more ram, but will not have any ongoing runtime root fs dependency on the http servers.\n'.format(label))
             oscat = oshandler.oscategory
             confdir = '/opt/confluent/lib/osdeploy/{}-diskless'.format(oscat)
-            os.symlink('{}/initramfs/addons.cpio'.format(confdir),
-                os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+            archaddon = '/opt/confluent/lib/osdeploy/{}-diskless/initramfs/{}/addons.cpio'.format(oscat, platform.machine())
+            if os.path.exists(archaddon):
+                os.symlink(archaddon, os.path.join(outdir, 'boot/initramfs/addons.cpio'))
+            else:
+                os.symlink('{}/initramfs/addons.cpio'.format(confdir),
+                    os.path.join(outdir, 'boot/initramfs/addons.cpio'))
             indir = '{}/profiles/default'.format(confdir)
             if os.path.exists(indir):
                 copy_tree(indir, outdir)
