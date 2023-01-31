@@ -19,7 +19,7 @@ This contains support utilities for enabling deployment of aarch64 architecture 
 %define debug_package %{nil}
 
 %prep
-%setup -n confluent_osdeploy -a 2
+%setup -n confluent_osdeploy -a 2 -a 1
 
 %build
 mkdir -p opt/confluent/bin
