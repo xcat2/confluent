@@ -671,6 +671,11 @@ def version_sort(iterable):
 
 def get_kern_version(filename):
     with open(filename, 'rb') as kernfile:
+        checkgzip = kernfile.read(2)
+        if checkgzip == b'\x1f\x8b':
+            # gzipped... this would probably be aarch64
+            # assume the filename has the version embedded
+            return os.path.basename(filename).replace('vmlinuz-', '')
         kernfile.seek(0x20e)
         offset = struct.unpack('<H', kernfile.read(2))[0] + 0x200
         kernfile.seek(offset)
@@ -1299,6 +1304,8 @@ def pack_image(args):
 def gather_bootloader(outdir, rootpath='/'):
     shimlocation = os.path.join(rootpath, 'boot/efi/EFI/BOOT/BOOTX64.EFI')
     if not os.path.exists(shimlocation):
+        shimlocation = os.path.join(rootpath, 'boot/efi/EFI/BOOT/BOOTAA64.EFI')
+    if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib64/efi/shim.efi')
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed')
@@ -1308,7 +1315,11 @@ def gather_bootloader(outdir, rootpath='/'):
     for candidate in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*')):
         if 'BOOT' not in candidate:
             grubbin = os.path.join(candidate, 'grubx64.efi')
-            break
+            if os.path.exists(grubbin):
+                break
+            grubbin = os.path.join(candidate, 'grubaa64.efi')
+            if os.path.exists(grubbin):
+                break
     if not grubbin:
         grubbin = os.path.join(rootpath, 'usr/lib64/efi/grub.efi')
     if not os.path.exists(grubbin):
