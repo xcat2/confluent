@@ -1182,8 +1182,8 @@ def search_smms_by_cert(currsmm, cert, cfg):
                 nl = list(
                     cfg.filter_node_attributes('enclosure.bay={}'.format(bay), nl))
                 if len(nl) == 1:
-                    return currsmm, port, nl[0]
-                return currsmm, port, None
+                    return currsmm, bay, nl[0]
+                return currsmm, bay, None
     exnl = list(cfg.filter_node_attrubutes('enclosure.extends=' + currsmm))
     if len(exnl) == 1:
         return search_smms_by_cert(exnl[0], cert, cfg)
@@ -1228,7 +1228,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             info['verfied'] = True
             info['enclosure.bay'] = match[1]
             if match[2]:
-                if not discover_node(cfg, handler, info, match[2]):
+                if not discover_node(cfg, handler, info, match[2], manual):
                     pending_nodes[match[2]] = nodename
                 return
         if 'enclosure.bay' not in info:
