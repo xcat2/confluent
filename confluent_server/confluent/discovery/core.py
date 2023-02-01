@@ -1157,6 +1157,38 @@ def get_nodename_from_enclosures(cfg, info):
     return nodename
 
 
+def search_smms_by_cert(currsmm, cert, cfg):
+    neighs = []
+    cv = util.TLSCertVerifier(
+        cfg, currsmm, 'pubkeys.tls_hardwaremanager').verify_cert
+    try:
+        cd = cfg.get_node_attributes(currsmm, ['hardwaremanagement.manager',
+                                               'pubkeys.tls_hardwaremanager'])
+        smmaddr = cd.get(currsmm, {}).get('hardwaremanagement.manager', {}).get('value', None)
+        wc = webclient.SecureHTTPConnection(currsmm, verifycallback=cv)
+        neighs = wc.grab_json_response('/scripts/neighdata.json')
+    except Exception:
+        return None
+    for neigh in neighs:
+        fprint = neigh.get('sha384', None)
+        if fprint and fprint.endswith('AA=='):
+            fprint = fprint[:-4]
+        if fprint and util.cert_matches(fprint, cert):
+            port = neigh.get('port', None)
+            if port is not None:
+                bay = port + 1
+                nl = list(
+                    cfg.filter_node_attributes('enclosure.manager=' + currsmm))
+                nl = list(
+                    cfg.filter_node_attributes('enclosure.bay={}'.format(bay), nl))
+                if len(nl) == 1:
+                    return currsmm, port, nl[0]
+                return currsmm, port, None
+    exnl = list(cfg.filter_node_attrubutes('enclosure.extends=' + currsmm))
+    if len(exnl) == 1:
+        return search_smms_by_cert(exnl[0], cert, cfg)
+
+
 def eval_node(cfg, handler, info, nodename, manual=False):
     try:
         handler.probe()  # unicast interrogation as possible to get more data
@@ -1191,6 +1223,14 @@ def eval_node(cfg, handler, info, nodename, manual=False):
         # The specified node is an enclosure (has nodes mapped to it), but
         # what we are talking to is *not* an enclosure
         # might be ambiguous, need to match chassis-uuid as well..
+        match = search_smms_by_cert(nodename, handler.https_cert, cfg)
+        if match:
+            info['verfied'] = True
+            info['enclosure.bay'] = match[1]
+            if match[2]:
+                if not discover_node(cfg, handler, info, match[2]):
+                    pending_nodes[match[2]] = nodename
+                return
         if 'enclosure.bay' not in info:
             unknown_info[info['hwaddr']] = info
             info['discostatus'] = 'unidentified'
