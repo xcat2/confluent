@@ -100,7 +100,9 @@ cd /sys/class/net
 if ! grep MANAGER: /etc/confluent/confluent.info; then
     confluentsrv=$(getarg confluent)
     if [ ! -z "$confluentsrv" ]; then
+        mgr=$confluentsrv
         if [[ "$confluentsrv" = *":"* ]]; then
+            mgr="[$mgr]"
             confluenthttpsrv=[$confluentsrv]
             /usr/libexec/nm-initrd-generator ip=:dhcp6
         else
@@ -146,7 +148,7 @@ fi
 while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
 	sleep 10
 done
-ifidx=$(cat /tmp/confluent.ifidx)
+ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
 if [ ! -z "$ifidx" ]; then
     ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
     ifname=${ifname%:}
