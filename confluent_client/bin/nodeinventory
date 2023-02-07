@@ -53,6 +53,8 @@ def print_mem_info(node, prefix, meminfo):
         memdescfmt += '3-{1} '
     elif 'DDR4' in meminfo['memory_type']:
         memdescfmt += '4-{1} '
+    elif 'DDR5' in meminfo['memory_type']:
+        memdescfmt += '5-{1} '
     elif 'DCPMM' in meminfo['memory_type']:
         memdescfmt = '{0}GB {1} '
         meminfo['module_type'] = 'DCPMM'
