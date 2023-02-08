@@ -242,6 +242,11 @@ if __name__ == '__main__':
                 emprint(f'There is no node named "{args.node}"')
                 allok = False
                 uuidok = True  # not really, but suppress the spurious error
+            dnsdomain = rsp.get('dns.domain', {}).get('value', '')
+            if ',' in dnsdomain or ' ' in dnsdomain:
+                allok = False
+                emprint(f'{args.node} has a dns.domain that appears to be a search instead of singular domain')
+                uuidok = True  # not really, but suppress the spurious error
             uuid = rsp.get('id.uuid', {}).get('value', None)
             if uuid:
                 uuidok = True
