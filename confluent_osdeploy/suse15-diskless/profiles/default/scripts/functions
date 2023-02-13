@@ -1,10 +1,10 @@
 #!/bin/bash
 function test_mgr() {
     whost=$1
-    if [[ "$whost" == *:* ]]; then
+    if [[ "$whost" == *:* ]] && [[ "$whost" != *[* ]] ; then
         whost="[$whost]"
     fi
-    if curl -s https://${whost}/confluent-api/ > /dev/null; then
+    if curl -gs https://${whost}/confluent-api/ > /dev/null; then
         return 0
     fi
     return 1
@@ -63,10 +63,10 @@ fetch_remote() {
     set_confluent_vars
     mkdir -p $(dirname $1)
     whost=$confluent_mgr
-    if [[ "$whost" == *:* ]]; then
+    if [[ "$whost" == *:* ]] && [[ "$whost" != *[* ]] ; then
         whost="[$whost]"
     fi
-    curl -f -sS $curlargs https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
+    curl -gf -sS $curlargs https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo $1 failed to download; return 1; fi
 }
 
@@ -174,10 +174,10 @@ run_remote_python() {
     cd $confluentscripttmpdir
     mkdir -p $(dirname $1)
     whost=$confluent_mgr
-    if [[ "$whost" == *:* ]]; then
+    if [[ "$whost" == *:* ]] && [[ "$whost" != *[* ]] ; then
         whost="[$whost]"
     fi
-    curl -f -sS $curlargs https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
+    curl -gf -sS $curlargs https://$whost/confluent-public/os/$confluent_profile/scripts/$1 > $1
     if [ $? != 0 ]; then echo "'$*'" failed to download; return 1; fi
     confluentpython $*
     retcode=$?
