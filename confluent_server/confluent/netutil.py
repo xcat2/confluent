@@ -198,8 +198,9 @@ class NetManager(object):
             ipv4addr = attribs.get('ipv4_address', None)
             if ipv4addr:
                 try:
-                    for ai in socket.getaddrinfo(ipv4addr, 0, socket.AF_INET, socket.SOCK_STREAM):
-                        ipv4addr = ai[-1][0]
+                    luaddr = ipv4addr.split('/', 1)[0]
+                    for ai in socket.getaddrinfo(luaddr, 0, socket.AF_INET, socket.SOCK_STREAM):
+                        ipv4addr.replace(luaddr, ai[-1][0])
                 except socket.gaierror:
                     pass
             else:
