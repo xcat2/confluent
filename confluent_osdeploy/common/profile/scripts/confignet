@@ -344,6 +344,13 @@ if __name__ == '__main__':
                     else:
                         netname_to_interfaces[uname] = {'interfaces': set([iname]), 'settings': nc['extranets'][netname]}
         doneidxs.add(curridx)
+    if 'default' in netname_to_interfaces:
+        for netn in netname_to_interfaces:
+            if netn == 'default':
+                continue
+            netname_to_interfaces['default']['interfaces'] -= netname_to_interfaces[netn]['interfaces']
+        if not netname_to_interfaces['default']['interfaces']:
+            del netname_to_interfaces['default']
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/bin/nmcli'):
         nm = NetworkManager(devtypes)
