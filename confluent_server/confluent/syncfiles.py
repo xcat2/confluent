@@ -98,11 +98,14 @@ class SyncList(object):
                 v = v.strip()
                 if ':' in v:
                     nr, v = v.split(':', 1)
-                    for candidate in noderange.NodeRange(nr, cfg).nodes:
-                        if candidate == nodename:
-                            break
-                    else:
-                        continue
+                    try:
+                        for candidate in noderange.NodeRange(nr, cfg).nodes:
+                            if candidate == nodename:
+                                break
+                        else:
+                            continue
+                    except Exception as e:
+                        raise Exception('Error on syncfile line "{}": {}'.format(ent, str(e)))
                 optparts = v.split()
                 v = optparts[0]
                 optparts = optparts[1:]
