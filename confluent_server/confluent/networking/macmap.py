@@ -220,7 +220,10 @@ def _start_offloader():
 
 
 def _recv_offload():
-    upacker = msgpack.Unpacker(encoding='utf8')
+    try:
+        upacker = msgpack.Unpacker(encoding='utf8')
+    except TypeError:
+        upacker = msgpack.Unpacker(raw=False, strict_map_key=False)
     instream = _offloader.stdout.fileno()
     while True:
         select.select([_offloader.stdout], [], [])
@@ -689,7 +692,10 @@ def rescan(cfg):
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '-o':
-        upacker = msgpack.Unpacker(encoding='utf8')
+        try:
+            upacker = msgpack.Unpacker(encoding='utf8')
+        except TypeError:
+            upacker = msgpack.Unpacker(raw=False, strict_map_key=False)
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
 
