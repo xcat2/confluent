@@ -2,7 +2,7 @@ nodeconsole(8) -- Open a console to a confluent node
 =====================================================
 
 ## SYNOPSIS
-`nodeconsole [options] <noderange>`
+`nodeconsole [options] <noderange> [-- [passthroughoptions]]`
 
 ## DESCRIPTION
 
@@ -86,3 +86,14 @@ keystroke will be interpreted as a command.  The following commands are availabl
   Get a list of supported commands
 * `<ent>`:
   Hit enter to skip entering a command at the escape prompt.
+
+
+## PASSTHROUGH OPTIONS
+
+While opening a windowed console with xterm or any other console of choice. The 
+nodeconsole command gives capality to specify passthrough options targeted at 
+the console. All options after the -- will be parsed the console program. For 
+example, opening a windowed console using xterm with a black background. 
+`nodeconconsole -w n1 -- -bg black`  
+
+
