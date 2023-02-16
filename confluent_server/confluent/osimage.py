@@ -805,11 +805,17 @@ class MediaImporter(object):
             raise Exception('`osdeploy initialize` must be executed before importing any media')
         self.profiles = []
         medfile = None
+        self.medfile = None
         if cfm and media in cfm.clientfiles:
-            medfile = cfm.clientfiles[media]
+            self.medfile = cfm.clientfiles[media]
+            medfile = self.medfile
         else:
             medfile = open(media, 'rb')
-        identity = fingerprint(medfile)
+        try:
+            identity = fingerprint(medfile)
+        finally:
+            if not self.medfile:
+                medfile.close()
         if not identity:
             raise exc.InvalidArgumentException('Unsupported Media')
         self.percent = 0.0
@@ -837,7 +843,6 @@ class MediaImporter(object):
             del importing[importkey]
             raise Exception('{0} already exists'.format(self.targpath))
         self.filename = os.path.abspath(media)
-        self.medfile = medfile
         self.error = ''
         self.importer = eventlet.spawn(self.importmedia)
 
@@ -851,7 +856,8 @@ class MediaImporter(object):
 
     def importmedia(self):
         os.environ['PYTHONPATH'] = ':'.join(sys.path)
-        os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
+        if self.medfile:
+            os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
         with open(os.devnull, 'w') as devnull:
             self.worker = subprocess.Popen(
                 [sys.executable, __file__, self.filename, '-b'],
