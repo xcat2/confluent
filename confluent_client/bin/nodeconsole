@@ -32,7 +32,7 @@ import re
 
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] node",
+    usage="Usage: %prog [options] <noderange> [kill][-- [passthroughoptions]]",
     epilog="Command sequences are available while connected to a console, hit "
            "ctrl-'e', then release ctrl, then 'c', then '?' for a full list. "
            "For example, ctrl-'e', then 'c', then '.' will exit the current "
@@ -65,13 +65,22 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
 (options, args) = argparser.parse_args()
 
 pass_through_args = []
-if len(args) > 1:
-   pass_through_args = args[1:]
-   args = args[:1]
+killcon = False
+try:
+    noderange = args[0]
+    if len(args) > 1:
+        if args[1] == 'kill':
+            killcon = True
+        pass_through_args = args[1:]
+        args = args[:1]
+except IndexError:
+    argparser.print_help()
+    sys.exit(1)
 
 if len(args) != 1:
     argparser.print_help()
     sys.exit(1)
+
 if options.log:
     logname = args[0]
     if not os.path.exists(logname) and logname[0] != '/':
@@ -82,6 +91,29 @@ if options.log:
     logreader.replay_to_console(logname)
     sys.exit(0)
 
+def kill(noderange):
+    sess = client.Command()
+    envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
+    if not envstring:
+        envstring = 'xterm'
+
+    nodes = []
+    for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
+        node = res.get('item', {}).get('href', '/').replace('/', '')
+        if not node:
+            sys.stderr.write(res.get('error', repr(res)) + '\n')
+            sys.exit(1)
+        nodes.append(node) 
+
+    for node in nodes:
+        ps_data=subprocess.Popen(['ps', '-auxww' ], stdout=subprocess.PIPE)
+        wintr=ps_data.communicate()[0]
+        for line in wintr.decode('utf-8').split('\n'):
+            if confettypath in line and envstring in line and node in line:
+                pid_line = [x for x in line.split(' ') if x != '']
+                ps_data=subprocess.Popen(['kill', '-9', pid_line[1] ], stdout=subprocess.PIPE)
+
+    sys.exit(0)
 
 def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):    
     if '-geometry' in envlist:
@@ -101,6 +133,10 @@ def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):
         g_index = 1
     return envlist     
 
+# add funcltionality to close/kill all open consoles
+if killcon:
+    kill(noderange)
+    
 #added functionality for wcons
 if options.windowed:
     result=subprocess.Popen(['xwininfo', '-root'], stdout=subprocess.PIPE)

@@ -2,7 +2,7 @@ nodeconsole(8) -- Open a console to a confluent node
 =====================================================
 
 ## SYNOPSIS
-`nodeconsole [options] <noderange> [-- [passthroughoptions]]`
+`nodeconsole [options] <noderange> [kill][-- [passthroughoptions]]`
 
 ## DESCRIPTION
 
@@ -15,6 +15,9 @@ When the console connection to the target is broken, then confluent on backend
 will initiate an automatic retry interval that is randomized between 2 and 4 minutes.
 The reopen escape sequence below requests an immediate retry, as does connecting
 a new session.
+
+When a windowed console is open the `nodeconsole <noderange> kill` command will kill the
+console process which will result in the console window closing. 
 
 ## OPTIONS
 
