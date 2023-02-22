@@ -1184,7 +1184,7 @@ def search_smms_by_cert(currsmm, cert, cfg):
                 if len(nl) == 1:
                     return currsmm, bay, nl[0]
                 return currsmm, bay, None
-    exnl = list(cfg.filter_node_attrubutes('enclosure.extends=' + currsmm))
+    exnl = list(cfg.filter_node_attributes('enclosure.extends=' + currsmm))
     if len(exnl) == 1:
         return search_smms_by_cert(exnl[0], cert, cfg)
 
