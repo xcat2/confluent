@@ -135,7 +135,7 @@ def sensorpass(showout=True, appendtime=False):
                         if sensedata['value'] is None:
                             showval = ''
                         elif isinstance(sensedata['value'], float):
-                            showval = u' {0:.5f} '.format(sensedata['value'])
+                            showval = u' {0:.5g} '.format(sensedata['value'])
                         else:
                             showval = u' {0} '.format(sensedata['value'])
                         if sensedata['units'] not in (None, u''):
@@ -191,6 +191,8 @@ def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
                             datum = ','.join([datum, healthstates])
                         else:
                             datum = healthstates
+                if isinstance(datum, float):
+                    datum = '{:.5g}'.format(datum)
                 rowdata.append(datum)
             except KeyError:
                 rowdata.append('N/A')
