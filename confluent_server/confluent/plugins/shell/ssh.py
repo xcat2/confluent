@@ -146,7 +146,7 @@ class SshShell(conapi.Console):
             return
         except cexc.PubkeyInvalid as pi:
             self.ssh.close()
-            self.keyaction = ''
+            self.keyaction = b''
             self.candidatefprint = pi.fingerprint
             self.datacallback(pi.message)
             self.keyattrname = pi.attrname
@@ -197,18 +197,18 @@ class SshShell(conapi.Console):
                 delidx = data.index(b'\x7f')
                 data = data[:delidx - 1] + data[delidx + 1:]
             self.keyaction += data
-            if '\r' in self.keyaction:
-                action = self.keyaction.split('\r')[0]
-                if action.lower() == 'accept':
+            if b'\r' in self.keyaction:
+                action = self.keyaction.split(b'\r')[0]
+                if action.lower() == b'accept':
                     self.nodeconfig.set_node_attributes(
                         {self.node:
                              {self.keyattrname: self.candidatefprint}})
                     self.datacallback('\r\n')
                     self.logon()
-                elif action.lower() == 'disconnect':
+                elif action.lower() == b'disconnect':
                     self.datacallback(conapi.ConsoleEvent.Disconnect)
                 else:
-                    self.keyaction = ''
+                    self.keyaction = b''
                     self.datacallback('\r\nEnter "disconnect" or "accept": ')
             elif len(data) > 0:
                 self.datacallback(data)
