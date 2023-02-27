@@ -41,6 +41,7 @@ try:
 except ImportError:
     pass
 import time
+import yaml
 
 _pamservice = 'confluent'
 _passcache = {}
@@ -122,30 +123,14 @@ class PromptsNeeded(Exception):
     #Opening YAML file and reading the custom roles
     with open("/etc/confluent/authorization.yaml","r") as stream:
         loaded_file = yaml.safe_load(stream)
-        for outside_key,outside_value in loaded_file.items():
-            for inside_key,inside_value in outside_value.items():
-                try:
-                    #Trying to append the new list of permissions to existing lists (i.e. Operator : {"retrieve" : ['*' , 'new_added_file_permission']}) 
-                    dictionary[outside_key][inside_key] = (list(set(dictionary[outside_key][inside_key]+inside_value)))
-                except KeyError:
-                    #If there is no previous action, we create a new one (i.e. Operator : { "new_action" : ['new_added_file_permission'] })
-                    try:
-                        dictionary[outside_key][inside_key] = inside_value
-                    except KeyError:
-                        #If there is a new role to be added, we add it along with the rest of the info (i.e. NewRole : {"new_action" : ['new_added_file_permission]})
-                        dictionary[outside_key] = outside_value
+        try:
+            dictionary.update(loaded_file)
+        except FileNotFoundError:
+            return "File does not exist"
+        return
                 
     
 def check_for_yaml():
-    #impot yaml and op.path to check if the file exists and to safe_load the yaml file.
-    try:
-        import yaml
-    except:
-        return "Yaml not installed"
-    try:
-        from os.path import exists
-    except:
-        return "could not import os.path"
     #checking if the file exists
     if exists("/etc/confluent/authorization.yaml"):
         add_roles(_allowedbyrole)
@@ -206,7 +191,6 @@ def authorize(name, element, tenant=False, operation='create',
     # skipuserobj is a leftover from the now abandoned plan to use pam session
     # to do authorization and authentication.  Now confluent always does authorization
     # even if pam does authentication.
-    check_for_yaml()
     if operation not in ('create', 'start', 'update', 'retrieve', 'delete', None):
         return False
     user, tenant = _get_usertenant(name, tenant)
