@@ -49,7 +49,8 @@ class WebClient(object):
             results.put(msg.ConfluentTargetInvalidCredentials(self.node, 'Unable to authenticate'))
             return {}
         elif status != 200:
-            results.put(msg.ConfluentNodeError(self.node, 'Unknown error: ' + rsp + ' while retrieving ' + url))
+            #must be str not bytes
+            results.put(msg.ConfluentNodeError(self.node, 'Unknown error: {} while retrieving {}'.format(rsp, url)))
             return {}
         return rsp
     
