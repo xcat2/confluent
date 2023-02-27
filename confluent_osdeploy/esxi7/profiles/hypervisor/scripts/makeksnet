@@ -33,6 +33,8 @@ for info in vswinfo.split('\n'):
     upinfo = uplinkmatch.match(info)
     if upinfo:
         vmnic = upinfo.group(1)
+        if vmnic and 'vusb0' not in vmnic:
+            break
 try:
     with open('/tmp/confluentident/cnflnt.jsn') as identin:
         identcfg = json.load(identin)
