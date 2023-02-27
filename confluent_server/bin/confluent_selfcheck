@@ -15,7 +15,7 @@ import confluent.sshutil as sshutil
 import confluent.certutil as certutil
 import confluent.client as client
 import confluent.config.configmanager as configmanager
-import subprocess
+import eventlet.green.subprocess as subprocess
 import tempfile
 import shutil
 import eventlet.green.socket as socket

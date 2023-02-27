@@ -37,6 +37,12 @@ class hybridcsv(csv.excel):
     lineterminator = '\n'
 
 
+def floatformat(num):
+    fm = u'{:.5f}'.format(num).rstrip('0')
+    if fm[-1:] == u'.':
+        return fm + u'0'
+    return fm
+
 csv.register_dialect('hybrid', hybridcsv)
 
 import confluent.client as client
@@ -135,7 +141,7 @@ def sensorpass(showout=True, appendtime=False):
                         if sensedata['value'] is None:
                             showval = ''
                         elif isinstance(sensedata['value'], float):
-                            showval = u' {0:.5f} '.format(sensedata['value'])
+                            showval = floatformat(sensedata['value'])
                         else:
                             showval = u' {0} '.format(sensedata['value'])
                         if sensedata['units'] not in (None, u''):
@@ -191,6 +197,8 @@ def format_csv(csvwriter, orderedsensors, resdata, showtime=True):
                             datum = ','.join([datum, healthstates])
                         else:
                             datum = healthstates
+                if isinstance(datum, float):
+                    datum = floatformat(datum)
                 rowdata.append(datum)
             except KeyError:
                 rowdata.append('N/A')
