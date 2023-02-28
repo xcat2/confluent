@@ -296,6 +296,10 @@ class NetworkManager(object):
                 subprocess.check_call(['nmcli', 'c', 'u', u])
             else:
                 subprocess.check_call(['nmcli', 'c', 'add', 'type', self.devtypes[iname], 'con-name', cname, 'connection.interface-name', iname] + cargs)
+                self.read_connections()
+                u = self.uuidbyname.get(cname, None)
+                if u:
+                    subprocess.check_call(['nmcli', 'c', 'u', u])
 
 
 
