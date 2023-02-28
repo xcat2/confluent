@@ -33,15 +33,20 @@ export nodename confluent_mgr confluent_profile
 exec >> /var/log/confluent/confluent-firstboot.log
 exec 2>> /var/log/confluent/confluent-firstboot.log
 chmod 600 /var/log/confluent/confluent-firstboot.log
+if [ ! -f /etc/confluent/firstboot.ran ]; then
+    cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
+    confluentpython /root/confignet
+    rm /root/confignet
+fi
+
+
 while ! ping -c 1 $confluent_pingtarget >& /dev/null; do
 	sleep 1
 done
 
+
 if [ ! -f /etc/confluent/firstboot.ran ]; then
     touch /etc/confluent/firstboot.ran
-
-    cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
-    run_remote_python confignet
 
     run_remote firstboot.custom
     # Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
