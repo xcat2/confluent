@@ -642,7 +642,6 @@ def has_quorum():
     myrole = None
     if iam:
         myrole = iam.get('role', None)
-    myrole = get_collective_member(get_myname()).get('role', None)
     if myrole != 'nonvoting':
         voters += 1
     allvoters = 0
