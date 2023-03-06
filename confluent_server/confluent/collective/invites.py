@@ -22,12 +22,13 @@ import hmac
 import os
 pending_invites = {}
 
-def create_server_invitation(servername):
+def create_server_invitation(servername, role):
     servername = servername.encode('utf-8')
     randbytes = (3 - ((len(servername) + 2) % 3)) % 3 + 64
     invitation = os.urandom(randbytes)
-    pending_invites[servername] = invitation
-    return base64.b64encode(servername + b'@' + invitation)
+    pending_invites[servername] = {'invitation': invitation, 'role': role}
+    invite = servername + b'@' + invitation
+    return base64.b64encode(invite)
 
 def create_client_proof(invitation, mycert, peercert):
     return hmac.new(invitation, peercert + mycert, hashlib.sha256).digest()
@@ -42,6 +43,8 @@ def check_client_proof(servername, mycert, peercert, proof):
     if servername not in pending_invites:
         return False
     invitation = pending_invites[servername]
+    role = invitation['role']
+    invitation = invitation['invitation']
     validproof = hmac.new(invitation, mycert + peercert, hashlib.sha256
                           ).digest()
     if proof == validproof:
@@ -54,7 +57,7 @@ def check_client_proof(servername, mycert, peercert, proof):
         # Now to generate an answer...., reverse the cert order so our answer
         # is different, but still proving things
         return hmac.new(invitation, peercert + mycert, hashlib.sha256
-                          ).digest()
+                          ).digest(), role
     # The given proof did not verify the invitation
-    return False
+    return False, None
 

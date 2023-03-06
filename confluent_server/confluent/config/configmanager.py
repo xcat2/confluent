@@ -89,6 +89,7 @@ import string
 import struct
 import sys
 import threading
+import time
 import traceback
 try:
     unicode
@@ -320,7 +321,7 @@ def _rpc_set_group_attributes(tenant, attribmap, autocreate):
 def check_quorum():
     if isinstance(cfgleader, bool):
         raise exc.DegradedCollective()
-    if (not cfgleader) and len(cfgstreams) < (len(_cfgstore.get('collective', {})) // 2):
+    if (not cfgleader) and (not has_quorum()):
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
     if cfgleader and not _hasquorum:
@@ -348,9 +349,9 @@ def exec_on_followers(fnname, *args):
     pushes = eventlet.GreenPool()
     # Check health of collective prior to attempting
     for _ in pushes.starmap(
-        _push_rpc, [(cfgstreams[s], b'') for s in cfgstreams]):
+            _push_rpc, [(cfgstreams[s]['stream'], b'') for s in cfgstreams]):
         pass
-    if len(cfgstreams) < (len(_cfgstore['collective']) // 2):
+    if not has_quorum():
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
     exec_on_followers_unconditional(fnname, *args)
@@ -363,7 +364,7 @@ def exec_on_followers_unconditional(fnname, *args):
     payload = msgpack.packb({'function': fnname, 'args': args,
                              'txcount': _txcount}, use_bin_type=False)
     for _ in pushes.starmap(
-            _push_rpc, [(cfgstreams[s], payload) for s in cfgstreams]):
+            _push_rpc, [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
         pass
 
 
@@ -615,6 +616,37 @@ def set_global(globalname, value, sync=True):
     if sync:
         ConfigManager._bg_sync_to_file()
 
+mycachedname = [None, 0]
+def get_myname():
+    if mycachedname[1] > time.time() - 15:
+        return mycachedname[0]
+    try:
+        with open('/etc/confluent/cfg/myname', 'r') as f:
+            mycachedname[0] = f.read().strip()
+            mycachedname[1] = time.time()
+            return mycachedname[0]
+    except IOError:
+        myname = socket.gethostname().split('.')[0]
+        with open('/etc/confluent/cfg/myname', 'w') as f:
+            f.write(myname)
+        mycachedname[0] = myname
+        mycachedname[1] = time.time()
+        return myname
+
+def has_quorum():
+    voters = 0
+    for follower in cfgstreams:
+        if cfgstreams[follower].get('role', None) != 'nonvoting':
+            voters += 1
+    myrole = get_collective_member(get_myname()).get('role', None)
+    if myrole != 'nonvoting':
+        voters += 1
+    allvoters = 0
+    for ghost in list_collective():
+        if get_collective_member(ghost).get('role', None) != 'nonvoting':
+            allvoters += 1
+    return voters > allvoters // 2
+    
 cfgstreams = {}
 def relay_slaved_requests(name, listener):
     global cfgleader
@@ -622,21 +654,21 @@ def relay_slaved_requests(name, listener):
     pushes = eventlet.GreenPool()
     if name not in _followerlocks:
         _followerlocks[name] = gthread.RLock()
+    meminfo = get_collective_member(name)
     with _followerlocks[name]:
         try:
             stop_following()
             if name in cfgstreams:
                 try:
-                    cfgstreams[name].close()
+                    cfgstreams[name]['stream'].close()
                 except Exception:
                     pass
                 del cfgstreams[name]
                 if membership_callback:
                     membership_callback()
-            cfgstreams[name] = listener
+            cfgstreams[name] = {'stream': listener, 'role': meminfo.get('role', None)}
             lh = StreamHandler(listener)
-            _hasquorum = len(cfgstreams) >= (
-                    len(_cfgstore['collective']) // 2)
+            _hasquorum = has_quorum()
             _newquorum = None
             while _hasquorum != _newquorum:
                 if _newquorum is not None:
@@ -644,10 +676,9 @@ def relay_slaved_requests(name, listener):
                 payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
                 for _ in pushes.starmap(
                         _push_rpc,
-                        [(cfgstreams[s], payload) for s in cfgstreams]):
+                        [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
                     pass
-                _newquorum = len(cfgstreams) >= (
-                        len(_cfgstore['collective']) // 2)
+                _newquorum = has_quorum()
             _hasquorum = _newquorum
             if _hasquorum and _pending_collective_updates:
                 apply_pending_collective_updates()
@@ -693,12 +724,11 @@ def relay_slaved_requests(name, listener):
             except KeyError:
                 pass  # May have already been closed/deleted...
             if cfgstreams:
-                _hasquorum = len(cfgstreams) >= (
-                        len(_cfgstore['collective']) // 2)
+                _hasquorum = has_quorum()
                 payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
                 for _ in pushes.starmap(
                         _push_rpc,
-                        [(cfgstreams[s], payload) for s in cfgstreams]):
+                        [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
                     pass
             if membership_callback:
                 membership_callback()
@@ -756,8 +786,8 @@ def stop_leading(newleader=None):
     for stream in list(cfgstreams):
         try:
             if rpcpayload is not None:
-                _push_rpc(cfgstreams[stream], rpcpayload)
-            cfgstreams[stream].close()
+                _push_rpc(cfgstreams[stream]['stream'], rpcpayload)
+            cfgstreams[stream]['stream'].close()
         except Exception:
             pass
         try:
@@ -876,12 +906,12 @@ def follow_channel(channel):
     return {}
 
 
-def add_collective_member(name, address, fingerprint):
+def add_collective_member(name, address, fingerprint, role=None):
     if cfgleader:
-        return exec_on_leader('add_collective_member', name, address, fingerprint)
+        return exec_on_leader('add_collective_member', name, address, fingerprint, role)
     if cfgstreams:
-        exec_on_followers('_true_add_collective_member', name, address, fingerprint)
-    _true_add_collective_member(name, address, fingerprint)
+        exec_on_followers('_true_add_collective_member', name, address, fingerprint, True, role)
+    _true_add_collective_member(name, address, fingerprint, role=role)
 
 def del_collective_member(name):
     if cfgleader and not isinstance(cfgleader, bool):
@@ -934,7 +964,7 @@ def apply_pending_collective_updates():
         del _pending_collective_updates[name]
 
 
-def _true_add_collective_member(name, address, fingerprint, sync=True):
+def _true_add_collective_member(name, address, fingerprint, sync=True, role=None):
     name = confluent.util.stringify(name)
     if _cfgstore is None:
         init(not sync)  # use not sync to avoid read from disk
@@ -942,6 +972,8 @@ def _true_add_collective_member(name, address, fingerprint, sync=True):
         _cfgstore['collective'] = {}
     _cfgstore['collective'][name] = {'name': name, 'address': address,
                                      'fingerprint': fingerprint}
+    if role:
+        _cfgstore['collective'][name]['role'] = role
     with _dirtylock:
         if 'collectivedirty' not in _cfgstore:
             _cfgstore['collectivedirty'] = set([])

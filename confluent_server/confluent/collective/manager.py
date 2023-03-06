@@ -153,7 +153,7 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
                 for c in colldata:
                     cfm._true_add_collective_member(c, colldata[c]['address'],
                                                     colldata[c]['fingerprint'],
-                                                    sync=False)
+                                                    sync=False, role=colldata[c].get('role', None))
                 for globvar in globaldata:
                     cfm.set_global(globvar, globaldata[globvar], False)
                 cfm._txcount = dbi.get('txcount', 0)
@@ -328,7 +328,8 @@ def handle_connection(connection, cert, request, local=False):
             #TODO(jjohnson2): Cannot do the invitation if not the head node, the certificate hand-carrying
             #can't work in such a case.
             name = request['name']
-            invitation = invites.create_server_invitation(name)
+            role = request.get('role', '')
+            invitation = invites.create_server_invitation(name, role)
             tlvdata.send(connection,
                          {'collective': {'invitation': invitation}})
             connection.close()
@@ -401,8 +402,8 @@ def handle_connection(connection, cert, request, local=False):
             cfm.check_quorum()
             mycert = util.get_certificate_from_file('/etc/confluent/srvcert.pem')
             proof = base64.b64decode(request['hmac'])
-            myrsp = invites.check_client_proof(request['name'], mycert,
-                                            cert, proof)
+            myrsp, role = invites.check_client_proof(request['name'], mycert,
+                                                     cert, proof)
             if not myrsp:
                 tlvdata.send(connection, {'error': 'Invalid token'})
                 connection.close()
@@ -418,7 +419,7 @@ def handle_connection(connection, cert, request, local=False):
             cfm.add_collective_member(get_myname(),
                                     connection.getsockname()[0], myfprint)
             cfm.add_collective_member(request['name'],
-                                    connection.getpeername()[0], fprint)
+                                    connection.getpeername()[0], fprint, role)
             myleader = get_leader(connection)
             ldrfprint = cfm.get_collective_member_by_address(
                 myleader)['fingerprint']
@@ -590,9 +591,12 @@ def populate_collinfo(collinfo):
     activemembers = set(cfm.cfgstreams)
     activemembers.add(iam)
     collinfo['offline'] = []
+    collinfo['nonvoting'] = []
     for member in cfm.list_collective():
         if member not in activemembers:
             collinfo['offline'].append(member)
+        if cfm.get_collective_member(member).get('role', None) == 'nonvoting':
+            collinfo['nonvoting'].append(member)
 
 
 def try_assimilate(drone, followcount, remote):

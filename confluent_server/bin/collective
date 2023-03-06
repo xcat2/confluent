@@ -52,11 +52,12 @@ def make_certificate():
     os.umask(umask)
 
 
-def show_invitation(name):
+def show_invitation(name, nonvoting=False):
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         make_certificate()
     s = client.Command().connection
-    tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name}})
+    role = 'nonvoting' if nonvoting else None
+    tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name, 'role': role}})
     invite = tlvdata.recv(s)['collective']
     if 'error' in invite:
         sys.stderr.write(invite['error'] + '\n')
@@ -104,16 +105,19 @@ def show_collective():
         return
     if 'quorum' in res['collective']:
         print('Quorum: {0}'.format(res['collective']['quorum']))
-    print('Leader: {0}'.format(res['collective']['leader']))
+    leadernonvoting = res['collective']['leader'] in res['collective'].get('nonvoting', ())
+    print('Leader: {0}{1}'.format(res['collective']['leader'], ' (non-voting)' if leadernonvoting else ''))
     if 'active' in res['collective']:
         if res['collective']['active']:
             print('Active collective members:')
             for member in sortutil.natural_sort(res['collective']['active']):
-                print('    {0}'.format(member))
+                nonvoter = member in res['collective'].get('nonvoting', ())
+                print('    {0}{1}'.format(member, ' (nonvoting)' if nonvoter else ''))
         if res['collective']['offline']:
             print('Offline collective members:')
             for member in sortutil.natural_sort(res['collective']['offline']):
-                print('    {0}'.format(member))
+                nonvoter = member in res['collective'].get('nonvoting', ())
+                print('    {0}{1}'.format(member, ' (nonvoting)' if nonvoter else ''))
     else:
         print('Run collective show on leader for more data')
 
@@ -128,6 +132,7 @@ def main():
                                     'collective member.  Run collective invite -h for more information')
     ic.add_argument('name', help='Name of server to invite to join the '
                                  'collective')
+    ic.add_argument('-n', help='Join as a non-voting member, do not have this member contribute to quorum', action='store_true')
     dc = sp.add_parser('delete', help='Delete a member of a collective')
     dc.add_argument('name', help='Name of server to delete from collective')
     jc = sp.add_parser('join', help='Join a collective.  Run collective join -h for more information')
@@ -138,7 +143,7 @@ def main():
     if cmdset.command == 'gencert':
         make_certificate()
     elif cmdset.command == 'invite':
-        show_invitation(cmdset.name)
+        show_invitation(cmdset.name, cmdset.n)
     elif cmdset.command == 'join':
         join_collective(cmdset.server, cmdset.i)
     elif cmdset.command == 'show':
