@@ -638,6 +638,10 @@ def has_quorum():
     for follower in cfgstreams:
         if cfgstreams[follower].get('role', None) != 'nonvoting':
             voters += 1
+    iam = get_collective_member(get_myname())
+    myrole = None
+    if iam:
+        myrole = iam.get('role', None)
     myrole = get_collective_member(get_myname()).get('role', None)
     if myrole != 'nonvoting':
         voters += 1
