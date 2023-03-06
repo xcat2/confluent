@@ -416,8 +416,10 @@ def handle_connection(connection, cert, request, local=False):
             myrsp = base64.b64encode(myrsp)
             fprint = util.get_fingerprint(cert)
             myfprint = util.get_fingerprint(mycert)
-            cfm.add_collective_member(get_myname(),
-                                    connection.getsockname()[0], myfprint)
+            iam = cfm.get_collective_member(get_myname())
+            if not iam:
+                cfm.add_collective_member(get_myname(),
+                                          connection.getsockname()[0], myfprint)
             cfm.add_collective_member(request['name'],
                                     connection.getpeername()[0], fprint, role)
             myleader = get_leader(connection)
