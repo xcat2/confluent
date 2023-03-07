@@ -117,24 +117,37 @@ class PromptsNeeded(Exception):
         self.prompts = prompts
 
  #add function to change _allowedbyrole and _deniedbyrole vars.
- def add_roles(dictionary):
+ def add_roles(_allowed,_denied):
     #function to parse the roles and the files. If there are modifications to be done to the roles, items will be added to dictionaries.
     #If there are no moodifications done to one of the roles, it continues to the next
     #Opening YAML file and reading the custom roles
     with open("/etc/confluent/authorization.yaml","r") as stream:
         loaded_file = yaml.safe_load(stream)
         try:
-            dictionary.update(loaded_file)
-        except FileNotFoundError:
-            return "File does not exist"
+            allowed_loaded = loaded_file["_allowedbyrole"]
+        except:
+            pass
+        try:
+            denied_loaded = loaded_file["_deniedbyrole"]
+        except:
+            pass
+ 
+        try:
+            _allowed.update(allowed_loaded)
+        except NameError:
+            pass
+        try: 
+            _denied.update(denied_loaded)
+        except NameError:
+            pass
         return
                 
     
 def check_for_yaml():
     #checking if the file exists
     if exists("/etc/confluent/authorization.yaml"):
-        add_roles(_allowedbyrole)
-        add_roles(_deniedbyrole)
+        add_roles(_allowedbyrole,_deniedbyrole)
+
         return "Custom auth. file detected in /etc/confluent, updated roles accordingly"
     else:
         return "No custom auth. file. Continuing as normal"
