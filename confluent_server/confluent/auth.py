@@ -124,11 +124,11 @@ class PromptsNeeded(Exception):
     with open("/etc/confluent/authorization.yaml","r") as stream:
         loaded_file = yaml.safe_load(stream)
         try:
-            allowed_loaded = loaded_file["_allowedbyrole"]
+            allowed_loaded = loaded_file["allowedbyrole"]
         except:
             pass
         try:
-            denied_loaded = loaded_file["_deniedbyrole"]
+            denied_loaded = loaded_file["deniedbyrole"]
         except:
             pass
  
