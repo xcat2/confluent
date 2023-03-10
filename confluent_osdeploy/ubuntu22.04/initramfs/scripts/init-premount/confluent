@@ -5,10 +5,48 @@ done
 mkdir -p /custom-installation
 cp -a /opt/confluent /custom-installation
 touch /custom-installation/confluent/confluent.info
-while ! grep NODENAME /custom-installation/confluent/confluent.info; do
-    /opt/confluent/bin/copernicus -t > /custom-installation/confluent/confluent.info
+TRIES=5
+while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
+    sleep 2
+    TRIES=$((TRIES - 1))
 done
-MGR="[$(grep MANAGER: /custom-installation/confluent/confluent.info | head -n 1 | awk '{print $2}')]"
+if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    tmnt=/tmp/idntmnt
+    mkdir -p /tmp/identdata/
+    mkdir -p $tmnt
+    tcfg=/tmp/idnttmp
+    mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
+    cp -a $tmnt/* /tmp/identdata/
+    cd $tmnt
+    deploysrvs=$(sed -n '/^deploy_servers:/,/^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+    sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
+    autoconfigmethod=$(grep ^ipv4_method: $tcfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+    . /scripts/functions
+    if [ "$autoconfigmethod" = "static" ]; then
+        TRYNIC=$(ip link|grep LOWER_UP|awk '{print $2}'|sed -e s/:$//)
+        MYIP=$(grep ^ipv4_address: $tcfg | awk '{print $2}'|sed -e s'!/.*!!')
+        MYGW=$(grep ^ipv4_gateway: $tcfg | awk '{print $2}')
+        MYNM=$(grep ^ipv4_netmask: $tcfg | awk '{print $2}')
+        ipconfig -d $MYIP::$MYGW:$MYNM::$TRYNIC
+    else
+        configure_networking
+    fi
+    MGR=$deploysrvs
+    NODENAME=$(grep ^nodename: /tmp/idntmnt/cnflnt.yml | awk '{print $2}')
+    echo "NODENAME: $NODENAME" >> /custom-installation/confluent/confluent.info
+    echo "MANAGER: $MGR" >> /custom-installation/confluent/confluent.info
+    echo "EXTMGRINFO: $MGR||1" >> /custom-installation/confluent/confluent.info
+    hmackeyfile=/tmp/cnflnthmackeytmp
+    echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
+    cd -
+    umount $tmnt
+else
+    while ! grep NODENAME /custom-installation/confluent/confluent.info; do
+        /opt/confluent/bin/copernicus -t > /custom-installation/confluent/confluent.info
+    done
+    MGR="[$(grep MANAGER: /custom-installation/confluent/confluent.info | head -n 1 | awk '{print $2}')]"
+fi
 osprofile=$(sed -e 's/.*osprofile=//' -e 's/ .*//' /proc/cmdline)
 cat /proc/cmdline > /custom-installation/confluent/cmdline.orig
 if [ -f /custom-installation/autocons.info ]; then
