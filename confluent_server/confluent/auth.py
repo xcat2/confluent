@@ -116,11 +116,11 @@ class PromptsNeeded(Exception):
     def __init__(self, prompts):
         self.prompts = prompts
 
- #add function to change _allowedbyrole and _deniedbyrole vars.
- def add_roles(_allowed,_denied):
-    #function to parse the roles and the files. If there are modifications to be done to the roles, items will be added to dictionaries.
-    #If there are no moodifications done to one of the roles, it continues to the next
-    #Opening YAML file and reading the custom roles
+#add function to change _allowedbyrole and _deniedbyrole vars.
+def add_roles(_allowed,_denied):
+    # function to parse the roles and the files. If there are modifications to be done to the roles, items will be added to dictionaries.
+    # If there are no moodifications done to one of the roles, it continues to the next
+    # Opening YAML file and reading the custom roles
     with open("/etc/confluent/authorization.yaml","r") as stream:
         loaded_file = yaml.safe_load(stream)
         try:
