@@ -21,6 +21,7 @@ if [ -e /tmp/cnflnthmackeytmp ]; then
     cp $hmackeyfile tmp
     chroot . custom-installation/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
     chroot . curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_CRYPTHMAC: $(cat /root/$hmacfile)" -d @/tmp/cnflntcryptfile  https://$MGR/confluent-api/self/registerapikey
+    cp /root/$passfile /root/custom-installation/confluent/confluent.apikey
 else
     chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
     MGR=[$MGR]
