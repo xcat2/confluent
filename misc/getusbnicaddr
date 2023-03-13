@@ -1,0 +1,31 @@
+#!/usr/bin/python3
+import glob
+import os
+import select
+import socket
+
+
+def scan_nic(nicidx):
+    srvs = {}
+    s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+    s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    s6.bind(('::', 1900))
+    msg = b'M-SEARCH * HTTP/1.1\r\nHOST: [ff02::c]:1900\r\nMAN: "ssdp:discover"\r\nST: urn:dmtf-org:service:redfish-rest:1\r\nMX: 3\r\n\r\n'
+    s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, nicidx)
+    s6.sendto(msg, ('ff02::c', 1900))
+    (rsp, peer) = s6.recvfrom(9000)
+    print('{}%{}'.format(peer[0], nicidx))
+
+if __name__ == '__main__':
+    for nic in glob.glob('/sys/class/net/*'):
+        nic = os.path.basename(nic)
+        try:
+            driver = os.readlink('/sys/class/net/{}/device/driver/module'.format(nic))
+        except:
+            continue
+        if 'cdc_ether' not in driver:
+            continue
+        idx = int(open('/sys/class/net/{}/ifindex'.format(nic)).read())
+        break
+    scan_nic(idx)
