@@ -13,14 +13,14 @@ oum=$(umask)
 umask 077
 if [ -e /tmp/cnflnthmackeytmp ]; then
     hmackeyfile=/tmp/cnflnthmackeytmp
-    echo -n $(grep ^apitoken: /tmp/identdata/cnflnt.yml|awk '{print $2}') > $hmackeyfile
+    #echo -n $(grep ^apitoken: /tmp/identdata/cnflnt.yml|awk '{print $2}') > $hmackeyfile
     passfile=/tmp/cnflnttmppassfile
     passcrypt=/tmp/cnflntcryptfile
     hmacfile=/tmp/cnflnthmacfile
     chroot . ln -sf /custom-installation/confluent/bin/clortho custom-installation/confluent/bin/genpasshmac
     cp $hmackeyfile tmp
     chroot . custom-installation/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
-    chroot . curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d @/tmp/cnflntcryptfile  https://$MGR/confluent-api/self/registerapikey
+    chroot . curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_CRYPTHMAC: $(cat /root/$hmacfile)" -d @/tmp/cnflntcryptfile  https://$MGR/confluent-api/self/registerapikey
 else
     chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
     MGR=[$MGR]
