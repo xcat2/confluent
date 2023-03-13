@@ -19,6 +19,7 @@
 #define MAXPACKET 1024
 
 static const char cryptalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./";
+static const char b64alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 unsigned char* genpasswd(int len) {
         unsigned char * passwd;
@@ -56,10 +57,10 @@ char * b64e(uint8_t * data, uint32_t datalen) {
         currchunk[1] = remaining > 1 ? currptr[1] : 0;
         currchunk[2] = remaining > 2 ? currptr[2] : 0;
         currptr += 3;
-        currout[0] = cryptalpha[currchunk[0] >> 2];
-        currout[1] = cryptalpha[(currchunk[0] << 4 | currchunk[1] >> 4) & 0x3f];
-        currout[2] = remaining > 1 ? cryptalpha[(currchunk[1] << 2 | currchunk[2] >> 6) & 0x3f] : '=';
-        currout[3] = remaining > 2 ? cryptalpha[currchunk[2] & 0x3f] : '=';
+        currout[0] = b64alpha[currchunk[0] >> 2];
+        currout[1] = b64alpha[(currchunk[0] << 4 | currchunk[1] >> 4) & 0x3f];
+        currout[2] = remaining > 1 ? b64alpha[(currchunk[1] << 2 | currchunk[2] >> 6) & 0x3f] : '=';
+        currout[3] = remaining > 2 ? b64alpha[currchunk[2] & 0x3f] : '=';
         remaining -= 3;
         currout += 4;
     }
