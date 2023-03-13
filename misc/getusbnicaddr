@@ -10,7 +10,7 @@ def scan_nic(nicidx):
     s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     s6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-    s6.bind(('::', 1900))
+    s6.bind(('::', 0))
     msg = b'M-SEARCH * HTTP/1.1\r\nHOST: [ff02::c]:1900\r\nMAN: "ssdp:discover"\r\nST: urn:dmtf-org:service:redfish-rest:1\r\nMX: 3\r\n\r\n'
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, nicidx)
     s6.sendto(msg, ('ff02::c', 1900))
