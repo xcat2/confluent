@@ -29,6 +29,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         MYGW=$(grep ^ipv4_gateway: $tcfg | awk '{print $2}')
         MYNM=$(grep ^ipv4_netmask: $tcfg | awk '{print $2}')
         ipconfig -d $MYIP::$MYGW:$MYNM::$TRYNIC
+        echo $TRYNIC > /tmp/autodetectnic
     else
         configure_networking
     fi
