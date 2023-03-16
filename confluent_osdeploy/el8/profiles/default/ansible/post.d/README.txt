@@ -1,6 +1,10 @@
 Ansible playbooks ending in .yml or .yaml that are placed into this directory will be executed at the
 appropriate phase of the install process.
 
+Alternatively, plays may be placed in /var/lib/confluent/private/os/<profilename>/ansible/<directory>.
+This prevents public clients from being able to read the plays, which is not necessary for them to function,
+and may protect them from divulging material contained in the plays or associated roles.
+
 The 'hosts' may be omitted, and if included will be ignored, replaced with the host that is specifically
 requesting the playbooks be executed.
 
