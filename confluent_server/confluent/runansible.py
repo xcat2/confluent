@@ -101,7 +101,7 @@ def run_playbooks(playfiles, nodes):
 def print_result(result, state, collector=None):
     output = {
         'task_name': result.task_name,
-        'changed': result._result['changed'],
+        'changed': result._result.get('changed', ''),
     }
     output['state'] = state
     output['warnings'] = result._result.get('warnings', [])
@@ -144,18 +144,27 @@ if __name__ == '__main__':
         diff=False, verbosity=0, remote_user='root')
 
 
-    invlist = sys.argv[1] + ','
     loader = DataLoader()
-    invman = InventoryManager(loader=loader, sources=invlist)
+    invman = None
+    if os.path.exists('/etc/ansible/hosts'):
+        aninv = InventoryManager(loader=loader, sources='/etc/ansible/hosts')
+        anshost = aninv.get_host(sys.argv[1])
+        if anshost:
+            invman = aninv
+    if not invman:
+        invlist = sys.argv[1] + ','
+        invman = InventoryManager(loader=loader, sources=invlist)
     varman = VariableManager(loader=loader, inventory=invman)
-
     plays = yaml.safe_load(open(sys.argv[2]))
+    os.chdir(os.path.dirname(sys.argv[2]))
     if isinstance(plays, dict):
         plays = [plays]
     taskman = TaskQueueManager(inventory=invman, loader=loader, passwords={},
         variable_manager=varman, stdout_callback=ResultsCollector())
     for currplay in plays:
         currplay['hosts'] = sys.argv[1]
+        if 'become' in currplay and 'become_user' not in currplay:
+            del currplay['become']
         play = Play().load(currplay, loader=loader)
         try:
             taskman.run(play)
