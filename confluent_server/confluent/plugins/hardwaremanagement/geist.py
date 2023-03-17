@@ -109,7 +109,7 @@ class GeistClient(object):
             {'cmd': 'control', 'token': self.token,
             'data': {'action': state, 'delay': False}})
 
-def process_measurement(keyname, name, enttype, measurement, readings, category):
+def process_measurement(keyname, name, enttype, entname, measurement, readings, category):
     if measurement['type'] == 'realPower':
         if category not in ('all', 'power'):
             return
@@ -128,12 +128,7 @@ def process_measurement(keyname, name, enttype, measurement, readings, category)
         readtype = 'Voltage'
     else:
         return
-    if enttype == 'outlet':
-        myname = 'Outlet {0} '.format(int(keyname) + 1) + readtype
-    elif keyname == 'total0':
-        myname = 'Overall ' + readtype
-    elif keyname.startswith('phase'):
-        myname = keyname.replace('phase', 'Phase ') + ' ' + readtype
+    myname = entname + ' ' + readtype
     if name != 'all' and simplify_name(myname) != name:
         return
     readings.append({
@@ -147,8 +142,9 @@ def process_measurement(keyname, name, enttype, measurement, readings, category)
 def process_measurements(name, category, measurements, enttype, readings):
     for measure in util.natural_sort(list(measurements)):
         measurement = measurements[measure]['measurement']
+        entname = measurements[measure]['name']
         for measureid in measurement:
-            process_measurement(measure, name, enttype, measurement[measureid], readings, category)
+            process_measurement(measure, name, enttype, entname, measurement[measureid], readings, category)
     
 
 _sensors_by_node = {}
@@ -187,6 +183,12 @@ def get_outlet(node, configmanager):
     state = gc.get_outlet(element[-1])
     return msg.PowerState(node=node, state=state)
 
+def read_firmware(node, configmanager):
+    gc = GeistClient(node, configmanager)
+    adev = gc.wc.grab_json_response('/api/sys')
+    myversion = adev['data']['version']
+    yield msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
+
 def retrieve(nodes, element, configmanager, inputdata):
     if 'outlets' in element:
         gp = greenpool.GreenPile(pdupool)
@@ -204,6 +206,13 @@ def retrieve(nodes, element, configmanager, inputdata):
             for datum in rsp:
                 yield datum
         return
+    elif '/'.join(element).startswith('inventory/firmware/all'):
+        gp = greenpool.GreenPile(pdupool)
+        for node in nodes:
+            gp.spawn(read_firmware, node, configmanager)
+        for rsp in gp:
+            for datum in rsp:
+                yield datum
     else:
         for node in nodes:
             yield  msg.ConfluentResourceUnavailable(node, 'Not implemented')
