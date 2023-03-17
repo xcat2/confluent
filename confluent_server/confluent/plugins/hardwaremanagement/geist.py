@@ -109,6 +109,48 @@ class GeistClient(object):
             {'cmd': 'control', 'token': self.token,
             'data': {'action': state, 'delay': False}})
 
+def process_measurement(keyname, name, enttype, measurement, readings, category):
+    if measurement['type'] == 'realPower':
+        if category not in ('all', 'power'):
+            return
+        readtype = 'Real Power'
+    elif measurement['type'] == 'apparentPower':
+        if category not in ('all', 'power'):
+            return
+        readtype = 'Apparent Power'
+    elif measurement['type'] == 'energy':
+        if category not in ('all', 'energy'):
+            return
+        readtype = 'Energy'
+    elif measurement['type'] == 'voltage':
+        if category not in ('all',):
+            return
+        readtype = 'Voltage'
+    else:
+        return
+    if enttype == 'outlet':
+        myname = 'Outlet {0} '.format(int(keyname) + 1) + readtype
+    elif keyname == 'total0':
+        myname = 'Overall ' + readtype
+    elif keyname.startswith('phase'):
+        myname = keyname.replace('phase', 'Phase ') + ' ' + readtype
+    if name != 'all' and simplify_name(myname) != name:
+        return
+    readings.append({
+        'name': myname,
+        'value': float(measurement['value']),
+        'units': measurement['units'],
+        'type': readtype.split()[-1]
+    })
+ 
+
+def process_measurements(name, category, measurements, enttype, readings):
+    for measure in util.natural_sort(list(measurements)):
+        measurement = measurements[measure]['measurement']
+        for measureid in measurement:
+            process_measurement(measure, name, enttype, measurement[measureid], readings, category)
+    
+
 _sensors_by_node = {}
 def read_sensors(element, node, configmanager):
     category, name = element[-2:]
@@ -116,6 +158,7 @@ def read_sensors(element, node, configmanager):
     if len(element) == 3:
         # just get names
         category = name
+        name = 'all'
         justnames = True
     if category in ('leds, fans', 'temperature'):
         return
@@ -129,111 +172,14 @@ def read_sensors(element, node, configmanager):
         raise Exception('Unable to support multiple pdus at an ip')
     print(repr(element))
     readings = []
-    totalenergy = 0.0
-    totalrealpower = 0.0
-    totalapparentpower = 0.0
     for pduid in sn[0]['data']:
         datum = sn[0]['data'][pduid]
-        for ent in util.natural_sort(list(datum['entity'])):
-            outsensors = datum['entity'][ent]['measurement']
-            if ent.startswith('breaker'):
-                continue
-            if ent == 'total0':
-                continue
-        for outlet in util.natural_sort(list(datum['outlet'])):
-            outsensors = datum['outlet'][outlet]['measurement']
-            for measure in outsensors:
-                measurement = outsensors[measure]
-                if measurement['type'] == 'energy' and category != 'power':
-                    myname = 'Outlet {0} Energy'.format(int(outlet) + 1)
-                    if justnames:
-                        yield msg.ChildCollection(simplify_name(myname))
-                        continue
-                    totalenergy += float(measurement['value'])
-                    if name != 'all' and simplify_name(myname) != name:
-                        continue
-                    reading = {
-                        'name': myname,
-                        'value': float(measurement['value']),
-                        'units': measurement['units'],
-                        'type': 'Energy'
-                    }
-                    readings.append(reading)
-                if measurement['type'] == 'realPower' and category != 'energy':
-                    myname = 'Outlet {0} Real Power'.format(int(outlet) + 1)
-                    if justnames:
-                        yield msg.ChildCollection(simplify_name(myname))
-                        continue
-                    totalrealpower += float(measurement['value'])
-                    if name != 'all' and simplify_name(myname) != name:
-                        continue
-                    reading = {
-                        'name': myname,
-                        'value': float(measurement['value']),
-                        'units': measurement['units'],
-                        'type': 'Current'
-                    }
-                    readings.append(reading)
-                if measurement['type'] == 'voltage' and category == 'all':
-                    myname = 'Outlet {0} Voltage'.format(int(outlet) + 1)
-                    if justnames:
-                        yield msg.ChildCollection(simplify_name(myname))
-                        continue
-                    if name != 'all' and simplify_name(myname) != name:
-                        continue
-                    reading = {
-                        'name': myname,
-                        'value': float(measurement['value']),
-                        'units': measurement['units'],
-                        'type': 'Voltage'
-                    }
-                    readings.append(reading)
-                if measurement['type'] == 'apparentPower' and category != 'energy':
-                    myname = 'Outlet {0} Apparent Power'.format(int(outlet) + 1)
-                    if justnames:
-                        yield msg.ChildCollection(simplify_name(myname))
-                        continue
-                    totalapparentpower += float(measurement['value'])
-                    if name != 'all' and simplify_name(myname) != name:
-                        continue
-                    reading = {
-                        'name': myname,
-                        'value': float(measurement['value']),
-                        'units': measurement['units'],
-                        'type': 'Current'
-                    }
-                    readings.append(reading)
-    myname = 'Overall Energy'
-    if justnames and category != 'power':
-        yield msg.ChildCollection(simplify_name(myname))
-    elif (name == 'all' or simplify_name(myname) == name) and category != 'power':
-        readings.append({
-            'name': 'Overall Energy',
-            'value': totalenergy,
-            'units': 'kWh',
-            'type': 'Energy',
-        })
-    myname = 'Overall Real Power'
-    if justnames and category != 'energy':
-        yield msg.ChildCollection(simplify_name(myname))
-    elif (name == 'all' or simplify_name(myname) == name) and category != 'energy':
-        readings.append({
-            'name': 'Overall Real Power',
-            'value': totalrealpower,
-            'units': 'W',
-            'type': 'Current',
-        })
-    myname = 'Overall Apparent Power'
-    if justnames and category != 'energy':
-        yield msg.ChildCollection(simplify_name(myname))
-    elif (name == 'all' or simplify_name(myname) == name) and category != 'energy':
-        readings.append({
-            'name': 'Overall Apparent Power',
-            'value': totalapparentpower,
-            'units': 'VA',
-            'type': 'Current',
-        })
-    if readings:
+        process_measurements(name, category, datum['entity'], 'entity', readings)
+        process_measurements(name, category, datum['outlet'], 'outlet', readings)
+    if justnames:
+        for reading in readings:
+            yield msg.ChildCollection(simplify_name(reading['name']))
+    else:
         yield msg.SensorReadings(readings, name=node)
 
 def get_outlet(node, configmanager):
