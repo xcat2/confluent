@@ -60,6 +60,9 @@ manualrpms = [
     'tmux',  # use the extracttmuxlicenses on the source to generate NOTICE below
 ]
 manuallicenses = [
+    '/usr/share/doc/hostname/COPYRIGHT',
+    '/usr/share/doc/hwdata/COPYING',
+    '/usr/share/doc/hwdata/LICENSE',
     '/usr/share/doc/ipmitool/COPYING',
     '/usr/share/doc/libaio/COPYING',
     '/usr/share/doc/net-snmp/COPYING',
@@ -67,6 +70,21 @@ manuallicenses = [
     '/usr/share/licenses/xfsprogs/GPL-2.0',
     '/usr/share/licenses/xfsprogs/LGPL-2.1',
     '/usr/share/licenses/tmux/NOTICE',
+    '/usr/share/licenses/kernel-extra/exceptions/Linux-syscall-note',
+    '/usr/share/licenses/kernel-extra/other/Apache-2.0',
+    '/usr/share/licenses/kernel-extra/other/CC-BY-SA-4.0',
+    '/usr/share/licenses/kernel-extra/other/CDDL-1.0',
+    '/usr/share/licenses/kernel-extra/other/GPL-1.0',
+    '/usr/share/licenses/kernel-extra/other/Linux-OpenIB',
+    '/usr/share/licenses/kernel-extra/other/MPL-1.1',
+    '/usr/share/licenses/kernel-extra/other/X11',
+    '/usr/share/licenses/kernel-extra/preferred/BSD-2-Clause',
+    '/usr/share/licenses/kernel-extra/preferred/BSD-3-Clause',
+    '/usr/share/licenses/kernel-extra/preferred/BSD-3-Clause-Clear',
+    '/usr/share/licenses/kernel-extra/preferred/GPL-2.0',
+    '/usr/share/licenses/kernel-extra/preferred/LGPL-2.0',
+    '/usr/share/licenses/kernel-extra/preferred/LGPL-2.1',
+    '/usr/share/licenses/kernel-extra/preferred/MIT',
 ]
 for lic in manuallicenses:
     print(lic)
