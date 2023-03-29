@@ -350,7 +350,10 @@ def _find_service(service, target):
             msg = smsg.format(bcast, service)
             if not isinstance(msg, bytes):
                 msg = msg.encode('utf8')
-            net4.sendto(msg, (bcast, 1900))
+            try:
+                net4.sendto(msg, (bcast, 1900))
+            except socket.error:
+                pass
     # SSDP by spec encourages responses to spread out over a 3 second interval
     # hence we must be a bit more patient
     deadline = util.monotonic_time() + 4
