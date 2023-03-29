@@ -2201,9 +2201,6 @@ class ConfigManager(object):
         self._bg_sync_to_file()
 
     def add_node_attributes(self, attribmap):
-        for node in attribmap:
-            if 'groups' not in attribmap[node]:
-                attribmap[node]['groups'] = []
         self.set_node_attributes(attribmap, autocreate=True)
 
     def rename_nodes(self, renamemap):
@@ -2335,6 +2332,8 @@ class ConfigManager(object):
                         '"{0}" is not a valid node name'.format(node))
             if autocreate is False and node not in self._cfgstore['nodes']:
                 raise ValueError("node {0} does not exist".format(node))
+            if 'groups' not in attribmap[node] and node not in self._cfgstore['nodes']:
+                attribmap[node]['groups'] = []
             for attrname in list(attribmap[node]):
                 if attrname in _attraliases:
                     truename = _attraliases[attrname]
