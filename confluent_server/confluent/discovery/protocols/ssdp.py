@@ -345,7 +345,7 @@ def _find_service(service, target):
             try:
                 net4.sendto(msg, (mcastv4addr, 1900))
             except socket.error as se:
-                if se.errno != 101:
+                if se.errno != 101 and se.errno != 1:
                     raise
             msg = smsg.format(bcast, service)
             if not isinstance(msg, bytes):
