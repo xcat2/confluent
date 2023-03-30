@@ -186,7 +186,7 @@ class NodeRange(object):
         for idx in range(len(leftbits)):
             if leftbits[idx] == rightbits[idx]:
                 finalfmt += leftbits[idx]
-            elif leftbits[idx][0] in pp.alphas:
+            elif leftbits[idx][0] in pp.alphas or rightbits[idx][0] in pp.alphas:
                 # if string portion unequal, not going to work
                 return self.failorreturn(seqrange)
             else:
