@@ -69,7 +69,7 @@ if [ "$v4cfgmeth" = "static" ]; then
     for namesrv in "$namesrvs"; do
         setdebopt netcfg/get_nameservers $namesrv string
     done
-elif [ "$vpcfgmeth" = "dhcp" ]; then
+elif [ "$v4cfgmeth" = "dhcp" ]; then
     setdebopt netcfg/disable_dhcp false boolean
     setdebopt netcfg/confirm_static false boolean
 fi
