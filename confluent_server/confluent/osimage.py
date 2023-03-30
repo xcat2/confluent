@@ -376,7 +376,13 @@ def check_ubuntu(isoinfo):
         if not isinstance(arch, str):
             arch = arch.decode('utf8')
         major = '.'.join(ver.split('.', 2)[:2])
-        if 'efi/boot/bootaa64.efi' in isoinfo[0]:
+        if 'install/hwe-netboot/ubuntu-installer/amd64/linux' in isoinfo[0]:
+            # debian-installer style amd64
+            return {
+                'name': 'ubuntu-{0}-{1}'.format(ver, arch),
+                'method': EXTRACT,
+                'category': 'ubuntu{0}'.format(major)}
+        elif 'efi/boot/bootaa64.efi' in isoinfo[0]:
             exlist = ['casper/vmlinuz', 'casper/initrd',
                     'efi/boot/bootaa64.efi', 'efi/boot/grubaa64.efi'
                     ]
