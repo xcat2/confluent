@@ -237,6 +237,7 @@ if __name__ == '__main__':
         allok = True
         uuidok = False
         macok = False
+        valid_nodes = [node for node in sess.read('/nodes/')] #get all valiv nodes
         for rsp in sess.read(f'/nodes/{args.node}/attributes/all'):
             if rsp.get('errorcode', None) == 404:
                 emprint(f'There is no node named "{args.node}"')
@@ -259,6 +260,15 @@ if __name__ == '__main__':
                     mac = rsp[key].get('value', None)
                     if mac:
                         macok = True
+            #adding new code to check if the response is something like net.<something>switch
+            for key in rsp:
+                if key.startswith('new.')and key.endswith('switch'):
+                    switch_value = rsp[key].get('value',None)
+                    if switch_value == 'true':
+                        if args.node in valid_nodes:
+                            print(f'{args.node} is a valid node.')
+                        else:
+                            emprint(f'{args.node} is not a valid node')
         if not uuidok and not macok:
             allok = False
             emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
