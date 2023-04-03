@@ -265,10 +265,9 @@ if __name__ == '__main__':
                 if key.startswith('net.')and key.endswith('switch'):
                     switch_value = rsp[key].get('value',None)
                     if switch_value in valid_nodes:
-                        if args.node in valid_nodes:
-                            print(f'{args.node} is a valid node.')
-                        else:
-                            emprint(f'{args.node} is not a valid node')
+                        print(f'{switch_value} is valid.')
+                    else:
+                        emprint(f'{switch_value} is not valid.')
         if not uuidok and not macok:
             allok = False
             emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
