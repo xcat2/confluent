@@ -28,6 +28,7 @@ cd ..
 tar Jcvf confluent_el9bin.tar.xz el9bin/
 tar Jcvf confluent_el8bin.tar.xz el8bin/
 mv confluent_el8bin.tar.xz ~/rpmbuild/SOURCES/
+mv confluent_el9bin.tar.xz ~/rpmbuild/SOURCES/
 rm -rf el9bin
 rm -rf el8bin
 rpmbuild -ba confluent_osdeploy.spec
