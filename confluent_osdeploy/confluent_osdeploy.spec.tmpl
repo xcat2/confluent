@@ -7,6 +7,7 @@ License: Apache2
 URL: https://hpc.lenovo.com/
 Source0: confluent_osdeploy.tar.xz
 Source1: confluent_el9bin.tar.xz
+Source2: confluent_el8bin.tar.xz
 BuildArch: noarch
 Requires: confluent_ipxe mtools tar
 BuildRoot: /tmp
@@ -18,16 +19,14 @@ This contains support utilities for enabling deployment of x86_64 architecture s
 %define debug_package %{nil}
 
 %prep
-%setup -n confluent_osdeploy -a 1
+%setup -n confluent_osdeploy -a 2 -a 1
 
 %build
-mkdir -p opt/confluent/bin
-mkdir -p stateless-bin
-cd utils
-make all
-cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
-cp start_root urlmount ../stateless-bin/
-cd ..
+#cd utils
+#make all
+#cp confluent_imginfo copernicus clortho autocons ../opt/confluent/bin
+#cp start_root urlmount ../stateless-bin/
+#cd ..
 ln -s el8 el9
 for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 coreos el9; do
     mkdir ${os}out
@@ -35,7 +34,7 @@ for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 coreos el9; do
     if [ -d ../${os}bin ]; then 
         cp -a ../${os}bin/opt .
     else
-        cp -a ../opt .
+        cp -a ../el8bin/opt .
     fi
     cp -a ../${os}/initramfs/* .
     cp -a ../common/initramfs/* .
@@ -49,14 +48,14 @@ for os in el7 el8 suse15 el9 ubuntu20.04; do
     if [ -d ../${os}bin ]; then
         cp -a ../${os}bin/opt .
     else
-        cp -a ../opt .
+        cp -a ../el8bin/opt .
     fi
     cp -a ../${os}-diskless/initramfs/* .
     cp -a ../common/initramfs/* .
     if [ -d ../${os}bin ]; then 
         cp -a ../${os}bin/stateless-bin/* opt/confluent/bin
     else
-        cp -a ../stateless-bin/* opt/confluent/bin
+        cp -a ../el8bin/stateless-bin/* opt/confluent/bin
     fi
     find . | cpio -H newc -o > ../addons.cpio
     mv ../addons.cpio .
