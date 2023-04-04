@@ -11,7 +11,7 @@ mv confluent_osdeploy.tar.xz ~/rpmbuild/SOURCES/
 cd -
 mkdir -p el9bin/opt/confluent/bin
 mkdir -p el9bin/stateless-bin
-podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t fedorabuilder make -C /buildutils
+podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t el9build make -C /buildutils
 cd utils
 mv confluent_imginfo copernicus clortho autocons ../el9bin/opt/confluent/bin
 mv start_root urlmount ../el9bin/stateless-bin/
