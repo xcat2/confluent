@@ -13,16 +13,16 @@ mkdir -p el9bin/opt/confluent/bin
 mkdir -p el9bin/stateless-bin
 podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t fedorabuild make -C /buildutils
 cd utils
-mv confluent_imginfo copernicus clortho autocons ../el9bin/opt/confluent/bin
-mv start_root urlmount ../el9bin/stateless-bin/
+cp confluent_imginfo copernicus clortho autocons ../el9bin/opt/confluent/bin
+cp start_root urlmount ../el9bin/stateless-bin/
 make clean
 cd ..
 mkdir -p el8bin/opt/confluent/bin
 mkdir -p el8bin/stateless-bin
 podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t el8build make -C /buildutils
 cd utils
-mv confluent_imginfo copernicus clortho autocons ../el8bin/opt/confluent/bin
-mv start_root urlmount ../el8bin/stateless-bin/
+cp confluent_imginfo copernicus clortho autocons ../el8bin/opt/confluent/bin
+cp start_root urlmount ../el8bin/stateless-bin/
 make clean
 cd ..
 tar Jcvf confluent_el9bin.tar.xz el9bin/
