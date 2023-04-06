@@ -27,6 +27,7 @@ for i in /sys/class/net/*; do
     ip link set $(basename $i) up
 done
 cp -a /tls/* /etc/ssl/certs/
+mkdir -p /etc/confluent
 if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     tmnt=$(mktemp -d)
     tcfg=$(mktemp)
@@ -34,6 +35,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     cd $tmnt
     deploysrvs=$(sed -n '/^deploy_servers:/,/^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
     nodename=$(grep ^nodename: cnflnt.yml|cut -f 2 -d ' ')
+    echo NODENAME: $nodename > /etc/confluent/confluent.info
     sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
     autoconfigmethod=$(grep ^ipv4_method: $tcfg)
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
@@ -67,8 +69,8 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     passcrypt=/tmp/cnflntcryptfile
     hmacfile=/tmp/cnflnthmacfile
     echo -n $(grep ^apitoken: cnflnt.yml|cut -d ' ' -f 2) > $hmackeyfile
+    /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
     wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" --post-file=$passcrypt https://$mgr/confluent-api/self/registerapikey -O - --quiet
-    rm registerapikey
     cp $passfile /etc/confluent/confluent.apikey
     nic=$NICGUESS
 else
@@ -76,6 +78,7 @@ else
     dhcpid=$(mktemp)
     mkdir -p /etc/confluent
     cp /tls/* /etc/ssl/certs/
+    cat /tls/*.pem >> /etc/confluent/ca.pem
     for nic in $(ip link | grep mtu|grep -v LOOPBACK|cut -d: -f 2|sed -e 's/ //'); do
         ip link set $nic up
     done
@@ -98,6 +101,7 @@ wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_APIKEY: $apike
 cd -
 predir=$(mktemp -d)
 cd $predir
+cp /etc/confluent/deploycfg /etc/confluent/confluent.deploycfg
 profile=$(grep ^profile: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
 for namesrv in "$namesrvs"; do
@@ -114,7 +118,7 @@ setdebopt time/zone $(grep ^timezone: /etc/confluent/deploycfg|cut -d ' ' -f 2|s
 ntpsrvs=$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
 for ntpsrv in "$ntpsrvs"; do
     setdebopt clock-setup/ntp true boolean
-    setdebopt clock-setup/ntep-server $ntpsrv string
+    setdebopt clock-setup/ntp-server $ntpsrv string
 done
 setdebopt debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2) select
 domainname=$(grep ^dnsdomain: /etc/confluent/deploycfg|cut -d ' ' -f 2)
@@ -127,14 +131,28 @@ fi
 
 wget https://$mgr/confluent-public/os/$profile/scripts/pre.sh
 chmod u+x pre.sh
+wget https://$mgr/confluent-public/os/$profile/scripts/prechroot.sh
+chmod u+x prechroot.sh
+wget https://$mgr/confluent-public/os/$profile/scripts/post.sh
+chmod u+x post.sh
 wget https://$mgr/confluent-public/os/$profile/preseed.cfg
 cat preseed.cfg >> /preseed.cfg
+echo $mgr > /etc/confluent/deployer
 setdebopt auto-install/enable true boolean
 setdebopt partman/early_command  $predir/pre.sh string
+setdebopt preseed/late_command $predir/prechroot.sh string
+mv $predir/post.sh /tmp/
 cd -
 ip -4 a flush dev $nic
 setdebopt netcfg/choose_interface $nic select
 setdebopt netcfg/get_hostname $nodename string
+setdebopt mirror/protocol https string
+setdebopt mirror/country manual string
+setdebopt mirror/https/hostname $mgr string
+setdebopt mirror/https/directory /confluent-public/os/$profile/distribution string
+setdebopt mirror/protocol https string
+setdebopt mirror/https/proxy "" string
+setdebopt apt-setup/security_host $mgr string
 if [ ! -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     v4cfgmeth=$(grep ipv4_method: /etc/confluent/deploycfg |cut -d: -f 2|sed -e 's/ //')
     if [ "$v4cfgmeth" = "static" ]; then
