@@ -19,7 +19,7 @@ make clean
 cd ..
 mkdir -p el8bin/opt/confluent/bin
 mkdir -p el8bin/stateless-bin
-podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t el8build make -C /buildutils
+podman run --privileged --rm -v $(pwd)/utils:/buildutils -i -t el7build make -C /buildutils
 cd utils
 cp confluent_imginfo copernicus clortho autocons ../el8bin/opt/confluent/bin
 cp start_root urlmount ../el8bin/stateless-bin/
