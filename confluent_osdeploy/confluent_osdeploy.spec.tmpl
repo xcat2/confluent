@@ -28,7 +28,7 @@ This contains support utilities for enabling deployment of x86_64 architecture s
 #cp start_root urlmount ../stateless-bin/
 #cd ..
 ln -s el8 el9
-for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 coreos el9; do
+for os in rhvh4 el7 genesis el8 suse15 ubuntu18.04 ubuntu20.04 ubuntu22.04 coreos el9; do
     mkdir ${os}out
     cd ${os}out
     if [ -d ../${os}bin ]; then 
