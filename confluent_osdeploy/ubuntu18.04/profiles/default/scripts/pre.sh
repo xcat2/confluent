@@ -31,6 +31,50 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     echo HostKey $keyfile >> /etc/ssh/sshd_config
     echo HostCertificate $certfile >> /etc/ssh/sshd_config
 done
+if [ -e /tmp/installdisk ]; then
+    instdisk=$(cat /tmp/installdisk)
+else
+    for blockdev in $(ls /sys/class/block/); do
+        shortname=$(basename $blockdev)
+        if [ "$shortname" != "${shortname%loop*}" ]; then
+            continue
+        fi
+        udevadm info --query=property /dev/$shortname |grep DEVTYPE=disk > /dev/null || continue # ignore partitions
+        udevadm info --query=property /dev/$shortname |grep DM_NAME > /dev/null && continue # not a real disk
+        sz=$(cat /sys/block/$shortname/size 2> /dev/null)
+        [ -z "$sz" ] && continue
+        [ $sz -lt 1048576 ] && continue # Too small
+        [ -z "$firstdisk" ] && firstdisk=$shortname
+        if udevadm info --query=property /dev/$shortname|grep ID_MODEL=| sed -e s/' '/_/g | grep -iE '(thinksystem_m.2|m.2_nvme_2-bay_raid_kit)' > /dev/null; then
+            instdisk=$shortname
+            break
+        fi
+        if udevadm info --query=property /dev/$shortname|grep MD_CONTAINER=imsm; then
+            sraid=$sortname
+        else
+            drv=$(udevadm info -a /dev/sdb|grep DRIVERS==|grep -Ev '""|"sd"' | sed -e s/.*=// -e s/'"'//g)
+            if [ "ahci" = "$drv" -a -z "$onbdisk" ]; then
+                onbdisk=$shortname
+            elif [ "megaraid" = "$drv" -a -z "$rdisk" ]; then
+                rdisk=$shortname
+            fi
+        fi
+    done
+fi
+if [ -z "$instdisk" ]; then
+    if [ ! -z "$sraid"]; then
+        instdisk=$sraid
+    elif [ ! -z "$onbdisk" ]; then
+        instdisk=$onbdisk
+    elif [ ! -z "$rdisk" ]; then
+        instdisk=$rdisk
+    else
+        instdisk=$firstdisk
+    fi
+fi
+if [ ! -z "$instdisk" ]; then
+    debconf-set partman-auto/disk /dev/$instdisk
+fi
 echo HostbasedAuthentication yes >> /etc/ssh/sshd_config
 echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config
 echo IgnoreRhosts no >> /etc/ssh/sshd_config

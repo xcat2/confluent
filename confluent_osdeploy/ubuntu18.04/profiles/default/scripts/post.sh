@@ -1,23 +1,10 @@
 #!/bin/bash
-mkdir /run/sshd
-mkdir /root/.ssh
+mkdir -p /run/sshd
+mkdir -p /root/.ssh
 cat /tmp/ssh/*pubkey >> /root/.ssh/authorized_keys
 cat /tmp/ssh/*.ca | sed -e s/^/'@cert-authority * '/ >> /etc/ssh/ssh_known_hosts
 chmod 700 /etc/confluent
 chmod go-rwx /etc/confluent/*
-for pubkey in /etc/ssh/ssh_host*key.pub; do
-    certfile=${pubkey/.pub/-cert.pub}
-    privfile=${pubkey%.pub}
-    python3 /opt/confluent/bin/apiclient /confluent-api/self/sshcert  $pubkey > $certfile
-    if [ -s $certfile ]; then
-        if ! grep $certfile /etc/ssh/sshd_config; then
-            echo HostCertificate $certfile >> /etc/ssh/sshd_config
-        fi
-    fi
-    if ! grep $privfile /etc/ssh/sshd_config > /dev/null; then
-        echo HostKey $privfile >> /etc/ssh/sshd_config
-    fi
-done
 sshconf=/etc/ssh/ssh_config
 if [ -d /etc/ssh/ssh_config.d/ ]; then
     sshconf=/etc/ssh/ssh_config.d/01-confluent.conf
@@ -26,10 +13,14 @@ echo 'Host *' >> $sshconf
 echo '    HostbasedAuthentication yes' >> $sshconf
 echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
+/usr/sbin/sshd
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | awk '{print $2}')
-python3 /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/firstboot.sh > /etc/confluent/firstboot.sh
+mkdir -p /opt/confluent/bin
+python3 /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
+chmod +x /opt/confluent/bin/firstboot.sh
+python3 /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/firstboot.service > /etc/systemd/system/firstboot.service
+systemctl enable firstboot
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
-chmod +x /etc/confluent/firstboot.sh
 source /etc/confluent/functions
 python3 /opt/confluent/bin/apiclient /confluent-api/self/nodelist | sed -e s/'^- //' > /tmp/allnodes
 cp /tmp/allnodes /root/.shosts
@@ -72,4 +63,5 @@ run_remote_python syncfileclient
 run_remote_parts post.d
 run_remote_config post
 
+python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
 
