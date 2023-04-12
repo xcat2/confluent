@@ -1,4 +1,6 @@
 #!/bin/sh
+HOME=$(getent passwd $(whoami)|cut -d: -f 6)
+export HOME
 
 # This script is executed on the first boot after install has
 # completed. It is best to edit the middle of the file as

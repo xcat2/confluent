@@ -5,6 +5,8 @@
 # noted below so custom commands are executed before
 # the script notifies confluent that install is fully complete.
 
+HOME=$(getent passwd $(whoami)|cut -d: -f 6)
+export HOME
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')

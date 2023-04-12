@@ -1,4 +1,6 @@
 #!/bin/bash
+HOME=$(getent passwd $(whoami)|cut -d: -f 6)
+export HOME
 
 # This script runs at the end of the final boot, updating status
 exec >> /var/log/confluent/confluent-firstboot.log

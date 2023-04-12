@@ -1,5 +1,8 @@
 #!/bin/bash
 echo "Confluent first boot is running"
+HOME=$(getent passwd $(whoami)|cut -d: -f 6)
+export HOME
+seems a potentially relevant thing to put i... by Jarrod Johnson
 cp -a /etc/confluent/ssh/* /etc/ssh/
 systemctl restart sshd
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg |awk '{print $2}')
