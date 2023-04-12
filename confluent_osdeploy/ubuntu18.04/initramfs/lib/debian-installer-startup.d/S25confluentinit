@@ -43,9 +43,10 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
     for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
         for dsrv in $deploysrvs; do
-            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null >& /dev/null; then
+            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
                 deploysrvs=$dsrv
                 NIC=$NICGUESS
+            fi
         done
     done
     deploysrvs=$dsrv
@@ -69,7 +70,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
                 ip route add default via $v4gw
             fi
             for dsrv in $deploysrvs; do
-                if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null >& /dev/null; then
+                if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
                     deploysrvs=$dsrv
                     NIC=$NICGUESS
                     setdebopt netcfg/choose_interface $NIC select
@@ -90,7 +91,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             udhcpc $NICGUESS
         done
         for dsrv in $deploysrvs; do
-            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null >& /dev/null; then
+            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
                 deploysrvs=$dsrv
             fi
         done
