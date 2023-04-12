@@ -24,6 +24,8 @@ while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
     TRIES=$((TRIES - 1))
 done
 for i in /sys/class/net/*; do
+    ip link set $(basename $i) down
+    udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
     ip link set $(basename $i) up
 done
 cp -a /tls/* /etc/ssl/certs/
@@ -39,7 +41,14 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
     autoconfigmethod=$(grep ^ipv4_method: $tcfg)
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
-    NICGUESS=$(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'|head -n 1)
+    for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+        for dsrv in $deploysrvs; do
+            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null >& /dev/null; then
+                deploysrvs=$dsrv
+                NIC=$NICGUESS
+        done
+    done
+    deploysrvs=$dsrv
     if [ "$autoconfigmethod" = "static" ]; then
         setdebopt netcfg/disable_dhcp true boolean
         v4addr=$(grep ^ipv4_address: $tcfg|cut -d: -f 2|sed -e 's/ //')
@@ -51,16 +60,40 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         setdebopt netcfg/get_netmask $v4nm string
         setdebopt netcfg/get_ipaddress ${v4addr%/*} string
         setdebopt netcfg/confirm_static true boolean
-        ip addr add dev $NICGUESS $v4addr
         if [ ! -z "$v4gw" ]; then
             setdebopt netcfg/get_gateway $v4gw string
-            ip route add default via $v4gw
         fi
+        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+            ip addr add dev $NICGUESS $v4addr
+            if [ ! -z "$v4gw" ]; then
+                ip route add default via $v4gw
+            fi
+            for dsrv in $deploysrvs; do
+                if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null >& /dev/null; then
+                    deploysrvs=$dsrv
+                    NIC=$NICGUESS
+                    setdebopt netcfg/choose_interface $NIC select
+                    break
+                fi
+            done
+            if [ -z "$NIC" ]; then
+                ip -4 a flush dev $NICGUESS
+            else
+                break
+            fi
+        done 
         #TODO: nameservers
     elif [ "$v4cfgmeth" = "dhcp" ]; then
         setdebopt netcfg/disable_dhcp false boolean
         setdebopt netcfg/confirm_static false boolean
-        udhcpc $NICGUESS
+        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+            udhcpc $NICGUESS
+        done
+        for dsrv in $deploysrvs; do
+            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null >& /dev/null; then
+                deploysrvs=$dsrv
+            fi
+        done
     fi
     mgr=$deploysrvs
     ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
@@ -72,7 +105,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
     wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" --post-file=$passcrypt https://$mgr/confluent-api/self/registerapikey -O - --quiet
     cp $passfile /etc/confluent/confluent.apikey
-    nic=$NICGUESS
+    nic=$NIC
 else
     dhuuid=$(reverse_uuid $(cat /sys/devices/virtual/dmi/id/product_uuid))
     dhcpid=$(mktemp)
