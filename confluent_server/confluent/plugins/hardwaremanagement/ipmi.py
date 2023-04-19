@@ -488,6 +488,7 @@ class IpmiHandler(object):
             try:
                 persistent_ipmicmds[(node, tenant)].close_confluent()
                 persistent_ipmicmds[(node, tenant)].ipmi_session._mark_broken()
+                persistent_ipmicmds[(node, tenant)].ipmi_session.logonwaiters = []
             except KeyError:  # was no previous session
                 pass
             try:
@@ -496,7 +497,6 @@ class IpmiHandler(object):
                     userid=connparams['username'],
                     password=connparams['passphrase'], kg=connparams['kg'],
                     port=connparams['port'], onlogon=self.logged)
-
                 ipmisess = persistent_ipmicmds[(node, tenant)].ipmi_session
                 begin = util.monotonic_time()
                 while ((not (ipmisess.broken or self.loggedin)) and
