@@ -178,7 +178,7 @@ def read_sensors(element, node, configmanager):
     else:
         yield msg.SensorReadings(readings, name=node)
 
-def get_outlet(node, configmanager):
+def get_outlet(node, configmanager, element):
     gc = GeistClient(node, configmanager)
     state = gc.get_outlet(element[-1])
     return msg.PowerState(node=node, state=state)
@@ -193,7 +193,7 @@ def retrieve(nodes, element, configmanager, inputdata):
     if 'outlets' in element:
         gp = greenpool.GreenPile(pdupool)
         for node in nodes:
-            gp.spawn(get_outlet, node, configmanager)
+            gp.spawn(get_outlet, node, configmanager, element)
         for res in gp:
             yield res
            
