@@ -41,15 +41,6 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
     autoconfigmethod=$(grep ^ipv4_method: $tcfg)
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
-    for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
-        for dsrv in $deploysrvs; do
-            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
-                deploysrvs=$dsrv
-                NIC=$NICGUESS
-            fi
-        done
-    done
-    deploysrvs=$dsrv
     if [ "$autoconfigmethod" = "static" ]; then
         setdebopt netcfg/disable_dhcp true boolean
         v4addr=$(grep ^ipv4_address: $tcfg|cut -d: -f 2|sed -e 's/ //')
@@ -212,5 +203,3 @@ if [ ! -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         setdebopt netcfg/confirm_static false boolean
     fi
 fi
-
-
