@@ -237,7 +237,7 @@ if __name__ == '__main__':
         allok = True
         uuidok = False
         macok = False
-        valid_nodes = [node['item']['href'][:-1] for node in c.read('/nodes/')] #get all valiv nodes
+        valid_nodes = [node['item']['href'][:-1] for node in sess.read('/nodes/')] #get all valid nodes
         for rsp in sess.read(f'/nodes/{args.node}/attributes/all'):
             if rsp.get('errorcode', None) == 404:
                 emprint(f'There is no node named "{args.node}"')
