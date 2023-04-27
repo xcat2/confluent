@@ -66,6 +66,7 @@ import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
 import confluent.discovery.protocols.ssdp as ssdp
+#import confluent.discovery.protocols.mdns as mdns
 import confluent.discovery.protocols.slp as slp
 import confluent.discovery.handlers.imm as imm
 import confluent.discovery.handlers.cpstorage as cpstorage
@@ -117,6 +118,7 @@ nodehandlers = {
     'onie-switch': None,
     'cumulus-switch': None,
     'affluent-switch': None,
+    #'openbmc': None,
     'service:io-device.Lenovo:management-module': None,
     'service:thinkagile-storage': cpstorage,
     'service:lenovo-tsm': tsm,
@@ -130,6 +132,7 @@ servicenames = {
     'service:lenovo-smm2': 'lenovo-smm2',
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
+    #'openbmc': 'openbmc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
     'service:io-device.Lenovo:management-module': 'lenovo-switch',
     'service:thinkagile-storage': 'thinkagile-storagebmc',
@@ -1631,6 +1634,7 @@ def stop_autosense():
 
 def start_autosense():
     autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
+    #autosensors.add(eventlet.spawn(mdns.snoop, safe_detected, mdns))
     autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
     remotescan()
 
