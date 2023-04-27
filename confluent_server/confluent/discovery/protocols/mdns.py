@@ -48,25 +48,7 @@ webclient = eventlet.import_patched('pyghmi.util.webclient')
 mcastv4addr = '224.0.0.251'
 mcastv6addr = 'ff02::fb'
 
-ssdp6mcast = socket.inet_pton(socket.AF_INET6, mcastv6addr)
-
-
-
-def oldactive_scan(handler, protocol=None):
-    known_peers = set([])
-    for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
-        for addr in scanned['addresses']:
-            if addr in known_peers:
-                break
-            hwaddr = neighutil.get_hwaddr(addr[0])
-            if not hwaddr:
-                continue
-            if not scanned.get('hwaddr', None):
-                scanned['hwaddr'] = hwaddr
-            known_peers.add(addr)
-        else:
-            scanned['protocol'] = protocol
-            handler(scanned)
+mdns6mcast = socket.inet_pton(socket.AF_INET6, mcastv6addr)
 
 def name_to_qname(name):
     nameparts = name.split('.')
@@ -76,59 +58,50 @@ def name_to_qname(name):
         qname += bytes(bytearray([len(namepart)])) + namepart
     qname += b'\x00'
     return qname
-    
 
+PTR = 12
+SRV = 33
 
-listsrvs = struct.pack('!HHHHHH', 
+def _makequery(name):
+    return struct.pack('!HHHHHH', 
             0, # transaction id
             0, # flags, stdard query
             1, # query count
             0, # answers
             0, # authorities
             0) + \
-        name_to_qname('_services._dns-sd._udp.local') + \
+        name_to_qname(name) + \
         struct.pack('!HH', 
-            12, # PTR
-            (1 << 15) | 1)
-        
-def scan(services, target=None):
-    pass
+            PTR,
+            (1 << 15) | 1)  # Unicast response
+
+#listsrvs = _makequery('_services._dns-sd._udp.local')  # to get all possible services
+listobmccons = _makequery('_obmc_console._tcp.local')
 
 
 def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler):
     if mac in peerbymacaddress and peer not in peerbymacaddress[mac]['addresses']:
         peerbymacaddress[mac]['addresses'].append(peer)
     else:
+        sdata = _mdns_to_dict(rsp)
+        if not sdata:
+            return 0
         peerdata = {
             'hwaddr': mac,
             'addresses': [peer],
+            'services': ['openbmc'],
+            'urls': '/redfish/v1/'
         }
-        for headline in rsp[1:]:
-            if not headline:
-                continue
-            headline = util.stringify(headline)
-            header, _, value = headline.partition(':')
-            header = header.strip()
-            value = value.strip()
-            if header == 'NT':
-                if 'redfish-rest' not in value:
-                    return
-            elif header == 'NTS':
-                if value == 'ssdp:byebye':
-                    handler = byehandler
-                elif value != 'ssdp:alive':
-                    handler = None
-            elif header == 'AL':
-                if not value.endswith('/redfish/v1/'):
-                    return
-            elif header == 'LOCATION':
-                if not value.endswith('/DeviceDescription.json'):
-                    return
+        if sdata.get('ttl', 0) == 0:
+            if byehandler:
+                eventlet.spawn_n(check_fish_handler, byehandler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
+            return 1
         if handler:
             eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
-
+        return 2
+        
 def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer):
-    retdata = check_fish(('/DeviceDescription.json', peerdata))
+    retdata = check_fish(('/redfish/v1/', peerdata))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -137,7 +110,7 @@ def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress
 
 
 def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
-    """Watch for SSDP notify messages
+    """Watch for unsolicited mDNS answers
 
     The handler shall be called on any service coming online.
     byehandler is called whenever a system advertises that it is departing.
@@ -152,6 +125,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     # Normally, I like using v6/v4 agnostic socket. However, since we are
     # dabbling in multicast wizardry here, such sockets can cause big problems,
     # so we will have two distinct sockets
+    # TTL=0 is a wthdrawal, otherwise an announce
     tracelog = log.Logger('trace')
     net4, net6 = get_sockets()
     net6.bind(('', 5353))
@@ -163,22 +137,19 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     event=log.Events.stacktrace)
     known_peers = set([])
     recent_peers = set([])
-    init_sockets()
     for ifidx in util.list_interface_indexes():
-        v6grp = ssdp6mcast + struct.pack('=I', ifidx)
+        v6grp = mdns6mcast + struct.pack('=I', ifidx)
         net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, v6grp)
-    
     for i4 in util.list_ips():
-        ssdp4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
+        mdns4mcast = socket.inet_pton(socket.AF_INET, mcastv4addr) + \
                      socket.inet_aton(i4['addr'])
         try:
             net4.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
-                            ssdp4mcast)
+                            mdns4mcast)
         except socket.error as e:
             if e.errno != 98:
                 # errno 98 can happen if aliased, skip for now
                 raise
-
     peerbymacaddress = {}
     while True:
         try:
@@ -192,103 +163,20 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             while r and len(deferrednotifies) < 256:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
-                    if rsp[:4] == b'PING':
-                        continue
                     if peer in recent_peers:
                         continue
-                    rsp = rsp.split(b'\r\n')
-                    if b' ' not in rsp[0]:
-                        continue
-                    method, _ = rsp[0].split(b' ', 1)
-                    if method == b'NOTIFY':
-                        if peer in known_peers:
+                    mac = neighutil.get_hwaddr(peer[0])
+                    if not mac:
+                        probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
+                        try:
+                            s.sendto(b'\x00', probepeer)
+                        except Exception:
                             continue
+                        deferrednotifies.append((peer, rsp))
+                    datum = _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
+                    if datum == 2:
                         recent_peers.add(peer)
-                        mac = neighutil.get_hwaddr(peer[0])
-                        if mac == False:
-                            # neighutil determined peer ip is not local, skip attempt
-                            # to probe and critically, skip growing deferrednotifiers
-                            continue
-                        if not mac:
-                            probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
-                            try:
-                                s.sendto(b'\x00', probepeer)
-                            except Exception:
-                                continue
-                            deferrednotifies.append((peer, rsp))
-                            continue
-                        _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
-                    elif method == b'M-SEARCH':
-                        if not uuidlookup:
-                            continue
-                        #ip = peer[0].partition('%')[0]
-                        for headline in rsp[1:]:
-                            if not headline:
-                                continue
-                            headline = util.stringify(headline)
-                            headline = headline.partition(':')
-                            if len(headline) < 3:
-                                continue
-                            forcereply = False
-                            if  headline[0] == 'ST' and headline[-1].startswith(' urn:xcat.org:service:confluent:'):
-                                try:
-                                    cfm.check_quorum()
-                                except Exception:
-                                    continue
-                                for query in headline[-1].split('/'):
-                                    node = None
-                                    if query.startswith('confluentuuid='):
-                                        myuuid = cfm.get_global('confluent_uuid')
-                                        curruuid = query.split('=', 1)[1].lower()
-                                        if curruuid != myuuid:
-                                            break
-                                        forcereply = True
-                                    elif query.startswith('allconfluent=1'):
-                                        reply = 'HTTP/1.1 200 OK\r\n\r\nCONFLUENT: PRESENT\r\n'
-                                        if not isinstance(reply, bytes):
-                                            reply = reply.encode('utf8')
-                                        s.sendto(reply, peer)
-                                    elif query.startswith('uuid='):
-                                        curruuid = query.split('=', 1)[1].lower()
-                                        node = uuidlookup(curruuid)
-                                    elif query.startswith('mac='):
-                                        currmac = query.split('=', 1)[1].lower()
-                                        node = uuidlookup(currmac)
-                                    if node:
-                                        cfg = cfm.ConfigManager(None)
-                                        cfd = cfg.get_node_attributes(
-                                            node, ['deployment.pendingprofile', 'collective.managercandidates'])
-                                        if not forcereply:
-                                            # Do not bother replying to a node that
-                                            # we have no deployment activity
-                                            # planned for
-                                            if not cfd.get(node, {}).get(
-                                                    'deployment.pendingprofile', {}).get('value', None):
-                                                break
-                                        candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
-                                        if candmgrs:
-                                            candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
-                                            if collective.get_myname() not in candmgrs:
-                                                break
-                                        currtime = time.time()
-                                        seconds = int(currtime)
-                                        msecs = int(currtime * 1000 % 1000)
-                                        reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
-                                        if '%' in peer[0]:
-                                            iface = socket.getaddrinfo(peer[0], 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][-1]
-                                            reply += 'MGTIFACE: {0}\r\n'.format(
-                                                peer[0].split('%', 1)[1])
-                                            ncfg = netutil.get_nic_config(
-                                                cfg, node, ifidx=iface)
-                                            if ncfg.get('matchesnodename', None):
-                                                reply += 'DEFAULTNET: 1\r\n'
-                                        elif not netutil.address_is_local(peer[0]):
-                                            continue
-                                        if not isinstance(reply, bytes):
-                                            reply = reply.encode('utf8')
-                                        s.sendto(reply, peer)
-                                        break
-                r = select.select((net4, net6), (), (), 0.2)
+                r = select.select((net4, net6), (), (), 1.5)
                 if r:
                     r = r[0]
             if deferrednotifies:
@@ -330,7 +218,7 @@ def active_scan(handler, protocol=None):
         net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF,
                         idx)
         try:
-            net6.sendto(listsrvs, (mcastv6addr, 5353, 0, 0))
+            net6.sendto(listobmccons, (mcastv6addr, 5353, 0, 0))
         except socket.error:
             # ignore interfaces without ipv6 multicast causing error
                 pass
@@ -341,7 +229,7 @@ def active_scan(handler, protocol=None):
         net4.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
                         socket.inet_aton(addr))
         try:
-            net4.sendto(listsrvs, (mcastv4addr, 5353))
+            net4.sendto(listobmccons, (mcastv4addr, 5353))
         except socket.error as se:
             if se.errno != 101 and se.errno != 1:
                 raise
@@ -360,8 +248,7 @@ def active_scan(handler, protocol=None):
                     continue
                 deferparse.append((rsp, peer))
                 continue
-            _parse_mdns(peer, rsp, peerdata)
-            #TODO_parse_ssdp(peer, rsp, peerdata)
+            _parse_mdns(peer, rsp, peerdata, '_obmc_console._tcp.local')
         timeout = deadline - util.monotonic_time()
         if timeout < 0:
             timeout = 0
@@ -370,35 +257,13 @@ def active_scan(handler, protocol=None):
         eventlet.sleep(2.2)
     for dp in deferparse:
         rsp, peer = dp
-        _parse_mdns(peer, rsp, peerdata)
-        #_parse_ssdp(peer, rsp, peerdata)
-    handler(peerdata)
-    return
+        _parse_mdns(peer, rsp, peerdata, '_obmc_console._tcp.local')
     querypool = gp.GreenPool()
     pooltargs = []
     for nid in peerdata:
-        if peerdata[nid].get('services', [None])[0] == 'urn::service:affluent:1':
-            peerdata[nid]['attributes'] = {
-                'type': 'affluent-switch',
-            }
-            peerdata[nid]['services'] = ['affluent-switch']
-            mya = peerdata[nid]['attributes']
-            usn = peerdata[nid]['usn']
-            idinfo = usn.split('::')
-            for idi in idinfo:
-                key, val = idi.split(':', 1)
-                if key == 'uuid':
-                    peerdata[nid]['uuid'] = val
-                elif key == 'serial':
-                    mya['enclosure-serial-number'] = [val]
-                elif key == 'model':
-                    mya['enclosure-machinetype-model'] = [val]
-            return peerdata[nid]
-            continue
         if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
             continue
-        if '/DeviceDescription.json' in peerdata[nid]['urls']:
-            pooltargs.append(('/DeviceDescription.json', peerdata[nid]))
+        pooltargs.append(('/redfish/v1/', peerdata[nid]))
         # For now, don't interrogate generic redfish bmcs
         # This is due to a need to deduplicate from some supported SLP
         # targets (IMM, TSM, others)
@@ -408,7 +273,7 @@ def active_scan(handler, protocol=None):
         #    pooltargs.append(('/redfish/v1/', peerdata[nid]))
     for pi in querypool.imap(check_fish, pooltargs):
         if pi is not None:
-            return pi
+            handler(pi)
 
 def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
@@ -435,7 +300,10 @@ def check_fish(urldata, port=443, verifycallback=None):
             peerinfo = wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
         if 'UUID' in peerinfo:
-            data['services'] = ['service:redfish-bmc']
+            if 'services' not in data:
+                data['services'] = ['service:redfish-bmc']
+            else:
+                data['services'].append('service:redfish-bmc')
             data['uuid'] = peerinfo['UUID'].lower()
             return data
     return None
@@ -452,6 +320,9 @@ def extract_qname(view, reply):
             name += extract_qname(reply[view[1]:], reply)[1] + '.'
             view = view[2:]
             idx += 1
+            if name:
+                return idx, name[:-1]
+            return idx, ''
         else:
             name += view[1:currlen + 1].tobytes().decode('utf8') + '.'
             view = view[currlen + 1:]
@@ -468,7 +339,43 @@ def extract_qname(view, reply):
 
 
 
-def _parse_mdns(peer, rsp, peerdata):
+def _mdns_to_dict(rsp):
+    txid, flags, quests, answers, arr, morerr = struct.unpack('!HHHHHH', rsp[:12])
+    rv = memoryview(rsp[12:])
+    rspv = memoryview(rsp)
+    retval = {}
+    while quests:
+        idx, name = extract_qname(rv, rspv)
+        rv = rv[idx:]
+        typ, dclass = struct.unpack('!HH', rv[:4]) 
+        quests -= 1
+        rv = rv[4:]
+    while answers:
+        idx, name = extract_qname(rv, rspv)
+        rv = rv[idx:]
+        typ, dclass, ttl, dlen = struct.unpack('!HHIH', rv[:10])
+        if 0 and typ == 12:  # PTR, we don't need for now...
+            adata = extract_qname(rv[10:], rspv)
+            if 'ptrs' not in retval:
+                retval['ptrs'] = [{'name': adata, 'ttl': ttl}]
+            else:
+                retval['ptrs'].append({'name': adata, 'ttl': ttl})
+        if typ == 33:
+            portnum = struct.unpack('!H', rv[14:16])[0]
+            retval['protoname'] = name.split('.', 1)[1]
+            retval['portnumber'] = portnum
+            retval['ttl'] = ttl
+        rv = rv[dlen + 10:]
+        answers -= 1
+    return retval
+
+
+def _parse_mdns(peer, rsp, peerdata, srvname):
+    parsed = _mdns_to_dict(rsp)
+    if not parsed:
+        return
+    if parsed.get('ttl', 0) == 0:
+        return
     nid = peer[0]
     mac = neighutil.get_hwaddr(peer[0])
     if mac:
@@ -481,28 +388,13 @@ def _parse_mdns(peer, rsp, peerdata):
         peerdatum = {
             'addresses': [peer],
             'hwaddr': mac,
-            'services': []
+            'services': [srvname]
         }
+        if srvname == '_obmc_console._tcp.local':
+            peerdatum['services'] = ['openbmc']
+            peerdatum['urls'] = ['/redfish/v1/']
         peerdata[nid] = peerdatum
-    txid, flags, quests, answers, arr, morerr = struct.unpack('!HHHHHH', rsp[:12])
-    rv = memoryview(rsp[12:])
-    rspv = memoryview(rsp)
-    while quests:
-        idx, name = extract_qname(rv, rspv)
-        rv = rv[idx:]
-        typ, dclass = struct.unpack('!HH', rv[:4]) 
-        quests -= 1
-        rv = rv[4:]
-    while answers:
-        idx, name = extract_qname(rv, rspv)
-        rv = rv[idx:]
-        typ, dclass, ttl, dlen = struct.unpack('!HHIH', rv[:10])
-        if typ == 12:  # PTR
-            adata = extract_qname(rv[10:], rspv)
-            if adata[1] not in peerdatum['services']:
-                peerdatum['services'].append(adata[1])
-        rv = rv[dlen + 10:]
-        answers -= 1
+    
 
 def _parse_ssdp(peer, rsp, peerdata):
     nid = peer[0]
@@ -554,4 +446,4 @@ from pprint import pprint
 if __name__ == '__main__':
     def printit(rsp):
         print(repr(rsp))
-    active_scan(pprint)
+    snoop(pprint)
