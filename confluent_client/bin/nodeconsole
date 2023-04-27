@@ -282,8 +282,13 @@ if options.tile:
             sys.exit(1)
         nodes.append(node)
     initial = True
+    in_tmux = False
     pane = 0
     sessname = 'nodeconsole_{0}'.format(os.getpid())
+    if os.environ.get("TMUX"):
+        initial = False
+        in_tmux = True
+        subprocess.call(['tmux', 'rename-session', sessname])
     for node in sortutil.natural_sort(nodes):
         panename = '{0}:{1}'.format(sessname, pane)
         if initial:
@@ -304,7 +309,8 @@ if options.tile:
             pane += 1
     subprocess.call(['tmux', 'select-pane', '-t', sessname])
     subprocess.call(['tmux', 'set-option', '-t', panename, 'pane-border-status', 'top'], stderr=null)
-    os.execlp('tmux', 'tmux', 'attach', '-t', sessname)
+    if not in_tmux:
+        os.execlp('tmux', 'tmux', 'attach', '-t', sessname)
 else:
     os.execl(confettypath, confettypath, 'start',
              '/nodes/{0}/console/session'.format(args[0]))
