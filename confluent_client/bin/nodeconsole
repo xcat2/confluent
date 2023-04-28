@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/libexec/platform-python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2015 Lenovo
@@ -23,6 +23,7 @@ path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
+
 import confluent.client as client
 import confluent.sortutil as sortutil
 import confluent.logreader as logreader
@@ -106,12 +107,20 @@ def kill(noderange):
         nodes.append(node) 
 
     for node in nodes:
-        ps_data=subprocess.Popen(['ps', '-auxww' ], stdout=subprocess.PIPE)
-        wintr=ps_data.communicate()[0]
-        for line in wintr.decode('utf-8').split('\n'):
-            if confettypath in line and envstring in line and node in line:
-                pid_line = [x for x in line.split(' ') if x != '']
-                ps_data=subprocess.Popen(['kill', '-9', pid_line[1] ], stdout=subprocess.PIPE)
+        s=socket.socket(socket.AF_UNIX)
+        winid=None
+        try:
+            win=subprocess.Popen(['xwininfo', '-tree', '-root'], stdout=subprocess.PIPE)
+            wintr=win.communicate()[0]
+            for line in wintr.decode('utf-8').split('\n'):
+                if 'console: {0}'.format(node) in line or 'confetty' in line:
+                    win_obj = [ele for ele in line.split(' ') if ele.strip()]
+                    winid = win_obj[0]
+        except:
+            print("Error: cannot retrieve window id of node {}".format(node))
+
+        if winid:
+            ps_data=subprocess.Popen(['xkill', '-id', winid ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     sys.exit(0)
 
@@ -259,7 +268,7 @@ if options.windowed:
         else:
             pass 
         with open(os.devnull, 'wb') as devnull:
-            xopen=subprocess.Popen(envlist + [confettypath, '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)] , stdin=devnull)
+            xopen=subprocess.Popen(envlist + [confettypath, '-c', '/tmp/controlpath-{0}'.format(node), '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)] , stdin=devnull)
     sys.exit(0)
 #end of wcons
 if options.tile:
@@ -273,8 +282,13 @@ if options.tile:
             sys.exit(1)
         nodes.append(node)
     initial = True
+    in_tmux = False
     pane = 0
     sessname = 'nodeconsole_{0}'.format(os.getpid())
+    if os.environ.get("TMUX"):
+        initial = False
+        in_tmux = True
+        subprocess.call(['tmux', 'rename-session', sessname])
     for node in sortutil.natural_sort(nodes):
         panename = '{0}:{1}'.format(sessname, pane)
         if initial:
@@ -295,7 +309,8 @@ if options.tile:
             pane += 1
     subprocess.call(['tmux', 'select-pane', '-t', sessname])
     subprocess.call(['tmux', 'set-option', '-t', panename, 'pane-border-status', 'top'], stderr=null)
-    os.execlp('tmux', 'tmux', 'attach', '-t', sessname)
+    if not in_tmux:
+        os.execlp('tmux', 'tmux', 'attach', '-t', sessname)
 else:
     os.execl(confettypath, confettypath, 'start',
              '/nodes/{0}/console/session'.format(args[0]))
