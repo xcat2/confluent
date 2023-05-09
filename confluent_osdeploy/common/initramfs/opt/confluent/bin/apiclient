@@ -356,6 +356,7 @@ class HTTPSClient(client.HTTPConnection, object):
     def connect(self):
         addrinf = socket.getaddrinfo(self.host, self.port)[0]
         psock = socket.socket(addrinf[0])
+        psock.settimeout(15)
         psock.connect(addrinf[4])
         ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         ctx.load_verify_locations('/etc/confluent/ca.pem')
