@@ -353,7 +353,7 @@ class HTTPSClient(client.HTTPConnection, object):
                 raise Exception('Unable to reach any hosts')
         return foundsrv
 
-    def connect(self):
+    def connect(self, tries=3):
         addrinf = socket.getaddrinfo(self.host, self.port)[0]
         psock = socket.socket(addrinf[0])
         psock.settimeout(15)
@@ -376,6 +376,10 @@ class HTTPSClient(client.HTTPConnection, object):
                 self.errout.write(errmsg)
                 self.errout.flush()
             sys.exit(1)
+        except socket.timeout:
+            if not tries:
+                raise
+            return self.connect(tries=tries-1)
 
     def grab_url(self, url, data=None, returnrsp=False):
         return self.grab_url_with_status(url, data, returnrsp)[1]
