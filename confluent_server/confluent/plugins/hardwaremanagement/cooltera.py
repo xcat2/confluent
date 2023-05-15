@@ -84,7 +84,7 @@ _thesensors = {
         'ps1': ('Secondary loop return pressure', 'bar'),
         'ps3': ('Primary loop supply pressure', 'bar'),
         'ps2': ('Secondary loop supply pressure', 'bar'),
-        'ps4': ('Primary loop return pressure', 'bar'),'
+        'ps4': ('Primary loop return pressure', 'bar'),
     },
 }
 
