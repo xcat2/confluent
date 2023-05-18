@@ -21,6 +21,10 @@ class InvalidApiKey(Exception):
 def msg_align(len):
     return (len + 3) & ~3
 
+try:
+    _protoparm = ssl.PROTOCOL_TLS_CLIENT
+except AttributeError:    
+    _protoparm = ssl.PROTOCOL_SSLv23
 cryptname = ctypes.util.find_library('crypt')
 if not cryptname:
     if os.path.exists('/lib64/libcrypt.so.2') or os.path.exists('/usr/lib64/libcrypt.so.2'):
@@ -305,7 +309,7 @@ class HTTPSClient(client.HTTPConnection, object):
     def check_connections(self):
         foundsrv = None
         hosts = self.hosts
-        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx = ssl.SSLContext(_protoparm)
         ctx.load_verify_locations('/etc/confluent/ca.pem')
         ctx.verify_mode = ssl.CERT_REQUIRED
         ctx.check_hostname = True
@@ -358,7 +362,7 @@ class HTTPSClient(client.HTTPConnection, object):
         psock = socket.socket(addrinf[0])
         psock.settimeout(15)
         psock.connect(addrinf[4])
-        ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        ctx = ssl.SSLContext(_protoparm)
         ctx.load_verify_locations('/etc/confluent/ca.pem')
         host = self.host.split('%', 1)[0]
         if '[' not in host and ':' in host:
