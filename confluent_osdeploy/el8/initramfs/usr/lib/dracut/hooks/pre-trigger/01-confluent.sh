@@ -1,6 +1,7 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
 . /lib/dracut-lib.sh
+setsid sh -c 'exec bash <> /dev/tty2 >&0 2>&1' &
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
@@ -81,9 +82,11 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             v4nm=${v4nm#ipv4_netmask: }
             DETECTED=0
             for dsrv in $deploysrvs; do
-                if curl --capath /tls/ -s --connect-timeout 1 https://$dsrv/confluent-public/ > /dev/null; then
+                if curl --capath /tls/ -s --connect-timeout 3 https://$dsrv/confluent-public/ > /dev/null; then
+                    rm /run/NetworkManager/system-connections/*
                     /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none
                     DETECTED=1
+                    ifname=$NICGUESS
                     break
                 fi
             done
@@ -175,14 +178,16 @@ while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self
 	sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
-if [ ! -z "$ifidx" ]; then
-    ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
-    ifname=${ifname%:}
-    ifname=${ifname%@*}
-    echo $ifname > /tmp/net.ifaces
-else
-    ip -br a|grep UP|awk '{print $1}' > /tmp/net.ifaces
-    ifname=$(cat /tmp/net.ifaces)
+if [ -z "$ifname" ]; then
+    if [ ! -z "$ifidx" ]; then
+        ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+        ifname=${ifname%:}
+        ifname=${ifname%@*}
+        echo $ifname > /tmp/net.ifaces
+    else
+        ip -br a|grep UP|awk '{print $1}' > /tmp/net.ifaces
+        ifname=$(cat /tmp/net.ifaces)
+    fi
 fi
 
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
