@@ -262,12 +262,13 @@ if __name__ == '__main__':
                         macok = True
             #adding new code to check if the response is something like net.<something>switch
             for key in rsp:
-                if key.startswith('net.')and key.endswith('switch'):
+                if ((key.startswith('net.') and key.endswith('switch')) 
+                        or (key.startswith('power.') and key.endswith('pdu'))
+                        or (key.startswith('enclosure.') and key.endswith('manager'))
+                        ):
                     switch_value = rsp[key].get('value',None)
-                    if switch_value in valid_nodes:
-                        print(f'{switch_value} is valid.')
-                    else:
-                        emprint(f'{switch_value} is not valid.')
+                    if switch_value and switch_value not in valid_nodes:
+                        emprint(f'{switch_value} is not a valid node name (as referenced by attribute "{key}" of node {args.node}).')
         if not uuidok and not macok:
             allok = False
             emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
