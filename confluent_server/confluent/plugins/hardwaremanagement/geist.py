@@ -17,6 +17,7 @@ import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
 import eventlet.green.time as time
+import eventlet
 import eventlet.greenpool as greenpool
 
 def simplify_name(name):
@@ -226,5 +227,6 @@ def update(nodes, element, configmanager, inputdata):
         gc = GeistClient(node, configmanager)
         newstate = inputdata.powerstate(node)
         gc.set_outlet(element[-1], newstate)
+    eventlet.sleep(1)
     for res in retrieve(nodes, element, configmanager, inputdata):
         yield res
