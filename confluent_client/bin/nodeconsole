@@ -42,6 +42,10 @@ argparser.add_option('-t', '--tile', action='store_true', default=False,
                      help='Tile console windows in the terminal')
 argparser.add_option('-l', '--log', action='store_true', default=False,
                      help='Enter log replay mode instead of showing a live console')
+
+argparser.add_option('-d', '--dump', action='store_true', default=False,
+                     help= 'Dump log in stdout with timestamps')
+
 argparser.add_option('-w','--windowed', action='store_true', default=False,
                      help='Open terminal windows for each node.  The '
                           'environment variable NODECONSOLE_WINDOWED_COMMAND '
@@ -90,6 +94,16 @@ if options.log:
         sys.stderr.write('Unable to locate {0} on local system\n'.format(logname))
         sys.exit(1)
     logreader.replay_to_console(logname)
+    sys.exit(0)
+
+if options.dump:
+    logname = args[0]
+    if not os.path.exists(logname) and logname[0] != '/':
+        logname = os.path.join('/var/log/confluent/consoles', logname)
+    if not os.path.exists(logname):
+        sys.stderr.write('Unable to locate {0} on local system\n'.format(logname))
+        sys.exit(1)
+    logreader.dump_to_console(logname)
     sys.exit(0)
 
 def kill(noderange):

@@ -296,5 +296,47 @@ def replay_to_console(txtfile):
             sys.exit(1)
     _replay_to_console(txtfile, binfile)
 
+def dump_to_console(txtfile):
+    if os.path.exists(txtfile + '.cbl'):
+        binfile = txtfile + '.cbl'
+    elif '.' not in txtfile:
+        if '/' not in txtfile:
+            txtfile = os.getcwd() + '/' + txtfile
+        sys.stderr.write('Unable to locate cbl file: "{0}"\n'.format(txtfile + '.cbl'))
+        sys.exit(1)
+    else:
+        fileparts = txtfile.split('.')
+        prefix = '.'.join(fileparts[:-1])
+        binfile = prefix + '.cbl.' + fileparts[-1]
+        if not os.path.exists(binfile):
+            sys.stderr.write('Unable to locate cbl file: "{0}"\n'.format(binfile))
+            sys.exit(1)
+    replay = LogReplay(txtfile, binfile)
+    quitit = False
+    writeout('\x1b[2J\x1b[;H')
+    prepend = ''
+    try:
+        while not quitit:
+            newdata, delay = replay.get_output(False)
+            if newdata:
+                if prepend:
+                    newdata = prepend + newdata
+                    prepend = b''
+                writeout(newdata.replace(b'\r\n', '\r\n[ {0} ] '.format(time.strftime('%m/%d %H:%M:%S', time.localtime(replay.laststamp))).encode('utf8')))
+                newdata = ''
+                try:
+                    if hasattr(sys.stdout, 'buffer'):
+                        sys.stdout.buffer.flush()
+                    else:
+                        sys.stdout.flush()
+                except IOError:
+                    pass
+            else:
+                break
+    except Exception:
+        writeout('\x1b[m\x1b[?25h\n')
+        raise
+    writeout('\x1b[m\x1b[?25h\n')
+
 if __name__ == '__main__':
     replay_to_console(sys.argv[1])
