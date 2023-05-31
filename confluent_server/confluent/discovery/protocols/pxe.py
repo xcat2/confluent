@@ -297,92 +297,96 @@ def proxydhcp(handler, nodeguess):
     msg.msg_namelen = ctypes.sizeof(clientaddr)
     cfg = cfm.ConfigManager(None)
     while True:
-        ready = select.select([net4011], [], [], None)
-        if not ready or not ready[0]:
-            continue
-        i = recvmsg(net4011.fileno(), ctypes.pointer(msg), 0)
-        #nb, client = net4011.recvfrom_into(rq)
-        if i < 240:
-            continue
-        rqv = memoryview(rq)[:i]
-        client = (ipfromint(clientaddr.sin_addr.s_addr), socket.htons(clientaddr.sin_port))
-        _, level, typ = struct.unpack('QII', cmsgarr[:16])
-        if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
-            idx, recv = struct.unpack('II', cmsgarr[16:24])
-            recv = ipfromint(recv)
         try:
-            optidx = rqv.tobytes().index(b'\x63\x82\x53\x63') + 4
-        except ValueError:
-            continue
-        hwlen = rq[2]
-        opts, disco = opts_to_dict(rq, optidx, 3)
-        disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rq[28:28+hwlen]])
-        node = None
-        if disco.get('hwaddr', None) in macmap:
-            node = macmap[disco['hwaddr']]
-        elif disco.get('uuid', None) in uuidmap:
-            node = uuidmap[disco['uuid']]
-        myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
-        skiplogging = True
-        netaddr = disco['hwaddr']
-        if time.time() > ignoredisco.get(netaddr, 0) + 90:
-            skiplogging = False
-            ignoredisco[netaddr] = time.time()
-        if not myipn:
-            info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
-                            'architecture': disco['arch'],
-                            'netinfo': {'ifidx': idx, 'recvip': recv},
-                            'services': ('pxe-client',)}
-            if not skiplogging:
-                handler(info)
-        if not node:
-            if not myipn and not skiplogging:
-                log.log(
-                        {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
-                            disco.get('uuid', 'unknown'), disco.get('hwaddr', 'unknown')
-                )})
-            continue
-        profile = None
-        if not myipn:
-            myipn = socket.inet_aton(recv)
-            profile = get_deployment_profile(node, cfg)
-            if profile:
-                log.log({
-                    'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
-            else:
+            ready = select.select([net4011], [], [], None)
+            if not ready or not ready[0]:
+                continue
+            i = recvmsg(net4011.fileno(), ctypes.pointer(msg), 0)
+            #nb, client = net4011.recvfrom_into(rq)
+            if i < 240:
+                continue
+            rqv = memoryview(rq)[:i]
+            client = (ipfromint(clientaddr.sin_addr.s_addr), socket.htons(clientaddr.sin_port))
+            _, level, typ = struct.unpack('QII', cmsgarr[:16])
+            if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
+                idx, recv = struct.unpack('II', cmsgarr[16:24])
+                recv = ipfromint(recv)
+            try:
+                optidx = rqv.tobytes().index(b'\x63\x82\x53\x63') + 4
+            except ValueError:
+                continue
+            hwlen = rq[2]
+            opts, disco = opts_to_dict(rq, optidx, 3)
+            disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rq[28:28+hwlen]])
+            node = None
+            if disco.get('hwaddr', None) in macmap:
+                node = macmap[disco['hwaddr']]
+            elif disco.get('uuid', None) in uuidmap:
+                node = uuidmap[disco['uuid']]
+            myipn = myipbypeer.get(rqv[28:28+hwlen].tobytes(), None)
+            skiplogging = True
+            netaddr = disco['hwaddr']
+            if time.time() > ignoredisco.get(netaddr, 0) + 90:
+                skiplogging = False
+                ignoredisco[netaddr] = time.time()
+            if not myipn:
+                info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
+                                'architecture': disco['arch'],
+                                'netinfo': {'ifidx': idx, 'recvip': recv},
+                                'services': ('pxe-client',)}
                 if not skiplogging:
-                    log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
+                    handler(info)
+            if not node:
+                if not myipn and not skiplogging:
+                    log.log(
+                            {'info': 'No node matches boot attempt from uuid {0} or hardware address {1}'.format(
+                                disco.get('uuid', 'unknown'), disco.get('hwaddr', 'unknown')
+                    )})
                 continue
-        if opts.get(77, None) == b'iPXE':
-            if not profile:
+            profile = None
+            if not myipn:
+                myipn = socket.inet_aton(recv)
                 profile = get_deployment_profile(node, cfg)
-            if not profile:
-                log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
+                if profile:
+                    log.log({
+                        'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
+                else:
+                    if not skiplogging:
+                        log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
+                    continue
+            if opts.get(77, None) == b'iPXE':
+                if not profile:
+                    profile = get_deployment_profile(node, cfg)
+                if not profile:
+                    log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
+                    continue
+                myip = socket.inet_ntoa(myipn)
+                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
+            elif disco['arch'] == 'uefi-x64':
+                bootfile = b'confluent/x86_64/ipxe.efi'
+            elif disco['arch'] == 'bios-x86':
+                bootfile = b'confluent/x86_64/ipxe.kkpxe'
+            elif disco['arch'] == 'uefi-aarch64':
+                bootfile = b'confluent/aarch64/ipxe.efi'
+            if len(bootfile) > 127:
+                log.log(
+                    {'info': 'Boot offer cannot be made to {0} as the '
+                    'profile name "{1}" is {2} characters longer than is supported '
+                    'for this boot method.'.format(
+                        node, profile, len(bootfile) - 127)})
                 continue
-            myip = socket.inet_ntoa(myipn)
-            bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
-        elif disco['arch'] == 'uefi-x64':
-            bootfile = b'confluent/x86_64/ipxe.efi'
-        elif disco['arch'] == 'bios-x86':
-            bootfile = b'confluent/x86_64/ipxe.kkpxe'
-        elif disco['arch'] == 'uefi-aarch64':
-            bootfile = b'confluent/aarch64/ipxe.efi'
-        if len(bootfile) > 127:
-            log.log(
-                {'info': 'Boot offer cannot be made to {0} as the '
-                'profile name "{1}" is {2} characters longer than is supported '
-                'for this boot method.'.format(
-                    node, profile, len(bootfile) - 127)})
-            continue
-        rpv[:240] = rqv[:240].tobytes()
-        rpv[0:1] = b'\x02'
-        rpv[108:108 + len(bootfile)] = bootfile
-        rpv[240:243] = b'\x35\x01\x05'
-        rpv[243:249] = b'\x36\x04' + myipn
-        rpv[20:24] = myipn
-        rpv[249:268] = b'\x61\x11' + opts[97]
-        rpv[268:280] = b'\x3c\x09PXEClient\xff'
-        net4011.sendto(rpv[:281], client)
+            rpv[:240] = rqv[:240].tobytes()
+            rpv[0:1] = b'\x02'
+            rpv[108:108 + len(bootfile)] = bootfile
+            rpv[240:243] = b'\x35\x01\x05'
+            rpv[243:249] = b'\x36\x04' + myipn
+            rpv[20:24] = myipn
+            rpv[249:268] = b'\x61\x11' + opts[97]
+            rpv[268:280] = b'\x3c\x09PXEClient\xff'
+            net4011.sendto(rpv[:281], client)
+        except Exception as e:
+            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                            event=log.Events.stacktrace)
 
 
 def start_proxydhcp(handler, nodeguess=None):

@@ -549,7 +549,10 @@ class SuseHandler(OsHandler):
         subprocess.check_call(cmd)
         subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
         os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
-        args.cmd = ['mkinitrd']
+        if os.path.exists(os.path.join(self.targpath, 'sbin/mkinitrd')):
+            args.cmd = ['mkinitrd']
+        else:
+            args.cmd = ['dracut', '-f']
         run_constrainedx(fancy_chroot, (args, self.targpath))
 
 
@@ -1206,7 +1209,14 @@ def recursecp(source, targ):
 def pack_image(args):
     outdir = args.profilename
     if '/' in outdir:
-        raise Exception('Full path not supported, supply only the profile name')
+        raise Exception('Full path not supported, supply only the profile name\n')
+    if args.baseprofile:
+        baseprofiledir = args.baseprofile
+        if '/' not in args.baseprofile:
+            baseprofiledir = os.path.join('/var/lib/confluent/public/os', args.baseprofile)
+        if not os.path.exists(baseprofiledir):
+            sys.stderr.write('Specified base profile "{0}" does not seem to exist\n'.format(baseprofiledir))
+            sys.exit(1)
     privdir = os.path.join('/var/lib/confluent/private/os/', outdir)
     outdir = os.path.join('/var/lib/confluent/public/os/', outdir)
     if os.path.exists(outdir):

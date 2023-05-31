@@ -1,6 +1,7 @@
 #!/bin/sh
 [ -e /tmp/confluent.initq ] && return 0
 . /lib/dracut-lib.sh
+setsid sh -c 'exec bash <> /dev/tty2 >&0 2>&1' &
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
@@ -55,21 +56,49 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     sed -n '/^net_cfgs:/, /^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/, /^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
     autoconfigmethod=$(grep ^ipv4_method: $tcfg)
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
-    if [ "$autoconfigmethod" = "dhcp" ]; then
-        /usr/libexec/nm-initrd-generator ip=:dhcp
-    else
-        v4addr=$(grep ^ipv4_address: $tcfg)
-        v4addr=${v4addr#ipv4_address: }
-        v4addr=${v4addr%/*}
-        v4gw=$(grep ^ipv4_gateway: $tcfg)
-        v4gw=${v4gw#ipv4_gateway: }
-        if [ "$v4gw" = "null" ]; then
-            v4gw=""
+     for i in /sys/class/net/*; do
+        ip link set $(basename $i) down
+        udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
+        ip link set $(basename $i) up
+    done
+    for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
+        if [ "$autoconfigmethod" = "dhcp" ]; then
+            /usr/libexec/nm-initrd-generator ip=$NICGUESS:dhcp
+        else
+            v4addr=$(grep ^ipv4_address: $tcfg)
+            v4addr=${v4addr#ipv4_address: }
+            v4plen=${v4addr#*/}
+            v4addr=${v4addr%/*}
+            v4gw=$(grep ^ipv4_gateway: $tcfg)
+            v4gw=${v4gw#ipv4_gateway: }
+            ip addr add dev $NICGUESS $v4addr/$v4plen
+            if [ "$v4gw" = "null" ]; then
+                v4gw=""
+            fi
+            if [ ! -z "$v4gw" ]; then
+                ip route add default via $v4gw
+            fi
+            v4nm=$(grep ipv4_netmask: $tcfg)
+            v4nm=${v4nm#ipv4_netmask: }
+            DETECTED=0
+            for dsrv in $deploysrvs; do
+                if curl --capath /tls/ -s --connect-timeout 3 https://$dsrv/confluent-public/ > /dev/null; then
+                    rm /run/NetworkManager/system-connections/*
+                    /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none
+                    DETECTED=1
+                    ifname=$NICGUESS
+                    break
+                fi
+            done
+            if [ ! -z "$v4gw" ]; then
+                ip route del default via $v4gw
+            fi
+            ip addr flush dev $NICGUESS
+            if [ $DETECTED = 1 ]; then
+                break
+            fi
         fi
-        v4nm=$(grep ipv4_netmask: $tcfg)
-        v4nm=${v4nm#ipv4_netmask: }
-        /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname::none
-    fi
+    done
     NetworkManager --configure-and-quit=initrd --no-daemon
     hmackeyfile=/tmp/cnflnthmackeytmp
     echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
@@ -85,10 +114,10 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         echo 'MANAGER: '$deploysrv >> /etc/confluent/confluent.info
     done
     for deployer in $deploysrvs; do
-        if curl -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt -k https://$deployer/confluent-api/self/registerapikey; then
+        if curl --capath /tls/ -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" -d@$passcrypt -k https://$deployer/confluent-api/self/registerapikey; then
             cp $passfile /etc/confluent/confluent.apikey
             confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-            curl -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+            curl --capath /tls/ -sf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$deployer/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
             confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg)
             confluent_profile=${confluent_profile#profile: }
             mgr=$deployer
@@ -114,7 +143,7 @@ if ! grep MANAGER: /etc/confluent/confluent.info; then
         for mac in $(ip -br link|grep -v LOOPBACK|awk '{print $3}'); do
             myids=$myids"/mac="$mac
         done
-        myname=$(curl -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
+        myname=$(curl --capath /tls/ -sH "CONFLUENT_IDS: $myids" https://$confluenthttpsrv/confluent-api/self/whoami)
         if [ ! -z "$myname" ]; then
             echo NODENAME: $myname > /etc/confluent/confluent.info
             echo MANAGER: $confluentsrv >> /etc/confluent/confluent.info
@@ -149,14 +178,16 @@ while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self
 	sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
-if [ ! -z "$ifidx" ]; then
-    ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
-    ifname=${ifname%:}
-    ifname=${ifname%@*}
-    echo $ifname > /tmp/net.ifaces
-else
-    ip -br a|grep UP|awk '{print $1}' > /tmp/net.ifaces
-    ifname=$(cat /tmp/net.ifaces)
+if [ -z "$ifname" ]; then
+    if [ ! -z "$ifidx" ]; then
+        ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+        ifname=${ifname%:}
+        ifname=${ifname%@*}
+        echo $ifname > /tmp/net.ifaces
+    else
+        ip -br a|grep UP|awk '{print $1}' > /tmp/net.ifaces
+        ifname=$(cat /tmp/net.ifaces)
+    fi
 fi
 
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)

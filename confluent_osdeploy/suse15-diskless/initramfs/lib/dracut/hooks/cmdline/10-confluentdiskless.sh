@@ -161,7 +161,7 @@ else
     echo -e "BOOTPROTO='static'\nSTARTMODE='auto'" >> /run/confluent/ifcfg-$ifname
     echo "IPADDR='$v4addr/$v4nm'" >> /run/confluent/ifcfg-$ifname
     if [ ! -z "$v4gw" ]; then
-        echo defafult $v4gw - $ifname > /run/confluent/ifroute-$ifname
+        echo default $v4gw - $ifname > /run/confluent/ifroute-$ifname
     fi
 fi
 

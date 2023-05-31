@@ -229,7 +229,7 @@ if options.windowed:
             elif 'Height' in line:
                 window_height = int(line.split(':')[1])
             elif '-geometry' in line:
-                l = re.split(' |x|\+', line)
+                l = re.split(' |x|-|\+', line)
                 l_nosp = [ele for ele in l if ele.strip()]
                 wmxo = int(l_nosp[1])
                 wmyo = int(l_nosp[2])
