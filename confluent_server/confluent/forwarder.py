@@ -119,7 +119,7 @@ def get_port(addr, clientip, sessionid):
                 newsock.bind(('::', newport, 0, 0))
                 newsock.listen(50)
                 break
-            except OSError as e:
+            except (socket.error, OSError) as e:
                 if e.errno == 98:
                     newport += 1
                     continue
