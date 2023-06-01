@@ -10,6 +10,7 @@ fi
 oum=$(umask)
 umask 0077
 mkdir -p /etc/confluent
+echo -n > /etc/confluent/confluent.info
 cat /tls/*.pem > /etc/confluent/ca.pem
 TRIES=5
 while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
@@ -23,7 +24,12 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
     cd $tmnt
     deploysrvs=$(sed -n '/^deploy_servers:/, /^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+
     nodename=$(grep ^nodename: cnflnt.yml|awk '{print $2}')
+    echo "NODENAME: "$nodename > /etc/confluent/confluent.info
+    for dsrv in $deploysrvs; do
+        echo 'MANAGER: '$dsrv >> /etc/confluent/confluent.info
+    done
     sed -n '/^net_cfgs:/, /^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/, /^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
     autoconfigmethod=$(grep ^ipv4_method: $tcfg)
     autoconfigmethod=${autoconfigmethod#ipv4_method: }
@@ -32,42 +38,79 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
         ip link set $(basename $i) up
     done
+    usedhcp=0
     for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
-        echo $NICGUESS
+        if [ "$autoconfigmethod" = "dhcp" ]; then
+            usedhcp=1
+        else
+            v4addr=$(grep ^ipv4_address: $tcfg)
+            v4addr=${v4addr#ipv4_address: }
+            v4plen=${v4addr#*/}
+            v4addr=${v4addr%/*}
+            v4gw=$(grep ^ipv4_gateway: $tcfg)
+            v4gw=${v4gw#ipv4_gateway: }
+            ip addr add dev $NICGUESS $v4addr/$v4plen
+            if [ "$v4gw" = "null" ]; then
+                v4gw=""
+            fi
+            if [ ! -z "$v4gw" ]; then
+                ip route add default via $v4gw
+            fi
+            v4nm=$(grep ipv4_netmask: $tcfg)
+            v4nm=${v4nm#ipv4_netmask: }
+            TESTSRV=$(python /opt/confluent/bin/apiclient -c 2> /dev/null)
+            if [ ! -z "$v4gw" ]; then
+                ip route del default via $v4gw
+            fi
+            ip -4 addr flush dev $NICGUESS
+            if [ ! -z "$TESTSRV" ]; then
+                mgr=$TESTSRV
+                ifname=$NICGUESS
+                break
+            fi
     done
 fi
 TRIES=0
-echo -n > /etc/confluent/confluent.info
-cd /sys/class/net
-while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
-    TRIES=$((TRIES + 1))
-    for currif in *; do
-        ip link set $currif up
+if [ "$usedhcp" = 1 ]; then
+    echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
+elif [ -z "$ifname" ]; then
+    cd /sys/class/net
+    while ! awk -F'|' '{print $3}' /etc/confluent/confluent.info |grep 1 >& /dev/null && [ "$TRIES" -lt 60 ]; do
+        TRIES=$((TRIES + 1))
+        for currif in *; do
+            ip link set $currif up
+        done
+        /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
     done
-    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
-done
-cd /
-grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
+    cd /
+    grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
+    echo -n "" > /etc/cmdline.d/01-confluent.conf
+else
+    echo -n ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none > /etc/cmdline.d/01-confluent.conf
+fi
 echo -n "" > /tmp/confluent.initq
 # restart cmdline
-echo -n "" > /etc/cmdline.d/01-confluent.conf
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
-
 python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
-ifidx=$(cat /tmp/confluent.ifidx)
-ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
-ifname=${ifname%:}
-echo $ifname > /tmp/net.ifaces
-
+if [ -z "$ifname"  ]; then
+    ifidx=$(cat /tmp/confluent.ifidx)
+    ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
+    ifname=${ifname%:}
+fi
+if [ ! -z "$ifname" ]; then
+    echo $ifname > /tmp/net.ifaces
+fi
 dnsdomain=$(grep ^dnsdomain: /etc/confluent/confluent.deploycfg)
 dnsdomain=${dnsdomain#dnsdomain: }
 hostname=$nodename
 if [ ! -z "$dnsdomain" ] && [ "$dnsdomain" != "null" ]; then
     hostname=$hostname.$dnsdomain
 fi
-mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
-mgr=${mgr#deploy_server: }
+if [ -z "$mgr" ]; then
+    mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
+    mgr=${mgr#deploy_server: }
+fi
 profilename=$(grep ^profile: /etc/confluent/confluent.deploycfg)
 profilename=${profilename#profile: }
 proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg)
@@ -91,21 +134,23 @@ kickstart=$proto://$mgr/confluent-public/os/$profilename/kickstart
 root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
 export kickstart
 export root
-autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
-autoconfigmethod=${autoconfigmethod#ipv4_method: }
-if [ "$autoconfigmethod" = "dhcp" ]; then
-    echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
-else
-    v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
-    v4addr=${v4addr#ipv4_address: }
-    v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
-    v4gw=${v4gw#ipv4_gateway: }
-    if [ "$v4gw" = "null" ]; then
-        v4gw=""
+if [ -z "$autoconfigmethod" ]; then
+    autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+    if [ "$autoconfigmethod" = "dhcp" ]; then
+        echo ip=$ifname:dhcp >>  /etc/cmdline.d/01-confluent.conf
+    else
+        v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg)
+        v4addr=${v4addr#ipv4_address: }
+        v4gw=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg)
+        v4gw=${v4gw#ipv4_gateway: }
+        if [ "$v4gw" = "null" ]; then
+            v4gw=""
+        fi
+        v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
+        v4nm=${v4nm#ipv4_netmask: }
+        echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
     fi
-    v4nm=$(grep ipv4_netmask: /etc/confluent/confluent.deploycfg)
-    v4nm=${v4nm#ipv4_netmask: }
-    echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none >> /etc/cmdline.d/01-confluent.conf
 fi
 nameserversec=0
 while read -r entry; do
