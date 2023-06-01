@@ -325,7 +325,7 @@ class HTTPSClient(client.HTTPConnection, object):
                     foundsrv = host
                     psock.close()
                     break
-                except OSError:
+                except (OSError, socket.error):
                     continue
                 except ssl.SSLError:
                     continue
