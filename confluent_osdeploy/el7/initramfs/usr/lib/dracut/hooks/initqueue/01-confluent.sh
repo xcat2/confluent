@@ -33,7 +33,9 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         ip link set $(basename $i) up
     done
     for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
-
+        echo $NICGUESS
+    done
+fi
 TRIES=0
 echo -n > /etc/confluent/confluent.info
 cd /sys/class/net
