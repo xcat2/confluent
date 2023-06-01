@@ -7,8 +7,33 @@ if [ -f /tmp/dd_disk ]; then
         fi
     done
 fi
+oum=$(umask)
+umask 0077
 mkdir -p /etc/confluent
 cat /tls/*.pem > /etc/confluent/ca.pem
+TRIES=5
+while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
+    sleep 2
+    TRIES=$((TRIES - 1))
+done
+if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    tmnt=/tmp/idntmnt
+    mkdir -p $tmnt
+    tcfg=/tmp/idnttmp
+    mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
+    cd $tmnt
+    deploysrvs=$(sed -n '/^deploy_servers:/, /^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+    nodename=$(grep ^nodename: cnflnt.yml|awk '{print $2}')
+    sed -n '/^net_cfgs:/, /^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/, /^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
+    autoconfigmethod=$(grep ^ipv4_method: $tcfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+     for i in /sys/class/net/*; do
+        ip link set $(basename $i) down
+        udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
+        ip link set $(basename $i) up
+    done
+    for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
+
 TRIES=0
 echo -n > /etc/confluent/confluent.info
 cd /sys/class/net
@@ -27,7 +52,6 @@ echo -n "" > /etc/cmdline.d/01-confluent.conf
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
 
-oum=$(umask)
 python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
 ifidx=$(cat /tmp/confluent.ifidx)
 ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
