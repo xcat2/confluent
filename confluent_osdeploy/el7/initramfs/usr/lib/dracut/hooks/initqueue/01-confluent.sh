@@ -68,6 +68,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
                 ifname=$NICGUESS
                 break
             fi
+        fi
     done
 fi
 TRIES=0
