@@ -66,7 +66,7 @@ import eventlet.semaphore as semaphore
 import itertools
 import msgpack
 import os
-import socket
+import eventlet.green.socket as socket
 import struct
 import sys
 
