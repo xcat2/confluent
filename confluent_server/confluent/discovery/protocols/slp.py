@@ -63,6 +63,9 @@ def _parse_slp_header(packet):
                                            bytes(b'\x00' + packet[7:14]))
     parsed['lang'] = packet[14:14 + langlen].decode('utf-8')
     parsed['payload'] = packet[14 + langlen:]
+    errcode = struct.unpack('!H', packet[14 + langlen:16 + langlen])[0]
+    if errcode != 0:
+        return None
     if offset:
         parsed['offset'] = 14 + langlen
         parsed['extoffset'] = offset
