@@ -288,12 +288,16 @@ def _authorize_request(env, operation, reqbody):
             authdata = auth.authorize(name, element=element, operation=operation)
         else:
             element = None
-    if (not authdata) and 'HTTP_COOKIE' in env:
-        cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
-        if cidx >= 0:
-            sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
+    if not authdata:
+        if 'HTTP_CONFLUENTSESSION' in env:
+            sessionid = env['HTTP_CONFLUENTSESSION']
             sessid = sessionid
-            sessid = sessionid
+        elif 'HTTP_COOKIE' in env:
+            cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
+            if cidx >= 0:
+                sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
+                sessid = sessionid
+        if sessionid:
             if sessionid in httpsessions:
                 if _csrf_valid(env, httpsessions[sessionid]):
                     if env['PATH_INFO'] == '/sessions/current/logout':
