@@ -316,7 +316,10 @@ if __name__ == '__main__':
     srvs, _ = apiclient.scan_confluents()
     doneidxs = set([])
     for srv in srvs:
-        s = socket.create_connection((srv, 443))
+        try:
+            s = socket.create_connection((srv, 443))
+        except socket.error:
+            continue
         myname = s.getsockname()
         s.close()
         if len(myname) == 4:
