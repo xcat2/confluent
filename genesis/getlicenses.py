@@ -36,6 +36,8 @@ for rpm in rpmlist:
     if srpm.startswith('linux-firmware'):
         continue
     for relrpm in srpmtorpm[srpm]:
+        if relrpm.startswith('libss-'):
+            continue
         liclist = runcmd(f'rpm -qL {relrpm}')
         for lic in liclist:
             if not lic:
@@ -53,15 +55,24 @@ manualrpms = [
     'hwdata',
     'snmp',
     'libnl3',
-    'libbpf',  # this is covered by kernel
+    'libbpf',  # this is covered by kernel, but need to make a directory explaining. libbpf is literally just a copy of the kernel source rpm
     'sqlite',  # public domain
     'linux-firmware',  #all pertinent licenses are stripped out
     'xfsprogs',  # manually added by hand below (not in rpm)
     'tmux',  # use the extracttmuxlicenses on the source to generate NOTICE below
 ]
 manuallicenses = [
+    '/usr/share/licenses/lz4/LICENSE.BSD',
+    # cp /usr/share/doc/lz4-libs/LICENSE /usr/share/licenses/lz4/LICENSE.BSD
+    #'lz4-1.8.3]# cp LICENSE  /usr/share/licenses/lz4/LICENSE'
+    # net-snmp has a bundled openssl, but the build does not avail itself of that copy
+    '/usr/share/licenses/perl-libs/LICENSE', # ./dist/ExtUtils-CBuilder/LICENSE from perl srpm
+    '/usr/share/licenses/lz4/LICENSE',
+    '/usr/share/licenses/lm_sensors/COPYING',
+    '/usr/share/doc/libunistring/README',
     '/usr/share/doc/hostname/COPYRIGHT',
     '/usr/share/doc/hwdata/COPYING',
+    '/usr/share/doc/zstd/README.md',
     '/usr/share/doc/hwdata/LICENSE',
     '/usr/share/doc/ipmitool/COPYING',
     '/usr/share/doc/libaio/COPYING',
@@ -85,6 +96,15 @@ manuallicenses = [
     '/usr/share/licenses/kernel-extra/preferred/LGPL-2.0',
     '/usr/share/licenses/kernel-extra/preferred/LGPL-2.1',
     '/usr/share/licenses/kernel-extra/preferred/MIT',
+    '/usr/share/licenses/util-linux/COPYING.GPLv3', # extract from parse-date.c, from srpm
+    '/usr/share/licenses/kmod/tools/COPYING', # GPL not LGPL, must extract from kmod srpm
+    '/usr/share/licenses/krb5/NOTICE', # copy it verbatim from LICENSE, exact same file
+    '/usr/share/doc/less/README',
+    '/usr/share/licenses/libcap-ng-utils/COPYING',
+    '/usr/share/licenses/libdb/copyright', # from libdb, db-5.3.28, lang/sql/odbc/debian/copyright
+    '/usr/share/licenses/libgcrypt/LICENSES.ppc-aes-gcm', # libgcrypt license to carry forward
+    '/usr/share/licenses/libgcrypt/LICENSES', # OCB is covered by several.. OCB license 
+    '/usr/share/licenses/libgcrypt/README'
 ]
 for lic in manuallicenses:
     print(lic)
