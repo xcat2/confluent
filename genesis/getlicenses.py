@@ -50,6 +50,7 @@ for lic in sorted(licenses):
     print(lic)
 manualrpms = [
     'ipmitool',
+    'efivar-libs',
     'almalinux-release',
     'libaio',
     'hwdata',
@@ -105,6 +106,7 @@ manuallicenses = [
     '/usr/share/licenses/libgcrypt/LICENSES.ppc-aes-gcm', # libgcrypt license to carry forward
     '/usr/share/licenses/libgcrypt/LICENSES', # OCB is covered by several.. OCB license 
     '/usr/share/licenses/libgcrypt/README'
+    '/usr/share/licenses/efivar/COPYING',
 ]
 for lic in manuallicenses:
     print(lic)
