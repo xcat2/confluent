@@ -98,7 +98,7 @@ manuallicenses = [
     '/usr/share/licenses/kernel-extra/preferred/MIT',
     '/usr/share/licenses/util-linux/COPYING.GPLv3', # extract from parse-date.c, from srpm
     '/usr/share/licenses/kmod/tools/COPYING', # GPL not LGPL, must extract from kmod srpm
-    '/usr/share/licenses/krb5/NOTICE', # copy it verbatim from LICENSE, exact same file
+    '/usr/share/licenses/krb5-libs/NOTICE', # copy it verbatim from LICENSE, exact same file
     '/usr/share/doc/less/README',
     '/usr/share/licenses/libcap-ng-utils/COPYING',
     '/usr/share/licenses/libdb/copyright', # from libdb, db-5.3.28, lang/sql/odbc/debian/copyright
