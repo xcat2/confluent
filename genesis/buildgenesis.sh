@@ -48,7 +48,7 @@ done
 mkdir -p licenses/ipmitool
 cp /usr/share/doc/ipmitool/COPYING  licenses/ipmitool
 echo %license /opt/confluent/genesis/%{arch}/licenses/ipmitool/COPYING >> confluent-genesis-out.spec
-ln -s /opt/confluent/genesis/%{arch}/licenses/kernel-core /opt/confluent/genesis/%{arch}/licenses/libbpf
+ln -s /opt/confluent/genesis/%{arch}/licenses/kernel-core licenses/libbpf
 echo /opt/confluent/genesis/%{arch}/licenses/libbpf >> confluent-genesis-out.spec
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
