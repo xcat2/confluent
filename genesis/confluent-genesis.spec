@@ -1,5 +1,5 @@
 %define arch x86_64
-Version: 3.6.2
+Version: 3.7.1
 Release:  1
 Name: confluent-genesis-%{arch}
 BuildArch: noarch
