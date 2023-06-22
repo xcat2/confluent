@@ -29,6 +29,11 @@ console process which will result in the console window closing.
   Perform a log reply on the current, local log in /var/log/confluent/consoles.
   If in collective mode, this only makes sense to use on the current collective
   manager at this time.
+
+  * `-T`, `--Timestamp`:
+ Dump the log with Timpstamps on the current, local log in /var/log/confluent/consoles.
+  If in collective mode, this only makes sense to use on the current collective
+  manager at this time.
   
 * `-w`, `--windowed`:
   Open terminal windows for each node.  The
