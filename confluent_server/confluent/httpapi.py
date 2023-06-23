@@ -488,7 +488,7 @@ def wsock_handler(ws):
                             msg = json.loads(clientmsg[1:])
                             action = msg.get('operation', None)
                             if not action:
-                                action = msg.get('start', None)
+                                action = msg.get('action', None)
                             targ = msg.get('target', None)
                             if targ:
                                 authdata = auth.authorize(name, targ, operation=action)
