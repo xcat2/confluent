@@ -487,6 +487,8 @@ def wsock_handler(ws):
                         elif clientmsg[0] == '!':
                             msg = json.loads(clientmsg[1:])
                             action = msg.get('operation', None)
+                            if not action:
+                                action = msg.get('start', None)
                             targ = msg.get('target', None)
                             if targ:
                                 authdata = auth.authorize(name, targ, operation=action)
@@ -524,6 +526,13 @@ def wsock_handler(ws):
                                             datacallback=datacallback,
                                             width=width, height=height)
                                     myconsoles[clientsessid] = consession
+                            elif action == 'resize':
+                                clientsessid = '{0}'.format(msg['sessid'])
+                                myconsoles[clientsessid].resize(
+                                    width=msg['width'], height=msg['height'])
+                            if action == 'break':
+                                clientsessid = '{0}'.format(msg['sessid'])
+                                myconsoles[clientsessid].send_break()
                             elif action == 'stop':
                                 sessid = '{0}'.format(msg.get('sessid', None))
                                 if sessid in myconsoles:
