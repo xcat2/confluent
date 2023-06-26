@@ -17,16 +17,17 @@
 
 try:
     import confluent.sshutil as sshutil
+    import eventlet
+    import eventlet.green.subprocess as subprocess
 except ImportError:
     pass
-import eventlet
-import eventlet.green.subprocess as subprocess
 import json
 import msgpack
 import os
 import struct
 import sys
 
+anspypath = None
 running_status = {}
 class PlayRunner(object):
     def __init__(self, playfiles, nodes):
@@ -73,11 +74,22 @@ class PlayRunner(object):
         }
 
     def _really_run_playbooks(self):
+        global anspypath
+        mypath = anspypath
+        if not mypath:
+            ansloc = shutil.which('ansible')
+            if ansloc:
+                with open(onsloc, 'r') as onsop:
+                    shebang = onsop.readline()
+                    anspypath = shebang.strip().replace('#!', '')
+                    mypath = anspypath
+        if not mypath:
+            mypath = sys.executable    
         with open(os.devnull, 'w+') as devnull:
             targnodes = ','.join(self.nodes)
             for playfilename in self.playfiles:
                 worker = subprocess.Popen(
-                    [sys.executable, __file__, targnodes, playfilename],
+                    [mypath, __file__, targnodes, playfilename],
                     stdin=devnull, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE)
                 stdout, self.stderr = worker.communicate()
