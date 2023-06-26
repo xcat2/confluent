@@ -26,6 +26,20 @@ def simplify_name(name):
 
 pdupool = greenpool.GreenPool(128)
 
+def data_by_type(indata):
+    databytype = {}
+    for keyname in indata:
+        obj = indata[keyname]
+        objtype = obj.get('type', None)
+        if not objtype:
+            continue
+        if objtype in databytype:
+            raise Exception("Multiple instances of type {} not yet supported".format(objtype))
+        databytype[objtype] = obj
+        obj['keyname'] = keyname
+    return databytype
+        
+
 class GeistClient(object):
     def __init__(self, pdu, configmanager):
         self.node = pdu
@@ -91,19 +105,25 @@ class GeistClient(object):
     def get_outlet(self, outlet):
         rsp = self.wc.grab_json_response('/api/dev')
         rsp = rsp['data']
-        if len(rsp) != 1:
+        dbt = data_by_type(rsp)
+        if 't3hd' in dbt:
+            del dbt['t3hd']
+        if len(dbt) != 1:
             raise Exception('Multiple PDUs not supported per pdu')
-        pduname = list(rsp)[0]
-        outlet = rsp[pduname]['outlet'][str(int(outlet) - 1)]
+        pdutype = list(dbt)[0]
+        outlet = dbt[pdutype]['outlet'][str(int(outlet) - 1)]
         state = outlet['state'].split('2')[-1]
         return state
 
     def set_outlet(self, outlet, state):
         rsp = self.wc.grab_json_response('/api/dev')
-        if len(rsp['data']) != 1:
+        dbt = data_by_type(rsp)
+        if 't3hd' in dbt:
+            del dbt['t3hd']
+        if len(dbt) != 1:
             self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
-        pdu = list(rsp['data'])[0]
+        pdu = dbt[list(dbt)[0]].keyname
         outlet = int(outlet) - 1
         rsp = self.wc.grab_json_response(
             '/api/dev/{0}/outlet/{1}'.format(pdu, outlet),
@@ -127,6 +147,12 @@ def process_measurement(keyname, name, enttype, entname, measurement, readings, 
         if category not in ('all',):
             return
         readtype = 'Voltage'
+    elif measurement['type'] == 'temperature':
+        readtype = 'Temperature'
+    elif measurement['type'] == 'dewpoint':
+        readtype = 'Dewpoint'
+    elif measurement['type'] == 'humidity':
+        readtype = 'Humidity'
     else:
         return
     myname = entname + ' ' + readtype
@@ -165,14 +191,13 @@ def read_sensors(element, node, configmanager):
         adev = gc.wc.grab_json_response('/api/dev')
         _sensors_by_node[node] = (adev, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
-    if len(sn[0]['data']) != 1:
-        raise Exception('Unable to support multiple pdus at an ip')
-    print(repr(element))
+    dbt = data_by_type(sn[0]['data'])
     readings = []
-    for pduid in sn[0]['data']:
-        datum = sn[0]['data'][pduid]
+    for datatype in dbt:        
+        datum = dbt[datatype]
         process_measurements(name, category, datum['entity'], 'entity', readings)
-        process_measurements(name, category, datum['outlet'], 'outlet', readings)
+        if 'outlet' in datum:
+            process_measurements(name, category, datum['outlet'], 'outlet', readings)
     if justnames:
         for reading in readings:
             yield msg.ChildCollection(simplify_name(reading['name']))
