@@ -38,7 +38,7 @@ def data_by_type(indata):
         databytype[objtype] = obj
         obj['keyname'] = keyname
     return databytype
-        
+
 
 class GeistClient(object):
     def __init__(self, pdu, configmanager):
@@ -117,13 +117,13 @@ class GeistClient(object):
 
     def set_outlet(self, outlet, state):
         rsp = self.wc.grab_json_response('/api/dev')
-        dbt = data_by_type(rsp)
+        dbt = data_by_type(rsp['data'])
         if 't3hd' in dbt:
             del dbt['t3hd']
         if len(dbt) != 1:
             self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
-        pdu = dbt[list(dbt)[0]].keyname
+        pdu = dbt[list(dbt)[0]]['keyname']
         outlet = int(outlet) - 1
         rsp = self.wc.grab_json_response(
             '/api/dev/{0}/outlet/{1}'.format(pdu, outlet),
