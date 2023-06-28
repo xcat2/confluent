@@ -1232,7 +1232,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             info['enclosure.bay'] = match[1]
             if match[2]:
                 if not discover_node(cfg, handler, info, match[2], manual):
-                    pending_nodes[match[2]] = nodename
+                    pending_nodes[match[2]] = info
                 return
         if 'enclosure.bay' not in info:
             unknown_info[info['hwaddr']] = info
