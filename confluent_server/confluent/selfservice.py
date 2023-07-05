@@ -402,7 +402,7 @@ def handle_request(env, start_response):
                 yield node + '\n'
         else:
             start_response('200 OK', (('Content-Type', retype),))
-            yield dumper(sorted(nodes))
+            yield dumper(list(util.natural_sort(nodes)))
     elif env['PATH_INFO'] == '/self/remoteconfigbmc' and reqbody:
         try:
             reqbody = yaml.safe_load(reqbody)
@@ -570,7 +570,7 @@ def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
     if not os.path.isdir(target) and os.path.isdir(target + '.d'):
         target = target + '.d'
     try:
-        slist = sorted(os.listdir(target))
+        slist = list(util.natural_sort(os.listdir(target))
     except OSError:
         pass
     return slist, profile
