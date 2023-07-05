@@ -570,7 +570,7 @@ def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
     if not os.path.isdir(target) and os.path.isdir(target + '.d'):
         target = target + '.d'
     try:
-        slist = os.listdir(target)
+        slist = sorted(os.listdir(target))
     except OSError:
         pass
     return slist, profile
