@@ -21,6 +21,7 @@ try:
     import eventlet.green.subprocess as subprocess
 except ImportError:
     pass
+import shutil
 import json
 import msgpack
 import os
@@ -79,7 +80,7 @@ class PlayRunner(object):
         if not mypath:
             ansloc = shutil.which('ansible')
             if ansloc:
-                with open(onsloc, 'r') as onsop:
+                with open(ansloc, 'r') as onsop:
                     shebang = onsop.readline()
                     anspypath = shebang.strip().replace('#!', '')
                     mypath = anspypath
