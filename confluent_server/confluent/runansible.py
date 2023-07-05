@@ -162,8 +162,9 @@ if __name__ == '__main__':
     if os.path.exists('/etc/ansible/hosts'):
         aninv = InventoryManager(loader=loader, sources='/etc/ansible/hosts')
         anshost = aninv.get_host(sys.argv[1])
-        if anshost:
-            invman = aninv
+        if not anshost:
+            aninv.add_host(sys.argv[1])
+        invman = aninv
     if not invman:
         invlist = sys.argv[1] + ','
         invman = InventoryManager(loader=loader, sources=invlist)
