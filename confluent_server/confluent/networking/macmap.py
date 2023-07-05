@@ -208,7 +208,6 @@ def _offload_map_switch(switch, password, user):
 
 def _start_offloader():
     global _offloader
-    os.environ['PYTHONPATH'] = ':'.join(sys.path)
     _offloader = subprocess.Popen(
         [sys.executable, __file__, '-o'], bufsize=0, stdin=subprocess.PIPE,
         stdout=subprocess.PIPE)
@@ -691,6 +690,10 @@ def rescan(cfg):
 
 
 if __name__ == '__main__':
+    path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+    if path.startswith('/opt'):
+        sys.path.append(path)
     if len(sys.argv) > 1 and sys.argv[1] == '-o':
         try:
             upacker = msgpack.Unpacker(encoding='utf8')

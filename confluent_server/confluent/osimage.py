@@ -861,7 +861,6 @@ class MediaImporter(object):
         return {'phase': self.phase, 'progress': self.percent, 'profiles': self.profiles, 'error': self.error}
 
     def importmedia(self):
-        os.environ['PYTHONPATH'] = ':'.join(sys.path)
         if self.medfile:
             os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
         with open(os.devnull, 'w') as devnull:
@@ -931,8 +930,13 @@ def get_importing_status(importkey):
 
 if __name__ == '__main__':
     os.umask(0o022)
+    path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+    if path.startswith('/opt'):
+        sys.path.append(path)
     if len(sys.argv) > 2:
         mfd = os.environ.get('CONFLUENT_MEDIAFD', None)
         sys.exit(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd))
     else:
         sys.exit(import_image(sys.argv[1], callback=printit))
+
