@@ -41,7 +41,7 @@ mkdir -p /etc/confluent
 echo -n > /etc/confluent/confluent.info
 umask $oum
 TRIES=5
-while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
+while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
     sleep 2
     TRIES=$((TRIES - 1))
 done
