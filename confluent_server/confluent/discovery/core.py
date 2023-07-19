@@ -229,6 +229,7 @@ def _printable_ip(sa):
 
 def send_discovery_datum(info):
     addresses = info.get('addresses', [])
+    addresses = util.natural_sort(addresses)
     if info['handler'] == pxeh:
         enrich_pxe_info(info)
     yield msg.KeyValueData({'nodename': info.get('nodename', '')})
