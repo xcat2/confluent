@@ -258,7 +258,8 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         seconds = int(currtime)
                                         msecs = int(currtime * 1000 % 1000)
                                         reply = 'HTTP/1.1 200 OK\r\nNODENAME: {0}\r\nCURRTIME: {1}\r\nCURRMSECS: {2}\r\n'.format(node, seconds, msecs)
-                                        if netutil.ip_on_same_subnet(peer[0], 'fe80::', 64):
+                                        theip = peer[0].split('%', 1)[0]
+                                        if netutil.ip_on_same_subnet(theip, 'fe80::', 64):
                                             if '%' in peer[0]:
                                                 ifidx = peer[0].split('%', 1)[1]
                                                 iface = socket.getaddrinfo(peer[0], 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][-1]
