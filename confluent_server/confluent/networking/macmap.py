@@ -31,7 +31,14 @@
 # this module will provide mac to switch and full 'ifName' label
 # This functionality is restricted to the null tenant
 
+import os
+import sys
+
 if __name__ == '__main__':
+    path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.realpath(os.path.join(path, '..', '..'))
+    if path.startswith('/opt'):
+        sys.path.append(path)
     import confluent.config.configmanager as cfm
     import confluent.snmputil as snmp
 
@@ -43,8 +50,6 @@ import eventlet.green.select as select
 import eventlet.green.socket as socket
 
 
-import os
-import sys
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -690,10 +695,6 @@ def rescan(cfg):
 
 
 if __name__ == '__main__':
-    path = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
-    if path.startswith('/opt'):
-        sys.path.append(path)
     if len(sys.argv) > 1 and sys.argv[1] == '-o':
         try:
             upacker = msgpack.Unpacker(encoding='utf8')

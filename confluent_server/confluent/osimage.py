@@ -1,6 +1,4 @@
 #!/usr/bin/python
-import confluent.exceptions as exc
-import confluent.messages as msg
 import eventlet
 import eventlet.green.select as select
 import eventlet.green.subprocess as subprocess
@@ -14,6 +12,14 @@ import shutil
 import sys
 import time
 import yaml
+if __name__ == '__main__':
+    path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.realpath(os.path.join(path, '..'))
+    if path.startswith('/opt'):
+        sys.path.append(path)
+
+import confluent.exceptions as exc
+import confluent.messages as msg
 
 COPY = 1
 EXTRACT = 2
@@ -930,10 +936,6 @@ def get_importing_status(importkey):
 
 if __name__ == '__main__':
     os.umask(0o022)
-    path = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
-    if path.startswith('/opt'):
-        sys.path.append(path)
     if len(sys.argv) > 2:
         mfd = os.environ.get('CONFLUENT_MEDIAFD', None)
         sys.exit(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd))
