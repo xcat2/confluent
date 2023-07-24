@@ -69,11 +69,11 @@ if __name__ == '__main__':
         sys.path.append(path)
 import confluent.config.attributes as allattributes
 import confluent.config.conf as conf
-import confluent.log
 import confluent.noderange as noderange
 import confluent.util
 import confluent.netutil as netutil
 import confluent.exceptions as exc
+import confluent.log
 import copy
 import crypt
 try:
