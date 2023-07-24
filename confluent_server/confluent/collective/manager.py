@@ -63,7 +63,7 @@ connecting = ContextBool()
 leader_init = ContextBool()
 enrolling = ContextBool()
 
-def connect_to_leader(cert=None, name=None, leader=None, remote=None):
+def connect_to_leader(cert=None, name=None, leader=None, remote=None, isretry=False):
     global currentleader
     global follower
     ocert = cert
@@ -72,8 +72,9 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
     oremote = remote
     if leader is None:
         leader = currentleader
-    log.log({'info': 'Attempting connection to leader {0}'.format(leader),
-             'subsystem': 'collective'})
+    if not isretry:
+        log.log({'info': 'Attempting connection to leader {0}'.format(leader),
+                 'subsystem': 'collective'})
     try:
         remote = connect_to_collective(cert, leader, remote)
     except Exception as e:
@@ -106,8 +107,8 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
                         'subsystem': 'collective'})
                     return False
                 if 'waitinline' in keydata:
-                    eventlet.sleep(0.1)
-                    return connect_to_leader(cert, name, leader, remote)
+                    eventlet.sleep(0.3)
+                    return connect_to_leader(cert, name, leader, None, isretry=True)
                 if 'leader' in keydata:
                     if keydata['leader'] == None:
                         return None
@@ -151,7 +152,7 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
                     except Exception:
                         pass
                     log.log({'error': 'Retrying connection, error during initial sync', 'subsystem': 'collective'})
-                    return connect_to_leader(ocert, oname, oleader, oremote)
+                    return connect_to_leader(ocert, oname, oleader, None)
                     raise Exception("Error doing initial DB transfer")  # bad ssl write retry
                 dbjson += ndata
             cfm.clear_configuration()
