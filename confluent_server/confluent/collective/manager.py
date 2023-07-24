@@ -84,6 +84,8 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
     with connecting:
         with cfm._initlock:
             banner = tlvdata.recv(remote)  # the banner
+            if not banner:
+                return
             vers = banner.split()[2]
             if vers not in (b'v2', b'v3'):
                 raise Exception('This instance only supports protocol 2 or 3, synchronize versions between collective members')
@@ -103,7 +105,12 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None):
                                 '{0}'.format(leader),
                         'subsystem': 'collective'})
                     return False
+                if 'waitinline' in keydata:
+                    eventlet.sleep(0.1)
+                    return connect_to_leader(cert, name, leader, remote)
                 if 'leader' in keydata:
+                    if keydata['leader'] == None:
+                        return None
                     log.log(
                         {'info': 'Prospective leader {0} has redirected this '
                                  'member to {1}'.format(leader, keydata['leader']),
@@ -271,7 +278,11 @@ def handle_connection(connection, cert, request, local=False):
                 return
             if follower is not None:
                 linfo = cfm.get_collective_member_by_address(currentleader)
-                remote = socket.create_connection((currentleader, 13001), 15)
+                try:
+                    remote = socket.create_connection((currentleader, 13001), 15)
+                except Exception:
+                    cfm.stop_following()
+                    return
                 remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
                                          keyfile='/etc/confluent/privkey.pem',
                                          certfile='/etc/confluent/srvcert.pem')
@@ -537,6 +548,11 @@ def handle_connection(connection, cert, request, local=False):
                                       'backoff': True})
             connection.close()
             return
+        if leader_init.active:
+            tlvdata.send(connection, {'error': 'Servicing a connection',
+                                      'waitinline': True})
+            connection.close()
+            return
         if myself != get_leader(connection):
             tlvdata.send(
                 connection,
@@ -569,9 +585,15 @@ def handle_connection(connection, cert, request, local=False):
             tlvdata.send(connection, cfm._cfgstore['collective'])
             tlvdata.send(connection, {'confluent_uuid': cfm.get_global('confluent_uuid')}) # cfm.get_globals())
             cfgdata = cfm.ConfigManager(None)._dump_to_json()
-            tlvdata.send(connection, {'txcount': cfm._txcount,
-                                      'dbsize': len(cfgdata)})
-            connection.sendall(cfgdata)
+            try:
+                tlvdata.send(connection, {'txcount': cfm._txcount,
+                            'dbsize': len(cfgdata)})
+                connection.sendall(cfgdata)
+            except Exception:
+                try:
+                    connection.close()
+                finally:
+                    return None
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
         connection.settimeout(90)
@@ -660,7 +682,11 @@ def get_leader(connection):
 
 def retire_as_leader(newleader=None):
     global currentleader
+    global reassimilate
     cfm.stop_leading(newleader)
+    if reassimilate is not None:
+        reassimilate.kill()
+        reassimilate = None
     currentleader = None
 
 def become_leader(connection):
@@ -668,6 +694,10 @@ def become_leader(connection):
     global follower
     global retrythread
     global reassimilate
+    if cfm.get_collective_member(get_myname()).get('role', None) == 'nonvoting':
+        log.log({'info': 'Refraining from being leader of collective (nonvoting)',
+            'subsystem': 'collective'})
+        return False
     log.log({'info': 'Becoming leader of collective',
              'subsystem': 'collective'})
     if follower is not None:
@@ -679,15 +709,20 @@ def become_leader(connection):
         retrythread = None
     currentleader = connection.getsockname()[0]
     skipaddr = connection.getpeername()[0]
+    if reassimilate is not None:
+        reassimilate.kill()
+    reassimilate = eventlet.spawn(reassimilate_missing)
     if _assimilate_missing(skipaddr):
         schedule_rebalance()
-        if reassimilate is not None:
-            reassimilate.kill()
-        reassimilate = eventlet.spawn(reassimilate_missing)
+
 
 def reassimilate_missing():
     eventlet.sleep(30)
-    while cfm.cfgstreams and _assimilate_missing():
+    while True:
+        try:
+            _assimilate_missing()
+        except Exception as e:
+            cfm.logException()
         eventlet.sleep(30)
 
 def _assimilate_missing(skipaddr=None):
@@ -800,6 +835,8 @@ def start_collective():
         connecto = []
         for member in sorted(list(cfm.list_collective())):
             if member == myname:
+                continue
+            if cfm.get_collective_member(member).get('role', None) == 'nonvoting':
                 continue
             if cfm.cfgleader is None:
                 cfm.stop_following(True)

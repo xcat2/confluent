@@ -59,6 +59,14 @@ except ModuleNotFoundError:
 import ast
 import base64
 from binascii import hexlify
+import os
+import sys
+
+if __name__ == '__main__':
+    path = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.realpath(os.path.join(path, '..', '..'))
+    if path.startswith('/opt'):
+        sys.path.append(path)
 import confluent.config.attributes as allattributes
 import confluent.config.conf as conf
 import confluent.log
@@ -77,17 +85,16 @@ import eventlet
 import eventlet.event as event
 import eventlet.green.select as select
 import eventlet.green.threading as gthread
+import eventlet.green.subprocess as subprocess
 import fnmatch
 import hashlib
 import json
 import msgpack
 import operator
-import os
 import random
 import re
 import string
 import struct
-import sys
 import threading
 import time
 import traceback
@@ -422,7 +429,10 @@ def _push_rpc(stream, payload):
                 pass
             if membership_callback:
                 membership_callback()
-            stream.close()
+            try:
+                stream.close()
+            except Exception:
+                pass
 
 
 def decrypt_value(cryptvalue,
@@ -690,7 +700,9 @@ def relay_slaved_requests(name, listener):
                 if name not in cfgstreams:
                     raise Exception("Unexpected loss of node in followers: " + name)
                 sz = struct.unpack('!Q', msg)[0]
-                if sz != 0:
+                if sz == 0:
+                    _push_rpc(listener, b'')
+                else:
                     rpc = b''
                     while len(rpc) < sz:
                         nrpc = listener.recv(sz - len(rpc))
@@ -740,6 +752,16 @@ def relay_slaved_requests(name, listener):
                 return False
             return True
 
+lastheartbeat = None
+def check_leader():
+    _push_rpc(cfgleader, b'')
+    tries = 0
+    while tries < 30:
+        eventlet.sleep(0.1)
+        tries += 1
+        if lastheartbeat and lastheartbeat > (confluent.util.monotonic_time() - 3):
+            return True
+    raise Exception("Leader has disappeared")
 
 class StreamHandler(object):
     def __init__(self, sock):
@@ -761,10 +783,13 @@ class StreamHandler(object):
                     res = _push_rpc(self.sock, b'')  # nulls are a keepalive
                     if not res:
                         return None
+                    #TODO: this test can work fine even if the other end is
+                    # gone, go to a more affirmative test to more quickly
+                    # detect outage to peer
                     self.keepalive = confluent.util.monotonic_time() + 20
             self.expiry = confluent.util.monotonic_time() + 60
             msg = self.sock.recv(8)
-        except Exception:
+        except Exception as e:
             msg = None
         return msg
 
@@ -858,6 +883,7 @@ cfgleader = None
 def follow_channel(channel):
     global _txcount
     global _hasquorum
+    global lastheartbeat
     try:
         stop_leading()
         stop_following(channel)
@@ -865,7 +891,9 @@ def follow_channel(channel):
         msg = lh.get_next_msg()
         while msg:
             sz = struct.unpack('!Q', msg)[0]
-            if sz != 0:
+            if sz == 0:
+                lastheartbeat = confluent.util.monotonic_time()
+            else:
                 rpc = b''
                 while len(rpc) < sz:
                     nrpc = channel.recv(sz - len(rpc))
@@ -2540,6 +2568,15 @@ class ConfigManager(object):
                        data.
 
         """
+        with open(os.devnull, 'w+') as devnull:
+            worker = subprocess.Popen(
+                [sys.executable, __file__, '-r' if redact else ''],
+                        stdin=devnull, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+            stdout, stderr = worker.communicate()
+        return stdout
+
+    def _real_dump_to_json(self, redact=None):
         dumpdata = {}
         for confarea in _config_areas:
             if confarea not in self._cfgstore:
@@ -2871,9 +2908,9 @@ def dump_db_to_directory(location, password, redact=None, skipkeys=False):
         with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
             cfgfile.write(_dump_keys(password))
             cfgfile.write('\n')
-    with open(os.path.join(location, 'main.json'), 'w') as cfgfile:
+    with open(os.path.join(location, 'main.json'), 'wb') as cfgfile:
         cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
-        cfgfile.write('\n')
+        cfgfile.write(b'\n')
     if 'collective' in _cfgstore:
         with open(os.path.join(location, 'collective.json'), 'w') as cfgfile:
             cfgfile.write(json.dumps(_cfgstore['collective']))
@@ -2914,6 +2951,11 @@ def init(stateless=False):
         _cfgstore = {}
 
 
+if __name__ == '__main__':
+    redact=None
+    if '-r' in sys.argv:
+        redact=True
+    sys.stdout.write(ConfigManager(None)._real_dump_to_json(redact))
 # some unit tests worth implementing:
 # set group attribute on lower priority group, result is that node should not
 # change
