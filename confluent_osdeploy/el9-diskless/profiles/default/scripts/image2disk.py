@@ -11,6 +11,8 @@ import struct
 import sys
 import subprocess
 
+bootuuid = None
+
 def get_next_part_meta(img, imgsize):
     if img.tell() == imgsize:
         return None
@@ -53,10 +55,13 @@ class PartedRunner():
     def __init__(self, disk):
         self.disk = disk
 
-    def run(self, command):
+    def run(self, command, check=True):
         command = command.split()
         command = ['parted', '-a', 'optimal', '-s', self.disk] + command
-        return subprocess.check_output(command).decode('utf8')
+        if check:
+            return subprocess.check_output(command).decode('utf8')
+        else:
+            return subprocess.run(command, stdout=subprocess.PIPE).stdout.decode('utf8')
 
 def fixup(rootdir, vols):
     devbymount = {}
@@ -125,9 +130,12 @@ def fixup(rootdir, vols):
         sys.stdout.flush()
     for metafs in ('proc', 'sys', 'dev'):
         subprocess.check_call(['mount', '-o', 'bind', '/{}'.format(metafs), os.path.join(rootdir, metafs)])
-    with open(os.path.join(rootdir, 'etc/sysconfig/grub')) as defgrubin:
+    grubsyscfg = os.path.join(rootdir, 'etc/sysconfig/grub')
+    if not os.path.exists(grubsyscfg):
+        grubsyscfg = os.path.join(rootdir, 'etc/default/grub')
+    with open(grubsyscfg) as defgrubin:
         defgrub = defgrubin.read().split('\n')
-    with open(os.path.join(rootdir, 'etc/sysconfig/grub'), 'w') as defgrubout:
+    with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
             newline = []
@@ -136,8 +144,34 @@ def fixup(rootdir, vols):
                     continue
                 newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
-    grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/')
-    subprocess.check_call(['chroot', rootdir, 'grub2-mkconfig', '-o', grubcfg])
+    grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/').replace('//', '/')
+    grubcfg = grubcfg.split('\n')
+    if not grubcfg[-1]:
+        grubcfg = grubcfg[:-1]
+    if len(grubcfg) == 1:
+        grubcfg = grubcfg[0]
+    else:
+        for gcfg in grubcfg:
+            rgcfg = os.path.join(rootdir, gcfg[1:])  # gcfg has a leading / to get rid of
+            if os.stat(rgcfg).st_size > 256:
+                grubcfg = gcfg
+            else:
+                with open(rgcfg, 'r') as gin:
+                    tgrubcfg = gin.read()
+                tgrubcfg = tgrubcfg.split('\n')
+                if 'search --no-floppy --fs-uuid --set=dev' in tgrubcfg[0]:
+                    tgrubcfg[0] = 'search --no-floppy --fs-uuid --set=dev ' + bootuuid
+                with open(rgcfg, 'w') as gout:
+                    for gcline in tgrubcfg:
+                        gout.write(gcline)
+                        gout.write('\n')
+    try:
+        subprocess.check_call(['chroot', rootdir, 'grub2-mkconfig', '-o', grubcfg])
+    except Exception as e:
+        print(repr(e))
+        print(rootdir)
+        print(grubcfg)
+        time.sleep(86400)
     newroot = None
     with open('/etc/shadow') as shadowin:
         shents = shadowin.read().split('\n')
@@ -184,6 +218,7 @@ def had_swap():
     return False
 
 def install_to_disk(imgpath):
+    global bootuuid
     lvmvols = {}
     deftotsize = 0
     mintotsize = 0
@@ -224,7 +259,7 @@ def install_to_disk(imgpath):
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
     parted = PartedRunner(instdisk)
-    dinfo = parted.run('unit s print')
+    dinfo = parted.run('unit s print', check=False)
     dinfo = dinfo.split('\n')
     sectors = 0
     sectorsize = 0
@@ -366,6 +401,14 @@ def install_to_disk(imgpath):
                 sys.stdout.write('\x1b[1K\rDone writing {0}'.format(vol['mount']))
                 sys.stdout.write('\n')
                 sys.stdout.flush()
+                if vol['mount'] == '/boot':
+                    tbootuuid = subprocess.check_output(['blkid', vol['targetdisk']])
+                    if b'UUID="' in tbootuuid:
+                        bootuuid = tbootuuid.split(b'UUID="', 1)[1].split(b'"')[0].decode('utf8')
+
+
+
+
             subprocess.check_call(['umount', '/run/imginst/targ'])
         for vol in allvols:
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])

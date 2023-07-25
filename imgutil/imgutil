@@ -174,7 +174,7 @@ def capture_remote(args):
     subprocess.check_call(['rsync', __file__, '{0}:/run/imgutil/capenv/'.format(targ)])
     finfo = subprocess.check_output(['ssh', targ, 'python3', '/run/imgutil/capenv/imgutil', 'getfingerprint']).decode('utf8')
     finfo = json.loads(finfo)
-    if finfo['oscategory'] != 'el8':
+    if finfo['oscategory'] not in ('el8', 'el9'):
         raise Exception('Not yet supported for capture: ' + repr(finfo))
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
