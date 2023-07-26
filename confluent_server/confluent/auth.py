@@ -125,6 +125,9 @@ def add_roles(_allowed,_denied):
         loaded_file = yaml.safe_load(stream)
         try:
             allowed_loaded = loaded_file["allowedbyrole"]
+            for role in allowed_loaded:
+                if role not in configmanager._validroles:
+                    configmanager._validroles.append(role)
         except:
             pass
         try:

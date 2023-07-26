@@ -127,7 +127,7 @@ _attraliases = {
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
 }
-_validroles = ('Administrator', 'Operator', 'Monitor', 'Stub')
+_validroles = ['Administrator', 'Operator', 'Monitor', 'Stub']
 
 membership_callback = None
 
