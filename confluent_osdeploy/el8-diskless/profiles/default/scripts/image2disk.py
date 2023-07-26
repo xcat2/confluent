@@ -130,6 +130,8 @@ def fixup(rootdir, vols):
         sys.stdout.flush()
     for metafs in ('proc', 'sys', 'dev'):
         subprocess.check_call(['mount', '-o', 'bind', '/{}'.format(metafs), os.path.join(rootdir, metafs)])
+    if os.path.exists(os.path.join(rootdir, 'etc/lvm/devices/system.devices')):
+        os.remove(os.path.join(rootdir, 'etc/lvm/devices/system.devices'))
     grubsyscfg = os.path.join(rootdir, 'etc/sysconfig/grub')
     if not os.path.exists(grubsyscfg):
         grubsyscfg = os.path.join(rootdir, 'etc/default/grub')

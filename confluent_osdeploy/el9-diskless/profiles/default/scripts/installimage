@@ -31,6 +31,9 @@ if [ ! -f /sysroot/tmp/installdisk ]; then
 fi
 lvm vgchange -a n
 udevadm control -e
+if [ -f /sysroot/etc/lvm/devices/system.devices ]; then
+    rm /sysroot/etc/lvm/devices/system.devices
+fi
 chroot /sysroot /usr/lib/systemd/systemd-udevd --daemon
 chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python image2disk.py"
 echo "Port 22" >> /etc/ssh/sshd_config
