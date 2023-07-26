@@ -145,7 +145,7 @@ def add_roles(_allowed,_denied):
     
 def check_for_yaml():
     #checking if the file exists
-    if exists("/etc/confluent/authorization.yaml"):
+    if os.path.exists("/etc/confluent/authorization.yaml"):
         add_roles(_allowedbyrole,_deniedbyrole)
 
         return "Custom auth. file detected in /etc/confluent, updated roles accordingly"
