@@ -306,6 +306,7 @@ def run(args):
         except AttributeError:
             pass  # Windows...
         os.umask(oumask)
+    auth.check_for_yaml()
     collective.startup()
     consoleserver.initialize()
     http_bind_host, http_bind_port = _get_connector_config('http')
