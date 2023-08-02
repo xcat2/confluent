@@ -88,8 +88,8 @@ def connect_to_leader(cert=None, name=None, leader=None, remote=None, isretry=Fa
             if not banner:
                 return
             vers = banner.split()[2]
-            if vers not in (b'v2', b'v3'):
-                raise Exception('This instance only supports protocol 2 or 3, synchronize versions between collective members')
+            if vers != b'v4':
+                raise Exception('This instance only supports protocol 4, synchronize versions between collective members')
             tlvdata.recv(remote)  # authpassed... 0..
             if name is None:
                 name = get_myname()
@@ -569,7 +569,7 @@ def handle_connection(connection, cert, request, local=False):
                           'txcount': cfm._txcount})
             log.log({'info': 'Connecting to leader due to superior '
                              'transaction count', 'subsystem': 'collective'})
-            connection.close()
+            connection.close()  # well this won't work
             if not connect_to_leader(
                 None, None, connection.getpeername()[0]):
                 if retrythread is None:

@@ -131,7 +131,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
                 authenticated = True
         # version 0 == original, version 1 == pickle3 allowed, 2 = pickle forbidden, msgpack allowed
         # v3 - filehandle allowed
-        send_data(connection, "Confluent -- v3 --")
+        # v4 - schema change and keepalive changes
+        send_data(connection, "Confluent -- v4 --")
         while not authenticated:  # prompt for name and passphrase
             send_data(connection, {'authpassed': 0})
             response = tlvdata.recv(connection)
