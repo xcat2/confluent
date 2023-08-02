@@ -199,12 +199,11 @@ def update(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
         yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
         return
-    timeout = 1
+    timeout = 4
     for node in nodes:
         gc = PDUClient(node, configmanager)
         newstate = inputdata.powerstate(node)
         gc.set_outlet(element[-1], newstate)
-        timeout += 1
         gc.logout()
     eventlet.sleep(timeout)
     for res in retrieve(nodes, element, configmanager, inputdata):
