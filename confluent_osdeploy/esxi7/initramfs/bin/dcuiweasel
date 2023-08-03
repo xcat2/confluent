@@ -94,6 +94,7 @@ while ! grep NODENAME /etc/confluent/confluent.info; do
     fi
 done
 node=$(grep NODENAME: /etc/confluent/confluent.info|head -n 1|awk '{print $2}')
+cat /tls/*.pem > /etc/confluent/ca.pem
 mgr=$(python /opt/confluent/bin/apiclient -c)
 APIKEY=$(cat /etc/confluent/confluent.apikey)
 
@@ -108,7 +109,6 @@ while [ -z "$APIKEY" ]; do
     (/clortho $node $mgr || /opt/confluent/bin/clortho $node $mgr) > /etc/confluent/confluent.apikey
     APIKEY=$(cat /etc/confluent/confluent.apikey)
 done
-cat /tls/*.pem > /etc/confluent/ca.pem
 /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg.new
 profile=$(grep ^profile: /etc/confluent/confluent.deploycfg.new | sed -e 's/^profile: //')
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/kickstart > /etc/confluent/ks.cfg
