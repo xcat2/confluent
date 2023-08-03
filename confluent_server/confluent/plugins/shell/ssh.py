@@ -120,6 +120,10 @@ class SshShell(conapi.Console):
         return
 
     def logon(self):
+        self.inputmode = -3
+        eventlet.spawn_n(self.do_logon)
+    
+    def do_logon(self):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(
                 HostKeyHandler(self.nodeconfig, self.node))
@@ -185,6 +189,8 @@ class SshShell(conapi.Console):
     def write(self, data):
         if self.inputmode == -2:
             self.datacallback(conapi.ConsoleEvent.Disconnect)
+            return
+        elif self.inputmode == -3:
             return
         elif self.inputmode == -1:
             while len(data) and data[0:1] == b'\x7f' and len(self.keyaction):
