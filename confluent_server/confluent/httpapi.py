@@ -55,6 +55,12 @@ except ModuleNotFoundError:
     import urllib.parse as urlparse
 import eventlet.websocket
 import eventlet.wsgi
+
+#these modifications might need to be changed later now just proof of concept
+import os
+import cgi
+#from cgi import parse_qs, escape
+
 #scgi = eventlet.import_patched('flup.server.scgi')
 tlvdata = confluent.tlvdata
 
@@ -171,6 +177,7 @@ def _get_query_dict(env, reqbody, reqtype):
     qdict = {}
     try:
         qstring = env['QUERY_STRING']
+  
     except KeyError:
         qstring = None
     if qstring:
@@ -288,16 +295,12 @@ def _authorize_request(env, operation, reqbody):
             authdata = auth.authorize(name, element=element, operation=operation)
         else:
             element = None
-    if not authdata:
-        if 'HTTP_CONFLUENTSESSION' in env:
-            sessionid = env['HTTP_CONFLUENTSESSION']
+    if (not authdata) and 'HTTP_COOKIE' in env:
+        cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
+        if cidx >= 0:
+            sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
             sessid = sessionid
-        elif 'HTTP_COOKIE' in env:
-            cidx = (env['HTTP_COOKIE']).find('confluentsessionid=')
-            if cidx >= 0:
-                sessionid = env['HTTP_COOKIE'][cidx+19:cidx+51]
-                sessid = sessionid
-        if sessionid:
+            sessid = sessionid
             if sessionid in httpsessions:
                 if _csrf_valid(env, httpsessions[sessionid]):
                     if env['PATH_INFO'] == '/sessions/current/logout':
@@ -487,8 +490,6 @@ def wsock_handler(ws):
                         elif clientmsg[0] == '!':
                             msg = json.loads(clientmsg[1:])
                             action = msg.get('operation', None)
-                            if not action:
-                                action = msg.get('action', None)
                             targ = msg.get('target', None)
                             if targ:
                                 authdata = auth.authorize(name, targ, operation=action)
@@ -526,13 +527,6 @@ def wsock_handler(ws):
                                             datacallback=datacallback,
                                             width=width, height=height)
                                     myconsoles[clientsessid] = consession
-                            elif action == 'resize':
-                                clientsessid = '{0}'.format(msg['sessid'])
-                                myconsoles[clientsessid].resize(
-                                    width=msg['width'], height=msg['height'])
-                            if action == 'break':
-                                clientsessid = '{0}'.format(msg['sessid'])
-                                myconsoles[clientsessid].send_break()
                             elif action == 'stop':
                                 sessid = '{0}'.format(msg.get('sessid', None))
                                 if sessid in myconsoles:
@@ -666,9 +660,13 @@ def resourcehandler_backend(env, start_response):
         start_response('302 Found', headers)
         yield ''
         return
-    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
-        reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
+
+    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0: 
+        reqbody = ''     
+        # reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
+        if 'application/json' in reqtype:
+            reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
     operation = opmap[env['REQUEST_METHOD']]
     querydict = _get_query_dict(env, reqbody, reqtype)
     if operation != 'retrieve' and 'restexplorerop' in querydict:
@@ -887,6 +885,60 @@ def resourcehandler_backend(env, start_response):
             start_response('200 OK', headers)
             yield rsp
             return
+    elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):
+        #TODO figure out why content length shows data being there but data string is empty (TK)
+        # Solution the wsgi.iput stream can only be read once and it is being read at the top 
+        if 'multipart/form-data' in reqtype:
+            field_storage = cgi.FieldStorage(fp=env['wsgi.input'], environ=env, keep_blank_values=True)
+            for item in field_storage.list:
+                if item.filename: 
+                    storage_file_path = '/var/lib/confluent/client_assets/' + item.filename       
+                    file_content = item.file.read()    
+                    with open(storage_file_path, 'wb') as file:
+                        file.write(file_content)
+            yield json.dumps({'data': storage_file_path})
+            start_response('200 OK', headers)
+            return 
+
+        url = env['PATH_INFO']
+        if 'application/json' in reqtype:
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
+            pbody = json.loads(reqbody)
+            args = pbody['args']
+            args_dict = {'filename': args}
+            try:
+                args_dict.update({'bank': pbody['bank']})
+            except KeyError:
+                pass
+            noderrs = {}
+            nodeurls = {}
+            # start_response('202 Accepted', headers)
+            hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)
+            for res in hdlr:
+                if isinstance(res, confluent.messages.CreatedResource):
+                    watchurl = res.kvpairs['created']
+                    currnode = watchurl.split('/')[1]
+                    nodeurls[currnode] = '/' + watchurl
+            yield json.dumps({'data': nodeurls})
+            start_response('200 OK', headers)
+            return
+
+    elif (operation == 'delete' and ('/firmware/updates/active' in env['PATH_INFO'])):
+        url = env['PATH_INFO']
+        if 'application/json' in reqtype:
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
+            pbody = json.loads(reqbody)
+            args = pbody['args']
+            try:
+                os.remove(args)
+                start_response('200 OK', headers)        
+                return
+            except Exception as e:
+                return e
+
+
     else:
         # normal request
         url = env['PATH_INFO']
@@ -972,6 +1024,7 @@ def _assemble_html(responses, resource, querydict, url, extension):
         else:
             pendingrsp.append(rsp)
     for rsp in pendingrsp:
+        print(rsp.html() + "<br>")
         yield rsp.html() + "<br>"
     if iscollection:
         # localpath = url[:-2] (why was this here??)
@@ -1070,6 +1123,7 @@ def serve(bind_host, bind_port):
         try:
             sock = eventlet.listen(
                 (bind_host, bind_port, 0, 0), family=socket.AF_INET6)
+            
         except socket.error as e:
             if e.errno != 98:
                 raise
