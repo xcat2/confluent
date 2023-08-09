@@ -227,7 +227,7 @@ def get_apikey(nodename, hosts, errout=None):
     return apikey
 
 class HTTPSClient(client.HTTPConnection, object):
-    def __init__(self, usejson=False, port=443, host=None, errout=None, phmac=None):
+    def __init__(self, usejson=False, port=443, host=None, errout=None, phmac=None, checkonly=False):
         self.phmac = phmac
         self.errout = None
         if errout:
@@ -291,7 +291,7 @@ class HTTPSClient(client.HTTPConnection, object):
         if self.phmac:
             with open(phmac, 'r') as hmacin:
                 self.stdheaders['CONFLUENT_CRYPTHMAC'] = hmacin.read()
-        else:
+        elif not checkonly:
             self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(node, self.hosts, errout=self.errout)
         if mgtiface:
             self.stdheaders['CONFLUENT_MGTIFACE'] = mgtiface
@@ -468,7 +468,7 @@ if __name__ == '__main__':
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
-    client = HTTPSClient(usejson, errout=errout, phmac=phmac)
+    client = HTTPSClient(usejson, errout=errout, phmac=phmac, checkonly=checkonly)
     if waitfor:
         status = 201
         while status != waitfor:
