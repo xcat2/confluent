@@ -886,7 +886,6 @@ def resourcehandler_backend(env, start_response):
             yield rsp
             return
     elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):
-        #TODO figure out why content length shows data being there but data string is empty (TK)
         # Solution the wsgi.iput stream can only be read once and it is being read at the top 
         if 'multipart/form-data' in reqtype:
             field_storage = cgi.FieldStorage(fp=env['wsgi.input'], environ=env, keep_blank_values=True)
