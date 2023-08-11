@@ -9,19 +9,35 @@ MGR=$(grep ^EXTMGRINFO: /custom-installation/confluent/confluent.info |awk -F'|'
 MGR=$(grep ^MANAGER: /custom-installation/confluent/confluent.info|head -n 1| awk '{print $2}')
 MGTIFACE=$(grep $MGR /custom-installation/confluent/confluent.info | grep ^EXTMGRINFO: | head -n 1 | awk -F'|' '{print $2}')
 oum=$(umask)
-umask 077
-chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
-MGR=[$MGR]
 deploycfg=/root/custom-installation/confluent/confluent.deploycfg
+netcfgfile=$deploycfg
+umask 077
+if [ -e /tmp/cnflnthmackeytmp ]; then
+    netcfgfile=/tmp/idnttmp
+    hmackeyfile=/tmp/cnflnthmackeytmp
+    #echo -n $(grep ^apitoken: /tmp/identdata/cnflnt.yml|awk '{print $2}') > $hmackeyfile
+    passfile=/tmp/cnflnttmppassfile
+    passcrypt=/tmp/cnflntcryptfile
+    hmacfile=/tmp/cnflnthmacfile
+    chroot . ln -sf /custom-installation/confluent/bin/clortho custom-installation/confluent/bin/genpasshmac
+    cp $hmackeyfile tmp
+    chroot . custom-installation/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+    chroot . curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_CRYPTHMAC: $(cat /root/$hmacfile)" -d @/tmp/cnflntcryptfile  https://$MGR/confluent-api/self/registerapikey
+    cp /root/$passfile /root/custom-installation/confluent/confluent.apikey
+    DEVICE=$(cat /tmp/autodetectnic)
+else
+    chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
+    MGR=[$MGR]
+    nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
+    nic=$(ip link |grep ^$nic:|awk '{print $2}')
+    DEVICE=${nic%:}
+fi
 if [ -z "$MGTIFACE" ]; then
 	chroot . usr/bin/curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
 else
 	chroot . usr/bin/curl -f -H "CONFLUENT_MGTIFACE: $MGTIFACE" -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
 fi
 umask $oum
-nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
-nic=$(ip link |grep ^$nic:|awk '{print $2}')
-DEVICE=${nic%:}
 ipv4m=$(grep ^ipv4_method $deploycfg|awk '{print$2}')
 . /scripts/functions
 if [ "$ipv4m" = "dhcp" ]; then
