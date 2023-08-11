@@ -38,20 +38,20 @@ else
 	chroot . usr/bin/curl -f -H "CONFLUENT_MGTIFACE: $MGTIFACE" -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg
 fi
 umask $oum
-ipv4m=$(grep ^ipv4_method $deploycfg|awk '{print$2}')
+ipv4m=$(grep ^ipv4_method $netcfgfile|awk '{print$2}')
 . /scripts/functions
 if [ "$ipv4m" = "dhcp" ]; then
     IP=dhcp
     configure_networking
 elif [ "$ipv4m" = "static" ]; then
-    v4addr=$(grep ^ipv4_address: $deploycfg)
+    v4addr=$(grep ^ipv4_address: $netcfgfile)
     v4addr=${v4addr#ipv4_address: }
-    v4gw=$(grep ^ipv4_gateway: $deploycfg)
+    v4gw=$(grep ^ipv4_gateway: $netcfgfile)
     v4gw=${v4gw#ipv4_gateway: }
     if [ "$v4gw" = "null" ]; then
         v4gw=""
     fi
-    v4nm=$(grep ipv4_netmask: $deploycfg)
+    v4nm=$(grep ipv4_netmask: $netcfgfile)
     v4nm=${v4nm#ipv4_netmask: }
     dnsdomain=$(grep ^dnsdomain: $deploycfg)
     dnsdomain=${dnsdomain#dnsdomain: }
