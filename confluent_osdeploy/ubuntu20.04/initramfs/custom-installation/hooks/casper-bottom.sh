@@ -44,7 +44,7 @@ if [ "$ipv4m" = "dhcp" ]; then
     IP=dhcp
     configure_networking
 elif [ "$ipv4m" = "static" ]; then
-    v4addr=$(grep ^ipv4_address: $netcfgfile)
+    v4addr=$(grep ^ipv4_address: $netcfgfile| sed -e 's!/.*!!')
     v4addr=${v4addr#ipv4_address: }
     v4gw=$(grep ^ipv4_gateway: $netcfgfile)
     v4gw=${v4gw#ipv4_gateway: }
