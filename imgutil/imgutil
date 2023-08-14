@@ -1011,7 +1011,7 @@ def fingerprint_host_el(args, hostpath='/'):
                     release = v
                 elif k == 'Version':
                     version = v
-        except subprocess.SubprocessError:
+        except (subprocess.SubprocessError, FileNotFoundError):
             return None
     if 'el8' not in release and 'el7' not in release and 'el9' not in release:
         return None
