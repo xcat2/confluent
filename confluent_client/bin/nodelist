@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/libexec/platform-python
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2015-2017 Lenovo
@@ -15,12 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__author__ = 'jjohnson2,alin37'
+__author__ = 'jjohnson2,alin37,wgrzeda'
 
 import optparse
 import os
 import signal
 import sys
+
+
 
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -39,9 +41,12 @@ def main():
           "   or: %prog [options] noderange <nodeattribute>...")
     argparser.add_option('-b', '--blame', action='store_true',
                      help='Show information about how attributes inherited')
+    argparser.add_option('-d', '--delim', metavar="STRING", default = "\n",
+                     help='Delimiter separating the values')
     (options, args) = argparser.parse_args()
     noderange=""
     nodelist=""
+    list = []
     try:
         noderange = args[0]
         nodelist = '/noderange/{0}/nodes/'.format(noderange)
@@ -61,7 +66,9 @@ def main():
                 sys.stderr.write(res['error'] + '\n')
                 exitcode = 1
             else:
-                print(res['item']['href'].replace('/', ''))
+                elem=(res['item']['href'].replace('/', ''))
+                list.append(elem)
+    print(*list, sep = options.delim)
 
     sys.exit(exitcode)
 
