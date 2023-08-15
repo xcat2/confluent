@@ -173,9 +173,11 @@ if __name__ == '__main__':
     os.chdir(os.path.dirname(sys.argv[2]))
     if isinstance(plays, dict):
         plays = [plays]
-    taskman = TaskQueueManager(inventory=invman, loader=loader, passwords={},
-        variable_manager=varman, stdout_callback=ResultsCollector())
+
     for currplay in plays:
+        taskman = TaskQueueManager(inventory=invman, loader=loader, passwords={},
+            variable_manager=varman, stdout_callback=ResultsCollector())
+
         currplay['hosts'] = sys.argv[1]
         if 'become' in currplay and 'become_user' not in currplay:
             del currplay['become']
