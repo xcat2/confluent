@@ -139,6 +139,7 @@ def capture_fs(args):
         masker.mask('/etc/ssh/*key')
         masker.mask('/etc/pki/tls/private/*')
         masker.mask('/root/.ssh/id_*')
+        masker.mask('/etc/netplan/*.yaml')
         subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
 def capture_local_cleanup():
