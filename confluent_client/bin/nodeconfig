@@ -37,11 +37,9 @@ class NullOpt(object):
     blame = None
     clear = None
 
-
 def bailout(msg, code=1):
     sys.stderr.write(msg + '\n')
     sys.exit(code)
-
 
 argparser = optparse.OptionParser(usage="Usage: %prog [options] <noderange> [setting|setting=value]")
 argparser.add_option('-c', '--comparedefault', dest='comparedefault',
