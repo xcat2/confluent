@@ -107,7 +107,7 @@ if [ "$v6meth" = static ]; then
         ip route add default via $v6gw
     fi
 fi
-v4meth=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+v4meth=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 if [ "$v4meth" = static ]; then
     v4addr=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')
     v4prefix=$(grep ^prefix: /etc/confluent/confluent.deploycfg | awk '{print $2}')
