@@ -148,7 +148,6 @@ def _assign_value():
         assignment[depkey] = depval
     assignment[key] = value
 
-
 def parse_config_line(arguments, single=False):
     global setmode, printallbmc, forceset, key, value, needval, candidate, path, attrib
     for pidx in range(0, len(arguments)):
@@ -306,9 +305,9 @@ else:
         if options.comparedefault:
             continue
 
-        rcode |= client.print_attrib_path(path, session, list(queryparms[path]),NullOpt(), queryparms[path])
-        
-       
+        rcode |= client.print_attrib_path(path, session, list(queryparms[path]),
+                                      NullOpt(), queryparms[path])
+
     if printsys == 'all' or printextbmc or printbmc or printallbmc:
         if printbmc or not printextbmc:
          rcode |= client.print_attrib_path(
