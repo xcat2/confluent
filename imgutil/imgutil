@@ -139,13 +139,30 @@ def capture_fs(args):
         masker.mask('/etc/ssh/*key')
         masker.mask('/etc/pki/tls/private/*')
         masker.mask('/root/.ssh/id_*')
+        masker.mask('/etc/netplan/*.yaml')
         subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
 def capture_local_cleanup():
-    shutil.rmtree('/usr/lib/dracut/modules.d/97confluent')
+    try:
+        shutil.rmtree('/usr/lib/dracut/modules.d/97confluent')
+    except Exception:
+        pass
     subprocess.check_call(['umount', '/run/imgutil/capout'])
 
 def build_boot_tree(targpath):
+    if  glob.glob('/usr/lib/dracut/modules.d/97confluent/install*'):
+        return build_el_boot_tree(targpath)
+    elif glob.glob('/etc/initramfs-tools/'):
+        return build_deb_boot_tree(targpath)
+
+def build_deb_boot_tree(targpath):
+    kver = os.uname().release
+    mkdirp(os.path.join(targpath, 'boot/initramfs/'))
+    subprocess.check_call(['mkinitramfs', '-o', os.path.join(targpath, 'boot/initramfs/distribution')])
+    shutil.copy2('/boot/vmlinuz-{}'.format(kver), os.path.join(targpath, 'boot/kernel'))
+    gather_bootloader(targpath)
+
+def build_el_boot_tree(targpath):
     for dscript in glob.glob('/usr/lib/dracut/modules.d/97confluent/install*'):
         os.chmod(dscript, 0o755)
     kver = os.uname().release
@@ -168,19 +185,25 @@ def capture_remote(args):
     # with here locally,
     # another that is remotely called to gather target profile info
     # and a third that is exclusive to pack_image for diskless mode
-    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
-    utillib = os.path.join(utillib, 'el8/dracut/')
     subprocess.check_call(['ssh', targ, 'mkdir', '-p', '/run/imgutil/capenv'])
     subprocess.check_call(['rsync', __file__, '{0}:/run/imgutil/capenv/'.format(targ)])
     finfo = subprocess.check_output(['ssh', targ, 'python3', '/run/imgutil/capenv/imgutil', 'getfingerprint']).decode('utf8')
     finfo = json.loads(finfo)
-    if finfo['oscategory'] not in ('el8', 'el9'):
+    if finfo['oscategory'] not in ('el8', 'el9', 'ubuntu20.04', 'ubuntu22.04'):
         raise Exception('Not yet supported for capture: ' + repr(finfo))
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
-    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
-    utillib = os.path.join(utillib, '{}/dracut/'.format(oscat))
-    subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97confluent'.format(targ)])
+    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')        
+    if oscat.startswith('ubuntu'):
+        utillib = os.path.join(utillib, '{}/initramfs-tools/'.format(oscat))
+        if not os.path.exists(utillib):
+            raise Exception('Not yet supported for capture: ' + repr(finfo))
+        subprocess.check_call(['rsync', '-a', utillib, '{0}:/etc/initramfs-tools'.format(targ)])
+    else:
+        utillib = os.path.join(utillib, '{}/dracut/'.format(oscat))
+        if not os.path.exists(utillib):
+            raise Exception('Not yet supported for capture: ' + repr(finfo))
+        subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97confluent'.format(targ)])
     sys.stdout.write('Generating deployment initramfs...')
     sys.stdout.flush()
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalboot'])
