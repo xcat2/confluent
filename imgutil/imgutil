@@ -205,7 +205,7 @@ def capture_remote(args):
         if not os.path.exists(utillib):
             raise Exception('Not yet supported for capture: ' + repr(finfo))
         subprocess.check_call(['rsync', '-a', utillib, '{0}:/etc/initramfs-tools'.format(targ)])
-        subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'chmod', '+x', '/etc/initramfs-tools/hook/confluent'])
+        subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'chmod', '+x', '/etc/initramfs-tools/hooks/confluent'])
     else:
         utillib = os.path.join(utillib, '{}/dracut/'.format(oscat))
         if not os.path.exists(utillib):
