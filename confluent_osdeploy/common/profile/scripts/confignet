@@ -253,6 +253,7 @@ class NetworkManager(object):
 
     def apply_configuration(self, cfg):
         cmdargs = {}
+        cmdargs['connection.autoconnect'] = 'yes'
         stgs = cfg['settings']
         cmdargs['ipv6.method'] = stgs.get('ipv6_method', 'link-local')
         if stgs.get('ipv6_address', None):
