@@ -3,7 +3,13 @@ import configparser
 import ctypes
 import ctypes.util
 import datetime
-from distutils.dir_util import copy_tree
+import inspect
+from shutil import copytree as copytree
+if 'dirs_exist_ok' in inspect.getargspec(copytree).args:
+    def copy_tree(src, dst):
+        copytree(src, dst, dirs_exist_ok=True)
+else:
+    from distutils.dir_util import copy_tree
 import glob
 import json
 import argparse
