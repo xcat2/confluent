@@ -5,7 +5,7 @@ import ctypes.util
 import datetime
 import inspect
 from shutil import copytree as copytree
-if 'dirs_exist_ok' in inspect.getargspec(copytree).args:
+if hasattr(inspect, 'getfullargspec') and 'dirs_exist_ok' in inspect.getfullargspec(copytree).args:
     def copy_tree(src, dst):
         copytree(src, dst, dirs_exist_ok=True)
 else:
