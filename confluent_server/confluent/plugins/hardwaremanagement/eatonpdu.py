@@ -158,7 +158,7 @@ def get_sensor_data(element, node, configmanager):
         sn = _sensors_by_node.get(node, None)
     for outlet in sn[0]:
         for sensename in sn[0][outlet]:
-            myname = 'Outlet {0} {1}'.format(outlet, sensename)
+            myname = '{0} {1}'.format(outlet, sensename)
             measurement = sn[0][outlet][sensename]
             if name == 'all' or simplify_name(myname) == name:
                 readings.append({
@@ -259,6 +259,11 @@ class PDUClient(object):
         url = '/config/gateway?page={}&sessionId={}&_dc={}'.format(suburl, self.sessid, int(time.time()))
         return wc.grab_response(url)
 
+    def do_request1(self, suburl):
+        wc = self.wc
+        url = '/config/gateway?page={}&sessionId={}'.format(suburl, self.sessid)
+        return wc.grab_response(url)
+
     def logout(self):
         self.do_request('cgi_logout')
 
@@ -274,29 +279,51 @@ class PDUClient(object):
         return
     
     def get_sensor_data(self):
-        rsp = self.do_request('cgi_pdu_outlets')
+        rsp = self.do_request1('cgi_overview')
+
         data = sanitize_json(rsp[0])
         data = json.loads(data)
+        data1 = data['data'][4][0][8]
         data = data['data'][0]
         sdata = {}
         for outdata in data:
+
             outsense = {}
-            outletname = outdata[0][0]
-            outsense['Energy'] = {
-                'value': float(outdata[11] / 1000),
-                'units': 'kwh',
-                'type': 'Energy'
-            }
+            outletname = outdata[3]
             outsense['Power'] = {
-                'value': float(outdata[4]),
-                'units': 'w',
+                'value': outdata[5],
+                'units': 'kW',
                 'type': 'Power',
             }
+            sdata[outletname] = outsense
+        for outdata in data1:
+
+            outsense = {}
+            outletname = outdata[0]
+            if type(outdata[1]) == str :
+                splitter = outdata[1].split(" ")
+
+                if len(splitter) == 1:
+                    splitter.append('w')
+                outsense['Power'] = {
+                        'value': splitter[0],
+                        'units': splitter[1],
+                        'type': 'Power',
+                        }
+            elif type(outdata[1]) == list:
+                if type(outdata[1][1]) == float:
+                    outletname=outletname.strip('</br> Since')
+
+                    outsense['Energy'] = {
+                            'value': outdata[1][0] / 1000,
+                            'units': 'kWh',
+                            'type': 'Energy',
+                            }
             sdata[outletname] = outsense
         return sdata
 
     def set_outlet(self, outlet, state):
-        rsp = self.do_request('cgi_pdu_outlets')
+        rsp = self.do_request('cgi_overview')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
         data = data['data'][0]
