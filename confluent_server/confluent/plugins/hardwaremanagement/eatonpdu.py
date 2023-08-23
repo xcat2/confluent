@@ -323,7 +323,7 @@ class PDUClient(object):
         return sdata
 
     def set_outlet(self, outlet, state):
-        rsp = self.do_request('cgi_overview')
+        rsp = self.do_request('cgi_pdu_outlets')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
         data = data['data'][0]
