@@ -25,6 +25,10 @@ import hashlib
 import json
 import time
 
+def simplify_name(name):
+    return name.lower().replace(' ', '_').replace('/', '-').replace(
+        '_-_', '-')
+
 #eaton uses 'eval' rather than json, massage it to be valid json
 def sanitize_json(data):
     if not isinstance(data, str):
@@ -131,6 +135,43 @@ class WebConnection(wc.SecureHTTPConnection):
         body = rsp.read()
         return body, rsp.status
 
+_sensors_by_node = {}
+def get_sensor_data(element, node, configmanager):
+    category, name = element[-2:]
+    justnames = False
+    readings = []
+    if len(element) == 3:
+        # just get names
+        category = name
+        name = 'all'
+        justnames = True
+    if category in ('leds, fans', 'temperature'):
+        return
+    sn = _sensors_by_node.get(node, None)
+    if not sn or sn[1] < time.time():
+        gc = PDUClient(node, configmanager)
+        try:
+            sdata = gc.get_sensor_data()
+        finally:
+            gc.logout()
+        _sensors_by_node[node] = [sdata, time.time() + 1]
+        sn = _sensors_by_node.get(node, None)
+    for outlet in sn[0]:
+        for sensename in sn[0][outlet]:
+            myname = '{0} {1}'.format(outlet, sensename)
+            measurement = sn[0][outlet][sensename]
+            if name == 'all' or simplify_name(myname) == name:
+                readings.append({
+                    'name': myname,
+                    'value': float(measurement['value']),
+                    'units': measurement['units'],
+                    'type': measurement['type'],
+                })
+    if justnames:
+        for reading in readings:
+            yield msg.ChildCollection(simplify_name(reading['name']))
+    else:
+        yield msg.SensorReadings(readings, name=node)
 
 
 class PDUClient(object):
@@ -218,6 +259,11 @@ class PDUClient(object):
         url = '/config/gateway?page={}&sessionId={}&_dc={}'.format(suburl, self.sessid, int(time.time()))
         return wc.grab_response(url)
 
+    def do_request1(self, suburl):
+        wc = self.wc
+        url = '/config/gateway?page={}&sessionId={}'.format(suburl, self.sessid)
+        return wc.grab_response(url)
+
     def logout(self):
         self.do_request('cgi_logout')
 
@@ -231,9 +277,53 @@ class PDUClient(object):
             if outdata[0] == outlet:
                 return 'on' if outdata[3] else 'off'
         return
+    
+    def get_sensor_data(self):
+        rsp = self.do_request1('cgi_overview')
+
+        data = sanitize_json(rsp[0])
+        data = json.loads(data)
+        data1 = data['data'][4][0][8]
+        data = data['data'][0]
+        sdata = {}
+        for outdata in data:
+
+            outsense = {}
+            outletname = outdata[3]
+            outsense['Power'] = {
+                'value': outdata[5],
+                'units': 'kW',
+                'type': 'Power',
+            }
+            sdata[outletname] = outsense
+        for outdata in data1:
+
+            outsense = {}
+            outletname = outdata[0]
+            if type(outdata[1]) == str :
+                splitter = outdata[1].split(" ")
+
+                if len(splitter) == 1:
+                    splitter.append('w')
+                outsense['Power'] = {
+                        'value': splitter[0],
+                        'units': splitter[1],
+                        'type': 'Power',
+                        }
+            elif type(outdata[1]) == list:
+                if type(outdata[1][1]) == float:
+                    outletname=outletname.strip('</br> Since')
+                    print(outletname)
+                    outsense['Energy'] = {
+                            'value': outdata[1][0] / 1000,
+                            'units': 'kWh',
+                            'type': 'Energy',
+                            }
+            sdata[outletname] = outsense
+        return sdata
 
     def set_outlet(self, outlet, state):
-        rsp = self.do_request('cgi_pdu_outlets')
+        rsp = self.do_request('cgi_overview')
         data = sanitize_json(rsp[0])
         data = json.loads(data)
         data = data['data'][0]
@@ -247,7 +337,12 @@ class PDUClient(object):
             idx += 1
 
 def retrieve(nodes, element, configmanager, inputdata):
-    if 'outlets' not in element:
+    if element[0] == 'sensors':
+        for node in nodes:
+            for res in get_sensor_data(element, node, configmanager):
+                yield res
+        return
+    elif 'outlets' not in element:
         for node in nodes:
             yield  msg.ConfluentResourceUnavailable(node, 'Not implemented')
         return
