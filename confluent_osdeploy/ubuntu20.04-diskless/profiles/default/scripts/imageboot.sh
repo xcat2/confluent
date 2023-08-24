@@ -134,4 +134,6 @@ if grep installtodisk /proc/cmdline > /dev/null; then
 fi
 mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
+mv /lib/firmware /lib/firmware-ramfs
+ln -s /sysroot/lib/firmware /lib/firmware
 exec /opt/confluent/bin/start_root
