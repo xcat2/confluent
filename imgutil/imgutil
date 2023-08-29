@@ -1378,6 +1378,10 @@ def gather_bootloader(outdir, rootpath='/'):
         grubs = glob.glob(grubs)
         if len(grubs) == 1:
             grubbin = grubs[0]
+    if 'ubuntu' in grubbin:  # we needd to store a hint that this grub has a different hard coded prefix
+        mkdirp(os.path.join(outdir, 'boot/EFI/ubuntu/'))
+        with open(os.path.join(outdir, 'boot/EFI/ubuntu/grub.cfg'), 'w') as wo:
+            wo.write('')
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
 
