@@ -150,23 +150,32 @@ class NetplanManager(object):
         needcfgapply = False
         for devname in devnames:
             needcfgwrite = False
+            if stgs['ipv6_method'] == 'static':
+                curraddr = stgs['ipv6_address']
+                currips = self.getcfgarrpath([devname, 'addresses'])
+                if curraddr not in currips:
+                    needcfgwrite = True
+                    currips.append(curraddr)
             if stgs['ipv4_method'] == 'static':
                 curraddr = stgs['ipv4_address']
                 currips = self.getcfgarrpath([devname, 'addresses'])
                 if curraddr not in currips:
                     needcfgwrite = True
                     currips.append(curraddr)
-            gwaddr = stgs.get('ipv4_gateway', None)
-            if gwaddr:
-                cfgroutes = self.getcfgarrpath([devname, 'routes'])
-                for rinfo in cfgroutes:
-                    if rinfo.get('via', None) == gwaddr:
-                        break
-                else:
-                    needcfgwrite = True
-                    cfgroutes.append({'via': gwaddr, 'to': 'default'})
+            gws = []
+            gws.append(stgs.get('ipv4_gateway', None))
+            gws.append(stgs.get('ipv6_gateway', None))
+            for gwaddr in gws:
+                if gwaddr:
+                    cfgroutes = self.getcfgarrpath([devname, 'routes'])
+                    for rinfo in cfgroutes:
+                        if rinfo.get('via', None) == gwaddr:
+                            break
+                    else:
+                        needcfgwrite = True
+                        cfgroutes.append({'via': gwaddr, 'to': 'default'})
             if needcfgwrite:
-                needcfgaply = True
+                needcfgapply = True
                 newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
                 with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
                     planout.write(yaml.dump(newcfg))
