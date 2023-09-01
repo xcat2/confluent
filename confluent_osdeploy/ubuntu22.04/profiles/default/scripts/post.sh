@@ -78,6 +78,7 @@ cat /target/etc/confluent/tls/*.pem > /target/usr/local/share/ca-certificates/co
 cat /target/etc/confluent/tls/*.pem > /etc/confluent/ca.pem
 chroot /target update-ca-certificates
 chroot /target bash -c "source /etc/confluent/functions; run_remote_python syncfileclient"
+chroot /target bash -c "source /etc/confluent/functions; run_remote_python confignet"
 chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d"
 source /target/etc/confluent/functions
 
