@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script is executed on the first boot after install has
 # completed. It is best to edit the middle of the file as
