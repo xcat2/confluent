@@ -437,6 +437,7 @@ def get_mydir(oscategory):
 class OsHandler(object):
     def __init__(self, name, version, arch, args):
         self.name = name
+        self._interactive = True
         self.version = version
         self.arch = arch
         self.sourcepath = None
@@ -463,6 +464,9 @@ class OsHandler(object):
             self.addrepos = args.addrepos
         except AttributeError:
             self.addrepos = []
+
+    def set_interactive(self, shouldbeinteractive):
+        self._interactive = shouldbeinteractive
 
     def get_json(self):
         odata = [self.oscategory, self.version, self.arch, self.name]
@@ -577,7 +581,10 @@ class SuseHandler(OsHandler):
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
-        subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+        if self._interactive:
+            subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+        else:
+            subprocess.check_call(['zypper', '-n', '-R', self.targpath, 'install'] + self.zyppargs)
         os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
         if os.path.exists(os.path.join(self.targpath, 'sbin/mkinitrd')):
             args.cmd = ['mkinitrd']
@@ -625,7 +632,6 @@ class ElHandler(OsHandler):
         self.yumargs = []
         super().__init__(name, version, arch, args)
 
-
     def add_pkglists(self):
         self.yumargs.extend(self.list_packages())
 
@@ -657,7 +663,10 @@ class ElHandler(OsHandler):
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
-        subprocess.check_call(['yum'] + self.yumargs)
+        if self._interactive:
+            subprocess.check_call(['yum'] + self.yumargs)
+        else:
+            subprocess.check_call(['yum', '-y'] + self.yumargs)
         with open('/proc/mounts') as mountinfo:
             for line in mountinfo.readlines():
                 if line.startswith('selinuxfs '):
@@ -794,6 +803,7 @@ def main():
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
+    buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
@@ -1128,6 +1138,8 @@ def build_root(args):
             sys.stderr.write(
                 'Unable to recognize build system os\n')
         sys.exit(1)
+    if args.non_interactive:
+        oshandler.set_interactive(True)
     oshandler.set_target(args.scratchdir)
     oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
