@@ -1139,7 +1139,7 @@ def build_root(args):
                 'Unable to recognize build system os\n')
         sys.exit(1)
     if args.non_interactive:
-        oshandler.set_interactive(True)
+        oshandler.set_interactive(False)
     oshandler.set_target(args.scratchdir)
     oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
