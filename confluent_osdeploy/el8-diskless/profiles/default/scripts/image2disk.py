@@ -13,6 +13,12 @@ import subprocess
 
 bootuuid = None
 
+def get_partname(devname, idx):
+    if devname[-1] in '0123456789':
+        return '{}p{}'.format(devname, idx)
+    else:
+        return '{}{}'.format(devname, idx)
+
 def get_next_part_meta(img, imgsize):
     if img.tell() == imgsize:
         return None
@@ -295,7 +301,7 @@ def install_to_disk(imgpath):
         if end > sectors:
             end = sectors
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
-        vol['targetdisk'] = instdisk + '{0}'.format(volidx)
+        vol['targetdisk'] = get_partname(instdisk, volidx)
         curroffset += size + 1
     if not lvmvols:
         if swapsize:
@@ -305,10 +311,10 @@ def install_to_disk(imgpath):
             if end > sectors:
                 end = sectors
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
-            subprocess.check_call(['mkswap', instdisk + '{}'.format(volidx + 1)])
+            subprocess.check_call(['mkswap', get_partname(instdisk, volidx + 1)])
     else:
         parted.run('mkpart lvm {}s 100%'.format(curroffset))
-        lvmpart = instdisk + '{}'.format(volidx + 1)
+        lvmpart = get_partname(instdisk, volidx + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', 'localstorage', lvmpart])
         vginfo = subprocess.check_output(['vgdisplay', 'localstorage', '--units', 'b']).decode('utf8')
