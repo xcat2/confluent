@@ -332,18 +332,7 @@ def get_full_net_config(configmanager, node, serverip=None):
     if serverip:
         myaddrs = get_addresses_by_serverip(serverip)
     nm = NetManager(myaddrs, node, configmanager)
-    nnc = get_nic_config(configmanager, node, serverip=serverip)
     defaultnic = {}
-    if nnc.get('ipv4_address', None):
-        defaultnic['ipv4_address'] = '{}/{}'.format(nnc['ipv4_address'], nnc['prefix'])
-    if nnc.get('ipv4_gateway', None):
-        defaultnic['ipv4_gateway'] = nnc['ipv4_gateway']
-    if nnc.get('ipv4_method', None):
-        defaultnic['ipv4_method'] = nnc['ipv4_method']
-    if nnc.get('ipv6_address', None):
-        defaultnic['ipv6_address'] = '{}/{}'.format(nnc['ipv6_address'], nnc['ipv6_prefix'])
-    if nnc.get('ipv6_method', None):
-        defaultnic['ipv6_method'] = nnc['ipv6_method']
     if None in attribs:
         nm.process_attribs(None, attribs[None])
         del attribs[None]
@@ -354,6 +343,18 @@ def get_full_net_config(configmanager, node, serverip=None):
         retattrs['default'] = nm.myattribs[None]
         add_netmask(retattrs['default'])
         del nm.myattribs[None]
+    else:
+        nnc = get_nic_config(configmanager, node, serverip=serverip)
+        if nnc.get('ipv4_address', None):
+            defaultnic['ipv4_address'] = '{}/{}'.format(nnc['ipv4_address'], nnc['prefix'])
+        if nnc.get('ipv4_gateway', None):
+            defaultnic['ipv4_gateway'] = nnc['ipv4_gateway']
+        if nnc.get('ipv4_method', None):
+            defaultnic['ipv4_method'] = nnc['ipv4_method']
+        if nnc.get('ipv6_address', None):
+            defaultnic['ipv6_address'] = '{}/{}'.format(nnc['ipv6_address'], nnc['ipv6_prefix'])
+        if nnc.get('ipv6_method', None):
+            defaultnic['ipv6_method'] = nnc['ipv6_method']
     retattrs['extranets'] = nm.myattribs
     for attri in retattrs['extranets']:
         add_netmask(retattrs['extranets'][attri])
@@ -361,7 +362,7 @@ def get_full_net_config(configmanager, node, serverip=None):
             defaultnic = {}
         if retattrs['extranets'][attri].get('ipv6_address', None) == defaultnic.get('ipv6_address', 'NOPE'):
             defaultnic = {}
-    if 'default' not in retattrs and defaultnic:
+    if defaultnic:
         retattrs['default'] = defaultnic
         add_netmask(retattrs['default'])
         ipv4addr = defaultnic.get('ipv4_address', None)
