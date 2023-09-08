@@ -196,7 +196,13 @@ def capture_remote(args):
     finfo = subprocess.check_output(['ssh', targ, 'python3', '/run/imgutil/capenv/imgutil', 'getfingerprint']).decode('utf8')
     finfo = json.loads(finfo)
     if finfo['oscategory'] not in ('el8', 'el9', 'ubuntu20.04', 'ubuntu22.04'):
-        raise Exception('Not yet supported for capture: ' + repr(finfo))
+        sys.stderr.write('Not yet supported for capture: ' + repr(finfo) + '\n')
+        sys.exit(1)
+    unmet = finfo.get('unmetprereqs', [])
+    if unmet:
+        for cmd in unmet:
+            sys.stderr.write(cmd + '\n')
+        sys.exit(1)
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
     utillib = __file__.replace('bin/imgutil', 'lib/imgutil')        
@@ -442,6 +448,7 @@ class OsHandler(object):
         self.arch = arch
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
+        self.captureprereqs = []
         try:
             pkglist = args.packagelist
         except AttributeError:
@@ -474,7 +481,7 @@ class OsHandler(object):
             if not isinstance(odata[idx], str):
                 odata[idx] = odata[idx].decode('utf8')
         info = {'oscategory': odata[0],
-                'version': odata[1], 'arch': odata[2], 'name': odata[3]}
+                'version': odata[1], 'arch': odata[2], 'name': odata[3], 'unmetprereqs': self.captureprereqs}
         return json.dumps(info)
 
     def prep_root_premount(self, args):
@@ -594,12 +601,21 @@ class SuseHandler(OsHandler):
 
 
 class DebHandler(OsHandler):
-    def __init__(self, name, version, arch, args, codename):
+    def __init__(self, name, version, arch, args, codename, hostpath):
         self.includepkgs = []
         self.targpath = None
         self.codename = codename
         self.oscategory = name + version
         super().__init__(name, version, arch, args)
+        needpkgs = []
+        if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
+            needpkgs.append('tpm2-tools')
+        lfuses = glob.glob('/lib/*/libfuse.so.2')
+        if not lfuses:
+            needpkgs.append('libfuse2')
+        if needpkgs:
+            needapt = 'Missing packages needed in target for capture, to add required packages: apt install ' + ' '.join(needpkgs)
+            self.captureprereqs.append(needapt)
 
     def add_pkglists(self):
         self.includepkgs.extend(self.list_packages())
@@ -1082,7 +1098,7 @@ def fingerprint_host_deb(args, hostpath='/'):
     except IOError:
         pass
     if osname:
-        return DebHandler(osname, vers, os.uname().machine, args, codename)
+        return DebHandler(osname, vers, os.uname().machine, args, codename, hostpath)
 
 
 def fingerprint_host_suse(args, hostpath='/'):
