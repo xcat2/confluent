@@ -1597,7 +1597,10 @@ def remotescan():
     mycfm = cfm.ConfigManager(None)
     myname = collective.get_myname()
     for remagent in get_subscriptions():
-        affluent.renotify_me(remagent, mycfm, myname)
+        try:
+            affluent.renotify_me(remagent, mycfm, myname)
+        except Exception as e:
+            log.log({'error': 'Unexpected problem asking {} for discovery notifications'.format(remagent)})
 
 
 def blocking_scan():
@@ -1637,7 +1640,7 @@ def start_autosense():
     autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
     #autosensors.add(eventlet.spawn(mdns.snoop, safe_detected, mdns))
     autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
-    remotescan()
+    eventlet.spawn(remotescan)
 
 
 nodes_by_fprint = {}
