@@ -613,7 +613,7 @@ class DebHandler(OsHandler):
         needpkgs = []
         if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
             needpkgs.append('tpm2-tools')
-        lfuses = glob.glob('/lib/*/libfuse.so.2')
+        lfuses = glob.glob(os.path.join(hostpath, '/lib/*/libfuse.so.2')
         if not lfuses:
             needpkgs.append('libfuse2')
         if needpkgs:
@@ -650,6 +650,21 @@ class ElHandler(OsHandler):
         self.oscategory = 'el{0}'.format(version.split('.')[0])
         self.yumargs = []
         super().__init__(name, version, arch, args)
+        needpkgs = []
+        if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
+            needpkgs.append('tpm2-tools')
+        lfuses = glob.glob(os.path.join(hostpath, '/usr/lib64/libfuse.so.2')
+        if not lfuses:
+            needpkgs.append('fuse-libs')
+        if not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc')):
+            needpkgs.append('ipcalc')
+        if not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhclient')):
+            needpkgs.append('dhcp-client')
+        if not os.path.exists(os.path.join(hostpath, 'usr/sbin/mount.nfs')):
+            needpkgs.append('nfs-utils')
+        if needpkgs:
+            needapt = 'Missing packages needed in target for capture, to add required packages: dnf install ' + ' '.join(needpkgs)
+            self.captureprereqs.append(needapt)
 
     def add_pkglists(self):
         self.yumargs.extend(self.list_packages())
