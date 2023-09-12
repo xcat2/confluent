@@ -23,7 +23,10 @@ import subprocess
 import sys
 import tempfile
 import time
-import yaml
+try:
+    import yaml
+except ImportError:
+    pass
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
