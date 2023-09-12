@@ -366,7 +366,7 @@ def get_full_net_config(configmanager, node, serverip=None):
         retattrs['default'] = defaultnic
         add_netmask(retattrs['default'])
         ipv4addr = defaultnic.get('ipv4_address', None)
-        if '/' in ipv4addr:
+        if ipv4addr and '/' in ipv4addr:
             ipv4bytes = socket.inet_pton(socket.AF_INET, ipv4addr.split('/')[0])
             for addr in nm.myaddrs:
                 if addr[0] != socket.AF_INET:
@@ -374,7 +374,7 @@ def get_full_net_config(configmanager, node, serverip=None):
                 if ipn_on_same_subnet(addr[0], addr[1], ipv4bytes, addr[2]):
                     defaultnic['current_nic'] = True
         ipv6addr = defaultnic.get('ipv6_address', None)
-        if '/' in ipv6addr:
+        if ipv6addr and '/' in ipv6addr:
             ipv6bytes = socket.inet_pton(socket.AF_INET6, ipv6addr.split('/')[0])
             for addr in nm.myaddrs:
                 if addr[0] != socket.AF_INET6:
