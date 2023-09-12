@@ -60,10 +60,13 @@ class PartedRunner():
     def __init__(self, disk):
         self.disk = disk
 
-    def run(self, command):
+    def run(self, command, check=True)::
         command = command.split()
         command = ['parted', '-a', 'optimal', '-s', self.disk] + command
-        return subprocess.check_output(command).decode('utf8')
+        if check:
+            return subprocess.check_output(command).decode('utf8')
+        else:
+            return subprocess.run(command, stdout=subprocess.PIPE).stdout.decode('utf8')
 
 def fixup(rootdir, vols):
     devbymount = {}
@@ -173,6 +176,8 @@ def fixup(rootdir, vols):
             partnum = re.search('(\d+)$', targdev).group(1)
             targblock = re.search('(.*)\d+$', targdev).group(1)
     if targblock:
+        if targblock.endswith('p') and 'nvme' in targblock:
+            targblock = targblock[:-1]
         shimpath = subprocess.check_output(['find', os.path.join(rootdir, 'boot/efi'), '-name', 'shimx64.efi']).decode('utf8').strip()
         shimpath = shimpath.replace(rootdir, '/').replace('/boot/efi', '').replace('//', '/').replace('/', '\\')
         subprocess.check_call(['efibootmgr', '-c', '-d', targblock, '-l', shimpath, '--part', partnum])
@@ -231,7 +236,8 @@ def install_to_disk(imgpath):
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
     parted = PartedRunner(instdisk)
-    dinfo = parted.run('unit s print')
+    # do this safer, unit s print might bomb
+    dinfo = parted.run('unit s print', check=False)
     dinfo = dinfo.split('\n')
     sectors = 0
     sectorsize = 0
