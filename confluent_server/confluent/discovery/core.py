@@ -1429,7 +1429,13 @@ def discover_node(cfg, handler, info, nodename, manual):
                 newnodeattribs['pubkeys.tls_hardwaremanager'] = \
                     util.get_fingerprint(handler.https_cert, 'sha256')
             if newnodeattribs:
-                cfg.set_node_attributes({nodename: newnodeattribs})
+                currattrs = cfg.get_node_attributes(nodename, newnodeattribs)
+                for checkattr in newnodeattribs:
+                    checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
+                    if checkval != newnodeattribs[checkattr]:
+                        break
+                else:
+                    cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
             if nodeconfig:
@@ -1508,7 +1514,13 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
                 if info['hwaddr'] != oldhwaddr:
                     attribs[newattrname] = info['hwaddr']
         if attribs:
-            cfg.set_node_attributes({nodename: attribs})
+            currattrs = cfg.get_node_attributes(nodename, attribs)
+            for checkattr in attribs:
+                checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
+                if checkval != attribs[checkattr]:
+                    break
+            else:
+                cfg.set_node_attributes({nodename: attribs})
     if info['uuid'] in known_pxe_uuids:
         return True
     if uuid_is_valid(info['uuid']):
