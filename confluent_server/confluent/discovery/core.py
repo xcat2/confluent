@@ -1433,9 +1433,8 @@ def discover_node(cfg, handler, info, nodename, manual):
                 for checkattr in newnodeattribs:
                     checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
                     if checkval != newnodeattribs[checkattr]:
+                        cfg.set_node_attributes({nodename: newnodeattribs})
                         break
-                else:
-                    cfg.set_node_attributes({nodename: newnodeattribs})
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
             if nodeconfig:
@@ -1518,9 +1517,8 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
             for checkattr in attribs:
                 checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
                 if checkval != attribs[checkattr]:
+                    cfg.set_node_attributes({nodename: attribs})
                     break
-            else:
-                cfg.set_node_attributes({nodename: attribs})
     if info['uuid'] in known_pxe_uuids:
         return True
     if uuid_is_valid(info['uuid']):
