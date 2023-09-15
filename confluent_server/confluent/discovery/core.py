@@ -648,6 +648,8 @@ def detected_models():
 
 
 def _recheck_nodes(nodeattribs, configmanager):
+    if not cfm.config_is_ready():
+        return
     if rechecklock.locked():
         # if already in progress, don't run again
         # it may make sense to schedule a repeat, but will try the easier and less redundant way first
@@ -766,6 +768,9 @@ def eval_detected(info):
 def detected(info):
     global rechecker
     global rechecktime
+    if not cfm.config_is_ready():
+        # drop processing of discovery data while configmanager is 'down'
+        return
     # later, manual and CMM discovery may act on SN and/or UUID
     for service in info['services']:
         if service in nodehandlers:
