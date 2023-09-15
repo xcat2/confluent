@@ -259,6 +259,9 @@ def get_myname():
         mycachedname[1] = time.time()
         return myname
 
+def in_collective():
+    return bool(list(cfm.list_collective()))
+
 def handle_connection(connection, cert, request, local=False):
     global currentleader
     global retrythread
@@ -815,6 +818,9 @@ def start_collective():
     global follower
     global retrythread
     global initting
+    if initting:
+        # do not nest startup if startup backs up loops of starting collective
+        return
     initting = True
     retrythread = None
     try:
