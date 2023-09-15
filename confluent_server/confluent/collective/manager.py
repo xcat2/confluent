@@ -43,7 +43,7 @@ currentleader = None
 follower = None
 retrythread = None
 failovercheck = None
-initting = False
+initting = True
 reassimilate = None
 
 class ContextBool(object):
@@ -818,9 +818,6 @@ def start_collective():
     global follower
     global retrythread
     global initting
-    if initting:
-        # do not nest startup if startup backs up loops of starting collective
-        return
     initting = True
     retrythread = None
     try:
