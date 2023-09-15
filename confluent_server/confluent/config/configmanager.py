@@ -883,7 +883,7 @@ def commit_clear():
                 pass
     ConfigManager.wait_for_sync(True)
     ConfigManager._bg_sync_to_file()
-    ready = True
+    _ready = True
 
 cfgleader = None
 
