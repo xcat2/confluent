@@ -831,6 +831,9 @@ _oldcfgstore = None
 _oldtxcount = 0
 
 
+def config_is_ready():
+    return _ready
+
 def rollback_clear():
     global _cfgstore
     global _txcount
@@ -848,6 +851,8 @@ def clear_configuration():
     global _txcount
     global _oldcfgstore
     global _oldtxcount
+    global _ready
+    _ready = False
     stop_leading()
     stop_following()
     _oldcfgstore = _cfgstore
@@ -858,6 +863,7 @@ def clear_configuration():
 def commit_clear():
     global _oldtxcount
     global _oldcfgstore
+    global _ready
     # first, copy over old non-key globals, as those are
     # currently defined as local to each collective member
     # currently just 'autosense' which is intended to be active
@@ -877,6 +883,7 @@ def commit_clear():
                 pass
     ConfigManager.wait_for_sync(True)
     ConfigManager._bg_sync_to_file()
+    ready = True
 
 cfgleader = None
 
