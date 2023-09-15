@@ -43,7 +43,7 @@ currentleader = None
 follower = None
 retrythread = None
 failovercheck = None
-initting = True
+initting = False
 reassimilate = None
 
 class ContextBool(object):
