@@ -2479,7 +2479,7 @@ class ConfigManager(object):
     def _load_from_json(self, jsondata, sync=True):
         self.inrestore = True
         try:
-            _load_from_json_backend(self, jsondata, sync=True)
+            self._load_from_json_backend(jsondata, sync=True)
         finally:
             self.inrestore = False
 
