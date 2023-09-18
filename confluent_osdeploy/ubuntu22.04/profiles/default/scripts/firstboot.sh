@@ -2,7 +2,10 @@
 echo "Confluent first boot is running"
 HOME=$(getent passwd $(whoami)|cut -d: -f 6)
 export HOME
-seems a potentially relevant thing to put i... by Jarrod Johnson
+(
+exec >> /target/var/log/confluent/confluent-firstboot.log
+exec 2>> /target/var/log/confluent/confluent-firstboot.log
+chmod 600 /target/var/log/confluent/confluent-firstboot.log
 cp -a /etc/confluent/ssh/* /etc/ssh/
 systemctl restart sshd
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg |awk '{print $2}')
@@ -22,3 +25,5 @@ source /etc/confluent/functions
 run_remote_parts firstboot.d
 run_remote_config firstboot.d
 curl --capath /etc/confluent/tls -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -X POST -d "status: complete" https://$confluent_mgr/confluent-api/self/updatestatus
+) &
+tail --pid $! -n 0 -F /target/var/log/confluent/confluent-post.log > /dev/console
