@@ -60,7 +60,7 @@ class PartedRunner():
     def __init__(self, disk):
         self.disk = disk
 
-    def run(self, command, check=True)::
+    def run(self, command, check=True):
         command = command.split()
         command = ['parted', '-a', 'optimal', '-s', self.disk] + command
         if check:
