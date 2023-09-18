@@ -36,7 +36,7 @@ if [ "$OPKGNAME" = "confluent-server" ]; then
     if grep wheezy /etc/os-release; then
         sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex, python-dateutil, python-pyopenssl, python-msgpack/' debian/control
     else
-        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi, python3-paramiko/' debian/control
+        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi, python3-paramiko, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd/' debian/control
     fi
     if grep wheezy /etc/os-release; then
         echo 'confluent_client python-confluent-client' >> debian/pydist-overrides
@@ -49,6 +49,13 @@ if ! grep wheezy /etc/os-release; then
 fi
 head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
+cat > debian/postinst << EOF
+if ! getent passwd confluent > /dev/null; then 
+    useradd -r affluent -d /var/lib/affluent -s /bin/nologin
+    mkdir /etc/confluent
+    chown confluent /etc/confluent
+fi
+EOF
 echo 'export PYBUILD_INSTALL_ARGS=--install-lib=/opt/confluent/lib/python' >> debian/rules
 #echo 'Provides: python-'$DPKGNAME >> debian/control
 #echo 'Conflicts: python-'$DPKGNAME >> debian/control
