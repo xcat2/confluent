@@ -51,8 +51,8 @@ head -n -1 debian/control > debian/control1
 mv debian/control1 debian/control
 cat > debian/postinst << EOF
 if ! getent passwd confluent > /dev/null; then 
-    useradd -r affluent -d /var/lib/affluent -s /bin/nologin
-    mkdir /etc/confluent
+    useradd -r confluent -d /var/lib/confluent -s /usr/sbin/nologin
+    mkdir -p /etc/confluent
     chown confluent /etc/confluent
 fi
 EOF
