@@ -21,7 +21,8 @@ done
 hostnamectl set-hostname $(grep ^NODENAME: /etc/confluent/confluent.info | awk '{print $2}')
 touch /etc/cloud/cloud-init.disabled
 source /etc/confluent/functions
-
+confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+export confluent_mgr confluent_profile
 run_remote_parts firstboot.d
 run_remote_config firstboot.d
 curl --capath /etc/confluent/tls -f -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -X POST -d "status: complete" https://$confluent_mgr/confluent-api/self/updatestatus

@@ -87,6 +87,7 @@ chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d
 source /target/etc/confluent/functions
 
 run_remote_config post
+python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
 
 umount /target/sys /target/dev /target/proc
 ) &
