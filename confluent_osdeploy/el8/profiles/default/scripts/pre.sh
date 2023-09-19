@@ -87,6 +87,7 @@ done
 cryptboot=$(grep ^encryptboot: /etc/confluent/confluent.deploycfg | awk '{print $2}')
 LUKSPARTY=''
 touch /tmp/cryptpkglist
+touch /tmp/pkglist
 touch /tmp/addonpackages
 if [ "$cryptboot" == "tpm2" ]; then
 	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
@@ -102,15 +103,18 @@ confluentpython /opt/confluent/bin/apiclient /confluent-public/os/$confluent_pro
 run_remote pre.custom
 run_remote_parts pre.d
 confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/kickstart -o /tmp/kickstart.base
+if grep '^%include /tmp/pkglist' /tmp/kickstart.* > /dev/null; then
+    confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/packagelist -o /tmp/pkglist
+fi
 grep '^%include /tmp/partitioning' /tmp/kickstart.* > /dev/null || touch /tmp/installdisk
 if [ ! -e /tmp/installdisk ]; then
     run_remote_python getinstalldisk
 fi
+confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile/partitioning -o /tmp/partitioning.template
 grep '^%include /tmp/partitioning' /tmp/kickstart.* > /dev/null || rm /tmp/installdisk
 if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
-    echo clearpart --all --initlabel >> /tmp/partitioning
-    echo ignoredisk --only-use $(cat /tmp/installdisk) >> /tmp/partitioning
-    echo autopart --nohome $LUKSPARTY >> /tmp/partitioning
+    INSTALLDISK=$(cat /tmp/installdisk)
+    sed -e s/%%INSTALLDISK%%/$INSTALLDISK/ -e s/%%LUKSHOOK%%/$LUKSPARTY/ /tmp/partitioning.template > /tmp/partitioning
     dd if=/dev/zero of=/dev/$(cat /tmp/installdisk) bs=1M count=1 >& /dev/null
     vgchange -a n >& /dev/null
 fi
