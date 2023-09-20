@@ -613,7 +613,7 @@ class DebHandler(OsHandler):
         needpkgs = []
         if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
             needpkgs.append('tpm2-tools')
-        lfuses = glob.glob(os.path.join(hostpath, '/lib/*/libfuse.so.2')
+        lfuses = glob.glob(os.path.join(hostpath, '/lib/*/libfuse.so.2'))
         if not lfuses:
             needpkgs.append('libfuse2')
         if needpkgs:
@@ -646,14 +646,16 @@ class DebHandler(OsHandler):
 
 
 class ElHandler(OsHandler):
-    def __init__(self, name, version, arch, args):
+    def __init__(self, name, version, arch, args, hostpath='/'):
         self.oscategory = 'el{0}'.format(version.split('.')[0])
         self.yumargs = []
         super().__init__(name, version, arch, args)
         needpkgs = []
+        if not hostpath:
+            return
         if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
             needpkgs.append('tpm2-tools')
-        lfuses = glob.glob(os.path.join(hostpath, '/usr/lib64/libfuse.so.2')
+        lfuses = glob.glob(os.path.join(hostpath, '/usr/lib64/libfuse.so.2'))
         if not lfuses:
             needpkgs.append('fuse-libs')
         if not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc')):
@@ -1040,7 +1042,7 @@ def fingerprint_source_el(files, sourcepath, args):
             if arch == 'noarch':
                 prodinfo = open(os.path.join(sourcepath, '.discinfo')).read()
                 arch = prodinfo.split('\n')[2]
-            return ElHandler(osname, ver, arch, args)
+            return ElHandler(osname, ver, arch, args, None)
     return None
 
 
@@ -1092,7 +1094,7 @@ def fingerprint_host_el(args, hostpath='/'):
     osname = osname.replace('-release', '').replace('-', '_')
     if osname == 'centos_linux':
         osname = 'centos'
-    return ElHandler(osname, version, os.uname().machine, args)
+    return ElHandler(osname, version, os.uname().machine, args, hostpath)
 
 
 def fingerprint_host_deb(args, hostpath='/'):
