@@ -8,7 +8,6 @@ chmod go-rwx /etc/confluent/*
 for i in /custom-installation/ssh/*.ca; do
     echo '@cert-authority *' $(cat $i) >> /target/etc/ssh/ssh_known_hosts
 done
-
 cp -a /etc/ssh/ssh_host* /target/etc/confluent/ssh/
 cp -a /etc/ssh/sshd_config.d/confluent.conf /target/etc/confluent/ssh/sshd_config.d/
 sshconf=/target/etc/ssh/ssh_config
@@ -19,10 +18,15 @@ echo 'Host *' >> $sshconf
 echo '    HostbasedAuthentication yes' >> $sshconf
 echo '    EnableSSHKeysign yes' >> $sshconf
 echo '    HostbasedKeyTypes *ed25519*' >> $sshconf
-
+cp /etc/confluent/functions /target/etc/confluent/functions
+source /etc/confluent/functions
+mkdir -p /target/var/log/confluent
+cp /var/log/confluent/* /target/var/log/confluent/
+(
+exec >> /target/var/log/confluent/confluent-post.log
+exec 2>> /target/var/log/confluent/confluent-post.log
+chmod 600 /target/var/log/confluent/confluent-post.log
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /target/etc/confluent/firstboot.sh
-curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /target/etc/confluent/functions
-source /target/etc/confluent/functions
 chmod +x /target/etc/confluent/firstboot.sh
 cp /tmp/allnodes /target/root/.shosts
 cp /tmp/allnodes /target/etc/ssh/shosts.equiv
@@ -74,12 +78,17 @@ if [ -e /sys/firmware/efi ]; then
     fi
 fi
 cat /target/etc/confluent/tls/*.pem > /target/etc/confluent/ca.pem
+cat /target/etc/confluent/tls/*.pem > /target/usr/local/share/ca-certificates/confluent.crt
 cat /target/etc/confluent/tls/*.pem > /etc/confluent/ca.pem
+chroot /target update-ca-certificates
 chroot /target bash -c "source /etc/confluent/functions; run_remote_python syncfileclient"
+chroot /target bash -c "source /etc/confluent/functions; run_remote_python confignet"
 chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d"
 source /target/etc/confluent/functions
 
 run_remote_config post
+python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
 
 umount /target/sys /target/dev /target/proc
-
+) &
+tail --pid $! -n 0 -F /target/var/log/confluent/confluent-post.log > /dev/console

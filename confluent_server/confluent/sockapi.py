@@ -141,6 +141,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             if 'collective' in response:
                 return collective.handle_connection(connection, cert,
                                             response['collective'])
+            while not configmanager.config_is_ready():
+                eventlet.sleep(1)
             if 'dispatch' in response:
                 dreq = tlvdata.recvall(connection, response['dispatch']['length'])
                 return pluginapi.handle_dispatch(connection, cert, dreq,

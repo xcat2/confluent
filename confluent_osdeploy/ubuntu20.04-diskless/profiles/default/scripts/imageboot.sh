@@ -127,11 +127,13 @@ chmod +x /sysroot/opt/confluent/bin/onboot.sh
 cp /opt/confluent/bin/apiclient /sysroot/opt/confluent/bin
 ln -s /etc/systemd/system/onboot.service /sysroot/etc/systemd/system/multi-user.target.wants/onboot.service
 cp /etc/confluent/functions /sysroot/etc/confluent/functions
+mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
+ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
+mv /lib/firmware /lib/firmware-ramfs
+ln -s /sysroot/lib/firmware /lib/firmware
 if grep installtodisk /proc/cmdline > /dev/null; then
     . /etc/confluent/functions
     run_remote installimage
     exec reboot -f
 fi
-mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
-ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 exec /opt/confluent/bin/start_root

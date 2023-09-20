@@ -2,6 +2,7 @@
 import eventlet
 import eventlet.green.select as select
 import eventlet.green.subprocess as subprocess
+from fnmatch import fnmatch
 import glob
 import logging
 logging.getLogger('libarchive').addHandler(logging.NullHandler())
@@ -153,6 +154,14 @@ def update_boot_esxi(profiledir, profile, label):
          '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
 
 
+def find_glob(loc, fileglob):
+    for cdir, _, fs in os.walk(loc):
+        for f in fs:
+            if fnmatch(f, fileglob):
+                return os.path.join(cdir, f)
+    return None
+
+
 def update_boot_linux(profiledir, profile, label):
     profname = os.path.basename(profiledir)
     kernelargs = profile.get('kernelargs', '')
@@ -170,7 +179,11 @@ def update_boot_linux(profiledir, profile, label):
     for initramfs in initrds:
         grubcfg += " /initramfs/{0}".format(initramfs)
     grubcfg += "\n}\n"
-    with open(profiledir + '/boot/efi/boot/grub.cfg', 'w') as grubout:
+    # well need to honor grubprefix path if different
+    grubcfgpath = find_glob(profiledir + '/boot', 'grub.cfg')
+    if not grubcfgpath:
+        grubcfgpath = profiledir + '/boot/efi/boot/grub.cfg'
+    with open(grubcfgpath, 'w') as grubout:
         grubout.write(grubcfg)
     ipxeargs = kernelargs
     for initramfs in initrds:

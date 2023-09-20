@@ -189,8 +189,15 @@ cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 EOC
 echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
 echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
+linktype=$(ip link |grep -A2 ${ifname}|tail -n 1|awk '{print $1}')
+if [ "$linktype" = link/infiniband ]; then
+	linktype="infiniband"
+else
+	linktype="ethernet"
+fi
+echo type=$linktype >> /run/NetworkManager/system-connections/$ifname.nmconnection
+
 cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-type=ethernet
 autoconnect-retries=1
 EOC
 echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
@@ -198,9 +205,6 @@ cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 multi-connect=1
 permissions=
 wait-device-timeout=60000
-
-[ethernet]
-mac-address-blacklist=
 
 EOC
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')

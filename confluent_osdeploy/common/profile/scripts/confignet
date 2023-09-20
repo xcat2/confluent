@@ -9,6 +9,10 @@ import time
 import shlex
 import subprocess
 try:
+    import yaml
+except ImportError:
+    pass
+try:
     from importlib.machinery import SourceFileLoader
     def load_source(mod, path):
         return SourceFileLoader(mod, path).load_module()
@@ -106,6 +110,103 @@ def get_interface_name(iname, settings):
     if settings.get('current_nic', False):
         return iname
     return None
+
+class NetplanManager(object):
+    def __init__(self, deploycfg):
+        self.cfgbydev = {}
+        self.read_connections()
+        self.deploycfg = deploycfg
+
+    def read_connections(self):
+        for plan in glob.glob('/etc/netplan/*.y*ml'):
+            with open(plan) as planfile:
+                planinfo = yaml.safe_load(planfile)
+                if not planinfo:
+                    continue
+            nicinfo = planinfo.get('network', {}).get('ethernets', {})
+            for devname in nicinfo:
+                if devname == 'lo':
+                    continue
+                if 'gateway4' in nicinfo[devname]:
+                    # normalize deprecated syntax on read in
+                    gw4 = nicinfo[devname]['gateway4']
+                    del nicinfo[devname]['gateway4']
+                    routeinfo = nicinfo[devname].get('routes', [])
+                    for ri in routeinfo:
+                        if ri.get('via', None) == gw4 and ri.get('to', None) in ('default', '0.0.0.0/0', '0/0'):
+                            break
+                    else:
+                        routeinfo.append({
+                            'to': 'default',
+                            'via': gw4
+                        })
+                    nicinfo[devname]['routes'] = routeinfo
+                self.cfgbydev[devname] = nicinfo[devname]
+    
+    def apply_configuration(self, cfg):
+        devnames = cfg['interfaces']
+        if len(devnames) != 1:
+            raise Exception('Multi-nic team/bonds not yet supported')
+        stgs = cfg['settings']
+        needcfgapply = False
+        for devname in devnames:
+            needcfgwrite = False
+            if stgs['ipv6_method'] == 'static':
+                curraddr = stgs['ipv6_address']
+                currips = self.getcfgarrpath([devname, 'addresses'])
+                if curraddr not in currips:
+                    needcfgwrite = True
+                    currips.append(curraddr)
+            if stgs['ipv4_method'] == 'static':
+                curraddr = stgs['ipv4_address']
+                currips = self.getcfgarrpath([devname, 'addresses'])
+                if curraddr not in currips:
+                    needcfgwrite = True
+                    currips.append(curraddr)
+            gws = []
+            gws.append(stgs.get('ipv4_gateway', None))
+            gws.append(stgs.get('ipv6_gateway', None))
+            for gwaddr in gws:
+                if gwaddr:
+                    cfgroutes = self.getcfgarrpath([devname, 'routes'])
+                    for rinfo in cfgroutes:
+                        if rinfo.get('via', None) == gwaddr:
+                            break
+                    else:
+                        needcfgwrite = True
+                        cfgroutes.append({'via': gwaddr, 'to': 'default'})
+            dnsips = self.deploycfg.get('nameservers', [])
+            dnsdomain = self.deploycfg.get('dnsdomain', '')
+            if dnsips:
+                currdnsips = self.getcfgarrpath([devname, 'nameservers', 'addresses'])
+                for dnsip in dnsips:
+                    if dnsip not in currdnsips:
+                        needcfgwrite = True
+                        currdnsips.append(dnsip)
+            if dnsdomain:
+                currdnsdomain = self.getcfgarrpath([devname, 'nameservers', 'search'])
+                if dnsdomain not in currdnsdomain:
+                    needcfgwrite = True
+                    currdnsdomain.append(dnsdomain)
+            if needcfgwrite:
+                needcfgapply = True
+                newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
+                with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
+                    planout.write(yaml.dump(newcfg))
+        if needcfgapply:
+            subprocess.call(['netplan', 'apply'])
+
+    def getcfgarrpath(self, devpath):
+        currptr = self.cfgbydev
+        for k in devpath[:-1]:
+            if k not in currptr:
+                currptr[k] = {}
+            currptr = currptr[k]
+        if devpath[-1] not in currptr:
+            currptr[devpath[-1]] = []
+        return currptr[devpath[-1]]
+        
+
 
 class WickedManager(object):
     def __init__(self):
@@ -253,6 +354,7 @@ class NetworkManager(object):
 
     def apply_configuration(self, cfg):
         cmdargs = {}
+        cmdargs['connection.autoconnect'] = 'yes'
         stgs = cfg['settings']
         cmdargs['ipv6.method'] = stgs.get('ipv6_method', 'link-local')
         if stgs.get('ipv6_address', None):
@@ -315,6 +417,7 @@ if __name__ == '__main__':
     myaddrs = apiclient.get_my_addresses()
     srvs, _ = apiclient.scan_confluents()
     doneidxs = set([])
+    dc = None
     for srv in srvs:
         try:
             s = socket.create_connection((srv, 443))
@@ -334,6 +437,9 @@ if __name__ == '__main__':
             continue
         status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
         nc = json.loads(nc)
+        if not dc:
+            status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+            dc = json.loads(dc)
         iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
         if iname:
             for iname in iname.split(','):
@@ -359,6 +465,8 @@ if __name__ == '__main__':
         if not netname_to_interfaces['default']['interfaces']:
             del netname_to_interfaces['default']
     rm_tmp_llas(tmpllas)
+    if os.path.exists('/usr/sbin/netplan'):
+        nm = NetplanManager(dc)
     if os.path.exists('/usr/bin/nmcli'):
         nm = NetworkManager(devtypes)
     elif os.path.exists('/usr/sbin/wicked'):
