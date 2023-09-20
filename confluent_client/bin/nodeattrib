@@ -53,6 +53,8 @@ argparser.add_option('-p', '--prompt', action='store_true',
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='Prompt if trying to set attributes on more '
                           'than specified number of nodes')
+argparser.add_option('-s', '--set', dest='set', metavar='settings.batch',
+                     default=False, help='set attributes using a batch file')
 (options, args) = argparser.parse_args()
 
 
@@ -109,6 +111,23 @@ elif options.clear or options.environment or options.prompt:
     sys.stderr.write('Attribute names required with specified options\n')
     argparser.print_help()
     exitcode = 400
+
+elif options.set:
+    arglist = [noderange]
+    showtype='current'
+    argfile = open(options.set, 'r')
+    argset = argfile.readline()
+    while argset:
+        try:
+            argset = argset[:argset.index('#')]
+        except ValueError:
+            pass
+        argset = argset.strip()
+        if argset:
+            arglist += shlex.split(argset)
+        argset = argfile.readline() 
+    session.stop_if_noderange_over(noderange, options.maxnodes)
+    exitcode=client.updateattrib(session,arglist,nodetype, noderange, options, None)
 if exitcode != 0:
     sys.exit(exitcode)
 
