@@ -49,10 +49,11 @@ import eventlet.green.select as select
 
 import eventlet.green.socket as socket
 
-
+import confluent.collective.manager as collective
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
+import confluent.noderange as noderange
 import confluent.util as util
 from eventlet.greenpool import GreenPool
 import eventlet.green.subprocess as subprocess
@@ -502,10 +503,21 @@ def _full_updatemacmap(configmanager):
                 'Network topology not available to tenants')
         # here's a list of switches... need to add nodes that are switches
         nodelocations = configmanager.get_node_attributes(
-            configmanager.list_nodes(), ('type', 'net*.switch', 'net*.switchport'))
+            configmanager.list_nodes(), ('type', 'collective.managercandidates', 'net*.switch', 'net*.switchport'))
         switches = set([])
+        incollective = collective.in_collective()
+        if incollective:
+            mycollectivename = collective.get_myname()
         for node in nodelocations:
             cfg = nodelocations[node]
+            if incollective:
+                candmgrs = cfg.get('collective.managercandidates', {}).get('value', None)
+                if candmgrs:
+                    candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+                    if mycollectivename not in candmgrs:
+                        # do not think about trying to find nodes that we aren't possibly
+                        # supposed to be a manager for in a collective
+                        continue
             if cfg.get('type', {}).get('value', None) == 'switch':
                 switches.add(node)
             for attr in cfg:

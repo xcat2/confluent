@@ -11,6 +11,13 @@ import struct
 import sys
 import subprocess
 
+def get_partname(devname, idx):
+    if devname[-1] in '0123456789':
+        return '{}p{}'.format(devname, idx)
+    else:
+        return '{}{}'.format(devname, idx)
+
+
 def get_next_part_meta(img, imgsize):
     if img.tell() == imgsize:
         return None
@@ -53,10 +60,13 @@ class PartedRunner():
     def __init__(self, disk):
         self.disk = disk
 
-    def run(self, command):
+    def run(self, command, check=True):
         command = command.split()
         command = ['parted', '-a', 'optimal', '-s', self.disk] + command
-        return subprocess.check_output(command).decode('utf8')
+        if check:
+            return subprocess.check_output(command).decode('utf8')
+        else:
+            return subprocess.run(command, stdout=subprocess.PIPE).stdout.decode('utf8')
 
 def fixup(rootdir, vols):
     devbymount = {}
@@ -166,6 +176,8 @@ def fixup(rootdir, vols):
             partnum = re.search('(\d+)$', targdev).group(1)
             targblock = re.search('(.*)\d+$', targdev).group(1)
     if targblock:
+        if targblock.endswith('p') and 'nvme' in targblock:
+            targblock = targblock[:-1]
         shimpath = subprocess.check_output(['find', os.path.join(rootdir, 'boot/efi'), '-name', 'shimx64.efi']).decode('utf8').strip()
         shimpath = shimpath.replace(rootdir, '/').replace('/boot/efi', '').replace('//', '/').replace('/', '\\')
         subprocess.check_call(['efibootmgr', '-c', '-d', targblock, '-l', shimpath, '--part', partnum])
@@ -224,7 +236,8 @@ def install_to_disk(imgpath):
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
     parted = PartedRunner(instdisk)
-    dinfo = parted.run('unit s print')
+    # do this safer, unit s print might bomb
+    dinfo = parted.run('unit s print', check=False)
     dinfo = dinfo.split('\n')
     sectors = 0
     sectorsize = 0
@@ -258,7 +271,7 @@ def install_to_disk(imgpath):
         if end > sectors:
             end = sectors
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
-        vol['targetdisk'] = instdisk + '{0}'.format(volidx)
+        vol['targetdisk'] = get_partname(instdisk , volidx)
         curroffset += size + 1
     if not lvmvols:
         if swapsize:
@@ -268,10 +281,10 @@ def install_to_disk(imgpath):
             if end > sectors:
                 end = sectors
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
-            subprocess.check_call(['mkswap', instdisk + '{}'.format(volidx + 1)])
+            subprocess.check_call(['mkswap', get_partname(instdisk, volidx + 1)])
     else:
         parted.run('mkpart lvm {}s 100%'.format(curroffset))
-        lvmpart = instdisk + '{}'.format(volidx + 1)
+        lvmpart = get_partname(instdisk, volidx + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', 'localstorage', lvmpart])
         vginfo = subprocess.check_output(['vgdisplay', 'localstorage', '--units', 'b']).decode('utf8')

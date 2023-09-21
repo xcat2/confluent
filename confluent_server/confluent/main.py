@@ -326,7 +326,7 @@ def run(args):
             break
         except Exception:
             eventlet.sleep(0.5)
-    disco.start_detection()
+    eventlet.spawn_n(disco.start_detection)
     eventlet.sleep(1)
     consoleserver.start_console_sessions()
     while 1:

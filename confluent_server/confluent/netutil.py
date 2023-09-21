@@ -332,6 +332,7 @@ def get_full_net_config(configmanager, node, serverip=None):
     if serverip:
         myaddrs = get_addresses_by_serverip(serverip)
     nm = NetManager(myaddrs, node, configmanager)
+    defaultnic = {}
     if None in attribs:
         nm.process_attribs(None, attribs[None])
         del attribs[None]
@@ -342,9 +343,44 @@ def get_full_net_config(configmanager, node, serverip=None):
         retattrs['default'] = nm.myattribs[None]
         add_netmask(retattrs['default'])
         del nm.myattribs[None]
+    else:
+        nnc = get_nic_config(configmanager, node, serverip=serverip)
+        if nnc.get('ipv4_address', None):
+            defaultnic['ipv4_address'] = '{}/{}'.format(nnc['ipv4_address'], nnc['prefix'])
+        if nnc.get('ipv4_gateway', None):
+            defaultnic['ipv4_gateway'] = nnc['ipv4_gateway']
+        if nnc.get('ipv4_method', None):
+            defaultnic['ipv4_method'] = nnc['ipv4_method']
+        if nnc.get('ipv6_address', None):
+            defaultnic['ipv6_address'] = '{}/{}'.format(nnc['ipv6_address'], nnc['ipv6_prefix'])
+        if nnc.get('ipv6_method', None):
+            defaultnic['ipv6_method'] = nnc['ipv6_method']
     retattrs['extranets'] = nm.myattribs
     for attri in retattrs['extranets']:
         add_netmask(retattrs['extranets'][attri])
+        if retattrs['extranets'][attri].get('ipv4_address', None) == defaultnic.get('ipv4_address', 'NOPE'):
+            defaultnic = {}
+        if retattrs['extranets'][attri].get('ipv6_address', None) == defaultnic.get('ipv6_address', 'NOPE'):
+            defaultnic = {}
+    if defaultnic:
+        retattrs['default'] = defaultnic
+        add_netmask(retattrs['default'])
+        ipv4addr = defaultnic.get('ipv4_address', None)
+        if ipv4addr and '/' in ipv4addr:
+            ipv4bytes = socket.inet_pton(socket.AF_INET, ipv4addr.split('/')[0])
+            for addr in nm.myaddrs:
+                if addr[0] != socket.AF_INET:
+                    continue
+                if ipn_on_same_subnet(addr[0], addr[1], ipv4bytes, addr[2]):
+                    defaultnic['current_nic'] = True
+        ipv6addr = defaultnic.get('ipv6_address', None)
+        if ipv6addr and '/' in ipv6addr:
+            ipv6bytes = socket.inet_pton(socket.AF_INET6, ipv6addr.split('/')[0])
+            for addr in nm.myaddrs:
+                if addr[0] != socket.AF_INET6:
+                    continue
+                if ipn_on_same_subnet(addr[0], addr[1], ipv6bytes, addr[2]):
+                    defaultnic['current_nic'] = True
     return retattrs
 
 

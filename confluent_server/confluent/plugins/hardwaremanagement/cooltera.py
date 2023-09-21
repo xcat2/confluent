@@ -210,10 +210,12 @@ def xml2stateinfo(statdata):
     stateinfo = []
     sensornames = sorted([x.tag for x in statdata])
     themodel = None
-    for model in sensorsbymodel:
-        if sensorsbymodel[model] == sensornames:
+    for model in sorted(sensorsbymodel):
+        if all([x in sensornames for x in sensorsbymodel[model]]):
             themodel = model
             break
+    else:
+        print(repr(sensornames))
     thesensors = _thesensors[themodel]
 #['mode', 't1', 't2a', 't2b', 't2c', 't2', 't5', 't3', 't4', 'dw', 't3', 'rh', 'setpoint', 'secflow', 'primflow', 'ps1', 'ps1a', 'ps1b', 'ps2', 'ps3', 'ps4', 'ps5a', 'ps5b', 'ps5c', 'sdp', 'valve', 'valve2', 'pumpspeed1', 'pumpspeed2', 'pumpspeed3', 'alarms', 'dt', 'p3state', 'duty']
     for tagname in thesensors:

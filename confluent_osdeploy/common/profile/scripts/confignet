@@ -112,9 +112,10 @@ def get_interface_name(iname, settings):
     return None
 
 class NetplanManager(object):
-    def __init__(self):
+    def __init__(self, deploycfg):
         self.cfgbydev = {}
         self.read_connections()
+        self.deploycfg = deploycfg
 
     def read_connections(self):
         for plan in glob.glob('/etc/netplan/*.y*ml'):
@@ -174,6 +175,19 @@ class NetplanManager(object):
                     else:
                         needcfgwrite = True
                         cfgroutes.append({'via': gwaddr, 'to': 'default'})
+            dnsips = self.deploycfg.get('nameservers', [])
+            dnsdomain = self.deploycfg.get('dnsdomain', '')
+            if dnsips:
+                currdnsips = self.getcfgarrpath([devname, 'nameservers', 'addresses'])
+                for dnsip in dnsips:
+                    if dnsip not in currdnsips:
+                        needcfgwrite = True
+                        currdnsips.append(dnsip)
+            if dnsdomain:
+                currdnsdomain = self.getcfgarrpath([devname, 'nameservers', 'search'])
+                if dnsdomain not in currdnsdomain:
+                    needcfgwrite = True
+                    currdnsdomain.append(dnsdomain)
             if needcfgwrite:
                 needcfgapply = True
                 newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
@@ -403,6 +417,7 @@ if __name__ == '__main__':
     myaddrs = apiclient.get_my_addresses()
     srvs, _ = apiclient.scan_confluents()
     doneidxs = set([])
+    dc = None
     for srv in srvs:
         try:
             s = socket.create_connection((srv, 443))
@@ -422,6 +437,9 @@ if __name__ == '__main__':
             continue
         status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
         nc = json.loads(nc)
+        if not dc:
+            status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+            dc = json.loads(dc)
         iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
         if iname:
             for iname in iname.split(','):
@@ -448,7 +466,7 @@ if __name__ == '__main__':
             del netname_to_interfaces['default']
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/sbin/netplan'):
-        nm = NetplanManager()
+        nm = NetplanManager(dc)
     if os.path.exists('/usr/bin/nmcli'):
         nm = NetworkManager(devtypes)
     elif os.path.exists('/usr/sbin/wicked'):
