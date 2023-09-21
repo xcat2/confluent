@@ -84,6 +84,7 @@ class GeistClient(object):
             'secret.hardwaremanagementuser', {}).get('value', None)
         passwd = credcfg.get(
             'secret.hardwaremanagementpassword', {}).get('value', None)
+
         if not isinstance(username, str):
             username = username.decode('utf8')
         if not isinstance(passwd, str):
@@ -94,6 +95,7 @@ class GeistClient(object):
         rsp = self.wc.grab_json_response(
             '/api/auth/{0}'.format(username),
             {'cmd': 'login', 'data': {'password': passwd}})
+
         token = rsp['data']['token']
         return token
 
@@ -113,9 +115,7 @@ class GeistClient(object):
         if len(dbt) != 1:
             raise Exception('Multiple PDUs not supported per pdu')
         pdutype = list(dbt)[0]
-
-        outlet = dbt[pdutype]['outlet'][ str(int(outlet[0]) - 1) ]
-
+        outlet = dbt[pdutype]['outlet'][ str(int(outlet.join(c for c in outlet if c.isdigit())) - 1) ]
         state = outlet['state'].split('2')[-1]
         return state
 
@@ -128,7 +128,8 @@ class GeistClient(object):
             self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
         pdu = dbt[list(dbt)[0]]['keyname']
-        outlet = int(outlet) - 1
+        outlet = int(outlet.join(c for c in outlet if c.isdigit()))  - 1
+
         rsp = self.wc.grab_json_response(
             '/api/dev/{0}/outlet/{1}'.format(pdu, outlet),
             {'cmd': 'control', 'token': self.token,
@@ -151,6 +152,10 @@ def process_measurement(keyname, name, enttype, entname, measurement, readings, 
         if category not in ('all',):
             return
         readtype = 'Voltage'
+    elif measurement['type'] == 'current':
+        if category not in ('all',):
+            return
+        readtype = 'Current'
     elif measurement['type'] == 'temperature':
         readtype = 'Temperature'
     elif measurement['type'] == 'dewpoint':
@@ -196,10 +201,12 @@ def read_sensors(element, node, configmanager):
         _sensors_by_node[node] = (adev, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
     dbt = data_by_type(sn[0]['data'])
+
     readings = []
     for datatype in dbt:        
         datum = dbt[datatype]
         process_measurements(name, category, datum['entity'], 'entity', readings)
+
         if 'outlet' in datum:
             process_measurements(name, category, datum['outlet'], 'outlet', readings)
     if justnames:
@@ -249,10 +256,11 @@ def read_inventory(element, node, configmanager):
         
 
 def retrieve(nodes, element, configmanager, inputdata):
+
     if 'outlets' in element:
         gp = greenpool.GreenPile(pdupool)
         for node in nodes:
-            print(element)
+
             gp.spawn(get_outlet, element, node, configmanager)
         for res in gp:
             yield res
