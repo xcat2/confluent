@@ -48,6 +48,8 @@ def run():
                           'prompting if over the threshold')   
     argparser.add_option('-l', '--loginname', type='str',
                          help='Username to use when connecting, defaults to current user.')
+    argparser.add_option('-s', '--substitutename',
+                         help='Use a different name other than the nodename for rsync')
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of nodes to concurrently rsync')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
@@ -63,8 +65,14 @@ def run():
     c = client.Command()
     cmdstr = ' '.join(args[:-1])
     cmdstr = 'rsync -av --info=progress2 ' + cmdstr
-    if options.loginname:
-        cmdstr += ' {}@'.format(options.loginname) + '{node}:' + targpath
+    if options.loginname and options.substitutename: 
+        cmdstr += ' {}@'.format(options.loginname) + '{node}' + '{}:'.format(options.substitutename) + targpath
+    elif options.loginname and not options.substitutename:
+        cmdstr += ' {}@'.format(options.loginname) + '{node}:' + targpath  
+    elif options.substitutename and not options.loginname:
+        subname = options.substitutename
+        if '{' not in subname:
+            cmdstr += ' {node}' + '{}:'.format(options.substitutename)  + targpath
     else:
         cmdstr += ' {node}:' + targpath
 
