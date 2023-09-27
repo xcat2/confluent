@@ -35,6 +35,7 @@ echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config.d/confluent.con
 echo IgnoreRhosts no >> /etc/ssh/sshd_config.d/confluent.conf
 systemctl restart sshd
 mkdir -p /etc/confluent
+export confluent_profile confluent_mgr
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions
 . /etc/confluent/functions
 run_remote_parts pre.d
