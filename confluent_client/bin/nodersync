@@ -72,7 +72,9 @@ def run():
     elif options.substitutename and not options.loginname:
         subname = options.substitutename
         if '{' not in subname:
-            cmdstr += ' {node}' + '{}:'.format(options.substitutename)  + targpath
+            cmdstr += ' {node}' + '{}:'.format(subname)  + targpath
+        else:
+            cmdstr += ' {}:'.format(subname) + targpath
     else:
         cmdstr += ' {node}:' + targpath
 
