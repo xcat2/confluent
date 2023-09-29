@@ -65,18 +65,20 @@ def run():
     c = client.Command()
     cmdstr = ' '.join(args[:-1])
     cmdstr = 'rsync -av --info=progress2 ' + cmdstr
-    if options.loginname and options.substitutename: 
-        cmdstr += ' {}@'.format(options.loginname) + '{node}' + '{}:'.format(options.substitutename) + targpath
-    elif options.loginname and not options.substitutename:
-        cmdstr += ' {}@'.format(options.loginname) + '{node}:' + targpath  
-    elif options.substitutename and not options.loginname:
-        subname = options.substitutename
-        if '{' not in subname:
-            cmdstr += ' {node}' + '{}:'.format(subname)  + targpath
-        else:
-            cmdstr += ' {}:'.format(subname) + targpath
+    
+    targname = options.substitutename
+    if targname and '{' in targname:
+        targname =  targname + ':'
+    elif targname:
+        targname = '{node}' + targname + ':'
     else:
-        cmdstr += ' {node}:' + targpath
+        targname = '{node}:'
+
+    if options.loginname:
+        cmdstr += ' {}@'.format(options.loginname) + targname + targpath
+    else:
+        cmdstr += ' {}'.format(targname) + targpath
+    
 
     currprocs = 0
     all = set([])
