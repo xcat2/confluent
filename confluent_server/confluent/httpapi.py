@@ -885,34 +885,20 @@ def resourcehandler_backend(env, start_response):
             start_response('200 OK', headers)
             yield rsp
             return
-    elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):
-        # Solution the wsgi.iput stream can only be read once and it is being read at the top 
-        if 'multipart/form-data' in reqtype:
-            field_storage = cgi.FieldStorage(fp=env['wsgi.input'], environ=env, keep_blank_values=True)
-            for item in field_storage.list:
-                if item.filename: 
-                    storage_file_path = '/var/lib/confluent/client_assets/' + item.filename       
-                    file_content = item.file.read()    
-                    with open(storage_file_path, 'wb') as file:
-                        file.write(file_content)
-            yield json.dumps({'data': storage_file_path})
-            start_response('200 OK', headers)
-            return 
-
+    elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):    
         url = env['PATH_INFO']
         if 'application/json' in reqtype:
             if not isinstance(reqbody, str):
                 reqbody = reqbody.decode('utf8')
             pbody = json.loads(reqbody)
             args = pbody['args']
-            args_dict = {'filename': args}
-            try:
-                args_dict.update({'bank': pbody['bank']})
-            except KeyError:
-                pass
+            filepath = args
+            if 'staging' in args:
+                file_directory = '/var/lib/confluent/client_assets/{}'.format(args.split('/')[-1])  
+                filepath = '{0}/{1}'.format(file_directory, os.listdir(file_directory)[0])     # TODO find a way to validate that the file is found and its the expected one
+            args_dict = {'filename': filepath}
             noderrs = {}
             nodeurls = {}
-            # start_response('202 Accepted', headers)
             hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)
             for res in hdlr:
                 if isinstance(res, confluent.messages.CreatedResource):
@@ -922,20 +908,6 @@ def resourcehandler_backend(env, start_response):
             yield json.dumps({'data': nodeurls})
             start_response('200 OK', headers)
             return
-
-    elif (operation == 'delete' and ('/firmware/updates/active' in env['PATH_INFO'])):
-        url = env['PATH_INFO']
-        if 'application/json' in reqtype:
-            if not isinstance(reqbody, str):
-                reqbody = reqbody.decode('utf8')
-            pbody = json.loads(reqbody)
-            args = pbody['args']
-            try:
-                os.remove(args)
-                start_response('200 OK', headers)        
-                return
-            except Exception as e:
-                return e
 
 
     else:
