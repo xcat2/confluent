@@ -119,6 +119,7 @@ _cfgstore = None
 _pendingchangesets = {}
 _txcount = 0
 _hasquorum = True
+_ready = False
 
 _attraliases = {
     'bmc': 'hardwaremanagement.manager',
@@ -830,6 +831,9 @@ _oldcfgstore = None
 _oldtxcount = 0
 
 
+def config_is_ready():
+    return _ready
+
 def rollback_clear():
     global _cfgstore
     global _txcount
@@ -847,6 +851,8 @@ def clear_configuration():
     global _txcount
     global _oldcfgstore
     global _oldtxcount
+    global _ready
+    _ready = False
     stop_leading()
     stop_following()
     _oldcfgstore = _cfgstore
@@ -857,6 +863,7 @@ def clear_configuration():
 def commit_clear():
     global _oldtxcount
     global _oldcfgstore
+    global _ready
     # first, copy over old non-key globals, as those are
     # currently defined as local to each collective member
     # currently just 'autosense' which is intended to be active
@@ -876,6 +883,7 @@ def commit_clear():
                 pass
     ConfigManager.wait_for_sync(True)
     ConfigManager._bg_sync_to_file()
+    _ready = True
 
 cfgleader = None
 
@@ -1273,6 +1281,7 @@ class ConfigManager(object):
     def __init__(self, tenant, decrypt=False, username=None):
         self.clientfiles = {}
         global _cfgstore
+        self.inrestore = False
         with _initlock:
             if _cfgstore is None:
                 init()
@@ -2089,6 +2098,10 @@ class ConfigManager(object):
     def _notif_attribwatchers(self, nodeattrs):
         if self.tenant not in self._attribwatchers:
             return
+        if self.inrestore:
+            # Do not stir up attribute watchers during a collective join or DB restore,
+            # it's too hectic of a time to react
+            return
         notifdata = {}
         attribwatchers = self._attribwatchers[self.tenant]
         for node in nodeattrs:
@@ -2471,6 +2484,13 @@ class ConfigManager(object):
         #TODO: wait for synchronization to suceed/fail??)
 
     def _load_from_json(self, jsondata, sync=True):
+        self.inrestore = True
+        try:
+            self._load_from_json_backend(jsondata, sync=True)
+        finally:
+            self.inrestore = False
+
+    def _load_from_json_backend(self, jsondata, sync=True):
         """Load fresh configuration data from jsondata
 
         :param jsondata: String of jsondata
@@ -2939,9 +2959,9 @@ def get_globals():
         bkupglobals[globvar] = _cfgstore['globals'][globvar]
     return bkupglobals
 
-
 def init(stateless=False):
     global _cfgstore
+    global _ready
     if stateless:
         _cfgstore = {}
         return
@@ -2949,6 +2969,9 @@ def init(stateless=False):
         ConfigManager._read_from_path()
     except IOError:
         _cfgstore = {}
+    members = list(list_collective())
+    if len(members) < 2:
+        _ready = True
 
 
 if __name__ == '__main__':

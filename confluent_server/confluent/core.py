@@ -447,6 +447,7 @@ def _init_core():
                 },
             },
         },
+        'layout': PluginRoute({'handler': 'layout'}),
         'media': {
             'uploads': PluginCollection({
                 'pluginattrs': ['hardwaremanagement.method'],

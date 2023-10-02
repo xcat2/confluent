@@ -7,6 +7,7 @@ if [ -f /tmp/dd_disk ]; then
         fi
     done
 fi
+shutdownnic=""
 oum=$(umask)
 umask 0077
 mkdir -p /etc/confluent
@@ -26,6 +27,13 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     deploysrvs=$(sed -n '/^deploy_servers:/, /^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
 
     nodename=$(grep ^nodename: cnflnt.yml|awk '{print $2}')
+    ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
+    hmackeyfile=/tmp/hmackeyfile
+    passfile=/etc/confluent/confluent.apikey
+    passcrypt=/tmp/passcrypt
+    hmacfile=/tmp/hmacfile
+    echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile;
+    /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
     echo "NODENAME: "$nodename > /etc/confluent/confluent.info
     for dsrv in $deploysrvs; do
         echo 'MANAGER: '$dsrv >> /etc/confluent/confluent.info
@@ -38,6 +46,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
         ip link set $(basename $i) up
     done
+    sleep 10
     usedhcp=0
     for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
         if [ "$autoconfigmethod" = "dhcp" ]; then
@@ -59,15 +68,17 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             v4nm=$(grep ipv4_netmask: $tcfg)
             v4nm=${v4nm#ipv4_netmask: }
             TESTSRV=$(python /opt/confluent/bin/apiclient -c 2> /dev/null)
+            if [ ! -z "$TESTSRV" ]; then
+                python /opt/confluent/bin/apiclient -p $hmacfile /confluent-api/self/registerapikey $passcrypt
+                mgr=$TESTSRV
+                ifname=$NICGUESS
+                shutdownnic=$ifname
+                break
+            fi
             if [ ! -z "$v4gw" ]; then
                 ip route del default via $v4gw
             fi
             ip -4 addr flush dev $NICGUESS
-            if [ ! -z "$TESTSRV" ]; then
-                mgr=$TESTSRV
-                ifname=$NICGUESS
-                break
-            fi
         fi
     done
 fi
@@ -87,13 +98,18 @@ elif [ -z "$ifname" ]; then
     grep ^EXTMGRINFO: /etc/confluent/confluent.info || return 0  # Do absolutely nothing if no data at all yet
     echo -n "" > /etc/cmdline.d/01-confluent.conf
 else
-    echo -n ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none > /etc/cmdline.d/01-confluent.conf
+    echo ip=$v4addr::$v4gw:$v4nm:$hostname:$ifname:none > /etc/cmdline.d/01-confluent.conf
 fi
-echo -n "" > /tmp/confluent.initq
+python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+if [ ! -z "$shutdownnic" ]; then
+    if [ ! -z "$v4gw" ]; then
+        ip route del default via $v4gw
+    fi
+    ip -4 addr flush dev $shutdownnic
+fi
 # restart cmdline
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
-#TODO: blkid --label <whatever> to find mounted api
-python /opt/confluent/bin/apiclient /confluent-api/self/deploycfg > /etc/confluent/confluent.deploycfg
+echo -n "" > /tmp/confluent.initq
 if [ -z "$ifname"  ]; then
     ifidx=$(cat /tmp/confluent.ifidx)
     ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')

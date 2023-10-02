@@ -11,12 +11,14 @@ import struct
 import sys
 import subprocess
 
+bootuuid = None
+
+
 def get_partname(devname, idx):
     if devname[-1] in '0123456789':
         return '{}p{}'.format(devname, idx)
     else:
         return '{}{}'.format(devname, idx)
-
 
 def get_next_part_meta(img, imgsize):
     if img.tell() == imgsize:
@@ -116,14 +118,8 @@ def fixup(rootdir, vols):
         shutil.copy2(sshkey, newkey)
         finfo = os.stat(sshkey)
         os.chown(newkey, finfo[stat.ST_UID], finfo[stat.ST_GID])
-    for ifcfg in glob.glob(os.path.join(rootdir, 'etc/sysconfig/network-scripts/*')):
-        os.unlink(ifcfg)
-    for ifcfg in glob.glob(os.path.join(rootdir, 'etc/NetworkManager/system-connections/*')):
-        os.unlink(ifcfg)
-    for ifcfg in glob.glob('/run/NetworkManager/system-connections/*'):
-        newcfg = ifcfg.split('/')[-1]
-        newcfg = os.path.join(rootdir, 'etc/NetworkManager/system-connections/{0}'.format(newcfg))
-        shutil.copy2(ifcfg, newcfg)
+
+    # Will use confignet to handle networking for ubuntu
     shutil.rmtree(os.path.join(rootdir, 'etc/confluent/'))
     shutil.copytree('/etc/confluent', os.path.join(rootdir, 'etc/confluent'))
     if policy:
@@ -135,9 +131,14 @@ def fixup(rootdir, vols):
         sys.stdout.flush()
     for metafs in ('proc', 'sys', 'dev'):
         subprocess.check_call(['mount', '-o', 'bind', '/{}'.format(metafs), os.path.join(rootdir, metafs)])
-    with open(os.path.join(rootdir, 'etc/sysconfig/grub')) as defgrubin:
+    if os.path.exists(os.path.join(rootdir, 'etc/lvm/devices/system.devices')):
+        os.remove(os.path.join(rootdir, 'etc/lvm/devices/system.devices'))
+    grubsyscfg = os.path.join(rootdir, 'etc/sysconfig/grub')
+    if not os.path.exists(grubsyscfg):
+        grubsyscfg = os.path.join(rootdir, 'etc/default/grub')
+    with open(grubsyscfg) as defgrubin:
         defgrub = defgrubin.read().split('\n')
-    with open(os.path.join(rootdir, 'etc/sysconfig/grub'), 'w') as defgrubout:
+    with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
             newline = []
@@ -146,8 +147,37 @@ def fixup(rootdir, vols):
                     continue
                 newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
-    grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/')
-    subprocess.check_call(['chroot', rootdir, 'grub2-mkconfig', '-o', grubcfg])
+    grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/').replace('//', '/')
+    grubcfg = grubcfg.split('\n')
+    if not grubcfg[-1]:
+        grubcfg = grubcfg[:-1]
+    if len(grubcfg) == 1:
+        grubcfg = grubcfg[0]
+    else:
+        for gcfg in grubcfg:
+            rgcfg = os.path.join(rootdir, gcfg[1:])  # gcfg has a leading / to get rid of
+            if os.stat(rgcfg).st_size > 256:
+                grubcfg = gcfg
+            else:
+                with open(rgcfg, 'r') as gin:
+                    tgrubcfg = gin.read()
+                tgrubcfg = tgrubcfg.split('\n')
+                if 'search --no-floppy --fs-uuid --set=dev' in tgrubcfg[0]:
+                    tgrubcfg[0] = 'search --no-floppy --fs-uuid --set=dev ' + bootuuid
+                elif 'search.fs_uuid ' in tgrubcfg[0] and 'root' in tgrubcfg[0]:
+                    tgrubcfg[0] = 'search.fs_uuid ' + bootuuid + ' root'
+                with open(rgcfg, 'w') as gout:
+                    for gcline in tgrubcfg:
+                        gout.write(gcline)
+                        gout.write('\n')
+    try:
+        # must fixup root@d2:/boot/efi/EFI# cat ubuntu/grub.cfg ... uuid
+        subprocess.check_call(['chroot', rootdir, 'grub-mkconfig', '-o', grubcfg])
+    except Exception as e:
+        print(repr(e))
+        print(rootdir)
+        print(grubcfg)
+        time.sleep(86400)
     newroot = None
     with open('/etc/shadow') as shadowin:
         shents = shadowin.read().split('\n')
@@ -176,8 +206,6 @@ def fixup(rootdir, vols):
             partnum = re.search('(\d+)$', targdev).group(1)
             targblock = re.search('(.*)\d+$', targdev).group(1)
     if targblock:
-        if targblock.endswith('p') and 'nvme' in targblock:
-            targblock = targblock[:-1]
         shimpath = subprocess.check_output(['find', os.path.join(rootdir, 'boot/efi'), '-name', 'shimx64.efi']).decode('utf8').strip()
         shimpath = shimpath.replace(rootdir, '/').replace('/boot/efi', '').replace('//', '/').replace('/', '\\')
         subprocess.check_call(['efibootmgr', '-c', '-d', targblock, '-l', shimpath, '--part', partnum])
@@ -196,6 +224,7 @@ def had_swap():
     return False
 
 def install_to_disk(imgpath):
+    global bootuuid
     lvmvols = {}
     deftotsize = 0
     mintotsize = 0
@@ -236,7 +265,6 @@ def install_to_disk(imgpath):
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
     parted = PartedRunner(instdisk)
-    # do this safer, unit s print might bomb
     dinfo = parted.run('unit s print', check=False)
     dinfo = dinfo.split('\n')
     sectors = 0
@@ -271,7 +299,7 @@ def install_to_disk(imgpath):
         if end > sectors:
             end = sectors
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
-        vol['targetdisk'] = get_partname(instdisk , volidx)
+        vol['targetdisk'] = get_partname(instdisk, volidx)
         curroffset += size + 1
     if not lvmvols:
         if swapsize:
@@ -379,6 +407,14 @@ def install_to_disk(imgpath):
                 sys.stdout.write('\x1b[1K\rDone writing {0}'.format(vol['mount']))
                 sys.stdout.write('\n')
                 sys.stdout.flush()
+                if vol['mount'] == '/boot':
+                    tbootuuid = subprocess.check_output(['blkid', vol['targetdisk']])
+                    if b'UUID="' in tbootuuid:
+                        bootuuid = tbootuuid.split(b'UUID="', 1)[1].split(b'"')[0].decode('utf8')
+
+
+
+
             subprocess.check_call(['umount', '/run/imginst/targ'])
         for vol in allvols:
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
@@ -387,3 +423,4 @@ def install_to_disk(imgpath):
 
 if __name__ == '__main__':
     install_to_disk(os.environ['mountsrc'])
+

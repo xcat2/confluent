@@ -259,6 +259,9 @@ def get_myname():
         mycachedname[1] = time.time()
         return myname
 
+def in_collective():
+    return bool(list(cfm.list_collective()))
+
 def handle_connection(connection, cert, request, local=False):
     global currentleader
     global retrythread
@@ -713,6 +716,7 @@ def become_leader(connection):
     if reassimilate is not None:
         reassimilate.kill()
     reassimilate = eventlet.spawn(reassimilate_missing)
+    cfm._ready = True
     if _assimilate_missing(skipaddr):
         schedule_rebalance()
 
