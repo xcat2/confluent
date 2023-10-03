@@ -435,10 +435,26 @@ if __name__ == '__main__':
                     curridx = addr[-1]
         if curridx in doneidxs:
             continue
-        status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+        for tries in (1, 2 3):
+            try:
+                status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+                break
+            except Exception:
+                if tries == 3:
+                    raise
+                time.sleep(1)
+                continue
         nc = json.loads(nc)
         if not dc:
-            status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+            for tries in (1, 2 3):
+                try:
+                    status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+                    break
+                except Exception:
+                    if tries == 3:
+                        raise
+                    time.sleep(1)
+                    continue
             dc = json.loads(dc)
         iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
         if iname:
