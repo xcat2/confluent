@@ -55,6 +55,92 @@ def humanify_nodename(nodename):
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split(numregex, nodename)]
 
+def unnumber_nodename(nodename):
+    # stub out numbers
+    chunked = ["{}" if text.isdigit() else text.lower()
+            for text in re.split(numregex, nodename)]
+    return chunked
+
+def getnumbers_nodename(nodename):
+    return [int(x) for x in re.split(numregex, nodename) if x.isdigit()]
+    
+def group_elements(elems):
+    """ Take the specefied elements and chunk them according to text similarity
+    """
+    prev = None
+    currchunk = []
+    chunked_elems = [currchunk]
+    for elem in elems:
+        elemtxt = unnumber_nodename(elem)
+        if not prev:
+            prev = elemtxt
+            currchunk.append(elem)
+            continue
+        if prev == elemtxt:
+            currchunk.append(elem)
+        else:
+            currchunk = [elem]
+            chunked_elems.append(currchunk)
+            prev = elemtxt
+    return chunked_elems
+
+def abbreviate_chunk(chunk, validset):
+    if len(chunk) < 3:
+        return sorted(chunk, key=humanify_nodename)
+    #chunk = sorted(chunk, key=humanify_nodename)
+    vset = set(validset)
+    cset = set(chunk)
+    mins = None
+    maxs = None
+    for name in chunk:
+        currns = getnumbers_nodename(name)
+        if mins is None:
+            mins = list(currns)
+            maxs = list(currns)
+            continue
+        for n in range(len(currns)):
+            if currns[n] < mins[n]:
+                mins[n] = currns[n]
+            if currns[n] > maxs[n]:
+                maxs[n] = currns[n]
+    tmplt = ''.join(unnumber_nodename(chunk[0]))
+    bgnr = tmplt.format(*mins)
+    endr = tmplt.format(*maxs)
+    nr = '{}:{}'.format(bgnr, endr)
+    prospect = NodeRange(nr).nodes
+    ranges = []
+    discontinuities = (prospect - vset).union(prospect - cset)
+    currstart = None
+    prevnode = None
+    chunksize = 0
+    prospect = sorted(prospect, key=humanify_nodename)
+    currstart = prospect[0]
+    while prospect:
+        currnode = prospect.pop(0)
+        if currnode in discontinuities:
+            if chunksize == 0:
+                continue
+            elif chunksize == 1:
+                ranges.append(prevnode)
+            elif chunksize == 2:
+                ranges.append(','.join([currstart, prevnode]))
+            else:
+                ranges.append(':'.join([currstart, prevnode]))
+            chunksize = 0
+            currstart = None
+            continue
+        elif not currstart:
+            currstart = currnode
+        chunksize += 1
+        prevnode = currnode
+    if chunksize == 1:
+        ranges.append(prevnode)
+    elif chunksize == 2:
+        ranges.append(','.join([currstart, prevnode]))
+    elif chunksize != 0:
+        ranges.append(':'.join([currstart, prevnode]))
+    return ranges
+
 
 class ReverseNodeRange(object):
     """Abbreviate a set of nodes to a shorter noderange representation
@@ -71,7 +157,8 @@ class ReverseNodeRange(object):
     @property
     def noderange(self):
         subsetgroups = []
-        for group in self.cfm.get_groups(sizesort=True):
+        allgroups = self.cfm.get_groups(sizesort=True)
+        for group in allgroups:
             if lastnoderange:
                 for nr in lastnoderange:
                     if lastnoderange[nr] - self.nodes:
@@ -88,7 +175,28 @@ class ReverseNodeRange(object):
                 self.nodes -= nl
                 if not self.nodes:
                     break
-        return ','.join(sorted(subsetgroups) + sorted(self.nodes))
+        # then, analyze sequentially identifying matching alpha subsections
+        # then try out noderange from beginning to end
+        # we need to know discontinuities, which are either:
+        # nodes that appear in the noderange that are not in the nodes
+        # nodes that do not exist at all (we need a noderange modification 
+        # that returns non existing nodes)
+        ranges = []
+        try:
+            subsetgroups.sort(key=humanify_nodename)
+            groupchunks = group_elements(subsetgroups)
+            for gc in groupchunks:
+                ranges.extend(abbreviate_chunk(gc, allgroups))
+        except Exception:
+            subsetgroups.sort()
+        try:
+            nodes = sorted(self.nodes, key=humanify_nodename)
+            nodechunks = group_elements(nodes)
+            for nc in nodechunks:
+                ranges.extend(abbreviate_chunk(nc, self.cfm.list_nodes()))
+        except Exception:
+            ranges = sorted(self.nodes)
+        return ','.join(ranges)
 
 
 
