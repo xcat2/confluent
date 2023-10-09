@@ -64,6 +64,105 @@ def unnumber_nodename(nodename):
 def getnumbers_nodename(nodename):
     return [int(x) for x in re.split(numregex, nodename) if x.isdigit()]
     
+
+class Bracketer(object):
+    __slots__ = ['sequences', 'count', 'nametmpl', 'diffn', 'tokens']
+
+    def __init__(self, nodename):
+        self.sequences = []
+        realnodename = nodename
+        if ':' in nodename:
+            realnodename = nodename.split(':', 1)[0]
+        self.count = len(getnumbers_nodename(realnodename))
+        self.nametmpl = unnumber_nodename(realnodename)
+        for n in range(self.count):
+            self.sequences.append(None)
+        self.diffn = None
+        self.tokens = []
+        self.extend(nodename)
+
+    def extend(self, nodeorseq):
+        # can only differentiate a single number
+        endname = None
+        endnums = None
+        enddifn = self.diffn
+        if ':' in nodeorseq:
+            nodename, endname = nodeorseq.split(':', 1)
+        else:
+            nodename = nodeorseq
+        nums = getnumbers_nodename(nodename)
+        if endname:
+            diffcount = 0
+            endnums = getnumbers_nodename(endname)
+            ecount = len(endnums)
+            if ecount != self.count:
+                raise Exception("mismatched names passed")
+            for n in range(ecount):
+                if endnums[n] != nums[n]:
+                    enddifn = n
+                    diffcount += 1
+            if diffcount > 1:
+                if self.sequences:
+                    self.flush_current()
+                self.tokens.append(nodeorseq)  # TODO: could just abbreviate this with multiple []...
+                return
+        for n in range(self.count):
+            if endnums and endnums[n] != nums[n]:
+                outval = '{}:{}'.format(nums[n], endnums[n])
+            else:
+                outval = '{}'.format(nums[n])
+            if self.sequences[n] is None:
+                # We initialize to text pieces, 'currstart', and 'prev' number
+                self.sequences[n] = [[outval], nums[n], nums[n]]
+            elif self.sequences[n][2] == nums[n]:
+                continue  # new nodename has no new number, keep going
+            elif self.sequences[n][2] != nums[n]:
+                if self.diffn is not None and (n != self.diffn or enddifn != n):
+                    self.flush_current()
+                    self.sequences[n] = [[], nums[n], nums[n]]
+                self.diffn = n
+                self.sequences[n][0].append(outval)
+                self.sequences[n][2] = nums[n]
+            elif False: # previous attempt 
+                # A discontinuity, need to close off previous chunk
+                currstart = self.sequences[n][1]
+                prevnum = self.sequences[n][2]
+                if currstart == prevnum:
+                    self.sequences[n][0].append('{}'.format(currstart))
+                elif prevnum == currstart + 1:
+                    self.sequences[n][0].append('{},{}'.format(currstart, prevnum))
+                else:
+                    self.sequences[n][0].append('{}:{}'.format(currstart, prevnum))
+                self.sequences[n][1] = nums[n]
+                self.sequences[n][2] = nums[n]
+            elif False: # self.sequences[n][2] == nums[n] - 1: # sequential, increment prev
+                self.sequences[n][2] = nums[n]
+            else:
+                raise Exception('Decreasing node in extend call, not supported')
+
+    def flush_current(self):
+        txtfields = []
+        for n in range(self.count):
+            txtfield = ','.join(self.sequences[n][0])
+            #if self.sequences[n][1] == self.sequences[n][2]:
+            #    txtfield.append('{}'.format(self.sequences[n][1]))
+            #else:
+            #    txtfield.append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
+            if txtfield.isdigit():
+                txtfields.append(txtfield)
+            else:
+                txtfields.append('[{}]'.format(txtfield))
+        self.tokens.append(''.join(self.nametmpl).format(*txtfields))
+        self.sequences = []
+        for n in range(self.count):
+            self.sequences.append(None)
+
+    @property
+    def range(self):
+        if self.sequences:
+            self.flush_current()
+        return ','.join(self.tokens)
+
 def group_elements(elems):
     """ Take the specefied elements and chunk them according to text similarity
     """
@@ -123,7 +222,7 @@ def abbreviate_chunk(chunk, validset):
             elif chunksize == 1:
                 ranges.append(prevnode)
             elif chunksize == 2:
-                ranges.append(','.join([currstart, prevnode]))
+                ranges.extend([currstart, prevnode])
             else:
                 ranges.append(':'.join([currstart, prevnode]))
             chunksize = 0
@@ -136,7 +235,7 @@ def abbreviate_chunk(chunk, validset):
     if chunksize == 1:
         ranges.append(prevnode)
     elif chunksize == 2:
-        ranges.append(','.join([currstart, prevnode]))
+        ranges.extend([currstart, prevnode])
     elif chunksize != 0:
         ranges.append(':'.join([currstart, prevnode]))
     return ranges
@@ -193,7 +292,11 @@ class ReverseNodeRange(object):
             nodes = sorted(self.nodes, key=humanify_nodename)
             nodechunks = group_elements(nodes)
             for nc in nodechunks:
-                ranges.extend(abbreviate_chunk(nc, self.cfm.list_nodes()))
+                currchunks = abbreviate_chunk(nc, self.cfm.list_nodes())
+                bracketer = Bracketer(currchunks[0])
+                for chnk in currchunks[1:]:
+                    bracketer.extend(chnk)
+                ranges.append(bracketer.range)
         except Exception:
             ranges = sorted(self.nodes)
         return ','.join(ranges)
