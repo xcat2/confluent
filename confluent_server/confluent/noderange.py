@@ -80,70 +80,39 @@ class Bracketer(object):
         self.diffn = None
         self.tokens = []
         self.extend(nodename)
+        if self.count == 0:
+            self.tokens = [nodename]
 
     def extend(self, nodeorseq):
         # can only differentiate a single number
         endname = None
         endnums = None
-        enddifn = self.diffn
         if ':' in nodeorseq:
             nodename, endname = nodeorseq.split(':', 1)
         else:
             nodename = nodeorseq
         nums = getnumbers_nodename(nodename)
-        if endname:
-            diffcount = 0
-            endnums = getnumbers_nodename(endname)
-            ecount = len(endnums)
-            if ecount != self.count:
-                raise Exception("mismatched names passed")
-            for n in range(ecount):
-                if endnums[n] != nums[n]:
-                    enddifn = n
-                    if self.diffn is None:
-                        self.diffn = enddifn
-                    diffcount += 1
-            if diffcount > 1 or enddifn != self.diffn:
-                if self.sequences:
-                    self.flush_current()
-                txtfields = []
-                for idx in range(len(nums)):
-                    if endnums[idx] == nums[idx]:
-                        txtfields.append(nums[idx])
-                    else:
-                        txtfields.append('[{}:{}]'.format(nums[idx], endnums[idx]))
-                self.tokens.append(''.join(self.nametmpl).format(*txtfields))
-                return
         for n in range(self.count):
-            if endnums and endnums[n] != nums[n]:
-                outval = '{}:{}'.format(nums[n], endnums[n])
-            else:
-                outval = '{}'.format(nums[n])
             if self.sequences[n] is None:
                 # We initialize to text pieces, 'currstart', and 'prev' number
-                self.sequences[n] = [[outval], nums[n], nums[n]]
+                self.sequences[n] = [[], nums[n], nums[n]]
             elif self.sequences[n][2] == nums[n]:
                 continue  # new nodename has no new number, keep going
             elif self.sequences[n][2] != nums[n]:
-                if self.diffn is not None and (n != self.diffn or enddifn != n):
+                if self.diffn is not None and n != self.diffn:
                     self.flush_current()
                     self.sequences[n] = [[], nums[n], nums[n]]
-                self.diffn = n
-                self.sequences[n][0].append(outval)
-                self.sequences[n][2] = nums[n]
-            elif False: # previous attempt 
-                # A discontinuity, need to close off previous chunk
-                currstart = self.sequences[n][1]
-                prevnum = self.sequences[n][2]
-                if currstart == prevnum:
-                    self.sequences[n][0].append('{}'.format(currstart))
-                elif prevnum == currstart + 1:
-                    self.sequences[n][0].append('{},{}'.format(currstart, prevnum))
+                    self.diffn = None
                 else:
-                    self.sequences[n][0].append('{}:{}'.format(currstart, prevnum))
-                self.sequences[n][1] = nums[n]
-                self.sequences[n][2] = nums[n]
-            elif False: # self.sequences[n][2] == nums[n] - 1: # sequential, increment prev
+                    self.diffn = n
+                if self.sequences[n][2] == (nums[n] - 1):
+                    self.sequences[n][2] = nums[n]
+                elif self.sequences[n][2] < (nums[n] - 1):
+                    if self.sequences[n][2] != self.sequences[n][1]:
+                        self.sequences[n][0].append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
+                    else:
+                        self.sequences[n][0].append('{}'.format(self.sequences[n][1]))
+                    self.sequences[n][1] = nums[n]
                 self.sequences[n][2] = nums[n]
             else:
                 raise Exception('Decreasing node in extend call, not supported')
@@ -152,11 +121,11 @@ class Bracketer(object):
         txtfields = []
         if self.sequences and self.sequences[0] is not None:
             for n in range(self.count):
+                if self.sequences[n][1] == self.sequences[n][2]:
+                    self.sequences[n][0].append('{}'.format(self.sequences[n][1]))
+                else:
+                    self.sequences[n][0].append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
                 txtfield = ','.join(self.sequences[n][0])
-                #if self.sequences[n][1] == self.sequences[n][2]:
-                #    txtfield.append('{}'.format(self.sequences[n][1]))
-                #else:
-                #    txtfield.append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
                 if txtfield.isdigit():
                     txtfields.append(txtfield)
                 else:
@@ -171,6 +140,7 @@ class Bracketer(object):
         if self.sequences:
             self.flush_current()
         return ','.join(self.tokens)
+
 
 def group_elements(elems):
     """ Take the specefied elements and chunk them according to text similarity
@@ -192,74 +162,6 @@ def group_elements(elems):
             prev = elemtxt
     return chunked_elems
 
-def abbreviate_chunk(chunk, validset):
-    if len(chunk) < 3:
-        return sorted(chunk, key=humanify_nodename)
-    vset = set(validset)
-    cset = set(chunk)
-    minmaxes = [None]
-    diffn = None
-    prevns = None
-    for name in chunk:
-        currns = getnumbers_nodename(name)
-        if minmaxes[-1] is None:
-            minmaxes[-1] = [list(currns), list(currns)]
-            continue
-        if prevns is None:
-            prevns = currns
-        for n in range(len(currns)):
-            if prevns[n] != currns[n]:
-                if diffn is None:
-                    diffn = n
-                elif diffn != n:
-                    minmaxes.append([list(currns), list(currns)])
-                    continue
-            if currns[n] < minmaxes[-1][0][n]:
-                minmaxes.append([list(currns), list(currns)])
-            if currns[n] > minmaxes[-1][1][n]:
-                minmaxes[-1][1][n] = currns[n]
-        prevns = currns
-    tmplt = ''.join(unnumber_nodename(chunk[0]))
-    ranges = []
-    for x in minmaxes:
-        process_abbreviation(vset, cset, x[0], x[1], tmplt, ranges)
-    return ranges
-
-def process_abbreviation(vset, cset, mins, maxs, tmplt, ranges):
-    bgnr = tmplt.format(*mins)
-    endr = tmplt.format(*maxs)
-    nr = '{}:{}'.format(bgnr, endr)
-    prospect = NodeRange(nr).nodes
-    discontinuities = (prospect - vset).union(prospect - cset)
-    currstart = None
-    prevnode = None
-    chunksize = 0
-    prospect = sorted(prospect, key=humanify_nodename)
-    currstart = prospect[0]
-    while prospect:
-        currnode = prospect.pop(0)
-        if currnode in discontinuities:
-            if chunksize == 0:
-                continue
-            elif chunksize == 1:
-                ranges.append(prevnode)
-            elif chunksize == 2:
-                ranges.extend([currstart, prevnode])
-            else:
-                ranges.append(':'.join([currstart, prevnode]))
-            chunksize = 0
-            currstart = None
-            continue
-        elif not currstart:
-            currstart = currnode
-        chunksize += 1
-        prevnode = currnode
-    if chunksize == 1:
-        ranges.append(prevnode)
-    elif chunksize == 2:
-        ranges.extend([currstart, prevnode])
-    elif chunksize != 0:
-        ranges.append(':'.join([currstart, prevnode]))
 
 class ReverseNodeRange(object):
     """Abbreviate a set of nodes to a shorter noderange representation
@@ -305,9 +207,8 @@ class ReverseNodeRange(object):
             subsetgroups.sort(key=humanify_nodename)
             groupchunks = group_elements(subsetgroups)
             for gc in groupchunks:
-                currchunks = abbreviate_chunk(gc, allgroups)
-                bracketer = Bracketer(currchunks[0])
-                for chnk in currchunks[1:]:
+                bracketer = Bracketer(gc[0])
+                for chnk in gc[1:]:
                     bracketer.extend(chnk)
                 ranges.append(bracketer.range)
         except Exception:
@@ -316,9 +217,8 @@ class ReverseNodeRange(object):
             nodes = sorted(self.nodes, key=humanify_nodename)
             nodechunks = group_elements(nodes)
             for nc in nodechunks:
-                currchunks = abbreviate_chunk(nc, self.cfm.list_nodes())
-                bracketer = Bracketer(currchunks[0])
-                for chnk in currchunks[1:]:
+                bracketer = Bracketer(nc[0])
+                for chnk in nc[1:]:
                     bracketer.extend(chnk)
                 ranges.append(bracketer.range)
         except Exception:
