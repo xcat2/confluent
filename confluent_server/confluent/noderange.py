@@ -100,11 +100,19 @@ class Bracketer(object):
             for n in range(ecount):
                 if endnums[n] != nums[n]:
                     enddifn = n
+                    if self.diffn is None:
+                        self.diffn = enddifn
                     diffcount += 1
-            if diffcount > 1:
+            if diffcount > 1 or enddifn != self.diffn:
                 if self.sequences:
                     self.flush_current()
-                self.tokens.append(nodeorseq)  # TODO: could just abbreviate this with multiple []...
+                txtfields = []
+                for idx in range(len(nums)):
+                    if endnums[idx] == nums[idx]:
+                        txtfields.append(nums[idx])
+                    else:
+                        txtfields.append('[{}:{}]'.format(nums[idx], endnums[idx]))
+                self.tokens.append(''.join(self.nametmpl).format(*txtfields))
                 return
         for n in range(self.count):
             if endnums and endnums[n] != nums[n]:
@@ -142,17 +150,18 @@ class Bracketer(object):
 
     def flush_current(self):
         txtfields = []
-        for n in range(self.count):
-            txtfield = ','.join(self.sequences[n][0])
-            #if self.sequences[n][1] == self.sequences[n][2]:
-            #    txtfield.append('{}'.format(self.sequences[n][1]))
-            #else:
-            #    txtfield.append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
-            if txtfield.isdigit():
-                txtfields.append(txtfield)
-            else:
-                txtfields.append('[{}]'.format(txtfield))
-        self.tokens.append(''.join(self.nametmpl).format(*txtfields))
+        if self.sequences and self.sequences[0] is not None:
+            for n in range(self.count):
+                txtfield = ','.join(self.sequences[n][0])
+                #if self.sequences[n][1] == self.sequences[n][2]:
+                #    txtfield.append('{}'.format(self.sequences[n][1]))
+                #else:
+                #    txtfield.append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
+                if txtfield.isdigit():
+                    txtfields.append(txtfield)
+                else:
+                    txtfields.append('[{}]'.format(txtfield))
+            self.tokens.append(''.join(self.nametmpl).format(*txtfields))
         self.sequences = []
         for n in range(self.count):
             self.sequences.append(None)
@@ -186,28 +195,41 @@ def group_elements(elems):
 def abbreviate_chunk(chunk, validset):
     if len(chunk) < 3:
         return sorted(chunk, key=humanify_nodename)
-    #chunk = sorted(chunk, key=humanify_nodename)
     vset = set(validset)
     cset = set(chunk)
-    mins = None
-    maxs = None
+    minmaxes = [None]
+    diffn = None
+    prevns = None
     for name in chunk:
         currns = getnumbers_nodename(name)
-        if mins is None:
-            mins = list(currns)
-            maxs = list(currns)
+        if minmaxes[-1] is None:
+            minmaxes[-1] = [list(currns), list(currns)]
             continue
+        if prevns is None:
+            prevns = currns
         for n in range(len(currns)):
-            if currns[n] < mins[n]:
-                mins[n] = currns[n]
-            if currns[n] > maxs[n]:
-                maxs[n] = currns[n]
+            if prevns[n] != currns[n]:
+                if diffn is None:
+                    diffn = n
+                elif diffn != n:
+                    minmaxes.append([list(currns), list(currns)])
+                    continue
+            if currns[n] < minmaxes[-1][0][n]:
+                minmaxes.append([list(currns), list(currns)])
+            if currns[n] > minmaxes[-1][1][n]:
+                minmaxes[-1][1][n] = currns[n]
+        prevns = currns
     tmplt = ''.join(unnumber_nodename(chunk[0]))
+    ranges = []
+    for x in minmaxes:
+        process_abbreviation(vset, cset, x[0], x[1], tmplt, ranges)
+    return ranges
+
+def process_abbreviation(vset, cset, mins, maxs, tmplt, ranges):
     bgnr = tmplt.format(*mins)
     endr = tmplt.format(*maxs)
     nr = '{}:{}'.format(bgnr, endr)
     prospect = NodeRange(nr).nodes
-    ranges = []
     discontinuities = (prospect - vset).union(prospect - cset)
     currstart = None
     prevnode = None
@@ -238,8 +260,6 @@ def abbreviate_chunk(chunk, validset):
         ranges.extend([currstart, prevnode])
     elif chunksize != 0:
         ranges.append(':'.join([currstart, prevnode]))
-    return ranges
-
 
 class ReverseNodeRange(object):
     """Abbreviate a set of nodes to a shorter noderange representation
@@ -285,7 +305,11 @@ class ReverseNodeRange(object):
             subsetgroups.sort(key=humanify_nodename)
             groupchunks = group_elements(subsetgroups)
             for gc in groupchunks:
-                ranges.extend(abbreviate_chunk(gc, allgroups))
+                currchunks = abbreviate_chunk(gc, allgroups)
+                bracketer = Bracketer(currchunks[0])
+                for chnk in currchunks[1:]:
+                    bracketer.extend(chnk)
+                ranges.append(bracketer.range)
         except Exception:
             subsetgroups.sort()
         try:
