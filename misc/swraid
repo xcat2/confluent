@@ -1,6 +1,6 @@
 DEVICES="/dev/sda /dev/sdb"
 RAIDLEVEL=1
-mdadm --detail /dev/md*|grep 'Version : 1.0' >& /dev/null && exit 0
+mdadm --detail /dev/md*|grep 'Version : 1.0' >& /dev/null || (
 lvm vgchange -a n
 mdadm -S -s
 NUMDEVS=$(for dev in $DEVICES; do
@@ -14,5 +14,6 @@ mdadm -C /dev/md/raid $DEVICES -n $NUMDEVS -e 1.0 -l $RAIDLEVEL
 # shut and restart array to prime things for anaconda
 mdadm -S -s
 mdadm --assemble --scan
+)
 readlink /dev/md/raid|sed -e 's/.*\///' > /tmp/installdisk
 
