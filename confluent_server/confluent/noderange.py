@@ -62,14 +62,15 @@ def unnumber_nodename(nodename):
     return chunked
 
 def getnumbers_nodename(nodename):
-    return [int(x) for x in re.split(numregex, nodename) if x.isdigit()]
+    return [x for x in re.split(numregex, nodename) if x.isdigit()]
     
 
 class Bracketer(object):
-    __slots__ = ['sequences', 'count', 'nametmpl', 'diffn', 'tokens']
+    __slots__ = ['sequences', 'count', 'nametmpl', 'diffn', 'tokens', 'numlens']
 
     def __init__(self, nodename):
         self.sequences = []
+        self.numlens = []
         realnodename = nodename
         if ':' in nodename:
             realnodename = nodename.split(':', 1)[0]
@@ -77,6 +78,7 @@ class Bracketer(object):
         self.nametmpl = unnumber_nodename(realnodename)
         for n in range(self.count):
             self.sequences.append(None)
+            self.numlens.append([0, 0])
         self.diffn = None
         self.tokens = []
         self.extend(nodename)
@@ -84,6 +86,7 @@ class Bracketer(object):
             self.tokens = [nodename]
 
     def extend(self, nodeorseq):
+        # crap... failed to preserve 0 padding foro fixe width
         # can only differentiate a single number
         endname = None
         endnums = None
@@ -91,29 +94,37 @@ class Bracketer(object):
             nodename, endname = nodeorseq.split(':', 1)
         else:
             nodename = nodeorseq
-        nums = getnumbers_nodename(nodename)
+        txtnums = getnumbers_nodename(nodename)
+        nums = [int(x) for x in txtnums]
         for n in range(self.count):
             if self.sequences[n] is None:
                 # We initialize to text pieces, 'currstart', and 'prev' number
                 self.sequences[n] = [[], nums[n], nums[n]]
+                self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
             elif self.sequences[n][2] == nums[n]:
                 continue  # new nodename has no new number, keep going
             elif self.sequences[n][2] != nums[n]:
                 if self.diffn is not None and n != self.diffn:
                     self.flush_current()
                     self.sequences[n] = [[], nums[n], nums[n]]
+                    self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
                     self.diffn = None
                 else:
                     self.diffn = n
                 if self.sequences[n][2] == (nums[n] - 1):
                     self.sequences[n][2] = nums[n]
+                    self.numlens[n][1] = len(txtnums[n])
                 elif self.sequences[n][2] < (nums[n] - 1):
                     if self.sequences[n][2] != self.sequences[n][1]:
-                        self.sequences[n][0].append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
+                        fmtstr = '{{:0{}d}}:{{:0{}d}}'.format(*self.numlens[n])
+                        self.sequences[n][0].append(fmtstr.format(self.sequences[n][1], self.sequences[n][2]))
                     else:
-                        self.sequences[n][0].append('{}'.format(self.sequences[n][1]))
+                        fmtstr = '{{:0{}d}}'.format(self.numlens[n][0])
+                        self.sequences[n][0].append(fmtstr.format(self.sequences[n][1]))
                     self.sequences[n][1] = nums[n]
+                    self.numlens[n][0] = len(txtnums[n])
                 self.sequences[n][2] = nums[n]
+                self.numlens[n][1] = len(txtnums[n])
             else:
                 raise Exception('Decreasing node in extend call, not supported')
 
