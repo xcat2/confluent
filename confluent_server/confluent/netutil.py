@@ -25,6 +25,9 @@ import eventlet.support.greendns
 import os
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
+eventlet.support.greendns.resolver.clear()
+eventlet.support.greendns.resolver._resolver.lifetime = 1
+
 def msg_align(len):
     return (len + 3) & ~3
 
@@ -333,11 +336,13 @@ def get_full_net_config(configmanager, node, serverip=None):
         myaddrs = get_addresses_by_serverip(serverip)
     nm = NetManager(myaddrs, node, configmanager)
     defaultnic = {}
+    ppool = eventlet.greenpool.GreenPool(64)
     if None in attribs:
-        nm.process_attribs(None, attribs[None])
+        ppool.spawn(nm.process_attribs, None, attribs[None])
         del attribs[None]
     for netname in sorted(attribs):
-        nm.process_attribs(netname, attribs[netname])
+        ppool.spawn(nm.process_attribs, netname, attribs[netname])
+    ppool.waitall()
     retattrs = {}
     if None in nm.myattribs:
         retattrs['default'] = nm.myattribs[None]
