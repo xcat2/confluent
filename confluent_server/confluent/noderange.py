@@ -86,7 +86,6 @@ class Bracketer(object):
             self.tokens = [nodename]
 
     def extend(self, nodeorseq):
-        # crap... failed to preserve 0 padding foro fixe width
         # can only differentiate a single number
         endname = None
         endnums = None
@@ -97,23 +96,26 @@ class Bracketer(object):
         txtnums = getnumbers_nodename(nodename)
         nums = [int(x) for x in txtnums]
         for n in range(self.count):
+            padto = len(txtnums[n])
+            needpad = (padto != len('{}'.format(nums[n])))
             if self.sequences[n] is None:
                 # We initialize to text pieces, 'currstart', and 'prev' number
                 self.sequences[n] = [[], nums[n], nums[n]]
                 self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
-            elif self.sequences[n][2] == nums[n]:
+            elif self.sequences[n][2] == nums[n] and self.numlens[n][1] == padto:
                 continue  # new nodename has no new number, keep going
-            elif self.sequences[n][2] != nums[n]:
-                if self.diffn is not None and n != self.diffn:
+            else: # if self.sequences[n][2] != nums[n] or :
+                if self.diffn is not None and (n != self.diffn or 
+                        (needpad and padto != self.numlens[n][1])):
                     self.flush_current()
                     self.sequences[n] = [[], nums[n], nums[n]]
-                    self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
+                    self.numlens[n] = [padto, padto]
                     self.diffn = None
                 else:
                     self.diffn = n
                 if self.sequences[n][2] == (nums[n] - 1):
                     self.sequences[n][2] = nums[n]
-                    self.numlens[n][1] = len(txtnums[n])
+                    self.numlens[n][1] = padto
                 elif self.sequences[n][2] < (nums[n] - 1):
                     if self.sequences[n][2] != self.sequences[n][1]:
                         fmtstr = '{{:0{}d}}:{{:0{}d}}'.format(*self.numlens[n])
@@ -122,20 +124,20 @@ class Bracketer(object):
                         fmtstr = '{{:0{}d}}'.format(self.numlens[n][0])
                         self.sequences[n][0].append(fmtstr.format(self.sequences[n][1]))
                     self.sequences[n][1] = nums[n]
-                    self.numlens[n][0] = len(txtnums[n])
+                    self.numlens[n][0] = padto
                 self.sequences[n][2] = nums[n]
-                self.numlens[n][1] = len(txtnums[n])
-            else:
-                raise Exception('Decreasing node in extend call, not supported')
+                self.numlens[n][1] = padto
 
     def flush_current(self):
         txtfields = []
         if self.sequences and self.sequences[0] is not None:
             for n in range(self.count):
                 if self.sequences[n][1] == self.sequences[n][2]:
-                    self.sequences[n][0].append('{}'.format(self.sequences[n][1]))
+                    fmtstr = '{{:0{}d}}'.format(self.numlens[n][0])
+                    self.sequences[n][0].append(fmtstr.format(self.sequences[n][1]))
                 else:
-                    self.sequences[n][0].append('{}:{}'.format(self.sequences[n][1], self.sequences[n][2]))
+                    fmtstr = '{{:0{}d}}:{{:0{}d}}'.format(*self.numlens[n])
+                    self.sequences[n][0].append(fmtstr.format(self.sequences[n][1], self.sequences[n][2]))
                 txtfield = ','.join(self.sequences[n][0])
                 if txtfield.isdigit():
                     txtfields.append(txtfield)
