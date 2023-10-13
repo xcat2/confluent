@@ -16,13 +16,10 @@
 # limitations under the License.
 
 import argparse
+import base64
 import csv
-import fcntl
 import io
 import numpy as np
-
-import os
-import subprocess
 import sys
 
 try:
@@ -35,7 +32,31 @@ except ImportError:
     pass
 
 
-def plot(gui, output, plotdata, bins):
+def iterm_draw(data):
+    databuf = data.getbuffer()
+    datalen = len(databuf)
+    data = base64.b64encode(databuf).decode('utf8')
+    sys.stdout.write(
+        '\x1b]1337;File=inline=1;size={}:'.format(datalen))
+    sys.stdout.write(data)
+    sys.stdout.write('\a')
+    sys.stdout.write('\n')
+    sys.stdout.flush()
+
+
+def kitty_draw(data):
+    data = base64.b64encode(data.getbuffer())
+    while data:
+        chunk, data = data[:4096], data[4096:]
+        m = 1 if data else 0
+        sys.stdout.write('\x1b_Ga=T,f=100,m={};'.format(m))
+        sys.stdout.write(chunk.decode('utf8'))
+        sys.stdout.write('\x1b\\')
+        sys.stdout.flush()
+    sys.stdout.write('\n')
+
+
+def plot(gui, output, plotdata, bins, fmt):
     import matplotlib as mpl
     if gui and mpl.get_backend() == 'agg':
         sys.stderr.write('Error: No GUI backend available and -g specified!\n')
@@ -51,8 +72,13 @@ def plot(gui, output, plotdata, bins):
             tdata = io.BytesIO()
         plt.savefig(tdata)
     if not gui and not output:
-        writer = DumbWriter()
-        writer.draw(tdata)
+        if fmt == 'sixel':
+            writer = DumbWriter()
+            writer.draw(tdata)
+        elif fmt == 'kitty':
+            kitty_draw(tdata)
+        elif fmt == 'iterm':
+            iterm_draw(tdata)
     return n, bins
 
 def textplot(plotdata, bins):
@@ -81,7 +107,8 @@ histogram = False
 aparser = argparse.ArgumentParser(description='Quick access to common statistics')
 aparser.add_argument('-c', type=int, default=0, help='Column number to analyze (default is last column)')
 aparser.add_argument('-d', default=None, help='Value used to separate columns')
-aparser.add_argument('-x', default=False, action='store_true', help='Output histogram in sixel format')
+aparser.add_argument('-x', default=False, action='store_true', help='Output histogram in graphical format')
+aparser.add_argument('-f', default='sixel', help='Format for histogram output (sixel/iterm/kitty)')
 aparser.add_argument('-s', default=0, help='Number of header lines to skip before processing')
 aparser.add_argument('-g', default=False, action='store_true', help='Open histogram in separate graphical window')
 aparser.add_argument('-o', default=None, help='Output histogram to the specified filename in PNG format')
@@ -138,7 +165,7 @@ while data:
     data = list(csv.reader([data], delimiter=delimiter))[0]
 n = None
 if args.g or args.o or args.x:
-    n, bins = plot(args.g, args.o, plotdata, bins=args.b)
+    n, bins = plot(args.g, args.o, plotdata, bins=args.b, fmt=args.f)
 if args.t:
     n, bins = textplot(plotdata, bins=args.b)
 print('Samples: {5} Min: {3} Median: {0} Mean: {1} Max: {4} StandardDeviation: {2} Sum: {6}'.format(np.median(plotdata), np.mean(plotdata), np.std(plotdata), np.min(plotdata), np.max(plotdata), len(plotdata), np.sum(plotdata)))
