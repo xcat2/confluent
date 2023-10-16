@@ -106,6 +106,7 @@ class Bracketer(object):
                 continue  # new nodename has no new number, keep going
             else: # if self.sequences[n][2] != nums[n] or :
                 if self.diffn is not None and (n != self.diffn or 
+                        (padto < self.numlens[n][1]) or
                         (needpad and padto != self.numlens[n][1])):
                     self.flush_current()
                     self.sequences[n] = [[], nums[n], nums[n]]
