@@ -29,4 +29,5 @@ mv confluent_el8bin.tar.xz ~/rpmbuild/SOURCES/
 mv confluent_el9bin.tar.xz ~/rpmbuild/SOURCES/
 rm -rf el9bin
 rm -rf el8bin
-rpmbuild -ba confluent_osdeploy-aarch64.spec
+podman run --privileged --rm -v $HOME:/root el8builder rpmbuild -ba /root/confluent/confluent_osdeploy/confluent_osdeploy-aarch64.spec
+
