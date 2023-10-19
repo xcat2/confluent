@@ -221,22 +221,27 @@ class ReverseNodeRange(object):
             subsetgroups.sort(key=humanify_nodename)
             groupchunks = group_elements(subsetgroups)
             for gc in groupchunks:
+                if not gc:
+                    continue
                 bracketer = Bracketer(gc[0])
                 for chnk in gc[1:]:
                     bracketer.extend(chnk)
                 ranges.append(bracketer.range)
         except Exception:
             subsetgroups.sort()
+            ranges.extend(subsetgroups)
         try:
             nodes = sorted(self.nodes, key=humanify_nodename)
             nodechunks = group_elements(nodes)
             for nc in nodechunks:
+                if not nc:
+                    continue
                 bracketer = Bracketer(nc[0])
                 for chnk in nc[1:]:
                     bracketer.extend(chnk)
                 ranges.append(bracketer.range)
         except Exception:
-            ranges = sorted(self.nodes)
+            ranges.extend(sorted(self.nodes))
         return ','.join(ranges)
 
 
