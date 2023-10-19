@@ -1,3 +1,4 @@
+cd $(dirname $0)
 VERSION=`git describe|cut -d- -f 1`
 NUMCOMMITS=`git describe|cut -d- -f 2`
 if [ "$NUMCOMMITS" != "$VERSION"  ]; then
