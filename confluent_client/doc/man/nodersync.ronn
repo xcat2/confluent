@@ -16,6 +16,9 @@ noderange. This will present progress as percentage for all nodes.
   Specify how many rsync executions to do concurrently.  If noderange
   exceeds the count, then excess nodes will wait until one of the
   active count completes. 
+
+* `-s`, `--substitutename`:
+  'Use a different name other than the nodename for rsync'
   
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to run rsync to, prompting if over the

@@ -92,6 +92,7 @@ def msg_deserialize(packed):
         return cls(*m[1:])
     raise Exception("Unknown shenanigans")
 
+
 class ConfluentMessage(object):
     apicode = 200
     readonly = False
@@ -252,6 +253,21 @@ class ConfluentNodeError(object):
         # NOTE(jjohnson2): For single node errors, raise exception to
         # trigger what a developer of that medium would expect
         raise Exception('{0}: {1}'.format(self.node, self.error))
+
+
+class Generic(ConfluentMessage):
+
+    def __init__(self, data):
+        self.data = data
+
+    def json(self):
+        return json.dumps(self.data)
+    
+    def raw(self):
+        return self.data
+    
+    def html(self):
+        return json.dumps(self.data)
 
 
 class ConfluentResourceUnavailable(ConfluentNodeError):

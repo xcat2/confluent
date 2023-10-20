@@ -19,6 +19,12 @@ import json
 import os
 import time
 import yaml
+try:
+    from yaml import CSafeDumper as SafeDumper
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader
+    from yaml import SafeDumper
 import confluent.discovery.protocols.ssdp as ssdp
 import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
@@ -31,7 +37,20 @@ currtzvintage = None
 
 
 def yamldump(input):
-    return yaml.safe_dump(input, default_flow_style=False)
+    return yaml.dump_all([input], Dumper=SafeDumper, default_flow_style=False)
+
+def yamlload(input):
+    return yaml.load(input, Loader=SafeLoader)
+
+def listdump(input):
+    # special case yaml for flat dumb list
+    # this is about 25x faster than doing full yaml dump even with CSafeDumper
+    # with a 17,000 element list
+    retval = ''
+    for entry in input:
+        retval += '- ' + entry + '\n'
+    return retval
+
 
 def get_extra_names(nodename, cfg, myip=None):
     names = set([])
@@ -402,10 +421,13 @@ def handle_request(env, start_response):
                 yield node + '\n'
         else:
             start_response('200 OK', (('Content-Type', retype),))
-            yield dumper(list(util.natural_sort(nodes)))
+            if retype == 'application/yaml':
+                yield listdump(list(util.natural_sort(nodes)))
+            else:
+                yield dumper(list(util.natural_sort(nodes)))
     elif env['PATH_INFO'] == '/self/remoteconfigbmc' and reqbody:
         try:
-            reqbody = yaml.safe_load(reqbody)
+            reqbody = yamlload(reqbody)
         except Exception:
             reqbody = None
         cfgmod = reqbody.get('configmod', 'unspecified')
@@ -419,7 +441,7 @@ def handle_request(env, start_response):
         start_response('200 Ok', ())
         yield 'complete'
     elif env['PATH_INFO'] == '/self/updatestatus' and reqbody:
-        update = yaml.safe_load(reqbody)
+        update = yamlload(reqbody)
         statusstr = update.get('state', None)
         statusdetail = update.get('state_detail', None)
         didstateupdate = False
@@ -522,7 +544,7 @@ def handle_request(env, start_response):
             '/var/lib/confluent/public/os/{0}/scripts/{1}')
         if slist:
             start_response('200 OK', (('Content-Type', 'application/yaml'),))
-            yield yaml.safe_dump(util.natural_sort(slist), default_flow_style=False)
+            yield yamldump(util.natural_sort(slist))
         else:
             start_response('200 OK', ())
             yield ''
