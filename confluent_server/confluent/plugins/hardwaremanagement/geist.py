@@ -115,7 +115,8 @@ class GeistClient(object):
         if len(dbt) != 1:
             raise Exception('Multiple PDUs not supported per pdu')
         pdutype = list(dbt)[0]
-        outlet = dbt[pdutype]['outlet'][ str(int(outlet.join(c for c in outlet if c.isdigit())) - 1) ]
+        outlet = dbt[pdutype]['outlet'][ str(int(outlet)- 1) ]
+#        print(outlet)
         state = outlet['state'].split('2')[-1]
         return state
 
@@ -128,7 +129,7 @@ class GeistClient(object):
             self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
         pdu = dbt[list(dbt)[0]]['keyname']
-        outlet = int(outlet.join(c for c in outlet if c.isdigit()))  - 1
+        outlet = int(outlet)  - 1
 
         rsp = self.wc.grab_json_response(
             '/api/dev/{0}/outlet/{1}'.format(pdu, outlet),
@@ -237,17 +238,29 @@ def read_inventory(element, node, configmanager):
     inventory['present'] = True
     inventory['name'] = 'PDU'
     for elem in basedata.items():
-        if elem[0] !='component' and elem[0] !='locale' and elem[0] !='state' and elem[0] !='contact': # and elem[0] !='name':
-           _inventory[elem[0]] = elem[1]
+
+        if elem[0] !='component' and elem[0] !='locale' and elem[0] !='state' and elem[0] !='contact' and elem[0] !='appVersion' and elem[0] !='build' and elem[0] !='version' and elem[0] !='apiVersion':
+            temp = elem[0]
+            if elem[0] == "serialNumber":
+                temp = "Serial"
+            elif  elem[0] == "partNumber":
+                temp = "P/N"
+            elif  elem[0] == "modelNumber":
+                temp= "Lenovo P/N and Serial"
+            _inventory[temp] = elem[1]
         elif elem[0] =='component':
             tempname = ''
             for component in basedata['component'].items():
                 for item in component:
                     if type(item) == str:
+
                         tempname = item
                     else:
                         for entry in item.items():
-                            _inventory[tempname + ' ' + entry[0]] = entry[1]
+                            temp = entry[0]
+                            if temp == 'sn':
+                                temp = "Serial"
+                            _inventory[tempname + ' ' + temp] = entry[1]
                 
 
     inventory['information']= _inventory
