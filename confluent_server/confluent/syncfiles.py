@@ -212,6 +212,8 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
                     unreadablefiles.append(filename.replace(targdir, ''))
         if unreadablefiles:
             raise Exception("Syncing failed due to unreadable files: " + ','.join(unreadablefiles))
+        elif b'Permission denied, please try again.' in e.stderr:
+            raise Exception('Syncing failed due to authentication error, is the confluent automation key not set up (osdeploy initialize -a) or is there some process replacing authorized_keys on the host?')
         else:
             raise
     finally:
