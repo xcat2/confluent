@@ -481,6 +481,20 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
+                'normalized': {
+                    'inlet_temp': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'average_cpu_temp': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'total_power': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                },
                 'energy': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',

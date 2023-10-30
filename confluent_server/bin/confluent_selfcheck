@@ -15,6 +15,7 @@ import confluent.sshutil as sshutil
 import confluent.certutil as certutil
 import confluent.client as client
 import confluent.config.configmanager as configmanager
+import confluent.netutil as netutil
 import eventlet.green.subprocess as subprocess
 import tempfile
 import shutil
@@ -244,7 +245,7 @@ if __name__ == '__main__':
                 allok = False
                 uuidok = True  # not really, but suppress the spurious error
             dnsdomain = rsp.get('dns.domain', {}).get('value', '')
-            if ',' in dnsdomain or ' ' in dnsdomain:
+            if dnsdomain and (',' in dnsdomain or ' ' in dnsdomain):
                 allok = False
                 emprint(f'{args.node} has a dns.domain that appears to be a search instead of singular domain')
                 uuidok = True  # not really, but suppress the spurious error
@@ -269,9 +270,28 @@ if __name__ == '__main__':
                     switch_value = rsp[key].get('value',None)
                     if switch_value and switch_value not in valid_nodes:
                         emprint(f'{switch_value} is not a valid node name (as referenced by attribute "{key}" of node {args.node}).')
+        print(f"Checking network configuration for {args.node}")
+        cfg = configmanager.ConfigManager(None)
+        bootablev4nics = []
+        bootablev6nics = []
+        for nic in glob.glob("/sys/class/net/*/ifindex"):
+            idx = int(open(nic, "r").read())
+            nicname = nic.split('/')[-2]
+            ncfg = netutil.get_nic_config(cfg, args.node, ifidx=idx)
+            if ncfg['ipv4_address'] or ncfg['ipv4_method'] == 'dhcp':
+                bootablev4nics.append(nicname)
+            if ncfg['ipv6_address']:
+                bootablev6nics.append(nicname)
+        if bootablev4nics:
+            print("{} appears to have network configuration suitable for IPv4 deployment via: {}".format(args.node, ",".join(bootablev4nics)))
+        elif bootablev6nics:
+            print('{} appears to have networking configuration suitable for IPv6 deployment via: {}'.format(args.node, ",".join(bootablev6nics)))
+        else:
+            emprint(f"{args.node} may not have any viable IP network configuration (check name resolution (DNS or hosts file) "
+                    "and/or net.*ipv4_address, and verify that the deployment serer addresses and subnet mask/prefix length are accurate)")
         if not uuidok and not macok:
             allok = False
-            emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work')
+            emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work (Example resolution: nodeinventory {args.node} -s)')
         if allok:
             print(f'No issues detected with attributes of {args.node}')
         fprint("Checking name resolution: ")

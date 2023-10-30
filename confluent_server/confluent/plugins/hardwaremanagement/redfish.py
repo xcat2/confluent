@@ -712,6 +712,23 @@ class IpmiHandler(object):
             resourcename = sensor['name']
             self.sensormap[simplify_name(resourcename)] = resourcename
 
+    def read_normalized(self, sensorname):
+        readings = None
+        if sensorname == 'average_cpu_temp':
+            cputemp = self.ipmicmd.get_average_processor_temperature()
+            readings = [cputemp]
+        elif sensorname == 'inlet_temp':
+            inltemp = self.ipmicmd.get_inlet_temperature()
+            readings = [inltemp]
+        elif sensorname == 'total_power':
+            sensor = EmptySensor('Total Power')
+            sensor.states = []
+            sensor.units = 'W'
+            sensor.value = self.ipmicmd.get_system_power_watts()
+            readings = [sensor]
+        if readings:
+            self.output.put(msg.SensorReadings(readings, name=self.node))
+
     def read_sensors(self, sensorname):
         if sensorname == 'all':
             sensors = self.ipmicmd.get_sensor_descriptions()
@@ -1012,6 +1029,8 @@ class IpmiHandler(object):
         if len(self.element) < 3:
             return
         self.sensorcategory = self.element[2]
+        if self.sensorcategory == 'normalized':
+            return self.read_normalized(self.element[-1])
         # list sensors per category
         if len(self.element) == 3 and self.element[-2] == 'hardware':
             if self.sensorcategory == 'leds':

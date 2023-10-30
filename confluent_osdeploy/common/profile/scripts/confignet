@@ -435,7 +435,7 @@ if __name__ == '__main__':
                     curridx = addr[-1]
         if curridx in doneidxs:
             continue
-        for tries in (1, 2 3):
+        for tries in (1, 2, 3):
             try:
                 status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
                 break
@@ -446,7 +446,7 @@ if __name__ == '__main__':
                 continue
         nc = json.loads(nc)
         if not dc:
-            for tries in (1, 2 3):
+            for tries in (1, 2, 3):
                 try:
                     status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
                     break
