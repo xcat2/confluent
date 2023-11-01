@@ -189,7 +189,7 @@ cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 EOC
 echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
 echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
-linktype=$(ip link |grep -A2 ${ifname}|tail -n 1|awk '{print $1}')
+linktype=$(ip link show dev ${ifname}|grep link/|awk '{print $1}')
 if [ "$linktype" = link/infiniband ]; then
 	linktype="infiniband"
 else
