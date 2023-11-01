@@ -344,7 +344,7 @@ class NetworkManager(object):
                     bondcfg[stg] = deats[stg]
         if member in self.uuidbyname:
             subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[member]])
-        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
+        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
         if bondcfg:
             args = []
             for parm in bondcfg:
@@ -378,7 +378,7 @@ class NetworkManager(object):
             for arg in cmdargs:
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team', 'con-name', cname, 'connection.interface-name', cname, 'team.runner', stgs['team_mode']] + cargs)
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'mode={}'.format(stgs['team_mode'])] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
             subprocess.check_call(['nmcli', 'c', 'u', cname])
