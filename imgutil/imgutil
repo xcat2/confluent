@@ -61,13 +61,27 @@ FALLOC_FL_PUNCH_HOLE = 2
 numregex = re.compile('([0-9]+)')
 
 def get_partition_info():
+    with open('/proc/self/mountinfo') as procinfo:
+        mountinfo = procinfo.read()
+    capmounts = set([])
+    for entry in mountinfo.split('\n'):
+        if not entry:
+            continue
+        firstinf, lastinf = entry.split(' - ')
+        root, mount = firstinf.split()[3:5]
+        filesystem = lastinf.split()[0]
+        if root != '/':
+            continue
+        if filesystem not in ('ext3', 'ext4', 'xfs', 'btrfs', 'vfat'):
+            continue
+        capmounts.add(mount)
     with open('/proc/mounts') as procmounts:
         mountinfo = procmounts.read()
     for entry in mountinfo.split('\n'):
         if not entry:
             continue
         dev, mount, fs, flags = entry.split()[:4]
-        if fs not in ('ext3', 'ext4', 'xfs', 'btrfs', 'vfat'):
+        if mount not in capmounts:
             continue
         fsinfo = os.statvfs(mount)
         partinfo = {
