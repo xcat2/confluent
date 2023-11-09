@@ -151,13 +151,14 @@ class NetplanManager(object):
         needcfgapply = False
         for devname in devnames:
             needcfgwrite = False
-            if stgs['ipv6_method'] == 'static':
-                curraddr = stgs['ipv6_address']
+            # ipv6_method missing at uconn...
+            if stgs.get('ipv6_method', None) == 'static':
+                curraddr = stgs'ipv6_address']
                 currips = self.getcfgarrpath([devname, 'addresses'])
                 if curraddr not in currips:
                     needcfgwrite = True
                     currips.append(curraddr)
-            if stgs['ipv4_method'] == 'static':
+            if stgs.get('ipv4_method', None) == 'static':
                 curraddr = stgs['ipv4_address']
                 currips = self.getcfgarrpath([devname, 'addresses'])
                 if curraddr not in currips:
@@ -180,7 +181,7 @@ class NetplanManager(object):
             if dnsips:
                 currdnsips = self.getcfgarrpath([devname, 'nameservers', 'addresses'])
                 for dnsip in dnsips:
-                    if dnsip not in currdnsips:
+                    if dnsip and dnsip not in currdnsips:
                         needcfgwrite = True
                         currdnsips.append(dnsip)
             if dnsdomain:
