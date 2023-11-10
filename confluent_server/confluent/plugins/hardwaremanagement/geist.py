@@ -19,6 +19,7 @@ import confluent.exceptions as exc
 import eventlet.green.time as time
 import eventlet
 import eventlet.greenpool as greenpool
+import json
 
 def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-').replace(
@@ -83,6 +84,7 @@ class GeistClient(object):
             'secret.hardwaremanagementuser', {}).get('value', None)
         passwd = credcfg.get(
             'secret.hardwaremanagementpassword', {}).get('value', None)
+
         if not isinstance(username, str):
             username = username.decode('utf8')
         if not isinstance(passwd, str):
@@ -93,6 +95,7 @@ class GeistClient(object):
         rsp = self.wc.grab_json_response(
             '/api/auth/{0}'.format(username),
             {'cmd': 'login', 'data': {'password': passwd}})
+
         token = rsp['data']['token']
         return token
 
@@ -106,12 +109,14 @@ class GeistClient(object):
         rsp = self.wc.grab_json_response('/api/dev')
         rsp = rsp['data']
         dbt = data_by_type(rsp)
+
         if 't3hd' in dbt:
             del dbt['t3hd']
         if len(dbt) != 1:
             raise Exception('Multiple PDUs not supported per pdu')
         pdutype = list(dbt)[0]
-        outlet = dbt[pdutype]['outlet'][str(int(outlet) - 1)]
+        outlet = dbt[pdutype]['outlet'][ str(int(outlet)- 1) ]
+#        print(outlet)
         state = outlet['state'].split('2')[-1]
         return state
 
@@ -124,7 +129,8 @@ class GeistClient(object):
             self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
         pdu = dbt[list(dbt)[0]]['keyname']
-        outlet = int(outlet) - 1
+        outlet = int(outlet)  - 1
+
         rsp = self.wc.grab_json_response(
             '/api/dev/{0}/outlet/{1}'.format(pdu, outlet),
             {'cmd': 'control', 'token': self.token,
@@ -147,6 +153,10 @@ def process_measurement(keyname, name, enttype, entname, measurement, readings, 
         if category not in ('all',):
             return
         readtype = 'Voltage'
+    elif measurement['type'] == 'current':
+        if category not in ('all',):
+            return
+        readtype = 'Current'
     elif measurement['type'] == 'temperature':
         readtype = 'Temperature'
     elif measurement['type'] == 'dewpoint':
@@ -192,10 +202,12 @@ def read_sensors(element, node, configmanager):
         _sensors_by_node[node] = (adev, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
     dbt = data_by_type(sn[0]['data'])
+
     readings = []
     for datatype in dbt:        
         datum = dbt[datatype]
         process_measurements(name, category, datum['entity'], 'entity', readings)
+
         if 'outlet' in datum:
             process_measurements(name, category, datum['outlet'], 'outlet', readings)
     if justnames:
@@ -204,9 +216,10 @@ def read_sensors(element, node, configmanager):
     else:
         yield msg.SensorReadings(readings, name=node)
 
-def get_outlet(node, configmanager, element):
+def get_outlet(element, node, configmanager):
     gc = GeistClient(node, configmanager)
     state = gc.get_outlet(element[-1])
+
     return msg.PowerState(node=node, state=state)
 
 def read_firmware(node, configmanager):
@@ -215,11 +228,53 @@ def read_firmware(node, configmanager):
     myversion = adev['data']['version']
     yield msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
 
+
+def read_inventory(element, node, configmanager):
+    _inventory = {}
+    inventory = {}
+    gc = GeistClient(node, configmanager)
+    adev = gc.wc.grab_json_response('/api/sys')
+    basedata = adev['data']
+    inventory['present'] = True
+    inventory['name'] = 'PDU'
+    for elem in basedata.items():
+
+        if elem[0] !='component' and elem[0] !='locale' and elem[0] !='state' and elem[0] !='contact' and elem[0] !='appVersion' and elem[0] !='build' and elem[0] !='version' and elem[0] !='apiVersion':
+            temp = elem[0]
+            if elem[0] == "serialNumber":
+                temp = "Serial"
+            elif  elem[0] == "partNumber":
+                temp = "P/N"
+            elif  elem[0] == "modelNumber":
+                temp= "Lenovo P/N and Serial"
+            _inventory[temp] = elem[1]
+        elif elem[0] =='component':
+            tempname = ''
+            for component in basedata['component'].items():
+                for item in component:
+                    if type(item) == str:
+
+                        tempname = item
+                    else:
+                        for entry in item.items():
+                            temp = entry[0]
+                            if temp == 'sn':
+                                temp = "Serial"
+                            _inventory[tempname + ' ' + temp] = entry[1]
+                
+
+    inventory['information']= _inventory
+
+    yield msg.KeyValueData({'inventory': [inventory]}, node)
+        
+
 def retrieve(nodes, element, configmanager, inputdata):
+
     if 'outlets' in element:
         gp = greenpool.GreenPile(pdupool)
         for node in nodes:
-            gp.spawn(get_outlet, node, configmanager, element)
+
+            gp.spawn(get_outlet, element, node, configmanager)
         for res in gp:
             yield res
            
@@ -236,6 +291,14 @@ def retrieve(nodes, element, configmanager, inputdata):
         gp = greenpool.GreenPile(pdupool)
         for node in nodes:
             gp.spawn(read_firmware, node, configmanager)
+        for rsp in gp:
+            for datum in rsp:
+                yield datum
+
+    elif '/'.join(element).startswith('inventory/hardware/all'):
+        gp = greenpool.GreenPile(pdupool)
+        for node in nodes:
+            gp.spawn(read_inventory, element, node, configmanager)
         for rsp in gp:
             for datum in rsp:
                 yield datum
