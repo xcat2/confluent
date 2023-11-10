@@ -273,6 +273,29 @@ def opts_to_dict(rq, optidx, expectype=1):
 def ipfromint(numb):
     return socket.inet_ntoa(struct.pack('I', numb))
 
+def get_pxe_bootfile(node, opts, disco, profile, cfg, myip):
+    if opts.get(77, None) == b'iPXE':
+        if not profile:
+            profile = get_deployment_profile(node, cfg)
+        if not profile:
+            log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
+            return None
+        bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
+    elif disco['arch'] == 'uefi-x64':
+        bootfile = b'confluent/x86_64/ipxe.efi'
+    elif disco['arch'] == 'bios-x86':
+        bootfile = b'confluent/x86_64/ipxe.kkpxe'
+    elif disco['arch'] == 'uefi-aarch64':
+        bootfile = b'confluent/aarch64/ipxe.efi'
+    if len(bootfile) > 127:
+        log.log(
+            {'info': 'Boot offer cannot be made to {0} as the '
+            'profile name "{1}" is {2} characters longer than is supported '
+            'for this boot method.'.format(
+                node, profile, len(bootfile) - 127)})
+        return None
+    return bootfile
+
 def proxydhcp(handler, nodeguess):
     net4011 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     net4011.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -346,6 +369,7 @@ def proxydhcp(handler, nodeguess):
             profile = None
             if not myipn:
                 myipn = socket.inet_aton(recv)
+                myip = socket.inet_ntoa(myipn)
                 profile = get_deployment_profile(node, cfg)
                 if profile:
                     log.log({
@@ -354,26 +378,9 @@ def proxydhcp(handler, nodeguess):
                     if not skiplogging:
                         log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                     continue
-            if opts.get(77, None) == b'iPXE':
-                if not profile:
-                    profile = get_deployment_profile(node, cfg)
-                if not profile:
-                    log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
-                    continue
-                myip = socket.inet_ntoa(myipn)
-                bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myip, profile).encode('utf8')
-            elif disco['arch'] == 'uefi-x64':
-                bootfile = b'confluent/x86_64/ipxe.efi'
-            elif disco['arch'] == 'bios-x86':
-                bootfile = b'confluent/x86_64/ipxe.kkpxe'
-            elif disco['arch'] == 'uefi-aarch64':
-                bootfile = b'confluent/aarch64/ipxe.efi'
-            if len(bootfile) > 127:
-                log.log(
-                    {'info': 'Boot offer cannot be made to {0} as the '
-                    'profile name "{1}" is {2} characters longer than is supported '
-                    'for this boot method.'.format(
-                        node, profile, len(bootfile) - 127)})
+            myip = socket.inet_ntoa(myipn)
+            bootfile = get_pxe_bootfile(node, opts, disco, profile, cfg, myip)
+            if not bootfile:
                 continue
             rpv[:240] = rqv[:240].tobytes()
             rpv[0:1] = b'\x02'
@@ -398,6 +405,7 @@ def snoop(handler, protocol=None, nodeguess=None):
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
     # injection into the neigh table before OFFER or using SOCK_RAW.
+    global tracelog
     start_proxydhcp(handler, nodeguess)
     tracelog = log.Logger('trace')
     global attribwatcher
@@ -499,7 +507,7 @@ def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     if ignoredisco.get(mac, 0) + 90 < time.time():
         ignoredisco[mac] = time.time()
         handler(info)
-    consider_discover(info, req, net, cfg, None, nodeguess, addr)
+    consider_discover(info, req, net, cfg, None, nodeguess, disco, addr)
 
 def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
     rq = bytearray(rqv)
@@ -539,7 +547,7 @@ def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
                             and time.time() > ignoredisco.get(netaddr, 0) + 90):
         ignoredisco[netaddr] = time.time()
         handler(info)
-    consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess)
+    consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess, disco)
 
 
 
@@ -594,7 +602,7 @@ def get_deployment_profile(node, cfg, cfd=None):
 
 staticassigns = {}
 myipbypeer = {}
-def check_reply(node, info, packet, sock, cfg, reqview, addr):
+def check_reply(node, info, packet, sock, cfg, reqview, addr, disco):
     httpboot = info['architecture'] == 'uefi-httpboot'
     cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile = get_deployment_profile(node, cfg, cfd)
@@ -611,7 +619,7 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr):
             return
         return reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
     else:
-        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile)
+        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, disco)
 
 def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     myaddrs = netutil.get_my_addresses(addr[-1], socket.AF_INET6)
@@ -695,7 +703,7 @@ def get_my_duid():
     return _myuuid
 
 
-def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
+def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, disco):
     replen = 275  # default is going to be 286
     # while myipn is describing presumed destination, it's really
     # vague in the face of aliases, need to convert to ifidx and evaluate
@@ -733,7 +741,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
-        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system'.format(node)})
+        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system, over nic "{}"'.format(node, info['netinfo']['ifidx'])})
         return
     clipn = None
     if niccfg['ipv4_method'] == 'firmwarenone':
@@ -786,6 +794,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
     repview[255:257] = b'\x61\x11'
     repview[257:274] = packet[97]
+
     # Note that sending PXEClient kicks off the proxyDHCP procedure, ignoring
     # boot filename and such in the DHCP packet
     # we will simply always do it to provide the boot payload in a consistent
@@ -794,6 +803,9 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
         replen += 12
     else:
+        bootfile = get_pxe_bootfile(node, packet, disco, profile, cfg, myip)
+        if bootfile:
+            repview[108:108 + len(bootfile)] = bootfile
         repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
         replen += 11
     hwlen = bytearray(reqview[2:3].tobytes())[0]
@@ -885,11 +897,11 @@ def ack_request(pkt, rq, info):
     repview[26:28] = struct.pack('!H', datasum)
     send_raw_packet(repview, len(rply), rq, info)
 
-def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None):
+def consider_discover(info, packet, sock, cfg, reqview, nodeguess, disco, addr=None):
     if info.get('hwaddr', None) in macmap and info.get('uuid', None):
-        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr)
+        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr, disco)
     elif info.get('uuid', None) in uuidmap:
-        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr)
+        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr, disco)
     elif packet.get(53, None) == b'\x03':
         ack_request(packet, reqview, info)
     elif info.get('uuid', None) and info.get('hwaddr', None):
