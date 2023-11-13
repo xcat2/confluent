@@ -98,14 +98,15 @@ def initialize_ca():
          preexec_fn=normalize_uid)
     ouid = normalize_uid()
     try:
-        os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
-    except OSError as e:
-        if e.errno != 17:
-            raise
+        try:
+            os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
+        except OSError as e:
+            if e.errno != 17:
+                raise
+        cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
+        shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
     finally:
         os.seteuid(ouid)
-    cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
-    shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
     #    newent = '@cert-authority * ' + capub.read()
 
 

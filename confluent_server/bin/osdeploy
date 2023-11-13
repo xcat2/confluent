@@ -373,9 +373,14 @@ def initialize(cmdset):
         for rsp in c.read('/uuid'):
             uuid = rsp.get('uuid', {}).get('value', None)
             if uuid:
-                with open('confluent_uuid', 'w') as uuidout:
-                    uuidout.write(uuid)
-                    uuidout.write('\n')
+                oum = os.umask(0o11)
+                try:
+                    with open('confluent_uuid', 'w') as uuidout:
+                        uuidout.write(uuid)
+                        uuidout.write('\n')
+                    os.chmod('confluent_uuid', 0o644)
+                finally:
+                    os.umask(oum)
     totar.append('confluent_uuid')
     topack.append('confluent_uuid')
     if os.path.exists('ssh'):
@@ -403,7 +408,17 @@ def initialize(cmdset):
         if res:
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
-    os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
+    oum = os.umask(0o22)
+    try:
+        os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
+        os.chown('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
+    finally:
+        os.umask(oum)
+    oum = os.umask(0o22)
+    try:
+        os.chown('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
+    finally:
+        os.umask(oum)
     if cmdset.g:
         updateboot('genesis-x86_64')
     if totar:
@@ -411,6 +426,11 @@ def initialize(cmdset):
         tarcmd = ['tar', '-czf', tmptarname] + totar
         subprocess.check_call(tarcmd)
         os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
+        oum = os.umask(0o22)
+        try:
+            os.chown('/var/lib/confluent/public/site/initramfs.tgz', 0o644)
+        finally:
+            os.umask(0o22)
     os.chdir(opath)
     print('Site initramfs content packed successfully')
 
