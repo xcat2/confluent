@@ -186,6 +186,14 @@ def initialize_root_key(generate, automation=False):
         if os.path.exists('/etc/confluent/ssh/automation'):
             alreadyexist = True
         else:
+            ouid = normalize_uid()
+            try:
+                os.makedirs('/etc/confluent/ssh', mode=0o700)
+            except OSError as e:
+                if e.errno != 17:
+                    raise
+            finally:
+                os.seteuid(ouid)
             subprocess.check_call(
                 ['ssh-keygen', '-t', 'ed25519',
                 '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),

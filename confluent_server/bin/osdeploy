@@ -72,6 +72,12 @@ def main(args):
         return rebase(cmdset.profile)
     ap.print_help()
 
+def symlinkp(src, trg):
+    try:
+        os.symlink(src, trg)
+    except Exception as e:
+        if e.errno != 17:
+            raise
 
 def initialize_genesis():
     if not os.path.exists('/opt/confluent/genesis/x86_64/boot/kernel'):
@@ -89,30 +95,33 @@ def initialize_genesis():
         return retval[1]
     retcode = 0
     try:
+        util.mkdirp('/var/lib/confluent', 0o755)
         if hasconfluentuser:
+            os.chown('/var/lib/confluent', hasconfluentuser.pw_uid, -1)
             os.setgid(hasconfluentuser.pw_gid)
             os.setuid(hasconfluentuser.pw_uid)
         os.umask(0o22)
-        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
-        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
-        os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
+        util.mkdirp('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
+        util.mkdirp('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
+        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/BOOTX64.EFI')
-        os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
+        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/grubx64.efi')
-        os.symlink('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
+        symlinkp('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/distribution')
-        os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
+        symlinkp('/var/lib/confluent/public/site/initramfs.cpio',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/site.cpio')
-        os.symlink('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
+        symlinkp('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/addons.cpio')
-        os.symlink('/opt/confluent/genesis/x86_64/boot/kernel',
+        symlinkp('/opt/confluent/genesis/x86_64/boot/kernel',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/kernel')
-        shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/ansible/',
-                        '/var/lib/confluent/public/os/genesis-x86_64/ansible/')
-        shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
-                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
-        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
-                       '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
+        if not os.path.exists('/var/lib/confluent/public/os/genesis-x86_64/ansible/'):
+            shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/ansible/',
+                            '/var/lib/confluent/public/os/genesis-x86_64/ansible/')
+            shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
+                            '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
+            shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
+                            '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
     except Exception as e:
         sys.stderr.write(str(e) + '\n')
         retcode = 1
@@ -411,12 +420,12 @@ def initialize(cmdset):
     oum = os.umask(0o22)
     try:
         os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
-        os.chown('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
+        os.chmod('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
     finally:
         os.umask(oum)
     oum = os.umask(0o22)
     try:
-        os.chown('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
+        os.chmod('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
     finally:
         os.umask(oum)
     if cmdset.g:
@@ -428,7 +437,7 @@ def initialize(cmdset):
         os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
         oum = os.umask(0o22)
         try:
-            os.chown('/var/lib/confluent/public/site/initramfs.tgz', 0o644)
+            os.chmod('/var/lib/confluent/public/site/initramfs.tgz', 0o644)
         finally:
             os.umask(0o22)
     os.chdir(opath)
@@ -441,6 +450,9 @@ def initialize(cmdset):
 
 
 def updateboot(profilename):
+    if not os.path.exists('/var/lib/confluent/public/site/initramfs.cpio'):
+        emprint('Must generate site content first (TLS (-t) and/or SSH (-s))')
+        return 1
     c = client.Command()
     for rsp in c.update('/deployment/profiles/{0}'.format(profilename),
             {'updateboot': 1}):
