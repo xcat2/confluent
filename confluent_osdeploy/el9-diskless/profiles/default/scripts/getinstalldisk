@@ -3,6 +3,8 @@ import os
 
 class DiskInfo(object):
     def __init__(self, devname):
+        if devname.startswith('nvme') and 'c' in devname:
+            raise Exception("Skipping multipath devname")
         self.name = devname
         self.wwn = None
         self.path = None
