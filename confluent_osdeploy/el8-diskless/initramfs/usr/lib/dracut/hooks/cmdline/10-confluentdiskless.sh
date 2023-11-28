@@ -155,7 +155,7 @@ fi
 ready=0
 while [ $ready = "0" ]; do
     get_remote_apikey
-    if [[ $confluent_mgr == *:* ]]; then
+    if [[ $confluent_mgr == *:* ]] && [[ $confluent_mgr != "["* ]]; then
         confluent_mgr="[$confluent_mgr]"
     fi
     tmperr=$(mktemp)
@@ -324,7 +324,7 @@ fi
 echo '[proxy]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
 chmod 600 /run/NetworkManager/system-connections/*.nmconnection
 confluent_websrv=$confluent_mgr
-if [[ $confluent_websrv == *:* ]]; then
+if [[ $confluent_websrv == *:* ]] && [[ $confluent_websrv != "["* ]]; then
     confluent_websrv="[$confluent_websrv]"
 fi
 echo -n "Initializing ssh..."
