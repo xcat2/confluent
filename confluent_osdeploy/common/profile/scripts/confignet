@@ -295,7 +295,8 @@ class WickedManager(object):
 
 
 class NetworkManager(object):
-    def __init__(self, devtypes):
+    def __init__(self, devtypes, deploycfg):
+        self.deploycfg = deploycfg
         self.connections = {}
         self.uuidbyname = {}
         self.uuidbydev = {}
@@ -367,6 +368,20 @@ class NetworkManager(object):
             cmdargs['ipv4.gateway'] = stgs['ipv4_gateway']
         if stgs.get('ipv6_gateway', None):
             cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
+        dnsips = self.deploycfg.get('nameservers', [])
+        if not dnsips:
+            dnsips = []
+        dns4 = []
+        dns6 = []
+        for dnsip in dnsips:
+            if '.' in dnsip:
+                dns4.append(dnsip)
+            elif ':' in dnsip:
+                dns6.append(dnsip)
+        if dns4:
+            cmdargs['ipv4.dns'] = dns4.join(',')
+        if dns6:
+            cmdargs['ipv6.dns'] = dns6.join(',')
         if len(cfg['interfaces']) > 1:  # team time.. should be..
             if not cfg['settings'].get('team_mode', None):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
@@ -487,7 +502,7 @@ if __name__ == '__main__':
     if os.path.exists('/usr/sbin/netplan'):
         nm = NetplanManager(dc)
     if os.path.exists('/usr/bin/nmcli'):
-        nm = NetworkManager(devtypes)
+        nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
     for netn in netname_to_interfaces:
