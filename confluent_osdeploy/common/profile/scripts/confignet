@@ -379,6 +379,8 @@ class NetworkManager(object):
             for arg in cmdargs:
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
+            if stgs['team_mode'] == 'lacp':
+                stgs['team_mode'] = '802.3ad'
             subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'mode={}'.format(stgs['team_mode'])] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
