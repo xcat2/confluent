@@ -1,4 +1,7 @@
 #!/bin/sh
+# WARNING
+# be careful when editing files here as this script is called
+# in parallel to other copy operations, so changes to files can be lost
 discnum=$(basename $1)
 if [ "$discnum" != 1 ]; then exit 0; fi
 if [ -e $2/boot/kernel ]; then exit 0; fi
