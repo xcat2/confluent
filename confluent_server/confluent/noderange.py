@@ -96,6 +96,7 @@ class Bracketer(object):
         txtnums = getnumbers_nodename(nodename)
         nums = [int(x) for x in txtnums]
         for n in range(self.count):
+            # First pass to see if we have exactly one different number
             padto = len(txtnums[n])
             needpad = (padto != len('{}'.format(nums[n])))
             if self.sequences[n] is None:
@@ -105,7 +106,24 @@ class Bracketer(object):
             elif self.sequences[n][2] == nums[n] and self.numlens[n][1] == padto:
                 continue  # new nodename has no new number, keep going
             else: # if self.sequences[n][2] != nums[n] or :
-                if self.diffn is not None and (n != self.diffn or 
+                if self.diffn is not None and (n != self.diffn or
+                        (padto < self.numlens[n][1]) or
+                        (needpad and padto != self.numlens[n][1])):
+                    self.flush_current()
+                    self.sequences[n] = [[], nums[n], nums[n]]
+                    self.numlens[n] = [padto, padto]
+                self.diffn = n
+        for n in range(self.count):
+            padto = len(txtnums[n])
+            needpad = (padto != len('{}'.format(nums[n])))
+            if self.sequences[n] is None:
+                # We initialize to text pieces, 'currstart', and 'prev' number
+                self.sequences[n] = [[], nums[n], nums[n]]
+                self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
+            elif self.sequences[n][2] == nums[n] and self.numlens[n][1] == padto:
+                continue  # new nodename has no new number, keep going
+            else: # if self.sequences[n][2] != nums[n] or :
+                if self.diffn is not None and (n != self.diffn or
                         (padto < self.numlens[n][1]) or
                         (needpad and padto != self.numlens[n][1])):
                     self.flush_current()
@@ -449,3 +467,29 @@ class NodeRange(object):
         if self.cfm is None:
             return set([element])
         raise Exception(element + ' not a recognized node, group, or alias')
+
+if __name__ == '__main__':
+    cases = [
+        (['r3u4', 'r5u6'], 'r3u4,r5u6'),  # should not erroneously gather
+        (['r3u4s1', 'r5u6s3'], 'r3u4s1,r5u6s3'),  # should not erroneously gather
+        (['r3u4s1', 'r3u4s2', 'r5u4s3'], 'r3u4s[1:2],r5u4s3'),  # should not erroneously gather
+        (['r3u4', 'r3u5', 'r3u6', 'r3u9', 'r4u1'], 'r3u[4:6,9],r4u1'),
+        (['n01', 'n2', 'n03'], 'n01,n2,n03'),
+        (['n7', 'n8', 'n09', 'n10', 'n11', 'n12', 'n13', 'n14', 'n15', 'n16',
+          'n17', 'n18', 'n19', 'n20'], 'n[7:8],n[09:20]')
+    ]
+    for case in cases:
+        gc = case[0]
+        bracketer = Bracketer(gc[0])
+        for chnk in gc[1:]:
+            bracketer.extend(chnk)
+        br = bracketer.range
+        resnodes = NodeRange(br).nodes
+        if set(resnodes) != set(gc):
+            print('FAILED: ' + repr(sorted(gc)))
+            print('RESULT: ' + repr(sorted(resnodes)))
+            print('EXPECTED: ' + repr(case[1]))
+            print('ACTUAL: ' + br)
+
+
+
