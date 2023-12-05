@@ -379,9 +379,9 @@ class NetworkManager(object):
             elif ':' in dnsip:
                 dns6.append(dnsip)
         if dns4:
-            cmdargs['ipv4.dns'] = dns4.join(',')
+            cmdargs['ipv4.dns'] = ','.join(dns4)
         if dns6:
-            cmdargs['ipv6.dns'] = dns6.join(',')
+            cmdargs['ipv6.dns'] = ','.join(dns6)
         if len(cfg['interfaces']) > 1:  # team time.. should be..
             if not cfg['settings'].get('team_mode', None):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
