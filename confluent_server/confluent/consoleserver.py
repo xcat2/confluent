@@ -622,6 +622,8 @@ def connect_node(node, configmanager, username=None, direct=True, width=80,
     myname = collective.get_myname()
     if myc and myc != collective.get_myname() and direct:
         minfo = configmodule.get_collective_member(myc)
+        if not minfo:
+            raise Exception('Unable to get collective member for {}'.format(node))
         return ProxyConsole(node, minfo, myname, configmanager, username,
                             width, height)
     consk = (node, configmanager.tenant)
