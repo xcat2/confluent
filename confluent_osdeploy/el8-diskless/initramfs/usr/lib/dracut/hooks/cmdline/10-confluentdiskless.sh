@@ -155,7 +155,7 @@ fi
 ready=0
 while [ $ready = "0" ]; do
     get_remote_apikey
-    if [[ $confluent_mgr == *:* ]]; then
+    if [[ $confluent_mgr == *:* ]] && [[ $confluent_mgr != "["* ]]; then
         confluent_mgr="[$confluent_mgr]"
     fi
     tmperr=$(mktemp)
@@ -189,8 +189,15 @@ cat > /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 EOC
 echo id=${ifname} >> /run/NetworkManager/system-connections/$ifname.nmconnection
 echo uuid=$(uuidgen) >> /run/NetworkManager/system-connections/$ifname.nmconnection
+linktype=$(ip link show dev ${ifname}|grep link/|awk '{print $1}')
+if [ "$linktype" = link/infiniband ]; then
+	linktype="infiniband"
+else
+	linktype="ethernet"
+fi
+echo type=$linktype >> /run/NetworkManager/system-connections/$ifname.nmconnection
+
 cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
-type=ethernet
 autoconnect-retries=1
 EOC
 echo interface-name=$ifname >> /run/NetworkManager/system-connections/$ifname.nmconnection
@@ -198,9 +205,6 @@ cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
 multi-connect=1
 permissions=
 wait-device-timeout=60000
-
-[ethernet]
-mac-address-blacklist=
 
 EOC
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
@@ -320,7 +324,7 @@ fi
 echo '[proxy]' >> /run/NetworkManager/system-connections/$ifname.nmconnection
 chmod 600 /run/NetworkManager/system-connections/*.nmconnection
 confluent_websrv=$confluent_mgr
-if [[ $confluent_websrv == *:* ]]; then
+if [[ $confluent_websrv == *:* ]] && [[ $confluent_websrv != "["* ]]; then
     confluent_websrv="[$confluent_websrv]"
 fi
 echo -n "Initializing ssh..."

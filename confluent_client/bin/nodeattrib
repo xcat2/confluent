@@ -22,6 +22,7 @@ import optparse
 import os
 import signal
 import sys
+import shlex
 
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)

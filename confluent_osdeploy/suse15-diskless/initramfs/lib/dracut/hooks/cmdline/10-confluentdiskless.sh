@@ -116,7 +116,7 @@ fi
 ready=0
 while [ $ready = "0" ]; do
     get_remote_apikey
-    if [[ $confluent_mgr == *:* ]]; then
+    if [[ $confluent_mgr == *:* ]] && [[ $confluent_mgr != "["* ]]; then
         confluent_mgr="[$confluent_mgr]"
     fi
     tmperr=$(mktemp)

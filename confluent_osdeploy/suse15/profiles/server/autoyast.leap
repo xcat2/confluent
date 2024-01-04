@@ -10,6 +10,12 @@ dynamic behavior and replace with static configuration.
       <hwclock>UTC</hwclock>
       <timezone>%%TIMEZONE%%</timezone>
     </timezone>
+    <firstboot>
+      <firstboot_enabled config:type="boolean">false</firstboot_enabled>
+    </firstboot>
+    <kdump>
+      <add_crash_kernel config:type="boolean">false</add_crash_kernel>
+    </kdump>
     <general>
       <self_update config:type="boolean">false</self_update>
       <mode>

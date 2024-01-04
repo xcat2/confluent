@@ -4,7 +4,7 @@ nodelist(8) -- List confluent nodes and their attributes
 ## SYNOPSIS
 
 `nodelist <noderange>`  
-`nodelist <noderange> [-b] <nodeattribute>...`  
+`nodelist <noderange> [-b] [-d] {string} <nodeattribute>...`  
 
 ## DESCRIPTION
 
@@ -24,7 +24,8 @@ all attributes that begin with `net.` and end with `switch`.
 
 * `-b`, `--blame`:
   Annotate inherited and expression based attributes to show their base value.
-
+* `-d`, `--delim`:
+  Choose a delimiter to separat the values. Default - ENTER.
 ## EXAMPLES
 * Listing matching nodes of a simple noderange:
   `# nodelist n1-n4`  

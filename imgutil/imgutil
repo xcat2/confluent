@@ -3,7 +3,13 @@ import configparser
 import ctypes
 import ctypes.util
 import datetime
-from distutils.dir_util import copy_tree
+import inspect
+from shutil import copytree as copytree
+if hasattr(inspect, 'getfullargspec') and 'dirs_exist_ok' in inspect.getfullargspec(copytree).args:
+    def copy_tree(src, dst):
+        copytree(src, dst, dirs_exist_ok=True)
+else:
+    from distutils.dir_util import copy_tree
 import glob
 import json
 import argparse
@@ -17,7 +23,10 @@ import subprocess
 import sys
 import tempfile
 import time
-import yaml
+try:
+    import yaml
+except ImportError:
+    pass
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
@@ -52,13 +61,27 @@ FALLOC_FL_PUNCH_HOLE = 2
 numregex = re.compile('([0-9]+)')
 
 def get_partition_info():
+    with open('/proc/self/mountinfo') as procinfo:
+        mountinfo = procinfo.read()
+    capmounts = set([])
+    for entry in mountinfo.split('\n'):
+        if not entry:
+            continue
+        firstinf, lastinf = entry.split(' - ')
+        root, mount = firstinf.split()[3:5]
+        filesystem = lastinf.split()[0]
+        if root != '/':
+            continue
+        if filesystem not in ('ext3', 'ext4', 'xfs', 'btrfs', 'vfat'):
+            continue
+        capmounts.add(mount)
     with open('/proc/mounts') as procmounts:
         mountinfo = procmounts.read()
     for entry in mountinfo.split('\n'):
         if not entry:
             continue
         dev, mount, fs, flags = entry.split()[:4]
-        if fs not in ('ext3', 'ext4', 'xfs', 'btrfs', 'vfat'):
+        if mount not in capmounts:
             continue
         fsinfo = os.statvfs(mount)
         partinfo = {
@@ -139,13 +162,30 @@ def capture_fs(args):
         masker.mask('/etc/ssh/*key')
         masker.mask('/etc/pki/tls/private/*')
         masker.mask('/root/.ssh/id_*')
+        masker.mask('/etc/netplan/*.yaml')
         subprocess.check_call(['mksquashfs', '/run/imgutil/capin', fname + '.sfs', '-comp', 'xz'])
 
 def capture_local_cleanup():
-    shutil.rmtree('/usr/lib/dracut/modules.d/97confluent')
+    try:
+        shutil.rmtree('/usr/lib/dracut/modules.d/97confluent')
+    except Exception:
+        pass
     subprocess.check_call(['umount', '/run/imgutil/capout'])
 
 def build_boot_tree(targpath):
+    if  glob.glob('/usr/lib/dracut/modules.d/97confluent/install*'):
+        return build_el_boot_tree(targpath)
+    elif glob.glob('/etc/initramfs-tools/'):
+        return build_deb_boot_tree(targpath)
+
+def build_deb_boot_tree(targpath):
+    kver = os.uname().release
+    mkdirp(os.path.join(targpath, 'boot/initramfs/'))
+    subprocess.check_call(['mkinitramfs', '-o', os.path.join(targpath, 'boot/initramfs/distribution')])
+    shutil.copy2('/boot/vmlinuz-{}'.format(kver), os.path.join(targpath, 'boot/kernel'))
+    gather_bootloader(targpath)
+
+def build_el_boot_tree(targpath):
     for dscript in glob.glob('/usr/lib/dracut/modules.d/97confluent/install*'):
         os.chmod(dscript, 0o755)
     kver = os.uname().release
@@ -168,19 +208,32 @@ def capture_remote(args):
     # with here locally,
     # another that is remotely called to gather target profile info
     # and a third that is exclusive to pack_image for diskless mode
-    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
-    utillib = os.path.join(utillib, 'el8/dracut/')
     subprocess.check_call(['ssh', targ, 'mkdir', '-p', '/run/imgutil/capenv'])
     subprocess.check_call(['rsync', __file__, '{0}:/run/imgutil/capenv/'.format(targ)])
     finfo = subprocess.check_output(['ssh', targ, 'python3', '/run/imgutil/capenv/imgutil', 'getfingerprint']).decode('utf8')
     finfo = json.loads(finfo)
-    if finfo['oscategory'] not in ('el8', 'el9'):
-        raise Exception('Not yet supported for capture: ' + repr(finfo))
+    if finfo['oscategory'] not in ('el8', 'el9', 'ubuntu20.04', 'ubuntu22.04'):
+        sys.stderr.write('Not yet supported for capture: ' + repr(finfo) + '\n')
+        sys.exit(1)
+    unmet = finfo.get('unmetprereqs', [])
+    if unmet:
+        for cmd in unmet:
+            sys.stderr.write(cmd + '\n')
+        sys.exit(1)
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
-    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
-    utillib = os.path.join(utillib, '{}/dracut/'.format(oscat))
-    subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97confluent'.format(targ)])
+    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')        
+    if oscat.startswith('ubuntu'):
+        utillib = os.path.join(utillib, '{}/initramfs-tools/'.format(oscat))
+        if not os.path.exists(utillib):
+            raise Exception('Not yet supported for capture: ' + repr(finfo))
+        subprocess.check_call(['rsync', '-a', utillib, '{0}:/etc/initramfs-tools'.format(targ)])
+        subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'chmod', '+x', '/etc/initramfs-tools/hooks/confluent'])
+    else:
+        utillib = os.path.join(utillib, '{}/dracut/'.format(oscat))
+        if not os.path.exists(utillib):
+            raise Exception('Not yet supported for capture: ' + repr(finfo))
+        subprocess.check_call(['rsync', '-a', utillib, '{0}:/usr/lib/dracut/modules.d/97confluent'.format(targ)])
     sys.stdout.write('Generating deployment initramfs...')
     sys.stdout.flush()
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocalboot'])
@@ -407,10 +460,12 @@ def get_mydir(oscategory):
 class OsHandler(object):
     def __init__(self, name, version, arch, args):
         self.name = name
+        self._interactive = True
         self.version = version
         self.arch = arch
         self.sourcepath = None
         self.osname = '{}-{}-{}'.format(name, version, arch)
+        self.captureprereqs = []
         try:
             pkglist = args.packagelist
         except AttributeError:
@@ -434,13 +489,16 @@ class OsHandler(object):
         except AttributeError:
             self.addrepos = []
 
+    def set_interactive(self, shouldbeinteractive):
+        self._interactive = shouldbeinteractive
+
     def get_json(self):
         odata = [self.oscategory, self.version, self.arch, self.name]
         for idx in range(len(odata)):
             if not isinstance(odata[idx], str):
                 odata[idx] = odata[idx].decode('utf8')
         info = {'oscategory': odata[0],
-                'version': odata[1], 'arch': odata[2], 'name': odata[3]}
+                'version': odata[1], 'arch': odata[2], 'name': odata[3], 'unmetprereqs': self.captureprereqs}
         return json.dumps(info)
 
     def prep_root_premount(self, args):
@@ -547,7 +605,10 @@ class SuseHandler(OsHandler):
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
-        subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+        if self._interactive:
+            subprocess.check_call(['zypper', '-R', self.targpath, 'install'] + self.zyppargs)
+        else:
+            subprocess.check_call(['zypper', '-n', '-R', self.targpath, 'install'] + self.zyppargs)
         os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
         if os.path.exists(os.path.join(self.targpath, 'sbin/mkinitrd')):
             args.cmd = ['mkinitrd']
@@ -557,12 +618,21 @@ class SuseHandler(OsHandler):
 
 
 class DebHandler(OsHandler):
-    def __init__(self, name, version, arch, args, codename):
+    def __init__(self, name, version, arch, args, codename, hostpath):
         self.includepkgs = []
         self.targpath = None
         self.codename = codename
         self.oscategory = name + version
         super().__init__(name, version, arch, args)
+        needpkgs = []
+        if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
+            needpkgs.append('tpm2-tools')
+        lfuses = glob.glob(os.path.join(hostpath, '/lib/*/libfuse.so.2'))
+        if not lfuses:
+            needpkgs.append('libfuse2')
+        if needpkgs:
+            needapt = 'Missing packages needed in target for capture, to add required packages: apt install ' + ' '.join(needpkgs)
+            self.captureprereqs.append(needapt)
 
     def add_pkglists(self):
         self.includepkgs.extend(self.list_packages())
@@ -590,11 +660,27 @@ class DebHandler(OsHandler):
 
 
 class ElHandler(OsHandler):
-    def __init__(self, name, version, arch, args):
+    def __init__(self, name, version, arch, args, hostpath='/'):
         self.oscategory = 'el{0}'.format(version.split('.')[0])
         self.yumargs = []
         super().__init__(name, version, arch, args)
-
+        needpkgs = []
+        if not hostpath:
+            return
+        if not os.path.exists(os.path.join(hostpath, 'usr/bin/tpm2_getcap')):
+            needpkgs.append('tpm2-tools')
+        lfuses = glob.glob(os.path.join(hostpath, '/usr/lib64/libfuse.so.2'))
+        if not lfuses:
+            needpkgs.append('fuse-libs')
+        if not os.path.exists(os.path.join(hostpath, '/usr/bin/ipcalc')):
+            needpkgs.append('ipcalc')
+        if not os.path.exists(os.path.join(hostpath, 'usr/sbin/dhclient')):
+            needpkgs.append('dhcp-client')
+        if not os.path.exists(os.path.join(hostpath, 'usr/sbin/mount.nfs')):
+            needpkgs.append('nfs-utils')
+        if needpkgs:
+            needapt = 'Missing packages needed in target for capture, to add required packages: dnf install ' + ' '.join(needpkgs)
+            self.captureprereqs.append(needapt)
 
     def add_pkglists(self):
         self.yumargs.extend(self.list_packages())
@@ -627,7 +713,10 @@ class ElHandler(OsHandler):
         cmd = ['chmod', 'a+x']
         cmd.extend(glob.glob(os.path.join(targdir, '*')))
         subprocess.check_call(cmd)
-        subprocess.check_call(['yum'] + self.yumargs)
+        if self._interactive:
+            subprocess.check_call(['yum'] + self.yumargs)
+        else:
+            subprocess.check_call(['yum', '-y'] + self.yumargs)
         with open('/proc/mounts') as mountinfo:
             for line in mountinfo.readlines():
                 if line.startswith('selinuxfs '):
@@ -764,6 +853,7 @@ def main():
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
     buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
+    buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
         'cause it to be mounted in image as /run/external/, -v /:/run/root '
@@ -966,7 +1056,7 @@ def fingerprint_source_el(files, sourcepath, args):
             if arch == 'noarch':
                 prodinfo = open(os.path.join(sourcepath, '.discinfo')).read()
                 arch = prodinfo.split('\n')[2]
-            return ElHandler(osname, ver, arch, args)
+            return ElHandler(osname, ver, arch, args, None)
     return None
 
 
@@ -1011,14 +1101,14 @@ def fingerprint_host_el(args, hostpath='/'):
                     release = v
                 elif k == 'Version':
                     version = v
-        except subprocess.SubprocessError:
+        except (subprocess.SubprocessError, FileNotFoundError):
             return None
     if 'el8' not in release and 'el7' not in release and 'el9' not in release:
         return None
     osname = osname.replace('-release', '').replace('-', '_')
     if osname == 'centos_linux':
         osname = 'centos'
-    return ElHandler(osname, version, os.uname().machine, args)
+    return ElHandler(osname, version, os.uname().machine, args, hostpath)
 
 
 def fingerprint_host_deb(args, hostpath='/'):
@@ -1042,7 +1132,7 @@ def fingerprint_host_deb(args, hostpath='/'):
     except IOError:
         pass
     if osname:
-        return DebHandler(osname, vers, os.uname().machine, args, codename)
+        return DebHandler(osname, vers, os.uname().machine, args, codename, hostpath)
 
 
 def fingerprint_host_suse(args, hostpath='/'):
@@ -1098,6 +1188,8 @@ def build_root(args):
             sys.stderr.write(
                 'Unable to recognize build system os\n')
         sys.exit(1)
+    if args.non_interactive:
+        oshandler.set_interactive(False)
     oshandler.set_target(args.scratchdir)
     oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
@@ -1348,6 +1440,10 @@ def gather_bootloader(outdir, rootpath='/'):
         grubs = glob.glob(grubs)
         if len(grubs) == 1:
             grubbin = grubs[0]
+    if 'ubuntu' in grubbin:  # we needd to store a hint that this grub has a different hard coded prefix
+        mkdirp(os.path.join(outdir, 'boot/EFI/ubuntu/'))
+        with open(os.path.join(outdir, 'boot/EFI/ubuntu/grub.cfg'), 'w') as wo:
+            wo.write('')
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grubx64.efi'))
     shutil.copyfile(grubbin, os.path.join(outdir, 'boot/efi/boot/grub.efi'))
 

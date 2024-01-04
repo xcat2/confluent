@@ -1145,7 +1145,7 @@ def serve(bind_host, bind_port):
         pass  # we gave it our best shot there
     try:
         eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
-                             debug=False, socket_timeout=60)
+                             debug=False, socket_timeout=60, keepalive=False)
     except TypeError:
         # Older eventlet in place, skip arguments it does not understand
         eventlet.wsgi.server(sock, resourcehandler, log=False, debug=False)

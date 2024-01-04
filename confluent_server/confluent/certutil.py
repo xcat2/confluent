@@ -95,27 +95,29 @@ def assure_tls_ca():
         os.makedirs(os.path.dirname(fname))
     except OSError as e:
         if e.errno != 17:
+            os.seteuid(ouid)
             raise
+    try:
+        shutil.copy2('/etc/confluent/tls/cacert.pem', fname)
+        hv, _ = util.run(
+            ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'])
+        if not isinstance(hv, str):
+            hv = hv.decode('utf8')
+        hv = hv.strip()
+        hashname = '/var/lib/confluent/public/site/tls/{0}.0'.format(hv)
+        certname = '{0}.pem'.format(collective.get_myname())
+        for currname in os.listdir('/var/lib/confluent/public/site/tls/'):
+            currname = os.path.join('/var/lib/confluent/public/site/tls/', currname)
+            if currname.endswith('.0'):
+                try:
+                    realname = os.readlink(currname)
+                    if realname == certname:
+                        os.unlink(currname)
+                except OSError:
+                    pass
+        os.symlink(certname, hashname)
     finally:
         os.seteuid(ouid)
-    shutil.copy2('/etc/confluent/tls/cacert.pem', fname)
-    hv, _ = util.run(
-        ['openssl', 'x509', '-in', '/etc/confluent/tls/cacert.pem', '-hash', '-noout'])
-    if not isinstance(hv, str):
-        hv = hv.decode('utf8')
-    hv = hv.strip()
-    hashname = '/var/lib/confluent/public/site/tls/{0}.0'.format(hv)
-    certname = '{0}.pem'.format(collective.get_myname())
-    for currname in os.listdir('/var/lib/confluent/public/site/tls/'):
-        currname = os.path.join('/var/lib/confluent/public/site/tls/', currname)
-        if currname.endswith('.0'):
-            try:
-                realname = os.readlink(currname)
-                if realname == certname:
-                    os.unlink(currname)
-            except OSError:
-                pass
-    os.symlink(certname, hashname)
 
 def substitute_cfg(setting, key, val, newval, cfgfile, line):
     if key.strip() == setting:

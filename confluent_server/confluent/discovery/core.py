@@ -648,6 +648,8 @@ def detected_models():
 
 
 def _recheck_nodes(nodeattribs, configmanager):
+    if not cfm.config_is_ready():
+        return
     if rechecklock.locked():
         # if already in progress, don't run again
         # it may make sense to schedule a repeat, but will try the easier and less redundant way first
@@ -766,6 +768,9 @@ def eval_detected(info):
 def detected(info):
     global rechecker
     global rechecktime
+    if not cfm.config_is_ready():
+        # drop processing of discovery data while configmanager is 'down'
+        return
     # later, manual and CMM discovery may act on SN and/or UUID
     for service in info['services']:
         if service in nodehandlers:
@@ -1429,7 +1434,12 @@ def discover_node(cfg, handler, info, nodename, manual):
                 newnodeattribs['pubkeys.tls_hardwaremanager'] = \
                     util.get_fingerprint(handler.https_cert, 'sha256')
             if newnodeattribs:
-                cfg.set_node_attributes({nodename: newnodeattribs})
+                currattrs = cfg.get_node_attributes(nodename, newnodeattribs)
+                for checkattr in newnodeattribs:
+                    checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
+                    if checkval != newnodeattribs[checkattr]:
+                        cfg.set_node_attributes({nodename: newnodeattribs})
+                        break
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
             if nodeconfig:
@@ -1508,7 +1518,12 @@ def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
                 if info['hwaddr'] != oldhwaddr:
                     attribs[newattrname] = info['hwaddr']
         if attribs:
-            cfg.set_node_attributes({nodename: attribs})
+            currattrs = cfg.get_node_attributes(nodename, attribs)
+            for checkattr in attribs:
+                checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
+                if checkval != attribs[checkattr]:
+                    cfg.set_node_attributes({nodename: attribs})
+                    break
     if info['uuid'] in known_pxe_uuids:
         return True
     if uuid_is_valid(info['uuid']):
@@ -1597,7 +1612,10 @@ def remotescan():
     mycfm = cfm.ConfigManager(None)
     myname = collective.get_myname()
     for remagent in get_subscriptions():
-        affluent.renotify_me(remagent, mycfm, myname)
+        try:
+            affluent.renotify_me(remagent, mycfm, myname)
+        except Exception as e:
+            log.log({'error': 'Unexpected problem asking {} for discovery notifications'.format(remagent)})
 
 
 def blocking_scan():
@@ -1637,7 +1655,7 @@ def start_autosense():
     autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
     #autosensors.add(eventlet.spawn(mdns.snoop, safe_detected, mdns))
     autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
-    remotescan()
+    eventlet.spawn(remotescan)
 
 
 nodes_by_fprint = {}

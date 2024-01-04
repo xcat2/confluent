@@ -1,0 +1,4 @@
+clearpart --all --initlabel
+ignoredisk --only-use %%INSTALLDISK%%
+autopart --nohome %%LUKSHOOK%%
+

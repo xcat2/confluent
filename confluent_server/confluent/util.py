@@ -29,9 +29,9 @@ import struct
 import eventlet.green.subprocess as subprocess
 
 
-def mkdirp(path):
+def mkdirp(path, mode=0o777):
     try:
-        os.makedirs(path)
+        os.makedirs(path, mode)
     except OSError as e:
         if e.errno != 17:
             raise
@@ -42,7 +42,7 @@ def run(cmd):
     stdout, stderr = process.communicate()
     retcode = process.poll()
     if retcode:
-        raise subprocess.CalledProcessError(retcode, process.args, output=stdout)
+        raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
     return stdout, stderr
 
 

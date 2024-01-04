@@ -55,6 +55,145 @@ def humanify_nodename(nodename):
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split(numregex, nodename)]
 
+def unnumber_nodename(nodename):
+    # stub out numbers
+    chunked = ["{}" if text.isdigit() else text.lower()
+            for text in re.split(numregex, nodename)]
+    return chunked
+
+def getnumbers_nodename(nodename):
+    return [x for x in re.split(numregex, nodename) if x.isdigit()]
+    
+
+class Bracketer(object):
+    __slots__ = ['sequences', 'count', 'nametmpl', 'diffn', 'tokens', 'numlens']
+
+    def __init__(self, nodename):
+        self.sequences = []
+        self.numlens = []
+        realnodename = nodename
+        if ':' in nodename:
+            realnodename = nodename.split(':', 1)[0]
+        self.count = len(getnumbers_nodename(realnodename))
+        self.nametmpl = unnumber_nodename(realnodename)
+        for n in range(self.count):
+            self.sequences.append(None)
+            self.numlens.append([0, 0])
+        self.diffn = None
+        self.tokens = []
+        self.extend(nodename)
+        if self.count == 0:
+            self.tokens = [nodename]
+
+    def extend(self, nodeorseq):
+        # can only differentiate a single number
+        endname = None
+        endnums = None
+        if ':' in nodeorseq:
+            nodename, endname = nodeorseq.split(':', 1)
+        else:
+            nodename = nodeorseq
+        txtnums = getnumbers_nodename(nodename)
+        nums = [int(x) for x in txtnums]
+        for n in range(self.count):
+            # First pass to see if we have exactly one different number
+            padto = len(txtnums[n])
+            needpad = (padto != len('{}'.format(nums[n])))
+            if self.sequences[n] is None:
+                # We initialize to text pieces, 'currstart', and 'prev' number
+                self.sequences[n] = [[], nums[n], nums[n]]
+                self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
+            elif self.sequences[n][2] == nums[n] and self.numlens[n][1] == padto:
+                continue  # new nodename has no new number, keep going
+            else: # if self.sequences[n][2] != nums[n] or :
+                if self.diffn is not None and (n != self.diffn or
+                        (padto < self.numlens[n][1]) or
+                        (needpad and padto != self.numlens[n][1])):
+                    self.flush_current()
+                    self.sequences[n] = [[], nums[n], nums[n]]
+                    self.numlens[n] = [padto, padto]
+                self.diffn = n
+        for n in range(self.count):
+            padto = len(txtnums[n])
+            needpad = (padto != len('{}'.format(nums[n])))
+            if self.sequences[n] is None:
+                # We initialize to text pieces, 'currstart', and 'prev' number
+                self.sequences[n] = [[], nums[n], nums[n]]
+                self.numlens[n] = [len(txtnums[n]), len(txtnums[n])]
+            elif self.sequences[n][2] == nums[n] and self.numlens[n][1] == padto:
+                continue  # new nodename has no new number, keep going
+            else: # if self.sequences[n][2] != nums[n] or :
+                if self.diffn is not None and (n != self.diffn or
+                        (padto < self.numlens[n][1]) or
+                        (needpad and padto != self.numlens[n][1])):
+                    self.flush_current()
+                    self.sequences[n] = [[], nums[n], nums[n]]
+                    self.numlens[n] = [padto, padto]
+                    self.diffn = None
+                else:
+                    self.diffn = n
+                if self.sequences[n][2] == (nums[n] - 1):
+                    self.sequences[n][2] = nums[n]
+                    self.numlens[n][1] = padto
+                elif self.sequences[n][2] < (nums[n] - 1):
+                    if self.sequences[n][2] != self.sequences[n][1]:
+                        fmtstr = '{{:0{}d}}:{{:0{}d}}'.format(*self.numlens[n])
+                        self.sequences[n][0].append(fmtstr.format(self.sequences[n][1], self.sequences[n][2]))
+                    else:
+                        fmtstr = '{{:0{}d}}'.format(self.numlens[n][0])
+                        self.sequences[n][0].append(fmtstr.format(self.sequences[n][1]))
+                    self.sequences[n][1] = nums[n]
+                    self.numlens[n][0] = padto
+                self.sequences[n][2] = nums[n]
+                self.numlens[n][1] = padto
+
+    def flush_current(self):
+        txtfields = []
+        if self.sequences and self.sequences[0] is not None:
+            for n in range(self.count):
+                if self.sequences[n][1] == self.sequences[n][2]:
+                    fmtstr = '{{:0{}d}}'.format(self.numlens[n][0])
+                    self.sequences[n][0].append(fmtstr.format(self.sequences[n][1]))
+                else:
+                    fmtstr = '{{:0{}d}}:{{:0{}d}}'.format(*self.numlens[n])
+                    self.sequences[n][0].append(fmtstr.format(self.sequences[n][1], self.sequences[n][2]))
+                txtfield = ','.join(self.sequences[n][0])
+                if txtfield.isdigit():
+                    txtfields.append(txtfield)
+                else:
+                    txtfields.append('[{}]'.format(txtfield))
+            self.tokens.append(''.join(self.nametmpl).format(*txtfields))
+        self.sequences = []
+        for n in range(self.count):
+            self.sequences.append(None)
+
+    @property
+    def range(self):
+        if self.sequences:
+            self.flush_current()
+        return ','.join(self.tokens)
+
+
+def group_elements(elems):
+    """ Take the specefied elements and chunk them according to text similarity
+    """
+    prev = None
+    currchunk = []
+    chunked_elems = [currchunk]
+    for elem in elems:
+        elemtxt = unnumber_nodename(elem)
+        if not prev:
+            prev = elemtxt
+            currchunk.append(elem)
+            continue
+        if prev == elemtxt:
+            currchunk.append(elem)
+        else:
+            currchunk = [elem]
+            chunked_elems.append(currchunk)
+            prev = elemtxt
+    return chunked_elems
+
 
 class ReverseNodeRange(object):
     """Abbreviate a set of nodes to a shorter noderange representation
@@ -71,7 +210,8 @@ class ReverseNodeRange(object):
     @property
     def noderange(self):
         subsetgroups = []
-        for group in self.cfm.get_groups(sizesort=True):
+        allgroups = self.cfm.get_groups(sizesort=True)
+        for group in allgroups:
             if lastnoderange:
                 for nr in lastnoderange:
                     if lastnoderange[nr] - self.nodes:
@@ -88,7 +228,39 @@ class ReverseNodeRange(object):
                 self.nodes -= nl
                 if not self.nodes:
                     break
-        return ','.join(sorted(subsetgroups) + sorted(self.nodes))
+        # then, analyze sequentially identifying matching alpha subsections
+        # then try out noderange from beginning to end
+        # we need to know discontinuities, which are either:
+        # nodes that appear in the noderange that are not in the nodes
+        # nodes that do not exist at all (we need a noderange modification 
+        # that returns non existing nodes)
+        ranges = []
+        try:
+            subsetgroups.sort(key=humanify_nodename)
+            groupchunks = group_elements(subsetgroups)
+            for gc in groupchunks:
+                if not gc:
+                    continue
+                bracketer = Bracketer(gc[0])
+                for chnk in gc[1:]:
+                    bracketer.extend(chnk)
+                ranges.append(bracketer.range)
+        except Exception:
+            subsetgroups.sort()
+            ranges.extend(subsetgroups)
+        try:
+            nodes = sorted(self.nodes, key=humanify_nodename)
+            nodechunks = group_elements(nodes)
+            for nc in nodechunks:
+                if not nc:
+                    continue
+                bracketer = Bracketer(nc[0])
+                for chnk in nc[1:]:
+                    bracketer.extend(chnk)
+                ranges.append(bracketer.range)
+        except Exception:
+            ranges.extend(sorted(self.nodes))
+        return ','.join(ranges)
 
 
 
@@ -295,3 +467,29 @@ class NodeRange(object):
         if self.cfm is None:
             return set([element])
         raise Exception(element + ' not a recognized node, group, or alias')
+
+if __name__ == '__main__':
+    cases = [
+        (['r3u4', 'r5u6'], 'r3u4,r5u6'),  # should not erroneously gather
+        (['r3u4s1', 'r5u6s3'], 'r3u4s1,r5u6s3'),  # should not erroneously gather
+        (['r3u4s1', 'r3u4s2', 'r5u4s3'], 'r3u4s[1:2],r5u4s3'),  # should not erroneously gather
+        (['r3u4', 'r3u5', 'r3u6', 'r3u9', 'r4u1'], 'r3u[4:6,9],r4u1'),
+        (['n01', 'n2', 'n03'], 'n01,n2,n03'),
+        (['n7', 'n8', 'n09', 'n10', 'n11', 'n12', 'n13', 'n14', 'n15', 'n16',
+          'n17', 'n18', 'n19', 'n20'], 'n[7:8],n[09:20]')
+    ]
+    for case in cases:
+        gc = case[0]
+        bracketer = Bracketer(gc[0])
+        for chnk in gc[1:]:
+            bracketer.extend(chnk)
+        br = bracketer.range
+        resnodes = NodeRange(br).nodes
+        if set(resnodes) != set(gc):
+            print('FAILED: ' + repr(sorted(gc)))
+            print('RESULT: ' + repr(sorted(resnodes)))
+            print('EXPECTED: ' + repr(case[1]))
+            print('ACTUAL: ' + br)
+
+
+

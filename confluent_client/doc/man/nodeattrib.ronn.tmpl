@@ -7,8 +7,8 @@ nodeattrib(8) -- List or change confluent nodes attributes
 `nodeattrib <noderange> [<nodeattribute1=value1> <nodeattribute2=value2> ...]`  
 `nodeattrib -c <noderange> <nodeattribute1> <nodeattribute2> ...`  
 `nodeattrib -e <noderange> <nodeattribute1> <nodeattribute2> ...`  
-`nodeattrib -p <noderange> <nodeattribute1> <nodeattribute2> ...` 
-`nodeattrib <noderange> -s <attributes.batch>` 
+`nodeattrib -p <noderange> <nodeattribute1> <nodeattribute2> ...`
+`nodeattrib <noderange> -s <attributes.batch> ...` 
 
 ## DESCRIPTION
 
@@ -54,14 +54,17 @@ to a blank value will allow masking a group defined attribute with an empty valu
 * `-e`, `--environment`:
   Set specified attributes based on exported environment variable of matching name. 
   Environment variable names may be lower case or all upper case. 
-  Replace . with _ as needed (e.g. info.note may be specified as either $info_note or $INFO_NOTE
+  Replace . with _ as needed (e.g. info.note may be specified as either $info_note or $INFO_NOTE)
   
 * `-p`, `--prompt`:
   Request interactive prompting to provide values rather than the command line
   or environment variables.
 
 * `-s`, `--set`:
-  Set attributes using a batch file
+  Set attributes using a batch file rather than the command line. The attributes in the batch file 
+  can be specified as one line of key=value pairs simmilar to command line or each attribute can
+  be in its own line. Lines that start with # sign will be read as a comment. See EXAMPLES for batch
+  file syntax.   
  
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Prompt if trying to set attributes on more than
@@ -119,6 +122,25 @@ to a blank value will allow masking a group defined attribute with an empty valu
     `d1: net.mgt.switch: mgtswitch1`  
     `d1: net.pxe.switch: pxeswitch1`  
     `d1: net.switch:`  
+
+* Setting attributes using a batch file with syntax similar to command line:
+    `# cat nodeattributes.batch`  
+    `# power`
+    `power.psu1.outlet=3 power.psu1.pdu=pdu2`
+    `# nodeattrib n41 -s nodeattributes.batch`
+    `n41: 3`
+    `n41: pdu2`
+
+* Setting attributes using a batch file with syntax where each attribute is in its own line:
+    `# cat nodeattributes.batch`  
+    `# management`
+    `custom.mgt.switch=switch_main`
+    `custom.mgt.switch.port=swp4`
+    `# nodeattrib n41 -s nodeattributes.batch`
+    `n41: switch_main`
+    `n41: swp4`
+
+  
 
 ## SEE ALSO
 

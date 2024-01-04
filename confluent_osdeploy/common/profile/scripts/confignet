@@ -9,6 +9,10 @@ import time
 import shlex
 import subprocess
 try:
+    import yaml
+except ImportError:
+    pass
+try:
     from importlib.machinery import SourceFileLoader
     def load_source(mod, path):
         return SourceFileLoader(mod, path).load_module()
@@ -107,6 +111,104 @@ def get_interface_name(iname, settings):
         return iname
     return None
 
+class NetplanManager(object):
+    def __init__(self, deploycfg):
+        self.cfgbydev = {}
+        self.read_connections()
+        self.deploycfg = deploycfg
+
+    def read_connections(self):
+        for plan in glob.glob('/etc/netplan/*.y*ml'):
+            with open(plan) as planfile:
+                planinfo = yaml.safe_load(planfile)
+                if not planinfo:
+                    continue
+            nicinfo = planinfo.get('network', {}).get('ethernets', {})
+            for devname in nicinfo:
+                if devname == 'lo':
+                    continue
+                if 'gateway4' in nicinfo[devname]:
+                    # normalize deprecated syntax on read in
+                    gw4 = nicinfo[devname]['gateway4']
+                    del nicinfo[devname]['gateway4']
+                    routeinfo = nicinfo[devname].get('routes', [])
+                    for ri in routeinfo:
+                        if ri.get('via', None) == gw4 and ri.get('to', None) in ('default', '0.0.0.0/0', '0/0'):
+                            break
+                    else:
+                        routeinfo.append({
+                            'to': 'default',
+                            'via': gw4
+                        })
+                    nicinfo[devname]['routes'] = routeinfo
+                self.cfgbydev[devname] = nicinfo[devname]
+    
+    def apply_configuration(self, cfg):
+        devnames = cfg['interfaces']
+        if len(devnames) != 1:
+            raise Exception('Multi-nic team/bonds not yet supported')
+        stgs = cfg['settings']
+        needcfgapply = False
+        for devname in devnames:
+            needcfgwrite = False
+            # ipv6_method missing at uconn...
+            if stgs.get('ipv6_method', None) == 'static':
+                curraddr = stgs['ipv6_address']
+                currips = self.getcfgarrpath([devname, 'addresses'])
+                if curraddr not in currips:
+                    needcfgwrite = True
+                    currips.append(curraddr)
+            if stgs.get('ipv4_method', None) == 'static':
+                curraddr = stgs['ipv4_address']
+                currips = self.getcfgarrpath([devname, 'addresses'])
+                if curraddr not in currips:
+                    needcfgwrite = True
+                    currips.append(curraddr)
+            gws = []
+            gws.append(stgs.get('ipv4_gateway', None))
+            gws.append(stgs.get('ipv6_gateway', None))
+            for gwaddr in gws:
+                if gwaddr:
+                    cfgroutes = self.getcfgarrpath([devname, 'routes'])
+                    for rinfo in cfgroutes:
+                        if rinfo.get('via', None) == gwaddr:
+                            break
+                    else:
+                        needcfgwrite = True
+                        cfgroutes.append({'via': gwaddr, 'to': 'default'})
+            dnsips = self.deploycfg.get('nameservers', [])
+            dnsdomain = self.deploycfg.get('dnsdomain', '')
+            if dnsips:
+                currdnsips = self.getcfgarrpath([devname, 'nameservers', 'addresses'])
+                for dnsip in dnsips:
+                    if dnsip and dnsip not in currdnsips:
+                        needcfgwrite = True
+                        currdnsips.append(dnsip)
+            if dnsdomain:
+                currdnsdomain = self.getcfgarrpath([devname, 'nameservers', 'search'])
+                if dnsdomain not in currdnsdomain:
+                    needcfgwrite = True
+                    currdnsdomain.append(dnsdomain)
+            if needcfgwrite:
+                needcfgapply = True
+                newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
+                with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
+                    planout.write(yaml.dump(newcfg))
+        if needcfgapply:
+            subprocess.call(['netplan', 'apply'])
+
+    def getcfgarrpath(self, devpath):
+        currptr = self.cfgbydev
+        for k in devpath[:-1]:
+            if k not in currptr:
+                currptr[k] = {}
+            currptr = currptr[k]
+        if devpath[-1] not in currptr:
+            currptr[devpath[-1]] = []
+        return currptr[devpath[-1]]
+        
+
+
 class WickedManager(object):
     def __init__(self):
         self.teamidx = 0
@@ -193,7 +295,8 @@ class WickedManager(object):
 
 
 class NetworkManager(object):
-    def __init__(self, devtypes):
+    def __init__(self, devtypes, deploycfg):
+        self.deploycfg = deploycfg
         self.connections = {}
         self.uuidbyname = {}
         self.uuidbydev = {}
@@ -243,7 +346,7 @@ class NetworkManager(object):
                     bondcfg[stg] = deats[stg]
         if member in self.uuidbyname:
             subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[member]])
-        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
+        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
         if bondcfg:
             args = []
             for parm in bondcfg:
@@ -253,6 +356,7 @@ class NetworkManager(object):
 
     def apply_configuration(self, cfg):
         cmdargs = {}
+        cmdargs['connection.autoconnect'] = 'yes'
         stgs = cfg['settings']
         cmdargs['ipv6.method'] = stgs.get('ipv6_method', 'link-local')
         if stgs.get('ipv6_address', None):
@@ -264,6 +368,20 @@ class NetworkManager(object):
             cmdargs['ipv4.gateway'] = stgs['ipv4_gateway']
         if stgs.get('ipv6_gateway', None):
             cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
+        dnsips = self.deploycfg.get('nameservers', [])
+        if not dnsips:
+            dnsips = []
+        dns4 = []
+        dns6 = []
+        for dnsip in dnsips:
+            if '.' in dnsip:
+                dns4.append(dnsip)
+            elif ':' in dnsip:
+                dns6.append(dnsip)
+        if dns4:
+            cmdargs['ipv4.dns'] = ','.join(dns4)
+        if dns6:
+            cmdargs['ipv6.dns'] = ','.join(dns6)
         if len(cfg['interfaces']) > 1:  # team time.. should be..
             if not cfg['settings'].get('team_mode', None):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
@@ -276,7 +394,9 @@ class NetworkManager(object):
             for arg in cmdargs:
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team', 'con-name', cname, 'connection.interface-name', cname, 'team.runner', stgs['team_mode']] + cargs)
+            if stgs['team_mode'] == 'lacp':
+                stgs['team_mode'] = '802.3ad'
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'mode={}'.format(stgs['team_mode'])] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
             subprocess.check_call(['nmcli', 'c', 'u', cname])
@@ -315,6 +435,7 @@ if __name__ == '__main__':
     myaddrs = apiclient.get_my_addresses()
     srvs, _ = apiclient.scan_confluents()
     doneidxs = set([])
+    dc = None
     for srv in srvs:
         try:
             s = socket.create_connection((srv, 443))
@@ -332,8 +453,27 @@ if __name__ == '__main__':
                     curridx = addr[-1]
         if curridx in doneidxs:
             continue
-        status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+        for tries in (1, 2, 3):
+            try:
+                status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+                break
+            except Exception:
+                if tries == 3:
+                    raise
+                time.sleep(1)
+                continue
         nc = json.loads(nc)
+        if not dc:
+            for tries in (1, 2, 3):
+                try:
+                    status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+                    break
+                except Exception:
+                    if tries == 3:
+                        raise
+                    time.sleep(1)
+                    continue
+            dc = json.loads(dc)
         iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
         if iname:
             for iname in iname.split(','):
@@ -359,8 +499,10 @@ if __name__ == '__main__':
         if not netname_to_interfaces['default']['interfaces']:
             del netname_to_interfaces['default']
     rm_tmp_llas(tmpllas)
+    if os.path.exists('/usr/sbin/netplan'):
+        nm = NetplanManager(dc)
     if os.path.exists('/usr/bin/nmcli'):
-        nm = NetworkManager(devtypes)
+        nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
     for netn in netname_to_interfaces:
