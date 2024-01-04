@@ -99,5 +99,8 @@ def retrieve(nodes, element, configmanager, inputdata):
                 kvp = rsp.kvpairs
                 for node in kvp:
                     allnodedata[node]['height'] = kvp[node]['height']
+    for node in allnodedata:
+        if 'height' not in allnodedata[node]:
+            allnodedata[node]['height'] = 1
     yield msg.Generic(results)
 
