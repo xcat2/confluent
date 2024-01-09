@@ -29,7 +29,7 @@ for lic in $(cat /tmp/tmpliclist); do
     fname=$(basename $lo)
     dlo=$(dirname $lo)
     if [[ "$dlo" == *"-lib"* ]]; then
-        dlo=${dlo/-*}
+        dlo=${dlo/-lib*}
     elif [[ "$dlo" == "device-mapper-"* ]]; then
 	dlo=${dlo/-*}-mapper
     elif [[ "$dlo" == "bind-"* ]]; then
