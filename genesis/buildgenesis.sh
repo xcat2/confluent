@@ -44,6 +44,10 @@ for lic in $(cat /tmp/tmpliclist); do
     cp $lic licenses/$dlo/$fname
     lo=$dlo/$fname
     echo %license /opt/confluent/genesis/%{arch}/licenses/$lo >> confluent-genesis-out.spec
+    if [ "$fname" == README ] && [ "$dlo" == "zlib" ]; then
+        cp $lic licenses/nss/$fname
+        echo %license /opt/confluent/genesis/%{arch}/licenses/nss/$fname >> confluent-genesis-out.spec
+    fi
 done
 mkdir -p licenses/ipmitool
 cp /usr/share/doc/ipmitool/COPYING  licenses/ipmitool

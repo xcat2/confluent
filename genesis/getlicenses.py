@@ -29,12 +29,17 @@ with open(sys.argv[1]) as rpmlist:
     rpmlist = rpmlist.read().split('\n')
 licenses = set([])
 licensesbyrpm = {}
+lfirmlicenses = [
+        'WHENCE',
+        'chelsio_firmware',
+        'hfi1_firmware',
+        'ice_enhaced',
+        'rtlwifi_firmware.txt',
+]
 for rpm in rpmlist:
     if not rpm:
         continue
     srpm = rpmtosrpm[rpm]
-    if srpm.startswith('linux-firmware'):
-        continue
     for relrpm in srpmtorpm[srpm]:
         if relrpm.startswith('libss-'):
             continue
@@ -44,6 +49,12 @@ for rpm in rpmlist:
                 continue
             if lic == '(contains no files)':
                 continue
+            if srpm.startswith('linux-firmware'):
+                for desired in lfirmlicenses:
+                    if desired in lic:
+                        break
+                else:
+                    continue
             licensesbyrpm[rpm] = lic
             licenses.add(lic)
 for lic in sorted(licenses):
@@ -63,6 +74,8 @@ manualrpms = [
 ]
 manuallicenses = [
     '/usr/share/licenses/lz4/LICENSE.BSD',
+    '/usr/share/licenses/nss/LICENSE.APACHE', # http://www.apache.org/licenses/LICENSE-2.0
+    '/usr/share/licenses/openssh/COPYING.blowfish, # from header of blowfish file in bsd-compat
     # cp /usr/share/doc/lz4-libs/LICENSE /usr/share/licenses/lz4/LICENSE.BSD
     #'lz4-1.8.3]# cp LICENSE  /usr/share/licenses/lz4/LICENSE'
     # net-snmp has a bundled openssl, but the build does not avail itself of that copy
