@@ -80,6 +80,12 @@ manuallicenses = [
     #'lz4-1.8.3]# cp LICENSE  /usr/share/licenses/lz4/LICENSE'
     # net-snmp has a bundled openssl, but the build does not avail itself of that copy
     '/usr/share/licenses/perl-libs/LICENSE', # ./dist/ExtUtils-CBuilder/LICENSE from perl srpm
+    '/usr/share/licenses/pam/COPYING.bison', # pam_conv_y
+    '/usr/share/licenses/pcre/LICENSE.BSD2', # stack-less just in time compiler, Zoltan Herzeg
+    '/usr/share/licenses/sqlite/LICENSE.md', # https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md
+    '/usr/share/licenses/pcre2/LICENSE.BSD2',
+    '/usr/share/licenses/perl/COPYING.regexec', # regexec.c
+    '/usr/share/doc/platform-python/README.rst',
     '/usr/share/licenses/lz4/LICENSE',
     '/usr/share/licenses/lm_sensors/COPYING',
     '/usr/share/doc/libunistring/README',
@@ -93,7 +99,9 @@ manuallicenses = [
     '/usr/share/doc/libnl3/COPYING',
     '/usr/share/licenses/xfsprogs/GPL-2.0',
     '/usr/share/licenses/xfsprogs/LGPL-2.1',
-    '/usr/share/licenses/tmux/NOTICE',
+    '/usr/share/licenses/tmux/NOTICE', # built by extracttmuxlicenses.py
+    '/usr/share/licenses/tmux/COPYING', # extracted from source
+    '/usr/share/licenses/tmux/README', # extracted from source
     '/usr/share/licenses/kernel-extra/exceptions/Linux-syscall-note',
     '/usr/share/licenses/kernel-extra/other/Apache-2.0',
     '/usr/share/licenses/kernel-extra/other/CC-BY-SA-4.0',
