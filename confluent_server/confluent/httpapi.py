@@ -887,6 +887,45 @@ def resourcehandler_backend(env, start_response):
             start_response('200 OK', headers)
             yield rsp
             return
+    
+    elif (operation == 'create' and ('/staging' in env['PATH_INFO'])):
+        url = env['PATH_INFO']
+        args_dict = {}
+        content_length = int(env.get('CONTENT_LENGTH', 0))
+        if content_length > 0 and (len(url.split('/')) > 2):
+            # check if the user and the url defined user are the same 
+            if authorized['username'] == url.split('/')[2]:
+                args_dict.update({'filedata':env, 'content_length': content_length})
+                hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)
+                for resp in hdlr:
+                    if isinstance(resp, confluent.messages.FileUploadProgress):
+                        if resp.kvpairs['progress']['value'] == 100:
+                            progress = resp.kvpairs['progress']['value']
+                start_response('200 OK', headers)
+                yield json.dumps({'data': 'done'})
+                return       
+            else:
+                start_response('401 Unauthorized', headers)
+                yield json.dumps({'data': 'You do not have permission to write to file'})
+                return 
+        elif 'application/json' in reqtype and (len(url.split('/')) == 2):
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
+            pbody = json.loads(reqbody)
+            args = pbody['args']
+            args_dict.update({'filename': args, 'user': authorized['username']})
+            try:
+                args_dict.update({'bank': pbody['bank']})
+            except KeyError:
+                pass
+            hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)    
+            for res in hdlr:
+                if isinstance(res, confluent.messages.CreatedResource):
+                    stageurl = res.kvpairs['created']
+            start_response('200 OK', headers)
+            yield json.dumps({'data': stageurl})
+            return
+
     else:
         # normal request
         url = env['PATH_INFO']
