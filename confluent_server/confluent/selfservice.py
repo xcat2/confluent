@@ -30,7 +30,7 @@ import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
-currtz = None
+currtz = 'UTC'
 keymap = 'us'
 currlocale = 'en_US.UTF-8'
 currtzvintage = None
