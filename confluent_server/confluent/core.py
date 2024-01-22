@@ -44,6 +44,7 @@ import confluent.discovery.core as disco
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.mountmanager as mountmanager
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.osimage as osimage
@@ -159,7 +160,7 @@ def _merge_dict(original, custom):
 
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'usergroups/' ,
+                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/' ,
                    'users/', 'uuid', 'version']
 
 
@@ -169,6 +170,13 @@ class PluginRoute(object):
 
 
 
+def handle_storage(configmanager, inputdata, pathcomponents, operation):
+    if len(pathcomponents) == 1:
+        yield msg.ChildCollection('remote/')
+        return
+    if pathcomponents[1] == 'remote':
+        for rsp in mountmanager.handle_request(configmanager, inputdata, pathcomponents[2:], operation):
+            yield rsp
 def handle_deployment(configmanager, inputdata, pathcomponents,
                       operation):
     if len(pathcomponents) == 1:
@@ -1245,6 +1253,9 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     elif pathcomponents[0] == 'deployment':
         return handle_deployment(configmanager, inputdata, pathcomponents,
                                  operation)
+    elif pathcomponents[0] == 'storage':
+        return handle_storage(configmanager, inputdata, pathcomponents,
+                              operation)
     elif pathcomponents[0] == 'nodegroups':
         return handle_nodegroup_request(configmanager, inputdata,
                                         pathcomponents,
