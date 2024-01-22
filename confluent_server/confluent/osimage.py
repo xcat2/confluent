@@ -747,9 +747,9 @@ def rebase_profile(dirname):
     #      customization detected, skip
     # else
     #      update required, manifest update
-    
-    
-        
+
+
+
 def get_hashes(dirname):
     hashmap = {}
     for dname, _, fnames in os.walk(dirname):
@@ -776,7 +776,7 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
             continue
         oumask = os.umask(0o22)
         shutil.copytree(srcname, dirname)
-        hmap = get_hashes(dirname)            
+        hmap = get_hashes(dirname)
         profdata = None
         try:
             os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
@@ -824,11 +824,12 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
 
 class MediaImporter(object):
 
-    def __init__(self, media, cfm=None):
+    def __init__(self, media, cfm=None, customname=None, checkonly=False):
         self.worker = None
         if not os.path.exists('/var/lib/confluent/public'):
             raise Exception('`osdeploy initialize` must be executed before importing any media')
         self.profiles = []
+        self.errors = []
         medfile = None
         self.medfile = None
         if cfm and media in cfm.clientfiles:
@@ -848,25 +849,34 @@ class MediaImporter(object):
         self.phase = 'copying'
         if not identity:
             raise Exception('Unrecognized OS Media')
-        if 'subname' in identity:
+        if customname:
+            importkey = customname
+        elif 'subname' in identity:
             importkey = '{0}-{1}'.format(identity['name'], identity['subname'])
         else:
             importkey = identity['name']
-        if importkey in importing:
+        if importkey in importing and not checkonly:
             raise Exception('Media import already in progress for this media')
-        self.importkey = importkey
-        importing[importkey] = self
         self.importkey = importkey
         self.osname = identity['name']
         self.oscategory = identity.get('category', None)
-        targpath = identity['name']
+        if customname:
+            targpath = customname
+        else:
+            targpath = identity['name']
         self.distpath = '/var/lib/confluent/distributions/' + targpath
-        if identity.get('subname', None):
+        if identity.get('subname', None):  # subname is to indicate disk number in a media set
             targpath += '/' + identity['subname']
         self.targpath = '/var/lib/confluent/distributions/' + targpath
         if os.path.exists(self.targpath):
-            del importing[importkey]
-            raise Exception('{0} already exists'.format(self.targpath))
+            errstr = '{0} already exists'.format(self.targpath)
+            if checkonly:
+                self.errors = [errstr]
+            else:
+                raise Exception(errstr)
+        if checkonly:
+            return
+        importing[importkey] = self
         self.filename = os.path.abspath(media)
         self.error = ''
         self.importer = eventlet.spawn(self.importmedia)

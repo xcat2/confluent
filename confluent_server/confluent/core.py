@@ -70,6 +70,7 @@ import os
 import eventlet.green.socket as socket
 import struct
 import sys
+import yaml
 
 pluginmap = {}
 dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos')
@@ -177,6 +178,7 @@ def handle_storage(configmanager, inputdata, pathcomponents, operation):
     if pathcomponents[1] == 'remote':
         for rsp in mountmanager.handle_request(configmanager, inputdata, pathcomponents[2:], operation):
             yield rsp
+
 def handle_deployment(configmanager, inputdata, pathcomponents,
                       operation):
     if len(pathcomponents) == 1:
@@ -199,8 +201,19 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
             for prof in osimage.list_profiles():
                 yield msg.ChildCollection(prof + '/')
             return
-        if len(pathcomponents) == 3:
-            profname = pathcomponents[-1]
+        if len(pathcomponents) >= 3:
+            profname = pathcomponents[2]
+        if len(pathcomponents) == 4:
+            if operation == 'retrieve':
+                if len(pathcomponents) == 4 and pathcomponents[-1] == 'info':
+                    with open('/var/lib/confluent/public/os/{}/profile.yaml'.format(profname)) as profyaml:
+                        profinfo = yaml.safe_load(profyaml)
+                        profinfo['name'] = profname
+                    yield msg.KeyValueData(profinfo)
+                    return
+        elif len(pathcomponents) == 3:
+            if operation == 'retrieve':
+                yield msg.ChildCollection('info')
             if operation == 'update':
                 if 'updateboot' in inputdata:
                     osimage.update_boot(profname)
@@ -216,6 +229,17 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                     for cust in customized:
                         yield msg.KeyValueData({'customized': cust})
                     return
+    if pathcomponents[1] == 'fingerprint':
+        if operation == 'create':
+            importer = osimage.MediaImporter(inputdata['filename'], configmanager, checkonly=True)
+            medinfo = {
+                'targetpath': importer.targpath,
+                'name': importer.osname,
+                'oscategory': importer.oscategory,
+                'errors': importer.errors,
+            }
+            yield msg.KeyValueData(medinfo)
+            return
     if pathcomponents[1] == 'importing':
         if len(pathcomponents) == 2 or not pathcomponents[-1]:
             if operation == 'retrieve':
@@ -223,8 +247,12 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                     yield imp
                 return
             elif operation == 'create':
-                importer = osimage.MediaImporter(inputdata['filename'],
-                                                 configmanager)
+                if inputdata.get('custname', None):
+                    importer = osimage.MediaImporter(inputdata['filename'],
+                                                    configmanager, inputdata['custname'])
+                else:
+                    importer = osimage.MediaImporter(inputdata['filename'],
+                                                    configmanager)
                 yield msg.KeyValueData({'target': importer.targpath,
                                         'name': importer.importkey})
                 return

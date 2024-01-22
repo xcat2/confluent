@@ -28,6 +28,7 @@ def handle_request(configmanager, inputdata, pathcomponents, operation):
             mountsbyuser[curruser].append(currmount)
             yield msg.KeyValueData({
                 'path': currmount['path'],
+                'fullpath': '/var/run/confluent/browserfs/mount/{}'.format(currmount['path']),
                 'authtoken': currmount['authtoken']
             })
 
