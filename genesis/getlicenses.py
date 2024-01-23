@@ -94,6 +94,8 @@ manuallicenses = [
     '/usr/share/doc/zstd/README.md',
     '/usr/share/doc/hwdata/LICENSE',
     '/usr/share/doc/ipmitool/COPYING',
+    '/usr/share/licenses/linux-firmware/LICENSE.hfi1_firmware', # these two need to be extracted from srcrpm
+    '/usr/share/licenses/linux-firmware/LICENSE.ice_enhanced',  #
     '/usr/share/doc/libaio/COPYING',
     '/usr/share/doc/net-snmp/COPYING',
     '/usr/share/doc/libnl3/COPYING',
@@ -121,6 +123,8 @@ manuallicenses = [
     '/usr/share/licenses/kmod/tools/COPYING', # GPL not LGPL, must extract from kmod srpm
     '/usr/share/licenses/krb5-libs/NOTICE', # copy it verbatim from LICENSE, exact same file
     '/usr/share/doc/less/README',
+    '/usr/share/almalinux-release/EULA',
+    '/usr/share/doc/almalinux-release/GPL',
     '/usr/share/licenses/libcap-ng-utils/COPYING',
     '/usr/share/licenses/libdb/copyright', # from libdb, db-5.3.28, lang/sql/odbc/debian/copyright
     '/usr/share/licenses/libgcrypt/LICENSES.ppc-aes-gcm', # libgcrypt license to carry forward
