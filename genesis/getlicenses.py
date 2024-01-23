@@ -78,6 +78,7 @@ manuallicenses = [
     '/usr/share/licenses/openssh/COPYING.blowfish', # from header of blowfish file in bsd-compat
     '/usr/share/licenses/bc/COPYING.GPLv2',
     '/usr/share/licenses/bind-license/LICENSE', # MPLv2 from the source code
+    '/usr/share/licenses/procps-ng/COPYING.LIBv2.1', # fetched internet 
     # cp /usr/share/doc/lz4-libs/LICENSE /usr/share/licenses/lz4/LICENSE.BSD
     #'lz4-1.8.3]# cp LICENSE  /usr/share/licenses/lz4/LICENSE'
     # net-snmp has a bundled openssl, but the build does not avail itself of that copy
