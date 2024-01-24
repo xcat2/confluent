@@ -87,7 +87,7 @@ manuallicenses = [
     '/usr/share/licenses/pcre/LICENSE.BSD2', # stack-less just in time compiler, Zoltan Herzeg
     '/usr/share/licenses/sqlite/LICENSE.md', # https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md
     '/usr/share/licenses/pcre2/LICENSE.BSD2',
-    '/usr/share/licenses/dhcp/NOTICE',
+    '/usr/share/licenses/dhcp-common/NOTICE',
     '/usr/share/licenses/bash/NOTICE',
     '/usr/share/licenses/libsepol/NOTICE',
     '/usr/share/licenses/perl/COPYING.regexec', # regexec.c
