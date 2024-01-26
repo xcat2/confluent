@@ -88,6 +88,7 @@ manuallicenses = [
     '/usr/share/licenses/sqlite/LICENSE.md', # https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md
     '/usr/share/licenses/pcre2/LICENSE.BSD2',
     '/usr/share/licenses/dhcp-common/NOTICE',
+    '/usr/share/licenses/xz/COPYING.GPLv3', # manually extracted from xz source
     '/usr/share/licenses/bash/NOTICE',
     '/usr/share/licenses/libsepol/NOTICE',
     '/usr/share/licenses/perl/COPYING.regexec', # regexec.c
