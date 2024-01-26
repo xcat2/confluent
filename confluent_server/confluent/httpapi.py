@@ -618,32 +618,6 @@ def resourcehandler(env, start_response):
         yield '500 - ' + str(e)
         return
 
-def targ_ip_family(targip, first_pass=True):
-    # check ipv4
-    try:
-        socket.inet_aton(targip)
-        return 'is_ipv4'
-    except socket.error:
-        pass
-    # check ipv6
-    try:
-        check_ip = targip
-        if '%' in targip:
-            check_ip = targip.split('%')[0]
-        socket.inet_pton(socket.AF_INET6, check_ip)
-        return 'is_ipv6'
-    except socket.error:
-        # at this point we now know its not both ipv6 or ipv4 so we check if its hostname
-        if first_pass:
-            try:
-                ip_address = socket.gethostbyname(targip)
-                return targ_ip_family(ip_address, False)
-            except socket.gaierror:
-                return 'Cant figure that guy'
-        else:
-            return 'Cant figure it out'
-
-
 def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
@@ -769,15 +743,24 @@ def resourcehandler_backend(env, start_response):
             return
         targip = targip.split('/', 1)[0]
         if default:
-            # understand targip
-            ip_family = targ_ip_family(targip)
-            if ip_family == 'is_ipv4':
-                url = 'https://{0}'.format(targip)
-            elif ip_family == 'is_ipv6':
-                url = 'https://[{0}]'.format(targip)
-            else:
+            try:
+                ip_info = socket.getaddrinfo(targip, 0, 0, socket.SOCK_STREAM)
+            except socket.gaierror:
                 start_response('404 Not Found', headers)
-                yield 'Cant figure out the hardwaremanagenent.manager attribute ip'
+                yield 'hardwaremanagement.manager definition could not be resolved'
+                return
+            # this is just to future proof just in case the indexes of the address family change in future
+            for i in range(len(ip_info)):
+                if ip_info[i][0] == socket.AF_INET:
+                    url = 'https://{0}/'.format(ip_info[i][-1][0])
+                    start_response('302', [('Location', url)])
+                    yield 'Our princess is in another castle!'
+                    return
+                elif ip_info[i][0] == socket.AF_INET6:
+                    url = 'https://[{0}]/'.format(ip_info[i][-1][0])
+            if url.startswith('https://[fe80'):
+                start_response('405 Method Not Allowed', headers)
+                yield 'link local ipv6 address cannot be used in browser'
                 return
             start_response('302', [('Location', url)])
             yield 'Our princess is in another castle!'
