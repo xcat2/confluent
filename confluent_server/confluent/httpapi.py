@@ -618,6 +618,31 @@ def resourcehandler(env, start_response):
         yield '500 - ' + str(e)
         return
 
+def targ_ip_family(targip, first_pass=True):
+    # check ipv4
+    try:
+        socket.inet_aton(targip)
+        return 'is_ipv4'
+    except socket.error:
+        pass
+    # check ipv6
+    try:
+        check_ip = targip
+        if '%' in targip:
+            check_ip = targip.split('%')[0]
+        socket.inet_pton(socket.AF_INET6, check_ip)
+        return 'is_ipv6'
+    except socket.error:
+        # at this point we now know its not both ipv6 or ipv4 so we check if its hostname
+        if first_pass:
+            try:
+                ip_address = socket.gethostbyname(targip)
+                return targ_ip_family(ip_address, False)
+            except socket.gaierror:
+                return 'Cant figure that guy'
+        else:
+            return 'Cant figure it out'
+
 
 def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
@@ -728,7 +753,13 @@ def resourcehandler_backend(env, start_response):
     elif (env['PATH_INFO'].endswith('/forward/web') and
               env['PATH_INFO'].startswith('/nodes/')):
         prefix, _, _ = env['PATH_INFO'].partition('/forward/web')
-        _, _, nodename = prefix.rpartition('/')
+        #_, _, nodename = prefix.rpartition('/')
+        default = False
+        if 'default' in env['PATH_INFO']:
+            default = True
+            _,_,nodename,_ = prefix.split('/')
+        else:
+            _, _, nodename = prefix.rpartition('/')
         hm = cfgmgr.get_node_attributes(nodename, 'hardwaremanagement.manager')
         targip = hm.get(nodename, {}).get(
             'hardwaremanagement.manager', {}).get('value', None)
@@ -737,6 +768,20 @@ def resourcehandler_backend(env, start_response):
             yield 'No hardwaremanagement.manager defined for node'
             return
         targip = targip.split('/', 1)[0]
+        if default:
+            # understand targip
+            ip_family = targ_ip_family(targip)
+            if ip_family == 'is_ipv4':
+                url = 'https://{0}'.format(targip)
+            elif ip_family == 'is_ipv6':
+                url = 'https://[{0}]'.format(targip)
+            else:
+                start_response('404 Not Found', headers)
+                yield 'Cant figure out the hardwaremanagenent.manager attribute ip'
+                return
+            start_response('302', [('Location', url)])
+            yield 'Our princess is in another castle!'
+            return
         funport = forwarder.get_port(targip, env['HTTP_X_FORWARDED_FOR'],
                                      authorized['sessionid'])
         host = env['HTTP_X_FORWARDED_HOST']
