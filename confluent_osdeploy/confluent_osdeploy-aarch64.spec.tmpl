@@ -26,8 +26,6 @@ mkdir -p opt/confluent/bin
 mkdir -p stateless-bin
 cp -a el8bin/* .
 ln -s el8 el9
-ln -s ubuntu22.04 ubuntu24.04
-ln -s ubuntu22.04-diskless ubuntu24.04-diskless
 for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 coreos el9; do
     mkdir ${os}out
     cd ${os}out
