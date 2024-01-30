@@ -601,7 +601,7 @@ def fingerprint(archive):
                 return imginfo, None, None
 
 
-def import_image(filename, callback, backend=False, mfd=None):
+def import_image(filename, callback, backend=False, mfd=None, custtargpath=None, custdistpath=None, custname=''):
     if mfd:
         archive = os.fdopen(int(mfd), 'rb')
     else:
@@ -610,11 +610,16 @@ def import_image(filename, callback, backend=False, mfd=None):
     if not identity:
         return -1
     identity, imginfo, funname = identity
-    targpath = identity['name']
-    distpath = '/var/lib/confluent/distributions/' + targpath
-    if identity.get('subname', None):
-        targpath += '/' + identity['subname']
-    targpath = '/var/lib/confluent/distributions/' + targpath
+    distpath = custdistpath
+    if not distpath:
+        targpath = identity['name']
+        distpath = '/var/lib/confluent/distributions/' + targpath
+    if not custtargpath:
+        if identity.get('subname', None):
+            targpath += '/' + identity['subname']
+        targpath = '/var/lib/confluent/distributions/' + targpath
+    else:
+        targpath = custtargpath
     try:
         os.makedirs(targpath, 0o755)
     except Exception as e:
@@ -765,12 +770,15 @@ def get_hashes(dirname):
 
 
 def generate_stock_profiles(defprofile, distpath, targpath, osname,
-                            profilelist):
+                            profilelist, customname):
     osd, osversion, arch = osname.split('-')
     bootupdates = []
     for prof in os.listdir('{0}/profiles'.format(defprofile)):
         srcname = '{0}/profiles/{1}'.format(defprofile, prof)
-        profname = '{0}-{1}'.format(osname, prof)
+        if customname:
+            profname = '{0}-{1}'.format(customname, prof)
+        else:
+            profname = '{0}-{1}'.format(osname, prof)
         dirname = '/var/lib/confluent/public/os/{0}'.format(profname)
         if os.path.exists(dirname):
             continue
@@ -849,6 +857,7 @@ class MediaImporter(object):
         self.phase = 'copying'
         if not identity:
             raise Exception('Unrecognized OS Media')
+        self.customname = customname if customname else ''
         if customname:
             importkey = customname
         elif 'subname' in identity:
@@ -894,7 +903,7 @@ class MediaImporter(object):
             os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
         with open(os.devnull, 'w') as devnull:
             self.worker = subprocess.Popen(
-                [sys.executable, __file__, self.filename, '-b'],
+                [sys.executable, __file__, self.filename, '-b', self.targpath, self.distpath, self.customname],
                 stdin=devnull, stdout=subprocess.PIPE, close_fds=False)
         wkr = self.worker
         currline = b''
@@ -934,7 +943,7 @@ class MediaImporter(object):
                 self.oscategory)
             try:
                 generate_stock_profiles(defprofile, self.distpath, self.targpath,
-                                        self.osname, self.profiles)
+                                        self.osname, self.profiles, self.customname)
             except Exception as e:
                 self.phase = 'error'
                 self.error = str(e)
@@ -961,7 +970,7 @@ if __name__ == '__main__':
     os.umask(0o022)
     if len(sys.argv) > 2:
         mfd = os.environ.get('CONFLUENT_MEDIAFD', None)
-        sys.exit(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd))
+        sys.exit(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd, custtargpath=sys.argv[3], custdistpath=sys.argv[4], custname=sys.argv[5]))
     else:
         sys.exit(import_image(sys.argv[1], callback=printit))
 
