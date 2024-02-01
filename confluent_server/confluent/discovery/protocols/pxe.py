@@ -771,6 +771,14 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
                     node, profile, len(bootfile) - 127)})
             return
         repview[108:108 + len(bootfile)] = bootfile
+    elif info['architecture'] == 'uefi-aarch64' and packet.get(77, None) == b'iPXE':
+        if not profile:
+            profile = get_deployment_profile(node, cfg)
+        if not profile:
+            log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
+            return
+        bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+        repview[108:108 + len(bootfile)] = bootfile
     myip = myipn
     myipn = socket.inet_aton(myipn)
     orepview[12:16] = myipn
@@ -812,6 +820,13 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         repview[replen - 1:replen + 1] = b'\x03\x04'
         repview[replen + 1:replen + 5] = gateway
         replen += 6
+    if 82 in packet:
+        reloptionslen = len(packet[82])
+        reloptionshdr = struct.pack('BB', 82, reloptionslen)
+        repview[replen - 1:replen + 1] = reloptionshdr
+        repview[replen + 1:replen + reloptionslen + 1] = packet[82]
+        replen += 2 + reloptionslen
+
     repview[replen - 1:replen] = b'\xff'  # end of options, should always be last byte
     repview = memoryview(reply)
     pktlen = struct.pack('!H', replen + 28)  # ip+udp = 28
