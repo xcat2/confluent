@@ -246,11 +246,11 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
             try:
                 net4.sendto(data, ('239.255.255.253', 427))
             except socket.error as se:
-                # On occasion, multicasting may be disabled
-                # tolerate this scenario and move on
-                if se.errno != 101:
-                    raise
-            net4.sendto(data, (bcast, 427))
+                pass
+            try:
+                net4.sendto(data, (bcast, 427))
+            except socket.error as se:
+                pass
 
 
 def _grab_rsps(socks, rsps, interval, xidmap, deferrals):
