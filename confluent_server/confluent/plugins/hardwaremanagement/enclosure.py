@@ -15,10 +15,32 @@ import confluent.core as core
 import confluent.messages as msg
 import pyghmi.exceptions as pygexc
 import confluent.exceptions as exc
+import eventlet
+import eventlet.queue as queue
+import eventlet.greenpool as greenpool
+
+
+def reseat_bays(encmgr, bays, configmanager, rspq):
+    try:
+        for encbay in bays:
+            node = bays[encbay]
+            try:
+                for rsp in core.handle_path(
+                        '/nodes/{0}/_enclosure/reseat_bay'.format(encmgr),
+                        'update', configmanager,
+                        inputdata={'reseat': int(encbay)}):
+                    rspq.put(rsp)
+            except pygexc.UnsupportedFunctionality as uf:
+                rspq.put(msg.ConfluentNodeError(node, str(uf)))
+            except exc.TargetEndpointUnreachable as uf:
+                rspq.put(msg.ConfluentNodeError(node, str(uf)))
+    finally:
+        rspq.put(None)
 
 def update(nodes, element, configmanager, inputdata):
     emebs = configmanager.get_node_attributes(
         nodes, (u'enclosure.manager', u'enclosure.bay'))
+    baysbyencmgr = {}
     for node in nodes:
         try:
             em = emebs[node]['enclosure.manager']['value']
@@ -30,13 +52,20 @@ def update(nodes, element, configmanager, inputdata):
             em = node
         if not eb:
             eb = -1
-        try:
-            for rsp in core.handle_path(
-                    '/nodes/{0}/_enclosure/reseat_bay'.format(em),
-                    'update', configmanager,
-                    inputdata={'reseat': int(eb)}):
-                yield rsp
-        except pygexc.UnsupportedFunctionality as uf:
-            yield msg.ConfluentNodeError(node, str(uf))
-        except exc.TargetEndpointUnreachable as uf:
-            yield msg.ConfluentNodeError(node, str(uf))
+        if em not in baysbyencmgr:
+            baysbyencmgr[em] = {}
+        baysbyencmgr[em][eb] = node
+    rspq = queue.Queue()
+    gp = greenpool.GreenPool(64)
+    for encmgr in baysbyencmgr:
+        gp.spawn_n(reseat_bays, encmgr, baysbyencmgr[encmgr], configmanager, rspq)
+    while gp.running():
+        nrsp = rspq.get()
+        if nrsp is not None:
+            yield nrsp
+    while not rspq.empty():
+        nrsp = rspq.get()
+        if nrsp is not None:
+            yield nrsp
+
+
