@@ -15,7 +15,6 @@ import confluent.core as core
 import confluent.messages as msg
 import pyghmi.exceptions as pygexc
 import confluent.exceptions as exc
-import eventlet
 import eventlet.queue as queue
 import eventlet.greenpool as greenpool
 
