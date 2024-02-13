@@ -411,7 +411,7 @@ class NodeRange(object):
             return set(self.cfm.filter_nodenames(nameexpression, filternodes))
         elif '=' in element[0] or '!~' in element[0]:
             if self.purenumeric:
-                raise Exception('The "=" character is invalid within "[]"')
+                raise Exception('Equality/Inequality operators (=, !=, =~, !~) are invalid within "[]"')
             element = ''.join(element)
             if self.cfm is None:
                 raise Exception('Verification configmanager required')
