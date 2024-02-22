@@ -49,7 +49,6 @@ _handled_consoles = {}
 
 _tracelog = None
 _bufferdaemon = None
-_bufferlock = None
 
 try:
     range = xrange
@@ -602,8 +601,6 @@ def _start_tenant_sessions(cfm):
 def initialize():
     global _tracelog
     global _bufferdaemon
-    global _bufferlock
-    _bufferlock = semaphore.Semaphore()
     _tracelog = log.Logger('trace')
     _bufferdaemon = subprocess.Popen(
         ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
