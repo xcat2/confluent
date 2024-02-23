@@ -946,7 +946,7 @@ def _forward_rsp(connection, res):
     connection.sendall(r)
 
 
-def handle_node_request(configmanager, inputdata, operation,
+async def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
     if log.logfull:
         raise exc.TargetResourceUnavailable('Filesystem full, free up space and restart confluent service')
@@ -1027,7 +1027,7 @@ def handle_node_request(configmanager, inputdata, operation,
         else:
             raise Exception("TODO here")
     del pathcomponents[0:2]
-    passvalues = queue.Queue()
+    passvalues = asyncio.Queue()
     plugroute = routespec.routeinfo
     _plugin = None
 
@@ -1095,23 +1095,23 @@ def handle_node_request(configmanager, inputdata, operation,
         numworkers = 0
         for hfunc in nodesbyhandler:
             numworkers += 1
-            workers.spawn(addtoqueue, passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
+            asyncio.create_task(addtoqueue(passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
                                            'element': pathcomponents,
                 'configmanager': configmanager,
                 'inputdata': _get_input_data(_plugin, pathcomponents,
                                              operation, inputdata,nodes,
-                                             isnoderange, configmanager)})
+                                             isnoderange, configmanager)}))
         for manager in nodesbymanager:
             numworkers += 1
-            workers.spawn(addtoqueue, passvalues, dispatch_request, {
+            asyncio.create_task(addtoqueue(passvalues, dispatch_request, {
                 'nodes': nodesbymanager[manager], 'manager': manager,
                 'element': pathcomponents, 'configmanager': configmanager,
-                'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange})
+                'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange}))
         if isnoderange or not autostrip:
-            return iterate_queue(numworkers, passvalues)
+            return await iterate_queue(numworkers, passvalues)
         else:
             if numworkers > 0:
-                return iterate_queue(numworkers, passvalues, nodes[0])
+                return await iterate_queue(numworkers, passvalues, nodes[0])
             else:
                 raise exc.NotImplementedException()
 
@@ -1132,10 +1132,10 @@ def _get_input_data(plugin_ext, pathcomponents, operation, inputdata,
                                      nodes, isnoderange,configmanager)
 
 
-def iterate_queue(numworkers, passvalues, strip=False):
+async def iterate_queue(numworkers, passvalues, strip=False):
     completions = 0
     while completions < numworkers:
-        nv = passvalues.get()
+        nv = await passvalues.get()
         if nv == 'theend':
             completions += 1
         else:
@@ -1146,18 +1146,23 @@ def iterate_queue(numworkers, passvalues, strip=False):
             yield nv
 
 
-def addtoqueue(theq, fun, kwargs):
+async def addtoqueue(theq, fun, kwargs):
     try:
         result = fun(**kwargs)
         if isinstance(result, console.Console):
-            theq.put(result)
+            await theq.put(result)
         else:
-            for pv in result:
-                theq.put(pv)
+
+            if isinstance(result, types.AsyncGeneratorType):
+                async for pv in result:
+                    await theq.put(pv)
+            else:
+                for pv in result:
+                    await theq.put(pv)
     except Exception as e:
-        theq.put(e)
+        await theq.put(e)
     finally:
-        theq.put('theend')
+        await theq.put('theend')
 
 
 def dispatch_request(nodes, manager, element, configmanager, inputdata,

@@ -590,6 +590,11 @@ class InputFirmwareUpdate(ConfluentMessage):
 
     @property
     def filename(self):
+        # TODO: get the currennt_user and cross reference if that user is allowed to
+        # read...  however, not sure wwhat to do if user is pure confluent user
+        # though the staging may get an explicit pass, which should cover the web case...
+        # media and firmware are ways to currently push things out, but if we allow profile export
+        # what then?
         if self._complexname:
             raise Exception('User requested substitutions, but code is '
                             'written against old api, code must be fixed or '

@@ -15,11 +15,9 @@ import confluent.core as core
 import confluent.messages as msg
 import pyghmi.exceptions as pygexc
 import confluent.exceptions as exc
-import eventlet.queue as queue
-import eventlet.greenpool as greenpool
 
 
-def reseat_bays(encmgr, bays, configmanager, rspq):
+async def reseat_bays(encmgr, bays, configmanager, rspq):
     try:
         for encbay in bays:
             node = bays[encbay]
@@ -28,13 +26,13 @@ def reseat_bays(encmgr, bays, configmanager, rspq):
                         '/nodes/{0}/_enclosure/reseat_bay'.format(encmgr),
                         'update', configmanager,
                         inputdata={'reseat': int(encbay)}):
-                    rspq.put(rsp)
+                    await rspq.put(rsp)
             except pygexc.UnsupportedFunctionality as uf:
-                rspq.put(msg.ConfluentNodeError(node, str(uf)))
+                await rspq.put(msg.ConfluentNodeError(node, str(uf)))
             except exc.TargetEndpointUnreachable as uf:
-                rspq.put(msg.ConfluentNodeError(node, str(uf)))
+                await rspq.put(msg.ConfluentNodeError(node, str(uf)))
     finally:
-        rspq.put(None)
+        await rspq.put(None)
 
 def update(nodes, element, configmanager, inputdata):
     emebs = configmanager.get_node_attributes(
@@ -54,17 +52,16 @@ def update(nodes, element, configmanager, inputdata):
         if em not in baysbyencmgr:
             baysbyencmgr[em] = {}
         baysbyencmgr[em][eb] = node
-    rspq = queue.Queue()
-    gp = greenpool.GreenPool(64)
+    reseattasks = []
+    rspq = asyncio.Queue()
     for encmgr in baysbyencmgr:
-        gp.spawn_n(reseat_bays, encmgr, baysbyencmgr[encmgr], configmanager, rspq)
-    while gp.running():
-        nrsp = rspq.get()
+        currtask = asyncio.create_task(reseat_bays(encmgr, baysbyencmgr[encmgr], configmanager, rspq))
+        reseattasks.append(currtask)
+    while not all([task.done() for task in reseattasks]):;
+        nrsp = await rspq.get()
         if nrsp is not None:
             yield nrsp
     while not rspq.empty():
-        nrsp = rspq.get()
+        nrsp = await rspq.get()
         if nrsp is not None:
             yield nrsp
-
-

@@ -17,6 +17,9 @@
 
 import sys
 import os
+import eventlet.hubs
+eventlet.hubs.use_hub("eventlet.hubs.asyncio")
+
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):

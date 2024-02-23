@@ -30,11 +30,11 @@ import eventlet.support.greendns
 from fnmatch import fnmatch
 import os
 import pwd
-import pyghmi.constants as pygconstants
-import pyghmi.exceptions as pygexc
-import pyghmi.storage as storage
+import aiohmi.constants as pygconstants
+import aiohmi.exceptions as pygexc
+import aiohmi.storage as storage
 console = eventlet.import_patched('pyghmi.ipmi.console')
-ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
+import aiohmi.ipmi.command as ipmicommand
 import socket
 import ssl
 import traceback
@@ -174,7 +174,9 @@ def sanitize_invdata(indata):
 
 
 class IpmiCommandWrapper(ipmicommand.Command):
-    def __init__(self, node, cfm, **kwargs):
+    @classmethod
+    async def create(cls, node, cfm, **kwargs):
+        self = cls()
         self.cfm = cfm
         self.node = node
         self.sensormap = {}
@@ -185,7 +187,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
             (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
                       'hardwaremanagement.manager'), self._attribschanged)
-        super(self.__class__, self).__init__(**kwargs)
+        amait super().create(**kwargs)
         self.setup_confluent_keyhandler()
         try:
             os.makedirs('/var/cache/confluent/ipmi/')
@@ -380,7 +382,7 @@ class IpmiConsole(conapi.Console):
         self.solconnection.send_break()
 
 
-def perform_requests(operator, nodes, element, cfg, inputdata, realop):
+async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
     cryptit = cfg.decrypt
     cfg.decrypt = True
     configdata = cfg.get_node_attributes(nodes, _configattributes)
@@ -430,7 +432,7 @@ def perform_requests(operator, nodes, element, cfg, inputdata, realop):
 def perform_request(operator, node, element,
                     configdata, inputdata, cfg, results, realop):
         try:
-            return IpmiHandler(operator, node, element, configdata, inputdata,
+            return IpmiHandler.create(operator, node, element, configdata, inputdata,
                                cfg, results, realop).handle_request()
         except pygexc.IpmiException as ipmiexc:
             excmsg = str(ipmiexc)
@@ -460,9 +462,11 @@ def perform_request(operator, node, element,
 
 persistent_ipmicmds = {}
 
-class IpmiHandler(object):
-    def __init__(self, operation, node, element, cfd, inputdata, cfg, output,
+class IpmiHandler:
+    @classmethod
+    async def create(cls, operation, node, element, cfd, inputdata, cfg, output,
                  realop):
+        self = cls()
         self.cfm = cfg
         self.invmap = {}
         self.output = output
@@ -492,7 +496,7 @@ class IpmiHandler(object):
             except KeyError:  # was no previous session
                 pass
             try:
-                persistent_ipmicmds[(node, tenant)] = IpmiCommandWrapper(
+                persistent_ipmicmds[(node, tenant)] = await IpmiCommandWrapper.create(
                     node, cfg, bmc=connparams['bmc'],
                     userid=connparams['username'],
                     password=connparams['passphrase'], kg=connparams['kg'],
@@ -1636,14 +1640,14 @@ def initthread():
         _ipmithread = eventlet.spawn(_ipmi_evtloop)
 
 
-def create(nodes, element, configmanager, inputdata, realop='create'):
+async def create(nodes, element, configmanager, inputdata, realop='create'):
     initthread()
     if element == ['_console', 'session']:
         if len(nodes) > 1:
             raise Exception("_console/session does not support multiple nodes")
         return IpmiConsole(nodes[0], configmanager)
     else:
-        return perform_requests(
+        return await perform_requests(
             'update', nodes, element, configmanager, inputdata, realop)
 
 
@@ -1652,7 +1656,7 @@ def update(nodes, element, configmanager, inputdata):
     return create(nodes, element, configmanager, inputdata, 'update')
 
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     initthread()
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
@@ -1664,7 +1668,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         return firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'ffdc')
     else:
-        return perform_requests('read', nodes, element, configmanager,
+        return await perform_requests('read', nodes, element, configmanager,
                                 inputdata, 'read')
 
 def delete(nodes, element, configmanager, inputdata):

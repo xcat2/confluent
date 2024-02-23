@@ -22,35 +22,29 @@
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
-try:
-    import cryptography
-except ImportError:
-    # Using older, non-crypography based paramiko
-    cryptography = None
 
-import eventlet
 import hashlib
 import sys
 sys.modules['gssapi'] = None
-paramiko = eventlet.import_patched('paramiko')
-warnhostkey = False
-if cryptography and cryptography.__version__.split('.') < ['1', '5']:
-    # older cryptography with paramiko breaks most key support except
-    # ed25519
-    warnhostkey = True
-    paramiko.transport.Transport._preferred_keys = filter(
-        lambda x: 'ed25519' in x,
-        paramiko.transport.Transport._preferred_keys)
+#paramiko = eventlet.import_patched('paramiko')
+import asyncio
+import asyncssh
 
 
 
-class HostKeyHandler(paramiko.client.MissingHostKeyPolicy):
+
+class HostKeyHandler:
 
     def __init__(self, configmanager, node):
         self.cfm = configmanager
         self.node = node
 
     def missing_host_key(self, client, hostname, key):
+        # have to catch the valueerror and use ssh-keyscan to trigger this, asyncssh host key handling
+        # is a bit more limited compared to paramiko
+
+        #but... leverage /etc/ssh/ssh_known_hosts, we can try that way, and if it fails, fallback to our
+        #confluent db based handler
         fingerprint = 'sha512$' + hashlib.sha512(key.asbytes()).hexdigest()
         cfg = self.cfm.get_node_attributes(
                 self.node, ('pubkeys.ssh', 'pubkeys.addpolicy'))
@@ -94,11 +88,12 @@ class SshShell(conapi.Console):
         self.height = height
         if not self.connected:
             return
+        # asyncssh channel has change_terminal_size, hurray
         self.shell.resize_pty(width=width, height=height)
 
-    def recvdata(self):
+    async def recvdata(self):
         while self.connected:
-            pendingdata = self.shell.recv(8192)
+            pendingdata = await self.shell.stdout.read(8192)
             if not pendingdata:
                 self.ssh.close()
                 if self.datacallback:
@@ -123,31 +118,18 @@ class SshShell(conapi.Console):
         self.inputmode = -3
         eventlet.spawn_n(self.do_logon)
     
-    def do_logon(self):
-        self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(
-                HostKeyHandler(self.nodeconfig, self.node))
+    async def do_logon(self):
+        sco = asyncssh.SSHClientConnectionOptions()
+        #The below would be to support the confluent db, and only fallback if the SSH CA do not work
+        #sco.client_fatory = SSHKnownHostsLookup
+
         try:
             self.datacallback('\r\nConnecting to {}...'.format(self.node))
-            self.ssh.connect(self.node, username=self.username,
-                             password=self.password, allow_agent=False,
-                             look_for_keys=False)
-        except paramiko.AuthenticationException as e:
-            self.ssh.close()
-            self.inputmode = 0
-            self.username = b''
-            self.password = b''
-            self.datacallback('\r\nError connecting to {0}:\r\n {1}\r\n'.format(self.node, str(e)))
-            self.datacallback('\r\nlogin as: ')
-            return
-        except paramiko.ssh_exception.NoValidConnectionsError as e:
-            self.ssh.close()
-            self.datacallback('\r\nError connecting to {0}:\r\n {1}\r\n'.format(self.node, str(e)))
-            self.inputmode = 0
-            self.username = b''
-            self.password = b''
-            self.datacallback('\r\nlogin as: ')
-            return
+            try:
+                self.ssh = await asyncssh.connect(self,node, username=self.username, password=self.password, known_hosts='/etc/ssh/ssh_known_hosts')
+            except ValueError:
+                #TODO: non-cert ssh targets
+                raise
         except cexc.PubkeyInvalid as pi:
             self.ssh.close()
             self.keyaction = b''
@@ -157,17 +139,6 @@ class SshShell(conapi.Console):
             self.datacallback('\r\nNew fingerprint: ' + pi.fingerprint)
             self.inputmode = -1
             self.datacallback('\r\nEnter "disconnect" or "accept": ')
-            return
-        except paramiko.SSHException as pi:
-            self.ssh.close()
-            self.inputmode = -2
-            warn = str(pi)
-            if warnhostkey:
-                warn += ' (Older cryptography package on this host only ' \
-                        'works with ed25519, check ssh startup on target ' \
-                        'and permissions on /etc/ssh/*key)\r\n' \
-                        'Press Enter to close...'
-            self.datacallback('\r\n' + warn)
             return
         except Exception as e:
             self.ssh.close()
