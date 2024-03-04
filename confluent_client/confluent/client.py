@@ -62,6 +62,7 @@ def stringify(instr):
         return instr.encode('utf-8')
     return instr
 
+
 class Tabulator(object):
     def __init__(self, headers):
         self.headers = headers
@@ -121,7 +122,8 @@ def printerror(res, node=None):
     for node in res.get('databynode', {}):
         exitcode = res['databynode'][node].get('errorcode', exitcode)
         if 'error' in res['databynode'][node]:
-            sys.stderr.write('{0}: {1}\n'.format(node, res['databynode'][node]['error']))
+            sys.stderr.write(
+                '{0}: {1}\n'.format(node, res['databynode'][node]['error']))
             if exitcode == 0:
                 exitcode = 1
     if 'error' in res:
@@ -169,6 +171,11 @@ class Command(object):
                 self.serverloc = '/var/run/confluent/api.sock'
         else:
             self.serverloc = server
+        self.connected = False
+
+    async def ensure_connected(self):
+        if self.connected:
+            return True
         if os.path.isabs(self.serverloc) and os.path.exists(self.serverloc):
             self._connect_unix()
             self.unixdomain = True
@@ -176,9 +183,9 @@ class Command(object):
             raise Exception('Confluent service is not available')
         else:
             self._connect_tls()
-        self.protversion = int(tlvdata.recv(self.connection).split(
+        self.protversion = int((await tlvdata.recv(self.connection)).split(
             b'--')[1].strip()[1:])
-        authdata = tlvdata.recv(self.connection)
+        authdata = await tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
         else:
@@ -186,19 +193,21 @@ class Command(object):
         if not self.authenticated and 'CONFLUENT_USER' in os.environ:
             username = os.environ['CONFLUENT_USER']
             passphrase = os.environ['CONFLUENT_PASSPHRASE']
-            self.authenticate(username, passphrase)
+            await self.authenticate(username, passphrase)
+        self.connected = True
 
-    def add_file(self, name, handle, mode):
+    async def add_file(self, name, handle, mode):
+        await self.ensure_connected()
         if self.protversion < 3:
             raise Exception('Not supported with connected confluent server')
         if not self.unixdomain:
             raise Exception('Can only add a file to a unix domain connection')
         tlvdata.send(self.connection, {'filename': name, 'mode': mode}, handle)
 
-    def authenticate(self, username, password):
+    async def authenticate(self, username, password):
         tlvdata.send(self.connection,
                      {'username': username, 'password': password})
-        authdata = tlvdata.recv(self.connection)
+        authdata = await tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
 
@@ -328,25 +337,32 @@ class Command(object):
             cprint('')
             return 0
 
-    def read(self, path, parameters=None):
+    async def read(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('retrieve', path, self.connection, parameters)
+        async for rsp in send_request(
+                'retrieve', path, self.connection, parameters):
+            yield rsp
 
-    def update(self, path, parameters=None):
+    async def update(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('update', path, self.connection, parameters)
+        return await send_request('update', path, self.connection, parameters)
 
-    def create(self, path, parameters=None):
+    async def create(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('create', path, self.connection, parameters)
+        async for rsp in send_request('create', path, self.connection, parameters):
+            yield rsp
 
-    def delete(self, path, parameters=None):
+    async def delete(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('delete', path, self.connection, parameters)
+        return await send_request('delete', path, self.connection, parameters)
 
     def _connect_unix(self):
         self.connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -411,7 +427,7 @@ class Command(object):
             khf[hostid] = fingerprint
 
 
-def send_request(operation, path, server, parameters=None):
+async def send_request(operation, path, server, parameters=None):
     """This function iterates over all the responses
     received from the server.
 
@@ -424,16 +440,16 @@ def send_request(operation, path, server, parameters=None):
     payload = {'operation': operation, 'path': path}
     if parameters is not None:
         payload['parameters'] = parameters
-    tlvdata.send(server, payload)
-    result = tlvdata.recv(server)
+    await tlvdata.send(server, payload)
+    result = await tlvdata.recv(server)
     while '_requestdone' not in result:
         try:
             yield result
         except GeneratorExit:
             while '_requestdone' not in result:
-                result = tlvdata.recv(server)
+                result = await tlvdata.recv(server)
             raise
-        result = tlvdata.recv(server)
+        result = await tlvdata.recv(server)
 
 
 def attrrequested(attr, attrlist, seenattributes, node=None):
@@ -720,7 +736,7 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
                     else:
                         exitcode = session.simple_noderange_command(noderange, 'attributes/all',
                                                                     value, key)
-            except:
+            except Exception:
                 sys.stderr.write('Error: {0} not a valid expression\n'.format(str(updateargs[1:])))
                 exitcode = 1
             sys.exit(exitcode)

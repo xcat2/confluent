@@ -187,7 +187,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
             (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 'secret.ipmikg',
                       'hardwaremanagement.manager'), self._attribschanged)
-        amait super().create(**kwargs)
+        await super().create(**kwargs)
         self.setup_confluent_keyhandler()
         try:
             os.makedirs('/var/cache/confluent/ipmi/')

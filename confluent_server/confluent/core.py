@@ -1267,7 +1267,7 @@ def handle_discovery(pathcomponents, operation, configmanager, inputdata):
     if pathcomponents[0] == 'detected':
         pass
 
-def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
+async def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
 
     The plugins should generally return some sort of iterator.
@@ -1281,7 +1281,7 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'noderange':
-        return handle_node_request(configmanager, inputdata, operation,
+        return await  handle_node_request(configmanager, inputdata, operation,
                                    pathcomponents, autostrip)
     elif pathcomponents[0] == 'deployment':
         return handle_deployment(configmanager, inputdata, pathcomponents,
@@ -1295,7 +1295,7 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
                                         operation)
     elif pathcomponents[0] == 'nodes':
         # single node request of some sort
-        return handle_node_request(configmanager, inputdata,
+        return await handle_node_request(configmanager, inputdata,
                                    operation, pathcomponents, autostrip)
     elif pathcomponents[0] == 'discovery':
         return disco.handle_api_request(

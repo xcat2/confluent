@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
@@ -41,6 +41,7 @@
 # esc-( would interfere with normal esc use too much
 # ~ I will not use for now...
 
+import asyncio
 import math
 import getpass
 import optparse
@@ -360,7 +361,7 @@ def print_result(res):
             print(output.encode('utf-8'))
 
 
-def do_command(command, server):
+async def do_command(command, server):
     global exitcode
     global target
     global currconsole
@@ -399,7 +400,7 @@ def do_command(command, server):
                         target = otarget
             else:
                 foundchild = False
-                for res in session.read(parentpath, server):
+                async for res in session.read(parentpath, server):
                     try:
                         if res['item']['href'] == childname:
                             foundchild = True
@@ -434,7 +435,7 @@ def do_command(command, server):
                                 pass
         else:
             targpath = target
-        for res in session.read(targpath):
+        async for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
                     print(res['item']["href"])
@@ -854,7 +855,7 @@ opts, shellargs = parser.parse_args()
 
 username = None
 passphrase = None
-def server_connect():
+async def server_connect():
     global session, username, passphrase
     if opts.controlpath:
         termhandler.TermHandler(opts.controlpath)
@@ -864,7 +865,7 @@ def server_connect():
         session = client.Command(os.environ['CONFLUENT_HOST'])
     else:  # unix domain
         session = client.Command()
-
+    await session.ensure_connected()
     # Next stop, reading and writing from whichever of stdin and server goes first.
     #see pyghmi code for solconnect.py
     if not session.authenticated and username is not None:
@@ -890,10 +891,10 @@ if sys.stdout.isatty():
     import readline
 
 
-def main():
+async def main():
     global inconsole
     try:
-        server_connect()
+        await server_connect()
     except (EOFError, KeyboardInterrupt) as _:
         raise BailOut(0)
     except socket.gaierror:
@@ -920,10 +921,10 @@ def main():
     session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
-        do_command("start /nodes/%s/console/session" % session_node, netserver)
+        await do_command("start /nodes/%s/console/session" % session_node, netserver)
         doexit = True
     elif shellargs:
-        do_command(shellargs, netserver)
+        await do_command(shellargs, netserver)
         quitconfetty(fullexit=True, fixterm=False)
 
     powerstate = None
@@ -954,7 +955,7 @@ def main():
         else:
             currcommand = prompt()
             try:
-                do_command(currcommand, netserver)
+                await do_command(currcommand, netserver)
             except socket.error:
                 try:
                     server_connect()
@@ -1029,7 +1030,7 @@ if __name__ == '__main__':
     if opts.mintime:
         deadline = os.times()[4] + float(opts.mintime)
     try:
-        main()
+        asyncio.get_event_loop().run_until_complete(main())
     except BailOut as e:
         errcode = e.errorcode
     except Exception as e:

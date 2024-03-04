@@ -34,7 +34,7 @@ async def reseat_bays(encmgr, bays, configmanager, rspq):
     finally:
         await rspq.put(None)
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     emebs = configmanager.get_node_attributes(
         nodes, (u'enclosure.manager', u'enclosure.bay'))
     baysbyencmgr = {}
@@ -57,7 +57,7 @@ def update(nodes, element, configmanager, inputdata):
     for encmgr in baysbyencmgr:
         currtask = asyncio.create_task(reseat_bays(encmgr, baysbyencmgr[encmgr], configmanager, rspq))
         reseattasks.append(currtask)
-    while not all([task.done() for task in reseattasks]):;
+    while not all([task.done() for task in reseattasks]):
         nrsp = await rspq.get()
         if nrsp is not None:
             yield nrsp

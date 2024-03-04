@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import optparse
 import os
 import signal
@@ -32,27 +33,31 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-argparser = optparse.OptionParser(
-    usage='''\n       %prog noderange attribute1=value1 attribute2=value,...
-             \n ''')
-(options, args) = argparser.parse_args()
-requestargs=None
-try:
-    noderange = args[0]
-except IndexError:
-    argparser.print_help()
-    sys.exit(1)
-client.check_globbing(noderange)
-session = client.Command()
-exitcode = 0
-attribs = {'name': noderange}
-for arg in args[1:]:
-    key, val = arg.split('=', 1)
-    attribs[key] = val
-for r in session.create('/noderange/', attribs):
-    if 'error' in r:
-        sys.stderr.write(r['error'] + '\n')
-        exitcode |= 1
-    if 'created' in r:
-        print('{0}: created'.format(r['created']))
-sys.exit(exitcode)
+async def main():
+    argparser = optparse.OptionParser(
+        usage='''\n       %prog noderange attribute1=value1 attribute2=value,...
+                \n ''')
+    (options, args) = argparser.parse_args()
+    requestargs = None
+    try:
+        noderange = args[0]
+    except IndexError:
+        argparser.print_help()
+        sys.exit(1)
+    client.check_globbing(noderange)
+    session = client.Command()
+    exitcode = 0
+    attribs = {'name': noderange}
+    for arg in args[1:]:
+        key, val = arg.split('=', 1)
+        attribs[key] = val
+    async for r in session.create('/noderange/', attribs):
+        if 'error' in r:
+            sys.stderr.write(r['error'] + '\n')
+            exitcode |= 1
+        if 'created' in r:
+            print('{0}: created'.format(r['created']))
+    sys.exit(exitcode)
+
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

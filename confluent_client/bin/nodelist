@@ -1,4 +1,4 @@
-#!/usr/libexec/platform-python
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2015-2017 Lenovo
@@ -21,6 +21,7 @@ import optparse
 import os
 import signal
 import sys
+import asyncio
 
 
 
@@ -35,7 +36,7 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-def main():
+async def main():
     argparser = optparse.OptionParser(
     usage="Usage: %prog noderange\n"
           "   or: %prog [options] noderange <nodeattribute>...")
@@ -61,7 +62,7 @@ def main():
     if len(args) > 1:
         exitcode=client.printattributes(session,requestargs,showtype,nodetype,noderange,options)
     else:
-        for res in session.read(nodelist):
+        async for res in session.read(nodelist):
             if 'error' in res:
                 sys.stderr.write(res['error'] + '\n')
                 exitcode = 1
@@ -73,4 +74,4 @@ def main():
     sys.exit(exitcode)
 
 if __name__ == '__main__':
-    main()
+    asyncio.get_event_loop().run_until_complete(main())

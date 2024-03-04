@@ -21,6 +21,7 @@
 #
 
 import atexit
+import asyncio
 import ctypes
 import ctypes.util
 import errno
@@ -32,7 +33,7 @@ import sys
 import traceback
 
 import eventlet.green.select as select
-import eventlet.green.socket as socket
+import socket
 import eventlet.green.ssl as ssl
 import eventlet.support.greendns as greendns
 import eventlet
@@ -107,15 +108,15 @@ class ClientConsole(object):
         self.pendingdata = []
 
 
-def send_data(connection, data):
+async def send_data(connection, data):
     try:
-        tlvdata.send(connection, data)
+        await tlvdata.send(connection, data)
     except IOError as ie:
         if ie.errno != errno.EPIPE:
             raise
 
 
-def sessionhdl(connection, authname, skipauth=False, cert=None):
+async def sessionhdl(connection, authname, skipauth=False, cert=None):
     try:
         # For now, trying to test the console stuff, so let's just do n4.
         authenticated = False
@@ -132,10 +133,11 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         # version 0 == original, version 1 == pickle3 allowed, 2 = pickle forbidden, msgpack allowed
         # v3 - filehandle allowed
         # v4 - schema change and keepalive changes
-        send_data(connection, "Confluent -- v4 --")
+
+        await send_data(connection, "Confluent -- v4 --")
         while not authenticated:  # prompt for name and passphrase
-            send_data(connection, {'authpassed': 0})
-            response = tlvdata.recv(connection)
+            await send_data(connection, {'authpassed': 0})
+            response = await tlvdata.recv(connection)
             if not response:
                 return
             if 'collective' in response:
@@ -162,8 +164,8 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
             else:
                 authenticated = True
                 cfm = authdata[1]
-        send_data(connection, {'authpassed': 1})
-        request = tlvdata.recv(connection)
+        await send_data(connection, {'authpassed': 1})
+        request = await tlvdata.recv(connection)
         if request and isinstance(request, dict) and 'collective' in request:
             if skipauth:
                 if not libssl:
@@ -185,27 +187,27 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
                         {'collective': {'error': 'collective management commands may only be used by root'}})
         while request is not None:
             try:
-                process_request(
+                await process_request(
                     connection, request, cfm, authdata, authname, skipauth)
             except exc.ConfluentException as e:
                 if ((not isinstance(e, exc.LockedCredentials)) and
                         e.apierrorcode == 500):
                     tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                             event=log.Events.stacktrace)
-                send_data(connection, {'errorcode': e.apierrorcode,
+                await send_data(connection, {'errorcode': e.apierrorcode,
                                     'error': e.apierrorstr,
                                     'detail': e.get_error_body()})
-                send_data(connection, {'_requestdone': 1})
+                await send_data(connection, {'_requestdone': 1})
             except SystemExit:
                 sys.exit(0)
             except Exception as e:
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                             event=log.Events.stacktrace)
-                send_data(connection, {'errorcode': 500,
+                await send_data(connection, {'errorcode': 500,
                                         'error': 'Unexpected error - ' + str(e)})
-                send_data(connection, {'_requestdone': 1})
+                await send_data(connection, {'_requestdone': 1})
             try:
-                request = tlvdata.recv(connection)
+                request = await tlvdata.recv(connection)
             except Exception:
                 request = None
     finally:
@@ -216,15 +218,16 @@ def sessionhdl(connection, authname, skipauth=False, cert=None):
         except Exception:
             pass
 
-def send_response(responses, connection):
+async def send_response(responses, connection):
     if responses is None:
         return
+    responses = await responses
     for rsp in responses:
-        send_data(connection, rsp.raw())
-    send_data(connection, {'_requestdone': 1})
+        await send_data(connection, rsp.raw())
+    await send_data(connection, {'_requestdone': 1})
 
 
-def process_request(connection, request, cfm, authdata, authname, skipauth):
+async def process_request(connection, request, cfm, authdata, authname, skipauth):
     if isinstance(request, tlvdata.ClientFile):
         cfm.add_client_file(request)
         return
@@ -267,7 +270,7 @@ def process_request(connection, request, cfm, authdata, authname, skipauth):
         send_data(connection, {"errorcode": 400,
                                   "error": "Bad Request - " + str(e)})
         send_data(connection, {"_requestdone": 1})
-    send_response(hdlr, connection)
+    await send_response(hdlr, connection)
     return
 
 def start_proxy_term(connection, cert, request):
@@ -387,7 +390,7 @@ def _tlshandler(bind_host, bind_port):
         if addr[1] < 1000:
             eventlet.spawn_n(cs.handle_client, cnn, addr)
         else:
-            eventlet.spawn_n(_tlsstartup, cnn)
+            asyncio.create_task(_tlsstartup(cnn))
 
 
 if ffi:
@@ -395,8 +398,7 @@ if ffi:
     def verify_stub(store, misc):
         return 1
 
-
-def _tlsstartup(cnn):
+async def _tlsstartup(cnn):
     authname = None
     cert = None
     conf.init_config()
@@ -435,7 +437,7 @@ def _tlsstartup(cnn):
             cnn = ctx.wrap_socket(cnn, server_side=True)
         except AttributeError:
             raise Exception('Unable to find workable SSL support')
-    sessionhdl(cnn, authname, cert=cert)
+    await sessionhdl(cnn, authname, cert=cert)
 
 def removesocket():
     try:
@@ -443,8 +445,10 @@ def removesocket():
     except OSError:
         pass
 
-def _unixdomainhandler():
+async def _unixdomainhandler():
+    aloop = asyncio.get_event_loop()
     unixsocket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    unixsocket.settimeout(0)
     try:
         os.remove("/var/run/confluent/api.sock")
     except OSError:  # if file does not exist, no big deal
@@ -458,7 +462,7 @@ def _unixdomainhandler():
     atexit.register(removesocket)
     unixsocket.listen(5)
     while True:
-        cnn, addr = unixsocket.accept()
+        cnn, addr = await aloop.sock_accept(unixsocket)
         creds = cnn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED,
                                struct.calcsize('iII'))
         pid, uid, gid = struct.unpack('iII', creds)
@@ -479,7 +483,7 @@ def _unixdomainhandler():
             except KeyError:
                 cnn.close()
                 return
-        eventlet.spawn_n(sessionhdl, cnn, authname, skipauth)
+        asyncio.create_task(sessionhdl(cnn, authname, skipauth))
 
 
 class SockApi(object):
@@ -489,7 +493,7 @@ class SockApi(object):
         self.bind_host = bindhost or '::'
         self.bind_port = bindport or 13001
 
-    def start(self):
+    async def start(self):
         global auditlog
         global tracelog
         tracelog = log.Logger('trace')
@@ -500,7 +504,7 @@ class SockApi(object):
         else:
             eventlet.spawn_n(self.watch_for_cert)
         eventlet.spawn_n(self.watch_resolv)
-        self.unixdomainserver = eventlet.spawn(_unixdomainhandler)
+        self.unixdomainserver = asyncio.create_task(_unixdomainhandler())
 
     def watch_resolv(self):
         while True:

@@ -39,6 +39,7 @@ import confluent.httpapi as httpapi
 import confluent.log as log
 import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
+from eventlet.asyncio import spawn_for_awaitable
 try:
     import confluent.sockapi as sockapi
 except ImportError:
@@ -313,7 +314,7 @@ def run(args):
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
-        sockservice.start()
+        spawn_for_awaitable(sockservice.start())
     except NameError:
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
