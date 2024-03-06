@@ -32,6 +32,7 @@ anspypath = None
 running_status = {}
 class PlayRunner(object):
     def __init__(self, playfiles, nodes):
+        self.stderr = ''
         self.playfiles = playfiles
         self.nodes = nodes
         self.worker = None
@@ -96,7 +97,8 @@ class PlayRunner(object):
                     [mypath, __file__, targnodes, playfilename],
                     stdin=devnull, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE)
-                stdout, self.stderr = worker.communicate()
+                stdout, stder = worker.communicate()
+                self.stderr += stder.decode('utf8')
                 current = memoryview(stdout)
                 while len(current):
                     sz = struct.unpack('=q', current[:8])[0]
