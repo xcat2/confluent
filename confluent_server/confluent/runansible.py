@@ -63,6 +63,9 @@ class PlayRunner(object):
                 else:
                     textout += result['state'] + '\n'
             textout += '\n'
+            if self.stderr:
+                textout += "ERRORS **********************************\n"
+                textout += self.stderr
         return textout
 
     def dump_json(self):
