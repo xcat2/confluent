@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import csv
 import optparse
 import os
@@ -81,16 +82,15 @@ def subscribe_discovery(options, session, subscribe, targ):
             if 'status' in rsp:
                 print(rsp['status'])
     
-def print_disco(options, session, currmac, outhandler, columns):
+async def print_disco(options, session, currmac, outhandler, columns):
     procinfo = {}
-    for tmpinfo in session.read('/discovery/by-mac/{0}'.format(currmac)):
-
+    async for tmpinfo in session.read('/discovery/by-mac/{0}'.format(currmac)):
         procinfo.update(tmpinfo)
     if 'Switch' in columns or 'Port' in columns:
         if 'switch' in procinfo:
             procinfo['port'] = procinfo['switchport']
         else:
-            for tmpinfo in session.read(
+            async for tmpinfo in session.read(
                     '/networking/macs/by-mac/{0}'.format(currmac)):
                 if 'ports' in tmpinfo:
                     # The api sorts so that the most specific available value
@@ -160,12 +160,12 @@ def datum_complete(datum):
 searchkeys = set(['mac', 'serial', 'uuid'])
 
 
-def search_record(datum, options, session):
+async def search_record(datum, options, session):
     for searchkey in searchkeys:
         options.__dict__[searchkey] = None
     for searchkey in searchkeys & set(datum):
         options.__dict__[searchkey] = datum[searchkey]
-    return list(list_matching_macs(options, session))
+    return [x async for x in list_matching_macs(options, session)]
 
 
 def datum_to_attrib(datum):
@@ -245,7 +245,7 @@ def import_csv(options, session):
         sys.exit(exitcode)
 
 
-def list_discovery(options, session):
+async def list_discovery(options, session):
     orderby = None
     if options.fields:
         columns = []
@@ -261,23 +261,23 @@ def list_discovery(options, session):
             if options.order.lower() == field.lower():
                 orderby = field
     outhandler = client.Tabulator(columns)
-    for mac in list_matching_macs(options, session):
-        print_disco(options, session, mac, outhandler, columns)
+    for mac in [x async for x in list_matching_macs(options, session)]:
+        await print_disco(options, session, mac, outhandler, columns)
     if options.csv:
         outhandler.write_csv(sys.stdout, orderby)
     else:
         for row in outhandler.get_table(orderby):
             print(row)
 
-def clear_discovery(options, session):
-    for mac in list_matching_macs(options, session):
+async def clear_discovery(options, session):
+    async for mac in list_matching_macs(options, session):
         for res in session.delete('/discovery/by-mac/{0}'.format(mac)):
             if 'deleted' in res:
                 print('Cleared info for {0}'.format(res['deleted']))
             else:
                 print(repr(res))
 
-def list_matching_macs(options, session, node=None, checknode=True):
+async def list_matching_macs(options, session, node=None, checknode=True):
     path = '/discovery/'
     if node:
         path += 'by-node/{0}/'.format(node)
@@ -299,17 +299,16 @@ def list_matching_macs(options, session, node=None, checknode=True):
         path += 'by-mac/{0}'.format(options.mac)
         result = list(session.read(path))[0]
         if 'error' in result:
-            return []
-        return [options.mac.replace(':', '-')]
+            return
+        yield options.mac.replace(':', '-')
+        return
     else:
         path += 'by-mac/'
-        ret = []
-        for x in session.read(path):
+        async for x in session.read(path):
             if 'item' in x and 'href' in x['item']:
-                ret.append(x['item']['href'])
-        return ret
+                yield x['item']['href']
 
-def assign_discovery(options, session, needid=True):
+async def assign_discovery(options, session, needid=True):
     abort = False
     if options.importfile:
         return import_csv(options, session)
@@ -323,11 +322,11 @@ def assign_discovery(options, session, needid=True):
         abort = True
     if abort:
         sys.exit(1)
-    matches = list_matching_macs(options, session, None if needid else options.node, False)
+    matches = [x async for x in list_matching_macs(options, session, None if needid else options.node, False)]
     if not matches:
         # Do a rescan to catch missing requested data
         blocking_scan(session)
-        matches = list_matching_macs(options, session, None if needid else options.node, False)
+        matches = [x async for x in list_matching_macs(options, session, None if needid else options.node, False)]
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")
         sys.exit(1)
@@ -351,7 +350,7 @@ def blocking_scan(session):
     list(session.update('/networking/macs/rescan', {'rescan': 'start'}))
 
 
-def main():
+async def main():
     parser = optparse.OptionParser(
         usage='Usage: %prog [list|assign|rescan|clear|subscribe|unsubscribe|register] [options]')
     # -a for 'address' maybe?
@@ -402,13 +401,13 @@ def main():
         sys.exit(1)
     session = client.Command()
     if args[0] == 'list':
-        list_discovery(options, session)
+        await list_discovery(options, session)
     if args[0] == 'clear':
         clear_discovery(options, session)
     if args[0] == 'assign':
-        assign_discovery(options, session)
+        await assign_discovery(options, session)
     if args[0] == 'reassign':
-        assign_discovery(options, session, False)
+        await assign_discovery(options, session, False)
     if args[0] == 'register':
         register_endpoint(options, session, args[1])
     if args[0] == 'subscribe':
@@ -421,4 +420,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.get_event_loop().run_until_complete(main())

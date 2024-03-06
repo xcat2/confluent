@@ -33,6 +33,7 @@
 # functions.  Console is special and just get's passed through
 # see API.txt
 
+import asyncio
 import confluent
 import confluent.alerts as alerts
 import confluent.log as log

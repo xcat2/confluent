@@ -286,10 +286,10 @@ class Command(object):
             cprint('')
             return 0
     
-    def stop_if_noderange_over(self, noderange, maxnodes):
+    async def stop_if_noderange_over(self, noderange, maxnodes):
         if maxnodes is None:
             return
-        nsize = self.get_noderange_size(noderange)
+        nsize = await self.get_noderange_size(noderange)
         if nsize > maxnodes:
             if nsize == 1:
                 nodename = list(self.read(
@@ -304,16 +304,16 @@ class Command(object):
                 raise Exception("Aborting at user request")
         
 
-    def get_noderange_size(self, noderange):
+    async def get_noderange_size(self, noderange):
         numnodes = 0
-        for node in self.read('/noderange/{0}/nodes/'.format(noderange)):
+        async for node in self.read('/noderange/{0}/nodes/'.format(noderange)):
             if node.get('item', {}).get('href', None):
                 numnodes += 1
             else:
                 raise Exception("Error trying to size noderange {0}".format(noderange))
         return numnodes
 
-    def simple_nodegroups_command(self, noderange, resource, input=None, key=None, **kwargs):
+    async def simple_nodegroups_command(self, noderange, resource, input=None, key=None, **kwargs):
         try:
             rc = 0
             if resource[0] == '/':
@@ -324,12 +324,12 @@ class Command(object):
             else:
                 ikey = key
             if input is None:
-                for res in self.read('/nodegroups/{0}/{1}'.format(
+                for res in await self.read('/nodegroups/{0}/{1}'.format(
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res)
             else:
                 kwargs[ikey] = input
-                for res in self.update('/nodegroups/{0}/{1}'.format(
+                for res in await self.update('/nodegroups/{0}/{1}'.format(
                         noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res)
             return rc
@@ -349,20 +349,25 @@ class Command(object):
         await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return await send_request('update', path, self.connection, parameters)
+        async for rsp in send_request(
+                'update', path, self.connection, parameters):
+            yield rsp
 
     async def create(self, path, parameters=None):
         await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        async for rsp in send_request('create', path, self.connection, parameters):
+        async for rsp in send_request(
+                'create', path, self.connection, parameters):
             yield rsp
 
     async def delete(self, path, parameters=None):
         await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return await send_request('delete', path, self.connection, parameters)
+        async for rsp in send_request(
+                'delete', path, self.connection, parameters):
+            yield rsp
 
     def _connect_unix(self):
         self.connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -474,20 +479,20 @@ def attrrequested(attr, attrlist, seenattributes, node=None):
     return False
 
 
-def printattributes(session, requestargs, showtype, nodetype, noderange, options):
+async def printattributes(session, requestargs, showtype, nodetype, noderange, options):
     path = '/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)
-    return print_attrib_path(path, session, requestargs, options)
+    return await print_attrib_path(path, session, requestargs, options)
 
 def _sort_attrib(k):
     if isinstance(k[1], dict) and k[1].get('sortid', None) is not None:
         return k[1]['sortid']
     return k[0]
 
-def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
+async def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
     exitcode = 0
     seenattributes = NestedDict()
     allnodes = set([])
-    for res in session.read(path):
+    async for res in session.read(path):
         if 'error' in res:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1

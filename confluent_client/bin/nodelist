@@ -60,7 +60,7 @@ async def main():
     requestargs=args[1:]
     nodetype='noderange'
     if len(args) > 1:
-        exitcode=client.printattributes(session,requestargs,showtype,nodetype,noderange,options)
+        exitcode=await client.printattributes(session,requestargs,showtype,nodetype,noderange,options)
     else:
         async for res in session.read(nodelist):
             if 'error' in res:

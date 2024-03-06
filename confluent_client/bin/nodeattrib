@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -17,6 +17,7 @@
 
 __author__ = 'alin37'
 
+import asyncio
 from getpass import getpass
 import optparse
 import os
@@ -36,123 +37,127 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-argparser = optparse.OptionParser(
-    usage='''\n       %prog [-b] noderange [list of attributes or 'all']  \
-             \n       %prog -c noderange <list of attributes>  \
-             \n       %prog -e noderange <attribute names to set>  \
-             \n       %prog noderange attribute1=value1 attribute2=value,...
-             \n ''')
-argparser.add_option('-b', '--blame', action='store_true',
-                     help='Show information about how attributes inherited')
-argparser.add_option('-e', '--environment', action='store_true',
-                     help='Set attributes, but from environment variable of '
-                          'same name')
-argparser.add_option('-c', '--clear', action='store_true',
-                     help='Clear attributes')
-argparser.add_option('-p', '--prompt', action='store_true',
-                     help='Prompt for attribute values interactively')
-argparser.add_option('-m', '--maxnodes', type='int',
-                     help='Prompt if trying to set attributes on more '
-                          'than specified number of nodes')
-argparser.add_option('-s', '--set', dest='set', metavar='settings.batch',
-                     default=False, help='set attributes using a batch file')
-(options, args) = argparser.parse_args()
+async def main():
+    argparser = optparse.OptionParser(
+        usage='''\n       %prog [-b] noderange [list of attributes or 'all']  \
+                \n       %prog -c noderange <list of attributes>  \
+                \n       %prog -e noderange <attribute names to set>  \
+                \n       %prog noderange attribute1=value1 attribute2=value,...
+                \n ''')
+    argparser.add_option('-b', '--blame', action='store_true',
+                        help='Show information about how attributes inherited')
+    argparser.add_option('-e', '--environment', action='store_true',
+                        help='Set attributes, but from environment variable of '
+                            'same name')
+    argparser.add_option('-c', '--clear', action='store_true',
+                        help='Clear attributes')
+    argparser.add_option('-p', '--prompt', action='store_true',
+                        help='Prompt for attribute values interactively')
+    argparser.add_option('-m', '--maxnodes', type='int',
+                        help='Prompt if trying to set attributes on more '
+                            'than specified number of nodes')
+    argparser.add_option('-s', '--set', dest='set', metavar='settings.batch',
+                        default=False, help='set attributes using a batch file')
+    (options, args) = argparser.parse_args()
 
 
-#setting minimal output to only output current information
-showtype = 'current'
-requestargs=None
-try:
-    noderange = args[0]
-    nodelist = '/noderange/{0}/nodes/'.format(noderange)
-except IndexError:
-    argparser.print_help()
-    sys.exit(1)
-client.check_globbing(noderange)
-session = client.Command()
-exitcode = 0
-
-#Sets attributes
-nodetype="noderange"
-
-if len(args) > 1:
-    if "=" in args[1] or options.clear or options.environment or options.prompt:
-        if "=" in args[1] and options.clear:
-            print("Can not clear and set at the same time!")
-            argparser.print_help()
-            sys.exit(1)
-        argassign = None
-        if options.prompt:
-            argassign = {}
-            for arg in args[1:]:
-                oneval = 1
-                twoval = 2
-                while oneval != twoval:
-                    oneval = getpass('Enter value for {0}: '.format(arg))
-                    twoval = getpass('Confirm value for {0}: '.format(arg))
-                    if oneval != twoval:
-                        print('Values did not match.')
-                argassign[arg] = twoval
-        session.stop_if_noderange_over(noderange, options.maxnodes)
-        exitcode=client.updateattrib(session,args,nodetype, noderange, options, argassign)
+    #setting minimal output to only output current information
+    showtype = 'current'
+    requestargs=None
     try:
-        # setting user output to what the user inputs
-        if args[1] == 'all':
-            showtype = 'all'
-            requestargs=args[2:]
-        elif args[1] == 'current':
-            showtype = 'current'
-            requestargs=args[2:]
-        else:
-            showtype = 'all'
-            requestargs=args[1:]
-    except:
-        pass
-elif options.clear or options.environment or options.prompt:
-    sys.stderr.write('Attribute names required with specified options\n')
-    argparser.print_help()
-    exitcode = 400
+        noderange = args[0]
+        nodelist = '/noderange/{0}/nodes/'.format(noderange)
+    except IndexError:
+        argparser.print_help()
+        sys.exit(1)
+    client.check_globbing(noderange)
+    session = client.Command()
+    exitcode = 0
 
-elif options.set:
-    arglist = [noderange]
-    showtype='current'
-    argfile = open(options.set, 'r')
-    argset = argfile.readline()
-    while argset:
+    #Sets attributes
+    nodetype="noderange"
+
+    if len(args) > 1:
+        if "=" in args[1] or options.clear or options.environment or options.prompt:
+            if "=" in args[1] and options.clear:
+                print("Can not clear and set at the same time!")
+                argparser.print_help()
+                sys.exit(1)
+            argassign = None
+            if options.prompt:
+                argassign = {}
+                for arg in args[1:]:
+                    oneval = 1
+                    twoval = 2
+                    while oneval != twoval:
+                        oneval = getpass('Enter value for {0}: '.format(arg))
+                        twoval = getpass('Confirm value for {0}: '.format(arg))
+                        if oneval != twoval:
+                            print('Values did not match.')
+                    argassign[arg] = twoval
+            session.stop_if_noderange_over(noderange, options.maxnodes)
+            exitcode=client.updateattrib(session,args,nodetype, noderange, options, argassign)
         try:
-            argset = argset[:argset.index('#')]
-        except ValueError:
+            # setting user output to what the user inputs
+            if args[1] == 'all':
+                showtype = 'all'
+                requestargs=args[2:]
+            elif args[1] == 'current':
+                showtype = 'current'
+                requestargs=args[2:]
+            else:
+                showtype = 'all'
+                requestargs=args[1:]
+        except:
             pass
-        argset = argset.strip()
-        if argset:
-            arglist += shlex.split(argset)
-        argset = argfile.readline() 
-    session.stop_if_noderange_over(noderange, options.maxnodes)
-    exitcode=client.updateattrib(session,arglist,nodetype, noderange, options, None)
-if exitcode != 0:
+    elif options.clear or options.environment or options.prompt:
+        sys.stderr.write('Attribute names required with specified options\n')
+        argparser.print_help()
+        exitcode = 400
+
+    elif options.set:
+        arglist = [noderange]
+        showtype='current'
+        argfile = open(options.set, 'r')
+        argset = argfile.readline()
+        while argset:
+            try:
+                argset = argset[:argset.index('#')]
+            except ValueError:
+                pass
+            argset = argset.strip()
+            if argset:
+                arglist += shlex.split(argset)
+            argset = argfile.readline()
+        session.stop_if_noderange_over(noderange, options.maxnodes)
+        exitcode=client.updateattrib(session,arglist,nodetype, noderange, options, None)
+    if exitcode != 0:
+        sys.exit(exitcode)
+
+    # Lists all attributes
+    if len(args) > 0:
+        # setting output to all so it can search since if we do have something to search, we want to show all outputs even if it is blank.
+        if requestargs is None:
+            showtype = 'current'
+        elif requestargs == []:
+            #showtype already set
+            pass
+        else:
+            try:
+                requestargs.remove('all')
+                requestargs.remove('current')
+            except ValueError:
+                pass
+        exitcode = await client.printattributes(session, requestargs, showtype,nodetype, noderange, options)
+    else:
+        for res in session.read(nodelist):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
+                exitcode = 1
+            else:
+                print(res['item']['href'].replace('/', ''))
+
     sys.exit(exitcode)
 
-# Lists all attributes
-if len(args) > 0:
-    # setting output to all so it can search since if we do have something to search, we want to show all outputs even if it is blank.
-    if requestargs is None:
-        showtype = 'current'
-    elif requestargs == []:
-        #showtype already set
-        pass
-    else:
-        try:
-            requestargs.remove('all')
-            requestargs.remove('current')
-        except ValueError:
-            pass
-    exitcode = client.printattributes(session, requestargs, showtype,nodetype, noderange, options)
-else:
-    for res in session.read(nodelist):
-        if 'error' in res:
-            sys.stderr.write(res['error'] + '\n')
-            exitcode = 1
-        else:
-            print(res['item']['href'].replace('/', ''))
-
-sys.exit(exitcode)
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

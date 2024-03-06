@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import optparse
 import os
 import signal
@@ -32,26 +33,32 @@ if path.startswith('/opt'):
 
 import confluent.client as client
 
-argparser = optparse.OptionParser(
-    usage='''\n       %prog <noderange>
+
+async def main():
+    argparser = optparse.OptionParser(
+        usage='''\n       %prog <noderange>
              \n ''')
-argparser.add_option('-m', '--maxnodes', type='int',
-                     help='Specify a maximum number of '
-                          'nodes to delete, '
-                          'prompting if over the threshold')      
-(options, args) = argparser.parse_args()
-if len(args) != 1:
-    argparser.print_help()
-    sys.exit(1)
-noderange = args[0]
-client.check_globbing(noderange)
-session = client.Command()
-exitcode = 0
-session.stop_if_noderange_over(noderange, options.maxnodes)
-for r in session.delete('/noderange/{0}'.format(noderange)):
-    if 'error' in r:
-        sys.stderr.write(r['error'] + '\n')
-        exitcode |= 1
-    if 'deleted' in r:
-        print('{0}: deleted'.format(r['deleted']))
-sys.exit(exitcode)
+    argparser.add_option('-m', '--maxnodes', type='int',
+                         help='Specify a maximum number of '
+                              'nodes to delete, '
+                              'prompting if over the threshold')
+    (options, args) = argparser.parse_args()
+    if len(args) != 1:
+        argparser.print_help()
+        sys.exit(1)
+    noderange = args[0]
+    client.check_globbing(noderange)
+    session = client.Command()
+    exitcode = 0
+    await session.stop_if_noderange_over(noderange, options.maxnodes)
+    async for r in session.delete('/noderange/{0}'.format(noderange)):
+        if 'error' in r:
+            sys.stderr.write(r['error'] + '\n')
+            exitcode |= 1
+        if 'deleted' in r:
+            print('{0}: deleted'.format(r['deleted']))
+    sys.exit(exitcode)
+
+
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())
