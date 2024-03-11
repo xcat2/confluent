@@ -153,11 +153,11 @@ _confluent_osimage_completion()
 {
     _confluent_get_args
     if [ $NUMARGS == 2 ]; then
-        COMPREPLY=($(compgen -W "initialize import updateboot rebase" -- ${COMP_WORDS[COMP_CWORD]}))
+        COMPREPLY=($(compgen -W "initialize import importcheck updateboot rebase" -- ${COMP_WORDS[COMP_CWORD]}))
         return
     elif [ ${CMPARGS[1]} == 'initialize' ]; then
         COMPREPLY=($(compgen -W "-h -u -s -t -i" -- ${COMP_WORDS[COMP_CWORD]}))
-    elif [ ${CMPARGS[1]} == 'import' ]; then
+    elif [ ${CMPARGS[1]} == 'import' ] || [ ${CMPARGS[1]} == 'importcheck' ]; then
         compopt -o default
         COMPREPLY=()
         return

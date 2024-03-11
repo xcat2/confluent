@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 __author__ = 'jjohnson2,bfinley'
 
@@ -49,8 +49,11 @@ def main(args):
     wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
     wiz.add_argument('-l', help='Set up local management node to allow login from managed nodes', action='store_true')
+    osip = sp.add_parser('importcheck', help='Check import of an OS image from an ISO image')
+    osip.add_argument('imagefile', help='File to use for source of importing')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
+    osip.add_argument('-n', help='Specific a custom distribution name')
     upb = sp.add_parser(
         'updateboot',
         help='Push profile.yaml of the named profile data into boot assets as appropriate')
@@ -63,7 +66,9 @@ def main(args):
     if cmdset.command == 'list':
         return oslist()
     if cmdset.command == 'import':
-        return osimport(cmdset.imagefile)
+        return osimport(cmdset.imagefile, custname=cmdset.n)
+    if cmdset.command == 'importcheck':
+        return osimport(cmdset.imagefile, checkonly=True)
     if cmdset.command == 'initialize':
         return initialize(cmdset)
     if cmdset.command == 'updateboot':
@@ -496,7 +501,7 @@ def oslist():
     print("")
 
 
-def osimport(imagefile):
+def osimport(imagefile, checkonly=False, custname=None):
     c = client.Command()
     imagefile = os.path.abspath(imagefile)
     if c.unixdomain:
@@ -507,11 +512,33 @@ def osimport(imagefile):
             pass
     importing = False
     shortname = None
-    for rsp in c.create('/deployment/importing/', {'filename': imagefile}):
+    apipath = '/deployment/importing/'
+    if checkonly:
+        apipath = '/deployment/fingerprint/'
+    apiargs = {'filename': imagefile}
+    if custname:
+        apiargs['custname'] = custname
+    for rsp in c.create(apipath, apiargs):
         if 'target' in rsp:
             importing = True
             shortname = rsp['name']
             print('Importing from {0} to {1}'.format(imagefile, rsp['target']))
+        elif 'targetpath' in rsp:
+            tpath = rsp.get('targetpath', None)
+            tname = rsp.get('name', None)
+            oscat = rsp.get('oscategory', None)
+            if tpath:
+                print('Detected target directory: ' + tpath)
+            if tname:
+                print('Detected distribution name: ' + tname)
+            if oscat:
+                print('Detected OS category: ' + oscat)
+            for err in rsp.get('errors', []):
+                sys.stderr.write('Error: ' + err + '\n')
+
+        elif 'error' in rsp:
+            sys.stderr.write(rsp['error'] + '\n')
+            sys.exit(rsp.get('errorcode', 1))
         else:
             print(repr(rsp))
     try:
