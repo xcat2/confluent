@@ -10,6 +10,7 @@ import stat
 import struct
 import sys
 import subprocess
+import traceback
 
 bootuuid = None
 
@@ -426,4 +427,9 @@ def install_to_disk(imgpath):
 
 
 if __name__ == '__main__':
-    install_to_disk(os.environ['mountsrc'])
+    try:
+        install_to_disk(os.environ['mountsrc'])
+    except Exception:
+        traceback.print_exc()
+        time.sleep(86400)
+        raise
