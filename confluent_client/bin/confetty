@@ -42,7 +42,6 @@
 # ~ I will not use for now...
 
 import asyncio
-import math
 import getpass
 import optparse
 import os
@@ -52,6 +51,7 @@ import signal
 import socket
 import struct
 import sys
+import concurrent.futures
 import time
 try:
     import fcntl
@@ -235,14 +235,23 @@ session = None
 
 def completer(text, state):
     try:
-        return rcompleter(text, state)
-    except:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_completer, text, state)
+            return future.result()
+    except Exception:
         pass
-        #import traceback
-        #traceback.print_exc()
+        import traceback
+        traceback.print_exc()
 
 
-def rcompleter(text, state):
+def run_completer(text, state):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop.run_until_complete(
+            rcompleter(text, state))
+
+
+async def rcompleter(text, state):
     global candidates
     global valid_commands
     cline = readline.get_line_buffer()
@@ -272,7 +281,7 @@ def rcompleter(text, state):
     if candidates is None:
         candidates = []
         targpath = fullpath_target(lastarg)
-        for res in session.read(targpath):
+        async for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
                     candidates.append(res['item']["href"])
@@ -893,9 +902,12 @@ if sys.stdout.isatty():
 
 async def main():
     global inconsole
+    global consoleonly
+    global doexit
+    global doexit
     try:
         await server_connect()
-    except (EOFError, KeyboardInterrupt) as _:
+    except (EOFError, KeyboardInterrupt):
         raise BailOut(0)
     except socket.gaierror:
         sys.stderr.write('Could not connect to confluent\n')
@@ -917,7 +929,6 @@ async def main():
 
     doexit = False
     inconsole = False
-    pendingcommand = ""
     session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
@@ -1033,7 +1044,7 @@ if __name__ == '__main__':
         asyncio.get_event_loop().run_until_complete(main())
     except BailOut as e:
         errcode = e.errorcode
-    except Exception as e:
+    except Exception:
         import traceback
         excinfo = traceback.print_exc()
         try:
