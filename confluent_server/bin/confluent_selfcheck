@@ -280,13 +280,17 @@ if __name__ == '__main__':
         cfg = configmanager.ConfigManager(None)
         bootablev4nics = []
         bootablev6nics = []
+        targsships = []
         for nic in glob.glob("/sys/class/net/*/ifindex"):
             idx = int(open(nic, "r").read())
             nicname = nic.split('/')[-2]
             ncfg = netutil.get_nic_config(cfg, args.node, ifidx=idx)
+            if ncfg['ipv4_address']:
+                targsships.append(ncfg['ipv4_address'])
             if ncfg['ipv4_address'] or ncfg['ipv4_method'] == 'dhcp':
                 bootablev4nics.append(nicname)
             if ncfg['ipv6_address']:
+                targsships.append(ncfg['ipv6_address'])
                 bootablev6nics.append(nicname)
         if bootablev4nics:
             print("{} appears to have network configuration suitable for IPv4 deployment via: {}".format(args.node, ",".join(bootablev4nics)))
@@ -329,21 +333,22 @@ if __name__ == '__main__':
                 os.setgid(cuser.pw_gid)
                 os.setuid(cuser.pw_uid)
                 sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
-                srun = subprocess.run(
-                    ['ssh', '-Tn', '-o', 'BatchMode=yes', '-l', 'root',
-                     '-o', 'StrictHostKeyChecking=yes', args.node, 'true'],
-                    stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
-                if srun.returncode == 0:
-                    print(f'Confluent automation access to {args.node} seems OK')
-                else:
-                    if b'Host key verification failed' in srun.stderr:
-                        emprint('Confluent ssh unable to verify host key, check /etc/ssh/ssh_known_hosts. (Example resolution: osdeploy initialize -k)')
-                    elif b'ermission denied' in srun.stderr:
-                        emprint('Confluent user unable to ssh in, check /root/.ssh/authorized_keys on the target system versus /etc/confluent/ssh/automation.pub (Example resolution: osdeploy initialize -a)')
+                for targ in targsships:
+                    srun = subprocess.run(
+                        ['ssh', '-Tn', '-o', 'BatchMode=yes', '-l', 'root',
+                        '-o', 'StrictHostKeyChecking=yes', targ, 'true'],
+                        stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                    if srun.returncode == 0:
+                        print(f'Confluent automation access to {targ} seems OK')
                     else:
-                        emprint('Unknown error attempting confluent automation ssh:')
-                        sys.stderr.buffer.write(srun.stderr)
+                        if b'Host key verification failed' in srun.stderr:
+                            emprint(f'Confluent ssh unable to verify host key for {targ}, check /etc/ssh/ssh_known_hosts. (Example resolution: osdeploy initialize -k)')
+                        elif b'ermission denied' in srun.stderr:
+                            emprint(f'Confluent user unable to ssh in to {targ}, check /root/.ssh/authorized_keys on the target system versus /etc/confluent/ssh/automation.pub (Example resolution: osdeploy initialize -a)')
+                        else:
+                            emprint('Unknown error attempting confluent automation ssh:')
+                            sys.stderr.buffer.write(srun.stderr)
+                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
 # possible checks:
