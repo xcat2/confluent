@@ -344,7 +344,6 @@ if __name__ == '__main__':
                     else:
                         emprint('Unknown error attempting confluent automation ssh:')
                         sys.stderr.buffer.write(srun.stderr)
-                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
 # possible checks:
