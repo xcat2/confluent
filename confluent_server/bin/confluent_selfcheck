@@ -22,6 +22,8 @@ import shutil
 import eventlet.green.socket as socket
 import eventlet
 import greenlet
+import pwd
+import signal
 
 def fprint(txt):
     sys.stdout.write(txt)
@@ -109,6 +111,8 @@ def nics_missing_ipv6():
         iname, state = comps[:2]
         if iname == b'lo':
             continue
+        if iname == b'virbr0':
+            continue
         addrs = comps[2:]
         hasv6 = False
         hasv4 = False
@@ -157,6 +161,7 @@ def lookup_node(node):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='Run configuration checks for a system running confluent service')
     ap.add_argument('-n', '--node', help='A node name to run node specific checks against')
+    ap.add_argument('-a', '--automation', help='Do checks against a deployed node for automation and syncfiles function', action='store_true')
     args, extra = ap.parse_known_args(sys.argv)
     if len(extra) > 1:
         ap.print_help()
@@ -217,6 +222,7 @@ if __name__ == '__main__':
                 print('OK')
             except subprocess.CalledProcessError:
                 emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
+            os.kill(int(sshutil.agent_pid), signal.SIGTERM)
         fprint('Checking for blocked insecure boot: ')
         if insecure_boot_attempts():
             emprint('Some nodes are attempting network boot using PXE or HTTP boot, but the node is not configured to allow this (Example resolution: nodegroupattrib everything deployment.useinsecureprotocols=firmware)')
@@ -311,6 +317,34 @@ if __name__ == '__main__':
             emprint('Name resolution failed for node, it is normally a good idea for the node name to resolve to an IP')
         if result:
             print("OK")
+        if args.automation:
+            print(f'Checking confluent automation access to {args.node}...')
+            child = os.fork()
+            if child > 0:
+                pid, extcode = os.waitpid(child, 0)
+            else:
+                sshutil.ready_keys = {}
+                sshutil.agent_pid = None
+                cuser = pwd.getpwnam('confluent')
+                os.setgid(cuser.pw_gid)
+                os.setuid(cuser.pw_uid)
+                sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+                srun = subprocess.run(
+                    ['ssh', '-Tn', '-o', 'BatchMode=yes', '-l', 'root',
+                     '-o', 'StrictHostKeyChecking=yes', args.node, 'true'],
+                    stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+                if srun.returncode == 0:
+                    print(f'Confluent automation access to {args.node} seems OK')
+                else:
+                    if b'Host key verification failed' in srun.stderr:
+                        emprint('Confluent ssh unable to verify host key, check /etc/ssh/ssh_known_hosts. (Example resolution: osdeploy initialize -k)')
+                    elif b'ermission denied' in srun.stderr:
+                        emprint('Confluent user unable to ssh in, check /root/.ssh/authorized_keys on the target system versus /etc/confluent/ssh/automation.pub (Example resolution: osdeploy initialize -a)')
+                    else:
+                        emprint('Unknown error attempting confluent automation ssh:')
+                        sys.stderr.buffer.write(srun.stderr)
+                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
 # possible checks:
