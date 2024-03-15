@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import asyncio
 import os
 import signal
 import optparse
@@ -216,104 +216,108 @@ def parse_config_line(arguments, single=False):
                     queryparms[path] = {}
                 queryparms[path][attrib] = param
 
-if options.batch:
-    printsys = []
-    argfile = open(options.batch, 'r')
-    argset = argfile.readline()
-    while argset:
-        try:
-            argset = argset[:argset.index('#')]
-        except ValueError:
-            pass
-        argset = argset.strip()
-        if argset:
-            parse_config_line(shlex.split(argset), single=True)
+async def main():
+    if options.batch:
+        printsys = []
+        argfile = open(options.batch, 'r')
         argset = argfile.readline()
-else:
-    parse_config_line(args[1:])
-session = client.Command()
-rcode = 0
-if options.restoredefault:
-    session.stop_if_noderange_over(noderange, options.maxnodes)
-    if options.restoredefault.lower() in (
-        'sys', 'system', 'uefi', 'bios'):
-        for fr in session.update(
-                '/noderange/{0}/configuration/system/clear'.format(noderange),
-                {'clear': True}):
-            rcode |= client.printerror(fr)
-        sys.exit(rcode)
-    elif options.restoredefault.lower() in (
-        'bmc', 'imm', 'xcc'):
-        for fr in session.update(
-                '/noderange/{0}/configuration/management_controller/clear'.format(noderange),
-                {'clear': True}):
-            rcode |= client.printerror(fr)
-        sys.exit(rcode)
+        while argset:
+            try:
+                argset = argset[:argset.index('#')]
+            except ValueError:
+                pass
+            argset = argset.strip()
+            if argset:
+                parse_config_line(shlex.split(argset), single=True)
+            argset = argfile.readline()
     else:
-        sys.stderr.write(
-            'Unrecognized component to restore defaults: {0}\n'.format(
-                options.restoredefault))
-        sys.exit(1)
-if setmode:
-    session.stop_if_noderange_over(noderange, options.maxnodes)
-    if options.exclude:
-        sys.stderr.write('Cannot use exclude and assign at the same time\n')
-        sys.exit(1)
-    updatebypath = {}
-    attrnamebypath = {}
-    for key in assignment:
-        if key not in cfgpaths:
-            if key.startswith('bmc.'):
-                path = 'configuration/management_controller/extended/all'
-                attrib = key.replace('bmc.', '')
+        parse_config_line(args[1:])
+    session = client.Command()
+    rcode = 0
+    if options.restoredefault:
+        session.stop_if_noderange_over(noderange, options.maxnodes)
+        if options.restoredefault.lower() in (
+            'sys', 'system', 'uefi', 'bios'):
+            for fr in session.update(
+                    '/noderange/{0}/configuration/system/clear'.format(noderange),
+                    {'clear': True}):
+                rcode |= client.printerror(fr)
+            sys.exit(rcode)
+        elif options.restoredefault.lower() in (
+            'bmc', 'imm', 'xcc'):
+            for fr in session.update(
+                    '/noderange/{0}/configuration/management_controller/clear'.format(noderange),
+                    {'clear': True}):
+                rcode |= client.printerror(fr)
+            sys.exit(rcode)
+        else:
+            sys.stderr.write(
+                'Unrecognized component to restore defaults: {0}\n'.format(
+                    options.restoredefault))
+            sys.exit(1)
+    if setmode:
+        session.stop_if_noderange_over(noderange, options.maxnodes)
+        if options.exclude:
+            sys.stderr.write('Cannot use exclude and assign at the same time\n')
+            sys.exit(1)
+        updatebypath = {}
+        attrnamebypath = {}
+        for key in assignment:
+            if key not in cfgpaths:
+                if key.startswith('bmc.'):
+                    path = 'configuration/management_controller/extended/all'
+                    attrib = key.replace('bmc.', '')
+                else:
+                    path = 'configuration/system/all'
+                    attrib = key
             else:
-                path = 'configuration/system/all'
-                attrib = key
-        else:
-            path, attrib = cfgpaths[key]
-        if path not in updatebypath:
-            updatebypath[path] = {}
-            attrnamebypath[path] = {}
-        updatebypath[path][attrib] = assignment[key]
-        attrnamebypath[path][attrib] = key
-    # well, we want to expand things..
-    # check ipv4, if requested change method to static
-    for path in updatebypath:
-        for fr in session.update('/noderange/{0}/{1}'.format(noderange, path),
-                                updatebypath[path]):
-            rcode |= client.printerror(fr)
-            for node in fr.get('databynode', []):
-                r = fr['databynode'][node]
-                if 'value' not in r:
-                    continue
-                keyval = r['value']
-                key, val = keyval.split('=')
-                if key in attrnamebypath[path]:
-                    key = attrnamebypath[path][key]
-                print('{0}: {1}: {2}'.format(node, key, val))
-else:
-    for path in queryparms:
-        if options.comparedefault:
-            continue
-        rcode |= client.print_attrib_path(path, session, list(queryparms[path]),
-                                      NullOpt(), queryparms[path])
-    if printsys == 'all' or printextbmc or printbmc or printallbmc:
-        if printbmc or not printextbmc:
-         rcode |= client.print_attrib_path(
-                        '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
-                        session, printbmc, options, attrprefix='bmc.')
-        if options.extra:
-            rcode |= client.print_attrib_path(
-                    '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
-                    session, printextbmc, options)
-    if printsys or options.exclude:
-        if printsys == 'all':
-            printsys = []
-        if (options.comparedefault or printsys == []) and not options.advanced:
-            path = '/noderange/{0}/configuration/system/all'.format(noderange)
-        else:
-            path = '/noderange/{0}/configuration/system/advanced'.format(
-                noderange)
-        rcode = client.print_attrib_path(path, session, printsys,
-                                         options)
-sys.exit(rcode)
+                path, attrib = cfgpaths[key]
+            if path not in updatebypath:
+                updatebypath[path] = {}
+                attrnamebypath[path] = {}
+            updatebypath[path][attrib] = assignment[key]
+            attrnamebypath[path][attrib] = key
+        # well, we want to expand things..
+        # check ipv4, if requested change method to static
+        for path in updatebypath:
+            for fr in session.update('/noderange/{0}/{1}'.format(noderange, path),
+                                    updatebypath[path]):
+                rcode |= client.printerror(fr)
+                for node in fr.get('databynode', []):
+                    r = fr['databynode'][node]
+                    if 'value' not in r:
+                        continue
+                    keyval = r['value']
+                    key, val = keyval.split('=')
+                    if key in attrnamebypath[path]:
+                        key = attrnamebypath[path][key]
+                    print('{0}: {1}: {2}'.format(node, key, val))
+    else:
+        for path in queryparms:
+            if options.comparedefault:
+                continue
+            rcode |= await client.print_attrib_path(path, session, list(queryparms[path]),
+                                        NullOpt(), queryparms[path])
+        if printsys == 'all' or printextbmc or printbmc or printallbmc:
+            if printbmc or not printextbmc:
+                rcode |= await client.print_attrib_path(
+                            '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
+                            session, printbmc, options, attrprefix='bmc.')
+            if options.extra:
+                rcode |= await client.print_attrib_path(
+                        '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
+                        session, printextbmc, options)
+        if printsys or options.exclude:
+            if printsys == 'all':
+                printsys = []
+            if (options.comparedefault or printsys == []) and not options.advanced:
+                path = '/noderange/{0}/configuration/system/all'.format(noderange)
+            else:
+                path = '/noderange/{0}/configuration/system/advanced'.format(
+                    noderange)
+            rcode = await client.print_attrib_path(path, session, printsys,
+                                            options)
+    sys.exit(rcode)
+
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())
