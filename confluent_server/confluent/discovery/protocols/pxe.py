@@ -587,7 +587,10 @@ def get_deployment_profile(node, cfg, cfd=None):
         return None
     candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
     if candmgrs:
-        candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+        try:
+            candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+        except Exception: # fallback to unverified noderange
+            candmgrs = noderange.NodeRange(candmgrs).nodes
         if collective.get_myname() not in candmgrs:
             return None
     return profile
