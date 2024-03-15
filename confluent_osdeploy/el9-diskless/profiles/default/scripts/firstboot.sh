@@ -41,7 +41,7 @@ if [ ! -f /etc/confluent/firstboot.ran ]; then
     run_remote_config firstboot.d
 fi
 
-curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
+curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_websrv/confluent-api/self/updatestatus
 systemctl disable firstboot
 rm /etc/systemd/system/firstboot.service
 rm /etc/confluent/firstboot.ran
