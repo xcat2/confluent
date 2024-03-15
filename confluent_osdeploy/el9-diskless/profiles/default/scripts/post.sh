@@ -23,9 +23,9 @@ exec 2>> /var/log/confluent/confluent-post.log
 chmod 600 /var/log/confluent/confluent-post.log
 tail -f /var/log/confluent/confluent-post.log > /dev/console &
 logshowpid=$!
-curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.service > /etc/systemd/system/firstboot.service
+curl -f https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/firstboot.service > /etc/systemd/system/firstboot.service
 mkdir -p /opt/confluent/bin
-curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
+curl -f https://$confluent_websrv/confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
 chmod +x /opt/confluent/bin/firstboot.sh
 systemctl enable firstboot
 selinuxpolicy=$(grep ^SELINUXTYPE /etc/selinux/config |awk -F= '{print $2}')
@@ -40,7 +40,7 @@ run_remote_parts post.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post.d
 
-curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
+curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_websrv/confluent-api/self/updatestatus
 
 kill $logshowpid
 
