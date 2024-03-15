@@ -193,6 +193,7 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
         targip = node
         if peerip:
             targip = peerip
+        #BOOO, need stderr!!!
         output = util.run(
             ['rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip)])[0]
     except Exception as e:
@@ -212,7 +213,7 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
                     unreadablefiles.append(filename.replace(targdir, ''))
         if unreadablefiles:
             raise Exception("Syncing failed due to unreadable files: " + ','.join(unreadablefiles))
-        elif b'Permission denied, please try again.' in e.stderr:
+        elif hasattr(e, 'stderr') and e.stderr and b'Permission denied, please try again.' in e.stderr:
             raise Exception('Syncing failed due to authentication error, is the confluent automation key not set up (osdeploy initialize -a) or is there some process replacing authorized_keys on the host?')
         else:
             raise
@@ -231,7 +232,7 @@ def stage_ent(currmap, ent, targdir, appendexist=False):
     everyfent = []
     allfents = ent.split()
     for tmpent in allfents:
-        fents = glob.glob(tmpent)
+        fents = glob.glob(tmpent) # TODO: recursive globbing?
         if not fents:
             raise Exception('No matching files for "{}"'.format(tmpent))
         everyfent.extend(fents)
