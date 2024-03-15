@@ -206,6 +206,8 @@ def fixup(rootdir, vols):
                     ent = convert_lv(ent)
                     if ent:
                         newline.append(ent)
+                    elif '""' in ent:
+                        newline.append('""')
                 else:
                     newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
