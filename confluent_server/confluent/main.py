@@ -39,6 +39,7 @@ import confluent.httpapi as httpapi
 import confluent.log as log
 import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
+import linecache
 from eventlet.asyncio import spawn_for_awaitable
 try:
     import confluent.sockapi as sockapi
@@ -60,6 +61,7 @@ try:
 except ImportError:
     havefcntl = False
 #import multiprocessing
+import asyncio
 import gc
 from greenlet import greenlet
 import sys
@@ -72,6 +74,36 @@ import time
 import traceback
 import tempfile
 import uuid
+
+
+def format_stack(task):
+    task.print_stack()
+    extracted_list = []
+    checked = set()
+    for f in task.get_stack():
+        lineno = f.f_lineno
+        co = f.f_code
+        filename = co.co_filename
+        name = co.co_name
+        if filename not in checked:
+            checked.add(filename)
+            linecache.checkcache(filename)
+        line = linecache.getline(filename, lineno, f.f_globals)
+        extracted_list.append((filename, lineno, name, line))
+
+    exc = task._exception
+    if not extracted_list:
+        yield f'No stack for {task!r}'
+    elif exc is not None:
+        yield f'Traceback for {task!r} (most recent call last):'
+    else:
+        yield f'Stack for {task!r} (most recent call last):'
+
+    for x in traceback.format_list(extracted_list):
+        yield x
+    if exc is not None:
+        for line in traceback.format_exception_only(exc.__class__, exc):
+            yield line
 
 
 def _daemonize():
@@ -182,6 +214,9 @@ def dumptrace(signalname, frame):
             continue
         ht.write('Thread trace: ({0})\n'.format(id(o)))
         ht.write(''.join(traceback.format_stack(o.gr_frame)))
+    for atask in asyncio.all_tasks():
+        ht.write('Async trace: ({0})\n'.format(id(atask)))
+        ht.write(''.join([x for x in format_stack(atask)]))
     ht.close()
 
 def doexit():

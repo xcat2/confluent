@@ -95,8 +95,8 @@ async def main():
                         if oneval != twoval:
                             print('Values did not match.')
                     argassign[arg] = twoval
-            session.stop_if_noderange_over(noderange, options.maxnodes)
-            exitcode=client.updateattrib(session,args,nodetype, noderange, options, argassign)
+            await session.stop_if_noderange_over(noderange, options.maxnodes)
+            exitcode =  await client.updateattrib(session,args,nodetype, noderange, options, argassign)
         try:
             # setting user output to what the user inputs
             if args[1] == 'all':

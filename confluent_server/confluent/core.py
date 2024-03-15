@@ -50,6 +50,7 @@ import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.osimage as osimage
 import confluent.plugin as plugin
+import types
 try:
     import confluent.shellmodule as shellmodule
 except ImportError:
@@ -1109,10 +1110,10 @@ async def handle_node_request(configmanager, inputdata, operation,
                 'element': pathcomponents, 'configmanager': configmanager,
                 'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange}))
         if isnoderange or not autostrip:
-            return await iterate_queue(numworkers, passvalues)
+            return [x async for x in iterate_queue(numworkers, passvalues)]
         else:
             if numworkers > 0:
-                return await iterate_queue(numworkers, passvalues, nodes[0])
+                return [x async for x in iterate_queue(numworkers, passvalues, nodes[0])]
             else:
                 raise exc.NotImplementedException()
 
@@ -1158,6 +1159,7 @@ async def addtoqueue(theq, fun, kwargs):
                 async for pv in result:
                     await theq.put(pv)
             else:
+                print(repr(result))
                 for pv in result:
                     await theq.put(pv)
     except Exception as e:

@@ -258,7 +258,7 @@ class Command(object):
                 outhandler(node, res)
         return rc
 
-    def simple_noderange_command(self, noderange, resource, input=None,
+    async def simple_noderange_command(self, noderange, resource, input=None,
                                  key=None, errnodes=None, promptover=None, outhandler=None, **kwargs):
         try:
             self._currnoderange = noderange
@@ -271,13 +271,13 @@ class Command(object):
             else:
                 ikey = key
             if input is None:
-                for res in self.read('/noderange/{0}/{1}'.format(
+                async for res in self.read('/noderange/{0}/{1}'.format(
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res, errnodes, outhandler)
             else:
-                self.stop_if_noderange_over(noderange, promptover)
+                await self.stop_if_noderange_over(noderange, promptover)
                 kwargs[ikey] = input
-                for res in self.update('/noderange/{0}/{1}'.format(
+                async for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res, errnodes, outhandler)
             self._currnoderange = None
@@ -292,8 +292,8 @@ class Command(object):
         nsize = await self.get_noderange_size(noderange)
         if nsize > maxnodes:
             if nsize == 1:
-                nodename = list(self.read(
-                    '/noderange/{0}/nodes/'.format(noderange)))[0].get('item', {}).get('href', None)
+                nodename = [x async for x in self.read(
+                    '/noderange/{0}/nodes/'.format(noderange))][0].get('item', {}).get('href', None)
                 nodename = nodename[:-1]
                 p = getinput('Command is about to affect node {0}, continue (y/n)? '.format(nodename))
             else:
@@ -680,7 +680,7 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                     exitcode = 1
     return exitcode
 
-def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=None):
+async def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=None):
     # update attribute
     exitcode = 0
     if options.clear:
@@ -688,7 +688,7 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
         keydata = {}
         for attrib in updateargs[1:]:
             keydata[attrib] = None
-        for res in session.update(targpath, keydata):
+        async for res in session.update(targpath, keydata):
             if 'error' in res:
                 if 'errorcode' in res:
                     exitcode = res['errorcode']
@@ -705,21 +705,21 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
             value = os.environ.get(
                 key, os.environ[key.upper()])
             if (nodetype == "nodegroups"):
-                exitcode = session.simple_nodegroups_command(noderange,
+                exitcode = await ession.simple_nodegroups_command(noderange,
                                                              'attributes/all',
                                                              value, key)
             else:
-                exitcode = session.simple_noderange_command(noderange,
+                exitcode = await session.simple_noderange_command(noderange,
                                                             'attributes/all',
                                                             value, key)
         sys.exit(exitcode)
     elif dictassign:
         for key in dictassign:
             if nodetype == 'nodegroups':
-                exitcode = session.simple_nodegroups_command(
+                exitcode = await session.simple_nodegroups_command(
                     noderange, 'attributes/all', dictassign[key], key)
             else:
-                exitcode = session.simple_noderange_command(
+                exitcode = await session.simple_noderange_command(
                     noderange, 'attributes/all', dictassign[key], key)
     else:
         if "=" in updateargs[1]:
@@ -736,10 +736,10 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
                         key = val[0]
                         value = val[1]
                     if (nodetype == "nodegroups"):
-                        exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all',
+                        exitcode =  await session.simple_nodegroups_command(noderange, 'attributes/all',
                                                                      value, key)
                     else:
-                        exitcode = session.simple_noderange_command(noderange, 'attributes/all',
+                        exitcode = await session.simple_noderange_command(noderange, 'attributes/all',
                                                                     value, key)
             except Exception:
                 sys.stderr.write('Error: {0} not a valid expression\n'.format(str(updateargs[1:])))
