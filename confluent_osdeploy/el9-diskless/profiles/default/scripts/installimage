@@ -30,6 +30,7 @@ if [ ! -f /sysroot/tmp/installdisk ]; then
     done
 fi
 lvm vgchange -a n
+/sysroot/usr/sbin/wipefs -a /dev/$(cat /sysroot/tmp/installdisk)
 udevadm control -e
 if [ -f /sysroot/etc/lvm/devices/system.devices ]; then
     rm /sysroot/etc/lvm/devices/system.devices

@@ -83,6 +83,8 @@ def get_partition_info():
         dev, mount, fs, flags = entry.split()[:4]
         if mount not in capmounts:
             continue
+        if '/dev/zram' in dev:
+            continue
         fsinfo = os.statvfs(mount)
         partinfo = {
             'mount': mount,
