@@ -8,7 +8,7 @@ if [ -d $1/EFI/boot/ ]; then
 elif [ -d $1/efi/boot/ ]; then
     ln -s $1/efi/boot/* $2/boot/efi/boot
 else
-    echo "Unrecogrized boot contents in media" > &2
+    echo "Unrecogrized boot contents in media" >&2
     exit 1
 fi
 
