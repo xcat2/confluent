@@ -1091,8 +1091,8 @@ class _ExpressionFormat(string.Formatter):
 
     def _vformat(self, format_string, args, kwargs, used_args, recursion_depth,
                  auto_arg_index=False):
-        super()._vformat(format_string, args, kwargs, used_args,
-                         recursion_depth, auto_arg_index)
+        return super()._vformat(format_string, args, kwargs, used_args,
+                                recursion_depth, auto_arg_index)
 
     def get_field(self, field_name, args, kwargs):
         return field_name, field_name
