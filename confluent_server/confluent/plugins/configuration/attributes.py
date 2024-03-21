@@ -21,16 +21,16 @@ import confluent.util as util
 from fnmatch import fnmatch
 
 
-def retrieve(nodes, element, configmanager, inputdata):
+def retrieve(nodes, element, configmanager, inputdata, clearwarnbynode=None):
     configmanager.check_quorum()
     if nodes is not None:
-        return retrieve_nodes(nodes, element, configmanager, inputdata)
+        return retrieve_nodes(nodes, element, configmanager, inputdata, clearwarnbynode)
     elif element[0] == 'nodegroups':
         return retrieve_nodegroup(
-            element[1], element[3], configmanager, inputdata)
+            element[1], element[3], configmanager, inputdata, clearwarnbynode)
 
 
-def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
+def retrieve_nodegroup(nodegroup, element, configmanager, inputdata, clearwarnbynode):
     try:
         grpcfg = configmanager.get_nodegroup_attributes(nodegroup)
     except KeyError:
@@ -106,10 +106,12 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata):
                 raise Exception("BUGGY ATTRIBUTE FOR NODEGROUP")
 
 
-def retrieve_nodes(nodes, element, configmanager, inputdata):
+def retrieve_nodes(nodes, element, configmanager, inputdata, clearwarnbynode):
     attributes = configmanager.get_node_attributes(nodes)
     if element[-1] == 'all':
         for node in util.natural_sort(nodes):
+            if clearwarnbynode and node in clearwarnbynode:
+                yield msg.Attributes(node, {'_warnings': clearwarnbynode[node]})
             theattrs = set(allattributes.node).union(set(attributes[node]))
             for attribute in sorted(theattrs):
                 if attribute in attributes[node]:  # have a setting for it
@@ -266,6 +268,7 @@ def update_nodes(nodes, element, configmanager, inputdata):
             namemap[node] = rename['rename']
         configmanager.rename_nodes(namemap)
         return yield_rename_resources(namemap, isnode=True)
+    clearwarnbynode = {}
     for node in nodes:
         updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []
@@ -299,10 +302,11 @@ def update_nodes(nodes, element, configmanager, inputdata):
                         markup = (e.text[:e.offset-1] + '-->' + e.text[e.offset-1] + '<--' + e.text[e.offset:]).strip()
                         raise exc.InvalidArgumentException('Syntax error in attribute name: "{0}"'.format(markup))
             if len(clearattribs) > 0:
-                configmanager.clear_node_attributes([node], clearattribs)
+                clearwarnbynode[node] = []
+                configmanager.clear_node_attributes([node], clearattribs, warnings=clearwarnbynode[node])
             updatedict[node] = updatenode
     try:
         configmanager.set_node_attributes(updatedict)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
-    return retrieve(nodes, element, configmanager, inputdata)
+    return retrieve(nodes, element, configmanager, inputdata, clearwarnbynode)
