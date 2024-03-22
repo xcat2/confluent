@@ -1,0 +1,154 @@
+#!/usr/libexec/platform-python
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+
+# Copyright 2017 Lenovo
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+__author__ = 'tkucherera'
+
+import optparse
+import os
+import signal
+import sys
+import subprocess
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+argparser = optparse.OptionParser(
+    usage="Usage: %prog <start_node> -i <interface> <end_node> -e <eface>",
+)
+argparser.add_option('-i', '--interface', type='str',
+                    help='interface to check path against for the start node')
+argparser.add_option('-e', '--eface', type='str',
+                    help='interface to check path against for the end node')
+
+(options, args) = argparser.parse_args()
+
+
+session = client.Command()
+
+def get_neighbors(switch):
+    switch_neigbors = []
+    url = 'networking/neighbors/by-switch/{0}/by-peername/'.format(switch)
+    for neighbor in session.read(url):
+        if neighbor['item']['href'].startswith('switch'):
+            switch = neighbor['item']['href'].strip('/')
+            switch_neigbors.append(switch)
+    return switch_neigbors
+
+
+
+def find_path(start, end, path=[]):
+    path = path + [start]
+    if start == end:
+        return path  # If start and end are the same, return the path
+
+    for node in get_neighbors(start):
+        if node not in path and node.startswith('switch'):
+            new_path = find_path(node, end, path)
+            if new_path:
+                return new_path  # If a path is found, return it
+
+    return None  # If no path is found, return None
+
+
+
+def is_cumulus(switch):
+    try:
+        read_attrib = subprocess.check_output(['nodeattrib', switch, 'hardwaremanagement.method'])
+    except subprocess.CalledProcessError:
+        return False
+    for attribs in read_attrib.decode('utf-8').split('\n'):
+        if len(attribs.split(':')) > 1:
+            attrib = attribs.split(':')
+            if attrib[2].strip() == 'affluent':
+                return True
+            else:
+                return False
+        else:
+            return False
+
+
+def host_to_switch(node, interface=None):
+    # first check the the node config to see what switches are connected
+    # if host is in rhel can use nmstate package
+    cummulus_switches = []
+    netarg = 'net.*.switch'
+    if interface:
+        netarg = 'net.{0}.switch'.format(interface)
+    read_attrib = subprocess.check_output(['nodeattrib', node, netarg])
+    for attribs in read_attrib.decode('utf-8').split('\n'):
+        attrib = attribs.split(':')
+        try:
+            if ' net.mgt.switch' in attrib or attrib[2] == '':
+                continue
+        except IndexError:
+            continue
+        switch = attrib[2].strip()
+        if is_cumulus(switch):
+            cummulus_switches.append(switch)
+    return cummulus_switches
+
+try:
+    start_node = args[0]
+    end_node = args[1]
+    interface = options.interface
+    eface = options.eface
+except IndexError:
+    argparser.print_help()
+    sys.exit(1)
+
+def path_between_nodes(start_switches, end_switches):
+    for start_switch in start_switches:
+        for end_switch in end_switches:
+            if start_switch == end_switch:
+                return [start_switch]
+            else:
+                path = find_path(start_switch, end_switch)
+                if path:
+                    return path
+                else:
+                    return 'No path found'
+                
+end_nodeslist = []
+nodelist = '/noderange/{0}/nodes/'.format(end_node)
+for res in session.read(nodelist):
+    if 'error' in res:
+        sys.stderr.write(res['error'] + '\n')
+        exitcode = 1
+    else:
+        elem=(res['item']['href'].replace('/', ''))
+        end_nodeslist.append(elem)
+
+start_switches = host_to_switch(start_node, interface)
+for end_node in end_nodeslist:
+    if end_node:
+        end_switches = host_to_switch(end_node, eface)
+        path = path_between_nodes(start_switches, end_switches)
+        print(f'{start_node} to {end_node}: {path}')
+
+
+    
+
+
+
