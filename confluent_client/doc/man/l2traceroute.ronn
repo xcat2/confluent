@@ -1,0 +1,34 @@
+l2traceroute(8) -- returns the layer 2 route through an Ethernet network managed by confluent given 2 end points.
+==============================
+## SYNOPSIS
+`l2traceroute [options] <start_node> <end_noderange>`  
+
+## DESCRIPTION  
+**l2traceroute** is a command that returns the layer 2 route for the configered interfaces in nodeattrib.
+It can also be used with the -i and -e options to check against specific interfaces on the endpoints. 
+
+Note the net.<interface>.switch attributes have to be set on the end points 
+
+
+## OPTIONS
+* ` -e` EFACE, --eface=INTERFACE
+   interface to check against for the second end point 
+* ` -i` INTERFACE, --interface=INTERFACE
+   interface to check against for the first end point  
+* `-h`, `--help`:  
+  Show help message and exit      
+
+   
+## EXAMPLES
+ * Checking route between two nodes:  
+  `# l2traceroute_client n244 n1851`  
+  `n244 to n1851: ['switch114']`    
+    
+* Checking route from one node to multiple nodes:  
+  `# l2traceroute_client n244 n1833,n1851`    
+  `n244 to n1833: ['switch114', 'switch7', 'switch32', 'switch253', 'switch85', 'switch72', 'switch21', 'switch2', 'switch96', 'switch103', 'switch115']
+   n244 to n1851: ['switch114']`  
+
+
+ 
+
