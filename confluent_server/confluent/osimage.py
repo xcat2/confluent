@@ -411,9 +411,7 @@ def check_ubuntu(isoinfo):
                     ]
         return {'name': 'ubuntu-{0}-{1}'.format(ver, arch),
                 'method': EXTRACT|COPY,
-                'extractlist': ['casper/vmlinuz', 'casper/initrd',
-                'efi/boot/bootx64.efi', 'efi/boot/grubx64.efi'
-                ],
+                'extractlist': exlist,
                 'copyto': 'install.iso',
                 'category': 'ubuntu{0}'.format(major)}
 

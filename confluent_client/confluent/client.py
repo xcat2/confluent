@@ -689,6 +689,9 @@ async def updateattrib(session, updateargs, nodetype, noderange, options, dictas
         for attrib in updateargs[1:]:
             keydata[attrib] = None
         async for res in session.update(targpath, keydata):
+            for node in res.get('databynode', {}):
+                for warnmsg in res['databynode'][node].get('_warnings', []):
+                    sys.stderr.write('Warning: ' + warnmsg + '\n')
             if 'error' in res:
                 if 'errorcode' in res:
                     exitcode = res['errorcode']

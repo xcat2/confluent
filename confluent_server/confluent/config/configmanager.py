@@ -1089,6 +1089,11 @@ class _ExpressionFormat(string.Formatter):
         self._nodename = nodename
         self._numbers = None
 
+    def _vformat(self, format_string, args, kwargs, used_args, recursion_depth,
+                 auto_arg_index=False):
+        return super()._vformat(format_string, args, kwargs, used_args,
+                                recursion_depth, auto_arg_index)
+
     def get_field(self, field_name, args, kwargs):
         return field_name, field_name
 
@@ -2197,16 +2202,16 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
-    def clear_node_attributes(self, nodes, attributes):
+    def clear_node_attributes(self, nodes, attributes, warnings=None):
         if cfgleader:
             return exec_on_leader('_rpc_master_clear_node_attributes',
                                   self.tenant, nodes, attributes)
         if cfgstreams:
             exec_on_followers('_rpc_clear_node_attributes', self.tenant,
                               nodes, attributes)
-        self._true_clear_node_attributes(nodes, attributes)
+        self._true_clear_node_attributes(nodes, attributes, warnings)
 
-    def _true_clear_node_attributes(self, nodes, attributes):
+    def _true_clear_node_attributes(self, nodes, attributes, warnings):
         # accumulate all changes into a changeset and push in one go
         changeset = {}
         realattributes = []
@@ -2229,8 +2234,17 @@ class ConfigManager(object):
                     # delete it and check for inheritence to backfil data
                     del nodek[attrib]
                     self._do_inheritance(nodek, attrib, node, changeset)
+                    if not warnings is None:
+                        if attrib in nodek:
+                            warnings.append('The attribute "{}" was defined specifically for the node and clearing now has a value inherited from the group "{}"'.format(attrib, nodek[attrib]['inheritedfrom']))
                     _addchange(changeset, node, attrib)
                     _mark_dirtykey('nodes', node, self.tenant)
+                elif attrib in nodek:
+                    if not warnings is None:
+                        warnings.append('The attribute "{0}" is inherited from group "{1}", leaving the inherited value alone (use "{0}=" with no value to explicitly blank the value if desired)'.format(attrib, nodek[attrib]['inheritedfrom']))
+                else:
+                    if not warnings is None:
+                        warnings.append('Attribute "{}" is either already cleared, or does not match a defined attribute (if referencing an attribute group, try a wildcard)'.format(attrib))
                 if ('_expressionkeys' in nodek and
                         attrib in nodek['_expressionkeys']):
                     recalcexpressions = True

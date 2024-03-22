@@ -24,6 +24,7 @@ import confluent.noderange as noderange
 import eventlet
 import pwd
 import grp
+import sys
 
 def mkdirp(path):
     try:
@@ -193,9 +194,8 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
         targip = node
         if peerip:
             targip = peerip
-        #BOOO, need stderr!!!
-        output = util.run(
-            ['rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip)])[0]
+        output, stderr = util.run(
+            ['rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip)])
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
             # https://github.com/eventlet/eventlet/issues/413
@@ -215,6 +215,9 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
             raise Exception("Syncing failed due to unreadable files: " + ','.join(unreadablefiles))
         elif hasattr(e, 'stderr') and e.stderr and b'Permission denied, please try again.' in e.stderr:
             raise Exception('Syncing failed due to authentication error, is the confluent automation key not set up (osdeploy initialize -a) or is there some process replacing authorized_keys on the host?')
+        elif hasattr(e, 'stderr') and e.stderr:
+            sys.stderr.write(e.stderr.decode('utf8'))
+            raise
         else:
             raise
     finally:
