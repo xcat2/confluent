@@ -7,7 +7,9 @@ l2traceroute(8) -- returns the layer 2 route through an Ethernet network managed
 **l2traceroute** is a command that returns the layer 2 route for the configered interfaces in nodeattrib.
 It can also be used with the -i and -e options to check against specific interfaces on the endpoints. 
 
-Note the net.<interface>.switch attributes have to be set on the end points 
+
+## PREREQUISITES
+**l2traceroute** the net.<interface>.switch attributes have to be set on the end points if endpoint is not a switch
 
 
 ## OPTIONS
@@ -15,6 +17,8 @@ Note the net.<interface>.switch attributes have to be set on the end points
    interface to check against for the second end point 
 * ` -i` INTERFACE, --interface=INTERFACE
    interface to check against for the first end point  
+* ` -c` CUMULUS, --cumulus=CUMULUS
+   return layer 2 route through cumulus switches only 
 * `-h`, `--help`:  
   Show help message and exit      
 
