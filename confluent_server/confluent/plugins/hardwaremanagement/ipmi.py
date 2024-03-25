@@ -676,7 +676,7 @@ class IpmiHandler:
         elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
             return self.handle_bmcconfig(True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
-            return self.handle_sysconfig()
+            return await self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
             return self.handle_sysconfig(True)
         elif self.element[1:3] == ['system', 'clear']:
@@ -1499,14 +1499,15 @@ class IpmiHandler:
             self.ipmicmd.set_bmc_configuration(
                 self.inputdata.get_attributes(self.node))
 
-    def handle_sysconfig(self, advanced=False):
+    async def handle_sysconfig(self, advanced=False):
         if 'read' == self.op:
             try:
-                self.output.put(msg.ConfigSet(
-                    self.node, self.ipmicmd.get_system_configuration(
-                        hideadvanced=not advanced)))
+                syscfg = await self.ipmicmd.get_system_configuration(
+                    hideadvanced=not advanced)
+                await self.output.put(msg.ConfigSet(
+                    self.node, syscfg))
             except Exception as e:
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
         elif 'update' == self.op:
             self.ipmicmd.set_system_configuration(
