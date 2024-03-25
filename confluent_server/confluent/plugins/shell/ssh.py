@@ -107,7 +107,7 @@ class SshShell(conapi.Console):
         # that would rather not use the nodename as anything but an opaque
         # identifier
         self.datacallback = callback
-        if self.username is not b'':
+        if self.username != b'':
             self.logon()
         else:
             self.inputmode = 0

@@ -27,6 +27,7 @@ import socket
 import ssl
 import struct
 import eventlet.green.subprocess as subprocess
+import asyncio
 
 
 def mkdirp(path, mode=0o777):
@@ -36,6 +37,21 @@ def mkdirp(path, mode=0o777):
         if e.errno != 17:
             raise
 
+
+async def _sleep_and_run(sleeptime, func, args):
+    await asyncio.sleep(sleeptime)
+    func(*args)
+
+
+def spawn_after(sleeptime, func, *args):
+    return spawn(_sleep_and_run(sleeptime, func, args))
+
+
+def spawn(coro):
+    try:
+        return asyncio.create_task(coro)
+    except AttributeError:
+        return asyncio.get_event_loop().create_task(coro)
 
 def run(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

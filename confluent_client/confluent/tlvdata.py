@@ -289,7 +289,7 @@ async def recv(handle):
     else:
         data = await cloop.sock_recv(handle, dlen)
         while len(data) < dlen:
-            ndata = await asyncio.sock_recv(handle, dlen - len(data))
+            ndata = await cloop.sock_recv(handle, dlen - len(data))
             if not ndata:
                 raise Exception("Error reading data")
             data += ndata
