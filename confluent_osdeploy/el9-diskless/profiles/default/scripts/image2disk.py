@@ -103,7 +103,7 @@ def fixup(rootdir, vols):
                         uuid = uuid.strip()
                         entry[0] = 'UUID={}'.format(uuid)
                 elif entry[2] == 'swap':
-                    entry[0] = '/dev/mapper/{}-swap'.format(vgname)
+                    entry[0] = '/dev/mapper/{}-swap'.format(vgname.replace('-', '--'))
                 entry[0] = entry[0].ljust(42)
                 entry[1] = entry[1].ljust(16)
                 entry[3] = entry[3].ljust(28)
