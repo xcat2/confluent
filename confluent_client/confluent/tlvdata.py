@@ -190,6 +190,13 @@ def _unicode_list(currlist):
             _unicode_list(currlist[i])
 
 
+async def sendall(handle, data):
+    if isinstance(handle, tuple):
+        return await handle[1].write(data)
+    else:
+        cloop = asyncio.get_event_loop()
+        return await cloop.sock_sendall(handle, data)
+
 async def send(handle, data, filehandle=None):
     cloop = asyncio.get_event_loop()
     if isinstance(data, unicode):
@@ -223,17 +230,26 @@ async def send(handle, data, filehandle=None):
             tl |= 16777216
             await cloop.sock_sendall(handle, struct.pack("!I", tl))
             await cloop.sock_sendall(handle, sdata)
+        elif isinstance (handle, tuple):
+            raise Exception("Cannot send filehandle over network socket")
         else:
             tl |= (2 << 24)
             await cloop.sock_sendall(handle, struct.pack("!I", tl))
             await send_fds(handle, b'', [filehandle])
 
 
+async def _grabhdl(handle, size):
+    if isinstance(handle, tuple):
+        return await handle[0].read(size)
+    else:
+        cloop = asyncio.get_event_loop()
+        return await cloop.sock_recv(handle, size)
+
+
 async def recvall(handle, size):
-    cloop = asyncio.get_event_loop()
-    rd = await cloop.sock_recv(handle, size)
+    rd = await _grabhdl(handle, size)
     while len(rd) < size:
-        nd = await cloop.sock_recv(handle, size - len(rd))
+        nd = await _grabhdl(handle, size - len(rd))
         if not nd:
             raise Exception("Error reading data")
         rd += nd
@@ -241,12 +257,11 @@ async def recvall(handle, size):
 
 
 async def recv(handle):
-    cloop = asyncio.get_event_loop()
-    tl = await cloop.sock_recv(handle, 4)
+    tl = await _grabhdl(handle, 4)
     if not tl:
         return None
     while len(tl) < 4:
-        ndata = await cloop.sock_recv(handle, 4 - len(tl))
+        ndata = await _grabhdl(handle, 4 - len(tl))
         if not ndata:
             raise Exception("Error reading data")
         tl += ndata
@@ -261,6 +276,8 @@ async def recv(handle):
     if dlen == 0:
         return None
     if datatype == tlv.Types.filehandle:
+        if isinstance(handle, tuple):
+            raise Exception('Filehandle not supported over TLS socket')
         filehandles = array.array('i')
         rawbuffer = bytearray(2048)
         pkttype = ctypes.c_ubyte * 2048
@@ -287,9 +304,9 @@ async def recv(handle):
         data = json.loads(bytes(data))
         return ClientFile(data['filename'], data['mode'], filehandles[0])
     else:
-        data = await cloop.sock_recv(handle, dlen)
+        data = await _grabhdl(handle, dlen)
         while len(data) < dlen:
-            ndata = await cloop.sock_recv(handle, dlen - len(data))
+            ndata = await _grabhdl(handle, dlen - len(data))
             if not ndata:
                 raise Exception("Error reading data")
             data += ndata

@@ -62,9 +62,7 @@ except ImportError:
     crypto = None
 import confluent.util as util
 import eventlet
-import eventlet.greenpool as greenpool
 import eventlet.green.ssl as ssl
-import eventlet.queue as queue
 import eventlet.semaphore as semaphore
 import itertools
 import msgpack
@@ -1093,7 +1091,6 @@ async def handle_node_request(configmanager, inputdata, operation,
                     nodesbyhandler[hfunc] = [node]
         for bn in badcollnodes:
             nodesbyhandler[BadCollective(bn).error] = [bn]
-        workers = greenpool.GreenPool()
         numworkers = 0
         for hfunc in nodesbyhandler:
             numworkers += 1

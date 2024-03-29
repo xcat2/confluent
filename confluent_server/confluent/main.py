@@ -40,7 +40,6 @@ import confluent.log as log
 import confluent.collective.manager as collective
 import confluent.discovery.protocols.pxe as pxe
 import linecache
-from eventlet.asyncio import spawn_for_awaitable
 try:
     import confluent.sockapi as sockapi
 except ImportError:
@@ -283,7 +282,7 @@ def migrate_db():
     configmanager.init()
 
 
-def run(args):
+async def run(args):
     setlimits()
     try:
         configmanager.ConfigManager(None)
@@ -349,7 +348,7 @@ def run(args):
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
-        spawn_for_awaitable(sockservice.start())
+        asyncio.get_event_loop().create_task(sockservice.start())
     except NameError:
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
@@ -361,12 +360,12 @@ def run(args):
             configmanager.check_quorum()
             break
         except Exception:
-            eventlet.sleep(0.5)
+            await asyncio.sleep(0.5)
     eventlet.spawn_n(disco.start_detection)
-    eventlet.sleep(1)
+    await asyncio.sleep(1)
     consoleserver.start_console_sessions()
     while 1:
-        eventlet.sleep(100)
+        await asyncio.sleep(100)
 
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')

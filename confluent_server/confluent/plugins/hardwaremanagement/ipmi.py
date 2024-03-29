@@ -106,12 +106,6 @@ class NullLock(object):
 #console.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
-def exithandler():
-    if console.session.iothread is not None:
-        console.session.iothread.join()
-
-atexit.register(exithandler)
-
 #_ipmiworkers = greenpool.GreenPool(512)
 
 _ipmithread = None

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
@@ -15,10 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import sys
 import os
+import eventlet
 import eventlet.hubs
 eventlet.hubs.use_hub("eventlet.hubs.asyncio")
+from eventlet.asyncio import spawn_for_awaitable
+
 
 path = os.path.dirname(os.path.realpath(__file__))
 path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
@@ -35,7 +39,8 @@ import confluent.main
 import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    confluent.main.run(sys.argv)
+    gt = spawn_for_awaitable(confluent.main.run(sys.argv))
+    gt.wait()
 #except:
 #   pass
 #p.disable()
