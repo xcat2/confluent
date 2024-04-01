@@ -19,6 +19,7 @@
 # the PBKDF2 transform is skipped unless a user has been idle for sufficient
 # time
 
+import asyncio
 import confluent.config.configmanager as configmanager
 import eventlet
 import eventlet.tpool
@@ -238,7 +239,7 @@ def authorize(name, element, tenant=False, operation='create',
     return False
 
 
-def check_user_passphrase(name, passphrase, operation=None, element=None, tenant=False):
+async def check_user_passphrase(name, passphrase, operation=None, element=None, tenant=False):
     """Check a a login name and passphrase for authenticity and authorization
 
     The function combines authentication and authorization into one function.
@@ -268,7 +269,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         # by a user, which might be malicious
         # would normally make an event and wait
         # but here there's no need for that
-        eventlet.sleep(0.5)
+        await asyncio.sleep(0.5)
     cfm = configmanager.ConfigManager(tenant, username=user)
     ucfg = cfm.get_user(user)
     if ucfg is None:
@@ -280,7 +281,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         except KeyError:
             pass
     if ucfg is None:
-        eventlet.sleep(0.05)
+        await asyncio.sleep(0.05)
         return None
     bpassphrase = None
     if isinstance(passphrase, dict) and len(passphrase) == 1:
@@ -319,7 +320,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
         authcleaner = eventlet.spawn_after(30, _clean_authworkers)
         crypted = eventlet.tpool.execute(_do_pbkdf, passphrase, salt)
         del _passchecking[(user, tenant)]
-        eventlet.sleep(
+        await asyncio.sleep(
             0.05)  # either way, we want to stall so that client can't
         # determine failure because there is a delay, valid response will
         # delay as well
@@ -332,7 +333,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             pwe = pwd.getpwnam(user)
         except KeyError:
             #pam won't work if the user doesn't exist, don't go further
-            eventlet.sleep(0.05)  # stall even on test for existence of a username
+            await asyncio.sleep(0.05)  # stall even on test for existence of a username
             return None
         if os.getuid() != 0:
             # confluent is running with reduced privilege, however, pam_unix refuses
@@ -375,7 +376,7 @@ def check_user_passphrase(name, passphrase, operation=None, element=None, tenant
             if bpassphrase:
                 _passcache[(user, tenant)] = hashlib.sha256(bpassphrase).digest()
             return authorize(user, element, tenant, operation, skipuserobj=False)
-    eventlet.sleep(0.05)  # stall even on test for existence of a username
+    await asyncio.sleep(0.05)  # stall even on test for existence of a username
     return None
 
 def _apply_pbkdf(passphrase, salt):

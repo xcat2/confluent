@@ -32,12 +32,9 @@ import greenlet
 import random
 import time
 import sys
-try:
-    import OpenSSL.crypto as crypto
-except ImportError:
-    # while not always required, we use pyopenssl required for at least
-    # collective
-    crypto = None
+
+import OpenSSL.crypto as crypto
+
 
 currentleader = None
 follower = None

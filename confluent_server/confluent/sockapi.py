@@ -34,7 +34,6 @@ import traceback
 
 import socket
 import ssl
-import eventlet
 
 import confluent.auth as auth
 import confluent.credserver as credserver
@@ -57,7 +56,8 @@ plainsocket = None
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 libssl = ctypes.CDLL(ctypes.util.find_library('ssl'))
-libssl.SSL_CTX_set_cert_verify_callback.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+libssl.SSL_CTX_set_cert_verify_callback.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
 
 def _should_authlog(path, operation):
@@ -67,6 +67,7 @@ def _should_authlog(path, operation):
              (path.startswith('/noderange/') and path.endswith('/nodes/')))):
         return False
     return True
+
 
 class ClientConsole(object):
     def __init__(self, client):
@@ -109,7 +110,8 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
             if authdata:
                 cfm = authdata[1]
                 authenticated = True
-        # version 0 == original, version 1 == pickle3 allowed, 2 = pickle forbidden, msgpack allowed
+        # version 0 == original, version 1 == pickle3 allowed,
+        # v2 = pickle forbidden, msgpack allowed
         # v3 - filehandle allowed
         # v4 - schema change and keepalive changes
 
@@ -121,25 +123,28 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
                 return
             if 'collective' in response:
                 return collective.handle_connection(connection, cert,
-                                            response['collective'])
+                                                    response['collective'])
             while not configmanager.config_is_ready():
-                eventlet.sleep(1)
+                await asyncio.sleep(1)
             if 'dispatch' in response:
-                dreq = tlvdata.recvall(connection, response['dispatch']['length'])
+                dreq = tlvdata.recvall(
+                    connection, response['dispatch']['length'])
                 return pluginapi.handle_dispatch(connection, cert, dreq,
-                                                response['dispatch']['name'])
+                                                 response['dispatch']['name'])
             if 'proxyconsole' in response:
-                return start_proxy_term(connection, cert, response['proxyconsole'])
+                return start_proxy_term(connection, cert,
+                                        response['proxyconsole'])
             authname = response['username']
             passphrase = response['password']
             # note(jbjohnso): here, we need to authenticate, but not
             # authorize a user.  When authorization starts understanding
             # element path, that authorization will need to be called
             # per request the user makes
-            authdata = auth.check_user_passphrase(authname, passphrase)
+            authdata = await auth.check_user_passphrase(authname, passphrase)
             if not authdata:
                 auditlog.log(
-                    {'operation': 'connect', 'user': authname, 'allowed': False})
+                    {'operation': 'connect',
+                     'user': authname, 'allowed': False})
             else:
                 authenticated = True
                 cfm = authdata[1]
@@ -147,12 +152,14 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
         request = await tlvdata.recv(connection)
         if request and isinstance(request, dict) and 'collective' in request:
             if skipauth:
-                return collective.handle_connection(connection, None, request['collective'],
-                                            local=True)
+                return collective.handle_connection(
+                    connection, None, request['collective'], local=True)
             else:
                 tlvdata.send(
-                        connection,
-                        {'collective': {'error': 'collective management commands may only be used by root'}})
+                    connection,
+                    {'collective': {
+                        'error': 'collective management commands '
+                                 'may only be used by root'}})
         while request is not None:
             try:
                 await process_request(
@@ -160,19 +167,22 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
             except exc.ConfluentException as e:
                 if ((not isinstance(e, exc.LockedCredentials)) and
                         e.apierrorcode == 500):
-                    tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                            event=log.Events.stacktrace)
+                    tracelog.log(
+                        traceback.format_exc(), ltype=log.DataTypes.event,
+                        event=log.Events.stacktrace)
                 await send_data(connection, {'errorcode': e.apierrorcode,
-                                    'error': e.apierrorstr,
-                                    'detail': e.get_error_body()})
+                                             'error': e.apierrorstr,
+                                             'detail': e.get_error_body()})
                 await send_data(connection, {'_requestdone': 1})
             except SystemExit:
                 sys.exit(0)
             except Exception as e:
                 tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                            event=log.Events.stacktrace)
-                await send_data(connection, {'errorcode': 500,
-                                        'error': 'Unexpected error - ' + str(e)})
+                             event=log.Events.stacktrace)
+                await send_data(
+                    connection,
+                    {'errorcode': 500,
+                     'error': 'Unexpected error - ' + str(e)})
                 await send_data(connection, {'_requestdone': 1})
             try:
                 request = await tlvdata.recv(connection)
@@ -186,6 +196,7 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
         except Exception:
             pass
 
+
 async def send_response(responses, connection):
     if responses is None:
         return
@@ -195,7 +206,8 @@ async def send_response(responses, connection):
     await send_data(connection, {'_requestdone': 1})
 
 
-async def process_request(connection, request, cfm, authdata, authname, skipauth):
+async def process_request(
+        connection, request, cfm, authdata, authname, skipauth):
     if isinstance(request, tlvdata.ClientFile):
         cfm.add_client_file(request)
         return
@@ -232,14 +244,15 @@ async def process_request(connection, request, cfm, authdata, authname, skipauth
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
     except exc.NotFoundException as e:
         send_data(connection, {"errorcode": 404,
-                                  "error": "Target not found - " + str(e)})
+                               "error": "Target not found - " + str(e)})
         send_data(connection, {"_requestdone": 1})
     except exc.InvalidArgumentException as e:
         send_data(connection, {"errorcode": 400,
-                                  "error": "Bad Request - " + str(e)})
+                               "error": "Bad Request - " + str(e)})
         send_data(connection, {"_requestdone": 1})
     await send_response(hdlr, connection)
     return
+
 
 def start_proxy_term(connection, cert, request):
     droneinfo = configmanager.get_collective_member(request['name'])
@@ -254,6 +267,7 @@ def start_proxy_term(connection, cert, request):
         direct=False, width=request.get('width', 80), height=request.get(
             'height', 24))
     term_interact(None, None, ccons, None, connection, consession, None)
+
 
 def start_term(authname, cfm, connection, params, path, authdata, skipauth):
     elems = path.split('/')
@@ -322,8 +336,10 @@ def term_interact(authdata, authname, ccons, cfm, connection, consession,
                     tracelog.log(traceback.format_exc(),
                                  ltype=log.DataTypes.event,
                                  event=log.Events.stacktrace)
-                    send_data(connection, {'errorcode': 500,
-                                           'error': 'Unexpected error - ' + str(e)})
+                    send_data(
+                        connection,
+                        {'errorcode': 500,
+                         'error': 'Unexpected error - ' + str(e)})
                     send_data(connection, {'_requestdone': 1})
                 continue
         if not data:
@@ -336,6 +352,7 @@ def term_interact(authdata, authname, ccons, cfm, connection, consession,
 async def _tlshandler(bind_host, bind_port):
     global plainsocket
     plainsocket = socket.socket(socket.AF_INET6)
+    plainsocket.settimeout(0)
     plainsocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     plainsocket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     bound = False
@@ -347,7 +364,7 @@ async def _tlshandler(bind_host, bind_port):
             if e.errno != 98:
                 raise
             sys.stderr.write('TLS Socket in use, retrying in 1 second\n')
-            eventlet.sleep(1)
+            await asyncio.sleep(1)
     # Enable TCP_FASTOPEN
     plainsocket.setsockopt(socket.SOL_TCP, 23, 5)
     plainsocket.listen(5)
@@ -356,7 +373,7 @@ async def _tlshandler(bind_host, bind_port):
     while (1):  # TODO: exithook
         cnn, addr = await cloop.sock_accept(plainsocket)
         if addr[1] < 1000:
-            eventlet.spawn_n(cs.handle_client, cnn, addr)
+            asyncio.create_task(cs.handle_client(cnn, addr))
         else:
             asyncio.create_task(_tlsstartup(cnn))
 
@@ -404,8 +421,9 @@ async def _tlsstartup(cnn):
         libssl.SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_stub, 0)
         sreader = asyncio.StreamReader()
         sreaderprot = asyncio.StreamReaderProtocol(sreader)
-        tport, _ = await cloop.connect_accepted_socket(lambda: sreaderprot, sock=cnn, ssl=ctx)
-        swriter = asyncio.StreamWriter(tport, sreaderprot, sreader)
+        tport, _ = await cloop.connect_accepted_socket(
+            lambda: sreaderprot, sock=cnn, ssl=ctx)
+        swriter = asyncio.StreamWriter(tport, sreaderprot, sreader, cloop)
         cert = tport.get_extra_info('ssl_object').getpeercert(binary_form=True)
         cnn = (sreader, swriter)
         #cnn = ctx.wrap_socket(cnn, server_side=True)

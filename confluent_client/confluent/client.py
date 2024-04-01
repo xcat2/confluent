@@ -15,10 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import anydbm as dbm
-except ImportError:
-    import dbm
+import asyncio
+import ctypes
+import ctypes.util
+import dbm
 import csv
 import errno
 import fnmatch
@@ -30,6 +30,9 @@ import ssl
 import sys
 import confluent.tlvdata as tlvdata
 import confluent.sortutil as sortutil
+libssl = ctypes.CDLL(ctypes.util.find_library('ssl'))
+libssl.SSL_CTX_set_cert_verify_callback.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
 SO_PASSCRED = 16
 
@@ -45,6 +48,26 @@ try:
     getinput = raw_input
 except NameError:
     getinput = input
+
+
+class PyObject_HEAD(ctypes.Structure):
+    _fields_ = [
+        ("ob_refcnt",    ctypes.c_ssize_t),
+        ("ob_type",      ctypes.c_void_p),
+    ]
+
+
+# see main/Modules/_ssl.c, only caring about the SSL_CTX pointer
+class PySSLContext(ctypes.Structure):
+    _fields_ = [
+        ("ob_base",      PyObject_HEAD),
+        ("ctx",         ctypes.c_void_p),
+    ]
+
+
+@ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+def verify_stub(store, misc):
+    return 1
 
 
 class NestedDict(dict):
@@ -182,7 +205,7 @@ class Command(object):
         elif self.serverloc == '/var/run/confluent/api.sock':
             raise Exception('Confluent service is not available')
         else:
-            self._connect_tls()
+            await self._connect_tls()
         self.protversion = int((await tlvdata.recv(self.connection)).split(
             b'--')[1].strip()[1:])
         authdata = await tlvdata.recv(self.connection)
@@ -205,8 +228,8 @@ class Command(object):
         tlvdata.send(self.connection, {'filename': name, 'mode': mode}, handle)
 
     async def authenticate(self, username, password):
-        tlvdata.send(self.connection,
-                     {'username': username, 'password': password})
+        await tlvdata.send(self.connection,
+                           {'username': username, 'password': password})
         authdata = await tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
@@ -374,7 +397,7 @@ class Command(object):
         self.connection.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
         self.connection.connect(self.serverloc)
 
-    def _connect_tls(self):
+    async def _connect_tls(self):
         server, port = _parseserver(self.serverloc)
         for res in socket.getaddrinfo(server, port, socket.AF_UNSPEC,
                                       socket.SOCK_STREAM):
@@ -389,7 +412,7 @@ class Command(object):
             try:
                 self.connection.settimeout(5)
                 self.connection.connect(sa)
-                self.connection.settimeout(None)
+                self.connection.settimeout(0)
             except:
                 raise
                 self.connection.close()
@@ -412,10 +435,21 @@ class Command(object):
             cacert = None
             certreqs = ssl.CERT_NONE
             knownhosts = True
-        self.connection = ssl.wrap_socket(self.connection, ca_certs=cacert,
-                                          cert_reqs=certreqs)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        ssl_ctx = PySSLContext.from_address(id(ctx)).ctx
+        libssl.SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_stub, 0)
+        sreader = asyncio.StreamReader()
+        sreaderprot = asyncio.StreamReaderProtocol(sreader)
+        cloop = asyncio.get_event_loop()
+        tport, _ = await cloop.create_connection(
+            lambda: sreaderprot, sock=self.connection, ssl=ctx, server_hostname='x')
+        swriter = asyncio.StreamWriter(tport, sreaderprot, sreader, cloop)
+        self.connection = (sreader, swriter)
+        #self.connection = ssl.wrap_socket(self.connection, ca_certs=cacert,
+        #                                  cert_reqs=certreqs)
         if knownhosts:
-            certdata = self.connection.getpeercert(binary_form=True)
+            certdata = tport.get_extra_info('ssl_object').getpeercert(binary_form=True)
+            # certdata = self.connection.getpeercert(binary_form=True)
             fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
             fingerprint = fingerprint.encode('utf-8')
             hostid = '@'.join((port, server))

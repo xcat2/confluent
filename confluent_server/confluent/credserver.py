@@ -14,14 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import confluent.config.configmanager as cfm
 import confluent.netutil as netutil
 import confluent.util as util
 import datetime
-import eventlet
-import eventlet.green.select as select
-import eventlet.green.socket as socket
-import eventlet.greenpool
 import hashlib
 import hmac
 import os
@@ -60,25 +57,26 @@ class CredServer(object):
     def __init__(self):
         self.cfm = cfm.ConfigManager(None)
 
-    def handle_client(self, client, peer):
+    async def handle_client(self, client, peer):
         try:
             apiarmed = None
             hmackey = None
             hmacval = None
-            client.send(b'\xc2\xd1-\xa8\x80\xd8j\xba')
-            tlv = bytearray(client.recv(2))
+            cloop = asyncio.get_event_loop()
+            await cloop.sock_send(client, b'\xc2\xd1-\xa8\x80\xd8j\xba')
+            tlv = bytearray(cloop.sock_recv(client, 2))
             if tlv[0] != 1:
                 client.close()
                 return
-            nodename = util.stringify(client.recv(tlv[1]))
-            tlv = bytearray(client.recv(2))  # should always be null
+            nodename = util.stringify(await cloop.sock_recv(client, tlv[1]))
+            tlv = bytearray(await cloop.sock_recv(client, 2))  # should always be null
             onlylocal = True
             if tlv[0] == 6:
-                hmacval = client.recv(tlv[1])
+                hmacval = await cloop.sock_recv(client, tlv[1])
                 hmackey = self.cfm.get_node_attributes(nodename, ['secret.selfapiarmtoken'], decrypt=True)
                 hmackey = hmackey.get(nodename, {}).get('secret.selfapiarmtoken', {}).get('value', None)
             elif tlv[1]:
-                client.recv(tlv[1])
+                await cloop.sock_recv(client, tlv[1])
             apimats = self.cfm.get_node_attributes(nodename,
                     ['deployment.apiarmed', 'deployment.sealedapikey'])
             apiarmed = apimats.get(nodename, {}).get('deployment.apiarmed', {}).get(
@@ -95,7 +93,7 @@ class CredServer(object):
                         if not isinstance(sealed, bytes):
                             sealed = sealed.encode('utf8')
                         reply = b'\x80' + struct.pack('>H', len(sealed) + 1) + sealed + b'\x00'
-                        client.send(reply)
+                        await cloop.sock_send(client, reply)
                     client.close()
                     return
                 if apiarmed not in ('once', 'continuous'):
@@ -105,23 +103,23 @@ class CredServer(object):
                         self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
                         client.close()
                         return
-            client.send(b'\x02\x20')
+            await cloop.sock_send(client, b'\x02\x20')
             rttoken = os.urandom(32)
-            client.send(rttoken)
-            client.send(b'\x00\x00')
-            tlv = bytearray(client.recv(2))
+            await cloop.sock_send(client, rttoken)
+            await cloop.sock_send(client, b'\x00\x00')
+            tlv = bytearray(await cloop.sock_recv(client, 2))
             if tlv[0] != 3:
                 client.close()
                 return
-            echotoken = client.recv(tlv[1])
+            echotoken = await cloop.sock_recv(client, tlv[1])
             if echotoken != rttoken:
                 client.close()
                 return
-            tlv = bytearray(client.recv(2))
+            tlv = bytearray(await cloop.sock_recv(client, 2))
             if tlv[0] != 4:
                 client.close()
                 return
-            echotoken = util.stringify(client.recv(tlv[1]))
+            echotoken = util.stringify(await cloop.sock_recv(client, tlv[1]))
             if hmackey:
                 etok = echotoken.encode('utf8')
                 if hmacval != hmac.new(hmackey, etok, hashlib.sha256).digest():
@@ -133,12 +131,14 @@ class CredServer(object):
             if apiarmed == 'continuous':
                 del cfgupdate[nodename]['deployment.apiarmed']
             self.cfm.set_node_attributes(cfgupdate)
-            client.recv(2)  # drain end of message
-            client.send(b'\x05\x00') # report success
+            await cloop.sock_recv(client, 2)  # drain end of message
+            await cloop.sock_send(client, b'\x05\x00') # report success
         finally:
             client.close()
 
-if __name__ == '__main__':
+async def main():
     a = CredServer()
     while True:
-        eventlet.sleep(86400)
+        await asyncio.sleep(86400)
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

@@ -21,7 +21,6 @@ import ctypes
 import ctypes.util
 import confluent.tlv as tlv
 import socket
-import select
 from datetime import datetime
 import json
 import os
@@ -97,6 +96,7 @@ class ClientFile(object):
         self.fileobject = os.fdopen(fd, mode)
         self.filename = name
 
+
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
 recvmsg = libc.recvmsg
 recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
@@ -109,7 +109,9 @@ def _sendmsg(loop, fut, sock, msg, fds, rfd):
     if fut.cancelled():
         return
     try:
-        retdata = sock.sendmsg([msg], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds))])
+        retdata = sock.sendmsg(
+            [msg],
+            [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds))])
     except (BlockingIOError, InterruptedError):
         fd = sock.fileno()
         loop.add_reader(fd, _sendmsg, loop, fut, sock, fd)
@@ -148,6 +150,7 @@ def _recvmsg(loop, fut, sock, msglen, maxfds, rfd):
                         :len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
         fut.set_result(msglen, list(fds))
 
+
 def recv_fds(sock, msglen, maxfds):
     cloop = asyncio.get_event_loop()
     fut = cloop.create_future()
@@ -167,6 +170,7 @@ def decodestr(value):
     except AttributeError:
         return value
     return ret
+
 
 def unicode_dictvalues(dictdata):
     for key in dictdata:
@@ -192,10 +196,12 @@ def _unicode_list(currlist):
 
 async def sendall(handle, data):
     if isinstance(handle, tuple):
-        return await handle[1].write(data)
+        handle[1].write(data)
+        return await handle[1].drain()
     else:
         cloop = asyncio.get_event_loop()
         return await cloop.sock_sendall(handle, data)
+
 
 async def send(handle, data, filehandle=None):
     cloop = asyncio.get_event_loop()
@@ -213,10 +219,10 @@ async def send(handle, data, filehandle=None):
         if tl < 16777216:
             # type for string is '0', so we don't need
             # to xor anything in
-            await cloop.sock_sendall(handle, struct.pack("!I", tl))
+            await sendall(handle, struct.pack("!I", tl))
         else:
             raise Exception("String data length exceeds protocol")
-        await cloop.sock_sendall(handle, data)
+        await sendall(handle, data)
     elif isinstance(data, dict):  # JSON currently only goes to 4 bytes
         # Some structured message, like what would be seen in http responses
         unicode_dictvalues(data)  # make everything unicode, assuming UTF-8
@@ -228,9 +234,9 @@ async def send(handle, data, filehandle=None):
         # xor in the type (0b1 << 24)
         if filehandle is None:
             tl |= 16777216
-            await cloop.sock_sendall(handle, struct.pack("!I", tl))
-            await cloop.sock_sendall(handle, sdata)
-        elif isinstance (handle, tuple):
+            await sendall(handle, struct.pack("!I", tl))
+            await sendall(handle, sdata)
+        elif isinstance(handle, tuple):
             raise Exception("Cannot send filehandle over network socket")
         else:
             tl |= (2 << 24)

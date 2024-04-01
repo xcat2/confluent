@@ -52,7 +52,7 @@ def make_certificate():
     os.umask(umask)
 
 
-def show_invitation(name, nonvoting=False):
+async def show_invitation(name, nonvoting=False):
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         make_certificate()
     s = client.Command().connection
@@ -121,7 +121,7 @@ def show_collective():
     else:
         print('Run collective show on leader for more data')
 
-def main():
+async def main():
     a = argparse.ArgumentParser(description='Confluent server utility')
     sp = a.add_subparsers(dest='command')
     gc = sp.add_parser('gencert', help='Generate Confluent Certificates for '
@@ -152,4 +152,4 @@ def main():
         delete_member(cmdset.name)
 
 if __name__ == '__main__':
-    main()
+    asyncio.get_event_loop().run_until_complete(main())

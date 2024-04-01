@@ -486,7 +486,7 @@ async def do_command(command, server):
     elif argv[0] == 'set':
         setvalues(argv[1:])
     elif argv[0] == 'create':
-        createresource(argv[1:])
+        await createresource(argv[1:])
     elif argv[0] in ('rm', 'delete', 'remove'):
         delresource(argv[1])
     elif argv[0] in ('unset', 'clear'):
@@ -501,7 +501,7 @@ def shutdown():
     tlvdata.send(session.connection, {'operation': 'shutdown', 'path': '/'})
 
 
-def createresource(args):
+async def createresource(args):
     resname = args[0]
     attribs = args[1:]
     keydata = parameterize_attribs(attribs)
@@ -514,12 +514,12 @@ def createresource(args):
         collection, _, resname = targpath.rpartition('/')
         if 'name' not in keydata:
             keydata['name'] = resname
-    makecall(session.create, (collection, keydata))
+    await makecall(session.create, (collection, keydata))
 
 
-def makecall(callout, args):
+async def makecall(callout, args):
     global exitcode
-    for response in callout(*args):
+    async for response in callout(*args):
         if 'deleted' in response:
             print("Deleted: " + response['deleted'])
         if 'created' in response:
@@ -550,9 +550,9 @@ def clearvalues(resource, attribs):
             sys.stderr.write('Error: ' + res['error'] + '\n')
 
 
-def delresource(resname):
+async def delresource(resname):
     resname = fullpath_target(resname)
-    makecall(session.delete, (resname,))
+    await makecall(session.delete, (resname,))
 
 
 def setvalues(attribs):
