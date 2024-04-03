@@ -84,9 +84,9 @@ class AsyncSession(object):
         if not wshandler:
             self.reaper = eventlet.spawn_after(15, self.destroy)
 
-    def add(self, requestid, rsp):
+    async def add(self, requestid, rsp):
         if self.wshandler:
-            self.wshandler(messages.AsyncMessage((requestid, rsp)))
+            await self.wshandler(messages.AsyncMessage((requestid, rsp)))
         if self.responses is None:
             return
         self.responses.append((requestid, rsp))
@@ -116,10 +116,10 @@ class AsyncSession(object):
         self.responses = None
         del _asyncsessions[self.asyncid]
 
-    def run_handler(self, handler, requestid):
+    async def run_handler(self, handler, requestid):
         try:
             for rsp in handler:
-                self.add(requestid, rsp)
+                await self.add(requestid, rsp)
             self.add(requestid, messages.AsyncCompletion())
         except Exception as e:
             self.add(requestid, e)
@@ -146,7 +146,7 @@ class AsyncSession(object):
             yield self.responses.popleft()
 
 
-def run_handler(hdlr, env):
+async def run_handler(hdlr, env):
     asyncsessid = env['HTTP_CONFLUENTASYNCID']
     try:
         asyncsession = _asyncsessions[asyncsessid]['asyncsession']

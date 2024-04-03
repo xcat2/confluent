@@ -81,7 +81,7 @@ def get_extra_names(nodename, cfg, myip=None):
                     names.add(nip)
     return names
 
-def handle_request(env, start_response):
+def handle_request(req, make_response):
     global currtz
     global keymap
     global currlocale
