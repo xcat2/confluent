@@ -26,7 +26,7 @@ try:
 except ImportError:
     webauthn = None
 import asyncio
-from aiohttp import web, web_urldispatcher, connector, ClientSession
+from aiohttp import web, web_urldispatcher, connector, ClientSession, WSMsgType
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
@@ -243,7 +243,7 @@ def _csrf_valid(req, session):
     if 'csrftoken' not in session:
         # The client has not (yet) requested CSRF protection
         # so we return true
-        if 'ConfluentAuthToken' in req.headers:
+        if 'Confluentauthtoken' in req.headers:
             # The client has requested CSRF countermeasures,
             # oblige the request and apply a new token to the
             # session
@@ -264,7 +264,7 @@ def _csrf_valid(req, session):
     # The session has CSRF protection enabled, only mark valid if
     # the client has provided an auth token and that token matches the
     # value protecting the session
-    return ('ConfluentAuthToken' in req.headers and
+    return ('Confluentauthtoken' in req.headers and
             req.headers['ConfluentAuthToken'] == session['csrftoken'])
 
 
@@ -459,7 +459,6 @@ async def wsock_handler(req):
         return
     httpsessions[sessid]['inflight'].add(rsp)
     name = httpsessions[sessid]['name']
-    print(req.rel_url.path)
     authdata = auth.authorize(name, req.rel_url.path, operation='start')
     if not authdata:
         return
@@ -467,9 +466,9 @@ async def wsock_handler(req):
     username = httpsessions[sessid]['name']
     if req.rel_url.path == '/sessions/current/async':
         myconsoles = {}
-        async def asyncwscallback(rsp):
-            rsp = json.dumps(rsp.raw())
-            await rsp.send_str(u'!' + rsp)
+        async def asyncwscallback(rspm):
+            rspm = json.dumps(rspm.raw())
+            await rsp.send_str(u'!' + rspm)
         currsess['inflight'].add(rsp)
         asess = None
         try:
@@ -479,10 +478,14 @@ async def wsock_handler(req):
                 clientmsg = True
                 while clientmsg:
                     clientmsg = await rsp.receive()
+                    if clientmsg.type == WSMsgType.CLOSE:
+                        break
+                    elif clientmsg.type != WSMsgType.TEXT:
+                        continue
                     clientmsg = clientmsg.data
                     if clientmsg:
                         if clientmsg[0] == '?':
-                            ws.send('?')
+                            await rsp.send_str('?')
                         elif clientmsg[0] == '$':
                             targid, data = clientmsg[1:].split('$', 1)
                             if data[0] == ' ':
@@ -631,7 +634,6 @@ async def resourcehandler(request):
 
     try:
         if 'Sec-WebSocket-Version' in request.headers:
-            print('WebSocket....')
             return await wsock_handler(request)
         else:
             return await resourcehandler_backend(request, make_response)
@@ -953,9 +955,9 @@ async def resourcehandler_backend(req, make_response):
             hdlr = pluginapi.handle_path(url, operation,
                                          cfgmgr, querydict)
             if 'ConfluentAsyncId' in req.headers:
-                confluent.asynchttp.run_handler(hdlr, env)
-                await make_response('text/plain', 202, cookies=cookies)
-                rsp.write(b'Request queued')
+                await confluent.asynchttp.run_handler(hdlr, req)
+                rsp = await make_response('text/plain', 202, cookies=cookies)
+                await rsp.write(b'Request queued')
                 return rsp
             pagecontent = ""
             if mimetype == 'text/html':
@@ -1051,7 +1053,7 @@ async def _assemble_json(responses, resource=None, url=None, extension=None):
         else:
             links['collection'] = {"href": "./" + extension}
     rspdata = {}
-    for rsp in await responses:
+    async for rsp in await responses:
         if isinstance(rsp, confluent.messages.LinkRelation):
             haldata = rsp.raw()
             for hk in haldata:

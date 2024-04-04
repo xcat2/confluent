@@ -39,6 +39,7 @@
 # Much like console sessions, these will be reaped if a client spends too
 # far away.
 
+import asyncio
 import collections
 import confluent.exceptions as exc
 import confluent.messages as messages
@@ -91,6 +92,8 @@ class AsyncSession(object):
             return
         self.responses.append((requestid, rsp))
         if self._evt:
+
+
             self._evt.send()
             self._evt = None
 
@@ -118,11 +121,13 @@ class AsyncSession(object):
 
     async def run_handler(self, handler, requestid):
         try:
-            for rsp in handler:
+            handler = await handler
+            async for rsp in handler:
                 await self.add(requestid, rsp)
-            self.add(requestid, messages.AsyncCompletion())
+            await self.add(requestid, messages.AsyncCompletion())
         except Exception as e:
-            self.add(requestid, e)
+            print(repr(e))
+            await self.add(requestid, e)
 
     def get_responses(self, timeout=25):
         self.reaper.cancel()
@@ -146,15 +151,17 @@ class AsyncSession(object):
             yield self.responses.popleft()
 
 
-async def run_handler(hdlr, env):
-    asyncsessid = env['HTTP_CONFLUENTASYNCID']
+async def run_handler(hdlr, req):
+    asyncsessid = req.headers['ConfluentAsyncId']
     try:
         asyncsession = _asyncsessions[asyncsessid]['asyncsession']
-        requestid = env['HTTP_CONFLUENTREQUESTID']
+        requestid = req.headers['ConfluentRequestId']
     except KeyError:
         raise exc.InvalidArgumentException(
                 'Invalid Session ID or missing request id')
-    eventlet.spawn_n(asyncsession.run_handler, hdlr, requestid)
+    cloop = asyncio.get_event_loop()
+    cloop.create_task(asyncsession.run_handler(hdlr, requestid))
+    #eventlet.spawn_n(asyncsession.run_handler, hdlr, requestid)
     return requestid
 
 

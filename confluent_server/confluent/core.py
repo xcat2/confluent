@@ -642,14 +642,14 @@ def stripnode(iterablersp, node):
         yield i
 
 
-def iterate_collections(iterable, forcecollection=True):
+async def iterate_collections(iterable, forcecollection=True):
     for coll in iterable:
         if forcecollection and coll[-1] != '/':
             coll += '/'
         yield msg.ChildCollection(coll, candelete=True)
 
 
-def iterate_resources(fancydict):
+async def iterate_resources(fancydict):
     for resource in fancydict:
         if resource.startswith("_"):
             continue
@@ -768,7 +768,7 @@ def create_noderange(inputdata, configmanager):
 
 
 
-def enumerate_collections(collections):
+async def enumerate_collections(collections):
     for collection in collections:
         yield msg.ChildCollection(collection)
 
@@ -1107,10 +1107,10 @@ async def handle_node_request(configmanager, inputdata, operation,
                 'element': pathcomponents, 'configmanager': configmanager,
                 'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange}))
         if isnoderange or not autostrip:
-            return [x async for x in iterate_queue(numworkers, passvalues)]
+            return iterate_queue(numworkers, passvalues) # [x async for x in iterate_queue(numworkers, passvalues)]
         else:
             if numworkers > 0:
-                return [x async for x in iterate_queue(numworkers, passvalues, nodes[0])]
+                return iterate_queue(numworkers, passvalues, nodes[0]) # [x async for x in iterate_queue(numworkers, passvalues, nodes[0])]
             else:
                 raise exc.NotImplementedException()
 

@@ -411,6 +411,7 @@ async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
         except asyncio.QueueEmpty:
             pass
         except asyncio.TimeoutError:
+            print("whoopsie?")
             pass
         finally:
             for datum in sorted(
@@ -525,7 +526,7 @@ class IpmiHandler:
         self.ipmicmd = persistent_ipmicmds[(node, tenant)]
         giveup = util.monotonic_time() + 60
         while not self.ipmicmd.ipmi_session.broken and not self.ipmicmd.ipmi_session.logged and self.ipmicmd.ipmi_session.logging:
-            self.ipmicmd.ipmi_session.wait_for_rsp(3)
+            await self.ipmicmd.ipmi_session.wait_for_rsp(3)
             if util.monotonic_time() > giveup:
                 self.ipmicmd.ipmi_session.broken = True
         return self

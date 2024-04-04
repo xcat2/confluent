@@ -201,7 +201,9 @@ async def send_response(responses, connection):
     if responses is None:
         return
     responses = await responses
-    for rsp in responses:
+    if responses is None:
+        return
+    async for rsp in responses:
         await send_data(connection, rsp.raw())
     await send_data(connection, {'_requestdone': 1})
 
