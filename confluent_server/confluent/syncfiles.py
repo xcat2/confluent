@@ -336,7 +336,7 @@ def cleanit():
                     del toreap[nn]
                 else:
                     toreap[nn] = 1
-            elif nn is in toreap:
+            elif nn in toreap:
                 del toreap[nn]
             eventlet.sleep(30)
 
