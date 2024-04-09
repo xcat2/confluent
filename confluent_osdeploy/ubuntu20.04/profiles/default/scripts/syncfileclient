@@ -298,6 +298,8 @@ if __name__ == '__main__':
             status = synchronize()
         except Exception as e:
             sys.stderr.write(str(e))
+            sys.stderr.write('\n')
+            sys.stderr.flush()
             status = 300
         if status not in (204, 200):
             time.sleep((random.random()*3)+2)
