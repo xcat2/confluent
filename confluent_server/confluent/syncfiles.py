@@ -331,7 +331,11 @@ def cleanit():
         for nn in list(syncrunners):
             if syncrunners[nn].dead:
                 if nn in toreap:
-                    syncrunners[nn].wait()
+                    try:
+                        syncrunners[nn].wait()
+                    except Exception as e:
+                        print(repr(e))
+                        pass
                     del syncrunners[nn]
                     del toreap[nn]
                 else:
