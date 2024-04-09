@@ -289,6 +289,8 @@ syncrunners = {}
 
 def start_syncfiles(nodename, cfg, suffixes, principals=[]):
     peerip = None
+    if nodename in syncrunners:
+        return '503 Synchronization already in progress '
     if 'myips' in suffixes:
         targips = suffixes['myips']
         del suffixes['myips']

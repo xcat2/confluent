@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+import random
+import time
 import subprocess
 import importlib
 import tempfile
@@ -227,9 +229,14 @@ def synchronize():
                 myips.append(addr)
         data = json.dumps({'merge': tmpdir, 'appendonce': appendoncedir, 'myips': myips})
         status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles', data)
+        if status >= 300:
+            sys.stderr.write("Error starting syncfiles - {}:\n".format(status))
+            sys.stderr.write(repr(rsp))
+            return status
         if status == 202:
             lastrsp = ''
             while status != 204:
+                time.sleep(1+(2*random.random(a)))
                 status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
                 if not isinstance(rsp, str):
                     rsp = rsp.decode('utf8')
@@ -277,10 +284,19 @@ def synchronize():
                             os.chmod(fname, int(opts[fname][opt], 8))
                     if uid != -1 or gid != -1:
                         os.chown(fname, uid, gid)
+        return status
     finally:
         shutil.rmtree(tmpdir)
         shutil.rmtree(appendoncedir)
 
 
 if __name__ == '__main__':
-    synchronize()
+    status = 202
+    while status not in (204, 200):
+        try:
+            status = synchronize()
+        except Exception as e:
+            sys.stderr.write(str(e))
+            status = 300
+        if status not in (204, 200):
+            time.sleep((random.random()*3)+2)
