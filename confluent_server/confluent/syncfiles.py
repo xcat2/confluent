@@ -290,7 +290,7 @@ syncrunners = {}
 def start_syncfiles(nodename, cfg, suffixes, principals=[]):
     peerip = None
     if nodename in syncrunners:
-        return '503 Synchronization already in progress '
+        return '503 Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
     if 'myips' in suffixes:
         targips = suffixes['myips']
         del suffixes['myips']
@@ -313,13 +313,13 @@ def start_syncfiles(nodename, cfg, suffixes, principals=[]):
         raise Exception('Cannot perform syncfiles without profile assigned')
     synclist = '/var/lib/confluent/public/os/{}/syncfiles'.format(profile)
     if not os.path.exists(synclist):
-        return '200 OK'  # not running
+        return '200 OK', 'No synclist'  # not running
     sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
-        return '200 OK'  # the synclist has no actual entries
+        return '200 OK', 'Empty synclist'  # the synclist has no actual entries
     syncrunners[nodename] = eventlet.spawn(
         sync_list_to_node, sl, nodename, suffixes, peerip)
-    return '202 Queued' # backgrounded
+    return '202 Queued', 'Background synchronization initiated' # backgrounded
 
 def get_syncresult(nodename):
     if nodename not in syncrunners:
