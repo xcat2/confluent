@@ -58,6 +58,7 @@ class CredServer(object):
         self.cfm = cfm.ConfigManager(None)
 
     async def handle_client(self, client, peer):
+        disarm = None
         try:
             apiarmed = None
             hmackey = None
@@ -125,16 +126,22 @@ class CredServer(object):
                 if hmacval != hmac.new(hmackey, etok, hashlib.sha256).digest():
                     client.close()
                     return
-            cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}, 'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
-            if hmackey and apiarmed != 'continuous':
-                self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
-            if apiarmed == 'continuous':
-                del cfgupdate[nodename]['deployment.apiarmed']
+            cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}}}
             self.cfm.set_node_attributes(cfgupdate)
             await cloop.sock_recv(client, 2)  # drain end of message
             await cloop.sock_send(client, b'\x05\x00') # report success
+            if hmackey and apiarmed != 'continuous':
+                self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
+            if apiarmed != 'continuous':
+                disarm = {nodename: {'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
         finally:
-            client.close()
+            try:
+                client.close()
+            except Exception:
+                pass
+            if disarm:
+                self.cfm.set_node_attributes(disarm)
+
 
 async def main():
     a = CredServer()
