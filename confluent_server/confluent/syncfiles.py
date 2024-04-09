@@ -338,7 +338,7 @@ def cleanit():
                     toreap[nn] = 1
             elif nn in toreap:
                 del toreap[nn]
-            eventlet.sleep(30)
+        eventlet.sleep(30)
 
 
 def get_syncresult(nodename):
