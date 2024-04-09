@@ -9,6 +9,7 @@ import os
 import shutil
 import pwd
 import grp
+import sys
 from importlib.machinery import SourceFileLoader
 try:
     apiclient = SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient').load_module()
@@ -236,7 +237,7 @@ def synchronize():
         if status == 202:
             lastrsp = ''
             while status != 204:
-                time.sleep(1+(2*random.random(a)))
+                time.sleep(1+(2*random.random()))
                 status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
                 if not isinstance(rsp, str):
                     rsp = rsp.decode('utf8')
