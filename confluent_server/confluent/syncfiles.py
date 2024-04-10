@@ -290,8 +290,6 @@ cleaner = None
 def start_syncfiles(nodename, cfg, suffixes, principals=[]):
     global cleaner
     peerip = None
-    if nodename in syncrunners:
-        return '503 Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
     if 'myips' in suffixes:
         targips = suffixes['myips']
         del suffixes['myips']
@@ -318,6 +316,11 @@ def start_syncfiles(nodename, cfg, suffixes, principals=[]):
     sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
         return '200 OK', 'Empty synclist'  # the synclist has no actual entries
+    if nodename in syncrunners:
+        if syncrunners[nodename].dead:
+            syncrunners[nodename].wait()
+        else:
+            return '503 Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
     syncrunners[nodename] = eventlet.spawn(
         sync_list_to_node, sl, nodename, suffixes, peerip)
     if not cleaner:
