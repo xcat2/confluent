@@ -285,12 +285,11 @@ def mkpathorlink(source, destination, appendexist=False):
 
 
 syncrunners = {}
-
+cleaner = None
 
 def start_syncfiles(nodename, cfg, suffixes, principals=[]):
+    global cleaner
     peerip = None
-    if nodename in syncrunners:
-        return '503 Synchronization already in progress '
     if 'myips' in suffixes:
         targips = suffixes['myips']
         del suffixes['myips']
@@ -313,13 +312,41 @@ def start_syncfiles(nodename, cfg, suffixes, principals=[]):
         raise Exception('Cannot perform syncfiles without profile assigned')
     synclist = '/var/lib/confluent/public/os/{}/syncfiles'.format(profile)
     if not os.path.exists(synclist):
-        return '200 OK'  # not running
+        return '200 OK', 'No synclist'  # not running
     sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
-        return '200 OK'  # the synclist has no actual entries
+        return '200 OK', 'Empty synclist'  # the synclist has no actual entries
+    if nodename in syncrunners:
+        if syncrunners[nodename].dead:
+            syncrunners[nodename].wait()
+        else:
+            return '503 Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
     syncrunners[nodename] = eventlet.spawn(
         sync_list_to_node, sl, nodename, suffixes, peerip)
-    return '202 Queued' # backgrounded
+    if not cleaner:
+        cleaner = eventlet.spawn(cleanit)
+    return '202 Queued', 'Background synchronization initiated'  # backgrounded
+
+
+def cleanit():
+    toreap = {}
+    while True:
+        for nn in list(syncrunners):
+            if syncrunners[nn].dead:
+                if nn in toreap:
+                    try:
+                        syncrunners[nn].wait()
+                    except Exception as e:
+                        print(repr(e))
+                        pass
+                    del syncrunners[nn]
+                    del toreap[nn]
+                else:
+                    toreap[nn] = 1
+            elif nn in toreap:
+                del toreap[nn]
+        eventlet.sleep(30)
+
 
 def get_syncresult(nodename):
     if nodename not in syncrunners:

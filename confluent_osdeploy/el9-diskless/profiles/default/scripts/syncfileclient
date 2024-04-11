@@ -9,6 +9,7 @@ import os
 import shutil
 import pwd
 import grp
+import sys
 from importlib.machinery import SourceFileLoader
 try:
     apiclient = SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient').load_module()
@@ -231,12 +232,14 @@ def synchronize():
         status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles', data)
         if status >= 300:
             sys.stderr.write("Error starting syncfiles - {}:\n".format(status))
-            sys.stderr.write(repr(rsp))
+            sys.stderr.write(rsp.decode('utf8'))
+            sys.stderr.write('\n')
+            sys.stderr.flush()
             return status
         if status == 202:
             lastrsp = ''
             while status != 204:
-                time.sleep(1+(2*random.random(a)))
+                time.sleep(1+(2*random.random()))
                 status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
                 if not isinstance(rsp, str):
                     rsp = rsp.decode('utf8')
@@ -297,6 +300,8 @@ if __name__ == '__main__':
             status = synchronize()
         except Exception as e:
             sys.stderr.write(str(e))
+            sys.stderr.write('\n')
+            sys.stderr.flush()
             status = 300
         if status not in (204, 200):
             time.sleep((random.random()*3)+2)
