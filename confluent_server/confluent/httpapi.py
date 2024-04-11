@@ -43,9 +43,6 @@ import confluent.shellserver as shellserver
 import confluent.tlvdata
 import confluent.util as util
 import copy
-import eventlet
-import eventlet.greenthread
-import greenlet
 import json
 import socket
 import sys
@@ -55,10 +52,10 @@ try:
     import urlparse
 except ModuleNotFoundError:
     import urllib.parse as urlparse
-import eventlet.websocket
-import eventlet.wsgi
 tlvdata = confluent.tlvdata
 
+
+_cleaner = None
 
 auditlog = None
 tracelog = None
@@ -149,7 +146,7 @@ create_resource_functions = {
 }
 
 
-def _sessioncleaner():
+async def _sessioncleaner():
     while True:
         currtime = time.time()
         targsessions = []
@@ -165,7 +162,7 @@ def _sessioncleaner():
                 targsessions.append(session)
         for session in targsessions:
             del consolesessions[session]
-        eventlet.sleep(10)
+        await asyncio.sleep(10)
 
 
 def _get_query_dict(req, reqbody, reqtype):
@@ -300,7 +297,7 @@ async def _authorize_request(req, operation, reqbody):
                         for mythread in httpsessions[sessionid]['inflight']:
                             targets.append(mythread)
                         for mythread in targets:
-                            eventlet.greenthread.kill(mythread)
+                            print(repr(mythread))
                         forwarder.close_session(sessionid)
                         del httpsessions[sessionid]
                         return ('logout',)
@@ -791,7 +788,6 @@ async def resourcehandler_backend(req, make_response):
         return rsp
     elif (operation == 'create' and ('/console/session' in reqpath or
             '/shell/sessions/' in reqpath)):
-        #hard bake JSON into this path, do not support other incarnations
         if '/console/session' in reqpath:
             prefix, _, _ = reqpath.partition('/console/session')
             shellsession = False
@@ -879,54 +875,7 @@ async def resourcehandler_backend(req, make_response):
             rsp.write(json.dumps({'session': querydict['session']}))
             return rsp
         else:  # no keys, but a session, means it's hooking to receive data
-            sessid = querydict['session']
-            if sessid not in consolesessions:
-                start_response('400 Expired Session', headers)
-                return rsp
-            consolesessions[sessid]['expiry'] = time.time() + 90
-            # add our thread to the 'inflight' to have a hook to terminate
-            # a long polling request
-            loggedout = None
-            mythreadid = greenlet.getcurrent()
-            httpsessions[authorized['sessionid']]['inflight'].add(mythreadid)
-            try:
-                outdata = consolesessions[sessid]['session'].get_next_output(
-                    timeout=25)
-            except greenlet.GreenletExit as ge:
-                loggedout = ge
-            httpsessions[authorized['sessionid']]['inflight'].discard(
-                    mythreadid)
-            if sessid not in consolesessions:
-                start_response('400 Expired Session', headers)
-                return rsp
-            if loggedout is not None:
-                consolesessions[sessid]['session'].destroy()
-                start_response('401 Logged out', headers)
-                rsp.write(b'{"loggedout": 1}')
-                return rsp
-            bufferage = False
-            if 'stampsent' not in consolesessions[sessid]:
-                consolesessions[sessid]['stampsent'] = True
-                bufferage = consolesessions[sessid]['session'].get_buffer_age()
-            if isinstance(outdata, dict):
-                rspdata = outdata
-                rspdata['session'] = querydict['session']
-            else:
-                rspdata = {'session': querydict['session'],
-                           'data': outdata}
-            if bufferage is not False:
-                rspdata['bufferage'] = bufferage
-            try:
-                rspj = json.dumps(rspdata)
-            except UnicodeDecodeError:
-                try:
-                    rspj = json.dumps(rspdata, encoding='cp437')
-                except UnicodeDecodeError:
-                    rspj = json.dumps({'session': querydict['session'],
-                                      'data': 'DECODEERROR'})
-            start_response('200 OK', headers)
-            rsp.write(rspj)
-            return rsp
+            raise Exception("long polling console sessions are discontinued")
     else:
         # normal request
         url = reqpath
@@ -1128,8 +1077,6 @@ async def serve(bind_host, bind_port):
     await runner.setup()
     site = web.SockSite(runner, sock)
     await site.start()
-    # eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
-    #                     debug=False, socket_timeout=60, keepalive=False)
 
 
 
@@ -1142,13 +1089,13 @@ class HttpApi(object):
         self.bind_port = bind_port or 4005
 
     def start(self):
+        global _cleaner
         global auditlog
         global tracelog
+        if _cleaner is None:
+            _cleaner = asyncio.get_event_loop().create_task(
+                _sessioncleaner())
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
         self.server = asyncio.get_event_loop().create_task(
             serve(self.bind_host, self.bind_port))
-        # self.server = eventlet.spawn(serve, self.bind_host, self.bind_port)
-
-
-_cleaner = eventlet.spawn(_sessioncleaner)
