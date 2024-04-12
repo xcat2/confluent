@@ -2209,7 +2209,7 @@ class ConfigManager(object):
         if cfgleader:
             mywarnings = exec_on_leader('_rpc_master_clear_node_attributes',
                                   self.tenant, nodes, attributes)
-            if warnings is not None:
+            if mywarnings and warnings is not None:
                 warnings.extend(mywarnings)
             return
         if cfgstreams:
