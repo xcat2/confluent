@@ -750,7 +750,7 @@ def create_node(inputdata, configmanager):
     yield msg.CreatedResource(nodename)
 
 
-def create_noderange(inputdata, configmanager):
+async def create_noderange(inputdata, configmanager):
     try:
         noder = inputdata['name']
         del inputdata['name']

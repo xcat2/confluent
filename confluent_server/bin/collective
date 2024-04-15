@@ -1,6 +1,7 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 import argparse
+import asyncio
 import errno
 import os
 import pwd
@@ -55,37 +56,44 @@ def make_certificate():
 async def show_invitation(name, nonvoting=False):
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         make_certificate()
-    s = client.Command().connection
+    clicmd = client.Command()
+    await clicmd.ensure_connected()
+    s = clicmd.connection
     role = 'nonvoting' if nonvoting else None
-    tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name, 'role': role}})
-    invite = tlvdata.recv(s)['collective']
+    await tlvdata.send(s, {'collective': {'operation': 'invite', 'name': name, 'role': role}})
+    invite = await tlvdata.recv(s)
+    invite = invite['collective']
     if 'error' in invite:
         sys.stderr.write(invite['error'] + '\n')
         return
     print('{0}'.format(invite['invitation']))
 
 
-def join_collective(server, invitation):
+async def join_collective(server, invitation):
     if not os.path.exists('/etc/confluent/srvcert.pem'):
         make_certificate()
-    s = client.Command().connection
+    clicmd = client.Command()
+    await clicmd.ensure_connected()
+    s = clicmd.connection
     while not invitation:
         invitation = input('Paste the invitation here: ')
-    tlvdata.send(s, {'collective': {'operation': 'join',
+    await tlvdata.send(s, {'collective': {'operation': 'join',
                                     'invitation': invitation,
                                     'server': server}})
-    res = tlvdata.recv(s)
+    res = await tlvdata.recv(s)
     res = res.get('collective',
                   {'status': 'Unknown response: ' + repr(res)})
     print(res.get('status', res.get('error', repr(res))))
     if 'error' in res:
         sys.exit(1)
 
-def delete_member(name):
-    s = client.Command().connection
-    tlvdata.send(s, {'collective': {'operation': 'delete',
+async def delete_member(name):
+    clicmd = client.Command()
+    await clicmd.ensure_connected()
+    s = clicmd.connection
+    await tlvdata.send(s, {'collective': {'operation': 'delete',
                                     'member': name}})
-    res = tlvdata.recv(s)
+    res = await tlvdata.recv(s)
     res = res.get('collective',
                   {'status': 'Unknown response: ' + repr(res)})
     print(res.get('status', res.get('error', repr(res))))
@@ -93,10 +101,12 @@ def delete_member(name):
         sys.exit(1)
 
 
-def show_collective():
-    s = client.Command().connection
-    tlvdata.send(s, {'collective': {'operation': 'show'}})
-    res = tlvdata.recv(s)
+async def show_collective():
+    clicmd = client.Command()
+    await clicmd.ensure_connected()
+    s = clicmd.connection
+    await tlvdata.send(s, {'collective': {'operation': 'show'}})
+    res = await tlvdata.recv(s)
     if 'error' in res:
         print(res['error'])
         return
@@ -143,13 +153,13 @@ async def main():
     if cmdset.command == 'gencert':
         make_certificate()
     elif cmdset.command == 'invite':
-        show_invitation(cmdset.name, cmdset.n)
+        await show_invitation(cmdset.name, cmdset.n)
     elif cmdset.command == 'join':
-        join_collective(cmdset.server, cmdset.i)
+        await join_collective(cmdset.server, cmdset.i)
     elif cmdset.command == 'show':
-        show_collective()
+        await show_collective()
     elif cmdset.command == 'delete':
-        delete_member(cmdset.name)
+        await delete_member(cmdset.name)
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

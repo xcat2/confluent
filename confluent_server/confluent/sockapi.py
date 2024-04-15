@@ -122,7 +122,7 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
             if not response:
                 return
             if 'collective' in response:
-                return collective.handle_connection(connection, cert,
+                return await collective.handle_connection(connection, cert,
                                                     response['collective'])
             while not configmanager.config_is_ready():
                 await asyncio.sleep(1)
@@ -152,7 +152,7 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
         request = await tlvdata.recv(connection)
         if request and isinstance(request, dict) and 'collective' in request:
             if skipauth:
-                return collective.handle_connection(
+                return await collective.handle_connection(
                     connection, None, request['collective'], local=True)
             else:
                 tlvdata.send(

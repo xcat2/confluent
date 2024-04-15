@@ -259,7 +259,7 @@ def get_myname():
 def in_collective():
     return bool(list(cfm.list_collective()))
 
-def handle_connection(connection, cert, request, local=False):
+async def handle_connection(connection, cert, request, local=False):
     global currentleader
     global retrythread
     global initting
@@ -272,7 +272,7 @@ def handle_connection(connection, cert, request, local=False):
             return
         if operation in ('show', 'delete'):
             if not list(cfm.list_collective()):
-                tlvdata.send(connection,
+                await tlvdata.send(connection,
                              {'collective': {'error': 'Collective mode not '
                                                       'enabled on this '
                                                       'system'}})
@@ -292,17 +292,17 @@ def handle_connection(connection, cert, request, local=False):
                         linfo['fingerprint'],
                         cert)):
                     remote.close()
-                    tlvdata.send(connection,
+                    await tlvdata.send(connection,
                                  {'error': 'Invalid certificate, '
                                            'redo invitation process'})
                     connection.close()
                     return
-                tlvdata.recv(remote)  # ignore banner
-                tlvdata.recv(remote)  # ignore authpassed: 0
-                tlvdata.send(remote,
+                await tlvdata.recv(remote)  # ignore banner
+                await tlvdata.recv(remote)  # ignore authpassed: 0
+                await tlvdata.send(remote,
                              {'collective': {'operation': 'getinfo',
                                              'name': get_myname()}})
-                collinfo = tlvdata.recv(remote)
+                collinfo = await tlvdata.recv(remote)
             else:
                 collinfo = {}
                 populate_collinfo(collinfo)
@@ -312,20 +312,20 @@ def handle_connection(connection, cert, request, local=False):
             except exc.DegradedCollective:
                 collinfo['quorum'] = False
             if operation == 'show':
-                tlvdata.send(connection, {'collective':  collinfo})
+                await tlvdata.send(connection, {'collective':  collinfo})
             elif operation == 'delete':
                 todelete = request['member']
                 if (todelete == collinfo['leader'] or 
                        todelete in collinfo['active']):
-                    tlvdata.send(connection, {'collective':
+                    await tlvdata.send(connection, {'collective':
                             {'error': '{0} is still active, stop the confluent service to remove it'.format(todelete)}})
                     return
                 if todelete not in collinfo['offline']:
-                    tlvdata.send(connection, {'collective':
+                    await tlvdata.send(connection, {'collective':
                             {'error': '{0} is not a recognized collective member'.format(todelete)}})
                     return
                 cfm.del_collective_member(todelete)
-                tlvdata.send(connection,
+                await tlvdata.send(connection,
                     {'collective': {'status': 'Successfully deleted {0}'.format(todelete)}})
                 connection.close()
             return
@@ -342,7 +342,7 @@ def handle_connection(connection, cert, request, local=False):
             name = request['name']
             role = request.get('role', '')
             invitation = invites.create_server_invitation(name, role)
-            tlvdata.send(connection,
+            await tlvdata.send(connection,
                          {'collective': {'invitation': invitation}})
             connection.close()
         if 'join' == operation:
@@ -352,7 +352,7 @@ def handle_connection(connection, cert, request, local=False):
                 name, invitation = invitation.split(b'@', 1)
                 name = util.stringify(name)
             except Exception:
-                tlvdata.send(
+                await tlvdata.send(
                     connection,
                     {'collective':
                          {'status': 'Invalid token format'}})
@@ -369,7 +369,7 @@ def handle_connection(connection, cert, request, local=False):
                                          keyfile='/etc/confluent/privkey.pem',
                                          certfile='/etc/confluent/srvcert.pem')
             except Exception:
-                tlvdata.send(
+                await tlvdata.send(
                     connection,
                     {'collective':
                          {'status': 'Failed to connect to {0}'.format(host)}})
@@ -380,11 +380,11 @@ def handle_connection(connection, cert, request, local=False):
             cert = remote.getpeercert(binary_form=True)
             proof = base64.b64encode(invites.create_client_proof(
                 invitation, mycert, cert))
-            tlvdata.recv(remote)  # ignore banner
-            tlvdata.recv(remote)  # ignore authpassed: 0
-            tlvdata.send(remote, {'collective': {'operation': 'enroll',
+            await tlvdata.recv(remote)  # ignore banner
+            await tlvdata.recv(remote)  # ignore authpassed: 0
+            await tlvdata.send(remote, {'collective': {'operation': 'enroll',
                                                  'name': name, 'hmac': proof}})
-            rsp = tlvdata.recv(remote)
+            rsp = await tlvdata.recv(remote)
             if 'error' in rsp:
                 tlvdata.send(connection, {'collective':
                                               {'status': rsp['error']}})
@@ -395,7 +395,7 @@ def handle_connection(connection, cert, request, local=False):
             j = invites.check_server_proof(invitation, mycert, cert, proof)
             if not j:
                 remote.close()
-                tlvdata.send(connection, {'collective':
+                await tlvdata.send(connection, {'collective':
                                               {'status': 'Bad server token'}})
                 connection.close()
                 return
