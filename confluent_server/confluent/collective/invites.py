@@ -41,7 +41,7 @@ def check_server_proof(invitation, mycert, peercert, proof):
 def check_client_proof(servername, mycert, peercert, proof):
     servername = servername.encode('utf-8')
     if servername not in pending_invites:
-        return False
+        return False, None
     invitation = pending_invites[servername]
     role = invitation['role']
     invitation = invitation['invitation']

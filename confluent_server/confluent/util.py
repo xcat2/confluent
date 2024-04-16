@@ -40,10 +40,13 @@ def mkdirp(path, mode=0o777):
 
 async def _sleep_and_run(sleeptime, func, args):
     await asyncio.sleep(sleeptime)
-    func(*args)
+    print(repr(func))
+    await func(*args)
 
 
 def spawn_after(sleeptime, func, *args):
+    if func is None:
+        raise Exception('tf')
     return spawn(_sleep_and_run(sleeptime, func, args))
 
 

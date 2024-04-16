@@ -416,6 +416,7 @@ async def _tlsstartup(cnn):
         ctx.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3
         ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
         ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+        ctx.verify_mode = ssl.CERT_OPTIONAL
         ctx.set_ciphers(ciphers)
         ctx.load_cert_chain('/etc/confluent/srvcert.pem',
                             '/etc/confluent/privkey.pem')

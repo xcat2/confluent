@@ -742,7 +742,7 @@ async def updateattrib(session, updateargs, nodetype, noderange, options, dictas
             value = os.environ.get(
                 key, os.environ[key.upper()])
             if (nodetype == "nodegroups"):
-                exitcode = await ession.simple_nodegroups_command(noderange,
+                exitcode = await session.simple_nodegroups_command(noderange,
                                                              'attributes/all',
                                                              value, key)
             else:
