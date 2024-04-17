@@ -30,7 +30,7 @@ def retrieve(nodes, element, configmanager, inputdata, clearwarnbynode=None):
             element[1], element[3], configmanager, inputdata, clearwarnbynode)
 
 
-def retrieve_nodegroup(nodegroup, element, configmanager, inputdata, clearwarnbynode):
+def retrieve_nodegroup(nodegroup, element, configmanager, inputdata, clearwarnbynode=None):
     try:
         grpcfg = configmanager.get_nodegroup_attributes(nodegroup)
     except KeyError:
