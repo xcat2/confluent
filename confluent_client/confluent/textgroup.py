@@ -98,17 +98,24 @@ class GroupedData(object):
         self.byoutput = {}
         self.header = {}
         self.client = confluentconnection
+        self.detectedpad = None
 
     def generate_byoutput(self):
         self.byoutput = {}
+        thepad = self.detectedpad if self.detectedpad else ''
         for n in self.bynode:
-            output = '\n'.join(self.bynode[n])
+            output = ''
+            for ln in self.bynode[n]:
+                output += ln.replace(thepad, '', 1) + '\n'
             if output not in self.byoutput:
                 self.byoutput[output] = set([n])
             else:
                 self.byoutput[output].add(n)
 
     def add_line(self, node, line):
+        wspc = re.search(r'^\s*', line).group()
+        if self.detectedpad is None or len(wspc) < len(self.detectedpad):
+            self.detectedpad = wspc
         if node not in self.bynode:
             self.bynode[node] = [line]
         else:
