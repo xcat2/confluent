@@ -231,14 +231,14 @@ fi
 ISOSRC=$(blkid -t TYPE=iso9660|grep -Ei ' LABEL="'$ID-$VERSION_ID|sed -e s/:.*//)
 if [ -z "$ISOSRC" ]; then
     echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
+    root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
+    export root
 else
     echo inst.repo=cdrom:$ISOSRC >> /etc/cmdline.d/01-confluent.conf
 fi
 echo inst.ks=$proto://$mgr/confluent-public/os/$profilename/kickstart >> /etc/cmdline.d/01-confluent.conf
 kickstart=$proto://$mgr/confluent-public/os/$profilename/kickstart
-root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
 export kickstart
-export root
 autoconfigmethod=$(grep ipv4_method /etc/confluent/confluent.deploycfg)
 autoconfigmethod=${autoconfigmethod#ipv4_method: }
 if [ "$autoconfigmethod" = "dhcp" ]; then
