@@ -1,4 +1,4 @@
-#!/usr/libexec/platform-python
+#!/usr/bin/python2
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -98,16 +98,7 @@ cfgpaths = {
         'static_v6_gateway'),
     'bmc.hostname': (
         'configuration/management_controller/hostname', 'hostname'),
-    'bmc.ntp': (
-        'configuration/management_controller/ntp/enabled', 'state'),
-    'bmc.ntpServer1': (
-        'configuration/management_controller/ntp/servers/1', 'server'),
-    'bmc.ntpServer2': (
-        'configuration/management_controller/ntp/servers/2', 'server'),
-    'bmc.ntpServer3': (
-        'configuration/management_controller/ntp/servers/3', 'server')
 }
-
 
 autodeps = {
     'bmc.ipv4_address': (('bmc.ipv4_method', 'static'),)
@@ -122,7 +113,6 @@ client.check_globbing(noderange)
 setmode = None
 assignment = {}
 queryparms = {}
-
 printsys = []
 printbmc = []
 printextbmc = []
@@ -140,6 +130,7 @@ if len(args) == 1 or options.exclude:
         if path not in queryparms:
             queryparms[path] = {}
         queryparms[path][attrib] = candidate
+
 
 def _assign_value():
     if key not in cfgpaths:
@@ -242,7 +233,6 @@ else:
     parse_config_line(args[1:])
 session = client.Command()
 rcode = 0
-
 if options.restoredefault:
     session.stop_if_noderange_over(noderange, options.maxnodes)
     if options.restoredefault.lower() in (
@@ -305,10 +295,8 @@ else:
     for path in queryparms:
         if options.comparedefault:
             continue
-
-        rcode |= client.print_attrib_path(path, session, list(queryparms[path]),NullOpt(), queryparms[path])
-        
-       
+        rcode |= client.print_attrib_path(path, session, list(queryparms[path]),
+                                      NullOpt(), queryparms[path])
     if printsys == 'all' or printextbmc or printbmc or printallbmc:
         if printbmc or not printextbmc:
          rcode |= client.print_attrib_path(
