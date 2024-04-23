@@ -156,7 +156,6 @@ def get_sensor_data(element, node, configmanager):
             gc.logout()
         _sensors_by_node[node] = [sdata, time.time() + 1]
         sn = _sensors_by_node.get(node, None)
-#    print(sn)
     for outlet in sn[0]:
         for sensename in sn[0][outlet]:
             myname = '{0} {1}'.format(outlet, sensename)
@@ -278,35 +277,22 @@ class PDUClient(object):
             if outdata[0] == outlet:
                 return 'on' if outdata[3] else 'off'
         return
-    def get_outlet_sensors(self):
-        rsp = self.do_request('cgi_pdu_outlets')
-        data = sanitize_json(rsp[0])
-        data = json.loads(data)
-        data = data['data'][0]
-
-
-        return data
     
     def get_sensor_data(self):
         rsp = self.do_request1('cgi_overview')
-        
+
         data = sanitize_json(rsp[0])
         data = json.loads(data)
-        
         data1 = data['data'][4][0][8]
-
-        data = self.get_outlet_sensors()
+        data = data['data'][0]
         sdata = {}
-
         for outdata in data:
-            
+
             outsense = {}
-            outletname = outdata[0][1]
-
-
+            outletname = outdata[3]
             outsense['Power'] = {
-                'value': outdata[4],
-                'units': 'W',
+                'value': outdata[5],
+                'units': 'kW',
                 'type': 'Power',
             }
             sdata[outletname] = outsense
