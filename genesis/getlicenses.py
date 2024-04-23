@@ -29,12 +29,17 @@ with open(sys.argv[1]) as rpmlist:
     rpmlist = rpmlist.read().split('\n')
 licenses = set([])
 licensesbyrpm = {}
+lfirmlicenses = [
+        'WHENCE',
+        'chelsio_firmware',
+        'hfi1_firmware',
+        'ice_enhaced',
+        'rtlwifi_firmware.txt',
+]
 for rpm in rpmlist:
     if not rpm:
         continue
     srpm = rpmtosrpm[rpm]
-    if srpm.startswith('linux-firmware'):
-        continue
     for relrpm in srpmtorpm[srpm]:
         if relrpm.startswith('libss-'):
             continue
@@ -44,6 +49,12 @@ for rpm in rpmlist:
                 continue
             if lic == '(contains no files)':
                 continue
+            if srpm.startswith('linux-firmware'):
+                for desired in lfirmlicenses:
+                    if desired in lic:
+                        break
+                else:
+                    continue
             licensesbyrpm[rpm] = lic
             licenses.add(lic)
 for lic in sorted(licenses):
@@ -63,10 +74,25 @@ manualrpms = [
 ]
 manuallicenses = [
     '/usr/share/licenses/lz4/LICENSE.BSD',
+    '/usr/share/licenses/nss/LICENSE.APACHE', # http://www.apache.org/licenses/LICENSE-2.0
+    '/usr/share/licenses/openssh/COPYING.blowfish', # from header of blowfish file in bsd-compat
+    '/usr/share/licenses/bc/COPYING.GPLv2',
+    '/usr/share/licenses/bind-license/LICENSE', # MPLv2 from the source code
+    '/usr/share/licenses/procps-ng/COPYING.LIBv2.1', # fetched internet 
     # cp /usr/share/doc/lz4-libs/LICENSE /usr/share/licenses/lz4/LICENSE.BSD
     #'lz4-1.8.3]# cp LICENSE  /usr/share/licenses/lz4/LICENSE'
     # net-snmp has a bundled openssl, but the build does not avail itself of that copy
     '/usr/share/licenses/perl-libs/LICENSE', # ./dist/ExtUtils-CBuilder/LICENSE from perl srpm
+    '/usr/share/licenses/pam/COPYING.bison', # pam_conv_y
+    '/usr/share/licenses/pcre/LICENSE.BSD2', # stack-less just in time compiler, Zoltan Herzeg
+    '/usr/share/licenses/sqlite/LICENSE.md', # https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md
+    '/usr/share/licenses/pcre2/LICENSE.BSD2',
+    '/usr/share/licenses/dhcp-common/NOTICE',
+    '/usr/share/licenses/xz/COPYING.GPLv3', # manually extracted from xz source
+    '/usr/share/licenses/bash/NOTICE',
+    '/usr/share/licenses/libsepol/NOTICE',
+    '/usr/share/licenses/perl/COPYING.regexec', # regexec.c
+    '/usr/share/doc/platform-python/README.rst',
     '/usr/share/licenses/lz4/LICENSE',
     '/usr/share/licenses/lm_sensors/COPYING',
     '/usr/share/doc/libunistring/README',
@@ -75,12 +101,16 @@ manuallicenses = [
     '/usr/share/doc/zstd/README.md',
     '/usr/share/doc/hwdata/LICENSE',
     '/usr/share/doc/ipmitool/COPYING',
+    '/usr/share/licenses/linux-firmware/LICENSE.hfi1_firmware', # these two need to be extracted from srcrpm
+    '/usr/share/licenses/linux-firmware/LICENSE.ice_enhanced',  #
     '/usr/share/doc/libaio/COPYING',
     '/usr/share/doc/net-snmp/COPYING',
     '/usr/share/doc/libnl3/COPYING',
     '/usr/share/licenses/xfsprogs/GPL-2.0',
     '/usr/share/licenses/xfsprogs/LGPL-2.1',
-    '/usr/share/licenses/tmux/NOTICE',
+    '/usr/share/licenses/tmux/NOTICE', # built by extracttmuxlicenses.py
+    '/usr/share/licenses/tmux/COPYING', # extracted from source
+    '/usr/share/licenses/tmux/README', # extracted from source
     '/usr/share/licenses/kernel-extra/exceptions/Linux-syscall-note',
     '/usr/share/licenses/kernel-extra/other/Apache-2.0',
     '/usr/share/licenses/kernel-extra/other/CC-BY-SA-4.0',
@@ -100,6 +130,8 @@ manuallicenses = [
     '/usr/share/licenses/kmod/tools/COPYING', # GPL not LGPL, must extract from kmod srpm
     '/usr/share/licenses/krb5-libs/NOTICE', # copy it verbatim from LICENSE, exact same file
     '/usr/share/doc/less/README',
+    '/usr/share/almalinux-release/EULA',
+    '/usr/share/doc/almalinux-release/GPL',
     '/usr/share/licenses/libcap-ng-utils/COPYING',
     '/usr/share/licenses/libdb/copyright', # from libdb, db-5.3.28, lang/sql/odbc/debian/copyright
     '/usr/share/licenses/libgcrypt/LICENSES.ppc-aes-gcm', # libgcrypt license to carry forward

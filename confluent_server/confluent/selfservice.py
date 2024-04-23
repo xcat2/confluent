@@ -30,7 +30,7 @@ import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
-currtz = None
+currtz = 'UTC'
 keymap = 'us'
 currlocale = 'en_US.UTF-8'
 currtzvintage = None
@@ -517,8 +517,8 @@ def handle_request(env, start_response):
             pals = get_extra_names(nodename, cfg, myip)
             result = syncfiles.start_syncfiles(
                 nodename, cfg, json.loads(reqbody), pals)
-            start_response(result, ())
-            yield ''
+            start_response(result[0], ())
+            yield result[1]
             return
         if 'GET' == operation:
             status, output = syncfiles.get_syncresult(nodename)

@@ -29,9 +29,9 @@ import struct
 import eventlet.green.subprocess as subprocess
 
 
-def mkdirp(path):
+def mkdirp(path, mode=0o777):
     try:
-        os.makedirs(path)
+        os.makedirs(path, mode)
     except OSError as e:
         if e.errno != 17:
             raise
@@ -168,7 +168,7 @@ def cert_matches(fingerprint, certificate):
         return algo(certificate).digest() == fingerprint
     algo, _, fp = fingerprint.partition('$')
     newfp = None
-    if algo in ('sha512', 'sha256'):
+    if algo in ('sha512', 'sha256', 'sha384'):
         newfp = get_fingerprint(certificate, algo)
     return newfp and fingerprint == newfp
 

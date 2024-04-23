@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 __author__ = 'jjohnson2,bfinley'
 
@@ -49,8 +49,11 @@ def main(args):
     wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
     wiz.add_argument('-l', help='Set up local management node to allow login from managed nodes', action='store_true')
+    osip = sp.add_parser('importcheck', help='Check import of an OS image from an ISO image')
+    osip.add_argument('imagefile', help='File to use for source of importing')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
+    osip.add_argument('-n', help='Specific a custom distribution name')
     upb = sp.add_parser(
         'updateboot',
         help='Push profile.yaml of the named profile data into boot assets as appropriate')
@@ -63,7 +66,9 @@ def main(args):
     if cmdset.command == 'list':
         return oslist()
     if cmdset.command == 'import':
-        return osimport(cmdset.imagefile)
+        return osimport(cmdset.imagefile, custname=cmdset.n)
+    if cmdset.command == 'importcheck':
+        return osimport(cmdset.imagefile, checkonly=True)
     if cmdset.command == 'initialize':
         return initialize(cmdset)
     if cmdset.command == 'updateboot':
@@ -72,6 +77,12 @@ def main(args):
         return rebase(cmdset.profile)
     ap.print_help()
 
+def symlinkp(src, trg):
+    try:
+        os.symlink(src, trg)
+    except Exception as e:
+        if e.errno != 17:
+            raise
 
 def initialize_genesis():
     if not os.path.exists('/opt/confluent/genesis/x86_64/boot/kernel'):
@@ -89,30 +100,33 @@ def initialize_genesis():
         return retval[1]
     retcode = 0
     try:
+        util.mkdirp('/var/lib/confluent', 0o755)
         if hasconfluentuser:
+            os.chown('/var/lib/confluent', hasconfluentuser.pw_uid, -1)
             os.setgid(hasconfluentuser.pw_gid)
             os.setuid(hasconfluentuser.pw_uid)
         os.umask(0o22)
-        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
-        os.makedirs('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
-        os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
+        util.mkdirp('/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot', 0o755)
+        util.mkdirp('/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs', 0o755)
+        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/BOOTX64.EFI',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/BOOTX64.EFI')
-        os.symlink('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
+        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/grubx64.efi')
-        os.symlink('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
+        symlinkp('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/distribution')
-        os.symlink('/var/lib/confluent/public/site/initramfs.cpio',
+        symlinkp('/var/lib/confluent/public/site/initramfs.cpio',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/site.cpio')
-        os.symlink('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
+        symlinkp('/opt/confluent/lib/osdeploy/genesis/initramfs/addons.cpio',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/addons.cpio')
-        os.symlink('/opt/confluent/genesis/x86_64/boot/kernel',
+        symlinkp('/opt/confluent/genesis/x86_64/boot/kernel',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/kernel')
-        shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/ansible/',
-                        '/var/lib/confluent/public/os/genesis-x86_64/ansible/')
-        shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
-                        '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
-        shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
-                       '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
+        if not os.path.exists('/var/lib/confluent/public/os/genesis-x86_64/ansible/'):
+            shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/ansible/',
+                            '/var/lib/confluent/public/os/genesis-x86_64/ansible/')
+            shutil.copytree('/opt/confluent/lib/osdeploy/genesis/profiles/default/scripts/',
+                            '/var/lib/confluent/public/os/genesis-x86_64/scripts/')
+            shutil.copyfile('/opt/confluent/lib/osdeploy/genesis/profiles/default/profile.yaml',
+                            '/var/lib/confluent/public/os/genesis-x86_64/profile.yaml')
     except Exception as e:
         sys.stderr.write(str(e) + '\n')
         retcode = 1
@@ -373,9 +387,14 @@ def initialize(cmdset):
         for rsp in c.read('/uuid'):
             uuid = rsp.get('uuid', {}).get('value', None)
             if uuid:
-                with open('confluent_uuid', 'w') as uuidout:
-                    uuidout.write(uuid)
-                    uuidout.write('\n')
+                oum = os.umask(0o11)
+                try:
+                    with open('confluent_uuid', 'w') as uuidout:
+                        uuidout.write(uuid)
+                        uuidout.write('\n')
+                    os.chmod('confluent_uuid', 0o644)
+                finally:
+                    os.umask(oum)
     totar.append('confluent_uuid')
     topack.append('confluent_uuid')
     if os.path.exists('ssh'):
@@ -403,7 +422,17 @@ def initialize(cmdset):
         if res:
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
-    os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
+    oum = os.umask(0o22)
+    try:
+        os.rename(tmpname, '/var/lib/confluent/public/site/initramfs.cpio')
+        os.chmod('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
+    finally:
+        os.umask(oum)
+    oum = os.umask(0o22)
+    try:
+        os.chmod('/var/lib/confluent/public/site/initramfs.cpio', 0o644)
+    finally:
+        os.umask(oum)
     if cmdset.g:
         updateboot('genesis-x86_64')
     if totar:
@@ -411,6 +440,11 @@ def initialize(cmdset):
         tarcmd = ['tar', '-czf', tmptarname] + totar
         subprocess.check_call(tarcmd)
         os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
+        oum = os.umask(0o22)
+        try:
+            os.chmod('/var/lib/confluent/public/site/initramfs.tgz', 0o644)
+        finally:
+            os.umask(0o22)
     os.chdir(opath)
     print('Site initramfs content packed successfully')
 
@@ -421,6 +455,9 @@ def initialize(cmdset):
 
 
 def updateboot(profilename):
+    if not os.path.exists('/var/lib/confluent/public/site/initramfs.cpio'):
+        emprint('Must generate site content first (TLS (-t) and/or SSH (-s))')
+        return 1
     c = client.Command()
     for rsp in c.update('/deployment/profiles/{0}'.format(profilename),
             {'updateboot': 1}):
@@ -464,7 +501,7 @@ def oslist():
     print("")
 
 
-def osimport(imagefile):
+def osimport(imagefile, checkonly=False, custname=None):
     c = client.Command()
     imagefile = os.path.abspath(imagefile)
     if c.unixdomain:
@@ -475,11 +512,33 @@ def osimport(imagefile):
             pass
     importing = False
     shortname = None
-    for rsp in c.create('/deployment/importing/', {'filename': imagefile}):
+    apipath = '/deployment/importing/'
+    if checkonly:
+        apipath = '/deployment/fingerprint/'
+    apiargs = {'filename': imagefile}
+    if custname:
+        apiargs['custname'] = custname
+    for rsp in c.create(apipath, apiargs):
         if 'target' in rsp:
             importing = True
             shortname = rsp['name']
             print('Importing from {0} to {1}'.format(imagefile, rsp['target']))
+        elif 'targetpath' in rsp:
+            tpath = rsp.get('targetpath', None)
+            tname = rsp.get('name', None)
+            oscat = rsp.get('oscategory', None)
+            if tpath:
+                print('Detected target directory: ' + tpath)
+            if tname:
+                print('Detected distribution name: ' + tname)
+            if oscat:
+                print('Detected OS category: ' + oscat)
+            for err in rsp.get('errors', []):
+                sys.stderr.write('Error: ' + err + '\n')
+
+        elif 'error' in rsp:
+            sys.stderr.write(rsp['error'] + '\n')
+            sys.exit(rsp.get('errorcode', 1))
         else:
             print(repr(rsp))
     try:

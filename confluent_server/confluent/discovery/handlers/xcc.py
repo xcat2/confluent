@@ -247,6 +247,10 @@ class NodeHandler(immhandler.NodeHandler):
             if rsp.status == 200:
                 pwdchanged = True
                 password = newpassword
+                wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
+                if '_csrf_token' in wc.cookies:
+                    wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+                wc.grab_json_response_with_status('/api/providers/logout')
             else:
                 if rspdata.get('locktime', 0) > 0:
                     raise LockedUserException(
@@ -280,6 +284,7 @@ class NodeHandler(immhandler.NodeHandler):
                 rsp.read()
                 if rsp.status != 200:
                     return (None, None)
+                wc.grab_json_response_with_status('/api/providers/logout')
                 self._currcreds = (username, newpassword)
                 wc.set_basic_credentials(username, newpassword)
                 pwdchanged = True
@@ -434,6 +439,7 @@ class NodeHandler(immhandler.NodeHandler):
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,,,'.format(uid, username)})
                 if status == 200 and rsp.get('return', 0) == 13:
+                    wc.grab_json_response('/api/providers/logout')
                     wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
                     status = 503
                     while status != 200:
@@ -442,10 +448,13 @@ class NodeHandler(immhandler.NodeHandler):
                             {'UserName': username}, method='PATCH')
                         if status != 200:
                             rsp = json.loads(rsp)
-                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError'):
-                                eventlet.sleep(10)
+                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError'):
+                                eventlet.sleep(4)
                             else:
                                 break
+                    self.tmppasswd = None
+                    self._currcreds = (username, passwd)
+                    return
             self.tmppasswd = None
         wc.grab_json_response('/api/providers/logout')
         self._currcreds = (username, passwd)
@@ -632,3 +641,4 @@ def remote_nodecfg(nodename, cfm):
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)
     nh.config(nodename)
+

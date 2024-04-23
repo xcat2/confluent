@@ -60,6 +60,7 @@ cp /custom-installation/confluent/bin/apiclient /target/opt/confluent/bin
 mount -o bind /dev /target/dev
 mount -o bind /proc /target/proc
 mount -o bind /sys /target/sys
+mount -o bind /sys/firmware/efi/efivars /target/sys/firmware/efi/efivars
 if [ 1 = $updategrub ]; then
     chroot /target update-grub
 fi

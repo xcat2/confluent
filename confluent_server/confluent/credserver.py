@@ -127,14 +127,15 @@ class CredServer(object):
                 if hmacval != hmac.new(hmackey, etok, hashlib.sha256).digest():
                     client.close()
                     return
-            cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}, 'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
-            if hmackey and apiarmed != 'continuous':
-                self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
-            if apiarmed == 'continuous':
-                del cfgupdate[nodename]['deployment.apiarmed']
+            cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}}}
             self.cfm.set_node_attributes(cfgupdate)
             client.recv(2)  # drain end of message
             client.send(b'\x05\x00') # report success
+            if hmackey and apiarmed != 'continuous':
+                self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
+            if apiarmed != 'continuous':
+                tokclear = {nodename: {'deployment.sealedapikey': '', 'deployment.apiarmed': ''}}
+                self.cfm.set_node_attributes(tokclear)
         finally:
             client.close()
 

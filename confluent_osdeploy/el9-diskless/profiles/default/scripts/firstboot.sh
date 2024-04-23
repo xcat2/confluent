@@ -9,9 +9,16 @@ HOME=$(getent passwd $(whoami)|cut -d: -f 6)
 export HOME
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
-confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ -z "$confluent_mgr" ] || [ "$confluent_mgr" == "null" ] || ! ping -c 1 $confluent_mgr >& /dev/null; then
+    confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+fi
+confluent_websrv=$confluent_mgr
+if [[ "$confluent_mgr" == *:* ]]; then
+    confluent_websrv="[$confluent_mgr]"
+fi
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
-export nodename confluent_mgr confluent_profile
+export nodename confluent_mgr confluent_profile confluent_websrv
 . /etc/confluent/functions
 (
 exec >> /var/log/confluent/confluent-firstboot.log
@@ -34,7 +41,7 @@ if [ ! -f /etc/confluent/firstboot.ran ]; then
     run_remote_config firstboot.d
 fi
 
-curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
+curl -X POST -d 'status: complete' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_websrv/confluent-api/self/updatestatus
 systemctl disable firstboot
 rm /etc/systemd/system/firstboot.service
 rm /etc/confluent/firstboot.ran

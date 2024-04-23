@@ -102,9 +102,9 @@ def run():
         cmdv = ['ssh', sshnode] + cmdvbase + cmdstorun[0]
         if currprocs < concurrentprocs:
             currprocs += 1
-            run_cmdv(node, cmdv, all, pipedesc)
+            run_cmdv(sshnode, cmdv, all, pipedesc)
         else:
-            pendingexecs.append((node, cmdv))        
+            pendingexecs.append((sshnode, cmdv))
     if not all or exitcode:
         sys.exit(exitcode)
     rdy, _, _ = select.select(all, [], [], 10)

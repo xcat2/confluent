@@ -16,6 +16,7 @@ if [ -z "$confluent_mgr" ]; then
 fi
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 timedatectl set-timezone $(grep ^timezone: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+hostnamectl set-hostname $nodename
 export nodename confluent_mgr confluent_profile
 . /etc/confluent/functions
 mkdir -p /var/log/confluent

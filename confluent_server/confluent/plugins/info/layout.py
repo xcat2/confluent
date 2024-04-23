@@ -93,8 +93,14 @@ def retrieve(nodes, element, configmanager, inputdata):
             '/noderange/{0}/description'.format(needheight),
             'retrieve', configmanager,
             inputdata=None):
+                if not hasattr(rsp, 'kvpairs'):
+                    results['errors'].append((rsp.node, rsp.error))
+                    continue
                 kvp = rsp.kvpairs
                 for node in kvp:
                     allnodedata[node]['height'] = kvp[node]['height']
+    for node in allnodedata:
+        if 'height' not in allnodedata[node]:
+            allnodedata[node]['height'] = 1
     yield msg.Generic(results)
 

@@ -49,7 +49,6 @@ _handled_consoles = {}
 
 _tracelog = None
 _bufferdaemon = None
-_bufferlock = None
 
 try:
     range = xrange
@@ -62,39 +61,38 @@ def chunk_output(output, n):
         yield output[i:i + n]
 
 def get_buffer_output(nodename):
-    out = _bufferdaemon.stdin
-    instream = _bufferdaemon.stdout
+    out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+    out.connect("\x00confluent-vtbuffer")
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
     outdata = bytearray()
-    with _bufferlock:
-        out.write(struct.pack('I', len(nodename)))
-        out.write(nodename)
-        out.flush()
-        select.select((instream,), (), (), 30)
-        while not outdata or outdata[-1]:
-            try:
-                chunk = os.read(instream.fileno(), 128)
-            except IOError:
-                chunk = None
-            if chunk:
-                outdata.extend(chunk)
-            else:
-                select.select((instream,), (), (), 0)
-        return bytes(outdata[:-1])
+    out.send(struct.pack('I', len(nodename)))
+    out.send(nodename)
+    select.select((out,), (), (), 30)
+    while not outdata or outdata[-1]:
+        try:
+            chunk = os.read(out.fileno(), 128)
+        except IOError:
+            chunk = None
+        if chunk:
+            outdata.extend(chunk)
+        else:
+            select.select((out,), (), (), 0)
+    return bytes(outdata[:-1])
 
 
 def send_output(nodename, output):
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
-    with _bufferlock:
-        _bufferdaemon.stdin.write(struct.pack('I', len(nodename) | (1 << 29)))
-        _bufferdaemon.stdin.write(nodename)
-        _bufferdaemon.stdin.flush()
-        for chunk in chunk_output(output, 8192):
-            _bufferdaemon.stdin.write(struct.pack('I', len(chunk) | (2 << 29)))
-            _bufferdaemon.stdin.write(chunk)
-            _bufferdaemon.stdin.flush()
+    out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+    out.connect("\x00confluent-vtbuffer")
+    out.send(struct.pack('I', len(nodename) | (1 << 29)))
+    out.send(nodename)
+    for chunk in chunk_output(output, 8192):
+        out.send(struct.pack('I', len(chunk) | (2 << 29)))
+        out.send(chunk)
 
 def _utf8_normalize(data, decoder):
     # first we give the stateful decoder a crack at the byte stream,
@@ -174,6 +172,9 @@ class ConsoleHandler(object):
         if not self._isondemand:
             self.connectstate = 'connecting'
             eventlet.spawn(self._connect)
+
+    def resize(self, width, height):
+        return None
 
     def _get_retry_time(self):
         clustsize = len(self.cfgmgr._cfgstore['nodes'])
@@ -600,15 +601,10 @@ def _start_tenant_sessions(cfm):
 def initialize():
     global _tracelog
     global _bufferdaemon
-    global _bufferlock
-    _bufferlock = semaphore.Semaphore()
     _tracelog = log.Logger('trace')
     _bufferdaemon = subprocess.Popen(
-        ['/opt/confluent/bin/vtbufferd'], bufsize=0, stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE)
-    fl = fcntl.fcntl(_bufferdaemon.stdout.fileno(), fcntl.F_GETFL)
-    fcntl.fcntl(_bufferdaemon.stdout.fileno(),
-                fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL)
 
 def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
@@ -622,6 +618,8 @@ def connect_node(node, configmanager, username=None, direct=True, width=80,
     myname = collective.get_myname()
     if myc and myc != collective.get_myname() and direct:
         minfo = configmodule.get_collective_member(myc)
+        if not minfo:
+            raise Exception('Unable to get collective member for {}'.format(node))
         return ProxyConsole(node, minfo, myname, configmanager, username,
                             width, height)
     consk = (node, configmanager.tenant)

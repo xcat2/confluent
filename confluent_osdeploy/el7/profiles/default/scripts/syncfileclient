@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import pwd
+import time
 import grp
 try:
     from importlib.machinery import SourceFileLoader
@@ -223,6 +224,7 @@ def synchronize():
         if status == 202:
             lastrsp = ''
             while status != 204:
+                time.sleep(2)
                 status, rsp = ac.grab_url_with_status('/confluent-api/self/remotesyncfiles')
                 if not isinstance(rsp, str):
                     rsp = rsp.decode('utf8')
