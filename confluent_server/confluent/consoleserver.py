@@ -306,7 +306,7 @@ class ConsoleHandler(object):
 
     def _disconnect(self):
         if self.connectionthread:
-            self.connectionthread.kill()
+            self.connectionthread.cancel()
             self.connectionthread = None
         # clear the terminal buffer when disconnected
         self.clearbuffer()
@@ -328,7 +328,7 @@ class ConsoleHandler(object):
         if not self._is_local:
             return
         if self.connectionthread:
-            self.connectionthread.kill()
+            self.connectionthread.cancel()
             self.connectionthread = None
         self.connectionthread = util.spawn(self._connect_backend())
 

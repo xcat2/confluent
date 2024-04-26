@@ -647,7 +647,7 @@ def detected_models():
             yield info['modelnumber']
 
 
-def _recheck_nodes(nodeattribs, configmanager):
+async def _recheck_nodes(nodeattribs, configmanager):
     if not cfm.config_is_ready():
         return
     if rechecklock.locked():
@@ -1538,11 +1538,11 @@ nodeaddhandler = None
 needaddhandled = False
 
 
-def _handle_nodelist_change(configmanager):
+async def _handle_nodelist_change(configmanager):
     global needaddhandled
     global nodeaddhandler
     macmap.vintage = 0  # the current mac map is probably inaccurate
-    _recheck_nodes((), configmanager)
+    await _recheck_nodes((), configmanager)
     if needaddhandled:
         needaddhandled = False
         nodeaddhandler = eventlet.spawn(_handle_nodelist_change, configmanager)
@@ -1550,7 +1550,7 @@ def _handle_nodelist_change(configmanager):
         nodeaddhandler = None
 
 
-def newnodes(added, deleting, renamed, configmanager):
+async def newnodes(added, deleting, renamed, configmanager):
     global attribwatcher
     global needaddhandled
     global nodeaddhandler
@@ -1573,7 +1573,7 @@ def newnodes(added, deleting, renamed, configmanager):
     if nodeaddhandler:
         needaddhandled = True
     else:
-        nodeaddhandler = eventlet.spawn(_handle_nodelist_change, configmanager)
+        nodeaddhandler = util.spawn(_handle_nodelist_change(configmanager))
 
 
 

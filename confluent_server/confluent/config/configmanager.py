@@ -57,6 +57,7 @@ try:
 except ModuleNotFoundError:
     import dbm
 import ast
+import asyncio
 import base64
 from binascii import hexlify
 import os
@@ -81,11 +82,9 @@ try:
 except ModuleNotFoundError:
     import pickle as cPickle
 import errno
-import eventlet
 import eventlet.event as event
 import eventlet.green.select as select
-import eventlet.green.threading as gthread
-import eventlet.green.subprocess as subprocess
+import socket
 import fnmatch
 import hashlib
 import json
@@ -107,10 +106,10 @@ except NameError:
 _masterkey = None
 _masterintegritykey = None
 _dirtylock = threading.RLock()
-_leaderlock = gthread.RLock()
+_leaderlock = asyncio.Lock()
 _synclock = threading.RLock()
-_rpclock = gthread.RLock()
-_initlock = gthread.RLock()
+_rpclock = asyncio.Lock()
+_initlock = asyncio.Lock()
 _followerlocks = {}
 _config_areas = ('nodegroups', 'nodes', 'usergroups', 'users')
 tracelog = None
@@ -131,6 +130,7 @@ _attraliases = {
 _validroles = ['Administrator', 'Operator', 'Monitor', 'Stub']
 
 membership_callback = None
+
 
 def attrib_supports_expression(attrib):
     if not isinstance(attrib, str):
@@ -206,9 +206,11 @@ def _format_key(key, password=None):
         return {"unencryptedvalue": key}
 
 
-def _do_notifier(cfg, watcher, callback):
+async def _do_notifier(cfg, watcher, callback):
     try:
-        callback(nodeattribs=watcher['nodeattrs'], configmanager=cfg)
+        cbres = callback(nodeattribs=watcher['nodeattrs'], configmanager=cfg)
+        if cbres is not None:
+            await cbres
     except Exception:
         logException()
 
@@ -338,44 +340,41 @@ def check_quorum():
         raise exc.DegradedCollective()
 
 
-def exec_on_leader(function, *args):
+async def exec_on_leader(function, *args):
     if isinstance(cfgleader, bool):
         raise exc.DegradedCollective()
     xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     while xid in _pendingchangesets:
         xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
-    _pendingchangesets[xid] = event.Event()
+    cloop = asyncio.get_event_loop()
+    _pendingchangesets[xid] = cloop.create_future()  # future instead of event
     rpcpayload = msgpack.packb({'function': function, 'args': args,
                                 'xid': xid}, use_bin_type=False)
     rpclen = len(rpcpayload)
-    cfgleader.sendall(struct.pack('!Q', rpclen))
-    cfgleader.sendall(rpcpayload)
-    retv = _pendingchangesets[xid].wait()
+    cfgleader[1].write(struct.pack('!Q', rpclen))
+    cfgleader[1].write(rpcpayload)
+    await cfgleader[1].drain()
+    retv = await _pendingchangesets[xid]
     del _pendingchangesets[xid]
     return retv
 
 
-def exec_on_followers(fnname, *args):
-    pushes = eventlet.GreenPool()
+async def exec_on_followers(fnname, *args):
     # Check health of collective prior to attempting
-    for _ in pushes.starmap(
-            _push_rpc, [(cfgstreams[s]['stream'], b'') for s in cfgstreams]):
-        pass
+    await asyncio.gather(*[_push_rpc(cfgstreams[s]['stream'], b'') for s in cfgstreams])
     if not has_quorum():
         # the leader counts in addition to registered streams
         raise exc.DegradedCollective()
-    exec_on_followers_unconditional(fnname, *args)
+    await exec_on_followers_unconditional(fnname, *args)
 
 
-def exec_on_followers_unconditional(fnname, *args):
+async def exec_on_followers_unconditional(fnname, *args):
     global _txcount
-    pushes = eventlet.GreenPool()
     _txcount += 1
     payload = msgpack.packb({'function': fnname, 'args': args,
                              'txcount': _txcount}, use_bin_type=False)
-    for _ in pushes.starmap(
-            _push_rpc, [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
-        pass
+    await asyncio.gather(
+        *[_push_rpc(cfgstreams[s]['stream'], payload) for s in cfgstreams])
 
 
 def logException():
@@ -387,9 +386,12 @@ def logException():
                  event=confluent.log.Events.stacktrace)
 
 
-def _do_add_watcher(watcher, added, configmanager, renamed=()):
+async def _do_add_watcher(watcher, added, configmanager, renamed=()):
     try:
-        watcher(added=added, deleting=(), renamed=renamed, configmanager=configmanager)
+        watched = watcher(added=added, deleting=(), renamed=renamed, configmanager=configmanager)
+        if watched is None:
+            return
+        await watched
     except Exception:
         logException()
 
@@ -417,12 +419,14 @@ def init_masterkey(password=None, autogen=True):
     #        password=password))
 
 
-def _push_rpc(stream, payload):
-    with _rpclock:
+async def _push_rpc(stream, payload):
+    async with _rpclock:
         try:
-            stream.sendall(struct.pack('!Q', len(payload)))
+            stream[1].write(struct.pack('!Q', len(payload)))
             if len(payload):
-                stream.sendall(payload)
+                stream[1].write(payload)
+            print("sent payload: " + repr(payload))
+            await stream[1].drain()
             return True
         except Exception:
             logException()
@@ -664,16 +668,15 @@ def has_quorum():
     return voters > allvoters // 2
     
 cfgstreams = {}
-def relay_slaved_requests(name, listener):
+async def relay_slaved_requests(name, listener):
     global cfgleader
     global _hasquorum
-    pushes = eventlet.GreenPool()
     if name not in _followerlocks:
-        _followerlocks[name] = gthread.RLock()
+        _followerlocks[name] = asyncio.Lock()
     meminfo = get_collective_member(name)
-    with _followerlocks[name]:
+    async with _followerlocks[name]:
         try:
-            stop_following()
+            await stop_following()
             if name in cfgstreams:
                 try:
                     cfgstreams[name]['stream'].close()
@@ -690,15 +693,12 @@ def relay_slaved_requests(name, listener):
                 if _newquorum is not None:
                     _hasquorum = _newquorum
                 payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
-                for _ in pushes.starmap(
-                        _push_rpc,
-                        [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
-                    pass
+                await asyncio.gather(*[_push_rpc(cfgstreams[s]['stream'], payload) for s in cfgstreams])
                 _newquorum = has_quorum()
             _hasquorum = _newquorum
             if _hasquorum and _pending_collective_updates:
                 apply_pending_collective_updates()
-            msg = lh.get_next_msg()
+            msg = await lh.get_next_msg()
             while msg:
                 if name not in cfgstreams:
                     raise Exception("Unexpected loss of node in followers: " + name)
@@ -730,7 +730,7 @@ def relay_slaved_requests(name, listener):
                         if not res:
                             break
                 try:
-                    msg = lh.get_next_msg()
+                    msg = await lh.get_next_msg()
                 except Exception:
                     msg = None
         finally:
@@ -745,23 +745,21 @@ def relay_slaved_requests(name, listener):
             if cfgstreams:
                 _hasquorum = has_quorum()
                 payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
-                for _ in pushes.starmap(
-                        _push_rpc,
-                        [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
-                    pass
+                await asyncio.gather(
+                    *[_push_rpc(cfgstreams[s]['stream'], payload) for s in cfgstreams])
             if membership_callback:
                 membership_callback()
             if not cfgstreams and not cfgleader:  # last one out, set cfgleader to boolean to mark dead collective
-                stop_following(True)
+                await stop_following(True)
                 return False
             return True
 
 lastheartbeat = None
-def check_leader():
-    _push_rpc(cfgleader, b'')
+async def check_leader():
+    await _push_rpc(cfgleader, b'')
     tries = 0
     while tries < 30:
-        eventlet.sleep(0.1)
+        await asyncio.sleep(0.1)
         tries += 1
         if lastheartbeat and lastheartbeat > (confluent.util.monotonic_time() - 3):
             return True
@@ -774,25 +772,38 @@ class StreamHandler(object):
         self.expiry = self.keepalive + 40
 
 
-    def get_next_msg(self):
+    async def get_next_msg(self):
         r = (False,)
+        msg = None
         try:
-            while not r[0]:
-                r = select.select(
-                    (self.sock,), (), (),
-                    self.keepalive - confluent.util.monotonic_time())
-                if confluent.util.monotonic_time() > self.expiry:
-                    return None
-                if confluent.util.monotonic_time() > self.keepalive:
-                    res = _push_rpc(self.sock, b'')  # nulls are a keepalive
-                    if not res:
+            while not msg:
+                try:
+                    msg = await asyncio.wait_for(self.sock[0].read(), timeout=self.keepalive - confluent.util.monotonic_time())
+                except TimeoutError:
+                    msg = None
+                    if confluent.util.monotonic_time() > self.expiry:
                         return None
-                    #TODO: this test can work fine even if the other end is
-                    # gone, go to a more affirmative test to more quickly
-                    # detect outage to peer
-                    self.keepalive = confluent.util.monotonic_time() + 20
-            self.expiry = confluent.util.monotonic_time() + 60
-            msg = self.sock.recv(8)
+                    if confluent.util.monotonic_time() > self.keepalive:
+                        res = await _push_rpc(self.sock, b'')  # nulls are a keepalive
+                        if not res:
+                            return None
+                        self.keepalive = confluent.util.monotonic_time() + 20
+            # while not r[0]:
+            #    r = select.select(
+            #        (self.sock,), (), (),
+            #        self.keepalive - confluent.util.monotonic_time())
+            #    if confluent.util.monotonic_time() > self.expiry:
+            #        return None
+            #    if confluent.util.monotonic_time() > self.keepalive:
+            #        res = await _push_rpc(self.sock, b'')  # nulls are a keepalive
+            #        if not res:
+            #            return None
+            #        #TODO: this test can work fine even if the other end is
+            #        # gone, go to a more affirmative test to more quickly
+            #        # detect outage to peer
+            #        self.keepalive = confluent.util.monotonic_time() + 20
+            #self.expiry = confluent.util.monotonic_time() + 60
+            #msg = self.sock.recv(8)
         except Exception as e:
             msg = None
         return msg
@@ -801,8 +812,8 @@ class StreamHandler(object):
         self.sock = None
 
 
-def stop_following(replacement=None):
-    with _leaderlock:
+async def stop_following(replacement=None):
+    async with _leaderlock:
         global cfgleader
         if cfgleader and not isinstance(cfgleader, bool):
             try:
@@ -811,14 +822,14 @@ def stop_following(replacement=None):
                 pass
         cfgleader = replacement
 
-def stop_leading(newleader=None):
+async def stop_leading(newleader=None):
     rpcpayload = None
     if newleader is not None:
         rpcpayload = msgpack.packb({'newleader': newleader}, use_bin_type=False)
     for stream in list(cfgstreams):
         try:
             if rpcpayload is not None:
-                _push_rpc(cfgstreams[stream]['stream'], rpcpayload)
+                await _push_rpc(cfgstreams[stream]['stream'], rpcpayload)
             cfgstreams[stream]['stream'].close()
         except Exception:
             pass
@@ -849,15 +860,15 @@ def rollback_clear():
     ConfigManager.wait_for_sync(True)
 
 
-def clear_configuration():
+async def clear_configuration():
     global _cfgstore
     global _txcount
     global _oldcfgstore
     global _oldtxcount
     global _ready
     _ready = False
-    stop_leading()
-    stop_following()
+    await stop_leading()
+    await stop_following()
     _oldcfgstore = _cfgstore
     _oldtxcount = _txcount
     _cfgstore = {}
@@ -891,23 +902,23 @@ def commit_clear():
 cfgleader = None
 
 
-def follow_channel(channel):
+async def follow_channel(channel):
     global _txcount
     global _hasquorum
     global lastheartbeat
     try:
-        stop_leading()
-        stop_following(channel)
+        await stop_leading()
+        await stop_following(channel)
         lh = StreamHandler(channel)
-        msg = lh.get_next_msg()
+        msg = await lh.get_next_msg()
         while msg:
+            msg, rpc = msg[:8], msg[8:]
             sz = struct.unpack('!Q', msg)[0]
             if sz == 0:
                 lastheartbeat = confluent.util.monotonic_time()
             else:
-                rpc = b''
                 while len(rpc) < sz:
-                    nrpc = channel.recv(sz - len(rpc))
+                    nrpc = await channel[0].read(sz - len(rpc))
                     if not nrpc:
                         raise Exception('Truncated message error')
                     rpc += nrpc
@@ -930,36 +941,36 @@ def follow_channel(channel):
                             exc = ValueError(excstr)
                         else:
                             exc = Exception(excstr)
-                        _pendingchangesets[rpc['xid']].send_exception(exc)
+                        _pendingchangesets[rpc['xid']].set_exception(exc)
                     else:
-                        _pendingchangesets[rpc['xid']].send(rpc.get('ret', None))
+                        _pendingchangesets[rpc['xid']].set_result(rpc.get('ret', None))
                 if 'quorum' in rpc:
                     _hasquorum = rpc['quorum']
-                res = _push_rpc(channel, b'')  # use null as ACK
+                res = await _push_rpc(channel, b'')  # use null as ACK
                 if not res:
                     break
-            msg = lh.get_next_msg()
+            msg = await lh.get_next_msg()
     finally:
         # mark the connection as broken
         if cfgstreams:
-            stop_following(None)
+            await stop_following(None)
         else:
-            stop_following(True)
+            await stop_following(True)
     return {}
 
 
-def add_collective_member(name, address, fingerprint, role=None):
+async def add_collective_member(name, address, fingerprint, role=None):
     if cfgleader:
-        return exec_on_leader('add_collective_member', name, address, fingerprint, role)
+        return await exec_on_leader('add_collective_member', name, address, fingerprint, role)
     if cfgstreams:
-        exec_on_followers('_true_add_collective_member', name, address, fingerprint, True, role)
+        await exec_on_followers('_true_add_collective_member', name, address, fingerprint, True, role)
     _true_add_collective_member(name, address, fingerprint, role=role)
 
-def del_collective_member(name):
+async def del_collective_member(name):
     if cfgleader and not isinstance(cfgleader, bool):
-        return exec_on_leader('del_collective_member', name)
+        return await exec_on_leader('del_collective_member', name)
     if cfgstreams:
-        exec_on_followers_unconditional('_true_del_collective_member', name)
+        await exec_on_followers_unconditional('_true_del_collective_member', name)
     _true_del_collective_member(name)
 
 def _true_del_collective_member(name, sync=True):
@@ -1290,7 +1301,7 @@ class ConfigManager(object):
         self.clientfiles = {}
         global _cfgstore
         self.inrestore = False
-        with _initlock:
+        if True: # with _initlock:
             if _cfgstore is None:
                 init()
             self.decrypt = decrypt
@@ -1544,7 +1555,7 @@ class ConfigManager(object):
         except KeyError:
             return None
 
-    def set_usergroup(self, groupname, attributemap):
+    async def set_usergroup(self, groupname, attributemap):
         """Set usergroup attribute(s)
 
         :param groupname: the name of teh group to modify
@@ -1554,7 +1565,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_set_usergroup', self.tenant,
                                   groupname, attributemap)
         if cfgstreams:
-            exec_on_followers('_rpc_set_usergroup', self.tenant, groupname,
+            await exec_on_followers('_rpc_set_usergroup', self.tenant, groupname,
                               attributemap)
         self._true_set_usergroup(groupname, attributemap)
 
@@ -1573,7 +1584,7 @@ class ConfigManager(object):
         _mark_dirtykey('usergroups', groupname, self.tenant)
         self._bg_sync_to_file()
 
-    def create_usergroup(self, groupname, role="Administrator"):
+    async def create_usergroup(self, groupname, role="Administrator"):
         """Create a new user
 
         :param groupname: The name of the user group
@@ -1585,7 +1596,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_create_usergroup', self.tenant,
                                   groupname, role)
         if cfgstreams:
-            exec_on_followers('_rpc_create_usergroup', self.tenant, groupname,
+            await exec_on_followers('_rpc_create_usergroup', self.tenant, groupname,
                               role)
         self._true_create_usergroup(groupname, role)
 
@@ -1609,11 +1620,11 @@ class ConfigManager(object):
         _mark_dirtykey('usergroups', groupname, self.tenant)
         self._bg_sync_to_file()
 
-    def del_usergroup(self, name):
+    async def del_usergroup(self, name):
         if cfgleader:
             return exec_on_leader('_rpc_master_del_usergroup', self.tenant, name)
         if cfgstreams:
-            exec_on_followers('_rpc_del_usergroup', self.tenant, name)
+            await exec_on_followers('_rpc_del_usergroup', self.tenant, name)
         self._true_del_usergroup(name)
 
     def _true_del_usergroup(self, name):
@@ -1622,7 +1633,7 @@ class ConfigManager(object):
             _mark_dirtykey('usergroups', name, self.tenant)
         self._bg_sync_to_file()
 
-    def set_user(self, name, attributemap):
+    async def set_user(self, name, attributemap):
         """Set user attribute(s)
 
         :param name: The login name of the user
@@ -1632,7 +1643,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_set_user', self.tenant, name,
                                   attributemap)
         if cfgstreams:
-            exec_on_followers('_rpc_set_user', self.tenant, name, attributemap)
+            await exec_on_followers('_rpc_set_user', self.tenant, name, attributemap)
         self._true_set_user(name, attributemap)
 
     def _true_set_user(self, name, attributemap):
@@ -1660,11 +1671,11 @@ class ConfigManager(object):
         _mark_dirtykey('users', name, self.tenant)
         self._bg_sync_to_file()
 
-    def del_user(self, name):
+    async def del_user(self, name):
         if cfgleader:
             return exec_on_leader('_rpc_master_del_user', self.tenant, name)
         if cfgstreams:
-            exec_on_followers('_rpc_del_user', self.tenant, name)
+            await exec_on_followers('_rpc_del_user', self.tenant, name)
         self._true_del_user(name)
 
     def _true_del_user(self, name):
@@ -1673,7 +1684,7 @@ class ConfigManager(object):
             _mark_dirtykey('users', name, self.tenant)
         self._bg_sync_to_file()
 
-    def create_user(self, name,
+    async def create_user(self, name,
                     role="Administrator", uid=None, displayname=None,
                     attributemap=None):
         """Create a new user
@@ -1689,7 +1700,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_create_user', self.tenant,
                                   name, role, uid, displayname, attributemap)
         if cfgstreams:
-            exec_on_followers('_rpc_create_user', self.tenant, name,
+            await exec_on_followers('_rpc_create_user', self.tenant, name,
                               role, uid, displayname, attributemap)
         self._true_create_user(name, role, uid, displayname, attributemap)
 
@@ -1903,7 +1914,7 @@ class ConfigManager(object):
     def add_group_attributes(self, attribmap):
         self.set_group_attributes(attribmap, autocreate=True)
 
-    def set_group_attributes(self, attribmap, autocreate=False):
+    async def set_group_attributes(self, attribmap, autocreate=False):
         for group in attribmap:
             curr = attribmap[group]
             for attrib in curr:
@@ -1922,7 +1933,7 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_set_group_attributes',
                                   self.tenant, attribmap, autocreate)
         if cfgstreams:
-            exec_on_followers('_rpc_set_group_attributes', self.tenant,
+            await exec_on_followers('_rpc_set_group_attributes', self.tenant,
                               attribmap, autocreate)
         self._true_set_group_attributes(attribmap, autocreate)
 
@@ -2036,12 +2047,12 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
-    def clear_group_attributes(self, groups, attributes):
+    async def clear_group_attributes(self, groups, attributes):
         if cfgleader:
             return exec_on_leader('_rpc_master_clear_group_attributes',
                                   self.tenant, groups, attributes)
         if cfgstreams:
-            exec_on_followers('_rpc_clear_group_attributes', self.tenant,
+            await exec_on_followers('_rpc_clear_group_attributes', self.tenant,
                               groups, attributes)
         self._true_clear_group_attributes(groups, attributes)
 
@@ -2155,23 +2166,25 @@ class ConfigManager(object):
         for watcher in notifdata:
             watcher = notifdata[watcher]
             callback = watcher['callback']
-            eventlet.spawn_n(_do_notifier, self, watcher, callback)
+            confluent.util.spawn(_do_notifier(self, watcher, callback))
 
-    def del_nodes(self, nodes):
+    async def del_nodes(self, nodes):
         if isinstance(nodes, set):
             nodes = list(nodes)  # msgpack can't handle set
         if cfgleader:  # slaved to a collective
-            return exec_on_leader('_rpc_master_del_nodes', self.tenant,
-                                  nodes)
+            return await exec_on_leader('_rpc_master_del_nodes', self.tenant,
+                                        nodes)
         if cfgstreams:
-            exec_on_followers('_rpc_del_nodes', self.tenant, nodes)
-        self._true_del_nodes(nodes)
+            await exec_on_followers('_rpc_del_nodes', self.tenant, nodes)
+        await self._true_del_nodes(nodes)
 
-    def _true_del_nodes(self, nodes):
+    async def _true_del_nodes(self, nodes):
         if self.tenant in self._nodecollwatchers:
             for watcher in self._nodecollwatchers[self.tenant]:
                 watcher = self._nodecollwatchers[self.tenant][watcher]
-                watcher(added=(), deleting=nodes, renamed=(), configmanager=self)
+                watched = watcher(added=(), deleting=nodes, renamed=(), configmanager=self)
+                if watched is not None:
+                    await watched
         changeset = {}
         for node in nodes:
             # set a reserved attribute for the sake of the change notification
@@ -2186,12 +2199,12 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
-    def del_groups(self, groups):
+    async def del_groups(self, groups):
         if cfgleader:
             return exec_on_leader('_rpc_master_del_groups', self.tenant,
                                   groups)
         if cfgstreams:
-            exec_on_followers('_rpc_del_groups', self.tenant, groups)
+            await exec_on_followers('_rpc_del_groups', self.tenant, groups)
         self._true_del_groups(groups)
 
     def _true_del_groups(self, groups):
@@ -2205,7 +2218,7 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
-    def clear_node_attributes(self, nodes, attributes, warnings=None):
+    async def clear_node_attributes(self, nodes, attributes, warnings=None):
         if cfgleader:
             mywarnings = exec_on_leader('_rpc_master_clear_node_attributes',
                                   self.tenant, nodes, attributes)
@@ -2213,7 +2226,7 @@ class ConfigManager(object):
                 warnings.extend(mywarnings)
             return
         if cfgstreams:
-            exec_on_followers('_rpc_clear_node_attributes', self.tenant,
+            await exec_on_followers('_rpc_clear_node_attributes', self.tenant,
                               nodes, attributes)
         self._true_clear_node_attributes(nodes, attributes, warnings)
 
@@ -2261,15 +2274,15 @@ class ConfigManager(object):
         self._notif_attribwatchers(changeset)
         self._bg_sync_to_file()
 
-    def add_node_attributes(self, attribmap):
-        self.set_node_attributes(attribmap, autocreate=True)
+    async def add_node_attributes(self, attribmap):
+        await self.set_node_attributes(attribmap, autocreate=True)
 
-    def rename_nodes(self, renamemap):
+    async def rename_nodes(self, renamemap):
         if cfgleader:
             return exec_on_leader('_rpc_master_rename_nodes', self.tenant,
             renamemap)
         if cfgstreams:
-            exec_on_followers('_rpc_rename_nodes', self.tenant, renamemap)
+            await exec_on_followers('_rpc_rename_nodes', self.tenant, renamemap)
         self._true_rename_nodes(renamemap)
 
     def _true_rename_nodes(self, renamemap):
@@ -2309,14 +2322,14 @@ class ConfigManager(object):
             nodecollwatchers = self._nodecollwatchers[self.tenant]
             for watcher in nodecollwatchers:
                 watcher = nodecollwatchers[watcher]
-                eventlet.spawn_n(_do_add_watcher, watcher, (), self, renamemap)
+                confluent.util.spawn(_do_add_watcher(watcher, (), self, renamemap))
         self._bg_sync_to_file()
 
-    def rename_nodegroups(self, renamemap):
+    async def rename_nodegroups(self, renamemap):
         if cfgleader:
             return exec_on_leader('_rpc_master_rename_nodegroups', self.tenant, renamemap)
         if cfgstreams:
-            exec_on_followers('_rpc_rename_nodegroups', self.tenant, renamemap)
+            await exec_on_followers('_rpc_rename_nodegroups', self.tenant, renamemap)
         self._true_rename_groups(renamemap)
 
     def _true_rename_groups(self, renamemap):
@@ -2349,7 +2362,7 @@ class ConfigManager(object):
 
 
 
-    def set_node_attributes(self, attribmap, autocreate=False):
+    async def set_node_attributes(self, attribmap, autocreate=False):
         for node in attribmap:
             curr = attribmap[node]
             for attrib in curr:
@@ -2368,14 +2381,11 @@ class ConfigManager(object):
             return exec_on_leader('_rpc_master_set_node_attributes',
                                         self.tenant, attribmap, autocreate)
         if cfgstreams:
-            exec_on_followers('_rpc_set_node_attributes',
+            await exec_on_followers('_rpc_set_node_attributes',
                                    self.tenant, attribmap, autocreate)
         self._true_set_node_attributes(attribmap, autocreate)
 
     def _true_set_node_attributes(self, attribmap, autocreate):
-        # TODO(jbjohnso): multi mgr support, here if we have peers,
-        # pickle the arguments and fire them off in eventlet
-        # flows to peers, all should have the same result
         newnodes = []
         changeset = {}
         # first do a sanity check of the input upfront
@@ -2499,18 +2509,18 @@ class ConfigManager(object):
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
                 for watcher in nodecollwatchers:
                     watcher = nodecollwatchers[watcher]
-                    eventlet.spawn_n(_do_add_watcher, watcher, newnodes, self)
+                    confluent.util.spawn(_do_add_watcher(watcher, newnodes, self))
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
-    def _load_from_json(self, jsondata, sync=True):
+    async def _load_from_json(self, jsondata, sync=True):
         self.inrestore = True
         try:
-            self._load_from_json_backend(jsondata, sync=True)
+            await self._load_from_json_backend(jsondata, sync=True)
         finally:
             self.inrestore = False
 
-    def _load_from_json_backend(self, jsondata, sync=True):
+    async def _load_from_json_backend(self, jsondata, sync=True):
         """Load fresh configuration data from jsondata
 
         :param jsondata: String of jsondata
@@ -2569,13 +2579,13 @@ class ConfigManager(object):
             if confarea not in tmpconfig:
                 continue
             if confarea == 'nodes':
-                self.set_node_attributes(tmpconfig[confarea], True)
+                await self.set_node_attributes(tmpconfig[confarea], True)
             elif confarea == 'nodegroups':
-                self.set_group_attributes(tmpconfig[confarea], True)
+                await self.set_group_attributes(tmpconfig[confarea], True)
             elif confarea == 'usergroups':
                 for usergroup in tmpconfig[confarea]:
                     role = tmpconfig[confarea][usergroup].get('role', 'Administrator')
-                    self.create_usergroup(usergroup, role=role)
+                    await self.create_usergroup(usergroup, role=role)
             elif confarea == 'users':
                 for user in tmpconfig[confarea]:
                     ucfg = tmpconfig[confarea][user]
@@ -2587,7 +2597,7 @@ class ConfigManager(object):
                             uid = uid.encode('utf8')
                     displayname = ucfg.get('displayname', None)
                     role = ucfg.get('role', None)
-                    self.create_user(user, uid=uid, displayname=displayname, role=role)
+                    await self.create_user(user, uid=uid, displayname=displayname, role=role)
                     for attrname in ('authid', 'authenticators', 'cryptpass'):
                         if attrname in tmpconfig[confarea][user]:
                             self._cfgstore['users'][user][attrname] = tmpconfig[confarea][user][attrname]
@@ -2595,7 +2605,7 @@ class ConfigManager(object):
         if sync:
             self._bg_sync_to_file()
 
-    def _dump_to_json(self, redact=None):
+    async def _dump_to_json(self, redact=None):
         """Dump the configuration in json form to output
 
         password is used to protect the 'secret' attributes in liue of the
@@ -2609,11 +2619,11 @@ class ConfigManager(object):
 
         """
         with open(os.devnull, 'w+') as devnull:
-            worker = subprocess.Popen(
-                [sys.executable, __file__, '-r' if redact else ''],
-                        stdin=devnull, stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE)
-            stdout, stderr = worker.communicate()
+            worker = await asyncio.create_subprocess_exec(
+                sys.executable, __file__, '-r' if redact else '',
+                        stdin=devnull, stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE)
+            stdout, stderr = await worker.communicate()
         return stdout
 
     def _real_dump_to_json(self, redact=None):
@@ -2911,7 +2921,7 @@ def _dump_keys(password, dojson=True):
     return keydata
 
 
-def restore_db_from_directory(location, password):
+async def restore_db_from_directory(location, password):
     try:
         with open(os.path.join(location, 'keys.json'), 'r') as cfgfile:
             keydata = cfgfile.read()
@@ -2939,7 +2949,7 @@ def restore_db_from_directory(location, password):
             raise
     with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
         cfgdata = cfgfile.read()
-        ConfigManager(tenant=None)._load_from_json(cfgdata)
+        await ConfigManager(tenant=None)._load_from_json(cfgdata)
     ConfigManager.wait_for_sync(True)
 
 

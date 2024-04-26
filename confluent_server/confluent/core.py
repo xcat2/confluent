@@ -678,12 +678,12 @@ def delete_nodegroup_collection(collectionpath, configmanager):
         raise Exception("Not implemented")
 
 
-def delete_node_collection(collectionpath, configmanager, isnoderange):
+async def delete_node_collection(collectionpath, configmanager, isnoderange):
     if len(collectionpath) == 2:  # just node
         nodes = [collectionpath[-1]]
         if isnoderange:
             nodes = noderange.NodeRange(nodes[0], configmanager).nodes
-        configmanager.del_nodes(nodes)
+        await configmanager.del_nodes(nodes)
         for node in nodes:
             yield msg.DeletedResource(node)
     else:
@@ -734,7 +734,7 @@ def create_group(inputdata, configmanager):
     yield msg.CreatedResource(groupname)
 
 
-def create_node(inputdata, configmanager):
+async def create_node(inputdata, configmanager):
     try:
         nodename = inputdata['name']
         if ' ' in nodename:
@@ -744,7 +744,7 @@ def create_node(inputdata, configmanager):
     except KeyError:
         raise exc.InvalidArgumentException('name not specified')
     try:
-        configmanager.add_node_attributes(attribmap)
+        await configmanager.add_node_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     yield msg.CreatedResource(nodename)
@@ -760,7 +760,7 @@ async def create_noderange(inputdata, configmanager):
     except KeyError:
         raise exc.InvalidArgumentException('name not specified')
     try:
-        configmanager.add_node_attributes(attribmap)
+        await configmanager.add_node_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     for node in attribmap:
@@ -1021,7 +1021,7 @@ async def handle_node_request(configmanager, inputdata, operation,
     if iscollection:
         if operation == "delete":
             return delete_node_collection(pathcomponents, configmanager,
-                                          isnoderange)
+                                                isnoderange)
         elif operation == "retrieve":
             return enumerate_node_collection(pathcomponents, configmanager)
         else:

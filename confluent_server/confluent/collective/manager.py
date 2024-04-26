@@ -101,8 +101,9 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                           ''.format(leader, str(e)),
                  'subsystem': 'collective'})
         return False
+    print("connecting to leader")
     async with connecting:
-        with cfm._initlock:
+        async with cfm._initlock:
             # remote is a socket...
             banner = await tlvdata.recv(remote)  # the banner
             if not banner:
@@ -128,7 +129,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                     return False
                 if 'waitinline' in keydata:
                     await asyncio.sleep(0.3)
-                    return connect_to_leader(cert, name, leader, None, isretry=True)
+                    return await connect_to_leader(cert, name, leader, None, isretry=True)
                 if 'leader' in keydata:
                     if keydata['leader'] == None:
                         return None
@@ -140,7 +141,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                         keydata['leader'])
                     if ldrc and ldrc['name'] == name:
                         raise Exception("Redirected to self")
-                    return connect_to_leader(name=name,
+                    return await connect_to_leader(name=name,
                                              leader=keydata['leader'])
                 if 'txcount' in keydata:
                     log.log({'info':
@@ -150,12 +151,12 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                              'subsystem': 'collective'})
                     return await become_leader(remote)
                 return False
-                follower.kill()
-                cfm.stop_following()
+                follower.cancel()
+                await cfm.stop_following()
                 follower = None
             if follower is not None:
-                follower.kill()
-                cfm.stop_following()
+                follower.cancel()
+                await cfm.stop_following()
                 follower = None
             log.log({'info': 'Following leader {0}'.format(leader),
                      'subsystem': 'collective'})
@@ -165,17 +166,17 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
             dbsize = dbi['dbsize']
             dbjson = b''
             while (len(dbjson) < dbsize):
-                ndata = remote.recv(dbsize - len(dbjson))
+                ndata = await remote[0].read(dbsize - len(dbjson))
                 if not ndata:
                     try:
-                        remote.close()
+                        remote[0].close()
                     except Exception:
                         pass
                     log.log({'error': 'Retrying connection, error during initial sync', 'subsystem': 'collective'})
-                    return connect_to_leader(ocert, oname, oleader, None)
+                    return await connect_to_leader(ocert, oname, oleader, None)
                     raise Exception("Error doing initial DB transfer")  # bad ssl write retry
                 dbjson += ndata
-            cfm.clear_configuration()
+            await cfm.clear_configuration()
             try:
                 cfm._restore_keys(keydata, None, sync=False)
                 for c in colldata:
@@ -185,28 +186,30 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                 for globvar in globaldata:
                     cfm.set_global(globvar, globaldata[globvar], False)
                 cfm._txcount = dbi.get('txcount', 0)
-                cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
+                await cfm.ConfigManager(tenant=None)._load_from_json(dbjson,
                                                                sync=False)
                 cfm.commit_clear()
             except Exception:
-                cfm.stop_following()
+                print("huh????")
+                await cfm.stop_following()
                 cfm.rollback_clear()
                 raise
             currentleader = leader
         #spawn this as a thread...
-        remote.settimeout(90)
+        #remote.settimeout(90)
         follower = util.spawn(follow_leader(remote, leader))
     return True
 
 
-def follow_leader(remote, leader):
+async def follow_leader(remote, leader):
     global currentleader
     global retrythread
     global follower
     cleanexit = False
     newleader = None
     try:
-        exitcause = cfm.follow_channel(remote)
+        exitcause = await cfm.follow_channel(remote)
+        print(repr(exitcause))
         newleader = exitcause.get('newleader', None)
     except greenlet.GreenletExit:
         cleanexit = True
@@ -219,7 +222,7 @@ def follow_leader(remote, leader):
             log.log(
                 {'info': 'Previous leader directed us to join new leader {}'.format(newleader)})
             try:
-                if connect_to_leader(None, get_myname(), newleader):
+                if await connect_to_leader(None, get_myname(), newleader):
                     return
             except Exception:
                 log.log({'error': 'Unknown error attempting to connect to {}, check trace log'.format(newleader), 'subsystem': 'collective'})
@@ -228,7 +231,7 @@ def follow_leader(remote, leader):
                          'collective membership'.format(leader), 'subsystem': 'collective'})
         # The leader has folded, time to startup again...
         follower = None
-        cfm.stop_following()
+        await cfm.stop_following()
         currentleader = None
         if retrythread is None:  # start a recovery
             retrythread = util.spawn_after(
@@ -324,18 +327,18 @@ async def handle_connection(connection, cert, request, local=False):
             if follower is not None:
                 linfo = cfm.get_collective_member_by_address(currentleader)
                 try:
-                    remote = socket.create_connection((currentleader, 13001), 15)
+                    _, remote = await create_connection(currentleader)
                 except Exception:
                     cfm.stop_following()
                     return
-                remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
-                                         keyfile='/etc/confluent/privkey.pem',
-                                         certfile='/etc/confluent/srvcert.pem')
-                cert = remote.getpeercert(binary_form=True)
+                #remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
+                #                         keyfile='/etc/confluent/privkey.pem',
+                #                         certfile='/etc/confluent/srvcert.pem')
+                cert = remote[1].get_extra_info('ssl_object').getpeercert(binary_form=True)
                 if not (linfo and util.cert_matches(
                         linfo['fingerprint'],
                         cert)):
-                    remote.close()
+                    #remote.close()
                     await tlvdata.send(connection,
                                  {'error': 'Invalid certificate, '
                                            'redo invitation process'})
@@ -368,7 +371,7 @@ async def handle_connection(connection, cert, request, local=False):
                     await tlvdata.send(connection, {'collective':
                             {'error': '{0} is not a recognized collective member'.format(todelete)}})
                     return
-                cfm.del_collective_member(todelete)
+                await cfm.del_collective_member(todelete)
                 await tlvdata.send(connection,
                     {'collective': {'status': 'Successfully deleted {0}'.format(todelete)}})
                 connection.close()
@@ -458,7 +461,6 @@ async def handle_connection(connection, cert, request, local=False):
             proof = rsp['collective']['approval']
             proof = base64.b64decode(proof)
             j = invites.check_server_proof(invitation, mycert, cert, proof)
-            print(repr(j))
             if not j:
                 remote.close()
                 await tlvdata.send(connection, {'collective':
@@ -494,9 +496,9 @@ async def handle_connection(connection, cert, request, local=False):
             myfprint = util.get_fingerprint(mycert)
             iam = cfm.get_collective_member(get_myname())
             if not iam:
-                cfm.add_collective_member(get_myname(),
+                await cfm.add_collective_member(get_myname(),
                                           connection[1].transport.get_extra_info('socket').getsockname()[0], myfprint)
-            cfm.add_collective_member(request['name'],
+            await cfm.add_collective_member(request['name'],
                                     connection[1].transport.get_extra_info('socket').getpeername()[0], fprint, role)
             myleader = await get_leader(connection)
             ldrfprint = cfm.get_collective_member_by_address(
@@ -516,17 +518,17 @@ async def handle_connection(connection, cert, request, local=False):
         drone = request['name']
         droneinfo = cfm.get_collective_member(drone)
         if not droneinfo:
-            tlvdata.send(connection,
+            await tlvdata.send(connection,
                          {'error': 'Unrecognized leader, '
                                    'redo invitation process'})
             return
         if not util.cert_matches(droneinfo['fingerprint'], cert):
-            tlvdata.send(connection,
+            await tlvdata.send(connection,
                          {'error': 'Invalid certificate, '
                                    'redo invitation process'})
             return
         if request['txcount'] < cfm._txcount:
-            tlvdata.send(connection,
+            await tlvdata.send(connection,
                          {'error': 'Refusing to be assimilated by inferior'
                                    'transaction count',
                           'txcount': cfm._txcount,})
@@ -534,7 +536,7 @@ async def handle_connection(connection, cert, request, local=False):
         if cfm.cfgstreams and request['txcount'] == cfm._txcount:
             try:
                 cfm.check_quorum()
-                tlvdata.send(connection,
+                await tlvdata.send(connection,
                          {'error': 'Refusing to be assimilated as I am a leader with quorum',
                           'txcount': cfm._txcount,})
                 return
@@ -543,19 +545,19 @@ async def handle_connection(connection, cert, request, local=False):
                 myfollowcount = len(list(cfm.cfgstreams))
                 if followcount is not None:
                     if followcount < myfollowcount:
-                        tlvdata.send(connection,
+                        await tlvdata.send(connection,
                              {'error': 'Refusing to be assimilated by leader with fewer followers',
                             'txcount': cfm._txcount,})
                         return
                     elif followcount == myfollowcount:
                         myname = sortutil.naturalize_string(get_myname())
                         if myname < sortutil.naturalize_string(request['name']):
-                            tlvdata.send(connection,
+                            await tlvdata.send(connection,
                                 {'error': 'Refusing, my name is better',
                                 'txcount': cfm._txcount,})
                             return
         if follower is not None and not follower.dead:
-            tlvdata.send(
+            await tlvdata.send(
                 connection,
                 {'error': 'Already following, assimilate leader first',
                  'leader': currentleader})
@@ -563,24 +565,25 @@ async def handle_connection(connection, cert, request, local=False):
             return
         if connecting.active:
             # don't try to connect while actively already trying to connect
-            tlvdata.send(connection, {'status': 0})
-            connection.close()
+            await tlvdata.send(connection, {'status': 0})
+            #connection.close()
             return
-        if (currentleader == connection.getpeername()[0] and
+        cnn = connection[1].get_extra_info('socket')
+        if (currentleader == cnn.getpeername()[0] and
                 follower and not follower.dead):
             # if we are happily following this leader already, don't stir
             # the pot
-            tlvdata.send(connection, {'status': 0})
+            await tlvdata.send(connection, {'status': 0})
             connection.close()
             return
         log.log({'info': 'Connecting in response to assimilation',
                  'subsystem': 'collective'})
-        newleader = connection.getpeername()[0]
+        newleader = cnn.getpeername()[0]
         if cfm.cfgstreams:
-            retire_as_leader(newleader)
-        tlvdata.send(connection, {'status': 0})
-        connection.close()
-        if not connect_to_leader(None, None, leader=newleader):
+            await retire_as_leader(newleader)
+        await tlvdata.send(connection, {'status': 0})
+        cnn.close()
+        if not await connect_to_leader(None, None, leader=newleader):
             if retrythread is None:
                 retrythread = util.spawn_after(random.random(),
                                                    start_collective)
@@ -605,38 +608,40 @@ async def handle_connection(connection, cert, request, local=False):
             await tlvdata.send(connection,
                          {'error': 'Invalid certificate, '
                                    'redo invitation process'})
-            connection.close()
+            #connection.close()
             return
         cnn = connection[1].transport.get_extra_info('socket')
         myself = cnn.getsockname()[0]
         if connecting.active or initting:
             await tlvdata.send(connection, {'error': 'Connecting right now',
                                       'backoff': True})
-            connection.close()
+            #connection.close()
             return
         if leader_init.active:
             await tlvdata.send(connection, {'error': 'Servicing a connection',
                                       'waitinline': True})
-            connection.close()
+            #connection.close()
             return
         if myself != await get_leader(connection):
             await tlvdata.send(
                 connection,
                 {'error': 'Cannot assimilate, our leader is '
                           'in another castle', 'leader': currentleader})
-            connection.close()
+            #connection.close()
             return
         if request['txcount'] > cfm._txcount:
-            retire_as_leader()
-            tlvdata.send(connection,
+            await retire_as_leader()
+            await tlvdata.send(connection,
                          {'error': 'Client has higher tranasaction count, '
                                    'should assimilate me, connecting..',
                           'txcount': cfm._txcount})
             log.log({'info': 'Connecting to leader due to superior '
                              'transaction count', 'subsystem': 'collective'})
-            connection.close()  # well this won't work
-            if not connect_to_leader(
-                None, None, connection.getpeername()[0]):
+            cnn = connection[1].transport.get_extra_info('socket')
+            peername = cnn.getpeername()[0]
+            cnn.close()
+            if not await connect_to_leader(
+                None, None, peername):
                 if retrythread is None:
                     retrythread = util.spawn_after(5 + random.random(),
                                                    start_collective)
@@ -651,20 +656,22 @@ async def handle_connection(connection, cert, request, local=False):
             await tlvdata.send(connection, cfm._dump_keys(None, False))
             await tlvdata.send(connection, cfm._cfgstore['collective'])
             await tlvdata.send(connection, {'confluent_uuid': cfm.get_global('confluent_uuid')}) # cfm.get_globals())
-            cfgdata = cfm.ConfigManager(None)._dump_to_json()
+            cfgdata = await cfm.ConfigManager(None)._dump_to_json()
             try:
                 await tlvdata.send(connection, {'txcount': cfm._txcount,
                                 'dbsize': len(cfgdata)})
-                connection.sendall(cfgdata)
+                connection[1].write(cfgdata)
+                await connection[1].drain()
             except Exception:
                 try:
                     connection.close()
                 finally:
+                    raise
                     return None
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
-        connection.settimeout(90)
-        if not cfm.relay_slaved_requests(drone, connection):
+        #connection.settimeout(90)
+        if not await cfm.relay_slaved_requests(drone, connection):
             log.log({'info': 'All clients have disconnected, starting recovery process',
                      'subsystem': 'collective'})
             if retrythread is None:  # start a recovery if everyone else seems
@@ -698,13 +705,13 @@ async def try_assimilate(drone, followcount, remote):
         # Oh well, unable to connect, hopefully the rest will be
         # in order
         return
-    tlvdata.send(remote, {'collective': {'operation': 'assimilate',
+    await tlvdata.send(remote, {'collective': {'operation': 'assimilate',
                                          'name': get_myname(),
                                          'followcount': followcount,
                                          'txcount': cfm._txcount}})
-    tlvdata.recv(remote)  # the banner
-    tlvdata.recv(remote)  # authpassed... 0..
-    answer = tlvdata.recv(remote)
+    await tlvdata.recv(remote)  # the banner
+    await tlvdata.recv(remote)  # authpassed... 0..
+    answer = await tlvdata.recv(remote)
     if not answer:
         log.log(
             {'error':
@@ -715,8 +722,8 @@ async def try_assimilate(drone, followcount, remote):
     if 'txcount' in answer:
         log.log({'info': 'Deferring to {0} due to target being a better leader'.format(
             drone), 'subsystem': 'collective'})
-        retire_as_leader(drone)
-        if not connect_to_leader(None, None, leader=remote.getpeername()[0]):
+        await retire_as_leader(drone)
+        if not await connect_to_leader(None, None, leader=remote.getpeername()[0]):
             if retrythread is None:
                 retrythread = util.spawn_after(random.random(),
                                                     start_collective)
@@ -748,12 +755,12 @@ async def get_leader(connection):
         await become_leader(connection)
     return currentleader
 
-def retire_as_leader(newleader=None):
+async def retire_as_leader(newleader=None):
     global currentleader
     global reassimilate
-    cfm.stop_leading(newleader)
+    await cfm.stop_leading(newleader)
     if reassimilate is not None:
-        reassimilate.kill()
+        reassimilate.cancel()
         reassimilate = None
     currentleader = None
 
@@ -769,8 +776,8 @@ async def become_leader(connection):
     log.log({'info': 'Becoming leader of collective',
              'subsystem': 'collective'})
     if follower is not None:
-        follower.kill()
-        cfm.stop_following()
+        follower.cancel()
+        await cfm.stop_following()
         follower = None
     if retrythread is not None:
         retrythread.cancel()
@@ -779,7 +786,7 @@ async def become_leader(connection):
     currentleader = cnn.getsockname()[0]
     skipaddr = cnn.getpeername()[0]
     if reassimilate is not None:
-        reassimilate.kill()
+        reassimilate.cancel()
     reassimilate = util.spawn(reassimilate_missing())
     cfm._ready = True
     if await _assimilate_missing(skipaddr):
@@ -810,9 +817,11 @@ async def _assimilate_missing(skipaddr=None):
         connecto.append(dronecandidate)
     if not connecto:
         return True
+    connections = []
     for ct in connecto:
-        util.spawn(create_connection(ct))
+        connections.append(util.spawn(create_connection(ct)))
     for ent in connections:
+        ent = await ent
         member, remote = ent
         if isinstance(remote, Exception):
             continue
@@ -909,22 +918,26 @@ async def start_collective():
             if cfm.get_collective_member(member).get('role', None) == 'nonvoting':
                 continue
             if cfm.cfgleader is None:
-                cfm.stop_following(True)
+                await cfm.stop_following(True)
             ldrcandidate = cfm.get_collective_member(member)['address']
             connecto.append(ldrcandidate)
+        connections = []
         for ct in connecto:
-            util.spawn(create_connection(ct))
-        for ent in connections:
-            member, remote = ent
-            if isinstance(remote, Exception):
-                continue
-            if follower is None:
-                log.log({'info': 'Performing startup attempt to {0}'.format(
-                    member), 'subsystem': 'collective'})
-                if not await connect_to_leader(name=myname, leader=member, remote=remote):
+            connections.append(util.spawn(create_connection(ct)))
+        pnding = connections
+        while pnding:
+            rdy, pnding = await asyncio.wait(pnding, return_when=asyncio.FIRST_COMPLETED)
+            for ent in rdy:
+                member, remote = await ent
+                if isinstance(remote, Exception):
+                    continue
+                if follower is None:
+                    log.log({'info': 'Performing startup attempt to {0}'.format(
+                        member), 'subsystem': 'collective'})
+                    if not await connect_to_leader(name=myname, leader=member, remote=remote):
+                        remote.close()
+                else:
                     remote.close()
-            else:
-                remote.close()
     except Exception as e:
         pass
     finally:
