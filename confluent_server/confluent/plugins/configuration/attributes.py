@@ -157,9 +157,9 @@ def retrieve_nodes(nodes, element, configmanager, inputdata, clearwarnbynode):
                     raise Exception("BUGGY ATTRIBUTE FOR NODE")
 
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     if nodes is not None:
-        return update_nodes(nodes, element, configmanager, inputdata)
+        return await update_nodes(nodes, element, configmanager, inputdata)
     elif element[0] == 'nodegroups':
         return update_nodegroup(
             element[1], element[3], configmanager, inputdata)
@@ -243,7 +243,7 @@ def yield_rename_resources(namemap, isnode):
         else:
             yield msg.RenamedResource(node, namemap[node])
 
-def update_nodes(nodes, element, configmanager, inputdata):
+async def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
     if not nodes:
         raise exc.InvalidArgumentException(
@@ -306,7 +306,7 @@ def update_nodes(nodes, element, configmanager, inputdata):
                 configmanager.clear_node_attributes([node], clearattribs, warnings=clearwarnbynode[node])
             updatedict[node] = updatenode
     try:
-        configmanager.set_node_attributes(updatedict)
+        await configmanager.set_node_attributes(updatedict)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     return retrieve(nodes, element, configmanager, inputdata, clearwarnbynode)

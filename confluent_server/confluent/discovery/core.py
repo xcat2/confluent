@@ -730,7 +730,7 @@ def _recheck_single_unknown_info(configmanager, info):
         # if cancel did not result in dead, then we are in progress
         if rechecker is None or rechecker.dead:
             rechecktime = util.monotonic_time() + 300
-            rechecker = eventlet.spawn_after(300, _periodic_recheck,
+            rechecker = util.spawn_after(300, _periodic_recheck,
                                              configmanager)
         return
     nodename, info['maccount'] = get_nodename(configmanager, handler, info)
@@ -860,7 +860,7 @@ def detected(info):
             rechecker.cancel()
         if rechecker is None or rechecker.dead:
             rechecktime = util.monotonic_time() + 300
-            rechecker = eventlet.spawn_after(300, _periodic_recheck, cfg)
+            rechecker = util.spawn_after(300, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentfied'
         #TODO, eventlet spawn after to recheck sooner, or somehow else
@@ -1581,12 +1581,12 @@ rechecker = None
 rechecktime = None
 rechecklock = eventlet.semaphore.Semaphore()
 
-def _periodic_recheck(configmanager):
+async def _periodic_recheck(configmanager):
     global rechecker
     global rechecktime
     rechecker = None
     try:
-        _recheck_nodes((), configmanager)
+        await _recheck_nodes((), configmanager)
     except Exception:
         traceback.print_exc()
         log.log({'error': 'Unexpected error during discovery, check debug '
@@ -1595,7 +1595,7 @@ def _periodic_recheck(configmanager):
     # for rechecker was requested in the course of recheck_nodes
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
-        rechecker = eventlet.spawn_after(900, _periodic_recheck,
+        rechecker = util.spawn_after(900, _periodic_recheck,
                                          configmanager)
 
 
@@ -1643,7 +1643,7 @@ def start_detection():
         start_autosense()
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
-        rechecker = eventlet.spawn_after(900, _periodic_recheck, cfg)
+        rechecker = util.spawn_after(900, _periodic_recheck, cfg)
     eventlet.spawn_n(ssdp.snoop, safe_detected, None, ssdp, get_node_by_uuid_or_mac)
 
 def stop_autosense():

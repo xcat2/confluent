@@ -64,6 +64,7 @@ import confluent.util as util
 import eventlet
 import eventlet.green.ssl as ssl
 import eventlet.semaphore as semaphore
+import inspect
 import itertools
 import msgpack
 import os
@@ -81,6 +82,24 @@ try:
     unicode
 except NameError:
     unicode = str
+
+
+async def iterate_responses(responses):
+    # normalize plugin behaviors
+    # some might have an async Generator
+    # some might be a traditional generator
+    # others might return an awaitable generator
+    if inspect.isasyncgen(responses):
+        async for rsp in responses:
+            yield rsp
+    elif inspect.isgenerator(responses):
+        for rsp in responses:
+            yield rsp
+    elif inspect.isawaitable(responses):
+        responses = await responses
+        for rsp in responses:
+            yield rsp
+
 
 def seek_element(currplace, currkey, depth):
     try:
