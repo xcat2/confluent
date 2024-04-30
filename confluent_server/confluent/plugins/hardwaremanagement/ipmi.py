@@ -411,7 +411,7 @@ async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
         except asyncio.QueueEmpty:
             pass
         except asyncio.TimeoutError:
-            print("whoopsie?")
+            print("odd timeout?")
             pass
         finally:
             for datum in sorted(

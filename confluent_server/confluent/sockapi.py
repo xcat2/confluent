@@ -127,12 +127,12 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
             while not configmanager.config_is_ready():
                 await asyncio.sleep(1)
             if 'dispatch' in response:
-                dreq = tlvdata.recvall(
+                dreq = await tlvdata.recvall(
                     connection, response['dispatch']['length'])
-                return pluginapi.handle_dispatch(connection, cert, dreq,
+                return await pluginapi.handle_dispatch(connection, cert, dreq,
                                                  response['dispatch']['name'])
             if 'proxyconsole' in response:
-                return start_proxy_term(connection, cert,
+                return await start_proxy_term(connection, cert,
                                         response['proxyconsole'])
             authname = response['username']
             passphrase = response['password']
@@ -238,7 +238,7 @@ async def process_request(
         auditlog.log(auditmsg)
     try:
         if operation == 'start':
-            return start_term(authname, cfm, connection, params, path,
+            return await start_term(authname, cfm, connection, params, path,
                               authdata, skipauth)
         elif operation == 'shutdown' and skipauth:
             configmanager.ConfigManager.shutdown()
@@ -256,7 +256,7 @@ async def process_request(
     return
 
 
-def start_proxy_term(connection, cert, request):
+async def start_proxy_term(connection, cert, request):
     droneinfo = configmanager.get_collective_member(request['name'])
     if not util.cert_matches(droneinfo['fingerprint'], cert):
         connection.close()
@@ -268,10 +268,10 @@ def start_proxy_term(connection, cert, request):
         datacallback=ccons.sendall, skipreplay=request['skipreplay'],
         direct=False, width=request.get('width', 80), height=request.get(
             'height', 24))
-    term_interact(None, None, ccons, None, connection, consession, None)
+    await term_interact(None, None, ccons, None, connection, consession, None)
 
 
-def start_term(authname, cfm, connection, params, path, authdata, skipauth):
+async def start_term(authname, cfm, connection, params, path, authdata, skipauth):
     elems = path.split('/')
     if len(elems) < 4 or elems[1] != 'nodes':
         raise exc.InvalidArgumentException('Invalid path {0}'.format(path))
@@ -298,11 +298,11 @@ def start_term(authname, cfm, connection, params, path, authdata, skipauth):
         raise exc.InvalidArgumentException('Invalid path {0}'.format(path))
     if consession is None:
         raise Exception("TODO")
-    term_interact(authdata, authname, ccons, cfm, connection, consession,
+    await term_interact(authdata, authname, ccons, cfm, connection, consession,
                   skipauth)
 
 
-def term_interact(authdata, authname, ccons, cfm, connection, consession,
+async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                   skipauth):
     send_data(connection, {'started': 1})
     ccons.startsending()
@@ -310,7 +310,7 @@ def term_interact(authdata, authname, ccons, cfm, connection, consession,
     if bufferage is not False:
         send_data(connection, {'bufferage': bufferage})
     while consession is not None:
-        data = tlvdata.recv(connection)
+        data = await tlvdata.recv(connection)
         if type(data) == dict:
             if data['operation'] == 'stop':
                 consession.destroy()

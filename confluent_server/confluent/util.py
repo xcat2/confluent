@@ -40,7 +40,6 @@ def mkdirp(path, mode=0o777):
 
 async def _sleep_and_run(sleeptime, func, args):
     await asyncio.sleep(sleeptime)
-    print(repr(func))
     await func(*args)
 
 
