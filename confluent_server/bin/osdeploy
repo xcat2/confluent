@@ -3,6 +3,7 @@
 __author__ = 'jjohnson2,bfinley'
 
 import argparse
+import asyncio
 import glob
 import os
 import os.path
@@ -36,7 +37,7 @@ def emprint(txt):
         print(txt)
 
 fnamechars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.^'
-def main(args):
+async def main(args):
     ap = argparse.ArgumentParser(description='Manage OS deployment resources')
     sp = ap.add_subparsers(dest='command')
     wiz = sp.add_parser('initialize', help='Do OS deployment preparation')
@@ -70,7 +71,7 @@ def main(args):
     if cmdset.command == 'importcheck':
         return osimport(cmdset.imagefile, checkonly=True)
     if cmdset.command == 'initialize':
-        return initialize(cmdset)
+        return await initialize(cmdset)
     if cmdset.command == 'updateboot':
         return updateboot(cmdset.profile)
     if cmdset.command == 'rebase':
@@ -251,7 +252,7 @@ def install_tftp_content():
 
 
 
-def initialize(cmdset):
+async def initialize(cmdset):
     if os.getuid() != 0:
         sys.stderr.write('This command must run as root user\n')
         sys.exit(1)
@@ -384,7 +385,7 @@ def initialize(cmdset):
     totar = []
     if not os.path.exists('confluent_uuid'):
         c = client.Command()
-        for rsp in c.read('/uuid'):
+        async for rsp in c.read('/uuid'):
             uuid = rsp.get('uuid', {}).get('value', None)
             if uuid:
                 oum = os.umask(0o11)
@@ -566,4 +567,4 @@ def osimport(imagefile, checkonly=False, custname=None):
             list(c.delete('/deployment/importing/{0}'.format(shortname)))
 
 if __name__ == '__main__':
-    main(sys.argv)
+    asyncio.get_event_loop().run_until_complete(main(sys.argv))

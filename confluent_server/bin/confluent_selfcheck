@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import asyncio
 import os
 import socket
 import glob
@@ -16,11 +17,8 @@ import confluent.certutil as certutil
 import confluent.client as client
 import confluent.config.configmanager as configmanager
 import confluent.netutil as netutil
-import eventlet.green.subprocess as subprocess
 import tempfile
 import shutil
-import eventlet.green.socket as socket
-import eventlet
 import greenlet
 import pwd
 import signal
@@ -101,7 +99,6 @@ def web_api_works():
 
 def nics_missing_ipv6():
     # check for ability to create AF_INET6, for kernel disabled ipv6
-    a = socket.socket(socket.AF_INET6)
     ipaddrs = subprocess.check_output(['ip', '-br', 'a']).split(b'\n')
     missingnics = []
     for line in ipaddrs:
@@ -150,15 +147,14 @@ def uuid_matches():
     dbuuid = configmanager.get_global('confluent_uuid')
     return dbuuid == fsuuid
 
-def lookup_node(node):
+async def lookup_node(node):
     try:
-        return socket.getaddrinfo(node, 0)
-    except greenlet.GreenletExit:
-        return None
+        cloop = asyncio.get_event_loop()
+        return await cloop.getaddrinfo(node, 0)
     except Exception:
         return None
 
-if __name__ == '__main__':
+async def main():
     ap = argparse.ArgumentParser(description='Run configuration checks for a system running confluent service')
     ap.add_argument('-n', '--node', help='A node name to run node specific checks against')
     ap.add_argument('-a', '--automation', help='Do checks against a deployed node for automation and syncfiles function', action='store_true')
@@ -244,8 +240,8 @@ if __name__ == '__main__':
         allok = True
         uuidok = False
         macok = False
-        valid_nodes = [node['item']['href'][:-1] for node in sess.read('/nodes/')] #get all valid nodes
-        for rsp in sess.read(f'/nodes/{args.node}/attributes/all'):
+        valid_nodes = [node['item']['href'][:-1] async for node in sess.read('/nodes/')] #get all valid nodes
+        async for rsp in sess.read(f'/nodes/{args.node}/attributes/all'):
             if rsp.get('errorcode', None) == 404:
                 emprint(f'There is no node named "{args.node}"')
                 allok = False
@@ -305,18 +301,12 @@ if __name__ == '__main__':
         if allok:
             print(f'No issues detected with attributes of {args.node}')
         fprint("Checking name resolution: ")
-        lk = eventlet.spawn(lookup_node, args.node)
-        eventlet.sleep(0.1)
-        tries = 5
-        while not lk.dead and tries > 0:
-            eventlet.sleep(1)
-            tries -= 1
         deaddns = False
-        if not tries:
+        try:
+            result = await asyncio.wait_for(lookup_node(args.node), timeout=5)
+        except asyncio.exceptions.TimeoutError:
             emprint('Name resolution takes too long, check state of /etc/resolv.conf and indicated nameservers, this can produce failure to netboot or failure to commence installation')
-            lk.kill()
             deaddns = True
-        result = lk.wait()
         if not result and not deaddns:
             emprint('Name resolution failed for node, it is normally a good idea for the node name to resolve to an IP')
         if result:
@@ -355,3 +345,5 @@ if __name__ == '__main__':
 # arping on the node, check for dupes/against nodeinventory?
 # arping -D for mgt own ip addresses? check for dupes, also check for bleed through from one nic to another
 # iterate through profiles, use mtools to extract site initramfs, check if outdated
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())
