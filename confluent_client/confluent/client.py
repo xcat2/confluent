@@ -705,6 +705,14 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
                     noderange, 'attributes/all', dictassign[key], key)
     else:
         if "=" in updateargs[1]:
+            update_ready = True
+            for arg in updateargs[1:]:
+                if not '=' in arg:
+                    update_ready = False
+                    sys.stderr.write('Error: {0} not a valid expression\n'.format(str(arg)))
+                    exitcode = 1
+            if not update_ready:
+                sys.exit(exitcode)
             try:
                 for val in updateargs[1:]:
                     val = val.split('=', 1)
