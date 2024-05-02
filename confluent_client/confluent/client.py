@@ -595,7 +595,7 @@ def print_attrib_path(path, session, requestargs, options, rename=None, attrpref
                 else:
                     printmissing.add(attr)
         for missing in printmissing:
-            sys.stderr.write('Error: {0} not a valid attribute\n'.format(attr))
+            sys.stderr.write('Error: {0} not a valid attribute\n'.format(missing))
     return exitcode
 
 
@@ -709,9 +709,9 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
             for arg in updateargs[1:]:
                 if not '=' in arg:
                     update_ready = False
-                    sys.stderr.write('Error: {0} not a valid expression\n'.format(str(arg)))
                     exitcode = 1
             if not update_ready:
+                sys.stderr.write('Error: {0} Can not set and read at the same time!\n'.format(str(updateargs[1:])))
                 sys.exit(exitcode)
             try:
                 for val in updateargs[1:]:
