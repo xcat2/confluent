@@ -326,14 +326,14 @@ async def initialize(cmdset):
         try:
             sshutil.initialize_ca()
         except sshutil.AlreadyExists:
-            emprint('Skipping generation of SSH CA, already present and would likely be more problematic to regenerate than to reuse (if absolutely sure you want to discard old CA, then delete /etc/confluent/ssh/ca*)')
+            emprint('Skipping generation of SSH CA, already present and would likely be more problematic to regenerate than to reuse (if absolutely sure you want to discard old CA, then delete /etc/confluent/ssh/ca* and restart confluent)')
     if cmdset.a:
         didsomething = True
         init_confluent_myname()
         try:
             sshutil.initialize_root_key(True, True)
         except sshutil.AlreadyExists:
-            emprint('Skipping generation of new automation key, already present and regeneration usually causes more problems. (If absolutely certain, delete /etc/confluent/ssh/automation*)')
+            emprint('Skipping generation of new automation key, already present and regeneration usually causes more problems. (If absolutely certain, delete /etc/confluent/ssh/automation* and restart confluent)')
     if cmdset.p:
         install_tftp_content()
     if cmdset.l:
