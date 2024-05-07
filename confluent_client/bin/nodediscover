@@ -180,7 +180,7 @@ def datum_to_attrib(datum):
 
 unique_fields = frozenset(['serial', 'mac', 'uuid'])
 
-def import_csv(options, session):
+async def import_csv(options, session):
     nodedata = []
     unique_data = {}
     exitcode = 0
@@ -208,7 +208,7 @@ def import_csv(options, session):
             if not datum_complete(nodedatum):
                 sys.exit(1)
             if not search_record(nodedatum, options, session) and not broken:
-                blocking_scan(session)
+                await blocking_scan(session)
             if not search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
@@ -271,7 +271,7 @@ async def list_discovery(options, session):
 
 async def clear_discovery(options, session):
     async for mac in list_matching_macs(options, session):
-        for res in session.delete('/discovery/by-mac/{0}'.format(mac)):
+        async for res in session.delete('/discovery/by-mac/{0}'.format(mac)):
             if 'deleted' in res:
                 print('Cleared info for {0}'.format(res['deleted']))
             else:
@@ -311,7 +311,7 @@ async def list_matching_macs(options, session, node=None, checknode=True):
 async def assign_discovery(options, session, needid=True):
     abort = False
     if options.importfile:
-        return import_csv(options, session)
+        return await import_csv(options, session)
     if not options.node:
         sys.stderr.write("Node (-n) must be specified for assignment\n")
         abort = True
@@ -325,7 +325,7 @@ async def assign_discovery(options, session, needid=True):
     matches = [x async for x in list_matching_macs(options, session, None if needid else options.node, False)]
     if not matches:
         # Do a rescan to catch missing requested data
-        blocking_scan(session)
+        await blocking_scan(session)
         matches = [x async for x in list_matching_macs(options, session, None if needid else options.node, False)]
     if not matches:
         sys.stderr.write("No matching discovery candidates found\n")
@@ -343,11 +343,11 @@ async def assign_discovery(options, session, needid=True):
     if exitcode:
         sys.exit(exitcode)
 
-def blocking_scan(session):
-    list(session.update('/discovery/rescan', {'rescan': 'start'}))
-    while(list(session.read('/discovery/rescan'))[0].get('scanning', False)):
+async def blocking_scan(session):
+    list([x async for x in session.update('/discovery/rescan', {'rescan': 'start'})])
+    while(list([x async for x in session.read('/discovery/rescan')])[0].get('scanning', False)):
         time.sleep(0.5)
-    list(session.update('/networking/macs/rescan', {'rescan': 'start'}))
+    list([x async for x in session.update('/networking/macs/rescan', {'rescan': 'start'})])
 
 
 async def main():
@@ -403,7 +403,7 @@ async def main():
     if args[0] == 'list':
         await list_discovery(options, session)
     if args[0] == 'clear':
-        clear_discovery(options, session)
+        await clear_discovery(options, session)
     if args[0] == 'assign':
         await assign_discovery(options, session)
     if args[0] == 'reassign':
@@ -415,7 +415,7 @@ async def main():
     if args[0] == 'unsubscribe':
         subscribe_discovery(options, session, False, args[1])
     if args[0] == 'rescan':
-        blocking_scan(session)
+        await blocking_scan(session)
         print("Rescan complete")
 
 

@@ -484,7 +484,7 @@ async def do_command(command, server):
         startconsole(nodename)
         return
     elif argv[0] == 'set':
-        setvalues(argv[1:])
+        await setvalues(argv[1:])
     elif argv[0] == 'create':
         await createresource(argv[1:])
     elif argv[0] in ('rm', 'delete', 'remove'):
@@ -555,7 +555,7 @@ async def delresource(resname):
     await makecall(session.delete, (resname,))
 
 
-def setvalues(attribs):
+async def setvalues(attribs):
     global exitcode
     if '=' in attribs[0]:  # going straight to attribute
         resource = attribs[0][:attribs[0].index("=")]
@@ -569,7 +569,7 @@ def setvalues(attribs):
     if not keydata:
         return
     targpath = fullpath_target(resource)
-    for res in session.update(targpath, keydata):
+    async for res in session.update(targpath, keydata):
         if 'error' in res:
             if 'errorcode' in res:
                 exitcode = res['errorcode']
