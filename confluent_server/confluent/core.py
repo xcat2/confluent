@@ -83,13 +83,15 @@ async def iterate_responses(responses):
     if inspect.isasyncgen(responses):
         async for rsp in responses:
             yield rsp
-    elif inspect.isgenerator(responses):
+        return
+    elif inspect.isgenerator(responses) or isinstance(responses, list) or isinstance(responses, tuple):
         for rsp in responses:
             yield rsp
+        return
     elif inspect.isawaitable(responses):
         responses = await responses
-        for rsp in responses:
-            yield rsp
+    for rsp in responses:
+        yield rsp
 
 
 def seek_element(currplace, currkey, depth):
@@ -1307,7 +1309,7 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
         return await handle_node_request(configmanager, inputdata,
                                    operation, pathcomponents, autostrip)
     elif pathcomponents[0] == 'discovery':
-        return disco.handle_api_request(
+        return await disco.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'networking':
         return macmap.handle_api_request(
