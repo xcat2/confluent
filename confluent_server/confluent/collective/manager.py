@@ -723,7 +723,8 @@ async def try_assimilate(drone, followcount, remote):
         log.log({'info': 'Deferring to {0} due to target being a better leader'.format(
             drone), 'subsystem': 'collective'})
         await retire_as_leader(drone)
-        if not await connect_to_leader(None, None, leader=remote.getpeername()[0]):
+        cnn = remote[1].transport.get_extra_info('socket')
+        if not await connect_to_leader(None, None, leader=cnn.getpeername()[0]):
             if retrythread is None:
                 retrythread = util.spawn_after(random.random(),
                                                     start_collective)
