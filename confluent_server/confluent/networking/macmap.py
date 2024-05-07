@@ -42,12 +42,12 @@ if __name__ == '__main__':
     import confluent.config.configmanager as cfm
     import confluent.snmputil as snmp
 
-
+import asyncio
 from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
 from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
 import eventlet.green.select as select
 
-import eventlet.green.socket as socket
+import socket
 
 import confluent.collective.manager as collective
 import confluent.exceptions as exc
@@ -55,7 +55,6 @@ import confluent.log as log
 import confluent.messages as msg
 import confluent.noderange as noderange
 import confluent.util as util
-from eventlet.greenpool import GreenPool
 import eventlet.green.subprocess as subprocess
 import fcntl
 import eventlet
@@ -63,7 +62,7 @@ import eventlet.semaphore
 import msgpack
 import random
 import re
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
 
 
 noaffluent = set([])
@@ -124,9 +123,9 @@ def _namesmatch(switchdesc, userdesc):
         return True
     return False
 
-def _map_switch(args):
+async def _map_switch(args):
     try:
-        return _map_switch_backend(args)
+        return await _map_switch_backend(args)
     except (UnicodeError, socket.gaierror):
         log.log({'error': "Cannot resolve switch '{0}' to an address".format(
             args[0])})
@@ -152,11 +151,11 @@ def _nodelookup(switch, ifname):
     return None
 
 
-def _affluent_map_switch(args):
+async def _affluent_map_switch(args):
     switch, password, user, cfgm = args
     kv = util.TLSCertVerifier(cfgm, switch,
                                   'pubkeys.tls_hardwaremanager').verify_cert
-    wc =  webclient.SecureHTTPConnection(
+    wc =  webclient.WebConnection(
                 switch, 443, verifycallback=kv, timeout=5)
     wc.set_basic_credentials(user, password)
     macs, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
@@ -241,7 +240,7 @@ def _recv_offload():
             eventlet.sleep(0)
 
 
-def _map_switch_backend(args):
+async def _map_switch_backend(args):
     """Manipulate portions of mac address map relevant to a given switch
     """
 
@@ -267,7 +266,7 @@ def _map_switch_backend(args):
         user = None
     if switch not in noaffluent:
         try:
-            return _affluent_map_switch(args)
+            return await _affluent_map_switch(args)
         except exc.PubkeyInvalid:
             log.log({'error': 'While trying to gather ethernet mac addresses '
                               'from {0}, the TLS certificate failed validation. '
@@ -433,13 +432,13 @@ def _snmp_map_switch(switch, password, user):
 switchbackoff = 30
 
 
-def find_nodeinfo_by_mac(mac, configmanager):
+async def find_nodeinfo_by_mac(mac, configmanager):
     now = util.monotonic_time()
     if vintage and (now - vintage) < 90 and mac in _nodesbymac:
         return _nodesbymac[mac][0], {'maccount': _nodesbymac[mac][1]}
     # do not actually sweep switches more than once every 30 seconds
     # however, if there is an update in progress, wait on it
-    for _ in update_macmap(configmanager,
+    async for _ in update_macmap(configmanager,
                            vintage and (now - vintage) < switchbackoff):
         if mac in _nodesbymac:
             return _nodesbymac[mac][0], {'maccount': _nodesbymac[mac][1]}
@@ -449,10 +448,10 @@ def find_nodeinfo_by_mac(mac, configmanager):
     return None, {'maccount': 0}
 
 
-mapupdating = eventlet.semaphore.Semaphore()
+mapupdating = asyncio.Lock()
 
 
-def update_macmap(configmanager, impatient=False):
+async def update_macmap(configmanager, impatient=False):
     """Interrogate switches to build/update mac table
 
     Begin a rebuild process.  This process is a generator that will yield
@@ -462,13 +461,13 @@ def update_macmap(configmanager, impatient=False):
     """
     if mapupdating.locked():
         while mapupdating.locked():
-            eventlet.sleep(1)
+            await asyncio.sleep(1)
             yield None
         return
     if impatient:
         return
     completions = _full_updatemacmap(configmanager)
-    for completion in completions:
+    async for completion in completions:
         try:
             yield completion
         except GeneratorExit:
@@ -483,7 +482,7 @@ def _finish_update(completions):
         pass
 
 
-def _full_updatemacmap(configmanager):
+async def _full_updatemacmap(configmanager):
     global vintage
     global _apimacmap
     global _macmap
@@ -492,7 +491,7 @@ def _full_updatemacmap(configmanager):
     global _macsbyswitch
     global switchbackoff
     start = util.monotonic_time()
-    with mapupdating:
+    async with mapupdating:
         vintage = util.monotonic_time()
         # Clear all existing entries
         _macmap = {}
@@ -554,10 +553,12 @@ def _full_updatemacmap(configmanager):
             if switch not in switches:
                 del _macsbyswitch[switch]
         switchauth = get_switchcreds(configmanager, switches)
-        pool = GreenPool(64)
-        for ans in pool.imap(_map_switch, switchauth):
-            vintage = util.monotonic_time()
-            yield ans
+        #pool = GreenPool(64)
+        tsks = []
+        for sa in switchauth:
+            tsks.append(_map_switch(sa))
+        for tsk in asyncio.as_completed(tsks):
+            yield await tsk
     _apimacmap = _macmap
     endtime = util.monotonic_time()
     duration = endtime - start
@@ -574,7 +575,7 @@ def _dump_locations(info, macaddr, nodename=None):
     portinfo = []
     for location in info:
         portinfo.append({'switch': location[0],
-                              'port': location[1], 'macsonport': location[2]})
+                         'port': location[1], 'macsonport': location[2]})
     retdata['ports'] = sorted(portinfo, key=lambda x: x['macsonport'],
                               reverse=True)
     yield msg.KeyValueData(retdata)
@@ -587,7 +588,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             pathcomponents == ['networking', 'macs', 'rescan']):
         if inputdata != {'rescan': 'start'}:
             raise exc.InvalidArgumentException('Input must be rescan=start')
-        eventlet.spawn_n(rescan, configmanager)
+        util.spawn(rescan(configmanager))
         return [msg.KeyValueData({'rescan': 'started'})]
     raise exc.NotImplementedException(
         'Operation {0} on {1} not implemented'.format(
@@ -701,8 +702,8 @@ def dump_macinfo(macaddr):
     return _dump_locations(info, macaddr, _nodesbymac.get(macaddr, (None,))[0])
 
 
-def rescan(cfg):
-    for _ in update_macmap(cfg):
+async def rescan(cfg):
+    async for _ in update_macmap(cfg):
         pass
 
 

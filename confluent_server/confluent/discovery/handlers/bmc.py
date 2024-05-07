@@ -15,24 +15,19 @@
 import confluent.discovery.handlers.generic as generic
 import confluent.exceptions as exc
 import confluent.netutil as netutil
-import eventlet.support.greendns
 
 # Provide foundation for general IPMI device configuration
 
-import pyghmi.exceptions as pygexc
-ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
-ipmicommand.session.select = eventlet.green.select
-ipmicommand.session.threading = eventlet.green.threading
-ipmicommand.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
-getaddrinfo = eventlet.support.greendns.getaddrinfo
+import aiohmi.exceptions as pygexc
+import aiohmi.ipmi.command as ipmicommand
 
-
+import socket
 
 class NodeHandler(generic.NodeHandler):
     DEFAULT_USER = 'USERID'
     DEFAULT_PASS = 'PASSW0RD'
 
-    def _get_ipmicmd(self, user=None, password=None):
+    async def _get_ipmicmd(self, user=None, password=None):
         priv = None
         if user is None or password is None:
             if self.trieddefault:
@@ -42,7 +37,7 @@ class NodeHandler(generic.NodeHandler):
             user = self.DEFAULT_USER
         if password is None:
             password = self.DEFAULT_PASS
-        return ipmicommand.Command(self.ipaddr, user, password,
+        return await ipmicommand.create(self.ipaddr, user, password,
                                    privlevel=priv, keepalive=False)
 
     def __init__(self, info, configmanager):
@@ -56,7 +51,7 @@ class NodeHandler(generic.NodeHandler):
     def config(self, nodename, reset=False):
         self._bmcconfig(nodename, reset)
 
-    def _bmcconfig(self, nodename, reset=False, customconfig=None, vc=None):
+    async def _bmcconfig(self, nodename, reset=False, customconfig=None, vc=None):
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
         # In general, try to use https automation, to make it consistent
         # between hypothetical secure path and today.
@@ -69,7 +64,7 @@ class NodeHandler(generic.NodeHandler):
         passwd = creds.get(nodename, {}).get(
             'secret.hardwaremanagementpassword', {}).get('value', None)
         try:
-            ic = self._get_ipmicmd()
+            ic = await self._get_ipmicmd()
             passwd = self.DEFAULT_PASS
         except pygexc.IpmiException as pi:
             havecustomcreds = False
@@ -82,14 +77,14 @@ class NodeHandler(generic.NodeHandler):
             else:
                 passwd = self.DEFAULT_PASS
             if havecustomcreds:
-                ic = self._get_ipmicmd(user, passwd)
+                ic = await self._get_ipmicmd(user, passwd)
             else:
                 raise
         if vc:
             ic.register_key_handler(vc)
-        currusers = ic.get_users()
-        lanchan = ic.get_network_channel()
-        userdata = ic.xraw_command(netfn=6, command=0x44, data=(lanchan,
+        currusers = await ic.get_users()
+        lanchan = await ic.get_network_channel()
+        userdata = await ic.xraw_command(netfn=6, command=0x44, data=(lanchan,
                                                                 1))
         userdata = bytearray(userdata['data'])
         maxusers = userdata[0] & 0b111111
@@ -114,7 +109,7 @@ class NodeHandler(generic.NodeHandler):
                 newuserslot = uid
                 if newpass != passwd:  # don't mess with existing if no change
                     ic.set_user_password(newuserslot, password=newpass)
-                    ic = self._get_ipmicmd(user, passwd)
+                    ic = await self._get_ipmicmd(user, passwd)
                     if vc:
                         ic.register_key_handler(vc)
                 break
@@ -126,7 +121,7 @@ class NodeHandler(generic.NodeHandler):
                 ic.set_user_password(newuserslot, password=newpass)
             ic.set_user_name(newuserslot, newuser)
             if havecustomcreds:
-                ic = self._get_ipmicmd(user, passwd)
+                ic = await self._get_ipmicmd(user, passwd)
                 if vc:
                     ic.register_key_handler(vc)
             #We are remote operating on the account we are
@@ -161,7 +156,7 @@ class NodeHandler(generic.NodeHandler):
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
             newip = newip.split('/', 1)[0]
-            newipinfo = getaddrinfo(newip, 0)[0]
+            newipinfo = socket.getaddrinfo(newip, 0)[0]
             # This getaddrinfo is repeated in get_nic_config, could be
             # optimized, albeit with a more convoluted api..
             newip = newipinfo[-1][0]

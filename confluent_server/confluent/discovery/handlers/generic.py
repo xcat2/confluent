@@ -14,9 +14,8 @@
 
 import confluent.util as util
 import errno
-import eventlet
 import socket
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
 
 class NodeHandler(object):
     https_supported = True
@@ -37,6 +36,7 @@ class NodeHandler(object):
         self.relay_server = None
         self.web_ip = None
         self.web_port = None
+        self.https_cert = None
         # if this is a remote registered component, prefer to use the agent forwarder
         if info.get('forwarder_url', False):
             self.relay_url = info['forwarder_url']
@@ -114,14 +114,13 @@ class NodeHandler(object):
         elif self._certfailreason == 2:
             return 'unreachable'
 
-    @property
-    def https_cert(self):
+    async def get_https_cert(self):
         if self._fp:
             return self._fp
-        ip, port = self.get_web_port_and_ip()
-        wc = webclient.SecureHTTPConnection(ip, verifycallback=self._savecert, port=port)
+        ip, port = await self.get_web_port_and_ip()
+        wc = webclient.WebConnection(ip, verifycallback=self._savecert, port=port)
         try:
-            wc.connect()
+            await wc.request('GET', '/')
         except IOError as ie:
             if ie.errno == errno.ECONNREFUSED:
                 self._certfailreason = 1
@@ -134,16 +133,17 @@ class NodeHandler(object):
         except Exception:
             self._certfailreason = 2
             return None
+        self.https_cert = self._fp
         return self._fp
 
-    def get_web_port_and_ip(self):
+    async def get_web_port_and_ip(self):
         if self.web_ip:
             return self.web_ip, self.web_port
         # get target ip and port, either direct or relay as applicable
         if self.relay_url:
             kv = util.TLSCertVerifier(self.configmanager, self.relay_server,
                                   'pubkeys.tls_hardwaremanager').verify_cert
-            w = webclient.SecureHTTPConnection(self.relay_server, verifycallback=kv)
+            w = webclient.WebConnection(self.relay_server, verifycallback=kv)
             relaycreds = self.configmanager.get_node_attributes(self.relay_server, 'secret.*', decrypt=True)
             relaycreds = relaycreds.get(self.relay_server, {})
             relayuser = relaycreds.get('secret.hardwaremanagementuser', {}).get('value', None)
@@ -151,8 +151,7 @@ class NodeHandler(object):
             if not relayuser or not relaypass:
                 raise Exception('No credentials for {0}'.format(self.relay_server))
             w.set_basic_credentials(relayuser, relaypass)
-            w.connect()
-            w.request('GET', self.relay_url)
+            await w.request('GET', self.relay_url)
             r = w.getresponse()
             rb = r.read()
             if r.code != 302:

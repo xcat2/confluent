@@ -14,14 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import confluent.neighutil as neighutil
 import confluent.util as util
 import confluent.log as log
 import os
 import random
-import eventlet.greenpool
-import eventlet.green.select as select
-import eventlet.green.socket as socket
+#import eventlet.green.socket as socket
+import socket
 import struct
 import traceback
 
@@ -116,6 +116,7 @@ def _parse_slp_packet(packet, peer, rsps, xidmap, defer=None, sock=None):
         else:
             probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
             try:
+                sock.setblocking(1)
                 sock.sendto(b'\x00', probepeer)
             except Exception:
                 return
@@ -253,20 +254,51 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
                 pass
 
 
-def _grab_rsps(socks, rsps, interval, xidmap, deferrals):
-    r = None
-    res = select.select(socks, (), (), interval)
-    if res:
-        r = res[0]
-    while r:
-        for s in r:
-            (rsp, peer) = s.recvfrom(9000)
-            _parse_slp_packet(rsp, peer, rsps, xidmap, deferrals, s)
-            res = select.select(socks, (), (), interval)
-            if not res:
-                r = None
-            else:
-                r = res[0]
+import time
+
+def sock_read(fut, sock, cloop, allsocks):
+    if fut.done():
+        print("was already done???")
+        return
+    if not cloop.remove_reader(sock):
+        print("Was already removed??")
+    fut.set_result(sock)
+    allsocks.discard(sock)
+
+async def _bulk_recvfrom(socks, timeout):
+    allsocks = set([])
+    cloop = asyncio.get_running_loop()
+    done = True
+    while done:
+        currfutures = []
+        for sock in socks:
+            sock.setblocking(0)
+            currfut = asyncio.Future()
+            cloop.add_reader(sock, sock_read, currfut, sock, cloop, allsocks)
+            currfutures.append(currfut)
+        done, dumbfutures = await asyncio.wait(currfutures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+        for sk in allsocks:
+            cloop.remove_reader(sk)
+        for dumbfuture in dumbfutures:
+            dumbfuture.cancel()
+        socks = []
+        for currfut in done:
+            socks.append(await currfut)
+        for sock in socks:
+            sock.setblocking(0)
+            try:
+                yield (sock,) + sock.recvfrom(9000)
+            except socket.error:
+                print("shouldn't happen...")
+                continue
+    print("done recv")
+
+
+
+async def _grab_rsps(socks, rsps, interval, xidmap, deferrals):
+    async for srp in _bulk_recvfrom(socks, interval):
+        sock, rsp, peer = srp
+        _parse_slp_packet(rsp, peer, rsps, xidmap, deferrals, sock)
 
 
 
@@ -335,16 +367,17 @@ def _parse_attrs(data, parsed, xid=None):
     parsed['attributes'] = _parse_attrlist(attrstr)
 
 
-def fix_info(info, handler):
+async def fix_info(info, handler):
     if '_attempts' not in info:
         info['_attempts'] = 10
     if info['_attempts'] == 0:
         return
     info['_attempts'] -= 1
-    _add_attributes(info)
+    await _add_attributes(info)
     handler(info)
 
-def _add_attributes(parsed):
+
+async def _add_attributes(parsed):
     xid = parsed.get('xid', 42)
     attrq = _generate_attr_request(parsed['services'][0], xid)
     target = None
@@ -360,14 +393,16 @@ def _add_attributes(parsed):
         net = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
     else:
         net = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    cloop = asyncio.get_running_loop()
     try:
-        net.settimeout(2.0)
-        net.connect(target)
-    except socket.error:
+        net.settimeout(0)
+        net.setblocking(0)
+        await asyncio.wait_for(cloop.sock_connect(net, target), 2.0)
+    except (socket.error, asyncio.exceptions.TimeoutError) as te:
         return
     try:
-        net.sendall(attrq)
-        rsp = net.recv(8192)
+        await cloop.sock_sendall(net, attrq)
+        rsp = await cloop.sock_recv(net, 8192)
         net.close()
         _parse_attrs(rsp, parsed, xid)
     except Exception as e:
@@ -417,9 +452,9 @@ def query_srvtypes(target):
         stypes = payload[4:4+stypelen].decode('utf-8')
         return stypes.split(',')
 
-def rescan(handler):
+async def rescan(handler):
     known_peers = set([])
-    for scanned in scan():
+    async for scanned in scan():
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
@@ -431,7 +466,7 @@ def rescan(handler):
             handler(scanned)
 
 
-def snoop(handler, protocol=None):
+async def snoop(handler, protocol=None):
     """Watch for SLP activity
 
     handler will be called with a dictionary of relevant attributes
@@ -441,10 +476,10 @@ def snoop(handler, protocol=None):
     """
     tracelog = log.Logger('trace')
     try:
-        active_scan(handler, protocol)
+        await active_scan(handler, protocol)
     except Exception as e:
-            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                         event=log.Events.stacktrace)
+        tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                        event=log.Events.stacktrace)
     net = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     net.setsockopt(IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     slpg = socket.inet_pton(socket.AF_INET6, 'ff01::123')
@@ -475,7 +510,6 @@ def snoop(handler, protocol=None):
     while True:
         try:
             newmacs = set([])
-            r, _, _ = select.select((net, net4), (), (), 60)
             # clear known_peers and peerbymacaddress
             # to avoid stale info getting in...
             # rely upon the select(0.2) to catch rapid fire and aggregate ip
@@ -485,29 +519,34 @@ def snoop(handler, protocol=None):
             known_peers = set([])
             peerbymacaddress = {}
             deferpeers = []
-            while r and len(deferpeers) < 256:
-                for s in r:
-                    (rsp, peer) = s.recvfrom(9000)
+            timeo = 60
+            rdy = True
+            while rdy and len(deferpeers) < 256:
+                rdy = False
+                async for srp in _bulk_recvfrom((net, net4), timeo):
+                    rdy = True
+                    s, rsp, peer = srp
                     if peer in known_peers:
                         continue
                     mac = neighutil.get_hwaddr(peer[0])
                     if not mac:
                         probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
                         try:
+                            s.setblocking(1)
                             s.sendto(b'\x00', probepeer)
                         except Exception:
                             continue
                         deferpeers.append(peer)
                         continue
                     process_peer(newmacs, known_peers, peerbymacaddress, peer)
-                r, _, _ = select.select((net, net4), (), (), 0.2)
+                timeo = 0.2
             if deferpeers:
-                eventlet.sleep(2.2)
+                await asyncio.sleep(2.2)
                 for peer in deferpeers:
                     process_peer(newmacs, known_peers, peerbymacaddress, peer)
             for mac in newmacs:
                 peerbymacaddress[mac]['xid'] = 1
-                _add_attributes(peerbymacaddress[mac])
+                await _add_attributes(peerbymacaddress[mac])
                 peerbymacaddress[mac]['hwaddr'] = mac
                 peerbymacaddress[mac]['protocol'] = protocol
                 for srvurl in peerbymacaddress[mac].get('urls', ()):
@@ -515,6 +554,7 @@ def snoop(handler, protocol=None):
                         srvurl = srvurl[:-3]
                     if srvurl.endswith('://Athena:'):
                         continue
+                print(repr(peerbymacaddress[mac]))
                 if 'service:ipmi' in peerbymacaddress[mac]['services']:
                     continue
                 if 'service:lightttpd' in peerbymacaddress[mac]['services']:
@@ -560,13 +600,14 @@ def process_peer(newmacs, known_peers, peerbymacaddress, peer):
     newmacs.add(mac)
 
 
-def active_scan(handler, protocol=None):
+async def active_scan(handler, protocol=None):
     known_peers = set([])
     toprocess = []
     # Implement a warmup, inducing neighbor table activity
     # by kernel and giving 2 seconds for a retry or two if
     # needed
-    for scanned in scan():
+    async for scanned in scan():
+        print('fun with: '  + repr(scanned['services']))
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
@@ -581,7 +622,7 @@ def active_scan(handler, protocol=None):
             handler(scanned)
 
 
-def scan(srvtypes=_slp_services, addresses=None, localonly=False):
+async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     """Find targets providing matching requested srvtypes
 
     This is a generator that will iterate over respondants to the SrvType
@@ -613,23 +654,26 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     # processed, mitigating volume of response traffic
     rsps = {}
     deferrals = []
+    print('commence')
     for srvtype in srvtypes:
         xididx += 1
         _find_srvtype(net, net4, srvtype, addresses, initxid + xididx)
         xidmap[initxid + xididx] = srvtype
-        _grab_rsps((net, net4), rsps, 0.1, xidmap, deferrals)
+        await _grab_rsps((net, net4), rsps, 0.1, xidmap, deferrals)
     # now do a more slow check to work to get stragglers,
     # but fortunately the above should have taken the brunt of volume, so
     # reduced chance of many responses overwhelming receive buffer.
-    _grab_rsps((net, net4), rsps, 1, xidmap, deferrals)
+    print('waity')
+    await _grab_rsps((net, net4), rsps, 1, xidmap, deferrals)
+    print(len(rsps))
     if deferrals:
-        eventlet.sleep(1.2)  # already have a one second pause from select above
+        await asyncio.sleep(1.2)  # already have a one second pause from select above
         for defer in deferrals:
             rsp, peer = defer
             _parse_slp_packet(rsp, peer, rsps, xidmap)
     # now to analyze and flesh out the responses
     handleids = set([])
-    gp = eventlet.greenpool.GreenPool(128)
+    tsks = []
     for id in rsps:
         for srvurl in rsps[id].get('urls', ()):
             if len(srvurl) > 4:
@@ -644,9 +688,10 @@ def scan(srvtypes=_slp_services, addresses=None, localonly=False):
                     break
             else:
                 continue
-        gp.spawn_n(_add_attributes, rsps[id])
+        tsks.append(util.spawn(_add_attributes(rsps[id])))
         handleids.add(id)
-    gp.waitall()
+    if tsks:
+        await asyncio.wait(tsks)
     for id in handleids:
         if 'service:lighttpd' in rsps[id]['services']:
             currinf = rsps[id]

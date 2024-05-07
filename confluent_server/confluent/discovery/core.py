@@ -61,6 +61,7 @@
 #       retry until uppercase, lowercase, digit, and symbol all present)
 #     - Apply defined configuration to endpoint
 
+import asyncio
 import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
@@ -80,20 +81,21 @@ import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.util as util
+import inspect
 import json
 import eventlet
 import traceback
 import shlex
 import struct
-import eventlet.green.socket as socket
+#import eventlet.green.socket as socket
+import socket
 import socket as nsocket
-import eventlet.green.subprocess as subprocess
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import subprocess
+#import eventlet.green.subprocess as subprocess
+#webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
 import eventlet
-import eventlet.greenpool
-import eventlet.semaphore
 
 autosensors = set()
 scanner = None
@@ -153,7 +155,6 @@ servicebyname = {
     'lenovo-tsm': 'service:lenovo-tsm',
 }
 
-discopool = eventlet.greenpool.GreenPool(500)
 runningevals = {}
 # Passive-only auto-detection protocols:
 # PXE
@@ -512,8 +513,8 @@ def save_subscriptions(subs):
         dso.write(json.dumps(subs))
 
 
-def register_remote_addrs(addresses, configmanager):
-    def register_remote_addr(addr):
+async def register_remote_addrs(addresses, configmanager):
+    async def register_remote_addr(addr):
         nd = {
             'addresses': [(addr, 443)]
         }
@@ -522,12 +523,13 @@ def register_remote_addrs(addresses, configmanager):
             return addr, False
         sd['hwaddr'] = sd['attributes']['mac-address']
         nh = xcc.NodeHandler(sd, configmanager)
-        nh.scan()
-        detected(nh.info)
+        await nh.scan()
+        await detected(nh.info)
         return addr, True
-    rpool = eventlet.greenpool.GreenPool(512)
+    #rpool = eventlet.greenpool.GreenPool(512)
     for count in iterate_addrs(addresses, True):
         yield msg.ConfluentResourceCount(count)
+    return  # ASYNC
     for result in rpool.imap(register_remote_addr, iterate_addrs(addresses)):
         if result[1]:
             yield msg.CreatedResource(result[0])
@@ -535,7 +537,7 @@ def register_remote_addrs(addresses, configmanager):
             yield msg.ConfluentResourceNotFound(result[0])
 
 
-def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+async def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if pathcomponents == ['discovery', 'autosense']:
         return handle_autosense_config(operation, inputdata)
     if operation == 'retrieve' and pathcomponents[:2] == ['discovery', 'subscriptions']:
@@ -549,7 +551,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             pathcomponents == ['discovery', 'rescan']):
         if inputdata != {'rescan': 'start'}:
             raise exc.InvalidArgumentException()
-        rescan()
+        await rescan()
         return (msg.KeyValueData({'rescan': 'started'}),)
     elif operation in ('update', 'create') and pathcomponents[:2] == ['discovery', 'subscriptions']:
         target = pathcomponents[2]
@@ -570,7 +572,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         if pathcomponents == ['discovery', 'register']:
             if 'addresses' not in inputdata:
                 raise exc.InvalidArgumentException('Missing address in input')
-            return register_remote_addrs(inputdata['addresses'], configmanager)
+            return await register_remote_addrs(inputdata['addresses'], configmanager)
         if 'node' not in inputdata:
             raise exc.InvalidArgumentException('Missing node name in input')
         mac = _get_mac_from_query(pathcomponents)
@@ -581,7 +583,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
                                               '/'.join(pathcomponents)))
         handler = info['handler'].NodeHandler(info, configmanager)
         try:
-            eval_node(configmanager, handler, info, inputdata['node'],
+            await eval_node(configmanager, handler, info, inputdata['node'],
                       manual=True)
         except Exception as e:
             # or... incorrect passworod provided..
@@ -654,10 +656,10 @@ async def _recheck_nodes(nodeattribs, configmanager):
         # if already in progress, don't run again
         # it may make sense to schedule a repeat, but will try the easier and less redundant way first
         return
-    with rechecklock:
-        return _recheck_nodes_backend(nodeattribs, configmanager)
+    async with rechecklock:
+        return await _recheck_nodes_backend(nodeattribs, configmanager)
 
-def _recheck_nodes_backend(nodeattribs, configmanager):
+async def _recheck_nodes_backend(nodeattribs, configmanager):
     global rechecker
     _map_unique_ids(nodeattribs)
     # for the nodes whose attributes have changed, consider them as potential
@@ -673,7 +675,7 @@ def _recheck_nodes_backend(nodeattribs, configmanager):
     # Now we go through ones we did not find earlier
     for mac in list(unknown_info):
         try:
-            _recheck_single_unknown(configmanager, mac)
+            await _recheck_single_unknown(configmanager, mac)
         except Exception:
             traceback.print_exc()
             continue
@@ -685,19 +687,19 @@ def _recheck_nodes_backend(nodeattribs, configmanager):
             if info['handler'] is None:
                 next
             handler = info['handler'].NodeHandler(info, configmanager)
-            discopool.spawn_n(eval_node, configmanager, handler, info, nodename)
+            util.spawn(eval_node(configmanager, handler, info, nodename))
         except Exception:
             traceback.print_exc()
             log.log({'error': 'Unexpected error during discovery of {0}, check debug '
                               'logs'.format(nodename)})
 
 
-def _recheck_single_unknown(configmanager, mac):
+async def _recheck_single_unknown(configmanager, mac):
     info = unknown_info.get(mac, None)
-    _recheck_single_unknown_info(configmanager, info)
+    await _recheck_single_unknown_info(configmanager, info)
 
 
-def _recheck_single_unknown_info(configmanager, info):
+async def _recheck_single_unknown_info(configmanager, info):
     global rechecker
     global rechecktime
     if not info or info['handler'] is None:
@@ -728,12 +730,12 @@ def _recheck_single_unknown_info(configmanager, info):
         if rechecker is not None and rechecktime > util.monotonic_time() + 300:
             rechecker.cancel()
         # if cancel did not result in dead, then we are in progress
-        if rechecker is None or rechecker.dead:
+        if rechecker is None or rechecker.done():
             rechecktime = util.monotonic_time() + 300
             rechecker = util.spawn_after(300, _periodic_recheck,
                                              configmanager)
         return
-    nodename, info['maccount'] = get_nodename(configmanager, handler, info)
+    nodename, info['maccount'] = await get_nodename(configmanager, handler, info)
     if nodename:
         if handler.https_supported:
             dp = configmanager.get_node_attributes([nodename],
@@ -745,27 +747,30 @@ def _recheck_single_unknown_info(configmanager, info):
                 known_nodes[nodename][info['hwaddr']] = info
                 info['discostatus'] = 'discovered'
                 return  # already known, no need for more
-        discopool.spawn_n(eval_node, configmanager, handler, info, nodename)
+        util.spawn(eval_node(configmanager, handler, info, nodename))
 
 
 def safe_detected(info):
+    print(repr(info['services']))
     if 'hwaddr' not in info or not info['hwaddr']:
+        print("No mac!!!")
         return
     if info['hwaddr'] in runningevals:
+        print("Already mac!!!")
         # Do not evaluate the same mac multiple times at once
         return
-    runningevals[info['hwaddr']] = discopool.spawn(eval_detected, info)
+    runningevals[info['hwaddr']] = util.spawn(eval_detected(info))
 
 
-def eval_detected(info):
+async def eval_detected(info):
     try:
-        detected(info)
+        await detected(info)
     except Exception as e:
         traceback.print_exc()
     del runningevals[info['hwaddr']]
 
 
-def detected(info):
+async def detected(info):
     global rechecker
     global rechecktime
     if not cfm.config_is_ready():
@@ -783,7 +788,7 @@ def detected(info):
         return
     if (handler and not handler.NodeHandler.adequate(info) and
             info.get('protocol', None)):
-        eventlet.spawn_after(10, info['protocol'].fix_info, info,
+        util.spawn_after(10, info['protocol'].fix_info, info,
                              safe_detected)
         return
     if info['hwaddr'] in known_info and 'addresses' in info:
@@ -816,7 +821,9 @@ def detected(info):
     cfg = cfm.ConfigManager(None)
     if handler:
         handler = handler.NodeHandler(info, cfg)
-        handler.scan()
+        res = handler.scan()
+        if inspect.isawaitable(res):
+            await res
     try:
         if 'modelnumber' not in info:
             info['modelnumber'] = info['attributes']['enclosure-machinetype-model'][0]
@@ -858,7 +865,7 @@ def detected(info):
             )})
         if rechecker is not None and rechecktime > util.monotonic_time() + 300:
             rechecker.cancel()
-        if rechecker is None or rechecker.dead:
+        if rechecker is None or rechecker.done():
             rechecktime = util.monotonic_time() + 300
             rechecker = util.spawn_after(300, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
@@ -866,7 +873,7 @@ def detected(info):
         #TODO, eventlet spawn after to recheck sooner, or somehow else
         # influence periodic recheck to shorten delay?
         return
-    nodename, info['maccount'] = get_nodename(cfg, handler, info)
+    nodename, info['maccount'] = await get_nodename(cfg, handler, info)
     if nodename and handler and handler.https_supported:
         dp = cfg.get_node_attributes([nodename],
                                      ('pubkeys.tls_hardwaremanager', 'id.uuid', 'discovery.policy'))
@@ -893,7 +900,7 @@ def detected(info):
     #for now defer probe until inside eval_node.  We might not have
     #a nodename without probe in the future.
     if nodename and handler:
-        eval_node(cfg, handler, info, nodename)
+        await eval_node(cfg, handler, info, nodename)
     elif handler:
         #log.log(
         #    {'info': 'Detected unknown {0} with hwaddr {1} at '
@@ -1038,7 +1045,7 @@ def get_nodename_sysdisco(cfg, handler, info):
             return nl[0]
 
 
-def get_nodename(cfg, handler, info):
+async def get_nodename(cfg, handler, info):
     nodename = None
     maccount = None
     info['verified'] = False
@@ -1080,7 +1087,7 @@ def get_nodename(cfg, handler, info):
     if not nodename:  # as a last resort, search switches for info
         # This is the slowest potential operation, so we hope for the
         # best to occur prior to this
-        nodename, macinfo = macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
+        nodename, macinfo = await macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
         maccount = macinfo['maccount']
         if nodename:
             if handler.devname == 'SMM':
@@ -1198,7 +1205,7 @@ def search_smms_by_cert(currsmm, cert, cfg):
         return search_smms_by_cert(exnl[0], cert, cfg)
 
 
-def eval_node(cfg, handler, info, nodename, manual=False):
+async def eval_node(cfg, handler, info, nodename, manual=False):
     try:
         handler.probe()  # unicast interrogation as possible to get more data
         # switch concurrently
@@ -1237,7 +1244,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             info['verfied'] = True
             info['enclosure.bay'] = match[1]
             if match[2]:
-                if not discover_node(cfg, handler, info, match[2], manual):
+                if not await discover_node(cfg, handler, info, match[2], manual):
                     pending_nodes[match[2]] = info
                 return
         if 'enclosure.bay' not in info:
@@ -1304,7 +1311,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
             info['discostatus'] = 'unidentified'
             return
         nodename = nl[0]
-        if not discover_node(cfg, handler, info, nodename, manual):
+        if not await discover_node(cfg, handler, info, nodename, manual):
             # store it as pending, assuming blocked on enclosure
             # assurance...
             pending_nodes[nodename] = info
@@ -1324,7 +1331,7 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                     fprints = macmap.get_node_fingerprints(nodename, cfg)
                     for fprint in fprints:
                         if util.cert_matches(fprint[0], handler.https_cert):
-                            if not discover_node(cfg, handler, info,
+                            if not await discover_node(cfg, handler, info,
                                                  nodename, manual):
                                 pending_nodes[nodename] = info
                             return
@@ -1336,11 +1343,11 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                            'switch.'.format(nodename, handler.devname)
                 log.log({'error': errorstr})
                 return
-        if not discover_node(cfg, handler, info, nodename, manual):
+        if not await discover_node(cfg, handler, info, nodename, manual):
             pending_nodes[nodename] = info
 
 
-def discover_node(cfg, handler, info, nodename, manual):
+async def discover_node(cfg, handler, info, nodename, manual):
     if manual:
         if not cfg.is_node(nodename):
             raise exc.InvalidArgumentException(
@@ -1449,15 +1456,14 @@ def discover_node(cfg, handler, info, nodename, manual):
                     log.log({'error': 'Unable to get BMC address for {0]'.format(nodename)})
                 else:
                     bmcaddr = bmcaddr.split('/', 1)[0]
-                    wait_for_connection(bmcaddr)
-                    socket.getaddrinfo(bmcaddr, 443)
+                    await wait_for_connection(bmcaddr)
                     subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
 
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):
-            eventlet.spawn_n(_recheck_single_unknown_info, cfg, i)
+            util.spawn(_recheck_single_unknown_info(cfg, i))
         try:
             del pending_by_uuid[curruuid]
         except KeyError:
@@ -1545,7 +1551,7 @@ async def _handle_nodelist_change(configmanager):
     await _recheck_nodes((), configmanager)
     if needaddhandled:
         needaddhandled = False
-        nodeaddhandler = eventlet.spawn(_handle_nodelist_change, configmanager)
+        nodeaddhandler = util.spawn(_handle_nodelist_change(configmanager))
     else:
         nodeaddhandler = None
 
@@ -1579,7 +1585,7 @@ async def newnodes(added, deleting, renamed, configmanager):
 
 rechecker = None
 rechecktime = None
-rechecklock = eventlet.semaphore.Semaphore()
+rechecklock = asyncio.Lock()
 
 async def _periodic_recheck(configmanager):
     global rechecker
@@ -1599,31 +1605,35 @@ async def _periodic_recheck(configmanager):
                                          configmanager)
 
 
-def rescan():
+async def rescan():
     _map_unique_ids()
     global scanner
     if scanner:
         return
     else:
-        scanner = eventlet.spawn(blocking_scan)
-    remotescan()
+        print("begin")
+        scanner = util.spawn(blocking_scan())
+        print("bg")
+    await remotescan()
 
-def remotescan():
+async def remotescan():
     mycfm = cfm.ConfigManager(None)
     myname = collective.get_myname()
     for remagent in get_subscriptions():
         try:
-            affluent.renotify_me(remagent, mycfm, myname)
+            await affluent.renotify_me(remagent, mycfm, myname)
         except Exception as e:
             log.log({'error': 'Unexpected problem asking {} for discovery notifications'.format(remagent)})
 
 
-def blocking_scan():
+async def blocking_scan():
     global scanner
-    slpscan = eventlet.spawn(slp.active_scan, safe_detected, slp)
-    ssdpscan = eventlet.spawn(ssdp.active_scan, safe_detected, ssdp)
-    slpscan.wait()
-    ssdpscan.wait()
+    slpscan = util.spawn(slp.active_scan(safe_detected, slp))
+    #ssdpscan = eventlet.spawn(ssdp.active_scan, safe_detected, ssdp)
+    print("beign slpscan")
+    await slpscan
+    print("end scan")
+    #ssdpscan.wait()
     scanner = None
 
 def start_detection():
@@ -1644,7 +1654,7 @@ def start_detection():
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
         rechecker = util.spawn_after(900, _periodic_recheck, cfg)
-    eventlet.spawn_n(ssdp.snoop, safe_detected, None, ssdp, get_node_by_uuid_or_mac)
+    #eventlet.spawn(ssdp.snoop(safe_detected, None, ssdp, get_node_by_uuid_or_mac))
 
 def stop_autosense():
     for watcher in list(autosensors):
@@ -1652,10 +1662,10 @@ def stop_autosense():
         autosensors.discard(watcher)
 
 def start_autosense():
-    autosensors.add(eventlet.spawn(slp.snoop, safe_detected, slp))
+    autosensors.add(util.spawn(slp.snoop(safe_detected, slp)))
     #autosensors.add(eventlet.spawn(mdns.snoop, safe_detected, mdns))
-    autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
-    eventlet.spawn(remotescan)
+    #autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
+    util.spawn(remotescan())
 
 
 nodes_by_fprint = {}
@@ -1699,7 +1709,10 @@ def _map_unique_ids(nodes=None):
             nodes_by_fprint[fprint] = node
 
 
-if __name__ == '__main__':
+async def main():
     start_detection()
     while True:
-        eventlet.sleep(30)
+        await asyncio.sleep(30)
+
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

@@ -12,21 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import confluent.discovery.handlers.generic as generic
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
-import eventlet
-import eventlet.support.greendns
-import json
-try:
-    from urllib import urlencode
-except ImportError:
-    from urllib.parse import urlencode
+import socket
+from urllib.parse import urlencode
 
-getaddrinfo = eventlet.support.greendns.getaddrinfo
 
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
 
 class NodeHandler(generic.NodeHandler):
     devname = 'TSM'
@@ -45,9 +40,11 @@ class NodeHandler(generic.NodeHandler):
         self.atdefault = True
         super(NodeHandler, self).__init__(info, configmanager)
 
-    def scan(self):
-        c = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
-        i = c.grab_json_response('/redfish/v1/')
+    async def scan(self):
+        await self.get_https_cert()
+        c = webclient.WebConnection(
+            self.ipaddr, 443, verifycallback=self.validate_cert)
+        i = await c.grab_json_response('/redfish/v1/')
         uuid = i.get('UUID', None)
         if uuid:
             self.info['uuid'] = uuid.lower()
@@ -58,20 +55,21 @@ class NodeHandler(generic.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
-    def _get_wc(self):
+    async def _get_wc(self):
         authdata = {  # start by trying factory defaults
             'username': self.DEFAULT_USER,
             'password': self.DEFAULT_PASS,
         }
-        wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        await self.get_https_cert()
+        wc = webclient.WebConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
         wc.set_header('Content-Type', 'application/json')
         authmode = 0
         if not self.trieddefault:
-            rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+            rsp, status = await wc.grab_json_response_with_status('/api/session', authdata)
             if status == 403:
                 wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
                 authmode = 1
-                rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+                rsp, status = await wc.grab_json_response_with_status('/api/session', urlencode(authdata))
             else:
                 authmode = 2
             if status > 400:
@@ -101,19 +99,19 @@ class NodeHandler(generic.NodeHandler):
                             rpasschange, method='PATCH')
                         if status >= 200 and status < 300:
                             authdata['password'] = self.targpass
-                            eventlet.sleep(10)
+                            await asyncio.sleep(10)
                         else:
                             if b'[web.lua] Error in RequestHandler, thread' in rsp:
-                                rsp, status = wc.grab_json_response_with_status('/api/reset-pass', passchange)
+                                rsp, status = await wc.grab_json_response_with_status('/api/reset-pass', passchange)
                             else:
                                 raise Exception("Redfish may not have been ready yet" + repr(rsp))
                     else:
-                        rsp, status = wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
+                        rsp, status = await wc.grab_json_response_with_status('/api/reset-pass', urlencode(passchange))
                     authdata['password'] = self.targpass
                     if authmode == 2:
-                        rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+                        rsp, status = await wc.grab_json_response_with_status('/api/session', authdata)
                     else:
-                        rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+                        rsp, status = await wc.grab_json_response_with_status('/api/session', urlencode(authdata))
                     self.csrftok = rsp['CSRFToken']
                     self.channel = rsp['channel']
                     self.curruser = self.DEFAULT_USER
@@ -129,10 +127,10 @@ class NodeHandler(generic.NodeHandler):
             authdata['username'] = self.curruser
             authdata['password'] = self.currpass
             if authmode != 1:
-                rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+                rsp, status = await wc.grab_json_response_with_status('/api/session', authdata)
             if authmode == 1 or status == 403:
                 wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
-                rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+                rsp, status = await wc.grab_json_response_with_status('/api/session', urlencode(authdata))
             if status != 200:
                 return None
             self.csrftok = rsp['CSRFToken']
@@ -141,10 +139,10 @@ class NodeHandler(generic.NodeHandler):
         authdata['username'] = self.targuser
         authdata['password'] = self.targpass
         if authmode != 1:
-            rsp, status = wc.grab_json_response_with_status('/api/session', authdata)
+            rsp, status = await wc.grab_json_response_with_status('/api/session', authdata)
         if authmode == 1 or status == 403:
             wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
-            rsp, status = wc.grab_json_response_with_status('/api/session', urlencode(authdata))
+            rsp, status = await wc.grab_json_response_with_status('/api/session', urlencode(authdata))
         if status != 200:
             return None
         self.curruser = self.targuser
@@ -153,7 +151,7 @@ class NodeHandler(generic.NodeHandler):
         self.channel = rsp['channel']
         return wc
 
-    def config(self, nodename):
+    async def config(self, nodename):
         self.nodename = nodename
         creds = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
@@ -167,7 +165,7 @@ class NodeHandler(generic.NodeHandler):
         passwd = util.stringify(passwd)
         self.targuser = user
         self.targpass = passwd
-        wc = self._get_wc()
+        wc = await self._get_wc()
         wc.set_header('X-CSRFTOKEN', self.csrftok)
         curruserinfo = {}
         authupdate = False
@@ -202,7 +200,7 @@ class NodeHandler(generic.NodeHandler):
                     'fe80::')):
             newip = cd['hardwaremanagement.manager']['value']
             newip = newip.split('/', 1)[0]
-            newipinfo = getaddrinfo(newip, 0)[0]
+            newipinfo = socket.getaddrinfo(newip, 0)[0]
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
@@ -239,7 +237,7 @@ def remote_nodecfg(nodename, cfm):
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
+    ipaddr = socket.getaddrinfo(ipaddr, 0)[0][-1]
     if not ipaddr:
         raise Exception('Cannot remote configure a system without known '
                          'address')

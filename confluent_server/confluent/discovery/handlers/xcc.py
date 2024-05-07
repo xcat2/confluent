@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import base64
 import codecs
 import confluent.discovery.handlers.imm as immhandler
@@ -19,15 +20,12 @@ import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
 import errno
-import eventlet
-import eventlet.support.greendns
 import json
 import os
-import pyghmi.exceptions as pygexc
-import eventlet.green.socket as socket
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.exceptions as pygexc
+import socket
+import aiohmi.util.webclient as webclient
 import struct
-getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
 def fixuuid(baduuid):
@@ -39,7 +37,8 @@ def fixuuid(baduuid):
     uuid = (a[:8], a[8:12], a[12:16], baduuid[19:23], baduuid[24:])
     return '-'.join(uuid).lower()
 
-class LockedUserException(Exception):
+
+class LockedUserException(BaseException):
     pass
 
 
@@ -88,8 +87,8 @@ class NodeHandler(immhandler.NodeHandler):
     def probe(self):
         return None
 
-    def scan(self):
-        ip, port = self.get_web_port_and_ip()
+    async def scan(self):
+        ip, port = await self.get_web_port_and_ip()
         c = webclient.SecureHTTPConnection(ip, port,
             verifycallback=self.validate_cert)
         i = c.grab_json_response('/api/providers/logoninfo')
@@ -131,7 +130,7 @@ class NodeHandler(immhandler.NodeHandler):
             if slot != 0:
                 self.info['enclosure.bay'] = slot
 
-    def preconfig(self, possiblenode):
+    async def preconfig(self, possiblenode):
         self.tmpnodename = possiblenode
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
@@ -152,7 +151,7 @@ class NodeHandler(immhandler.NodeHandler):
         disableipmi = False
         if currfirm >= 3:
             # IPMI is disabled and we need it, also we need to go to *some* password
-            wc = self.wc
+            wc = await self.get_wc()
             if not wc:
                 # We cannot try to enable SMM here without risking real credentials
                 # on the wire to untrusted parties
@@ -195,7 +194,7 @@ class NodeHandler(immhandler.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
-    def get_webclient(self, username, password, newpassword):
+    async def get_webclient(self, username, password, newpassword):
         wc = self._wc.dupe()
         try:
             wc.connect()
@@ -293,7 +292,7 @@ class NodeHandler(immhandler.NodeHandler):
             if pwdchanged:
                 # Remove the minimum change interval, to allow sane 
                 # password changes after provisional changes
-                wc = self.wc
+                wc = await self.get_wc()
                 self.set_password_policy('', wc)
             return (wc, pwdchanged)
         elif rspdata.get('locktime', 0) > 0:
@@ -301,8 +300,7 @@ class NodeHandler(immhandler.NodeHandler):
                 'The user "{0}" has been locked out by too many incorrect password attempts'.format(username))
         return (None, rspdata)
 
-    @property
-    def wc(self):
+    async def get_wc(self):
         passwd = None
         isdefault = True
         errinfo = {}
@@ -319,7 +317,7 @@ class NodeHandler(immhandler.NodeHandler):
             nodename = None
             inpreconfig = True
         if self._currcreds[0] is not None:
-            wc, pwdchanged = self.get_webclient(self._currcreds[0], self._currcreds[1], None)
+            wc, pwdchanged = await self.get_webclient(self._currcreds[0], self._currcreds[1], None)
             if wc:
                 return wc
         if nodename:
@@ -342,7 +340,7 @@ class NodeHandler(immhandler.NodeHandler):
                 # (TempW0rd42)
                 passwd = 'TempW0rd42'
             try:
-                wc, pwdchanged = self.get_webclient('USERID', 'PASSW0RD', passwd)
+                wc, pwdchanged = await self.get_webclient('USERID', 'PASSW0RD', passwd)
             except LockedUserException as lue:
                 wc = None
                 pwdchanged = 'The user "USERID" has been locked out by too many incorrect password attempts'
@@ -363,11 +361,11 @@ class NodeHandler(immhandler.NodeHandler):
         if self.tmppasswd:
             if savedexc:
                 raise savedexc
-            wc, errinfo = self.get_webclient('USERID', self.tmppasswd, passwd)
+            wc, errinfo = await self.get_webclient('USERID', self.tmppasswd, passwd)
         else:
             if user == 'USERID' and savedexc:
                 raise savedexc
-            wc, errinfo = self.get_webclient(user, passwd, None)
+            wc, errinfo = await self.get_webclient(user, passwd, None)
         if wc:
             return wc
         else:
@@ -408,7 +406,7 @@ class NodeHandler(immhandler.NodeHandler):
             if user['users_user_name'] == '':
                 return user['users_user_id']
 
-    def _setup_xcc_account(self, username, passwd, wc):
+    async def _setup_xcc_account(self, username, passwd, wc):
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         uid = None
         for user in userinfo['items'][0]['users']:
@@ -449,7 +447,7 @@ class NodeHandler(immhandler.NodeHandler):
                         if status != 200:
                             rsp = json.loads(rsp)
                             if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError'):
-                                eventlet.sleep(4)
+                                await asyncio.sleep(4)
                             else:
                                 break
                     self.tmppasswd = None
@@ -459,7 +457,7 @@ class NodeHandler(immhandler.NodeHandler):
         wc.grab_json_response('/api/providers/logout')
         self._currcreds = (username, passwd)
 
-    def _convert_sha256account(self, user, passwd, wc):
+    async def _convert_sha256account(self, user, passwd, wc):
         # First check if the specified user is sha256...
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         curruser = None
@@ -472,7 +470,7 @@ class NodeHandler(immhandler.NodeHandler):
                 break
         if curruser.get('users_pass_is_sha256', 0):
             self._wc = None
-            wc = self.wc
+            wc = await self.get_wc()
             nwc = wc.dupe()
             # Have to convert it for being useful with most Lenovo automation tools
             # This requires deleting the account entirely and trying again
@@ -511,7 +509,7 @@ class NodeHandler(immhandler.NodeHandler):
                     userparams = "{0},{1},{2},1,4,0,0,0,0,,8,".format(curruser['users_user_id'], user, tpass)
                     nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
                     nwc.grab_json_response('/api/providers/logout')
-                    nwc, pwdchanged = self.get_webclient(user, tpass, passwd)
+                    nwc, pwdchanged = await self.get_webclient(user, tpass, passwd)
                     if not nwc:
                         if not pwdchanged:
                             pwdchanged = 'Unknown'
@@ -523,11 +521,11 @@ class NodeHandler(immhandler.NodeHandler):
                     nwc.grab_json_response('/api/providers/logout')
             finally:
                 self._wc = None
-                wc = self.wc
+                wc = await self.get_wc()
                 wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
                 wc.grab_json_response('/api/providers/logout')
 
-    def config(self, nodename, reset=False):
+    async def config(self, nodename, reset=False):
         self.nodename = nodename
         cd = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
@@ -546,7 +544,7 @@ class NodeHandler(immhandler.NodeHandler):
             nodename, 'discovery.passwordrules')
         strruleset = dpp.get(nodename, {}).get(
             'discovery.passwordrules', {}).get('value', '')
-        wc = self.wc
+        wc = await self.get_wc()
         creds = self.configmanager.get_node_attributes(
             self.nodename, ['secret.hardwaremanagementuser',
             'secret.hardwaremanagementpassword'], decrypt=True)
@@ -557,9 +555,9 @@ class NodeHandler(immhandler.NodeHandler):
                 raise Exception(
                     'Request to use default credentials, but refused by target after it has been changed to {0}'.format(self.tmppasswd))
             if not isdefault:
-                self._setup_xcc_account(user, passwd, wc)
-                wc = self.wc
-        self._convert_sha256account(user, passwd, wc)
+                await self._setup_xcc_account(user, passwd, wc)
+                wc = await self.get_wc()
+        await self._convert_sha256account(user, passwd, wc)
         if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
                 or cd.get('console.method', {}).get('value', None) == 'ipmi'):
             nwc = wc.dupe()
@@ -587,7 +585,7 @@ class NodeHandler(immhandler.NodeHandler):
                         updateinf, method='PATCH')
         if targbmc and not targbmc.startswith('fe80::'):
             newip = targbmc.split('/', 1)[0]
-            newipinfo = getaddrinfo(newip, 0)[0]
+            newipinfo = socket.getaddrinfo(newip, 0)[0]
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
@@ -607,7 +605,7 @@ class NodeHandler(immhandler.NodeHandler):
                     raise exc.InvalidArgumentException('Will not remotely configure a device with no gateway')
                 wc.grab_json_response('/api/dataset', statargs)
         elif self.ipaddr.startswith('fe80::'):
-            self.configmanager.set_node_attributes(
+            await self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
         else:
             raise exc.TargetEndpointUnreachable(
@@ -625,7 +623,7 @@ class NodeHandler(immhandler.NodeHandler):
                 'value', None)
             # ok, set the uuid of the manager...
             if em:
-                self.configmanager.set_node_attributes(
+                await self.configmanager.set_node_attributes(
                     {em: {'id.uuid': enclosureuuid}})
 
 def remote_nodecfg(nodename, cfm):
@@ -634,9 +632,9 @@ def remote_nodecfg(nodename, cfm):
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
+    ipaddr = socket.getaddrinfo(ipaddr, 0)[0][-1]
     if not ipaddr:
-        raise Excecption('Cannot remote configure a system without known '
+        raise Exception('Cannot remote configure a system without known '
                          'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)

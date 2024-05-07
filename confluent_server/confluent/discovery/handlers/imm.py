@@ -73,7 +73,7 @@ class NodeHandler(bmchandler.NodeHandler):
         if slot != 0:
             self.info['enclosure.bay'] = slot
 
-    def probe(self):
+    async def probe(self):
         if self.info.get('enclosure.bay', 0) == 0:
             self.scan()
         if self.info.get('enclosure.bay', 0) != 0:
@@ -85,8 +85,8 @@ class NodeHandler(bmchandler.NodeHandler):
         try:
             # we are a dense platform, but the SLP data did not give us slot
             # attempt to probe using IPMI
-            ipmicmd = self._get_ipmicmd()
-            guiddata = ipmicmd.xraw_command(netfn=6, command=8)
+            ipmicmd = await self._get_ipmicmd()
+            guiddata = await ipmicmd.xraw_command(netfn=6, command=8)
             self.info['uuid'] = pygutil.decode_wireformat_uuid(
                 guiddata['data']).lower()
             ipmicmd.oem_init()

@@ -55,7 +55,7 @@ class WebClient(object):
         return rsp
     
 
-def renotify_me(node, configmanager, myname):
+async def renotify_me(node, configmanager, myname):
     creds = configmanager.get_node_attributes(
         node, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
     wc = WebClient(node, configmanager, creds)
