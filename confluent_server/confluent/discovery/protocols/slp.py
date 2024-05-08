@@ -628,7 +628,7 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     cloop = asyncio.get_running_loop()
     pktq = asyncio.Queue()
     cloop.add_reader(net, relay_packet, net, pktq)
-    cloop.add_reader(net4, relay_packet, net, pktq)
+    cloop.add_reader(net4, relay_packet, net4, pktq)
     initxid = random.randint(0, 32768)
     xididx = 0
     xidmap = {}
@@ -636,14 +636,12 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
     # processed, mitigating volume of response traffic
     rsps = {}
     deferrals = []
-    print('commence')
     rcvq = asyncio.Queue()
     for srvtype in srvtypes:
         xididx += 1
         await _find_srvtype(net, net4, srvtype, addresses, initxid + xididx)
         xidmap[initxid + xididx] = srvtype
         await asyncio.sleep(0)  # give async a chance to move things off buffer to queue
-    print('waity')
     while True:
         try:
             srp = await asyncio.wait_for(pktq.get(), 1.0)
@@ -653,7 +651,6 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
             break
     cloop.remove_reader(net)
     cloop.remove_reader(net4)
-    print(len(rsps))
     if deferrals:
         await asyncio.sleep(1.2)  # already have a one second pause from select above
         for defer in deferrals:
