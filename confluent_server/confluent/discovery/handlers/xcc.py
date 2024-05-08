@@ -89,9 +89,10 @@ class NodeHandler(immhandler.NodeHandler):
 
     async def scan(self):
         ip, port = await self.get_web_port_and_ip()
-        c = webclient.SecureHTTPConnection(ip, port,
+        await self.get_https_cert()
+        c = webclient.WebConnection(ip, port,
             verifycallback=self.validate_cert)
-        i = c.grab_json_response('/api/providers/logoninfo')
+        i = await c.grab_json_response('/api/providers/logoninfo')
         modelname = i.get('items', [{}])[0].get('machine_name', None)
         if modelname:
             self.info['modelname'] = modelname
@@ -196,30 +197,18 @@ class NodeHandler(immhandler.NodeHandler):
 
     async def get_webclient(self, username, password, newpassword):
         wc = self._wc.dupe()
-        try:
-            wc.connect()
-        except socket.error as se:
-            if se.errno != errno.ECONNREFUSED:
-                raise
-            return (None, None)
         pwdchanged = False
-        adata = json.dumps({'username': util.stringify(username),
-                            'password': util.stringify(password)
-                            })
+        adata = {'username': util.stringify(username),
+                 'password': util.stringify(password)}
         headers = {'Connection': 'keep-alive',
                    'Content-Type': 'application/json'}
-        rsp, status = wc.grab_json_response_with_status('/api/providers/get_nonce', {})
+        rsp, status = await wc.grab_json_response_with_status('/api/providers/get_nonce', {})
         nonce = None
         if status == 200:
              nonce = rsp.get('nonce', None)
              headers['Content-Security-Policy'] = 'nonce={0}'.format(nonce)
-        wc.request('POST', '/api/login', adata, headers)
-        rsp = wc.getresponse()
-        try:
-            rspdata = json.loads(rsp.read())
-        except Exception:
-            rspdata = {}
-        if rsp.status != 200 and password == 'PASSW0RD':
+        rspdata = await wc.grab_json_response('/api/login', adata, headers=headers)
+        if rspdata and password == 'PASSW0RD':
             if rspdata.get('locktime', 0) > 0:
                 raise LockedUserException(
                     'The user "{0}" has been locked out for too many incorrect password attempts'.format(username))
@@ -230,26 +219,18 @@ class NodeHandler(immhandler.NodeHandler):
             headers = {'Connection': 'keep-alive',
                        'Content-Type': 'application/json'}
             if nonce:
-                wc.request('POST', '/api/providers/get_nonce', '{}')
-                rsp = wc.getresponse()
-                tokbody = rsp.read()
-                if rsp.status == 200:
-                    rsp = json.loads(tokbody)
-                    nonce = rsp.get('nonce', None)
+                rsp = await wc.grab_json_response('/api/providers/get_nonce', {})
+                nonce = rsp.get('nonce', None)
+                if nonce:
                     headers['Content-Security-Policy'] = 'nonce={0}'.format(nonce)
-            wc.request('POST', '/api/login', adata, headers)
-            rsp = wc.getresponse()
-            try:
-                rspdata = json.loads(rsp.read())
-            except Exception:
-                rspdata = {}
-            if rsp.status == 200:
+            rspdata = await wc.grab_json_response('/api/login', adata, headers=headers)
+            if rspdata:
                 pwdchanged = True
                 password = newpassword
                 wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
                 if '_csrf_token' in wc.cookies:
                     wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
-                wc.grab_json_response_with_status('/api/providers/logout')
+                await wc.grab_json_response_with_status('/api/providers/logout')
             else:
                 if rspdata.get('locktime', 0) > 0:
                     raise LockedUserException(
@@ -306,9 +287,10 @@ class NodeHandler(immhandler.NodeHandler):
         errinfo = {}
         if self._wc is None:
             ip, port = self.get_web_port_and_ip()
-            self._wc = webclient.SecureHTTPConnection(
+            await self.get_https_cert()
+            self._wc = webclient.WebConnection(
                 ip, port, verifycallback=self.validate_cert)
-            self._wc.connect()
+            # self._wc.connect()
         nodename = None
         if self.nodename:
             nodename = self.nodename
