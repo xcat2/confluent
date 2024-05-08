@@ -411,7 +411,7 @@ def query_srvtypes(target):
     parsed = _parse_slp_header(rs)
     if parsed:
         payload = parsed['payload']
-        if payload[:2] != '\x00\x00':
+        if payload[:2] != b'\x00\x00':
             return
         stypelen = struct.unpack('!H', bytes(payload[2:4]))[0]
         stypes = payload[4:4+stypelen].decode('utf-8')
