@@ -518,7 +518,7 @@ async def register_remote_addrs(addresses, configmanager):
         nd = {
             'addresses': [(addr, 443)]
         }
-        sd = ssdp.check_fish(('/DeviceDescription.json', nd))
+        sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
         if not sd:
             return addr, False
         sd['hwaddr'] = sd['attributes']['mac-address']
@@ -751,12 +751,9 @@ async def _recheck_single_unknown_info(configmanager, info):
 
 
 def safe_detected(info):
-    print(repr(info['services']))
     if 'hwaddr' not in info or not info['hwaddr']:
-        print("No mac!!!")
         return
     if info['hwaddr'] in runningevals:
-        print("Already mac!!!")
         # Do not evaluate the same mac multiple times at once
         return
     runningevals[info['hwaddr']] = util.spawn(eval_detected(info))
@@ -1484,10 +1481,11 @@ async def discover_node(cfg, handler, info, nodename, manual):
         info['discofailure'] = 'policy'
     return False
 
-def wait_for_connection(bmcaddr):
+async def wait_for_connection(bmcaddr):
+    cloop = asyncio.get_running_loop()
     expiry = 75 + util.monotonic_time()
     while util.monotonic_time() < expiry:
-        for addrinf in socket.getaddrinfo(bmcaddr, 443, proto=socket.IPPROTO_TCP):
+        for addrinf in await cloop.getaddrinfo(bmcaddr, 443, proto=socket.IPPROTO_TCP):
             try:
                 tsock = socket.socket(addrinf[0])
                 tsock.settimeout(1)
@@ -1495,7 +1493,7 @@ def wait_for_connection(bmcaddr):
                 return
             except OSError:
                 continue
-        eventlet.sleep(1)
+        await asyncio.sleep(1)
 
 def do_pxe_discovery(cfg, handler, info, manual, nodename, policies):
     # use uuid based scheme in lieu of tls cert, ideally only
@@ -1629,9 +1627,10 @@ async def remotescan():
 async def blocking_scan():
     global scanner
     slpscan = util.spawn(slp.active_scan(safe_detected, slp))
-    #ssdpscan = eventlet.spawn(ssdp.active_scan, safe_detected, ssdp)
+    ssdpscan = util.spawn(ssdp.active_scan(safe_detected, ssdp))
     print("beign slpscan")
     await slpscan
+    await ssdpscan
     print("end scan")
     #ssdpscan.wait()
     scanner = None
@@ -1654,7 +1653,7 @@ def start_detection():
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
         rechecker = util.spawn_after(900, _periodic_recheck, cfg)
-    #eventlet.spawn(ssdp.snoop(safe_detected, None, ssdp, get_node_by_uuid_or_mac))
+    util.spawn(ssdp.snoop(safe_detected, None, ssdp, get_node_by_uuid_or_mac))
 
 def stop_autosense():
     for watcher in list(autosensors):
