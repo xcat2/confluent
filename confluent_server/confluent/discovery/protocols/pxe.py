@@ -80,33 +80,9 @@ class iovec(ctypes.Structure):   # from uio.h
     _fields_ = [('iov_base', ctypes.c_void_p),
                 ('iov_len', ctypes.c_size_t)]
 
-class msghdr(ctypes.Structure):  # from bits/socket.h
-    _fields_ = [('msg_name', ctypes.c_void_p),
-                ('msg_namelen', ctypes.c_uint),
-                ('msg_iov', ctypes.POINTER(iovec)),
-                ('msg_iovlen', ctypes.c_size_t),
-                ('msg_control', ctypes.c_void_p),
-                ('msg_controllen', ctypes.c_size_t),
-                ('msg_flags', ctypes.c_int)]
 
-class cmsghdr(ctypes.Structure):  # also from bits/socket.h
-    _fields_ = [('cmsg_len', ctypes.c_size_t),
-                ('cmsg_level', ctypes.c_int),
-                ('cmsg_type', ctypes.c_int)]
-                # ignore the __extension__
 
-class in_addr(ctypes.Structure):
-    _fields_ = [('s_addr', ctypes.c_uint32)]
 
-class in_pktinfo(ctypes.Structure):  # from bits/in.h
-    _fields_ = [('ipi_ifindex', ctypes.c_int),
-                ('ipi_spec_dst', in_addr),
-                ('ipi_addr', in_addr)]
-
-class sockaddr_in(ctypes.Structure):
-    _fields_ = [('sin_family', ctypes.c_ushort),  # per bits/sockaddr.h
-                ('sin_port', ctypes.c_uint16),  # per netinet/in.h
-                ('sin_addr', in_addr)]
 
 
 sendto = libc.sendto
@@ -114,9 +90,7 @@ sendto.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t,
                    ctypes.c_int, ctypes.POINTER(sockaddr_ll),
                    ctypes.c_size_t]
 sendto.restype = ctypes.c_size_t
-recvmsg = libc.recvmsg
-recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
-recvmsg.restype = ctypes.c_size_t
+
 
 pkttype = ctypes.c_char * 2048
 
@@ -142,20 +116,6 @@ def get_bcastaddr(idx):
 
 IP_PKTINFO = 8
 
-
-def CMSG_ALIGN(length):  # bits/socket.h
-    ret = (length + ctypes.sizeof(ctypes.c_size_t) - 1
-           & ~(ctypes.sizeof(ctypes.c_size_t) - 1))
-    return ctypes.c_size_t(ret)
-
-
-def CMSG_SPACE(length):  # bits/socket.h
-    ret = CMSG_ALIGN(length).value + CMSG_ALIGN(ctypes.sizeof(cmsghdr)).value
-    return ctypes.c_size_t(ret)
-
-
-cmsgtype = ctypes.c_char * CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
-cmsgsize = CMSG_SPACE(ctypes.sizeof(in_pktinfo)).value
 
 pxearchs = {
     b'\x00\x00': 'bios-x86',
