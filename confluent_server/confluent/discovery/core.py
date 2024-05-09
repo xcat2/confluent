@@ -1663,6 +1663,7 @@ def stop_autosense():
 def start_autosense():
     autosensors.add(util.spawn(slp.snoop(safe_detected, slp)))
     #autosensors.add(eventlet.spawn(mdns.snoop, safe_detected, mdns))
+    util.spawn(pxe.snoop(safe_detected, pxe, get_node_guess_by_uuid))
     #autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
     util.spawn(remotescan())
 
