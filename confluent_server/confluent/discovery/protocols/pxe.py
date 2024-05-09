@@ -76,14 +76,6 @@ class sockaddr_ll(ctypes.Structure):
                 ('sll_halen', ctypes.c_ubyte),
                 ('sll_addr', ctypes.c_ubyte * 20)]
 
-class iovec(ctypes.Structure):   # from uio.h
-    _fields_ = [('iov_base', ctypes.c_void_p),
-                ('iov_len', ctypes.c_size_t)]
-
-
-
-
-
 
 sendto = libc.sendto
 sendto.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t,
