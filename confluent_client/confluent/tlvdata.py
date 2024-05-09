@@ -97,10 +97,6 @@ class ClientFile(object):
         self.filename = name
 
 
-libc = ctypes.CDLL(ctypes.util.find_library('c'))
-recvmsg = libc.recvmsg
-recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
-recvmsg.restype = ctypes.c_int
 
 
 def _sendmsg(loop, fut, sock, msg, fds, rfd):
