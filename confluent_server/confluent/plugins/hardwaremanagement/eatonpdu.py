@@ -33,7 +33,8 @@ def simplify_name(name):
 def sanitize_json(data):
     if not isinstance(data, str):
         data = data.decode('utf8')
-    return re.sub(r'([^ {:,]*):', r'"\1":', data).replace("'", '"')
+    return re.sub(r'([^ {:,]*):', r'"\1":', data).replace("'", '"').replace(',,', ',null,')
+
 
 def answer_challenge(username, password, data):
     realm = data[0]
