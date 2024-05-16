@@ -39,7 +39,7 @@ import confluent.auth as auth
 import confluent.credserver as credserver
 import confluent.config.conf as conf
 import confluent.tlvdata as tlvdata
-import confluent.consoleserver as consoleserver
+#import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import confluent.exceptions as exc
 import confluent.log as log
@@ -192,8 +192,14 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
         if cfm:
             cfm.close_client_files()
         try:
-            connection.close()
-        except Exception:
+            if isinstance(connection, tuple):
+                connection[1].close()
+                await connection[1].wait_closed()
+                connection = connection[1].get_extra_info('socket')
+            else:
+                connection.close()
+        except Exception as e:
+            print(repr(e))
             pass
 
 

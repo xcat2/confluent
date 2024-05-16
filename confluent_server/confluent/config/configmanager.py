@@ -434,7 +434,8 @@ async def _push_rpc(stream, payload):
             if membership_callback:
                 membership_callback()
             try:
-                stream.close()
+                stream[1].close()
+                await stream[1].wait_closed()
             except Exception:
                 pass
 
@@ -778,12 +779,19 @@ class StreamHandler(object):
         try:
             while not msg:
                 try:
+                    # TODO: add an asyncio event or similar to allow stop_leading to shorten this loop,
+                    # since the read will not abort just because the associated writer closes, unfortunately
                     msg = await asyncio.wait_for(self.sock[0].read(8), timeout=self.keepalive - confluent.util.monotonic_time())
-                except TimeoutError:
+                    if msg:
+                        self.expiry = confluent.util.monotonic_time() + 60
+                except asyncio.exceptions.TimeoutError:
+                    print("timeout")
                     msg = None
                     if confluent.util.monotonic_time() > self.expiry:
+                        print("expired")
                         return None
                     if confluent.util.monotonic_time() > self.keepalive:
+                        print("kept alive")
                         res = await _push_rpc(self.sock, b'')  # nulls are a keepalive
                         if not res:
                             return None
@@ -805,6 +813,7 @@ class StreamHandler(object):
             #self.expiry = confluent.util.monotonic_time() + 60
             #msg = self.sock.recv(8)
         except Exception as e:
+            print(repr(e))
             msg = None
         return msg
 
@@ -813,12 +822,16 @@ class StreamHandler(object):
 
 
 async def stop_following(replacement=None):
+    print("discontinuing following")
     async with _leaderlock:
         global cfgleader
         if cfgleader and not isinstance(cfgleader, bool):
             try:
-                cfgleader.close()
-            except Exception:
+                cfgleader[1].close()
+                await cfgleader[1].wait_closed()
+            except Exception as e:
+                print(repr(cfgleader))
+                print(repr(e))
                 pass
         cfgleader = replacement
 
@@ -901,15 +914,24 @@ def commit_clear():
 
 cfgleader = None
 
+killswitch = None
+
 
 async def follow_channel(channel):
     global _txcount
     global _hasquorum
     global lastheartbeat
+    global killswitch
+    print("channel to follow now")
     try:
         await stop_leading()
         await stop_following(channel)
         lh = StreamHandler(channel)
+        # TODO: add killswitch mechanism. stop_following closes the writer, but
+        # that seems to have no impact on the reader, causing a senseless delay
+        # to timeout.
+        # to trigger this, kill the leader and immediately run 'collective show'
+        # on a follower
         msg = await lh.get_next_msg()
         while msg:
             msg, rpc = msg[:8], msg[8:]
@@ -954,6 +976,7 @@ async def follow_channel(channel):
             msg = await lh.get_next_msg()
     finally:
         # mark the connection as broken
+        print("I'm out...")
         if cfgstreams:
             await stop_following(None)
         else:
