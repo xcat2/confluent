@@ -207,7 +207,6 @@ async def follow_leader(remote, leader):
     newleader = None
     try:
         exitcause = await cfm.follow_channel(remote)
-        print(repr(exitcause))
         newleader = exitcause.get('newleader', None)
     except greenlet.GreenletExit:
         cleanexit = True
