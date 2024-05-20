@@ -21,17 +21,14 @@
 # patch pysnmp to have it be eventlet friendly has caused it's selection
 # This module simplifies the complex hlapi pysnmp interface
 
+import asyncio
 import confluent.exceptions as exc
-import eventlet
-from eventlet.support.greendns import getaddrinfo
-import pysnmp.smi.error as snmperr
 import socket
-snmp = eventlet.import_patched('pysnmp.hlapi')
+import pysnmp.hlapi.asyncio as snmp
 
-
-def _get_transport(name):
+async def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
-    res = getaddrinfo(name, 161, 0, socket.SOCK_DGRAM)
+    res = await asyncio.get_event_loop().getaddrinfo(name, 161, type=socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
         return snmp.Udp6TransportTarget(res[0][4], 2)
     else:
@@ -64,7 +61,7 @@ class Session(object):
                 authProtocol=snmp.usmHMACSHAAuthProtocol)
         self.eng = snmp.SnmpEngine()
 
-    def walk(self, oid):
+    async def walk(self, oid):
         """Walk over children of a given OID
 
         This is roughly equivalent to snmpwalk.  It will automatically try to
@@ -77,7 +74,7 @@ class Session(object):
         # there may come a time where we add more parameters to override the
         # automatic behavior (e.g. DES is weak, so it's likely to be
         # overriden, but some devices only support DES)
-        tp = _get_transport(self.server)
+        tp = await _get_transport(self.server)
         ctx = snmp.ContextData(self.context)
         resolvemib = False
         if '::' in oid:
@@ -86,33 +83,31 @@ class Session(object):
             obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
         else:
             obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
-
-        walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+        rsps = snmp.bulkWalkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
                                lexicographicMode=False, lookupMib=resolvemib)
-        try:
-            for rsp in walking:
-                errstr, errnum, erridx, answers = rsp
-                if errstr:
-                    errstr = str(errstr)
-                    finerr = errstr + ' while trying to connect to ' \
-                                      '{0}'.format(self.server)
-                    if errstr in ('Unknown USM user', 'unknownUserName',
-                                  'wrongDigest', 'Wrong SNMP PDU digest'):
-                        raise exc.TargetEndpointBadCredentials(finerr)
-                    # need to do bad credential versus timeout
-                    raise exc.TargetEndpointUnreachable(finerr)
-                elif errnum:
-                    raise exc.ConfluentException(errnum.prettyPrint() +
-                                                 ' while trying to connect to '
-                                                 '{0}'.format(self.server))
-                for ans in answers:
-                    if not obj[0].isPrefixOf(ans[0]):
-                        # PySNMP returns leftovers in a bulk command
-                        # filter out such leftovers
-                        break
-                    yield ans
-        except snmperr.WrongValueError:
-            raise exc.TargetEndpointBadCredentials('Invalid SNMPv3 password')
+        async for rsp in rsps:
+            errstr, errnum, erridx, answers = rsp
+            if errstr:
+                errstr = str(errstr)
+                finerr = errstr + ' while trying to connect to ' \
+                                    '{0}'.format(self.server)
+                if errstr in ('Unknown USM user', 'unknownUserName',
+                                'wrongDigest', 'Wrong SNMP PDU digest'):
+                    raise exc.TargetEndpointBadCredentials(finerr)
+                # need to do bad credential versus timeout
+                raise exc.TargetEndpointUnreachable(finerr)
+            elif errnum:
+                raise exc.ConfluentException(errnum.prettyPrint() +
+                                                ' while trying to connect to '
+                                                '{0}'.format(self.server))
+            for ans in answers:
+                if not obj[0].isPrefixOf(ans[0]):
+                    # PySNMP returns leftovers in a bulk command
+                    # filter out such leftovers
+                    break
+                yield ans
+        #except snmperr.WrongValueError:
+        #    raise exc.TargetEndpointBadCredentials('Invalid SNMPv3 password')
 
 
 

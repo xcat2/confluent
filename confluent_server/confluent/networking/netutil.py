@@ -66,10 +66,10 @@ def list_switches(configmanager):
     return util.natural_sort(switches)
 
 
-def get_portnamemap(conn):
+async def get_portnamemap(conn):
     ifnamemap = {}
     havenames = False
-    for vb in conn.walk('1.3.6.1.2.1.31.1.1.1.1'):
+    async for vb in conn.walk('1.3.6.1.2.1.31.1.1.1.1'):
         ifidx, ifname = vb
         if not ifname:
             continue
@@ -77,7 +77,7 @@ def get_portnamemap(conn):
         ifidx = int(str(ifidx).rsplit('.', 1)[1])
         ifnamemap[ifidx] = str(ifname)
     if not havenames:
-        for vb in conn.walk('1.3.6.1.2.1.2.2.1.2'):
+        async for vb in conn.walk('1.3.6.1.2.1.2.2.1.2'):
             ifidx, ifname = vb
             ifidx = int(str(ifidx).rsplit('.', 1)[1])
             ifnamemap[ifidx] = str(ifname)
