@@ -32,10 +32,8 @@ import confluent.netutil as netutil
 import confluent.util as util
 import ctypes
 import ctypes.util
-import eventlet
-import eventlet.green.socket as socket
-import eventlet.green.select as select
 import netifaces
+import socket
 import struct
 import time
 import traceback
@@ -362,7 +360,7 @@ def new_dhcp6_packet(handler, net6, cfg, nodeguess):
         return
     rqv = memoryview(pkt)
     if rqv[0] in (1, 3):
-        process_dhcp6req(handler, rqv, addr, net6, cfg, nodeguess)
+        util.spawn(process_dhcp6req(handler, rqv, addr, net6, cfg, nodeguess))
 
 
 async def snoop(handler, protocol=None, nodeguess=None):
@@ -401,7 +399,7 @@ async def snoop(handler, protocol=None, nodeguess=None):
     cloop.add_reader(net6, new_dhcp6_packet, handler, net6, cfg, nodeguess)
 
 
-def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
+async def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     ip = addr[0]
     req, disco = v6opts_to_dict(bytearray(rqv[4:]))
     req['txid'] = rqv[1:4]
@@ -416,7 +414,7 @@ def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
         net.sendto(b'\x00', addr)
     tries = 5
     while tries and not mac:
-        eventlet.sleep(0.01)
+        await asyncio.sleep(0.01)
         tries -= 1
         mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
     info = {'hwaddr': mac, 'uuid': disco['uuid'],
