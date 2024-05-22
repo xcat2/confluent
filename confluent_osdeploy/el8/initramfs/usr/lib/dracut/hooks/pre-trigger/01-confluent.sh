@@ -99,6 +99,10 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             fi
         fi
     done
+    for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
+        ip addr flush dev $NICGUESS
+        ip link set $NICGUESS down
+    done
     NetworkManager --configure-and-quit=initrd --no-daemon
     hmackeyfile=/tmp/cnflnthmackeytmp
     echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
@@ -175,7 +179,7 @@ if [ ! -z "$autocons" ]; then
     errout="-e $autocons"
 fi
 while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
-	sleep 10
+        sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
 if [ -z "$ifname" ]; then
@@ -216,15 +220,15 @@ proto=${proto#protocol: }
 textconsole=$(grep ^textconsole: /etc/confluent/confluent.deploycfg)
 textconsole=${textconsole#textconsole: }
 if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null; then
-	autocons=$(cat /tmp/01-autocons.devnode)
-	if [ ! -z "$autocons" ]; then
-	    echo Auto-configuring installed system to use text console
-	    echo Auto-configuring installed system to use text console > $autocons
+        autocons=$(cat /tmp/01-autocons.devnode)
+        if [ ! -z "$autocons" ]; then
+            echo Auto-configuring installed system to use text console
+            echo Auto-configuring installed system to use text console > $autocons
             /opt/confluent/bin/autocons -c > /dev/null
-	    cp /tmp/01-autocons.conf /etc/cmdline.d/
-	else
-	    echo "Unable to automatically detect requested text console"
-	fi
+            cp /tmp/01-autocons.conf /etc/cmdline.d/
+        else
+            echo "Unable to automatically detect requested text console"
+        fi
 fi
 
 . /etc/os-release
@@ -327,4 +331,8 @@ if [ -e /lib/nm-lib.sh ]; then
         fi
     fi
 fi
+for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
+    ip addr flush dev $NICGUESS
+    ip link set $NICGUESS down
+done
 
