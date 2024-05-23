@@ -61,7 +61,7 @@ for lic in sorted(licenses):
     print(lic)
 manualrpms = [
     'ipmitool',
-    'almalinux-release',
+    'centos-stream-release',
     'libaio',
     'hwdata',
     'snmp',
@@ -92,7 +92,7 @@ manuallicenses = [
     '/usr/share/licenses/bash/NOTICE',
     '/usr/share/licenses/libsepol/NOTICE',
     '/usr/share/licenses/perl/COPYING.regexec', # regexec.c
-    '/usr/share/doc/platform-python/README.rst',
+    '/usr/share/doc/python3/README.rst',
     '/usr/share/licenses/lz4/LICENSE',
     '/usr/share/licenses/lm_sensors/COPYING',
     '/usr/share/doc/libunistring/README',
@@ -111,14 +111,6 @@ manuallicenses = [
     '/usr/share/licenses/tmux/NOTICE', # built by extracttmuxlicenses.py
     '/usr/share/licenses/tmux/COPYING', # extracted from source
     '/usr/share/licenses/tmux/README', # extracted from source
-    '/usr/share/licenses/kernel-extra/exceptions/Linux-syscall-note',
-    '/usr/share/licenses/kernel-extra/other/Apache-2.0',
-    '/usr/share/licenses/kernel-extra/other/CC-BY-SA-4.0',
-    '/usr/share/licenses/kernel-extra/other/CDDL-1.0',
-    '/usr/share/licenses/kernel-extra/other/GPL-1.0',
-    '/usr/share/licenses/kernel-extra/other/Linux-OpenIB',
-    '/usr/share/licenses/kernel-extra/other/MPL-1.1',
-    '/usr/share/licenses/kernel-extra/other/X11',
     '/usr/share/licenses/kernel-extra/preferred/BSD-2-Clause',
     '/usr/share/licenses/kernel-extra/preferred/BSD-3-Clause',
     '/usr/share/licenses/kernel-extra/preferred/BSD-3-Clause-Clear',
@@ -126,12 +118,25 @@ manuallicenses = [
     '/usr/share/licenses/kernel-extra/preferred/LGPL-2.0',
     '/usr/share/licenses/kernel-extra/preferred/LGPL-2.1',
     '/usr/share/licenses/kernel-extra/preferred/MIT',
+    '/usr/share/licenses/kernel-extra/deprecated/GFDL-1.1',
+    '/usr/share/licenses/kernel-extra/deprecated/GFDL-1.2',
+    '/usr/share/licenses/kernel-extra/deprecated/GPL-1.0',
+    '/usr/share/licenses/kernel-extra/deprecated/ISC',
+    '/usr/share/licenses/kernel-extra/deprecated/Linux-OpenIB',
+    '/usr/share/licenses/kernel-extra/deprecated/X11',
+    '/usr/share/licenses/kernel-extra/deprecated/Zlib',
+    '/usr/share/licenses/kernel-extra/dual/Apache-2.0',
+    '/usr/share/licenses/kernel-extra/dual/CC-BY-4.0',
+    '/usr/share/licenses/kernel-extra/dual/CDDL-1.0',
+    '/usr/share/licenses/kernel-extra/dual/MPL-1.1',
+    '/usr/share/licenses/kernel-extra/exceptions/GCC-exception-2.0',
+    '/usr/share/licenses/kernel-extra/exceptions/Linux-syscall-note',
     '/usr/share/licenses/util-linux/COPYING.GPLv3', # extract from parse-date.c, from srpm
-    '/usr/share/licenses/kmod/tools/COPYING', # GPL not LGPL, must extract from kmod srpm
+    '/usr/share/licenses/kmod/COPYING', # GPL not LGPL, must extract from kmod srpm
     '/usr/share/licenses/krb5-libs/NOTICE', # copy it verbatim from LICENSE, exact same file
     '/usr/share/doc/less/README',
-    '/usr/share/almalinux-release/EULA',
-    '/usr/share/doc/almalinux-release/GPL',
+    '/usr/share/centos-release/EULA',
+    #'/usr/share/doc/almalinux-release/GPL',
     '/usr/share/licenses/libcap-ng-utils/COPYING',
     '/usr/share/licenses/libdb/copyright', # from libdb, db-5.3.28, lang/sql/odbc/debian/copyright
     '/usr/share/licenses/libgcrypt/LICENSES.ppc-aes-gcm', # libgcrypt license to carry forward
@@ -140,6 +145,7 @@ manuallicenses = [
 ]
 for lic in manuallicenses:
     print(lic)
+missinglics = []
 for rpm in rpmlist:
     if not rpm:
         continue
@@ -148,7 +154,9 @@ for rpm in rpmlist:
             break
     else:
         if rpm not in licensesbyrpm:
-            raise Exception('Unresolved license info for ' + rpm)
-            print("UH OH: " + rpm)
-            
+            missinglics.append(rpm)
 
+if missinglics:
+    for lic in missinglics:
+        print("Missing: " + lic)
+    raise Exception("Missing licenses: " + ','.join(missinglics))
