@@ -1,8 +1,18 @@
 import glob
+import os
 yearsbyname = {}
 namesbylicense = {}
 filesbylicense = {}
-for source in glob.glob('*.c'):
+allfiles = glob.glob('*.c')
+allfiles.extend(glob.glob('*.y'))
+allfiles.extend(glob.glob('compat/*.c'))
+foundbin = False
+for source in allfiles: # glob.glob('*.c'):
+    if 'cmd-parse.c' == source:
+        continue
+    if not os.path.exists(source.replace('.c', '.o')):
+        continue
+    foundbin = True
     with open(source, 'r') as sourcein:
         cap = False
         thelicense = ''
@@ -19,13 +29,27 @@ for source in glob.glob('*.c'):
                 line = line[3:]
                 if line.startswith('Author: '):
                     continue
+
+                if line == 'Copyright (c) 1989, 1993\n':
+                    name = 'The Regents of the University of California'
+                    if name not in yearsbyname:
+                        yearsbyname[name] = set([])
+                    yearsbyname[name].add('1989')
+                    yearsbyname[name].add('1993')
+                    continue
                 if line.startswith('Copyright'):
                     _, _, years, name = line.split(maxsplit=3)
-                    name = name.split('>', 1)[0] + '>'
+                    if '>' in name:
+                        name = name.split('>', 1)[0] + '>'
                     currnames.add(name)
                     if name not in yearsbyname:
                         yearsbyname[name] = set([])
-                    yearsbyname[name].add(years)
+                    if '-' in years:
+                        strt, end = years.split('-')
+                        for x in range(int(strt), int(end) + 1):
+                            print(str(x))
+                    else:
+                        yearsbyname[name].add(years)
                     continue
                 thelicense += line
         if thelicense not in namesbylicense:
