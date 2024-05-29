@@ -21,7 +21,7 @@ import confluent.config.configmanager as cfm
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.noderange as noderange
-import confluent.tlvdata as tlvdata
+import confluent.asynctlvdata as tlvdata
 import confluent.util as util
 import socket
 import ssl

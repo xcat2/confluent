@@ -37,7 +37,7 @@ import asyncio
 import confluent
 import confluent.alerts as alerts
 import confluent.log as log
-import confluent.tlvdata as tlvdata
+import confluent.asynctlvdata as tlvdata
 import confluent.config.attributes as attrscheme
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective

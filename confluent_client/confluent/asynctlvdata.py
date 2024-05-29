@@ -16,15 +16,11 @@
 # limitations under the License.
 
 import array
+import asyncio
 import ctypes
 import ctypes.util
 import confluent.tlv as tlv
-try:
-    import eventlet.green.socket as socket
-    import eventlet.green.select as select
-except ImportError:
-    import socket
-    import select
+import socket
 from datetime import datetime
 import json
 import os
@@ -39,6 +35,7 @@ try:
     range = xrange
 except NameError:
     pass
+
 
 class iovec(ctypes.Structure):   # from uio.h
     _fields_ = [('iov_base', ctypes.c_void_p),
@@ -56,6 +53,7 @@ class cmsghdr(ctypes.Structure):  # also from bits/socket.h
     @classmethod
     def init_data(cls, cmsg_len, cmsg_level, cmsg_type, cmsg_data):
         Data = ctypes.c_ubyte * ctypes.sizeof(cmsg_data)
+
         class _flexhdr(ctypes.Structure):
             _fields_ = cls._fields_ + [('cmsg_data', Data)]
 
@@ -98,13 +96,63 @@ class ClientFile(object):
         self.fileobject = os.fdopen(fd, mode)
         self.filename = name
 
-libc = ctypes.CDLL(ctypes.util.find_library('c'))
-recvmsg = libc.recvmsg
-recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
-recvmsg.restype = ctypes.c_int
-sendmsg = libc.sendmsg
-sendmsg.argtypes = [ctypes.c_int, ctypes.POINTER(msghdr), ctypes.c_int]
-sendmsg.restype = ctypes.c_size_t
+
+
+
+def _sendmsg(loop, fut, sock, msg, fds, rfd):
+    if rfd is not None:
+        loop.remove_reader(rfd)
+    if fut.cancelled():
+        return
+    try:
+        retdata = sock.sendmsg(
+            [msg],
+            [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds))])
+    except (BlockingIOError, InterruptedError):
+        fd = sock.fileno()
+        loop.add_reader(fd, _sendmsg, loop, fut, sock, fd)
+    except Exception as exc:
+        fut.set_exception(exc)
+    else:
+        fut.set_result(retdata)
+
+
+def send_fds(sock, msg, fds):
+    cloop = asyncio.get_event_loop()
+    fut = cloop.create_future()
+    _sendmsg(cloop, fut, sock, msg, fds, None)
+    return fut
+
+
+def _recvmsg(loop, fut, sock, msglen, maxfds, rfd):
+    if rfd is not None:
+        loop.remove_reader(rfd)
+    fds = array.array("i")   # Array of ints
+    try:
+        msg, ancdata, flags, addr = sock.recvmsg(
+            msglen, socket.CMSG_LEN(maxfds * fds.itemsize))
+    except (BlockingIOError, InterruptedError):
+        fd = sock.fileno()
+        loop.add_reader(fd, _recvmsg, loop, fut, sock, fd)
+    except Exception as exc:
+        fut.set_exception(exc)
+    else:
+        for cmsg_level, cmsg_type, cmsg_data in ancdata:
+            if (cmsg_level == socket.SOL_SOCKET
+                    and cmsg_type == socket.SCM_RIGHTS):
+                # Append data, ignoring any truncated integers at the end.
+                fds.frombytes(
+                    cmsg_data[
+                        :len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
+        fut.set_result(msglen, list(fds))
+
+
+def recv_fds(sock, msglen, maxfds):
+    cloop = asyncio.get_event_loop()
+    fut = cloop.create_future()
+    _recvmsg(cloop, fut, sock, msglen, maxfds, None)
+    return fut
+
 
 def decodestr(value):
     ret = None
@@ -118,6 +166,7 @@ def decodestr(value):
     except AttributeError:
         return value
     return ret
+
 
 def unicode_dictvalues(dictdata):
     for key in dictdata:
@@ -141,7 +190,17 @@ def _unicode_list(currlist):
             _unicode_list(currlist[i])
 
 
-def send(handle, data, filehandle=None):
+async def sendall(handle, data):
+    if isinstance(handle, tuple):
+        handle[1].write(data)
+        return await handle[1].drain()
+    else:
+        cloop = asyncio.get_event_loop()
+        return await cloop.sock_sendall(handle, data)
+
+
+async def send(handle, data, filehandle=None):
+    cloop = asyncio.get_event_loop()
     if isinstance(data, unicode):
         try:
             data = data.encode('utf-8')
@@ -156,10 +215,10 @@ def send(handle, data, filehandle=None):
         if tl < 16777216:
             # type for string is '0', so we don't need
             # to xor anything in
-            handle.sendall(struct.pack("!I", tl))
+            await sendall(handle, struct.pack("!I", tl))
         else:
             raise Exception("String data length exceeds protocol")
-        handle.sendall(data)
+        await sendall(handle, data)
     elif isinstance(data, dict):  # JSON currently only goes to 4 bytes
         # Some structured message, like what would be seen in http responses
         unicode_dictvalues(data)  # make everything unicode, assuming UTF-8
@@ -171,41 +230,40 @@ def send(handle, data, filehandle=None):
         # xor in the type (0b1 << 24)
         if filehandle is None:
             tl |= 16777216
-            handle.sendall(struct.pack("!I", tl))
-            handle.sendall(sdata)
+            await sendall(handle, struct.pack("!I", tl))
+            await sendall(handle, sdata)
+        elif isinstance(handle, tuple):
+            raise Exception("Cannot send filehandle over network socket")
         else:
             tl |= (2 << 24)
-            handle.sendall(struct.pack("!I", tl))
-            cdtype = ctypes.c_ubyte * len(sdata)
-            cdata = cdtype.from_buffer(bytearray(sdata))
-            ciov = iovec(iov_base=ctypes.addressof(cdata),
-                         iov_len=ctypes.c_size_t(ctypes.sizeof(cdata)))
-            fd = ctypes.c_int(filehandle)
-            cmh = cmsghdr.init_data(
-                cmsg_len=CMSG_LEN(
-                    ctypes.sizeof(fd)), cmsg_level=socket.SOL_SOCKET,
-                    cmsg_type=SCM_RIGHTS, cmsg_data=fd)
-            mh = msghdr(msg_name=None, msg_len=0, msg_iov=iovec_ptr(ciov),
-                        msg_iovlen=1, msg_control=ctypes.addressof(cmh),
-                        msg_controllen=ctypes.c_size_t(ctypes.sizeof(cmh)))
-            sendmsg(handle.fileno(), mh, 0)
+            await cloop.sock_sendall(handle, struct.pack("!I", tl))
+            await send_fds(handle, b'', [filehandle])
 
 
-def recvall(handle, size):
-    rd = handle.recv(size)
+async def _grabhdl(handle, size):
+    if isinstance(handle, tuple):
+        return await handle[0].read(size)
+    else:
+        cloop = asyncio.get_event_loop()
+        return await cloop.sock_recv(handle, size)
+
+
+async def recvall(handle, size):
+    rd = await _grabhdl(handle, size)
     while len(rd) < size:
-        nd = handle.recv(size - len(rd))
+        nd = await _grabhdl(handle, size - len(rd))
         if not nd:
             raise Exception("Error reading data")
         rd += nd
     return rd
 
-def recv(handle):
-    tl = handle.recv(4)
+
+async def recv(handle):
+    tl = await _grabhdl(handle, 4)
     if not tl:
         return None
     while len(tl) < 4:
-        ndata = handle.recv(4 - len(tl))
+        ndata = await _grabhdl(handle, 4 - len(tl))
         if not ndata:
             raise Exception("Error reading data")
         tl += ndata
@@ -220,6 +278,8 @@ def recv(handle):
     if dlen == 0:
         return None
     if datatype == tlv.Types.filehandle:
+        if isinstance(handle, tuple):
+            raise Exception('Filehandle not supported over TLS socket')
         filehandles = array.array('i')
         rawbuffer = bytearray(2048)
         pkttype = ctypes.c_ubyte * 2048
@@ -239,23 +299,16 @@ def recv(handle):
         msg.msg_iovlen = 1
         msg.msg_control = ctypes.addressof(cmsg)
         msg.msg_controllen = ctypes.sizeof(cmsg)
-        select.select([handle], [], [])
-        i = recvmsg(handle.fileno(), ctypes.pointer(msg), 0)
-        cdata = cmsgarr[CMSG_LEN(0).value:]
-        data = rawbuffer[:i]
-        if cmsg.cmsg_level == socket.SOL_SOCKET and cmsg.cmsg_type == SCM_RIGHTS:
-            try:
-                filehandles.fromstring(bytes(
-                    cdata[:len(cdata) - len(cdata) % filehandles.itemsize]))
-            except AttributeError:
-                filehandles.frombytes(bytes(
-                    cdata[:len(cdata) - len(cdata) % filehandles.itemsize]))
+        i = await recv_fds(handle, 2048, 4)
+        print(repr(i))
+        data = i[0]
+        filehandles = i[1]
         data = json.loads(bytes(data))
         return ClientFile(data['filename'], data['mode'], filehandles[0])
     else:
-        data = handle.recv(dlen)
+        data = await _grabhdl(handle, dlen)
         while len(data) < dlen:
-            ndata = handle.recv(dlen - len(data))
+            ndata = await _grabhdl(handle, dlen - len(data))
             if not ndata:
                 raise Exception("Error reading data")
             data += ndata

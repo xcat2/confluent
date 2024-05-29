@@ -15,10 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import anydbm as dbm
-except ImportError:
-    import dbm
+import asyncio
+import ctypes
+import ctypes.util
+import dbm
 import csv
 import errno
 import fnmatch
@@ -28,8 +28,11 @@ import shlex
 import socket
 import ssl
 import sys
-import confluent.tlvdata as tlvdata
+import confluent.asynctlvdata as tlvdata
 import confluent.sortutil as sortutil
+libssl = ctypes.CDLL(ctypes.util.find_library('ssl'))
+libssl.SSL_CTX_set_cert_verify_callback.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
 SO_PASSCRED = 16
 
@@ -47,6 +50,26 @@ except NameError:
     getinput = input
 
 
+class PyObject_HEAD(ctypes.Structure):
+    _fields_ = [
+        ("ob_refcnt",    ctypes.c_ssize_t),
+        ("ob_type",      ctypes.c_void_p),
+    ]
+
+
+# see main/Modules/_ssl.c, only caring about the SSL_CTX pointer
+class PySSLContext(ctypes.Structure):
+    _fields_ = [
+        ("ob_base",      PyObject_HEAD),
+        ("ctx",         ctypes.c_void_p),
+    ]
+
+
+@ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+def verify_stub(store, misc):
+    return 1
+
+
 class NestedDict(dict):
     def __missing__(self, key):
         value = self[key] = type(self)()
@@ -61,6 +84,7 @@ def stringify(instr):
     elif not isinstance(instr, bytes) and not isinstance(instr, str):
         return instr.encode('utf-8')
     return instr
+
 
 class Tabulator(object):
     def __init__(self, headers):
@@ -121,7 +145,8 @@ def printerror(res, node=None):
     for node in res.get('databynode', {}):
         exitcode = res['databynode'][node].get('errorcode', exitcode)
         if 'error' in res['databynode'][node]:
-            sys.stderr.write('{0}: {1}\n'.format(node, res['databynode'][node]['error']))
+            sys.stderr.write(
+                '{0}: {1}\n'.format(node, res['databynode'][node]['error']))
             if exitcode == 0:
                 exitcode = 1
     if 'error' in res:
@@ -169,16 +194,21 @@ class Command(object):
                 self.serverloc = '/var/run/confluent/api.sock'
         else:
             self.serverloc = server
+        self.connected = False
+
+    async def ensure_connected(self):
+        if self.connected:
+            return True
         if os.path.isabs(self.serverloc) and os.path.exists(self.serverloc):
             self._connect_unix()
             self.unixdomain = True
         elif self.serverloc == '/var/run/confluent/api.sock':
             raise Exception('Confluent service is not available')
         else:
-            self._connect_tls()
-        self.protversion = int(tlvdata.recv(self.connection).split(
+            await self._connect_tls()
+        self.protversion = int((await tlvdata.recv(self.connection)).split(
             b'--')[1].strip()[1:])
-        authdata = tlvdata.recv(self.connection)
+        authdata = await tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
         else:
@@ -186,19 +216,21 @@ class Command(object):
         if not self.authenticated and 'CONFLUENT_USER' in os.environ:
             username = os.environ['CONFLUENT_USER']
             passphrase = os.environ['CONFLUENT_PASSPHRASE']
-            self.authenticate(username, passphrase)
+            await self.authenticate(username, passphrase)
+        self.connected = True
 
-    def add_file(self, name, handle, mode):
+    async def add_file(self, name, handle, mode):
+        await self.ensure_connected()
         if self.protversion < 3:
             raise Exception('Not supported with connected confluent server')
         if not self.unixdomain:
             raise Exception('Can only add a file to a unix domain connection')
         tlvdata.send(self.connection, {'filename': name, 'mode': mode}, handle)
 
-    def authenticate(self, username, password):
-        tlvdata.send(self.connection,
-                     {'username': username, 'password': password})
-        authdata = tlvdata.recv(self.connection)
+    async def authenticate(self, username, password):
+        await tlvdata.send(self.connection,
+                           {'username': username, 'password': password})
+        authdata = await tlvdata.recv(self.connection)
         if authdata['authpassed'] == 1:
             self.authenticated = True
 
@@ -249,7 +281,7 @@ class Command(object):
                 outhandler(node, res)
         return rc
 
-    def simple_noderange_command(self, noderange, resource, input=None,
+    async def simple_noderange_command(self, noderange, resource, input=None,
                                  key=None, errnodes=None, promptover=None, outhandler=None, **kwargs):
         try:
             self._currnoderange = noderange
@@ -262,13 +294,13 @@ class Command(object):
             else:
                 ikey = key
             if input is None:
-                for res in self.read('/noderange/{0}/{1}'.format(
+                async for res in self.read('/noderange/{0}/{1}'.format(
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res, errnodes, outhandler)
             else:
-                self.stop_if_noderange_over(noderange, promptover)
+                await self.stop_if_noderange_over(noderange, promptover)
                 kwargs[ikey] = input
-                for res in self.update('/noderange/{0}/{1}'.format(
+                async for res in self.update('/noderange/{0}/{1}'.format(
                         noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res, errnodes, outhandler)
             self._currnoderange = None
@@ -277,14 +309,14 @@ class Command(object):
             cprint('')
             return 0
     
-    def stop_if_noderange_over(self, noderange, maxnodes):
+    async def stop_if_noderange_over(self, noderange, maxnodes):
         if maxnodes is None:
             return
-        nsize = self.get_noderange_size(noderange)
+        nsize = await self.get_noderange_size(noderange)
         if nsize > maxnodes:
             if nsize == 1:
-                nodename = list(self.read(
-                    '/noderange/{0}/nodes/'.format(noderange)))[0].get('item', {}).get('href', None)
+                nodename = [x async for x in self.read(
+                    '/noderange/{0}/nodes/'.format(noderange))][0].get('item', {}).get('href', None)
                 nodename = nodename[:-1]
                 p = getinput('Command is about to affect node {0}, continue (y/n)? '.format(nodename))
             else:
@@ -295,16 +327,16 @@ class Command(object):
                 raise Exception("Aborting at user request")
         
 
-    def get_noderange_size(self, noderange):
+    async def get_noderange_size(self, noderange):
         numnodes = 0
-        for node in self.read('/noderange/{0}/nodes/'.format(noderange)):
+        async for node in self.read('/noderange/{0}/nodes/'.format(noderange)):
             if node.get('item', {}).get('href', None):
                 numnodes += 1
             else:
                 raise Exception("Error trying to size noderange {0}".format(noderange))
         return numnodes
 
-    def simple_nodegroups_command(self, noderange, resource, input=None, key=None, **kwargs):
+    async def simple_nodegroups_command(self, noderange, resource, input=None, key=None, **kwargs):
         try:
             rc = 0
             if resource[0] == '/':
@@ -315,12 +347,12 @@ class Command(object):
             else:
                 ikey = key
             if input is None:
-                for res in self.read('/nodegroups/{0}/{1}'.format(
+                for res in await self.read('/nodegroups/{0}/{1}'.format(
                         noderange, resource)):
                     rc = self.handle_results(ikey, rc, res)
             else:
                 kwargs[ikey] = input
-                for res in self.update('/nodegroups/{0}/{1}'.format(
+                for res in await self.update('/nodegroups/{0}/{1}'.format(
                         noderange, resource), kwargs):
                     rc = self.handle_results(ikey, rc, res)
             return rc
@@ -328,32 +360,44 @@ class Command(object):
             cprint('')
             return 0
 
-    def read(self, path, parameters=None):
+    async def read(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('retrieve', path, self.connection, parameters)
+        async for rsp in send_request(
+                'retrieve', path, self.connection, parameters):
+            yield rsp
 
-    def update(self, path, parameters=None):
+    async def update(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('update', path, self.connection, parameters)
+        async for rsp in send_request(
+                'update', path, self.connection, parameters):
+            yield rsp
 
-    def create(self, path, parameters=None):
+    async def create(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('create', path, self.connection, parameters)
+        async for rsp in send_request(
+                'create', path, self.connection, parameters):
+            yield rsp
 
-    def delete(self, path, parameters=None):
+    async def delete(self, path, parameters=None):
+        await self.ensure_connected()
         if not self.authenticated:
             raise Exception('Unauthenticated')
-        return send_request('delete', path, self.connection, parameters)
+        async for rsp in send_request(
+                'delete', path, self.connection, parameters):
+            yield rsp
 
     def _connect_unix(self):
         self.connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.connection.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
         self.connection.connect(self.serverloc)
 
-    def _connect_tls(self):
+    async def _connect_tls(self):
         server, port = _parseserver(self.serverloc)
         for res in socket.getaddrinfo(server, port, socket.AF_UNSPEC,
                                       socket.SOCK_STREAM):
@@ -368,7 +412,7 @@ class Command(object):
             try:
                 self.connection.settimeout(5)
                 self.connection.connect(sa)
-                self.connection.settimeout(None)
+                self.connection.settimeout(0)
             except:
                 raise
                 self.connection.close()
@@ -391,10 +435,21 @@ class Command(object):
             cacert = None
             certreqs = ssl.CERT_NONE
             knownhosts = True
-        self.connection = ssl.wrap_socket(self.connection, ca_certs=cacert,
-                                          cert_reqs=certreqs)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        ssl_ctx = PySSLContext.from_address(id(ctx)).ctx
+        libssl.SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_stub, 0)
+        sreader = asyncio.StreamReader()
+        sreaderprot = asyncio.StreamReaderProtocol(sreader)
+        cloop = asyncio.get_event_loop()
+        tport, _ = await cloop.create_connection(
+            lambda: sreaderprot, sock=self.connection, ssl=ctx, server_hostname='x')
+        swriter = asyncio.StreamWriter(tport, sreaderprot, sreader, cloop)
+        self.connection = (sreader, swriter)
+        #self.connection = ssl.wrap_socket(self.connection, ca_certs=cacert,
+        #                                  cert_reqs=certreqs)
         if knownhosts:
-            certdata = self.connection.getpeercert(binary_form=True)
+            certdata = tport.get_extra_info('ssl_object').getpeercert(binary_form=True)
+            # certdata = self.connection.getpeercert(binary_form=True)
             fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
             fingerprint = fingerprint.encode('utf-8')
             hostid = '@'.join((port, server))
@@ -411,7 +466,7 @@ class Command(object):
             khf[hostid] = fingerprint
 
 
-def send_request(operation, path, server, parameters=None):
+async def send_request(operation, path, server, parameters=None):
     """This function iterates over all the responses
     received from the server.
 
@@ -424,16 +479,16 @@ def send_request(operation, path, server, parameters=None):
     payload = {'operation': operation, 'path': path}
     if parameters is not None:
         payload['parameters'] = parameters
-    tlvdata.send(server, payload)
-    result = tlvdata.recv(server)
+    await tlvdata.send(server, payload)
+    result = await tlvdata.recv(server)
     while '_requestdone' not in result:
         try:
             yield result
         except GeneratorExit:
             while '_requestdone' not in result:
-                result = tlvdata.recv(server)
+                result = await tlvdata.recv(server)
             raise
-        result = tlvdata.recv(server)
+        result = await tlvdata.recv(server)
 
 
 def attrrequested(attr, attrlist, seenattributes, node=None):
@@ -458,20 +513,20 @@ def attrrequested(attr, attrlist, seenattributes, node=None):
     return False
 
 
-def printattributes(session, requestargs, showtype, nodetype, noderange, options):
+async def printattributes(session, requestargs, showtype, nodetype, noderange, options):
     path = '/{0}/{1}/attributes/{2}'.format(nodetype, noderange, showtype)
-    return print_attrib_path(path, session, requestargs, options)
+    return await print_attrib_path(path, session, requestargs, options)
 
 def _sort_attrib(k):
     if isinstance(k[1], dict) and k[1].get('sortid', None) is not None:
         return k[1]['sortid']
     return k[0]
 
-def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
+async def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
     exitcode = 0
     seenattributes = NestedDict()
     allnodes = set([])
-    for res in session.read(path):
+    async for res in session.read(path):
         if 'error' in res:
             sys.stderr.write(res['error'] + '\n')
             exitcode = 1
@@ -659,7 +714,7 @@ def printgroupattributes(session, requestargs, showtype, nodetype, noderange, op
                     exitcode = 1
     return exitcode
 
-def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=None):
+async def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=None):
     # update attribute
     exitcode = 0
     if options.clear:
@@ -667,7 +722,7 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
         keydata = {}
         for attrib in updateargs[1:]:
             keydata[attrib] = None
-        for res in session.update(targpath, keydata):
+        async for res in session.update(targpath, keydata):
             for node in res.get('databynode', {}):
                 for warnmsg in res['databynode'][node].get('_warnings', []):
                     sys.stderr.write('Warning: ' + warnmsg + '\n')
@@ -687,21 +742,21 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
             value = os.environ.get(
                 key, os.environ[key.upper()])
             if (nodetype == "nodegroups"):
-                exitcode = session.simple_nodegroups_command(noderange,
+                exitcode = await session.simple_nodegroups_command(noderange,
                                                              'attributes/all',
                                                              value, key)
             else:
-                exitcode = session.simple_noderange_command(noderange,
+                exitcode = await session.simple_noderange_command(noderange,
                                                             'attributes/all',
                                                             value, key)
         sys.exit(exitcode)
     elif dictassign:
         for key in dictassign:
             if nodetype == 'nodegroups':
-                exitcode = session.simple_nodegroups_command(
+                exitcode = await session.simple_nodegroups_command(
                     noderange, 'attributes/all', dictassign[key], key)
             else:
-                exitcode = session.simple_noderange_command(
+                exitcode = await session.simple_noderange_command(
                     noderange, 'attributes/all', dictassign[key], key)
     else:
         if "=" in updateargs[1]:
@@ -726,12 +781,12 @@ def updateattrib(session, updateargs, nodetype, noderange, options, dictassign=N
                         key = val[0]
                         value = val[1]
                     if (nodetype == "nodegroups"):
-                        exitcode =  session.simple_nodegroups_command(noderange, 'attributes/all',
+                        exitcode =  await session.simple_nodegroups_command(noderange, 'attributes/all',
                                                                      value, key)
                     else:
-                        exitcode = session.simple_noderange_command(noderange, 'attributes/all',
+                        exitcode = await session.simple_noderange_command(noderange, 'attributes/all',
                                                                     value, key)
-            except:
+            except Exception:
                 sys.stderr.write('Error: {0} not a valid expression\n'.format(str(updateargs[1:])))
                 exitcode = 1
             sys.exit(exitcode)

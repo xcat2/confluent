@@ -41,7 +41,7 @@
 # esc-( would interfere with normal esc use too much
 # ~ I will not use for now...
 
-import asyncio
+import math
 import getpass
 import optparse
 import os
@@ -51,7 +51,6 @@ import signal
 import socket
 import struct
 import sys
-import concurrent.futures
 import time
 try:
     import fcntl
@@ -235,23 +234,14 @@ session = None
 
 def completer(text, state):
     try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_completer, text, state)
-            return future.result()
-    except Exception:
+        return rcompleter(text, state)
+    except:
         pass
-        import traceback
-        traceback.print_exc()
+        #import traceback
+        #traceback.print_exc()
 
 
-def run_completer(text, state):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    return loop.run_until_complete(
-            rcompleter(text, state))
-
-
-async def rcompleter(text, state):
+def rcompleter(text, state):
     global candidates
     global valid_commands
     cline = readline.get_line_buffer()
@@ -281,7 +271,7 @@ async def rcompleter(text, state):
     if candidates is None:
         candidates = []
         targpath = fullpath_target(lastarg)
-        async for res in session.read(targpath):
+        for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
                     candidates.append(res['item']["href"])
@@ -370,7 +360,7 @@ def print_result(res):
             print(output.encode('utf-8'))
 
 
-async def do_command(command, server):
+def do_command(command, server):
     global exitcode
     global target
     global currconsole
@@ -409,7 +399,7 @@ async def do_command(command, server):
                         target = otarget
             else:
                 foundchild = False
-                async for res in session.read(parentpath, server):
+                for res in session.read(parentpath, server):
                     try:
                         if res['item']['href'] == childname:
                             foundchild = True
@@ -444,7 +434,7 @@ async def do_command(command, server):
                                 pass
         else:
             targpath = target
-        async for res in session.read(targpath):
+        for res in session.read(targpath):
             if 'item' in res:  # a link relation
                 if type(res['item']) == dict:
                     print(res['item']["href"])
@@ -484,9 +474,9 @@ async def do_command(command, server):
         startconsole(nodename)
         return
     elif argv[0] == 'set':
-        await setvalues(argv[1:])
+        setvalues(argv[1:])
     elif argv[0] == 'create':
-        await createresource(argv[1:])
+        createresource(argv[1:])
     elif argv[0] in ('rm', 'delete', 'remove'):
         delresource(argv[1])
     elif argv[0] in ('unset', 'clear'):
@@ -501,7 +491,7 @@ def shutdown():
     tlvdata.send(session.connection, {'operation': 'shutdown', 'path': '/'})
 
 
-async def createresource(args):
+def createresource(args):
     resname = args[0]
     attribs = args[1:]
     keydata = parameterize_attribs(attribs)
@@ -514,12 +504,12 @@ async def createresource(args):
         collection, _, resname = targpath.rpartition('/')
         if 'name' not in keydata:
             keydata['name'] = resname
-    await makecall(session.create, (collection, keydata))
+    makecall(session.create, (collection, keydata))
 
 
-async def makecall(callout, args):
+def makecall(callout, args):
     global exitcode
-    async for response in callout(*args):
+    for response in callout(*args):
         if 'deleted' in response:
             print("Deleted: " + response['deleted'])
         if 'created' in response:
@@ -550,12 +540,12 @@ def clearvalues(resource, attribs):
             sys.stderr.write('Error: ' + res['error'] + '\n')
 
 
-async def delresource(resname):
+def delresource(resname):
     resname = fullpath_target(resname)
-    await makecall(session.delete, (resname,))
+    makecall(session.delete, (resname,))
 
 
-async def setvalues(attribs):
+def setvalues(attribs):
     global exitcode
     if '=' in attribs[0]:  # going straight to attribute
         resource = attribs[0][:attribs[0].index("=")]
@@ -569,7 +559,7 @@ async def setvalues(attribs):
     if not keydata:
         return
     targpath = fullpath_target(resource)
-    async for res in session.update(targpath, keydata):
+    for res in session.update(targpath, keydata):
         if 'error' in res:
             if 'errorcode' in res:
                 exitcode = res['errorcode']
@@ -864,7 +854,7 @@ opts, shellargs = parser.parse_args()
 
 username = None
 passphrase = None
-async def server_connect():
+def server_connect():
     global session, username, passphrase
     if opts.controlpath:
         termhandler.TermHandler(opts.controlpath)
@@ -874,7 +864,7 @@ async def server_connect():
         session = client.Command(os.environ['CONFLUENT_HOST'])
     else:  # unix domain
         session = client.Command()
-    await session.ensure_connected()
+
     # Next stop, reading and writing from whichever of stdin and server goes first.
     #see pyghmi code for solconnect.py
     if not session.authenticated and username is not None:
@@ -900,14 +890,11 @@ if sys.stdout.isatty():
     import readline
 
 
-async def main():
+def main():
     global inconsole
-    global consoleonly
-    global doexit
-    global doexit
     try:
-        await server_connect()
-    except (EOFError, KeyboardInterrupt):
+        server_connect()
+    except (EOFError, KeyboardInterrupt) as _:
         raise BailOut(0)
     except socket.gaierror:
         sys.stderr.write('Could not connect to confluent\n')
@@ -929,13 +916,14 @@ async def main():
 
     doexit = False
     inconsole = False
+    pendingcommand = ""
     session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
-        await do_command("start /nodes/%s/console/session" % session_node, netserver)
+        do_command("start /nodes/%s/console/session" % session_node, netserver)
         doexit = True
     elif shellargs:
-        await do_command(shellargs, netserver)
+        do_command(shellargs, netserver)
         quitconfetty(fullexit=True, fixterm=False)
 
     powerstate = None
@@ -966,7 +954,7 @@ async def main():
         else:
             currcommand = prompt()
             try:
-                await do_command(currcommand, netserver)
+                do_command(currcommand, netserver)
             except socket.error:
                 try:
                     server_connect()
@@ -1041,10 +1029,10 @@ if __name__ == '__main__':
     if opts.mintime:
         deadline = os.times()[4] + float(opts.mintime)
     try:
-        asyncio.get_event_loop().run_until_complete(main())
+        main()
     except BailOut as e:
         errcode = e.errorcode
-    except Exception:
+    except Exception as e:
         import traceback
         excinfo = traceback.print_exc()
         try:

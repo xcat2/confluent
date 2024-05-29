@@ -30,7 +30,7 @@ from aiohttp import web, web_urldispatcher, connector, ClientSession, WSMsgType
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
-import confluent.consoleserver as consoleserver
+#import confluent.consoleserver as consoleserver
 import confluent.discovery.core as disco
 import confluent.forwarder as forwarder
 import confluent.exceptions as exc
@@ -40,7 +40,7 @@ import confluent.core as pluginapi
 import confluent.asynchttp
 import confluent.selfservice as selfservice
 import confluent.shellserver as shellserver
-import confluent.tlvdata
+import confluent.asynctlvdata as tlvdata
 import confluent.util as util
 import copy
 import json
@@ -52,7 +52,6 @@ try:
     import urlparse
 except ModuleNotFoundError:
     import urllib.parse as urlparse
-tlvdata = confluent.tlvdata
 
 
 _cleaner = None

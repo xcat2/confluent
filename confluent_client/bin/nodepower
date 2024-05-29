@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import optparse
 import os
 import signal
@@ -86,8 +85,4 @@ if options.previous:
 def outhandler(node, res):
     for k in res[node]:
         client.cprint('{0}: {1}: {2}'.format(node, k.replace('inlet_', ''), res[node][k]))
-async def main():
-    sys.exit(await session.simple_noderange_command(noderange, '/power/{0}'.format(powurl), setstate, promptover=options.maxnodes, key='state', outhandler=outhandler))
-
-if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main())
+sys.exit(session.simple_noderange_command(noderange, '/power/{0}'.format(powurl), setstate, promptover=options.maxnodes, key='state', outhandler=outhandler))

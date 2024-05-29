@@ -38,7 +38,7 @@ import ssl
 import confluent.auth as auth
 import confluent.credserver as credserver
 import confluent.config.conf as conf
-import confluent.tlvdata as tlvdata
+import confluent.asynctlvdata as tlvdata
 #import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import confluent.exceptions as exc
