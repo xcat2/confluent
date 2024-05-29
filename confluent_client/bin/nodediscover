@@ -27,7 +27,7 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 
-import confluent.client as client
+import confluent.asynclient as client
 import confluent.sortutil as sortutil
 
 defcolumns = ['Node', 'Model', 'Serial', 'UUID', 'Mac Address', 'Type',
