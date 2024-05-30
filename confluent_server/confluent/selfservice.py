@@ -378,6 +378,8 @@ def handle_request(req, make_response):
                 tdc = util.run(['timedatectl'])[0].split(b'\n')
             except subprocess.CalledProcessError:
                 tdc = []
+                currtzvintage = time.time()
+                ncfg['timezone'] = currtz
             for ent in tdc:
                 ent = ent.strip()
                 if ent.startswith(b'Time zone:'):
