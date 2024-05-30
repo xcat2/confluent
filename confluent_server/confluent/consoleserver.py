@@ -64,7 +64,7 @@ async def get_buffer_output(nodename):
     out = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     out.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
     out.connect("\x00confluent-vtbuffer")
-    rdr, writer = await asyncio.open__unix_connection(sock=out)
+    rdr, writer = await asyncio.open_unix_connection(sock=out)
     if not isinstance(nodename, bytes):
         nodename = nodename.encode('utf8')
     outdata = bytearray()
@@ -77,7 +77,7 @@ async def get_buffer_output(nodename):
             raise Exception("bad read")
         outdata.extend(chunk)
     writer.close()
-    await writer.wait_close()
+    await writer.wait_closed()
     return bytes(outdata[:-1])
 
 
@@ -167,7 +167,10 @@ class ConsoleHandler(object):
         if self._genwatchattribs:
             self._attribwatcher = self.cfgmgr.watch_attributes(
                 (self.node,), self._genwatchattribs, self._attribschanged)
-        self.check_isondemand()
+        util.spawn(self.ondemand_init())
+
+    async def ondemand_init(self):
+        await self.check_isondemand()
         if not self._isondemand:
             self.connectstate = 'connecting'
             self._connect()
@@ -202,7 +205,7 @@ class ConsoleHandler(object):
             _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                           event=log.Events.stacktrace)
 
-    def check_isondemand(self):
+    async def check_isondemand(self):
         self._dologging = True
         attrvalue = self.cfgmgr.get_node_attributes(
             (self.node,), ('console.logging', 'collective.manager'))
@@ -216,21 +219,21 @@ class ConsoleHandler(object):
                 self._isondemand = True
             if (attrvalue[self.node]['console.logging']['value']) in ('none', 'memory'):
                 self._dologging = False
-        self.check_collective(attrvalue)
+        await self.check_collective(attrvalue)
 
-    def check_collective(self, attrvalue):
+    async def check_collective(self, attrvalue):
         myc = attrvalue.get(self.node, {}).get('collective.manager', {}).get(
             'value', None)
         if list(configmodule.list_collective()) and not myc:
             self._is_local = False
             self._detach()
-            self._disconnect()
+            await self._disconnect()
         if myc and myc != collective.get_myname():
             # Do not do console connect for nodes managed by another
             # confluent collective member
             self._is_local = False
             self._detach()
-            self._disconnect()
+            await self._disconnect()
         else:
             self._is_local = True
 
@@ -243,11 +246,11 @@ class ConsoleHandler(object):
             return util.monotonic_time() - self.lasttime
         return False
 
-    def _attribschanged(self, nodeattribs, configmanager, **kwargs):
+    async def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         if 'collective.manager' in nodeattribs[self.node]:
             attrval = configmanager.get_node_attributes(self.node,
                                                         'collective.manager')
-            self.check_collective(attrval)
+            await self.check_collective(attrval)
         if 'console.logging' in nodeattribs[self.node]:
             # decide whether logging changes how we react or not
             self._dologging = True
@@ -344,9 +347,12 @@ class ConsoleHandler(object):
                 'not configured,\r\nset it to a valid value for console '
                 'function')
         try:
-            self._console = list(await plugin.handle_path(
-                self._plugin_path.format(self.node),
-                "create", self.cfgmgr))[0]
+            consoles = await plugin.handle_path(
+                    self._plugin_path.format(self.node),
+                    "create", self.cfgmgr)
+            async for cns in consoles:
+                print(repr(cns))
+                self._console = cns
         except (exc.NotImplementedException, exc.NotFoundException):
             self._console = None
         except Exception as e:
@@ -563,7 +569,7 @@ class ConsoleHandler(object):
             except Exception:
                 _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                               event=log.Events.stacktrace)
-                self._got_disconnected()
+                await self._got_disconnected()
 
 
 def disconnect_node(node, configmanager):
@@ -608,7 +614,8 @@ async def initialize():
     #    ['/opt/confluent/bin/vtbufferd', 'confluent-vtbuffer'], bufsize=0, stdin=subprocess.DEVNULL,
     #    stdout=subprocess.DEVNULL)
 
-def start_console_sessions():
+
+async def start_console_sessions():
     configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
@@ -789,7 +796,7 @@ class ConsoleSession(object):
             if not skipreplay:
                 for recdata in await self.conshdl.get_recent():
                     if recdata:
-                        datacallback(recdata)
+                        await datacallback(recdata)
         await self.conshdl.attachsession(self)
 
 

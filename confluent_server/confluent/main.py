@@ -25,6 +25,9 @@
 # Things like heartbeating and discovery
 # It also will optionally snoop SLP DA requests
 
+
+#import logging
+#logging.basicConfig(filename='/tmp/asyn.log', level=logging.DEBUG)
 import atexit
 import confluent.auth as auth
 import confluent.config.conf as conf
@@ -283,6 +286,7 @@ def migrate_db():
 
 
 async def run(args):
+    asyncio.get_event_loop().set_debug(True)
     setlimits()
     try:
         configmanager.ConfigManager(None)
@@ -343,7 +347,7 @@ async def run(args):
         os.umask(oumask)
     auth.check_for_yaml()
     collective.startup()
-    consoleserver.initialize()
+    await consoleserver.initialize()
     http_bind_host, http_bind_port = _get_connector_config('http')
     sock_bind_host, sock_bind_port = _get_connector_config('socket')
     try:
@@ -363,7 +367,7 @@ async def run(args):
             await asyncio.sleep(0.5)
     eventlet.spawn_n(disco.start_detection)
     await asyncio.sleep(1)
-    consoleserver.start_console_sessions()
+    await consoleserver.start_console_sessions()
     while 1:
         await asyncio.sleep(100)
 

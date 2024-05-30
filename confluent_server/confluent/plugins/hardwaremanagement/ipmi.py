@@ -22,12 +22,12 @@ import confluent.messages as msg
 import confluent.util as util
 import copy
 import errno
-import eventlet
-import eventlet.event
-import eventlet.green.threading as threading
-import eventlet.greenpool as greenpool
-import eventlet.queue as queue
-import eventlet.support.greendns
+#import eventlet
+#import eventlet.event
+#import eventlet.green.threading as threading
+#import eventlet.greenpool as greenpool
+#import eventlet.queue as queue
+#import eventlet.support.greendns
 from fnmatch import fnmatch
 import os
 import pwd
@@ -53,8 +53,9 @@ except NameError:
 pci_cache = {}
 
 def get_dns_txt(qstring):
-    return eventlet.support.greendns.resolver.query(
-        qstring, 'TXT')[0].strings[0].replace('i=', '')
+    return None
+    # return eventlet.support.greendns.resolver.query(
+    #    qstring, 'TXT')[0].strings[0].replace('i=', '')
 
 def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     fqpi = '{0}.{1}.{2}.{3}'.format(subdevice, subvendor, device, vendor)
@@ -214,10 +215,10 @@ class IpmiCommandWrapper(ipmicommand.Command):
             # then do nothing
             pass
 
-    def get_health(self):
+    async def get_health(self):
         if self._inhealth:
             while self._inhealth:
-                eventlet.sleep(0.1)
+                await asyncio.sleep(0.1)
             return self._lasthealth
         self._inhealth = True
         try:
@@ -329,7 +330,7 @@ class IpmiConsole(conapi.Console):
         else:
             self.datacallback(data)
 
-    def connect(self, callback):
+    async def connect(self, callback):
         self.datacallback = callback
         # we provide a weak reference to pyghmi as otherwise we'd
         # have a circular reference and reference counting would never get
@@ -341,12 +342,7 @@ class IpmiConsole(conapi.Console):
                                                  kg=self.kg, force=True,
                                                  iohandler=self.handle_data)
             self.solconnection.outputlock = NullLock()
-            while (self.solconnection and not self.solconnection.connected and
-                   not (self.broken or self.solconnection.broken or
-                        self.solconnection.ipmi_session.broken)):
-                w = eventlet.event.Event()
-                _ipmiwaiters.append(w)
-                w.wait(15)
+            await self.solconnection.connect()
             if (self.broken or not self.solconnection or
                     self.solconnection.broken or
                     self.solconnection.ipmi_session.broken):
@@ -371,11 +367,11 @@ class IpmiConsole(conapi.Console):
         self.broken = True
         self.error = "closed"
 
-    def write(self, data):
-        self.solconnection.send_data(data)
+    async def write(self, data):
+        await self.solconnection.send_data(data)
 
-    def send_break(self):
-        self.solconnection.send_break()
+    async def send_break(self):
+        await self.solconnection.send_break()
 
 
 async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
@@ -1323,10 +1319,10 @@ class IpmiHandler:
         for sensor in filter(self.match_sensor, sensors):
             self.output.put(msg.ChildCollection(simplify_name(sensor['name'])))
 
-    def health(self):
+    async def health(self):
         if 'read' == self.op:
             try:
-                response = self.ipmicmd.get_health()
+                response = await self.ipmicmd.get_health()
             except pygexc.IpmiException:
                 self.output.put(msg.ConfluentTargetTimeout(self.node))
                 return
