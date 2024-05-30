@@ -22,6 +22,7 @@
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
+import confluent.util as util
 
 import hashlib
 import sys
@@ -93,7 +94,7 @@ class SshShell(conapi.Console):
 
     async def recvdata(self):
         while self.connected:
-            pendingdata = await self.shell.stdout.read(8192)
+            pendingdata = await self.shell[1].read(8192)
             if not pendingdata:
                 self.ssh.close()
                 if self.datacallback:
@@ -101,14 +102,14 @@ class SshShell(conapi.Console):
                 return
             self.datacallback(pendingdata)
 
-    def connect(self, callback):
+    async def connect(self, callback):
         # for now, we just use the nodename as the presumptive ssh destination
         # TODO(jjohnson2): use a 'nodeipget' utility function for architectures
         # that would rather not use the nodename as anything but an opaque
         # identifier
         self.datacallback = callback
         if self.username != b'':
-            self.logon()
+            await self.logon()
         else:
             self.inputmode = 0
             callback('\r\nlogin as: ')
@@ -116,7 +117,7 @@ class SshShell(conapi.Console):
 
     def logon(self):
         self.inputmode = -3
-        eventlet.spawn_n(self.do_logon)
+        util.spawn(self.do_logon())
     
     async def do_logon(self):
         sco = asyncssh.SSHClientConnectionOptions()
@@ -126,7 +127,7 @@ class SshShell(conapi.Console):
         try:
             self.datacallback('\r\nConnecting to {}...'.format(self.node))
             try:
-                self.ssh = await asyncssh.connect(self,node, username=self.username, password=self.password, known_hosts='/etc/ssh/ssh_known_hosts')
+                self.ssh = await asyncssh.connect(self.node, username=self.username.decode(), password=self.password.decode(), known_hosts='/etc/ssh/ssh_known_hosts')
             except ValueError:
                 #TODO: non-cert ssh targets
                 raise
@@ -153,9 +154,9 @@ class SshShell(conapi.Console):
         self.inputmode = 2
         self.connected = True
         self.datacallback('Connected\r\n')
-        self.shell = self.ssh.invoke_shell(width=self.width,
-                                           height=self.height)
-        self.rxthread = eventlet.spawn(self.recvdata)
+        self.shell = await self.ssh.open_session(term_type='vt100', term_size=(self.width, self.height)) # self.ssh.invoke_shell(width=self.width,
+                                           # height=self.height)
+        self.rxthread = util.spawn(self.recvdata())
 
     def write(self, data):
         if self.inputmode == -2:
@@ -223,7 +224,7 @@ class SshShell(conapi.Console):
                 self.datacallback(b'\r\n')
                 self.logon()
         else:
-            self.shell.sendall(data)
+            self.shell[0].write(data.decode())
 
     def close(self):
         if self.ssh is not None:

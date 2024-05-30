@@ -39,7 +39,7 @@ import confluent.auth as auth
 import confluent.credserver as credserver
 import confluent.config.conf as conf
 import confluent.asynctlvdata as tlvdata
-#import confluent.consoleserver as consoleserver
+import confluent.consoleserver as consoleserver
 import confluent.config.configmanager as configmanager
 import confluent.exceptions as exc
 import confluent.log as log
@@ -75,16 +75,16 @@ class ClientConsole(object):
         self.xmit = False
         self.pendingdata = []
 
-    def sendall(self, data):
+    async def sendall(self, data):
         if not self.xmit:
             self.pendingdata.append(data)
             return
-        send_data(self.client, data)
+        await send_data(self.client, data)
 
-    def startsending(self):
+    async def startsending(self):
         self.xmit = True
         for datum in self.pendingdata:
-            send_data(self.client, datum)
+            await send_data(self.client, datum)
         self.pendingdata = []
 
 
@@ -255,9 +255,9 @@ async def process_request(
                                "error": "Target not found - " + str(e)})
         send_data(connection, {"_requestdone": 1})
     except exc.InvalidArgumentException as e:
-        send_data(connection, {"errorcode": 400,
+        await send_data(connection, {"errorcode": 400,
                                "error": "Bad Request - " + str(e)})
-        send_data(connection, {"_requestdone": 1})
+        await send_data(connection, {"_requestdone": 1})
     await send_response(hdlr, connection)
     return
 
@@ -310,8 +310,8 @@ async def start_term(authname, cfm, connection, params, path, authdata, skipauth
 
 async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                   skipauth):
-    send_data(connection, {'started': 1})
-    ccons.startsending()
+    await send_data(connection, {'started': 1})
+    await ccons.startsending()
     bufferage = consession.get_buffer_age()
     if bufferage is not False:
         send_data(connection, {'bufferage': bufferage})
@@ -338,17 +338,17 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                 continue
             else:
                 try:
-                    process_request(connection, data, cfm, authdata, authname,
-                                    skipauth)
+                    await process_request(connection, data, cfm, authdata, authname,
+                                          skipauth)
                 except Exception as e:
                     tracelog.log(traceback.format_exc(),
                                  ltype=log.DataTypes.event,
                                  event=log.Events.stacktrace)
-                    send_data(
+                    await send_data(
                         connection,
                         {'errorcode': 500,
                          'error': 'Unexpected error - ' + str(e)})
-                    send_data(connection, {'_requestdone': 1})
+                    await send_data(connection, {'_requestdone': 1})
                 continue
         if not data:
             consession.destroy()

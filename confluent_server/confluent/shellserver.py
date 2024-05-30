@@ -41,9 +41,9 @@ class _ShellHandler(consoleserver.ConsoleHandler):
         return
         #return super().feedbuffer(data)
 
-    def get_recent(self):
-        retdata, connstate = super(_ShellHandler, self).get_recent()
-        return '', connstate
+    async def get_recent(self):
+        #retdata, connstate = await super(_ShellHandler, self).get_recent()
+        return '', {} # connstate
 
     def _got_disconnected(self):
         self.connectstate = 'closed'
@@ -117,7 +117,7 @@ class ShellSession(consoleserver.ConsoleSession):
             activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager, width=self.width, height=self.height)
         self.conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
 
-    def destroy(self):
+    async def destroy(self):
         try:
             activesessions[(self.configmanager.tenant, self.node,
                             self.username)][self.sessionid].close()
@@ -125,7 +125,7 @@ class ShellSession(consoleserver.ConsoleSession):
                                 self.username)][self.sessionid]
         except KeyError:
             pass
-        super(ShellSession, self).destroy()
+        return await super(ShellSession, self).destroy()
 
 def create(nodes, element, configmanager, inputdata):
     # For creating a resource, it really has to be handled

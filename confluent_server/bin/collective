@@ -15,9 +15,9 @@ if path.startswith('/opt'):
     # if installed into system path, do not muck with things
     sys.path.append(path)
 
-import confluent.client as client
+import confluent.asynclient as client
 import confluent.sortutil as sortutil
-import confluent.tlvdata as tlvdata
+import confluent.asynctlvdata as tlvdata
 
 try:
     input = raw_input
