@@ -91,8 +91,7 @@ class ShellSession(consoleserver.ConsoleSession):
     :param configmanager: A configuration manager object for current context
     :param username: Username for which this session object will operate
     :param datacallback: An asynchronous data handler, to be called when data
-                         is available.  Note that if passed, it makes
-                         'get_next_output' non-functional
+                         is available.
     :param skipreplay: If true, will skip the attempt to redraw the screen
     :param sessionid: An optional identifier to match a running session or
                       customize the name of a new session.

@@ -314,7 +314,7 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
     await ccons.startsending()
     bufferage = consession.get_buffer_age()
     if bufferage is not False:
-        send_data(connection, {'bufferage': bufferage})
+        await send_data(connection, {'bufferage': bufferage})
     while consession is not None:
         try:
             data = await tlvdata.recv(connection)

@@ -22,19 +22,12 @@ import confluent.messages as msg
 import confluent.util as util
 import copy
 import errno
-#import eventlet
-#import eventlet.event
-#import eventlet.green.threading as threading
-#import eventlet.greenpool as greenpool
-#import eventlet.queue as queue
-#import eventlet.support.greendns
 from fnmatch import fnmatch
 import os
 import pwd
 import aiohmi.constants as pygconstants
 import aiohmi.exceptions as pygexc
 import aiohmi.storage as storage
-#console = eventlet.import_patched('pyghmi.ipmi.console')
 import aiohmi.ipmi.console as console
 import aiohmi.ipmi.command as ipmicommand
 import socket
@@ -368,10 +361,12 @@ class IpmiConsole(conapi.Console):
         self.error = "closed"
 
     async def write(self, data):
-        await self.solconnection.send_data(data)
+        if self.solconnection:
+            await self.solconnection.send_data(data)
 
     async def send_break(self):
-        await self.solconnection.send_break()
+        if self.solconnection:
+            await self.solconnection.send_break()
 
 
 async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
@@ -407,7 +402,7 @@ async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
         except asyncio.QueueEmpty:
             pass
         except asyncio.TimeoutError:
-            print("odd timeout?")
+            print("odd timeout?" + repr(element) + repr(nodes))
             pass
         finally:
             for datum in sorted(

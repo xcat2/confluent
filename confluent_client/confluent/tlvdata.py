@@ -19,12 +19,8 @@ import array
 import ctypes
 import ctypes.util
 import confluent.tlv as tlv
-try:
-    import eventlet.green.socket as socket
-    import eventlet.green.select as select
-except ImportError:
-    import socket
-    import select
+import socket
+import select
 from datetime import datetime
 import json
 import os
