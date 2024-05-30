@@ -991,7 +991,7 @@ async def handle_node_request(configmanager, inputdata, operation,
     try:
         nodeorrange = pathcomponents[1]
         if not isnoderange and not configmanager.is_node(nodeorrange):
-            raise exc.NotFoundException("Invalid Node")
+            raise exc.NotFoundException(f'Invalid Node: {repr(pathcomponents)}')
         if isnoderange and not (len(pathcomponents) == 3 and
                                         pathcomponents[2] == 'abbreviate'):
             try:
@@ -1116,7 +1116,7 @@ async def handle_node_request(configmanager, inputdata, operation,
         numworkers = 0
         for hfunc in nodesbyhandler:
             numworkers += 1
-            asyncio.create_task(addtoqueue(passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
+            util.spawn(addtoqueue(passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
                                            'element': pathcomponents,
                 'configmanager': configmanager,
                 'inputdata': _get_input_data(_plugin, pathcomponents,
@@ -1124,7 +1124,7 @@ async def handle_node_request(configmanager, inputdata, operation,
                                              isnoderange, configmanager)}))
         for manager in nodesbymanager:
             numworkers += 1
-            asyncio.create_task(addtoqueue(passvalues, dispatch_request, {
+            util.spawn(addtoqueue(passvalues, dispatch_request, {
                 'nodes': nodesbymanager[manager], 'manager': manager,
                 'element': pathcomponents, 'configmanager': configmanager,
                 'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange}))

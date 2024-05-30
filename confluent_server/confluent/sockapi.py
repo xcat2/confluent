@@ -316,10 +316,13 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
     if bufferage is not False:
         send_data(connection, {'bufferage': bufferage})
     while consession is not None:
-        data = await tlvdata.recv(connection)
+        try:
+            data = await tlvdata.recv(connection)
+        except Exception:
+            data = None
         if type(data) == dict:
             if data['operation'] == 'stop':
-                consession.destroy()
+                await consession.destroy()
                 break
             elif data['operation'] == 'break':
                 consession.send_break()
@@ -350,10 +353,12 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                          'error': 'Unexpected error - ' + str(e)})
                     await send_data(connection, {'_requestdone': 1})
                 continue
-        if not data:
-            consession.destroy()
+        if not consession:
             break
-        consession.write(data)
+        if not data:
+            await consession.destroy()
+            break
+        await consession.write(data)
     connection.close()
 
 
@@ -484,7 +489,8 @@ async def _unixdomainhandler():
             except KeyError:
                 cnn.close()
                 return
-        asyncio.create_task(sessionhdl(cnn, authname, skipauth))
+        util.spawn(sessionhdl(cnn, authname, skipauth))
+        #asyncio.create_task(sessionhdl(cnn, authname, skipauth))
 
 
 class SockApi(object):

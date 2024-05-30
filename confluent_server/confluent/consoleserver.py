@@ -30,7 +30,7 @@ import confluent.exceptions as exc
 import confluent.interface.console as conapi
 import confluent.log as log
 import confluent.core as plugin
-import confluent.tlvdata as tlvdata
+import confluent.asynctlvdata as tlvdata
 import confluent.util as util
 import eventlet
 import eventlet.event
@@ -554,12 +554,12 @@ class ConsoleHandler(object):
         retdata = await get_buffer_output(nodeid)
         return retdata, connstate
 
-    def write(self, data):
+    async def write(self, data):
         if self.connectstate == 'connected':
             try:
                 if isinstance(data, str) and not isinstance(data, bytes):
                     data = data.encode('utf-8')
-                self._console.write(data)
+                await self._console.write(data)
             except Exception:
                 _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                               event=log.Events.stacktrace)
@@ -661,7 +661,7 @@ class ProxyConsole(object):
         while data:
             self.data_handler(data)
             data = await tlvdata.recv(self.remote)
-        self.remote.close()
+        self.remote[1].close()
 
     def get_buffer_age(self):
         # the server sends a buffer age if appropriate, no need to handle
@@ -673,17 +673,18 @@ class ProxyConsole(object):
         self.skipreplay = False
         return b''
 
-    def write(self, data):
+    async def write(self, data):
         # Relay data to the collective manager
         try:
-            tlvdata.send(self.remote, data)
-        except Exception:
+            await tlvdata.send(self.remote, data)
+        except Exception as e:
+            print(repr(e))
             if self.clisession:
-                self.clisession.detach()
+                await self.clisession.detach()
             self.clisession = None
 
 
-    def attachsession(self, session):
+    async def attachsession(self, session):
         self.clisession = session
         self.data_handler = session.data_handler
         termreq = {
@@ -700,30 +701,25 @@ class ProxyConsole(object):
             },
         }
         try:
-            remote = socket.create_connection((self.managerinfo['address'], 13001))
-            remote = ssl.wrap_socket(remote, cert_reqs=ssl.CERT_NONE,
-                                     keyfile='/etc/confluent/privkey.pem',
-                                     certfile='/etc/confluent/srvcert.pem')
-            if not util.cert_matches(self.managerinfo['fingerprint'],
-                                     remote.getpeercert(binary_form=True)):
-                raise Exception('Invalid peer certificate')
-        except Exception:
-            #await asyncio.sleep(3)
+            remote = await collective.connect_to_collective(None, self.managerinfo['address'])
+        except Exception as e:
+            print(repr(e))
+            await asyncio.sleep(3)
             if self.clisession:
                 self.clisession.detach()
-            self.detachsession(None)
+            await self.detachsession(None)
             return
-        tlvdata.recv(remote)
-        tlvdata.recv(remote)
-        tlvdata.send(remote, termreq)
+        await tlvdata.recv(remote)
+        await tlvdata.recv(remote)
+        await tlvdata.send(remote, termreq)
         self.remote = remote
         util.spawn(self.relay_data())
 
-    def detachsession(self, session):
+    async def detachsession(self, session):
         # we will disappear, so just let that happen...
         if self.remote:
             try:
-                tlvdata.send(self.remote, {'operation': 'stop'})
+                await tlvdata.send(self.remote, {'operation': 'stop'})
             except Exception:
                 pass
         self.clisession = None
@@ -840,16 +836,16 @@ class ConsoleSession(object):
         self._evt = None
         self.reghdl = None
 
-    def detach(self):
+    async def detach(self):
         """Handler for the console handler to detach so it can reattach,
         currently to facilitate changing from one collective.manager to
         another
 
         :return:
         """
-        self.conshdl.detachsession(self)
+        await self.conshdl.detachsession(self)
         self.connect_session()
-        self.conshdl.attachsession(self)
+        await self.conshdl.attachsession(self)
         self.write = self.conshdl.write
 
     def got_data(self, data):

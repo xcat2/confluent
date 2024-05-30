@@ -90,7 +90,7 @@ class SshShell(conapi.Console):
         if not self.connected:
             return
         # asyncssh channel has change_terminal_size, hurray
-        self.shell.resize_pty(width=width, height=height)
+        self.shell[0].channel.change_terminal_size(width=width, height=height)
 
     async def recvdata(self):
         while self.connected:
@@ -142,8 +142,8 @@ class SshShell(conapi.Console):
             self.datacallback('\r\nEnter "disconnect" or "accept": ')
             return
         except Exception as e:
-            self.ssh.close()
-            self.ssh.close()
+            if self.ssh:
+                self.ssh.close()
             self.inputmode = 0
             self.username = b''
             self.password = b''
@@ -158,7 +158,7 @@ class SshShell(conapi.Console):
                                            # height=self.height)
         self.rxthread = util.spawn(self.recvdata())
 
-    def write(self, data):
+    async def write(self, data):
         if self.inputmode == -2:
             self.datacallback(conapi.ConsoleEvent.Disconnect)
             return

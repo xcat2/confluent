@@ -22,6 +22,7 @@
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.util as util
 activesessions = {}
 
 
@@ -47,9 +48,12 @@ class _ShellHandler(consoleserver.ConsoleHandler):
 
     def _got_disconnected(self):
         self.connectstate = 'closed'
-        self._send_rcpts({'connectstate': self.connectstate})
+        util.spawn(self._bgdisconnect())
+
+    async def _bgdisconnect(self):
+        await self._send_rcpts({'connectstate': self.connectstate})
         for session in list(self.livesessions):
-            session.destroy()
+            await session.destroy()
 
 
 
@@ -119,7 +123,7 @@ class ShellSession(consoleserver.ConsoleSession):
 
     async def destroy(self):
         try:
-            activesessions[(self.configmanager.tenant, self.node,
+            await activesessions[(self.configmanager.tenant, self.node,
                             self.username)][self.sessionid].close()
             del activesessions[(self.configmanager.tenant, self.node,
                                 self.username)][self.sessionid]

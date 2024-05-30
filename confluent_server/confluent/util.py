@@ -28,6 +28,7 @@ import ssl
 import struct
 import eventlet.green.subprocess as subprocess
 import asyncio
+import random
 
 
 def mkdirp(path, mode=0o777):
@@ -48,12 +49,24 @@ def spawn_after(sleeptime, func, *args):
         raise Exception('tf')
     return spawn(_sleep_and_run(sleeptime, func, args))
 
+tsks = {}
 
 def spawn(coro):
+    tskid = random.random()
+    while tskid in tsks:
+        tskid = random.random()
+    tsks[tskid] = 1
     try:
-        return asyncio.create_task(coro)
+        tsks[tskid] = asyncio.create_task(_run(coro, tskid))
     except AttributeError:
-        return asyncio.get_event_loop().create_task(coro)
+        tsks[tskid] = asyncio.get_event_loop().create_task(_run(coro, tskid))
+    return tsks[tskid]
+
+async def _run(coro, taskid):
+    ret = await coro
+    del tsks[taskid]
+    return ret
+
 
 def run(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

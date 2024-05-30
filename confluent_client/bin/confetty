@@ -130,6 +130,15 @@ def print_help():
     #common with the api document
 
 
+def writeout(data):
+    while True:
+        try:
+            select.select((), (sys.stdout,), ())
+            sys.stdout.write(data)
+            break
+        except BlockingIOError:
+            continue
+
 def updatestatus(stateinfo={}):
     global powerstate, powertime, clearpowermessage
     status = consolename
@@ -149,10 +158,10 @@ def updatestatus(stateinfo={}):
     if 'state' in stateinfo:  # currently only read power means anything
         newpowerstate = stateinfo['state']['value']
         if newpowerstate != powerstate and newpowerstate == 'off':
-            sys.stdout.write("\x1b[2J\x1b[;H[powered off]\r\n")
+            writeout("\x1b[2J\x1b[;H[powered off]\r\n")
             clearpowermessage = True
         if newpowerstate == 'on' and clearpowermessage:
-            sys.stdout.write("\x1b[2J\x1b[;H")
+            writeout("\x1b[2J\x1b[;H")
             clearpowermessage = False
         powerstate = newpowerstate
     if 'clientcount' in laststate and laststate['clientcount'] != 1:
@@ -170,7 +179,7 @@ def updatestatus(stateinfo={}):
     if info:
         status += ' [' + ','.join(info) + ']'
     if os.environ.get('TERM', '') not in ('linux'):
-        sys.stdout.write('\x1b]0;console: %s\x07' % status)
+        writeout('\x1b]0;console: %s\x07' % status)
     sys.stdout.flush()
 
 
@@ -450,7 +459,7 @@ def do_command(command, server):
                 print_result(res)
     elif argv[0] == 'start':
         targpath = fullpath_target(argv[1])
-        nodename = targpath.split('/')[-3]
+        nodename = targpath.split('/')[2]
         currconsole = targpath
         startrequest = {'operation': 'start', 'path': targpath,
                         'parameters': {}}
@@ -657,9 +666,13 @@ def get_session_node(shellargs):
         return shellargs[0]
     if len(shellargs) == 2 and shellargs[0] == 'start':
         args = [s for s in shellargs[1].split('/') if s]
-        if len(args) == 4 and args[0] == 'nodes' and args[2] == 'console' and \
+        if len(args) == 4 and args[0] == 'nodes':
+            if args[2] == 'console' and \
                 args[3] == 'session':
-            return args[1]
+                return args[1]
+            if args[2] == 'shell' and \
+                args[3] == 'sessions':
+                return args[1]
     return None
 
 
@@ -920,7 +933,7 @@ def main():
     session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
-        do_command("start /nodes/%s/console/session" % session_node, netserver)
+        do_command(shellargs, netserver)
         doexit = True
     elif shellargs:
         do_command(shellargs, netserver)
@@ -980,14 +993,21 @@ def consume_termdata(fh, bufferonly=False):
             clearpowermessage = False
         if bufferonly:
             return data
-        try:
-            sys.stdout.write(data)
-        except UnicodeEncodeError:
-            sys.stdout.buffer.write(data.encode('utf8'))
-        except IOError:  # Some times circumstances are bad
-                         # resort to byte at a time...
-            for d in data:
-                sys.stdout.write(d)
+        data = data.encode('utf8')
+        written = False
+        while not written:
+            select.select((), (sys.stdout,), ())
+            try:
+                sys.stdout.buffer.write(data)
+                written = True
+            except BlockingIOError:
+                continue
+            except IOError:  # Some times circumstances are bad
+                            # resort to byte at a time...
+                raise
+                for d in data:
+                    sys.stdout.write(d)
+                written = True
         now = time.time()
         if ('showtime' not in laststate or
                                 (now // 60) != laststate['showtime'] // 60):
