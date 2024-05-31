@@ -1,11 +1,10 @@
 #!/usr/bin/python
 
+import asyncio
 import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.util as util
-import eventlet.green.subprocess as subprocess
-import eventlet
 import glob
 import os
 import shutil
@@ -15,12 +14,10 @@ agent_pid = None
 ready_keys = {}
 _sshver = None
 
-def sshver():
+async def sshver():
     global _sshver
     if _sshver is None:
-        p = subprocess.Popen(['ssh', '-V'], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-        _, output = p.communicate()
+        _, output =await util.check_output('ssh', '-V')
         _sshver = float(output.split()[0].split(b'_')[1].split(b'p')[0])
     return _sshver
 
@@ -34,11 +31,11 @@ def normalize_uid():
     return curruid
 
 agent_starting = False
-def assure_agent():
+async def assure_agent():
     global agent_starting
     global agent_pid
     while agent_starting:
-        eventlet.sleep(0.1)
+        await asyncio.sleep(0.1)
     if agent_pid is None:
         try:
             agent_starting = True
@@ -60,8 +57,8 @@ def assure_agent():
             agent_starting = False
     return True
 
-def get_passphrase():
-    if sshver() <= 7.6:
+async def get_passphrase():
+    if await sshver() <= 7.6:
         return ''
     # convert the master key to base64
     # for use in ssh passphrase context
@@ -75,7 +72,7 @@ def get_passphrase():
 class AlreadyExists(Exception):
     pass
 
-def initialize_ca():
+async def initialize_ca():
     ouid = normalize_uid()
     # if already there, skip, make warning
     myname = collective.get_myname()
@@ -92,9 +89,9 @@ def initialize_ca():
     finally:
         os.seteuid(ouid)
     comment = '{0} SSH CA'.format(myname)
-    subprocess.check_call(
-        ['ssh-keygen', '-C', comment, '-t', 'ed25519', '-f',
-         '/etc/confluent/ssh/ca', '-N', get_passphrase()],
+    await util.check_call(
+        'ssh-keygen', '-C', comment, '-t', 'ed25519', '-f',
+        '/etc/confluent/ssh/ca', '-N', await get_passphrase(),
          preexec_fn=normalize_uid)
     ouid = normalize_uid()
     try:
@@ -111,15 +108,15 @@ def initialize_ca():
 
 
 adding_key = False
-def prep_ssh_key(keyname):
+async def prep_ssh_key(keyname):
     global adding_key
     while adding_key:
-        eventlet.sleep(0.1)
+        await asyncio.sleep(0.1)
     adding_key = True
     if keyname in ready_keys:
         adding_key = False
         return
-    if not assure_agent():
+    if not await assure_agent():
         ready_keys[keyname] = 1
         adding_key = False
         return
@@ -129,14 +126,14 @@ def prep_ssh_key(keyname):
         with open(askpass, 'w') as ap:
             ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\nrm {0}\n'.format(askpass))
         os.chmod(askpass, 0o700)
-        os.environ['CONFLUENT_SSH_PASSPHRASE'] = get_passphrase()
+        os.environ['CONFLUENT_SSH_PASSPHRASE'] = await get_passphrase()
         olddisplay = os.environ.get('DISPLAY', None)
         oldaskpass = os.environ.get('SSH_ASKPASS', None)
         os.environ['DISPLAY'] = 'NONE'
         os.environ['SSH_ASKPASS'] = askpass
         try:
             with open(os.devnull, 'wb') as devnull:
-                subprocess.check_output(['ssh-add', keyname], stdin=devnull, stderr=devnull)
+                await util.check_call('ssh-add', keyname)
         finally:
             del os.environ['CONFLUENT_SSH_PASSPHRASE']
             del os.environ['DISPLAY']
@@ -150,10 +147,10 @@ def prep_ssh_key(keyname):
         adding_key = False
         shutil.rmtree(tmpdir)
 
-def sign_host_key(pubkey, nodename, principals=()):
+async def sign_host_key(pubkey, nodename, principals=()):
     tmpdir = tempfile.mkdtemp()
     try:
-        prep_ssh_key('/etc/confluent/ssh/ca')
+        await prep_ssh_key('/etc/confluent/ssh/ca')
         ready_keys['ca.pub'] = 1
         pkeyname = os.path.join(tmpdir, 'hostkey.pub')
         with open(pkeyname, 'wb') as pubfile:
@@ -161,25 +158,25 @@ def sign_host_key(pubkey, nodename, principals=()):
         principals = set(principals)
         principals.add(nodename)
         principals = ','.join(sorted(principals))
-        flags = '-Us' if sshver() > 7.6 else '-s'
+        flags = '-Us' if await sshver() > 7.6 else '-s'
         keyname = '/etc/confluent/ssh/ca.pub' if flags == '-Us' else '/etc/confluent/ssh/ca'
-        subprocess.check_call(
-            ['ssh-keygen', flags, keyname, '-I', nodename,
-             '-n', principals, '-h', pkeyname])
+        await util.check_call(
+            'ssh-keygen', flags, keyname, '-I', nodename,
+             '-n', principals, '-h', pkeyname)
         certname = pkeyname.replace('.pub', '-cert.pub')
         with open(certname) as cert:
             return cert.read()
     finally:
         shutil.rmtree(tmpdir)
 
-def initialize_root_key(generate, automation=False):
+async def initialize_root_key(generate, automation=False):
     authorized = []
     myname = collective.get_myname()
     alreadyexist = False
     for currkey in glob.glob('/root/.ssh/*.pub'):
         authorized.append(currkey)
     if generate and not authorized and not automation:
-        subprocess.check_call(['ssh-keygen', '-t', 'ed25519', '-f', '/root/.ssh/id_ed25519', '-N', ''])
+        await util.check_call('ssh-keygen', '-t', 'ed25519', '-f', '/root/.ssh/id_ed25519', '-N', '')
         for currkey in glob.glob('/root/.ssh/*.pub'):
             authorized.append(currkey)
     if automation and generate:
@@ -194,10 +191,10 @@ def initialize_root_key(generate, automation=False):
                     raise
             finally:
                 os.seteuid(ouid)
-            subprocess.check_call(
-                ['ssh-keygen', '-t', 'ed25519',
-                '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
-                '-C', 'Confluent Automation by {}'.format(myname)],
+            await util.check_call(
+                'ssh-keygen', '-t', 'ed25519',
+                '-f','/etc/confluent/ssh/automation', '-N', await get_passphrase(),
+                '-C', 'Confluent Automation by {}'.format(myname),
                 preexec_fn=normalize_uid)
         authorized = ['/etc/confluent/ssh/automation.pub']
     ouid = normalize_uid()
@@ -213,6 +210,8 @@ def initialize_root_key(generate, automation=False):
         suffix = 'automationpubkey'
     else:
         suffix = 'rootpubkey'
+    # if myname suffix is rootpubkey, and file exists, zero it 
+    # append instead of replace
     for auth in authorized:
         shutil.copy(
             auth,

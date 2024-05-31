@@ -16,6 +16,7 @@
 # limitations under the License.
 
 # Various utility functions that do not neatly fit into one category or another
+import asyncio
 import base64
 import confluent.exceptions as cexc
 import confluent.log as log
@@ -26,9 +27,9 @@ import re
 import socket
 import ssl
 import struct
-import eventlet.green.subprocess as subprocess
 import asyncio
 import random
+import subprocess
 
 
 def mkdirp(path, mode=0o777):
@@ -38,6 +39,12 @@ def mkdirp(path, mode=0o777):
         if e.errno != 17:
             raise
 
+
+async def check_call(*cmd, **kwargs):
+    subproc = await asyncio.create_subprocess_exec(*cmd, **kwargs)
+    rc = await subproc.wait()
+    if rc != 0:
+        raise subprocess.CalledProcessError(rc, cmd)
 
 async def _sleep_and_run(sleeptime, func, args):
     await asyncio.sleep(sleeptime)
@@ -68,12 +75,15 @@ async def _run(coro, taskid):
     return ret
 
 
-def run(cmd):
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate()
-    retcode = process.poll()
+async def check_output(*cmd):
+    process = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await process.communicate()
+    retcode = process.returncode
     if retcode:
-        raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
+        raise subprocess.CalledProcessError(
+            retcode, process.args,
+            output=stdout, stderr=stderr)
     return stdout, stderr
 
 

@@ -191,7 +191,7 @@ def handle_storage(configmanager, inputdata, pathcomponents, operation):
         for rsp in mountmanager.handle_request(configmanager, inputdata, pathcomponents[2:], operation):
             yield rsp
 
-def handle_deployment(configmanager, inputdata, pathcomponents,
+async def handle_deployment(configmanager, inputdata, pathcomponents,
                       operation):
     if len(pathcomponents) == 1:
         yield msg.ChildCollection('distributions/')
@@ -228,12 +228,12 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                 yield msg.ChildCollection('info')
             if operation == 'update':
                 if 'updateboot' in inputdata:
-                    osimage.update_boot(profname)
+                    await osimage.update_boot(profname)
                     yield msg.KeyValueData({'updated': profname})
                     return
                 elif 'rebase' in inputdata:
                     try:
-                        updated, customized = osimage.rebase_profile(profname)
+                        updated, customized = await osimage.rebase_profile(profname)
                     except osimage.ManifestMissing:
                         raise exc.InvalidArgumentException('Specified profile {0} does not have a manifest.yaml for rebase'.format(profname))
                     for upd in updated:
@@ -260,10 +260,12 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                 return
             elif operation == 'create':
                 if inputdata.get('custname', None):
-                    importer = osimage.MediaImporter(inputdata['filename'],
+                    importer = osimage.MediaImporter()
+                    await importer.init(inputdata['filename'],
                                                     configmanager, inputdata['custname'])
                 else:
-                    importer = osimage.MediaImporter(inputdata['filename'],
+                    importer = osimage.MediaImporter()
+                    await importer.init(inputdata['filename'],
                                                     configmanager)
                 yield msg.KeyValueData({'target': importer.targpath,
                                         'name': importer.importkey})

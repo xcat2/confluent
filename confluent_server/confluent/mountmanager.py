@@ -1,26 +1,26 @@
 
+import asyncio
 import eventlet
 import confluent.messages as msg
 import confluent.exceptions as exc
 import struct
 import eventlet.green.socket as socket
-import eventlet.green.subprocess as subprocess
 import os
 mountsbyuser = {}
 _browserfsd = None
 
-def assure_browserfs():
+async def assure_browserfs():
     global _browserfsd
     if _browserfsd is None:
         os.makedirs('/var/run/confluent/browserfs/mount', exist_ok=True)
-        _browserfsd = subprocess.Popen(
-            ['/opt/confluent/bin/browserfs',
+        _browserfsd = await asyncio.subprocess.create_subprocess_exec(
+            '/opt/confluent/bin/browserfs',
              '-c', '/var/run/confluent/browserfs/control',
              '-s', '127.0.0.1:4006',
              # browserfs supports unix domain websocket, however apache reverse proxy is dicey that way in some versions
-             '-w', '/var/run/confluent/browserfs/mount'])
+             '-w', '/var/run/confluent/browserfs/mount')
         while not os.path.exists('/var/run/confluent/browserfs/control'):
-            eventlet.sleep(0.5)
+            await asyncio.sleep(0.5)
 
 
 def handle_request(configmanager, inputdata, pathcomponents, operation):
@@ -50,8 +50,8 @@ def handle_request(configmanager, inputdata, pathcomponents, operation):
                 'authtoken': currmount['authtoken']
             })
 
-def requestmount(subdir, filename):
-    assure_browserfs()
+async def requestmount(subdir, filename):
+    await assure_browserfs()
     a = socket.socket(socket.AF_UNIX)
     a.connect('/var/run/confluent/browserfs/control')
     subname = subdir.encode()

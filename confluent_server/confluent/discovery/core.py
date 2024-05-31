@@ -90,8 +90,6 @@ import struct
 #import eventlet.green.socket as socket
 import socket
 import socket as nsocket
-import subprocess
-#import eventlet.green.subprocess as subprocess
 #webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
@@ -1454,7 +1452,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 else:
                     bmcaddr = bmcaddr.split('/', 1)[0]
                     await wait_for_connection(bmcaddr)
-                    subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
+                    await util.check_call('/opt/confluent/bin/nodeconfig', nodename, nodeconfig)
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
 

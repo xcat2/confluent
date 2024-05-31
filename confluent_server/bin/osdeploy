@@ -17,10 +17,9 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 import confluent.collective.manager as collective
-import eventlet.green.subprocess as subprocess
 import confluent.selfservice as selfservice
 import confluent.util as util
-import confluent.client as client
+import confluent.asynclient as client
 import confluent.sshutil as sshutil
 import confluent.certutil as certutil
 import confluent.netutil as netutil
@@ -67,7 +66,7 @@ async def main(args):
     if cmdset.command == 'list':
         return oslist()
     if cmdset.command == 'import':
-        return osimport(cmdset.imagefile, custname=cmdset.n)
+        return await osimport(cmdset.imagefile, custname=cmdset.n)
     if cmdset.command == 'importcheck':
         return osimport(cmdset.imagefile, checkonly=True)
     if cmdset.command == 'initialize':
@@ -161,7 +160,7 @@ def init_confluent_myname():
             os._exit(0)
 
 
-def local_node_trust_setup():
+async def local_node_trust_setup():
     init_confluent_myname()
     allnodes, domain = selfservice.get_cluster_list()
     myname = collective.get_myname()
@@ -187,7 +186,12 @@ def local_node_trust_setup():
         with open(certfile, 'w') as certout:
             certout.write(cert)
         if restorecon:
-            subprocess.check_call(['/usr/sbin/restorecon', certfile])
+            rcproc = await asyncio.create_subprocess_exec(
+                '/usr/sbin/restorecon', certfile)
+            rc = await rcproc.wait()
+            if rc != 0:
+                raise Exception("Failure to restorecon")
+            #subprocess.check_call(['/usr/sbin/restorecon', certfile])
     with open('/etc/ssh/sshd_config', 'r') as sshconf:
         currconfig = sshconf.read().split('\n')
     for conline in currconfig:
@@ -205,12 +209,17 @@ def local_node_trust_setup():
         for node in util.natural_sort(allnodes):
             equivout.write(node + '\n')
     if restorecon:
-        subprocess.check_call(
-            ['/usr/sbin/restorecon',
-            '/etc/ssh/shosts.equiv', '/root/.shosts'])
+        rcproc = await asyncio.create_subprocess_exec(
+            '/usr/sbin/restorecon', '/etc/ssh/shosts.equiv', '/root/.shosts')
+        rc = await rcproc.wait()
+        if rc != 0:
+            raise Exception('Unable to restorecon')
+        #subprocess.check_call(
+        #    ['/usr/sbin/restorecon',
+        #    '/etc/ssh/shosts.equiv', '/root/.shosts'])
 
 
-def install_tftp_content():
+async def install_tftp_content():
     tftplocation = None
     candidates = ('/tftpboot', '/var/lib/tftpboot', '/srv/tftpboot', '/srv/tftp')
     for cand in candidates:
@@ -225,7 +234,11 @@ def install_tftp_content():
             emprint('/tftpboot is detected as tftp directory, will not try to automatically enable tftp, as it is presumed to be externally managed')
         else:
             try:
-                subprocess.check_call(['systemctl', 'enable', 'tftp.socket', '--now'])
+                tfproc = await asyncio.create_subprocess_exec('systemctl', 'enable', 'tftp.socket', '--now')
+                rc = await tfproc.wait()
+                if rc != 0:
+                    raise Exception('{0}'.format(rc))
+                #subprocess.check_call(['systemctl', 'enable', 'tftp.socket', '--now'])
                 print('TFTP service is enabled and running')
             except Exception:
                 emprint('Unable to automatically enable and start tftp.socket, tftp server may already be running outside of systemd control')
@@ -301,20 +314,28 @@ async def initialize(cmdset):
                             'passphrase protected ssh key easier.\n')
             sys.exit(1)
         init_confluent_myname()
-        sshutil.initialize_root_key(False)
+        await sshutil.initialize_root_key(False)
     if cmdset.t:
         didsomething = True
         init_confluent_myname()
-        certutil.create_certificate()
+        await certutil.create_certificate()
         if os.path.exists('/usr/lib/systemd/system/httpd.service'):
             try:
-                subprocess.check_call(['systemctl', 'try-restart', 'httpd'])
+                hrproc = await asyncio.create_subprocess_exec('systemctl', 'try-restart', 'httpd')
+                rc = await hrproc.wait()
+                if rc != 0:
+                    raise Exception('Failed restarting HTTP')
+                #subprocess.check_call(['systemctl', 'try-restart', 'httpd'])
                 print('HTTP server has been restarted if it was running')
             except Exception:
                 emprint('New HTTPS certificates generated, restart the web server manually')
         elif os.path.exists('/usr/lib/systemd/system/apache2.service'):
             try:
-                subprocess.check_call(['systemctl', 'try-restart', 'apache2'])
+                hrproc = await asyncio.create_subprocess_exec('systemctl', 'try-restart', 'apache2')
+                rc = await hrproc.wait()
+                if rc != 0:
+                    raise Exception('Failed restarting HTTP')
+                # subprocess.check_call(['systemctl', 'try-restart', 'apache2'])
                 print('HTTP server has been restarted if it was running')
             except Exception:
                 emprint('New HTTPS certificates generated, restart the web server manually')
@@ -324,20 +345,20 @@ async def initialize(cmdset):
         didsomething = True
         init_confluent_myname()
         try:
-            sshutil.initialize_ca()
+            await sshutil.initialize_ca()
         except sshutil.AlreadyExists:
             emprint('Skipping generation of SSH CA, already present and would likely be more problematic to regenerate than to reuse (if absolutely sure you want to discard old CA, then delete /etc/confluent/ssh/ca* and restart confluent)')
     if cmdset.a:
         didsomething = True
         init_confluent_myname()
         try:
-            sshutil.initialize_root_key(True, True)
+            await sshutil.initialize_root_key(True, True)
         except sshutil.AlreadyExists:
             emprint('Skipping generation of new automation key, already present and regeneration usually causes more problems. (If absolutely certain, delete /etc/confluent/ssh/automation* and restart confluent)')
     if cmdset.p:
-        install_tftp_content()
+        await install_tftp_content()
     if cmdset.l:
-        local_node_trust_setup()
+        await local_node_trust_setup()
     if cmdset.k:
         cas = set([])
         cakeys = set([])
@@ -411,15 +432,20 @@ async def initialize(cmdset):
             for fname in files:
                 topack.append(os.path.join(currd, fname))
     with open(tmpname, 'wb') as initramfs:
-        packit = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
-                                  stdout=initramfs, stdin=subprocess.PIPE)
+        packit = await asyncio.subprocess.create_subprocess_exec(
+            'cpio', '-H', 'newc', '-o',
+            stdin=asyncio.subprocess.PIPE, stdout=initramfs)
+        #packit = subprocess.Popen(['cpio', '-H', 'newc', '-o'],
+        #                          stdout=initramfs, stdin=subprocess.PIPE)
         for packfile in topack:
             if not isinstance(packfile, bytes):
                 packfile = packfile.encode('utf8')
             packit.stdin.write(packfile)
             packit.stdin.write(b'\n')
+        await packit.stdin.drain()
         packit.stdin.close()
-        res = packit.wait()
+        await packit.stdin.wait_closed()
+        res = await packit.wait()
         if res:
             sys.stderr.write('Error occurred while packing site initramfs')
             sys.exit(1)
@@ -439,7 +465,9 @@ async def initialize(cmdset):
     if totar:
         tmptarname = tmpname.replace('cpio', 'tgz')
         tarcmd = ['tar', '-czf', tmptarname] + totar
-        subprocess.check_call(tarcmd)
+        tarproc = await asyncio.subprocess.create_subprocess_exec(*tarcmd)
+        await tarproc.wait()
+        #subprocess.check_call(tarcmd)
         os.rename(tmptarname, '/var/lib/confluent/public/site/initramfs.tgz')
         oum = os.umask(0o22)
         try:
@@ -450,7 +478,9 @@ async def initialize(cmdset):
     print('Site initramfs content packed successfully')
 
     if not os.path.exists('/etc/confluent/srvcert.pem'):
-        subprocess.check_call(['collective', 'gencert'])
+        gcproc = await asyncio.subprocess.create_subprocess_exec('collective', 'gencert')
+        await gcproc.wait()
+        #subprocess.check_call(['collective', 'gencert'])
     # TODO: check selinux and segetbool for httpd_can_network_connect
     # httpd available and enabled?
 
@@ -502,7 +532,7 @@ def oslist():
     print("")
 
 
-def osimport(imagefile, checkonly=False, custname=None):
+async def osimport(imagefile, checkonly=False, custname=None):
     c = client.Command()
     imagefile = os.path.abspath(imagefile)
     if c.unixdomain:
@@ -519,7 +549,7 @@ def osimport(imagefile, checkonly=False, custname=None):
     apiargs = {'filename': imagefile}
     if custname:
         apiargs['custname'] = custname
-    for rsp in c.create(apipath, apiargs):
+    async for rsp in c.create(apipath, apiargs):
         if 'target' in rsp:
             importing = True
             shortname = rsp['name']
@@ -544,7 +574,7 @@ def osimport(imagefile, checkonly=False, custname=None):
             print(repr(rsp))
     try:
         while importing:
-            for rsp in c.read('/deployment/importing/{0}'.format(shortname)):
+            async for rsp in c.read('/deployment/importing/{0}'.format(shortname)):
                 if 'progress' in rsp:
                     sys.stdout.write('{0}: {1:.2f}%    \r'.format(rsp['phase'],
                                                             rsp['progress']))
@@ -564,7 +594,8 @@ def osimport(imagefile, checkonly=False, custname=None):
                 time.sleep(0.5)
     finally:
         if shortname:
-            list(c.delete('/deployment/importing/{0}'.format(shortname)))
+            async for x in c.delete('/deployment/importing/{0}'.format(shortname)):
+                pass
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main(sys.argv))

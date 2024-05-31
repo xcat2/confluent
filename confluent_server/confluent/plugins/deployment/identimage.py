@@ -20,7 +20,7 @@
 # to use this.
 import confluent.messages as msg
 import confluent.netutil as netutil
-import eventlet.green.subprocess as subprocess
+import confluent.util as util
 import os
 import shutil
 import tempfile
@@ -41,7 +41,7 @@ def create_apikey():
     return newpass
 
 
-def create_ident_image(node, configmanager):
+async def create_ident_image(node, configmanager):
     tmpd = tempfile.mkdtemp()
     ident = { 'nodename': node }
     apikey = create_apikey()
@@ -63,13 +63,13 @@ def create_ident_image(node, configmanager):
     imgname = '/var/lib/confluent/private/identity_images/{0}.img'.format(node)
     if os.path.exists(imgname):
         os.remove(imgname)
-    subprocess.check_call(['/opt/confluent/bin/dir2img', tmpd, imgname, 'cnflnt_idnt'])
+    await util.check_call('/opt/confluent/bin/dir2img', tmpd, imgname, 'cnflnt_idnt')
     shutil.rmtree(tmpd)
 
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     for node in nodes:
-        create_ident_image(node, configmanager)
+        await create_ident_image(node, configmanager)
         yield msg.CreatedResource(
                 'nodes/{0}/deployment/ident_image'.format(node))
 

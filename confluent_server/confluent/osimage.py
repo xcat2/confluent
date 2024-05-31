@@ -1,7 +1,6 @@
 #!/usr/bin/python
+import asyncio
 import eventlet
-import eventlet.green.select as select
-import eventlet.green.subprocess as subprocess
 from fnmatch import fnmatch
 import glob
 import logging
@@ -21,6 +20,7 @@ if __name__ == '__main__':
 
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.util as util
 
 COPY = 1
 EXTRACT = 2
@@ -64,7 +64,7 @@ def symlink(src, targ):
             raise
 
 
-def update_boot(profilename):
+async def update_boot(profilename):
     if profilename.startswith('/var/lib/confluent/public'):
         profiledir = profilename
     else:
@@ -78,11 +78,11 @@ def update_boot(profilename):
     label = profile.get('label', profname)
     ostype = profile.get('ostype', 'linux')
     if ostype == 'linux':
-        update_boot_linux(profiledir, profile, label)
+        await update_boot_linux(profiledir, profile, label)
     elif ostype == 'esxi':
-        update_boot_esxi(profiledir, profile, label)
+        await update_boot_esxi(profiledir, profile, label)
 
-def update_boot_esxi(profiledir, profile, label):
+async def update_boot_esxi(profiledir, profile, label):
     profname = os.path.basename(profiledir)
     kernelargs = profile.get('kernelargs', '')
     oum = os.umask(0o22)
@@ -149,9 +149,9 @@ def update_boot_esxi(profiledir, profile, label):
             'chain boot/efi/boot/bootx64.efi -c /confluent-public/os/{0}/boot/boot.cfg'.format(pname))
     finally:
         ipxeout.close()
-    subprocess.check_call(
-        ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
-         '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
+    await util.check_call(
+        '/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
+         '{0}/boot.img'.format(profiledir), profname, preexec_fn=relax_umask)
 
 
 def find_glob(loc, fileglob):
@@ -162,7 +162,7 @@ def find_glob(loc, fileglob):
     return None
 
 
-def update_boot_linux(profiledir, profile, label):
+async def update_boot_linux(profiledir, profile, label):
     profname = os.path.basename(profiledir)
     kernelargs = profile.get('kernelargs', '')
     grubcfg = "set timeout=5\nmenuentry '"
@@ -200,9 +200,9 @@ def update_boot_linux(profiledir, profile, label):
         ipxeout.write('imgload kernel\nimgexec kernel\n')
     finally:
         ipxeout.close()
-    subprocess.check_call(
-        ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
-         '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
+    await util.check_call(
+        '/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
+         '{0}/boot.img'.format(profiledir), profname, preexec_fn=relax_umask)
 
 
 def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist=None):
@@ -551,7 +551,7 @@ def check_rhel(isoinfo):
     return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
 
 
-def scan_iso(archive):
+async def scan_iso(archive):
     filesizes = {}
     filecontents = {}
     dfd = os.dup(archive.fileno())
@@ -561,7 +561,7 @@ def scan_iso(archive):
             for ent in reader:
                 if str(ent).endswith('TRANS.TBL'):
                     continue
-                eventlet.sleep(0)
+                await asyncio.sleep(0)
                 filesizes[str(ent)] = ent.size
                 if str(ent) in READFILES:
                     filecontents[str(ent)] = b''
@@ -572,13 +572,13 @@ def scan_iso(archive):
     return filesizes, filecontents
 
 
-def fingerprint(archive):
+async def fingerprint(archive):
     archive.seek(0)
     header = archive.read(32768)
     archive.seek(32769)
     if archive.read(6) == b'CD001\x01':
         # ISO image
-        isoinfo = scan_iso(archive)
+        isoinfo = await scan_iso(archive)
         name = None
         for fun in globals():
             if fun.startswith('check_'):
@@ -599,12 +599,12 @@ def fingerprint(archive):
                 return imginfo, None, None
 
 
-def import_image(filename, callback, backend=False, mfd=None, custtargpath=None, custdistpath=None, custname=''):
+async def import_image(filename, callback, backend=False, mfd=None, custtargpath=None, custdistpath=None, custname=''):
     if mfd:
         archive = os.fdopen(int(mfd), 'rb')
     else:
         archive = open(filename, 'rb')
-    identity = fingerprint(archive)
+    identity = await fingerprint(archive)
     if not identity:
         return -1
     identity, imginfo, funname = identity
@@ -689,17 +689,20 @@ def copy_file(src, dst):
     makedirs(newdir, 0o755)
     shutil.copy2(src, dst)
 
-def get_hash(fname):
+async def get_hash(fname):
     currhash = hashlib.sha512()
     with open(fname, 'rb') as currf:
         currd = currf.read(2048)
+        await asyncio.sleep(0)
         while currd:
             currhash.update(currd)
             currd = currf.read(2048)
+            await asyncio.sleep(0)
+
     return currhash.hexdigest()
 
 
-def rebase_profile(dirname):
+async def rebase_profile(dirname):
     if dirname.startswith('/var/lib/confluent/public'):
         profiledir = dirname
     else:
@@ -712,7 +715,7 @@ def rebase_profile(dirname):
     except IOError:
         raise ManifestMissing()
     distdir = manifest['distdir']
-    newdisthashes = get_hashes(distdir)
+    newdisthashes = await get_hashes(distdir)
     olddisthashes = manifest['disthashes']
     customized = []
     newmanifest = []
@@ -737,7 +740,7 @@ def rebase_profile(dirname):
             newmanifest.append(updatecandidate)
     for nf in newmanifest:
         nfname = os.path.join(profiledir, nf)
-        currhash = get_hash(nfname)
+        currhash = await get_hash(nfname)
         manifest['disthashes'][nf] = currhash
     with open('{0}/manifest.yaml'.format(profiledir), 'w') as yout:
             yout.write('# This manifest enables rebase to know original source of profile data and if any customizations have been done\n')
@@ -753,21 +756,20 @@ def rebase_profile(dirname):
 
 
 
-def get_hashes(dirname):
+async def get_hashes(dirname):
     hashmap = {}
     for dname, _, fnames in os.walk(dirname):
         for fname in fnames:
             if fname == 'profile.yaml':
                 continue
             fullname = os.path.join(dname, fname)
-            currhash = hashlib.sha512()
             subname = fullname.replace(dirname + '/', '')
             if os.path.isfile(fullname):
-                hashmap[subname] = get_hash(fullname)
+                hashmap[subname] = await get_hash(fullname)
     return hashmap
 
 
-def generate_stock_profiles(defprofile, distpath, targpath, osname,
+async def generate_stock_profiles(defprofile, distpath, targpath, osname,
                             profilelist, customname):
     osd, osversion, arch = osname.split('-')
     bootupdates = []
@@ -782,7 +784,7 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
             continue
         oumask = os.umask(0o22)
         shutil.copytree(srcname, dirname)
-        hmap = get_hashes(dirname)
+        hmap = await get_hashes(dirname)
         profdata = None
         try:
             os.makedirs('{0}/boot/initramfs'.format(dirname), 0o755)
@@ -819,18 +821,18 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
             '/var/lib/confluent/public/site/initramfs.cpio',
             '{0}/boot/initramfs/site.cpio'.format(dirname))
         os.symlink(distpath, '{0}/distribution'.format(dirname))
-        subprocess.check_call(
-            ['sh', '{0}/initprofile.sh'.format(dirname),
-             targpath, dirname])
-        bootupdates.append(eventlet.spawn(update_boot, dirname))
+        await util.check_call(
+            'sh', '{0}/initprofile.sh'.format(dirname),
+             targpath, dirname)
+        bootupdates.append(util.spawn(update_boot(dirname)))
         profilelist.append(profname)
     for upd in bootupdates:
-        upd.wait()
+        await upd
 
 
 class MediaImporter(object):
 
-    def __init__(self, media, cfm=None, customname=None, checkonly=False):
+    async def init(self, media, cfm=None, customname=None, checkonly=False):
         self.worker = None
         if not os.path.exists('/var/lib/confluent/public'):
             raise Exception('`osdeploy initialize` must be executed before importing any media')
@@ -844,7 +846,7 @@ class MediaImporter(object):
         else:
             medfile = open(media, 'rb')
         try:
-            identity = fingerprint(medfile)
+            identity = await fingerprint(medfile)
         finally:
             if not self.medfile:
                 medfile.close()
@@ -886,27 +888,33 @@ class MediaImporter(object):
         importing[importkey] = self
         self.filename = os.path.abspath(media)
         self.error = ''
-        self.importer = eventlet.spawn(self.importmedia)
+        self.importer = util.spawn(self.importmedia())
 
     def stop(self):
-        if self.worker and self.worker.poll() is None:
+        if self.worker and self.worker.returncode is None:
             self.worker.kill()
 
     @property
     def progress(self):
         return {'phase': self.phase, 'progress': self.percent, 'profiles': self.profiles, 'error': self.error}
 
-    def importmedia(self):
+    async def importmedia(self):
         if self.medfile:
             os.environ['CONFLUENT_MEDIAFD'] = '{0}'.format(self.medfile.fileno())
         with open(os.devnull, 'w') as devnull:
-            self.worker = subprocess.Popen(
-                [sys.executable, __file__, self.filename, '-b', self.targpath, self.distpath, self.customname],
-                stdin=devnull, stdout=subprocess.PIPE, close_fds=False)
+            self.worker = await asyncio.create_subprocess_exec(
+                sys.executable, __file__, self.filename, '-b',
+                self.targpath, self.distpath, self.customname,
+                stdout=asyncio.subprocess.PIPE, close_fds=False)
         wkr = self.worker
         currline = b''
-        while wkr.poll() is None:
-            currline += wkr.stdout.read(1)
+        while wkr.returncode is None:
+            try:
+                await asyncio.wait_for(wkr.wait(), 0.001)
+            except asyncio.TimeoutError:
+                pass
+            nb = await wkr.stdout.read(128)
+            currline += nb
             if b'\r' in currline:
                 if b'%' in currline:
                     val = currline.split(b'%')[0].strip()
@@ -920,7 +928,7 @@ class MediaImporter(object):
                     self.percent = 100.0
                     return
                 currline = b''
-        a = wkr.stdout.read(1)
+        a = await wkr.stdout.read(1)
         while a:
             currline += a
             if b'\r' in currline:
@@ -935,12 +943,12 @@ class MediaImporter(object):
                     self.phase = 'error'
                     return
             currline = b''
-            a = wkr.stdout.read(1)
+            a = await wkr.stdout.read(1)
         if self.oscategory:
             defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(
                 self.oscategory)
             try:
-                generate_stock_profiles(defprofile, self.distpath, self.targpath,
+                await generate_stock_profiles(defprofile, self.distpath, self.targpath,
                                         self.osname, self.profiles, self.customname)
             except Exception as e:
                 self.phase = 'error'
@@ -968,7 +976,7 @@ if __name__ == '__main__':
     os.umask(0o022)
     if len(sys.argv) > 2:
         mfd = os.environ.get('CONFLUENT_MEDIAFD', None)
-        sys.exit(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd, custtargpath=sys.argv[3], custdistpath=sys.argv[4], custname=sys.argv[5]))
+        asyncio.get_event_loop().run_until_complete(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd, custtargpath=sys.argv[3], custdistpath=sys.argv[4], custname=sys.argv[5]))
     else:
-        sys.exit(import_image(sys.argv[1], callback=printit))
+        asyncio.get_event_loop().run_until_complete(import_image(sys.argv[1], callback=printit))
 
