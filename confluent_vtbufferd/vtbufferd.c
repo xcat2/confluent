@@ -232,10 +232,11 @@ int main(int argc, char* argv[]) {
     int numevts;
     int status;
     int poller;
-    int n;
+    int n, rt;
     socklen_t len;
-    int ctlsock, currsock;
-    socklen_t addrlen;
+    int ctlsock = 0;
+    int currsock = 0;
+    socklen_t addrlen = 0;
     struct ucred ucr;
 
     struct epoll_event epvt, evts[MAXEVTS];
@@ -247,6 +248,10 @@ int main(int argc, char* argv[]) {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path + 1, argv[1], sizeof(addr.sun_path) - 2); // abstract namespace socket
     ctlsock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (ctlsock < 0) {
+        perror("Unable to open unix socket - ");
+        exit(1);
+    }
     status = bind(ctlsock, (const struct sockaddr*)&addr, sizeof(sa_family_t) + strlen(argv[1]) + 1); //sizeof(struct sockaddr_un));
     if (status < 0) {
         perror("Unable to open unix socket - ");
@@ -272,7 +277,11 @@ int main(int argc, char* argv[]) {
             if (evts[n].data.fd == ctlsock) {
                 currsock = accept(ctlsock, (struct sockaddr *) &addr, &addrlen);
                 len = sizeof(ucr);
-                getsockopt(currsock, SOL_SOCKET, SO_PEERCRED, &ucr, &len);
+                rt = getsockopt(currsock, SOL_SOCKET, SO_PEERCRED, &ucr, &len);
+		if (rt < 0) {
+			close(currsock);
+			continue;
+		}
                 if (ucr.uid != getuid()) { // block access for other users
                     close(currsock);
                     continue;
