@@ -281,12 +281,12 @@ def _rpc_del_user(tenant, name):
     ConfigManager(tenant)._true_del_user(name)
 
 
-def _rpc_master_create_user(tenant, *args):
-    ConfigManager(tenant).create_user(*args)
+async def _rpc_master_create_user(tenant, *args):
+    await ConfigManager(tenant).create_user(*args)
 
 
-def _rpc_master_create_usergroup(tenant, *args):
-    ConfigManager(tenant).create_usergroup(*args)
+async def _rpc_master_create_usergroup(tenant, *args):
+    await ConfigManager(tenant).create_usergroup(*args)
 
 
 def _rpc_create_user(tenant, *args):
@@ -1697,8 +1697,8 @@ class ConfigManager(object):
         :param displayname: Optional long format name for UI consumption
         """
         if cfgleader:
-            return exec_on_leader('_rpc_master_create_user', self.tenant,
-                                  name, role, uid, displayname, attributemap)
+            return await exec_on_leader('_rpc_master_create_user', self.tenant,
+                                        name, role, uid, displayname, attributemap)
         if cfgstreams:
             await exec_on_followers('_rpc_create_user', self.tenant, name,
                               role, uid, displayname, attributemap)
@@ -2942,8 +2942,8 @@ async def restore_db_from_directory(location, password):
         collective = json.load(open(os.path.join(location, 'collective.json')))
         _cfgstore['collective'] = {}
         for coll in collective:
-            add_collective_member(coll, collective[coll]['address'],
-                                  collective[coll]['fingerprint'])
+            await add_collective_member(coll, collective[coll]['address'],
+                                        collective[coll]['fingerprint'])
     except IOError as e:
         if e.errno != 2:
             raise
@@ -2953,13 +2953,13 @@ async def restore_db_from_directory(location, password):
     ConfigManager.wait_for_sync(True)
 
 
-def dump_db_to_directory(location, password, redact=None, skipkeys=False):
+async def dump_db_to_directory(location, password, redact=None, skipkeys=False):
     if not redact and not skipkeys:
         with open(os.path.join(location, 'keys.json'), 'w') as cfgfile:
             cfgfile.write(_dump_keys(password))
             cfgfile.write('\n')
     with open(os.path.join(location, 'main.json'), 'wb') as cfgfile:
-        cfgfile.write(ConfigManager(tenant=None)._dump_to_json(redact=redact))
+        cfgfile.write(await ConfigManager(tenant=None)._dump_to_json(redact=redact))
         cfgfile.write(b'\n')
     if 'collective' in _cfgstore:
         with open(os.path.join(location, 'collective.json'), 'w') as cfgfile:

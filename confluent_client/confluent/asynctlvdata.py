@@ -198,6 +198,12 @@ async def sendall(handle, data):
         cloop = asyncio.get_event_loop()
         return await cloop.sock_sendall(handle, data)
 
+async def close(handle):
+    if isinstance(handle, tuple):
+        handle[1].close()
+        await handle[1].wait_closed()
+    else:
+        handle.close()
 
 async def send(handle, data, filehandle=None):
     cloop = asyncio.get_event_loop()

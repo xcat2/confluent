@@ -21,12 +21,11 @@
 
 import asyncio
 import confluent.config.configmanager as configmanager
-import eventlet
-import eventlet.tpool
 try:
     import Cryptodome.Protocol.KDF as KDF
 except ImportError:
     import Crypto.Protocol.KDF as KDF
+from concurrent.futures import ProcessPoolExecutor
 from fnmatch import fnmatch
 import hashlib
 import hmac
@@ -314,11 +313,11 @@ async def check_user_passphrase(name, passphrase, operation=None, element=None, 
         global authworkers
         global authcleaner
         if authworkers is None:
-            authworkers = multiprocessing.Pool(processes=1)
+            authworkers = ProcessPoolExecutor(max_workers=1) # multiprocessing.Pool(processes=1)
         else:
             authcleaner.cancel()
-        authcleaner = eventlet.spawn_after(30, _clean_authworkers)
-        crypted = eventlet.tpool.execute(_do_pbkdf, passphrase, salt)
+        authcleaner = util.spawn_after(30, _clean_authworkers)
+        crypted = await _do_pbkdf(passphrase, salt)
         del _passchecking[(user, tenant)]
         await asyncio.sleep(
             0.05)  # either way, we want to stall so that client can't
@@ -391,9 +390,10 @@ def _clean_authworkers():
     authcleaner = None
 
 
-def _do_pbkdf(passphrase, salt):
+async def _do_pbkdf(passphrase, salt):
     # we must get it over to the authworkers pool or else get blocked in
     # compute.  However, we do want to wait for result, so we have
     # one of the exceedingly rare sort of circumstances where 'apply'
     # actually makes sense
-    return authworkers.apply(_apply_pbkdf, [passphrase, salt])
+    res = await asyncio.get_event_loop().run_in_executor(authworkers, _apply_pbkdf, passphrase, salt)
+    return res

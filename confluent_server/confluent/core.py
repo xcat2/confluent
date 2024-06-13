@@ -586,7 +586,7 @@ def _init_core():
     }
 
 
-def create_user(inputdata, configmanager):
+async def create_user(inputdata, configmanager):
     try:
         username = inputdata['name']
         del inputdata['name']
@@ -594,10 +594,10 @@ def create_user(inputdata, configmanager):
         del inputdata['role']
     except (KeyError, ValueError):
         raise exc.InvalidArgumentException('Missing user name or role')
-    configmanager.create_user(username, role, attributemap=inputdata)
+    await configmanager.create_user(username, role, attributemap=inputdata)
 
 
-def create_usergroup(inputdata, configmanager):
+async def create_usergroup(inputdata, configmanager):
     try:
         groupname = inputdata['name']
         role = inputdata['role']
@@ -605,18 +605,18 @@ def create_usergroup(inputdata, configmanager):
         del inputdata['role']
     except (KeyError, ValueError):
         raise exc.InvalidArgumentException("Missing user name or role")
-    configmanager.create_usergroup(groupname, role)
+    await configmanager.create_usergroup(groupname, role)
 
 
-def update_usergroup(groupname, attribmap, configmanager):
+async def update_usergroup(groupname, attribmap, configmanager):
     try:
-        configmanager.set_usergroup(groupname, attribmap)
+        await configmanager.set_usergroup(groupname, attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
 
-def update_user(name, attribmap, configmanager):
+async def update_user(name, attribmap, configmanager):
     try:
-        configmanager.set_user(name, attribmap)
+        await configmanager.set_user(name, attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
 
@@ -1334,7 +1334,7 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
                 inputdata = msg.get_input_message(
                     pathcomponents, operation, inputdata,
                     configmanager=configmanager)
-                create_usergroup(inputdata.attribs, configmanager)
+                await create_usergroup(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.list_usergroups(),
                                        forcecollection=False)
         if usergroup not in configmanager.list_usergroups():
@@ -1347,7 +1347,7 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
             inputdata = msg.get_input_message(
                 pathcomponents, operation, inputdata,
                 configmanager=configmanager)
-            update_usergroup(usergroup, inputdata.attribs, configmanager)
+            await update_usergroup(usergroup, inputdata.attribs, configmanager)
             return show_usergroup(usergroup, configmanager)
     elif pathcomponents[0] == 'users':
         # TODO: when non-administrator accounts exist,
@@ -1359,7 +1359,7 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
                 inputdata = msg.get_input_message(
                     pathcomponents, operation, inputdata,
                     configmanager=configmanager)
-                create_user(inputdata.attribs, configmanager)
+                await create_user(inputdata.attribs, configmanager)
             return iterate_collections(configmanager.list_users(),
                                        forcecollection=False)
         if user not in configmanager.list_users():

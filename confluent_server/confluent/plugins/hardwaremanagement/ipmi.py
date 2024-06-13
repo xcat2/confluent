@@ -215,7 +215,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
             return self._lasthealth
         self._inhealth = True
         try:
-            self._lasthealth = super(IpmiCommandWrapper, self).get_health()
+            self._lasthealth = await super(IpmiCommandWrapper, self).get_health()
         except Exception:
             self._inhealth = False
             raise
@@ -560,7 +560,7 @@ class IpmiHandler:
         elif self.element == ['boot', 'nextdevice']:
             self.bootdevice()
         elif self.element == ['health', 'hardware']:
-            self.health()
+            await self.health()
         elif self.element == ['identify']:
             self.identify()
         elif self.element[0] == 'sensors':
@@ -1323,14 +1323,14 @@ class IpmiHandler:
                 return
             health = response['health']
             health = _str_health(health)
-            self.output.put(msg.HealthSummary(health, self.node))
+            await self.output.put(msg.HealthSummary(health, self.node))
             if 'badreadings' in response:
                 badsensors = []
                 for reading in response['badreadings']:
                     if hasattr(reading, 'health'):
                         reading.health = _str_health(reading.health)
                     badsensors.append(reading)
-                self.output.put(msg.SensorReadings(badsensors, name=self.node))
+                await self.output.put(msg.SensorReadings(badsensors, name=self.node))
         else:
             raise exc.InvalidArgumentException('health is read-only')
 

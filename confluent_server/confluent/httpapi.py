@@ -291,7 +291,7 @@ async def _authorize_request(req, operation, reqbody):
         if sessionid:
             if sessionid in httpsessions:
                 if _csrf_valid(req, httpsessions[sessionid]):
-                    if element == '/sessions/current/logout':
+                    if req.rel_url.path == '/sessions/current/logout':
                         targets = []
                         for mythread in httpsessions[sessionid]['inflight']:
                             targets.append(mythread)
@@ -305,8 +305,9 @@ async def _authorize_request(req, operation, reqbody):
                     authdata = auth.authorize(
                         name, element=element, operation=operation,
                         skipuserobj=httpsessions[sessionid]['skipuserobject'])
+
     if (not authdata) and 'Authorization' in req.headers:
-        if element == '/sessions/current/logout':
+        if req.rel_url.path == '/sessions/current/logout':
             if 'Referer' in req.headers:
                 # note that this doesn't actually do harm
                 # otherwise, but this way do not give appearance
@@ -331,7 +332,6 @@ async def _authorize_request(req, operation, reqbody):
             return {'code': 403}
         elif not authdata:
             return {'code': 401}
-        print(repr(authdata))
         sessid = _establish_http_session(req, authdata, name, cookie)
     if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
         if webauthn:
@@ -344,7 +344,7 @@ async def _authorize_request(req, operation, reqbody):
         auditmsg = {
             'user': util.stringify(name),
             'operation': operation,
-            'target': element,
+            'target': req.rel_url.path,
         }
         authinfo = {'code': 200,
                     'cookie': cookie,
@@ -677,8 +677,8 @@ async def resourcehandler_backend(req, make_response):
         rsp = make_response(mimetype, 302, 'Found', {'Location': redir})
         return
     if req.content_length:
-        reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
-        reqtype = env['CONTENT_TYPE']
+        reqbody = await req.read()
+        reqtype = req.content_type
     operation = opmap[req.method]
     querydict = _get_query_dict(req, reqbody, reqtype)
     if operation != 'retrieve' and 'restexplorerop' in querydict:
@@ -688,7 +688,7 @@ async def resourcehandler_backend(req, make_response):
     if 'logout' in authorized:
         rsp = await make_response("application/json", 200, 'Successful logout')
         await rsp.write(b'{"result": "200 - Successful logout"}')
-        return
+        return rsp
     if 'SuppressAuthHeader' in req.headers or 'ConfluentAuthToken' in req.headers:
         badauth = {'Content-type': 'text/plain'}
     else:

@@ -407,8 +407,7 @@ async def handle_connection(connection, cert, request, local=False):
                     connection,
                     {'collective':
                          {'status': 'Invalid token format'}})
-                connection[1].close()
-                await connection[1].wait_closed()
+                await tlvdata.close(connection)
                 return
             host = request['server']
             try:
@@ -446,8 +445,7 @@ async def handle_connection(connection, cert, request, local=False):
                     connection,
                     {'collective':
                          {'status': 'Failed to connect to {0}'.format(host)}})
-                connection[1].close()
-                await connection[1].wait_closed()
+                await tlvdata.close(connection)
                 raise
                 return
             mycert = util.get_certificate_from_file(
@@ -474,8 +472,7 @@ async def handle_connection(connection, cert, request, local=False):
                                               {'status': 'Bad server token'}})
                 return
             await tlvdata.send(connection, {'collective': {'status': 'Success'}})
-            connection[1].close()
-            await connection[1].wait_closed()
+            await tlvdata.close(connection)
             currentleader = rsp['collective']['leader']
             f = open('/etc/confluent/cfg/myname', 'w')
             f.write(name)

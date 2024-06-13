@@ -16,6 +16,7 @@
 # limitations under the License.
 
 
+import asyncio
 import getpass
 import optparse
 import sys
@@ -71,7 +72,8 @@ if args[0] == 'restore':
     try:
         cfm.init(True)
         cfm.statelessmode = True
-        cfm.restore_db_from_directory(dumpdir, password)
+        dp = cfm.restore_db_from_directory(dumpdir, password)
+        asyncio.get_event_loop().run_until_complete(dp)
         cfm.statelessmode = False
         cfm.ConfigManager.wait_for_sync(True)
         if owner != 0:
@@ -101,8 +103,8 @@ elif args[0] == 'dump':
     main._initsecurity(conf.get_config())
     if not os.path.exists(dumpdir):
         os.makedirs(dumpdir)
-    cfm.dump_db_to_directory(dumpdir, password, options.redact,
-                             options.skipkeys)
-
+    dp = cfm.dump_db_to_directory(dumpdir, password, options.redact,
+                                  options.skipkeys)
+    asyncio.get_event_loop().run_until_complete(dp)
 
 
