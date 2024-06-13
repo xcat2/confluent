@@ -30,7 +30,7 @@ from aiohttp import web, web_urldispatcher, connector, ClientSession, WSMsgType
 import confluent.auth as auth
 import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
-#import confluent.consoleserver as consoleserver
+import confluent.consoleserver as consoleserver
 import confluent.discovery.core as disco
 import confluent.forwarder as forwarder
 import confluent.exceptions as exc
@@ -424,10 +424,10 @@ def websockify_data(data):
         data = u' ' + data
     return data
 
-def datacallback_bound(clientsessid, ws):
-    def datacallback(data):
+def datacallback_bound(clientsessid, rsp):
+    async def datacallback(data):
         data = websockify_data(data)
-        ws.send('${0}$'.format(clientsessid) + data)
+        await rsp.send_str(u'${0}$'.format(clientsessid) + data)
     return datacallback
 
 async def wsock_handler(req):
@@ -485,7 +485,7 @@ async def wsock_handler(req):
                         elif clientmsg[0] == '$':
                             targid, data = clientmsg[1:].split('$', 1)
                             if data[0] == ' ':
-                                myconsoles[targid].write(data[1:])
+                                await myconsoles[targid].write(data[1:])
                         elif clientmsg[0] == '!':
                             msg = json.loads(clientmsg[1:])
                             action = msg.get('operation', None)
@@ -514,7 +514,7 @@ async def wsock_handler(req):
                                     auditmsg = {'operation': 'start', 'target': targ,
                                                 'user': util.stringify(username)}
                                     auditlog.log(auditmsg)
-                                    datacallback = datacallback_bound(clientsessid, ws)
+                                    datacallback = datacallback_bound(clientsessid, rsp)
                                     if shellsession:
                                         consession = shellserver.ShellSession(
                                             node=node, configmanager=cfgmgr,
