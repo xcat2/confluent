@@ -2,6 +2,15 @@
 [ -e /tmp/confluent.initq ] && return 0
 . /lib/dracut-lib.sh
 setsid sh -c 'exec bash <> /dev/tty2 >&0 2>&1' &
+if [ -f /tmp/dd_disk ]; then
+    for dd in $(cat /tmp/dd_disk); do
+        if [ -e $dd ]; then
+            driver-updates --disk $dd $dd
+	    rm $dd
+        fi
+    done
+    rm /tmp/dd_disk
+fi
 udevadm trigger
 udevadm trigger --type=devices --action=add
 udevadm settle
@@ -20,13 +29,6 @@ function confluentpython() {
         /usr/bin/python2 $*
     fi
 }
-if [ -f /tmp/dd_disk ]; then
-    for dd in $(cat /tmp/dd_disk); do
-        if [ -e $dd ]; then
-            driver-updates --disk $dd $dd
-        fi
-    done
-fi
 vlaninfo=$(getarg vlan)
 if [ ! -z "$vlaninfo" ]; then
         vldev=${vlaninfo#*:}

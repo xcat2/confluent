@@ -1,0 +1,30 @@
+nodeapply(8) -- Execute command on many nodes in a noderange through ssh
+=========================================================================
+
+## SYNOPSIS
+
+`nodeapply [options] <noderange>`
+
+## DESCRIPTION
+
+Provides shortcut access to a number of common operations against deployed
+nodes.  These operations include refreshing ssh certificates and configuration,
+rerunning syncflies, and executing specified postscripts.
+
+## OPTIONS
+  
+* `-k`, `--security`
+  Refresh SSH configuration (hosts.equiv and node SSH certificates)
+  
+* `-F`, `--sync`
+  Rerun syncfiles from deployed profile
+  
+* `-P SCRIPTS`, `--scripts=SCRIPTS`
+  Re-run specified scripts, with full path under scripts specified, e.g. post.d/scriptname,firstboot.d/otherscriptname
+ 
+* `-c COUNT`, `-f COUNT`, `--count=COUNT`
+  Specify the maximum number of instances to run concurrently
+
+* `-m MAXNODES`, `--maxnodes=MAXNODES`
+  Specify a maximum number of nodes to run remote ssh command to, prompting
+  if over the threshold
