@@ -44,11 +44,11 @@ int add_confluent_uuid(char* destination, int maxsize) {
     int uuidsize;
     uuidf = open("/confluent_uuid", O_RDONLY);
     if (uuidf < 0) { return 0; }
+    strncpy(destination, "/confluentuuid=", maxsize);
     uuidsize = read(uuidf, destination + 15, maxsize - 15);
     close(uuidf);
     if (uuidsize < 0) { return 0; }
     if (uuidsize > 524288) { return 0; }
-    strncpy(destination, "/confluentuuid=", maxsize);
     if (destination[uuidsize + 14] == '\n') {
         destination[uuidsize + 14] = 0;
     }
