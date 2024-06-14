@@ -334,49 +334,53 @@ async def check_user_passphrase(name, passphrase, operation=None, element=None, 
             #pam won't work if the user doesn't exist, don't go further
             await asyncio.sleep(0.05)  # stall even on test for existence of a username
             return None
-        if os.getuid() != 0:
-            # confluent is running with reduced privilege, however, pam_unix refuses
-            # to let a non-0 user check anothers password.
-            # We will fork and the child will assume elevated privilege to
-            # get unix_chkpwd helper to enable checking /etc/shadow
-            getprompt, sendprompt = os.pipe()
-            getprompt, sendprompt = os.fdopen(getprompt, 'rb', 0), os.fdopen(sendprompt, 'wb', 0)
-            pid = os.fork()
-            if not pid:
-                usergood = False
-                try:
-                    getprompt.close()
-                    # we change to the uid we are trying to authenticate as, because
-                    # pam_unix uses unix_chkpwd which reque
-                    os.setuid(pwe.pw_uid)
-                    pa = pam.pam()
-                    usergood = pa.authenticate(user, passphrase, service=_pamservice)
-                    if (not usergood and len(pa.prompts) > 1 and
-                            (not isinstance(passphrase, dict) or
-                            (set(passphrase) - pa.prompts))):
-                        sendprompt.write(msgpack.packb(list(pa.prompts)))
-                        sendprompt.close()
-                        os._exit(2)
-                finally:
-                    os._exit(0 if usergood else 1)
-            sendprompt.close()
-            usergood = os.waitpid(pid, 0)[1]
-            if (usergood >> 8) == 2:
-                prompts = getprompt.read()
-                if (prompts):
-                    raise PromptsNeeded(msgpack.unpackb(prompts))
-            usergood = usergood == 0
-            getprompt.close()
-        else:
-            # We are running as root, we don't need to fork in order to authenticate the
-            # user
-            usergood = pam.authenticate(user, passphrase, service=_pamservice)
+        usergood = await asyncio.get_event_loop().run_in_executor(authworkers, pam_check, pwe, user, passphrase)
         if usergood:
             if bpassphrase:
                 _passcache[(user, tenant)] = hashlib.sha256(bpassphrase).digest()
             return authorize(user, element, tenant, operation, skipuserobj=False)
     await asyncio.sleep(0.05)  # stall even on test for existence of a username
     return None
+
+def pam_check(pwe, user, passphrase):
+    if os.getuid() != 0:
+        # confluent is running with reduced privilege, however, pam_unix refuses
+        # to let a non-0 user check anothers password.
+        # We will fork and the child will assume elevated privilege to
+        # get unix_chkpwd helper to enable checking /etc/shadow
+        getprompt, sendprompt = os.pipe()
+        getprompt, sendprompt = os.fdopen(getprompt, 'rb', 0), os.fdopen(sendprompt, 'wb', 0)
+        pid = os.fork()
+        if not pid:
+            usergood = False
+            try:
+                getprompt.close()
+                # we change to the uid we are trying to authenticate as, because
+                # pam_unix uses unix_chkpwd which reque
+                os.setuid(pwe.pw_uid)
+                pa = pam.pam()
+                usergood = pa.authenticate(user, passphrase, service=_pamservice)
+                if (not usergood and len(pa.prompts) > 1 and
+                        (not isinstance(passphrase, dict) or
+                        (set(passphrase) - pa.prompts))):
+                    sendprompt.write(msgpack.packb(list(pa.prompts)))
+                    sendprompt.close()
+                    os._exit(2)
+            finally:
+                os._exit(0 if usergood else 1)
+        sendprompt.close()
+        usergood = os.waitpid(pid, 0)[1]
+        if (usergood >> 8) == 2:
+            prompts = getprompt.read()
+            if (prompts):
+                raise PromptsNeeded(msgpack.unpackb(prompts))
+        usergood = usergood == 0
+        getprompt.close()
+    else:
+        # We are running as root, we don't need to fork in order to authenticate the
+        # user
+        usergood = pam.authenticate(user, passphrase, service=_pamservice)
+    return usergood
 
 def _apply_pbkdf(passphrase, salt):
     return KDF.PBKDF2(passphrase, salt, 32, 10000,

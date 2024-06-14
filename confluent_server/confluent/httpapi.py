@@ -538,7 +538,7 @@ async def wsock_handler(req):
                             elif action == 'stop':
                                 sessid = '{0}'.format(msg.get('sessid', None))
                                 if sessid in myconsoles:
-                                    myconsoles[sessid].destroy()
+                                    await myconsoles[sessid].destroy()
                                     del myconsoles[sessid]
                         else:
                             print(repr(clientmsg))

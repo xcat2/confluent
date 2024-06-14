@@ -359,7 +359,7 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
             await consession.destroy()
             break
         await consession.write(data)
-    connection.close()
+    await tlvdata.close(connection)
 
 
 async def _tlshandler(bind_host, bind_port):
