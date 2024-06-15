@@ -63,43 +63,48 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
         ip link set $(basename $i) up
     done
-    for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
-        if [ "$autoconfigmethod" = "dhcp" ]; then
-            /usr/libexec/nm-initrd-generator ip=$NICGUESS:dhcp
-        else
-            v4addr=$(grep ^ipv4_address: $tcfg)
-            v4addr=${v4addr#ipv4_address: }
-            v4plen=${v4addr#*/}
-            v4addr=${v4addr%/*}
-            v4gw=$(grep ^ipv4_gateway: $tcfg)
-            v4gw=${v4gw#ipv4_gateway: }
-            ip addr add dev $NICGUESS $v4addr/$v4plen
-            if [ "$v4gw" = "null" ]; then
-                v4gw=""
-            fi
-            if [ ! -z "$v4gw" ]; then
-                ip route add default via $v4gw
-            fi
-            v4nm=$(grep ipv4_netmask: $tcfg)
-            v4nm=${v4nm#ipv4_netmask: }
-            DETECTED=0
-            for dsrv in $deploysrvs; do
-                if curl --capath /tls/ -s --connect-timeout 3 https://$dsrv/confluent-public/ > /dev/null; then
-                    rm /run/NetworkManager/system-connections/*
-                    /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none
-                    DETECTED=1
-                    ifname=$NICGUESS
+    TRIES=30
+    DETECTED=0
+    while [ "$DETECTED" = 0 ] && [ $TRIES -gt 0 ]; do
+        TRIES=$((TRIES - 1))
+        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
+            if [ "$autoconfigmethod" = "dhcp" ]; then
+                /usr/libexec/nm-initrd-generator ip=$NICGUESS:dhcp
+            else
+                v4addr=$(grep ^ipv4_address: $tcfg)
+                v4addr=${v4addr#ipv4_address: }
+                v4plen=${v4addr#*/}
+                v4addr=${v4addr%/*}
+                v4gw=$(grep ^ipv4_gateway: $tcfg)
+                v4gw=${v4gw#ipv4_gateway: }
+                ip addr add dev $NICGUESS $v4addr/$v4plen
+                if [ "$v4gw" = "null" ]; then
+                    v4gw=""
+                fi
+                if [ ! -z "$v4gw" ]; then
+                    ip route add default via $v4gw
+                fi
+                v4nm=$(grep ipv4_netmask: $tcfg)
+                v4nm=${v4nm#ipv4_netmask: }
+                DETECTED=0
+                for dsrv in $deploysrvs; do
+                    if curl --capath /tls/ -s --connect-timeout 3 https://$dsrv/confluent-public/ > /dev/null; then
+                        rm /run/NetworkManager/system-connections/*
+                        /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none
+                        DETECTED=1
+                        ifname=$NICGUESS
+                        break
+                    fi
+                done
+                if [ ! -z "$v4gw" ]; then
+                    ip route del default via $v4gw
+                fi
+                ip addr flush dev $NICGUESS
+                if [ $DETECTED = 1 ]; then
                     break
                 fi
-            done
-            if [ ! -z "$v4gw" ]; then
-                ip route del default via $v4gw
             fi
-            ip addr flush dev $NICGUESS
-            if [ $DETECTED = 1 ]; then
-                break
-            fi
-        fi
+        done
     done
     for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
         ip addr flush dev $NICGUESS
