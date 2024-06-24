@@ -86,6 +86,7 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
             'hwaddr': mac,
             'addresses': [peer],
         }
+        targurl = None
         for headline in rsp[1:]:
             if not headline:
                 continue
@@ -105,13 +106,18 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 if not value.endswith('/redfish/v1/'):
                     return
             elif header == 'LOCATION':
-                if not value.endswith('/DeviceDescription.json'):
+                if '/eth' in value and value.endswith('.xml'):
+                    targurl = '/redfish/v1/'
+                    continue # MegaRAC redfish
+                elif value.endswith('/DeviceDescription.json'):
+                    targurl = '/DeviceDescription.json'
+                else:
                     return
-        if handler:
-            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
+        if handler and targurl:
+            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl)
 
-def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer):
-    retdata = check_fish(('/DeviceDescription.json', peerdata))
+def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl):
+    retdata = check_fish((targurl, peerdata))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -411,6 +417,10 @@ def _find_service(service, target):
             continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
             pooltargs.append(('/DeviceDescription.json', peerdata[nid]))
+        else:
+            for targurl in peerdata[nid]['urls']:
+                if '/eth' in targurl and targurl.endswith('.xml'):
+                    pooltargs.append(('/redfish/v1/', peerdata[nid]))
         # For now, don't interrogate generic redfish bmcs
         # This is due to a need to deduplicate from some supported SLP
         # targets (IMM, TSM, others)
