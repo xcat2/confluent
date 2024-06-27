@@ -60,7 +60,6 @@ def active_scan(handler, protocol=None):
     known_peers = set([])
     for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
         for addr in scanned['addresses']:
-            addr = addr[0:1] + addr[2:]
             if addr in known_peers:
                 break
             hwaddr = neighutil.get_hwaddr(addr[0])
@@ -80,20 +79,13 @@ def scan(services, target=None):
 
 
 def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler):
-    if mac in peerbymacaddress:
-        normpeer = peer[0:1] + peer[2:]
-        for currpeer in peerbymacaddress[mac]['addresses']:
-            currnormpeer = currpeer[0:1] + peer[2:]
-            if currnormpeer == normpeer:
-                break
-        else:
-            peerbymacaddress[mac]['addresses'].append(peer)
+    if mac in peerbymacaddress and peer not in peerbymacaddress[mac]['addresses']:
+        peerbymacaddress[mac]['addresses'].append(peer)
     else:
         peerdata = {
             'hwaddr': mac,
             'addresses': [peer],
         }
-        targurl = None
         for headline in rsp[1:]:
             if not headline:
                 continue
@@ -113,20 +105,13 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 if not value.endswith('/redfish/v1/'):
                     return
             elif header == 'LOCATION':
-                if '/eth' in value and value.endswith('.xml'):
-                    targurl = '/redfish/v1/'
-                    targtype = 'megarac-bmc'
-                    continue # MegaRAC redfish
-                elif value.endswith('/DeviceDescription.json'):
-                    targurl = '/DeviceDescription.json'
-                    targtype = 'megarac-bmc'
-                else:
+                if not value.endswith('/DeviceDescription.json'):
                     return
-        if handler and targurl:
-            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype)
+        if handler:
+            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
 
-def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype):
-    retdata = check_fish((targurl, peerdata, targtype))
+def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer):
+    retdata = check_fish(('/DeviceDescription.json', peerdata))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -337,7 +322,7 @@ def _find_service(service, target):
                 host = '[{0}]'.format(host)
                 msg = smsg.format(host, service)
                 if not isinstance(msg, bytes):
-                    msg = msg.encode('utf8')
+                    msg = msg.encode('utf8')               
                 net6.sendto(msg, addr[4])
     else:
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -425,11 +410,7 @@ def _find_service(service, target):
         if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
             continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
-            pooltargs.append(('/DeviceDescription.json', peerdata[nid], 'lenovo-xcc'))
-        else:
-            for targurl in peerdata[nid]['urls']:
-                if '/eth' in targurl and targurl.endswith('.xml'):
-                    pooltargs.append(('/redfish/v1/', peerdata[nid], 'megarac-bmc'))
+            pooltargs.append(('/DeviceDescription.json', peerdata[nid]))
         # For now, don't interrogate generic redfish bmcs
         # This is due to a need to deduplicate from some supported SLP
         # targets (IMM, TSM, others)
@@ -444,7 +425,7 @@ def _find_service(service, target):
 def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
         verifycallback = lambda x: True
-    url, data, targtype = urldata
+    url, data = urldata
     try:
         wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)
         peerinfo = wc.grab_json_response(url)
@@ -466,7 +447,7 @@ def check_fish(urldata, port=443, verifycallback=None):
             peerinfo = wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
         if 'UUID' in peerinfo:
-            data['services'] = [targtype]
+            data['services'] = ['service:redfish-bmc']
             data['uuid'] = peerinfo['UUID'].lower()
             return data
     return None
@@ -485,12 +466,7 @@ def _parse_ssdp(peer, rsp, peerdata):
     if code == b'200':
         if nid in peerdata:
             peerdatum = peerdata[nid]
-            normpeer = peer[0:1] + peer[2:]
-            for currpeer in peerdatum['addresses']:
-                currnormpeer = currpeer[0:1] + peer[2:]
-                if currnormpeer == normpeer:
-                    break
-            else:
+            if peer not in peerdatum['addresses']:
                 peerdatum['addresses'].append(peer)
         else:
             peerdatum = {
@@ -525,7 +501,5 @@ def _parse_ssdp(peer, rsp, peerdata):
 
 if __name__ == '__main__':
     def printit(rsp):
-        pass # print(repr(rsp))
+        print(repr(rsp))
     active_scan(printit)
-
-
