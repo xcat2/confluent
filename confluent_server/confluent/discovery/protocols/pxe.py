@@ -315,9 +315,9 @@ def proxydhcp(handler, nodeguess):
                 optidx = rqv.tobytes().index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
-            hwlen = rq[2]
-            opts, disco = opts_to_dict(rq, optidx, 3)
-            disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rq[28:28+hwlen]])
+            hwlen = rqv[2]
+            opts, disco = opts_to_dict(rqv, optidx, 3)
+            disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rqv[28:28+hwlen]])
             node = None
             if disco.get('hwaddr', None) in macmap:
                 node = macmap[disco['hwaddr']]
