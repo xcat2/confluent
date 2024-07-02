@@ -1,7 +1,3 @@
-cd /sys/class/net
-for nic in *; do
-    ip link set $nic up
-done
 mkdir -p /custom-installation
 cp -a /opt/confluent /custom-installation
 touch /custom-installation/confluent/confluent.info
@@ -31,11 +27,37 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             MYGW=""
         fi
         MYNM=$(grep ^ipv4_netmask: $tcfg | awk '{print $2}')
-        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+        for NICGUESS in `ls /sys/class/net/`; do
+            if [ -n "$(ip link show "$NICGUESS" | grep "LOOPBACK")" ]; then
+                echo "$NICGUESS is loopback"
+                continue
+            fi
+            ip link set $NICGUESS up
+            counter=0
+            while true; do
+                status=$(ip link show "$NICGUESS" | grep "LOWER_UP")
+                if [ -n "$status" ]; then
+                    echo "Network interface $NICGUESS is LOWER_UP."
+                    break
+                else
+                    counter=$((counter + 1))
+                    echo "Network interface $NICGUESS is not LOWER_UP. Checking again...retries $counter"
+                fi
+                if [ "$counter" -gt 20 ]; then
+                    echo "Exceeded maximum number of checks. Exiting..."
+                    break
+                fi
+                sleep 1
+            done
+            NICLOWERUP=`ip link |grep $NICGUESS  |grep -iv LOWER_UP`
+            if [[ ! -z "$NICLOWERUP" ]]; then
+                continue
+            fi
             ip addr add dev $NICGUESS $v4addr
             if [ ! -z "$MYGW" ]; then
                 ip route add default via $MYGW
             fi
+            echo "Configure ${NICGUESS} network"
             for dsrv in $deploysrvs; do
                 if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
                     deploysrvs=$dsrv
@@ -49,6 +71,11 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
                 break
             fi
         done
+        if [ -z "$NIC"]; then
+            echo "Could not configure any network interface with ${v4addr}, please check your network configuration"
+            sleep 20
+            exit 1
+        fi
         ipconfig -d $MYIP::$MYGW:$MYNM::$NIC
         echo $NIC > /tmp/autodetectnic
     else
