@@ -231,6 +231,115 @@ class SshShell(conapi.Console):
             self.ssh.close()
         self.datacallback = None
 
+
 def create(nodes, element, configmanager, inputdata):
     if len(nodes) == 1:
         return SshShell(nodes[0], configmanager)
+
+
+class SshConn():
+
+    def __init__(self, node, config, username=b'', password=b''):
+        self.node = node
+        self.ssh = None
+        self.datacallback = None
+        self.nodeconfig = config
+        self.username = username
+        self.password = password
+        self.connected = False
+        self.inputmode = 0  # 0 = username, 1 = password...
+
+    def __del__(self):
+        if self.connected:
+            self.close()
+
+    def do_logon(self):
+        self.ssh = paramiko.SSHClient()
+        self.ssh.set_missing_host_key_policy(
+                HostKeyHandler(self.nodeconfig, self.node))
+        log.log({'info': f"Connecting to {self.node} by ssh"})
+        try:
+            if self.password:
+                self.ssh.connect(self.node, username=self.username,
+                                 password=self.password, allow_agent=False,
+                                 look_for_keys=False)
+            else:
+                self.ssh.connect(self.node, username=self.username)
+        except paramiko.AuthenticationException as e:
+            self.ssh.close()
+            self.inputmode = 0
+            self.username = b''
+            self.password = b''
+            log.log({'warn': f"Error connecting to {self.node}: {str(e)}"})
+            return
+        except paramiko.ssh_exception.NoValidConnectionsError as e:
+            self.ssh.close()
+            self.inputmode = 0
+            self.username = b''
+            self.password = b''
+            log.log({'warn': f"Error connecting to {self.node}: {str(e)}"})
+            return
+        except cexc.PubkeyInvalid as pi:
+            self.ssh.close()
+            self.keyaction = b''
+            self.candidatefprint = pi.fingerprint
+            log.log({'warn': pi.message})
+            self.keyattrname = pi.attrname
+            log.log({'info': f"New fingerprint: {pi.fingerprint}"})
+            self.inputmode = -1
+            return
+        except paramiko.SSHException as pi:
+            self.ssh.close()
+            self.inputmode = -2
+            warn = str(pi)
+            if warnhostkey:
+                warn += ' (Older cryptography package on this host only ' \
+                        'works with ed25519, check ssh startup on target ' \
+                        'and permissions on /etc/ssh/*key)\r\n'
+                log.log({'warn': warn})
+            return
+        except Exception as e:
+            self.ssh.close()
+            self.ssh.close()
+            self.inputmode = 0
+            self.username = b''
+            self.password = b''
+            log.log({'warn': f"Error connecting to {self.node}: {str(e)}"})
+            return
+        self.inputmode = 2
+        self.connected = True
+        log.log({'info': f"Connected by ssh to {self.node}"})
+
+    def exec_command(self, cmd, cmdargs):
+        safecmd = cmd.translate(str.maketrans({"[": r"\]",
+                                               "]":  r"\]",
+                                               "?": r"\?",
+                                               "!": r"\!",
+                                               "\\": r"\\",
+                                               "^": r"\^",
+                                               "$": r"\$",
+                                               " ": r"\ ",
+                                               "*": r"\*"}))
+        cmds = [safecmd]
+        for arg in cmdargs:
+            arg = arg.translate(str.maketrans({"[": r"\]",
+                                               "]":  r"\]",
+                                               "?": r"\?",
+                                               "!": r"\!",
+                                               "\\": r"\\",
+                                               "^": r"\^",
+                                               "$": r"\$",
+                                               " ": r"\ ",
+                                               "*": r"\*"}))
+            arg = "%s" % (str(arg).replace(r"'", r"'\''"),)
+            cmds.append(arg)
+
+        runcmd = " ".join(cmds)
+        stdin, stdout, stderr = self.ssh.exec_command(runcmd)
+        rcode = stdout.channel.recv_exit_status()
+        return stdout.readlines(), stderr.readlines()
+
+    def close(self):
+        if self.ssh is not None:
+            self.ssh.close()
+        log.log({'info': f"Disconnected from {self.node}"})
