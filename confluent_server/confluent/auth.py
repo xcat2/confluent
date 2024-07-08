@@ -58,7 +58,7 @@ _allowedbyrole = {
             '/nodes/',
             '/node*/media/uploads/',
             '/node*/inventory/firmware/updates/*',
-            '/node*/suppport/servicedata*',
+            '/node*/support/servicedata*',
             '/node*/attributes/expression',
             '/nodes/*/console/session*',
             '/nodes/*/shell/sessions*',
