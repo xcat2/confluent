@@ -679,7 +679,11 @@ async def resourcehandler_backend(req, make_response):
     if req.content_length:
         reqbody = await req.read()
         reqtype = req.content_type
-    operation = opmap[req.method]
+    operation = opmap.get(req.method, None)
+    if not operation:
+        rsp = make_response(mimetype, 400, 'Bad Request')
+        await rsp.write(b'Unsupported method')
+        return rsp
     querydict = _get_query_dict(req, reqbody, reqtype)
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']

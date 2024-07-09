@@ -79,8 +79,12 @@ if [ ! -z "$cons" ]; then
 fi
 echo "Preparing to deploy $osprofile from $MGR"
 echo $osprofile > /custom-installation/confluent/osprofile
-echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
-fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso"
+. /etc/os-release
+DIRECTISO=$(blkid -t TYPE=iso9660 |grep -Ei ' LABEL="Ubuntu-Server '$VERSION_ID)
+if [ -z "$DIRECTISO" ]; then
+    echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
+    fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso"
+fi
 if [ ! -z "$cons" ]; then
     fcmdline="$fcmdline console=${cons#/dev/}"
 fi
