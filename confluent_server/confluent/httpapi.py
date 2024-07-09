@@ -175,6 +175,8 @@ def _get_query_dict(env, reqbody, reqtype):
         qstring = None
     if qstring:
         for qpair in qstring.split('&'):
+            if '=' not in qpair:
+                continue
             qkey, qvalue = qpair.split('=')
             qdict[qkey] = qvalue
     if reqbody is not None:
@@ -668,7 +670,11 @@ def resourcehandler_backend(env, start_response):
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
-    operation = opmap[env['REQUEST_METHOD']]
+    operation = opmap.get(env['REQUEST_METHOD'], None)
+    if not operation:
+        start_response('400 Bad Method', headers)
+        yield ''
+        return
     querydict = _get_query_dict(env, reqbody, reqtype)
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
