@@ -158,7 +158,7 @@ def find_glob(loc, fileglob):
     for cdir, _, fs in os.walk(loc):
         for f in fs:
             if fnmatch(f, fileglob):
-                return os.path.join(cdir, f)
+                return [os.path.join(cdir, f)]
     return None
 
 
@@ -182,9 +182,13 @@ def update_boot_linux(profiledir, profile, label):
     # well need to honor grubprefix path if different
     grubcfgpath = find_glob(profiledir + '/boot', 'grub.cfg')
     if not grubcfgpath:
-        grubcfgpath = profiledir + '/boot/efi/boot/grub.cfg'
-    with open(grubcfgpath, 'w') as grubout:
-        grubout.write(grubcfg)
+        grubcfgpath = [
+                profiledir + '/boot/efi/boot/grub.cfg'
+                profiledir + '/boot/boot/grub.cfg'
+                ]
+    for grubcfgpth in grubcfgpath:
+        with open(grubcfgpth, 'w') as grubout:
+            grubout.write(grubcfg)
     ipxeargs = kernelargs
     for initramfs in initrds:
         ipxeargs += " initrd=" + initramfs
