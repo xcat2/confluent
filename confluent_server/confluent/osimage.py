@@ -184,7 +184,7 @@ def update_boot_linux(profiledir, profile, label):
     if not grubcfgpath:
         grubcfgpath = [
                 profiledir + '/boot/efi/boot/grub.cfg',
-                profiledir + '/boot/boot/grub.cfg'
+                profiledir + '/boot/boot/grub/grub.cfg'
                 ]
     for grubcfgpth in grubcfgpath:
         os.makedirs(os.path.dirname(grubcfgpth), 0o755, exist_ok=True)
