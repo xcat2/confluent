@@ -183,7 +183,7 @@ def update_boot_linux(profiledir, profile, label):
     grubcfgpath = find_glob(profiledir + '/boot', 'grub.cfg')
     if not grubcfgpath:
         grubcfgpath = [
-                profiledir + '/boot/efi/boot/grub.cfg'
+                profiledir + '/boot/efi/boot/grub.cfg',
                 profiledir + '/boot/boot/grub.cfg'
                 ]
     for grubcfgpth in grubcfgpath:
