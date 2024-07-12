@@ -187,6 +187,7 @@ def update_boot_linux(profiledir, profile, label):
                 profiledir + '/boot/boot/grub.cfg'
                 ]
     for grubcfgpth in grubcfgpath:
+        os.makedirs(os.path.dirname(grubcfgpth), 0o755, exist_ok=True)
         with open(grubcfgpth, 'w') as grubout:
             grubout.write(grubcfg)
     ipxeargs = kernelargs
