@@ -167,7 +167,7 @@ def update_boot_linux(profiledir, profile, label):
     kernelargs = profile.get('kernelargs', '')
     grubcfg = "set timeout=5\nmenuentry '"
     grubcfg += label
-    grubcfg += "' {\n    linuxefi /kernel " + kernelargs + "\n"
+    grubcfg += "' {\n    linux /kernel " + kernelargs + "\n"
     initrds = []
     for initramfs in glob.glob(profiledir + '/boot/initramfs/*.cpio'):
         initramfs = os.path.basename(initramfs)
@@ -175,7 +175,7 @@ def update_boot_linux(profiledir, profile, label):
     for initramfs in os.listdir(profiledir + '/boot/initramfs'):
         if initramfs not in initrds:
             initrds.append(initramfs)
-    grubcfg += "    initrdefi "
+    grubcfg += "    initrd "
     for initramfs in initrds:
         grubcfg += " /initramfs/{0}".format(initramfs)
     grubcfg += "\n}\n"
