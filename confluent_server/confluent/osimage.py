@@ -165,9 +165,27 @@ def find_glob(loc, fileglob):
 def update_boot_linux(profiledir, profile, label):
     profname = os.path.basename(profiledir)
     kernelargs = profile.get('kernelargs', '')
+    needefi = False
+    for grubexe in glob.glob(profiledir + '/boot/efi/boot/grubx64.efi'):
+        with open(grubexe, 'rb') as grubin:
+            grubcontent = grubin.read()
+            uaidx = grubcontent.find(b'User-Agent: GRUB 2.0')
+            if uaidx > 0:
+                grubcontent = grubcontent[uaidx:]
+                cridx = grubcontent.find(b'\r')
+                if cridx > 1:
+                    grubcontent = grubcontent[:cridx]
+                    grubver = grubcontent.split(b'~', 1)[0]
+                    grubver = grubver.rsplit(b' ', 1)[-1]
+                    grubver = grubver.split(b'.')
+                    if len(grubver) > 1:
+                        if int(grubver[0]) < 3 and int(grubver[1]) < 3:
+                            needefi = True
+    lincmd = 'linuxefi' if needefi else 'linux'
+    initrdcmd = 'initrdefi' if needefi else 'initrd'
     grubcfg = "set timeout=5\nmenuentry '"
     grubcfg += label
-    grubcfg += "' {\n    linux /kernel " + kernelargs + "\n"
+    grubcfg += "' {\n    " + lincmd + " /kernel " + kernelargs + "\n"
     initrds = []
     for initramfs in glob.glob(profiledir + '/boot/initramfs/*.cpio'):
         initramfs = os.path.basename(initramfs)
@@ -175,7 +193,7 @@ def update_boot_linux(profiledir, profile, label):
     for initramfs in os.listdir(profiledir + '/boot/initramfs'):
         if initramfs not in initrds:
             initrds.append(initramfs)
-    grubcfg += "    initrd "
+    grubcfg += "    " + initrdcmd + " "
     for initramfs in initrds:
         grubcfg += " /initramfs/{0}".format(initramfs)
     grubcfg += "\n}\n"
