@@ -115,7 +115,7 @@ grep '^%include /tmp/partitioning' /tmp/kickstart.* > /dev/null || rm /tmp/insta
 if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     INSTALLDISK=$(cat /tmp/installdisk)
     sed -e s/%%INSTALLDISK%%/$INSTALLDISK/ -e s/%%LUKSHOOK%%/$LUKSPARTY/ /tmp/partitioning.template > /tmp/partitioning
-    dd if=/dev/zero of=/dev/$(cat /tmp/installdisk) bs=1M count=1 >& /dev/null
     vgchange -a n >& /dev/null
+    wipefs -a -f /dev/$INSTALLDISK >& /dev/null
 fi
 kill $logshowpid
