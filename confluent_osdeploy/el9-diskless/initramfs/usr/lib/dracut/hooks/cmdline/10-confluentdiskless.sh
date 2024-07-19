@@ -171,6 +171,13 @@ permissions=
 wait-device-timeout=60000
 
 EOC
+if [ "$linktype" = infiniband ]; then
+cat >> /run/NetworkManager/system-connections/$ifname.nmconnection << EOC
+[infiniband]
+transport-mode=datagram
+
+EOC
+fi
 autoconfigmethod=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 auto6configmethod=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ "$autoconfigmethod" = "dhcp" ]; then
