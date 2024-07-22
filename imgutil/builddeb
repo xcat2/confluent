@@ -18,7 +18,7 @@ mv ubuntu* suse15 el7 el9 el8 deb/confluent_imgutil_$VERSION/opt/confluent/lib/i
 mkdir -p deb/confluent_imgutil_$VERSION/opt/confluent/share/licenses/confluent_imgutil
 cp LICENSE deb/confluent_imgutil_$VERSION/opt/confluent/share/licenses/confluent_imgutil
 sed -e 's/#VERSION#/'$VERSION/ control.tmpl >  deb/confluent_imgutil_$VERSION/DEBIAN/control
-dpkg-deb --build deb/lenovo_confluent_$VERSION
+dpkg-deb --build deb/confluent_imgutil_$VERSION
 if [ ! -z "$1" ]; then
-        mv deb/lenovo-confluent_$VERSION.deb $1
+        mv deb/confluent_imgutil_$VERSION.deb $1
 fi
