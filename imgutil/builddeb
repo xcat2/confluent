@@ -1,0 +1,24 @@
+#!/bin/bash
+VERSION=`git describe|cut -d- -f 1`
+NUMCOMMITS=`git describe|cut -d- -f 2`
+if [ "$NUMCOMMITS" != "$VERSION"  ]; then
+    VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
+fi
+mkdir -p /tmp/confluent-imgutil
+cp -a * /tmp/confluent-imgutil
+cp ../LICENSE /tmp/confluent-imgutil
+cd /tmp/confluent-imgutil
+rm -rf deb/confluent_imgutil_$VERSION/
+mkdir -p deb/confluent_imgutil_$VERSION/DEBIAN/
+mkdir -p deb/confluent_imgutil_$VERSION/opt/confluent/lib/imgutil
+mkdir -p deb/confluent_imgutil_$VERSION/opt/confluent/bin
+mv imgutil deb/confluent_imgutil_$VERSION/opt/confluent/bin/
+chmod a+x deb/confluent_imgutil_$VERSION/opt/confluent/bin/imgutil
+mv ubuntu* suse15 el7 el9 el8 deb/confluent_imgutil_$VERSION/opt/confluent/lib/imgutil/
+mkdir -p deb/confluent_imgutil_$VERSION/opt/confluent/share/licenses/confluent_imgutil
+cp LICENSE deb/confluent_imgutil_$VERSION/opt/confluent/share/licenses/confluent_imgutil
+sed -e 's/#VERSION#/'$VERSION/ control.tmpl >  deb/confluent_imgutil_$VERSION/DEBIAN/control
+dpkg-deb --build deb/lenovo_confluent_$VERSION
+if [ ! -z "$1" ]; then
+        mv deb/lenovo-confluent_$VERSION.deb $1
+fi
