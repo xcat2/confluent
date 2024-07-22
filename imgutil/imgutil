@@ -655,7 +655,8 @@ class DebHandler(OsHandler):
 
     def prep_root(self, args):
         shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
-        shutil.copytree('/etc/apt/sources.list.d', os.path.join(self.targpath, 'etc/apt/sources.list.d'))
+        for listfile in glob.glob('/etc/apt/sources.list.d/*'):
+            shutil.copy(listfile, os.path.join(self.targpath, listfile[1:]))
         args.cmd = ['apt-get', 'update']
         run_constrainedx(fancy_chroot, (args, self.targpath))
         args.cmd = ['apt-get', '-y', 'install'] + self.includepkgs
