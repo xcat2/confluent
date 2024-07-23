@@ -661,6 +661,12 @@ class DebHandler(OsHandler):
         run_constrainedx(fancy_chroot, (args, self.targpath))
         args.cmd = ['apt-get', '-y', 'install'] + self.includepkgs
         run_constrainedx(fancy_chroot, (args, self.targpath))
+        servicefile = os.path.join(self.targpath, 'usr/lib/systemd/system/ssh.service')
+        if os.path.exists(servicefile):
+            os.symlink('/usr/lib/systemd/system/ssh.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/ssh.service'))
+        else:
+            os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
+
 
 
 class ElHandler(OsHandler):
