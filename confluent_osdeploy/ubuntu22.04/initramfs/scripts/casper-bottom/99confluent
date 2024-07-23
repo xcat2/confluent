@@ -26,12 +26,14 @@ if [ -e /tmp/cnflnthmackeytmp ]; then
     chroot . curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_CRYPTHMAC: $(cat /root/$hmacfile)" -d @/tmp/cnflntcryptfile  https://$MGR/confluent-api/self/registerapikey
     cp /root/$passfile /root/custom-installation/confluent/confluent.apikey
     DEVICE=$(cat /tmp/autodetectnic)
+    IP=done
 else
     chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
     MGR=[$MGR]
     nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
     nic=$(ip link |grep ^$nic:|awk '{print $2}')
     DEVICE=${nic%:}
+    IP=done
 fi
 if [ -z "$MGTIFACE" ]; then
 	chroot . usr/bin/curl -f -H "CONFLUENT_NODENAME: $NODENAME" -H "CONFLUENT_APIKEY: $(cat /root//custom-installation/confluent/confluent.apikey)" https://${MGR}/confluent-api/self/deploycfg > $deploycfg

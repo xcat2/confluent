@@ -192,8 +192,10 @@ class NetplanManager(object):
             if needcfgwrite:
                 needcfgapply = True
                 newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
+                oumask = os.umask(0o77)
                 with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
                     planout.write(yaml.dump(newcfg))
+                os.umask(oumask)
         if needcfgapply:
             subprocess.call(['netplan', 'apply'])
 

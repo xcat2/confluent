@@ -320,7 +320,7 @@ def get_full_net_config(configmanager, node, serverip=None):
         if val is None:
             continue
         if attrib.startswith('net.'):
-            attrib = attrib.replace('net.', '').rsplit('.', 1)
+            attrib = attrib.replace('net.', '', 1).rsplit('.', 1)
             if len(attrib) == 1:
                 iface = None
                 attrib = attrib[0]
