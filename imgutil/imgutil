@@ -947,7 +947,7 @@ def fancy_chroot(args, installroot):
     os.chroot(installroot)
     os.chdir('/')
     _mount('/', '/', flags=MS_BIND)  # Make / manifest as a mounted filesystem in exec
-    os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
+    os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \\W]$ '.format(imgname)
     os.environ['CONFLUENT_IMGUTIL_MODE'] = 'exec'
     if oshandler:
         oshandler.set_source('/run/confluentdistro')
