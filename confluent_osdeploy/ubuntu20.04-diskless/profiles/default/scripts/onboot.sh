@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script is executed on each boot as it is
 # completed. It is best to edit the middle of the file as
