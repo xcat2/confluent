@@ -70,15 +70,17 @@ try:
     # so we need to ffi that in using a strategy compatible with PyOpenSSL
     import OpenSSL.SSL as libssln
     import OpenSSL.crypto as crypto
-    from OpenSSL._util import ffi
 except ImportError:
     libssl = None
-    ffi = None
     crypto = None
 
 plainsocket = None
 
 libc = ctypes.CDLL(ctypes.util.find_library('c'))
+libsslc = ctypes.CDLL(ctypes.util.find_library('ssl'))
+libsslc.SSL_CTX_set_cert_verify_callback.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+
 
 def _should_authlog(path, operation):
     if (operation == 'retrieve' and
@@ -389,11 +391,24 @@ def _tlshandler(bind_host, bind_port):
         else:
             eventlet.spawn_n(_tlsstartup, cnn)
 
+@ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+def verify_stub(store, misc):
+    return 1
 
-if ffi:
-    @ffi.callback("int(*)( X509_STORE_CTX *, void*)")
-    def verify_stub(store, misc):
-        return 1
+class PyObject_HEAD(ctypes.Structure):
+    _fields_ = [
+        ("ob_refcnt",    ctypes.c_ssize_t),
+        ("ob_type",      ctypes.c_void_p),
+    ]
+
+
+# see main/Modules/_ssl.c, only caring about the SSL_CTX pointer
+class PySSLContext(ctypes.Structure):
+    _fields_ = [
+        ("ob_base",      PyObject_HEAD),
+        ("ctx",         ctypes.c_void_p),
+    ]
+
 
 
 def _tlsstartup(cnn):
@@ -416,8 +431,8 @@ def _tlsstartup(cnn):
         ctx.use_certificate_file('/etc/confluent/srvcert.pem')
         ctx.use_privatekey_file('/etc/confluent/privkey.pem')
         ctx.set_verify(libssln.VERIFY_PEER, lambda *args: True)
-        libssln._lib.SSL_CTX_set_cert_verify_callback(ctx._context,
-                                                      verify_stub, ffi.NULL)
+        ssl_ctx = PySSLContext.from_address(id(ctx)).ctx
+        libsslc.SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_stub, 0)
         cnn = libssl.Connection(ctx, cnn)
         cnn.set_accept_state()
         cnn.do_handshake()
