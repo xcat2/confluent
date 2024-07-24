@@ -942,6 +942,8 @@ def fancy_chroot(args, installroot):
     sourceresolv = '/etc/resolv.conf'
     if os.path.islink(sourceresolv):
         sourceresolv = os.readlink(sourceresolv)
+    # normalize and resolve relative and absolute paths
+    sourceresolv = os.path.normpath(os.path.join('/etc', sourceresolv))
     dstresolv = os.path.join(installroot, 'etc/resolv.conf')
     if os.path.islink(dstresolv):
         dstresolv = os.path.join(installroot, os.readlink(dstresolv)[1:])
