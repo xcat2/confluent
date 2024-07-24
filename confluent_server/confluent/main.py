@@ -227,7 +227,7 @@ def assure_ownership(path):
             sys.exit(1)
     except OSError as e:
         if e.errno == 13:
-             if os.getuid() == 0:
+            if os.getuid() == 0:
                 sys.stderr.write('Attempting to run as root, when non-root usage is detected\n')
             else:
                 sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
