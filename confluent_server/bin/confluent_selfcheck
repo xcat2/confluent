@@ -24,6 +24,9 @@ import eventlet
 import greenlet
 import pwd
 import signal
+import confluent.collective.manager as collective
+import confluent.noderange as noderange
+
 
 def fprint(txt):
     sys.stdout.write(txt)
@@ -258,6 +261,9 @@ if __name__ == '__main__':
             uuid = rsp.get('id.uuid', {}).get('value', None)
             if uuid:
                 uuidok = True
+            if 'collective.managercandidates' in rsp:
+                # Check if current node in candidates
+                pass
             if 'deployment.useinsecureprotocols' in rsp:
                 insec = rsp.get('deployment.useinsecureprotocols', {}).get('value', None)
                 if insec != 'firmware':
@@ -276,8 +282,27 @@ if __name__ == '__main__':
                     switch_value = rsp[key].get('value',None)
                     if switch_value and switch_value not in valid_nodes:
                         emprint(f'{switch_value} is not a valid node name (as referenced by attribute "{key}" of node {args.node}).')
-        print(f"Checking network configuration for {args.node}")
         cfg = configmanager.ConfigManager(None)
+        cfd = cfg.get_node_attributes(
+            args.node, ('deployment.*', 'collective.managercandidates'))
+        profile = cfd.get(args.node, {}).get(
+            'deployment.pendingprofile', {}).get('value', None)
+        if not profile:
+            emprint(
+                f'{args.node} is not currently set to deploy any '
+                'profile, network boot attempts will be ignored')
+        candmgrs = cfd.get(args.node, {}).get(
+            'collective.managercandidates', {}).get('value', None)
+        if candmgrs:
+            try:
+                candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+            except Exception:  # fallback to unverified noderange
+                candmgrs = noderange.NodeRange(candmgrs).nodes
+            if collective.get_myname() not in candmgrs:
+                emprint(f'{args.node} has deployment restricted to '
+                        'certain collective managers excluding the '
+                        'system running the selfcheck')
+        print(f"Checking network configuration for {args.node}")
         bootablev4nics = []
         bootablev6nics = []
         targsships = []
