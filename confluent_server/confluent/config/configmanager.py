@@ -2647,7 +2647,7 @@ class ConfigManager(object):
                                 dumpdata[confarea][element][attribute]['cryptvalue'] = '!'.join(cryptval)
                     elif isinstance(dumpdata[confarea][element][attribute], set):
                         dumpdata[confarea][element][attribute] = \
-                            list(dumpdata[confarea][element][attribute])
+                            confluent.util.natural_sort(list(dumpdata[confarea][element][attribute]))
         return json.dumps(
             dumpdata, sort_keys=True, indent=4, separators=(',', ': '))
 
