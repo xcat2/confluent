@@ -8,7 +8,7 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
     fi
 done
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-if grep confluennt_imagemethod=untethered /proc/cmdline > /dev/null; then
+if grep confluent_imagemethod=untethered /proc/cmdline > /dev/null; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
