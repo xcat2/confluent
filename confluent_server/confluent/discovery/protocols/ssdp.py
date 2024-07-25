@@ -251,7 +251,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                                 break
                                         candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
                                         if candmgrs:
-                                            candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+                                            try:
+                                                candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+                                            except Exception:
+                                                candmgrs = noderange.NodeRange(candmgrs).nodes
                                             if collective.get_myname() not in candmgrs:
                                                 break
                                         currtime = time.time()
