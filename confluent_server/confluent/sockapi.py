@@ -431,7 +431,7 @@ def _tlsstartup(cnn):
         ctx.use_certificate_file('/etc/confluent/srvcert.pem')
         ctx.use_privatekey_file('/etc/confluent/privkey.pem')
         ctx.set_verify(libssln.VERIFY_PEER, lambda *args: True)
-        ssl_ctx = PySSLContext.from_address(id(ctx)).ctx
+        ssl_ctx = PySSLContext.from_address(id(ctx._context)).ctx
         libsslc.SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_stub, 0)
         cnn = libssl.Connection(ctx, cnn)
         cnn.set_accept_state()
