@@ -13,11 +13,6 @@ exec 2>> /var/log/confluent/confluent-pre.log
 chmod 600 /var/log/confluent/confluent-pre.log
 
 cryptboot=$(grep encryptboot: $deploycfg|sed -e 's/^encryptboot: //')
-if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
-   echo "****Encrypted boot requested, but not implemented for this OS, halting install" > /dev/console
-   [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but not implemented for this OS,halting install" >> $(cat /tmp/autoconsdev))
-   while :; do sleep 86400; done
-fi
 
 
 cat /custom-installation/ssh/*pubkey > /root/.ssh/authorized_keys
@@ -45,6 +40,13 @@ if [ ! -e /tmp/installdisk ]; then
     python3 /custom-installation/getinstalldisk
 fi
 sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
+if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
+    lukspass=$(head -c 64 < /dev/urandom |base64)
+    sed -i s!%%CRYPTPASS%%!$lukspass! /autoinstall.yaml
+    sed -i s!'#CRYPTBOOT'!! /autoinstall.yaml
+    echo $lukspass > /etc/confluent_lukspass
+
+fi
 ) &
 tail --pid $! -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console
 

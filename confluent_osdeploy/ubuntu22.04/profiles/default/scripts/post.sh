@@ -60,10 +60,12 @@ cp /custom-installation/confluent/bin/apiclient /target/opt/confluent/bin
 mount -o bind /dev /target/dev
 mount -o bind /proc /target/proc
 mount -o bind /sys /target/sys
+mount -o bind /run /target/run
 mount -o bind /sys/firmware/efi/efivars /target/sys/firmware/efi/efivars
 if [ 1 = $updategrub ]; then
     chroot /target update-grub
 fi
+
 echo "Port 22" >> /etc/ssh/sshd_config
 echo "Port 2222" >> /etc/ssh/sshd_config
 echo "Match LocalPort 22" >> /etc/ssh/sshd_config
@@ -88,8 +90,30 @@ chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d
 source /target/etc/confluent/functions
 
 run_remote_config post
+
+if [ -f /etc/confluent_lukspass ]; then
+    $lukspass=$(cat /etc/confluent_lukspass)
+    chroot /target apt install tpm2-initramfs-tool
+    chroot /target tpm2-initramfs-tool seal --data "$(lukspass)" > /dev/null
+    # The default PCR 7 mutates, and crypttab does not provide a way to pass args
+    cat > /target/usr/bin/tpm2-initramfs-tool.pcr0 << EOF
+#!/bin/sh
+tpm2-initramfs-tool -p 0 \$*
+EOF
+    chmod 755 /target/usr/bin/tpm2-initramfs-tool.pcr0
+    cat > /target/etc/initramfs-tools/hooks/tpm2-initramfs-tool <<EOF
+. /usr/share/initramfs-tools/hook-functions
+
+copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0
+copy_exec /usr/bin/tpm2-initramfs-tool
+copy_exec /usr/bin/tpm2-initramfs-tool.pcr0
+EOF
+    chmod 755 /target/etc/initramfs-tools/hooks/tpm2-initramfs-tool
+    chroot /target update-initramfs -u
+fi
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
 
-umount /target/sys /target/dev /target/proc
+
+umount /target/sys /target/dev /target/proc /target/run
 ) &
 tail --pid $! -n 0 -F /target/var/log/confluent/confluent-post.log > /dev/console
