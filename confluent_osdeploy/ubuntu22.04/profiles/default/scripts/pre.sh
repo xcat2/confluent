@@ -43,7 +43,7 @@ sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
 if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
     lukspass=$(head -c 66 < /dev/urandom |base64 -w0)
     run_remote_python addcrypt "$lukspass"
-    if ! grep 'pasword:' /autoinstall.yaml > /dev/null; then
+    if ! grep 'password:' /autoinstall.yaml > /dev/null; then
         echo "****Encrypted boot requested, but the user-data does not have a hook to enable,halting install" > /dev/console
         [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but the user-data does not have a hook to enable,halting install" >> $(cat /tmp/autoconsdev))
         while :; do sleep 86400; done
