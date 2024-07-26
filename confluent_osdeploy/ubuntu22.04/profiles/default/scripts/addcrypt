@@ -1,11 +1,11 @@
 import yaml
-import sys
+import os
 
 ainst = {}
 with open('/autoinstall.yaml', 'r') as allin:
     ainst = yaml.safe_load(allin)
 
-ainst['storage']['layout']['password'] = sys.argv[1]
+ainst['storage']['layout']['password'] = os.environ['lukspass']
 
 with open('/autoinstall.yaml', 'w') as allout:
     yaml.safe_dump(ainst, allout)
