@@ -105,7 +105,7 @@ if [ -f /etc/confluent_lukspass ]; then
         wall "Unable to find $CRYPTTAB_SOURCE, halting install"
         while :; do sleep 86400; done
     fi
-    $lukspass=$(cat /etc/confluent_lukspass)
+    lukspass=$(cat /etc/confluent_lukspass)
     chroot /target apt install libtss2-rc0
     PASSWORD=$(lukspass) chroot /target  systemd-cryptenroll --tpm2-device=auto $CRYPTTAB_SOURCE
     fetch_remote  systemdecrypt
