@@ -92,23 +92,66 @@ source /target/etc/confluent/functions
 run_remote_config post
 
 if [ -f /etc/confluent_lukspass ]; then
-    $lukspass=$(cat /etc/confluent_lukspass)
-    chroot /target apt install tpm2-initramfs-tool
-    chroot /target tpm2-initramfs-tool seal --data "$(lukspass)" > /dev/null
-    # The default PCR 7 mutates, and crypttab does not provide a way to pass args
-    cat > /target/usr/bin/tpm2-initramfs-tool.pcr0 << EOF
-#!/bin/sh
-tpm2-initramfs-tool -p 0 \$*
-EOF
-    chmod 755 /target/usr/bin/tpm2-initramfs-tool.pcr0
-    cat > /target/etc/initramfs-tools/hooks/tpm2-initramfs-tool <<EOF
-. /usr/share/initramfs-tools/hook-functions
+    numdevs=$(lsblk -lo name,uuid|grep $(awk '{print $2}' < /target/etc/crypttab |sed -e s/UUID=//)|wc -l)
+    if [ 0$numdevs -ne 1 ]; then
+        wall "Unable to identify the LUKS device, halting install"
+        while :; do sleep 86400; done
+    fi
+    CRYPTTAB_SOURCE=$(awk '{print $2}' /target/etc/crypttab)
+    . /target/usr/lib/cryptsetup/functions
+    crypttab_resolve_source
 
-copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0
-copy_exec /usr/bin/tpm2-initramfs-tool
-copy_exec /usr/bin/tpm2-initramfs-tool.pcr0
+    if [ ! -e $CRYPTTAB_SOURCE ]; then
+        wall "Unable to find $CRYPTTAB_SOURCE, halting install"
+        while :; do sleep 86400; done
+    fi
+    $lukspass=$(cat /etc/confluent_lukspass)
+    chroot /target apt install libtss2-rc0
+    PASSWORD=$(lukspass) chroot /target  systemd-cryptenroll --tpm2-device=auto $CRYPTTAB_SOURCE
+    cat >/target/etc/initramfs-tools/scripts/local-top/systemdecrypt << EOS
+#!/bin/sh
+case \$1 in
+prereqs)
+        echo
+        exit 0
+        ;;
+esac
+
+systemdecryptnow() {
+. /usr/lib/cryptsetup/functions
+local CRYPTTAB_SOURCE=\$(awk '{print \$2}' /systemdecrypt/crypttab)
+local CRYPTTAB_NAME=\$(awk '{print \$1}' /systemdecrypt/crypttab)
+crypttab_resolve_source
+/lib/systemd/systemd-cryptsetup attach "\${CRYPTTAB_NAME}" "\${CRYPTTAB_SOURCE}" none tpm2-device=auto
+}
+
+systemdecryptnow
+EOS
+    chmod 755 /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
+    cat > /target/etc/initramfs-tools/hooks/systemdecrypt <<EOF
+#!/bin/sh
+case "\$1" in
+    prereqs)
+        echo
+        exit 0
+        ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+mkdir -p \$DESTDIR/systemdecrypt
+copy_exec /lib/systemd/systemd-cryptsetup /lib/systemd
+for i in /lib/x86_64-linux-gnu/libtss2*
+do
+        copy_exec \${i} /lib/x86_64-linux-gnu
+done
+mkdir -p \$DESTDIR/scripts/local-top
+
+echo /scripts/local-top/systemdecrypt >> \$DESTDIR/scripts/local-top/ORDER
+
+if [ -f \$DESTDIR/cryptroot/crypttab ]; then
+    mv \$DESTDIR/cryptroot/crypttab \$DESTDIR/systemdecrypt/crypttab
+fi
 EOF
-    chmod 755 /target/etc/initramfs-tools/hooks/tpm2-initramfs-tool
     chroot /target update-initramfs -u
 fi
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
