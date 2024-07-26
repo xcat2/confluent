@@ -108,50 +108,11 @@ if [ -f /etc/confluent_lukspass ]; then
     $lukspass=$(cat /etc/confluent_lukspass)
     chroot /target apt install libtss2-rc0
     PASSWORD=$(lukspass) chroot /target  systemd-cryptenroll --tpm2-device=auto $CRYPTTAB_SOURCE
-    cat >/target/etc/initramfs-tools/scripts/local-top/systemdecrypt << EOS
-#!/bin/sh
-case \$1 in
-prereqs)
-        echo
-        exit 0
-        ;;
-esac
-
-systemdecryptnow() {
-. /usr/lib/cryptsetup/functions
-local CRYPTTAB_SOURCE=\$(awk '{print \$2}' /systemdecrypt/crypttab)
-local CRYPTTAB_NAME=\$(awk '{print \$1}' /systemdecrypt/crypttab)
-crypttab_resolve_source
-/lib/systemd/systemd-cryptsetup attach "\${CRYPTTAB_NAME}" "\${CRYPTTAB_SOURCE}" none tpm2-device=auto
-}
-
-systemdecryptnow
-EOS
-    chmod 755 /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
-    cat > /target/etc/initramfs-tools/hooks/systemdecrypt <<EOF
-#!/bin/sh
-case "\$1" in
-    prereqs)
-        echo
-        exit 0
-        ;;
-esac
-
-. /usr/share/initramfs-tools/hook-functions
-mkdir -p \$DESTDIR/systemdecrypt
-copy_exec /lib/systemd/systemd-cryptsetup /lib/systemd
-for i in /lib/x86_64-linux-gnu/libtss2*
-do
-        copy_exec \${i} /lib/x86_64-linux-gnu
-done
-mkdir -p \$DESTDIR/scripts/local-top
-
-echo /scripts/local-top/systemdecrypt >> \$DESTDIR/scripts/local-top/ORDER
-
-if [ -f \$DESTDIR/cryptroot/crypttab ]; then
-    mv \$DESTDIR/cryptroot/crypttab \$DESTDIR/systemdecrypt/crypttab
-fi
-EOF
+    fetch_remote  systemdecrypt
+    mv systemdecrypt /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
+    fetch_remote systemdecrypt-hook
+    mv systemdecrypt-hook /target/etc/initramfs-tools/hooks/systemdecrypt
+    chmod 755 /target/etc/initramfs-tools/scripts/local-top/systemdecrypt /target/etc/initramfs-tools/hooks/systemdecrypt
     chroot /target update-initramfs -u
 fi
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'

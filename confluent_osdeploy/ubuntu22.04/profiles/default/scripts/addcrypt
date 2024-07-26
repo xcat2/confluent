@@ -1,0 +1,12 @@
+import yaml
+import sys
+
+ainst = {}
+with open('/autoinstall.yaml', 'r') as allin:
+    ainst = yaml.safe_load(allin)
+
+ainst['storage']['layout']['password'] = sys.argv[1]
+
+with open('/autoinstall.yaml', 'w') as allout:
+    yaml.safe_dump(ainst, allout)
+

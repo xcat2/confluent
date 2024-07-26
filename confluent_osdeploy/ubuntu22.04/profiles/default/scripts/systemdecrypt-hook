@@ -1,0 +1,22 @@
+#!/bin/sh
+case "$1" in
+    prereqs)
+        echo
+        exit 0
+        ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+mkdir -p $DESTDIR/systemdecrypt
+copy_exec /lib/systemd/systemd-cryptsetup /lib/systemd
+for i in /lib/x86_64-linux-gnu/libtss2*
+do
+        copy_exec ${i} /lib/x86_64-linux-gnu
+done
+mkdir -p $DESTDIR/scripts/local-top
+
+echo /scripts/local-top/systemdecrypt >> $DESTDIR/scripts/local-top/ORDER
+
+if [ -f $DESTDIR/cryptroot/crypttab ]; then
+    mv $DESTDIR/cryptroot/crypttab $DESTDIR/systemdecrypt/crypttab
+fi

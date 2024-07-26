@@ -10,7 +10,6 @@ autoinstall:
   storage:
     layout:
       name: lvm
-#CRYPTBOOT      password: %%CRYPTPASS%%
       match:
         path: "%%INSTALLDISK%%"
   user-data:
