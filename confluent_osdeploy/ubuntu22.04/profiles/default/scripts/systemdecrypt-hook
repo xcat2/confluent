@@ -13,6 +13,10 @@ for i in /lib/x86_64-linux-gnu/libtss2*
 do
         copy_exec ${i} /lib/x86_64-linux-gnu
 done
+if [ -f /lib/x86_64-linux-gnu/cryptsetup/libcryptsetup-token-systemd-tpm2.so ]; then
+    mkdir -p $DESTDIR/lib/x86_64-linux-gnu/cryptsetup
+    copy_exec /lib/x86_64-linux-gnu/cryptsetup/libcryptsetup-token-systemd-tpm2.so /lib/x86_64-linux-gnu/cryptsetup
+fi
 mkdir -p $DESTDIR/scripts/local-top
 
 echo /scripts/local-top/systemdecrypt >> $DESTDIR/scripts/local-top/ORDER
