@@ -107,7 +107,7 @@ if [ -f /etc/confluent_lukspass ]; then
     fi
     lukspass=$(cat /etc/confluent_lukspass)
     chroot /target apt install libtss2-rc0
-    PASSWORD=$(lukspass) chroot /target  systemd-cryptenroll --tpm2-device=auto $CRYPTTAB_SOURCE
+    PASSWORD=$lukspass chroot /target  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs="" $CRYPTTAB_SOURCE
     fetch_remote  systemdecrypt
     mv systemdecrypt /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
     fetch_remote systemdecrypt-hook
