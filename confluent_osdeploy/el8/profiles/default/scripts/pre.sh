@@ -114,7 +114,7 @@ confluentpython /etc/confluent/apiclient /confluent-public/os/$confluent_profile
 grep '^%include /tmp/partitioning' /tmp/kickstart.* > /dev/null || rm /tmp/installdisk
 if [ -e /tmp/installdisk -a ! -e /tmp/partitioning ]; then
     INSTALLDISK=$(cat /tmp/installdisk)
-    sed -e s/%%INSTALLDISK%%/$INSTALLDISK/ -e "s/%%LUKSHOOK%%/$LUKSPARTY/" /tmp/partitioning.template > /tmp/partitioning
+    sed -e s/%%INSTALLDISK%%/$INSTALLDISK/ -e "s!%%LUKSHOOK%%!$LUKSPARTY!" /tmp/partitioning.template > /tmp/partitioning
     vgchange -a n >& /dev/null
     wipefs -a -f /dev/$INSTALLDISK >& /dev/null
 fi
