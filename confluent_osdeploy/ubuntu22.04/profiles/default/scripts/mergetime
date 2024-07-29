@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+import yaml
+import os
+
+ainst = {}
+with open('/autoinstall.yaml', 'r') as allin:
+    ainst = yaml.safe_load(allin)
+
+tz = None
+ntps = []
+with open('/etc/confluent/confluent.deploycfg', 'r') as confluentdeploycfg:
+    dcfg = yaml.safe_load(confluentdeploycfg)
+    tz = dcfg['timezone']
+    ntps = dcfg.get('ntpservers', [])
+
+if ntps and not ainst.get('ntp', None):
+    ainst['ntp'] = {}
+    ainst['ntp']['enabled'] = True
+    ainst['servers'] = ntps
+
+if tz and not ainst.get('timezone'):
+    ainst['timezone'] = tz
+
+with open('/autoinstall.yaml', 'w') as allout:
+    yaml.safe_dump(ainst, allout)
+

@@ -40,6 +40,7 @@ if [ ! -e /tmp/installdisk ]; then
     python3 /custom-installation/getinstalldisk
 fi
 sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
+run_remote_python mergetime
 if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
     lukspass=$(python3 /opt/confluent/bin/apiclient /confluent-api/self/profileprivate/pending/luks.key 2> /dev/null)
     if [ -z "$lukspass" ]; then
