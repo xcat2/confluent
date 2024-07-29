@@ -16,7 +16,7 @@ with open('/etc/confluent/confluent.deploycfg', 'r') as confluentdeploycfg:
 if ntps and not ainst.get('ntp', None):
     ainst['ntp'] = {}
     ainst['ntp']['enabled'] = True
-    ainst['servers'] = ntps
+    ainst['ntp']['servers'] = ntps
 
 if tz and not ainst.get('timezone'):
     ainst['timezone'] = tz
