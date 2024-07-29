@@ -90,8 +90,14 @@ touch /tmp/cryptpkglist
 touch /tmp/pkglist
 touch /tmp/addonpackages
 if [ "$cryptboot" == "tpm2" ]; then
-	LUKSPARTY="--encrypted --passphrase=$(cat /etc/confluent/confluent.apikey)"
-	echo $cryptboot >> /tmp/cryptboot
+    lukspass=$(python3 /opt/confluent/bin/apiclient /confluent-api/self/profileprivate/pending/luks.key 2> /dev/null)
+     if [ -z "$lukspass" ]; then
+        lukspass=$(python3 -c 'import os;import base64;print(base64.b64encode(os.urandom(66)).decode())')
+    fi
+    echo $lukspass > /etc/confluent/luks.key
+    chmod 000 /etc/confluent/luks.key
+    LUKSPARTY="--encrypted --passphrase=$lukspass"
+    echo $cryptboot >> /tmp/cryptboot
     echo clevis-dracut >> /tmp/cryptpkglist
 fi
 

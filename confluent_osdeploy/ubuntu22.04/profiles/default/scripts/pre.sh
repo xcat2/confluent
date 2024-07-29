@@ -41,7 +41,10 @@ if [ ! -e /tmp/installdisk ]; then
 fi
 sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
 if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
-    lukspass=$(head -c 66 < /dev/urandom |base64 -w0)
+    lukspass=$(python3 /opt/confluent/bin/apiclient /confluent-api/self/profileprivate/pending/luks.key 2> /dev/null)
+    if [ -z "$lukspass" ]; then
+        lukspass=$(head -c 66 < /dev/urandom |base64 -w0)
+    fi
     export lukspass
     run_remote_python addcrypt
     if ! grep 'password:' /autoinstall.yaml > /dev/null; then
@@ -52,7 +55,7 @@ if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "n
     sed -i s!%%CRYPTPASS%%!$lukspass! /autoinstall.yaml
     sed -i s!'#CRYPTBOOT'!! /autoinstall.yaml
     echo -n $lukspass > /etc/confluent_lukspass
-
+    chmod 000 /etc/confluent_lukspass
 fi
 ) &
 tail --pid $! -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console
