@@ -141,7 +141,7 @@ class TsmConsole(conapi.Console):
             bmc = prefix + ']'
         self.ws = WrappedWebSocket(host=bmc)
         self.ws.set_verify_callback(kv)
-        self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']))
+        self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']), subprotocols=[wc.cookies['XSRF-TOKEN']])
         self.connected = True
         eventlet.spawn_n(self.recvdata)
         return
