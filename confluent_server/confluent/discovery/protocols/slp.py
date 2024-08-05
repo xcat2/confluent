@@ -471,10 +471,13 @@ def snoop(handler, protocol=None):
             # socket in use can occur when aliased ipv4 are encountered
     net.bind(('', 427))
     net4.bind(('', 427))
-
+    newmacs = set([])
+    known_peers = set([])
+    peerbymacaddress = {}
+    deferpeers = []
     while True:
         try:
-            newmacs = set([])
+            newmacs.clear()
             r, _, _ = select.select((net, net4), (), (), 60)
             # clear known_peers and peerbymacaddress
             # to avoid stale info getting in...
@@ -482,9 +485,9 @@ def snoop(handler, protocol=None):
             # addresses that come close together
             # calling code needs to understand deeper context, as snoop
             # will now yield dupe info over time
-            known_peers = set([])
-            peerbymacaddress = {}
-            deferpeers = []
+            known_peers.clear()
+            peerbymacaddress.clear()
+            deferpeers.clear()
             while r and len(deferpeers) < 256:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
