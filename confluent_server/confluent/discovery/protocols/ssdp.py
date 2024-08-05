@@ -116,10 +116,11 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 if '/eth' in value and value.endswith('.xml'):
                     targurl = '/redfish/v1/'
                     targtype = 'megarac-bmc'
-                    continue # MegaRAC redfish
+                    continue  # MegaRAC redfish
                 elif value.endswith('/DeviceDescription.json'):
                     targurl = '/DeviceDescription.json'
-                    targtype = 'megarac-bmc'
+                    targtype = 'lenovo-xcc'
+                    continue
                 else:
                     return
         if handler and targurl:
@@ -179,11 +180,14 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     net4.bind(('', 1900))
     net6.bind(('', 1900))
     peerbymacaddress = {}
+    newmacs = set([])
+    deferrednotifies = []
+    machandlers = {}
     while True:
         try:
-            newmacs = set([])
-            deferrednotifies = []
-            machandlers = {}
+            newmacs.clear()
+            deferrednotifies.clear()
+            machandlers.clear()
             r = select.select((net4, net6), (), (), 60)
             if r:
                 r = r[0]
