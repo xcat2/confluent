@@ -134,7 +134,12 @@ class TsmConsole(conapi.Console):
         kv = util.TLSCertVerifier(
             self.nodeconfig, self.node, 'pubkeys.tls_hardwaremanager').verify_cert
         wc = webclient.SecureHTTPConnection(self.origbmc, 443, verifycallback=kv)
-        rsp = wc.grab_json_response_with_status('/login', {'data': [self.username.decode('utf8'), self.password.decode("utf8")]}, headers={'Content-Type': 'application/json'})
+        try:
+            rsp = wc.grab_json_response_with_status('/login', {'data': [self.username.decode('utf8'), self.password.decode("utf8")]}, headers={'Content-Type': 'application/json', 'Accept': 'application/json'})
+        except Exception as e:
+            raise cexc.TargetEndpointUnreachable(str(e))
+        if rsp[1] > 400:
+            raise cexc.TargetEndpointBadCredentials
         bmc = self.bmc
         if '%' in self.bmc:
             prefix = self.bmc.split('%')[0]
