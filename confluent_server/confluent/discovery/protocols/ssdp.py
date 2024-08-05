@@ -461,7 +461,7 @@ def check_fish(urldata, port=443, verifycallback=None):
         except KeyError:
             peerinfo['xcc-variant'] = '3'
         except IndexError:
-+            return None
+            return None
         try:
             myuuid = peerinfo['node-uuid'].lower()
             if '-' not in myuuid:
