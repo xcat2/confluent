@@ -639,7 +639,7 @@ def remote_nodecfg(nodename, cfm):
     ipaddr = ipaddr.split('/', 1)[0]
     ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
     if not ipaddr:
-        raise Excecption('Cannot remote configure a system without known '
+        raise Exception('Cannot remote configure a system without known '
                          'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)

@@ -24,6 +24,7 @@ getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 
 class NodeHandler(redfishbmc.NodeHandler):
+    devname = 'XCC'
 
     def get_firmware_default_account_info(self):
         return ('USERID', 'PASSW0RD')
