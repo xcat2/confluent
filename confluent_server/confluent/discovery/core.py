@@ -74,6 +74,7 @@ import confluent.discovery.handlers.tsm as tsm
 import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
+import confluent.discovery.handlers.megarac as megarac
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -114,6 +115,7 @@ nodehandlers = {
     'service:lenovo-smm2': smm,
     'lenovo-xcc': xcc,
     'lenovo-xcc3': xcc,
+    'megarac-bmc': megarac,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
     'onie-switch': None,
@@ -134,6 +136,7 @@ servicenames = {
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',
+    'megarac-bmc': 'megarac-bmc',
     #'openbmc': 'openbmc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
     'service:io-device.Lenovo:management-module': 'lenovo-switch',
@@ -150,6 +153,7 @@ servicebyname = {
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',
+    'megarac-bmc': 'megarac-bmc',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',
     'thinkagile-storage': 'service:thinkagile-storagebmc',
@@ -456,7 +460,7 @@ def iterate_addrs(addrs, countonly=False):
             yield 1
             return
         yield addrs
-    
+
 def _parameterize_path(pathcomponents):
     listrequested = False
     childcoll = True
@@ -545,7 +549,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         if len(pathcomponents) > 2:
             raise Exception('TODO')
         currsubs = get_subscriptions()
-        return [msg.ChildCollection(x) for x in currsubs]    
+        return [msg.ChildCollection(x) for x in currsubs]
     elif operation == 'retrieve':
         return handle_read_api_request(pathcomponents)
     elif (operation in ('update', 'create') and
@@ -1706,3 +1710,4 @@ if __name__ == '__main__':
     start_detection()
     while True:
         eventlet.sleep(30)
+
