@@ -33,6 +33,7 @@ class NodeHandler(redfishbmc.NodeHandler):
         ip, port = self.get_web_port_and_ip()
         c = webclient.SecureHTTPConnection(ip, port,
             verifycallback=self.validate_cert)
+        c.set_header('Accept', 'application/json')
         i = c.grab_json_response('/api/providers/logoninfo')
         modelname = i.get('items', [{}])[0].get('machine_name', None)
         if modelname:
