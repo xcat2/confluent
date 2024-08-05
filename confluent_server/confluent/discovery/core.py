@@ -74,6 +74,7 @@ import confluent.discovery.handlers.tsm as tsm
 import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
+import confluent.discovery.handlers.xcc3 as xcc3
 import confluent.discovery.handlers.megarac as megarac
 import confluent.exceptions as exc
 import confluent.log as log
@@ -114,7 +115,7 @@ nodehandlers = {
     'service:lenovo-smm': smm,
     'service:lenovo-smm2': smm,
     'lenovo-xcc': xcc,
-    'lenovo-xcc3': xcc,
+    'lenovo-xcc3': xcc3,
     'megarac-bmc': megarac,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,

@@ -80,6 +80,7 @@ class NodeHandler(generic.NodeHandler):
         wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
         wc.set_basic_credentials(defuser, defpass)
         wc.set_header('Content-Type', 'application/json')
+        wc.set_header('Accept', 'application/json')
         authmode = 0
         if not self.trieddefault:
             rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
@@ -114,7 +115,7 @@ class NodeHandler(generic.NodeHandler):
             if status > 400:
                 self.trieddefault = True
                 if status == 401:
-                    wc.set_basic_credentials(self.DEFAULT_USER, self.targpass)
+                    wc.set_basic_credentials(defuser, self.targpass)
                     rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
                     if status == 200:  # Default user still, but targpass
                         self.currpass = self.targpass
@@ -236,7 +237,10 @@ class NodeHandler(generic.NodeHandler):
                     break
             else:
                 wc.set_header('If-Match', '*')
-                rsp, status = wc.grab_json_response_with_status(actualnics[0], {'IPv4StaticAddresses': [newconfig]}, method='PATCH')
+                rsp, status = wc.grab_json_response_with_status(actualnics[0], {
+                    'DHCPv4': {'DHCPEnabled': False},
+                    'IPv4StaticAddresses': [newconfig]}, method='PATCH')
+
         elif self.ipaddr.startswith('fe80::'):
             self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
