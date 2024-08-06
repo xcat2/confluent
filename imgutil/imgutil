@@ -661,11 +661,20 @@ class DebHandler(OsHandler):
         run_constrainedx(fancy_chroot, (args, self.targpath))
         args.cmd = ['apt-get', '-y', 'install'] + self.includepkgs
         run_constrainedx(fancy_chroot, (args, self.targpath))
-        servicefile = os.path.join(self.targpath, 'usr/lib/systemd/system/ssh.service')
+        servicefile = os.path.join(
+            self.targpath, 'usr/lib/systemd/system/ssh.service')
         if os.path.exists(servicefile):
-            os.symlink('/usr/lib/systemd/system/ssh.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/ssh.service'))
+            targfile = os.path.join(
+                self.targpath,
+                'etc/systemd/system/multi-user.target.wants/ssh.service')
+            if not os.path.exists(targfile):
+                os.symlink('/usr/lib/systemd/system/ssh.service', targfile)
         else:
-            os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
+            targfile = os.path.join(
+                self.targpath,
+                'etc/systemd/system/multi-user.target.wants/sshd.service')
+            if not os.path.exists(targfile):
+                os.symlink('/usr/lib/systemd/system/sshd.service', targfile)
 
 
 
