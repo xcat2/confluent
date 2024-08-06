@@ -236,6 +236,8 @@ class NodeHandler(generic.NodeHandler):
             rsp, status = wc.grab_json_response_with_status(targaccturl, authupdate, method='PATCH')
             if status >= 300:
                 raise Exception("Failed attempting to update credentials on BMC")
+            self.curruser = user
+            self.currpass = passwd
             wc.set_basic_credentials(user, passwd)
             _, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
             tries = 10
