@@ -8,13 +8,13 @@ Source: confluent_imgutil.tar.xz
 BuildArch: noarch
 BuildRoot: /tmp/
 %if "%{dist}" == ".el8"
-Requires: squashfs-tools
+Requires: squashfs-tools cpio
 %else
 %if "%{dist}" == ".el9"
-Requires: squashfs-tools
+Requires: squashfs-tools cpio
 %else
 %if "%{dist}" == ".el7"
-Requires: squashfs-tools
+Requires: squashfs-tools cpio
 %else
 Requires: squashfs
 %endif
