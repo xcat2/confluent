@@ -963,7 +963,6 @@ def fancy_chroot(args, installroot):
     _mount('none', dstresolv, flags=MS_RDONLY|MS_REMOUNT|MS_BIND)
     os.chroot(installroot)
     os.chdir('/')
-    _mount('/', '/', flags=MS_BIND)  # Make / manifest as a mounted filesystem in exec
     os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \\W]$ '.format(imgname)
     os.environ['CONFLUENT_IMGUTIL_MODE'] = 'exec'
     if oshandler:
@@ -1004,7 +1003,13 @@ def build_root_backend(optargs):
 
 
 def _mount_constrained_fs(args, installroot):
+    # This is prepping for a chroot.
+    # For the target environment to be content with having a root
+    # filesystem, installroot must be a 'mount' entry of it's own,
+    # so bind mount to itself to satisfy
+    _mount(installroot, installroot, flags=MS_BIND)
     _mount('/dev', os.path.join(installroot, 'dev'), flags=MS_BIND|MS_RDONLY)
+    _mount('/dev/pts', os.path.join(installroot, 'dev/pts'), flags=MS_BIND|MS_RDONLY)
     _mount('proc', os.path.join(installroot, 'proc'), fstype='proc')
     _mount('sys', os.path.join(installroot, 'sys'), fstype='sysfs')
     _mount('runfs', os.path.join(installroot, 'run'), fstype='tmpfs')
