@@ -493,6 +493,8 @@ def snoop(handler, protocol=None):
                     (rsp, peer) = s.recvfrom(9000)
                     if peer in known_peers:
                         continue
+                    if peer in deferpeers:
+                        continue
                     mac = neighutil.get_hwaddr(peer[0])
                     if not mac:
                         probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
