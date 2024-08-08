@@ -390,6 +390,23 @@ async def _tlshandler(bind_host, bind_port):
         else:
             asyncio.create_task(_tlsstartup(cnn))
 
+@ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+def verify_stub(store, misc):
+    return 1
+
+class PyObject_HEAD(ctypes.Structure):
+    _fields_ = [
+        ("ob_refcnt",    ctypes.c_ssize_t),
+        ("ob_type",      ctypes.c_void_p),
+    ]
+
+
+# see main/Modules/_ssl.c, only caring about the SSL_CTX pointer
+class PySSLContext(ctypes.Structure):
+    _fields_ = [
+        ("ob_base",      PyObject_HEAD),
+        ("ctx",         ctypes.c_void_p),
+    ]
 
 @ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
 def verify_stub(store, misc):

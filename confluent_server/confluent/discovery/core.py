@@ -75,6 +75,7 @@ import confluent.discovery.handlers.tsm as tsm
 import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
+import confluent.discovery.handlers.xcc3 as xcc3
 import confluent.discovery.handlers.megarac as megarac
 import confluent.exceptions as exc
 import confluent.log as log
@@ -114,6 +115,7 @@ nodehandlers = {
     'service:lenovo-smm': smm,
     'service:lenovo-smm2': smm,
     'lenovo-xcc': xcc,
+    'lenovo-xcc3': xcc3,
     'megarac-bmc': megarac,
     'service:management-hardware.IBM:integrated-management-module2': imm,
     'pxe-client': pxeh,
@@ -134,6 +136,7 @@ servicenames = {
     'service:lenovo-smm2': 'lenovo-smm2',
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
+    'lenovo-xcc3': 'lenovo-xcc3',
     'megarac-bmc': 'megarac-bmc',
     #'openbmc': 'openbmc',
     'service:management-hardware.IBM:integrated-management-module2': 'lenovo-imm2',
@@ -150,6 +153,7 @@ servicebyname = {
     'lenovo-smm2': 'service:lenovo-smm2',
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
+    'lenovo-xcc3': 'lenovo-xcc3',
     'megarac-bmc': 'megarac-bmc',
     'lenovo-imm2': 'service:management-hardware.IBM:integrated-management-module2',
     'lenovo-switch': 'service:io-device.Lenovo:management-module',

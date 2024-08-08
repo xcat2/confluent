@@ -117,7 +117,7 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                     continue # MegaRAC redfish
                 elif value.endswith('/DeviceDescription.json'):
                     targurl = '/DeviceDescription.json'
-                    targtype = 'megarac-bmc'
+                    targtype = 'lenovo-xcc'
                 else:
                     return
         if handler:
@@ -182,11 +182,14 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     cloop.add_reader(net4, _relay_pkt, net4, pktq)
     cloop.add_reader(net6, _relay_pkt, net6, pktq)
     peerbymacaddress = {}
+    newmacs = set([])
+    deferrednotifies = []
+    machandlers = {}
     while True:
         try:
-            newmacs = set([])
-            deferrednotifies = []
-            machandlers = {}
+            newmacs.clear()
+            deferrednotifies.clear()
+            machandlers.clear()
             timeout = None
             srp = await pktq.get()
             recent_peers = set([])
@@ -480,18 +483,25 @@ async def check_fish(urldata, port=443, verifycallback=None):
     url, data, targtype = urldata
     try:
         wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback)
-        peerinfo = await wc.grab_json_response(url)
+        peerinfo = await wc.grab_json_response(url, headers={'Accept': 'application/json'})
     except socket.error:
         return None
     if url == '/DeviceDescription.json':
+        if not peerinfo:
+            return None
         try:
             peerinfo = peerinfo[0]
+        except KeyError:
+            peerinfo['xcc-variant'] = '3'
+        except IndexError:
+            return None
+        try:
             myuuid = peerinfo['node-uuid'].lower()
             if '-' not in myuuid:
                 myuuid = '-'.join([myuuid[:8], myuuid[8:12], myuuid[12:16], myuuid[16:20], myuuid[20:]])
             data['uuid'] = myuuid
             data['attributes'] = peerinfo
-            data['services'] = ['lenovo-xcc']
+            data['services'] = ['lenovo-xcc'] if 'xcc-variant' not in peerinfo else ['lenovo-xcc' + peerinfo['xcc-variant']]
             return data
         except (IndexError, KeyError):
             return None

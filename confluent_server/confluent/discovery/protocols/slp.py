@@ -481,18 +481,23 @@ async def snoop(handler, protocol=None):
     cloop = asyncio.get_running_loop()
     cloop.add_reader(net, relay_packet, net, pktq)
     cloop.add_reader(net4, relay_packet, net4, pktq)
+    newmacs = set([])
+    known_peers = set([])
+    peerbymacaddress = {}
+    deferpeers = []
     while True:
         try:
-            newmacs = set([])
+            newmacs.clear()
+            r, _, _ = select.select((net, net4), (), (), 60)
             # clear known_peers and peerbymacaddress
             # to avoid stale info getting in...
             # rely upon the select(0.2) to catch rapid fire and aggregate ip
             # addresses that come close together
             # calling code needs to understand deeper context, as snoop
             # will now yield dupe info over time
-            known_peers = set([])
-            peerbymacaddress = {}
-            deferpeers = []
+            known_peers.clear()
+            peerbymacaddress.clear()
+            deferpeers.clear()
             timeo = 60
             rdy = True
             srp = await pktq.get()

@@ -13,11 +13,6 @@ exec 2>> /var/log/confluent/confluent-pre.log
 chmod 600 /var/log/confluent/confluent-pre.log
 
 cryptboot=$(grep encryptboot: $deploycfg|sed -e 's/^encryptboot: //')
-if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
-   echo "****Encrypted boot requested, but not implemented for this OS, halting install" > /dev/console
-   [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but not implemented for this OS,halting install" >> $(cat /tmp/autoconsdev))
-   while :; do sleep 86400; done
-fi
 
 
 cat /custom-installation/ssh/*pubkey > /root/.ssh/authorized_keys
@@ -45,6 +40,24 @@ if [ ! -e /tmp/installdisk ]; then
     python3 /custom-installation/getinstalldisk
 fi
 sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
+run_remote_python mergetime
+if [ "$cryptboot" != "" ]  && [ "$cryptboot" != "none" ] && [ "$cryptboot" != "null" ]; then
+    lukspass=$(python3 /opt/confluent/bin/apiclient /confluent-api/self/profileprivate/pending/luks.key 2> /dev/null)
+    if [ -z "$lukspass" ]; then
+        lukspass=$(head -c 66 < /dev/urandom |base64 -w0)
+    fi
+    export lukspass
+    run_remote_python addcrypt
+    if ! grep 'password:' /autoinstall.yaml > /dev/null; then
+        echo "****Encrypted boot requested, but the user-data does not have a hook to enable,halting install" > /dev/console
+        [ -f '/tmp/autoconsdev' ] && (echo "****Encryptod boot requested, but the user-data does not have a hook to enable,halting install" >> $(cat /tmp/autoconsdev))
+        while :; do sleep 86400; done
+    fi
+    sed -i s!%%CRYPTPASS%%!$lukspass! /autoinstall.yaml
+    sed -i s!'#CRYPTBOOT'!! /autoinstall.yaml
+    echo -n $lukspass > /etc/confluent_lukspass
+    chmod 000 /etc/confluent_lukspass
+fi
 ) &
 tail --pid $! -n 0 -F /var/log/confluent/confluent-pre.log > /dev/console
 

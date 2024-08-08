@@ -57,7 +57,27 @@ class NodeHandler(generic.NodeHandler):
         self.csrftok = None
         self.channel = None
         self.atdefault = True
+        self._srvroot = None
+        self._mgrinfo = None
         super(NodeHandler, self).__init__(info, configmanager)
+
+    def srvroot(self, wc):
+        if not self._srvroot:
+            srvroot, status = wc.grab_json_response_with_status('/redfish/v1/')
+            if status == 200:
+                self._srvroot = srvroot
+        return self._srvroot
+
+    def mgrinfo(self, wc):
+        if not self._mgrinfo:
+            mgrs = self.srvroot(wc)['Managers']['@odata.id']
+            rsp = wc.grab_json_response(mgrs)
+            if len(rsp['Members']) != 1:
+                raise Exception("Can not handle multiple Managers")
+            mgrurl = rsp['Members'][0]['@odata.id']
+            self._mgrinfo = wc.grab_json_response(mgrurl)
+        return self._mgrinfo
+
 
     def get_firmware_default_account_info(self):
         raise Exception('This must be subclassed')
@@ -75,11 +95,36 @@ class NodeHandler(generic.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
+    def enable_ipmi(self, wc):
+        npu = self.mgrinfo(wc).get(
+            'NetworkProtocol', {}).get('@odata.id', None)
+        if not npu:
+            raise Exception('Cannot enable IPMI, no NetworkProtocol on BMC')
+        npi = wc.grab_json_response(npu)
+        if not npi.get('IPMI', {}).get('ProtocolEnabled'):
+            wc.set_header('If-Match', '*')
+            wc.grab_json_response_with_status(
+                npu, {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
+        acctinfo = wc.grab_json_response_with_status(
+            self.target_account_url(wc))
+        acctinfo = acctinfo[0]
+        actypes = acctinfo['AccountTypes']
+        candidates = acctinfo['AccountTypes@Redfish.AllowableValues']
+        if 'IPMI' not in actypes and 'IPMI' in candidates:
+            actypes.append('IPMI')
+            acctupd = {
+                'AccountTypes': actypes,
+                'Password': self.currpass,
+                }
+            rsp = wc.grab_json_response_with_status(
+                self.target_account_url(wc), acctupd, method='PATCH')
+
     def _get_wc(self):
         defuser, defpass = self.get_firmware_default_account_info()
         wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
         wc.set_basic_credentials(defuser, defpass)
         wc.set_header('Content-Type', 'application/json')
+        wc.set_header('Accept', 'application/json')
         authmode = 0
         if not self.trieddefault:
             rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
@@ -114,7 +159,7 @@ class NodeHandler(generic.NodeHandler):
             if status > 400:
                 self.trieddefault = True
                 if status == 401:
-                    wc.set_basic_credentials(self.DEFAULT_USER, self.targpass)
+                    wc.set_basic_credentials(defuser, self.targpass)
                     rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
                     if status == 200:  # Default user still, but targpass
                         self.currpass = self.targpass
@@ -143,13 +188,33 @@ class NodeHandler(generic.NodeHandler):
         self.currpass = self.targpass
         return wc
 
+    def target_account_url(self, wc):
+        asrv = self.srvroot(wc).get('AccountService', {}).get('@odata.id')
+        rsp, status = wc.grab_json_response_with_status(asrv)
+        accts = rsp.get('Accounts', {}).get('@odata.id')
+        rsp, status = wc.grab_json_response_with_status(accts)
+        accts = rsp.get('Members', [])
+        for accturl in accts:
+            accturl = accturl.get('@odata.id', '')
+            if accturl:
+                rsp, status = wc.grab_json_response_with_status(accturl)
+                if rsp.get('UserName', None) == self.curruser:
+                    targaccturl = accturl
+                    break
+        else:
+            raise Exception("Unable to identify Account URL to modify on this BMC")
+        return targaccturl
+
     def config(self, nodename):
+        mgrs = None
         self.nodename = nodename
         creds = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
                        'secret.hardwaremanagementpassword',
-                       'hardwaremanagement.manager', 'hardwaremanagement.method', 'console.method'],
-                       True)
+                       'hardwaremanagement.manager',
+                       'hardwaremanagement.method',
+                       'console.method'],
+            True)
         cd = creds.get(nodename, {})
         defuser, defpass = self.get_firmware_default_account_info()
         user, passwd, _ = self.get_node_credentials(
@@ -159,7 +224,6 @@ class NodeHandler(generic.NodeHandler):
         self.targuser = user
         self.targpass = passwd
         wc = self._get_wc()
-        srvroot, status = wc.grab_json_response_with_status('/redfish/v1/')
         curruserinfo = {}
         authupdate = {}
         wc.set_header('Content-Type', 'application/json')
@@ -168,31 +232,23 @@ class NodeHandler(generic.NodeHandler):
         if passwd != self.currpass:
             authupdate['Password'] = passwd
         if authupdate:
-            targaccturl = None
-            asrv = srvroot.get('AccountService', {}).get('@odata.id')
-            rsp, status = wc.grab_json_response_with_status(asrv)
-            accts = rsp.get('Accounts', {}).get('@odata.id')
-            rsp, status = wc.grab_json_response_with_status(accts)
-            accts = rsp.get('Members', [])
-            for accturl in accts:
-                accturl = accturl.get('@odata.id', '')
-                if accturl:
-                    rsp, status = wc.grab_json_response_with_status(accturl)
-                    if rsp.get('UserName', None) == self.curruser:
-                        targaccturl = accturl
-                        break
-            else:
-                raise Exception("Unable to identify Account URL to modify on this BMC")
+            targaccturl = self.target_account_url(wc)
             rsp, status = wc.grab_json_response_with_status(targaccturl, authupdate, method='PATCH')
             if status >= 300:
                 raise Exception("Failed attempting to update credentials on BMC")
+            self.curruser = user
+            self.currpass = passwd
             wc.set_basic_credentials(user, passwd)
             _, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
             tries = 10
             while tries and status >= 300:
                 tries -= 1
                 eventlet.sleep(1.0)
-                _, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+                _, status = wc.grab_json_response_with_status(
+                    '/redfish/v1/Managers')
+        if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
+                or cd.get('console.method', {}).get('value', None) == 'ipmi'):
+            self.enable_ipmi(wc)
         if ('hardwaremanagement.manager' in cd and
                 cd['hardwaremanagement.manager']['value'] and
                 not cd['hardwaremanagement.manager']['value'].startswith(
@@ -203,14 +259,8 @@ class NodeHandler(generic.NodeHandler):
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            mgrs = srvroot['Managers']['@odata.id']
-            rsp = wc.grab_json_response(mgrs)
-            if len(rsp['Members']) != 1:
-                raise Exception("Can not handle multiple Managers")
-            mgrurl = rsp['Members'][0]['@odata.id']
-            mginfo = wc.grab_json_response(mgrurl)
-            hifurls = get_host_interface_urls(wc, mginfo)
-            mgtnicinfo = mginfo['EthernetInterfaces']['@odata.id']
+            hifurls = get_host_interface_urls(wc, self.mgrinfo(wc))
+            mgtnicinfo = self.mgrinfo(wc)['EthernetInterfaces']['@odata.id']
             mgtnicinfo = wc.grab_json_response(mgtnicinfo)
             mgtnics = [x['@odata.id'] for x in mgtnicinfo.get('Members', [])]
             actualnics = []
@@ -236,7 +286,9 @@ class NodeHandler(generic.NodeHandler):
                     break
             else:
                 wc.set_header('If-Match', '*')
-                rsp, status = wc.grab_json_response_with_status(actualnics[0], {'IPv4StaticAddresses': [newconfig]}, method='PATCH')
+                rsp, status = wc.grab_json_response_with_status(actualnics[0], {
+                    'DHCPv4': {'DHCPEnabled': False},
+                    'IPv4StaticAddresses': [newconfig]}, method='PATCH')
         elif self.ipaddr.startswith('fe80::'):
             self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})

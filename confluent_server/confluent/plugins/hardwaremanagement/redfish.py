@@ -522,6 +522,8 @@ class IpmiHandler(object):
             return self.handle_sysconfig(True)
         elif self.element[1:3] == ['system', 'clear']:
             return self.handle_sysconfigclear()
+        elif self.element[1:3] == ['management_controller', 'clear']:
+            return self.handle_bmcconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
             return self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
@@ -1322,6 +1324,12 @@ class IpmiHandler(object):
         elif 'update' == self.op:
             self.ipmicmd.set_bmc_configuration(
                 self.inputdata.get_attributes(self.node))
+
+    def handle_bmcconfigclear(self):
+        if 'read' == self.op:
+            raise exc.InvalidArgumentException(
+                'Cannot read the "clear" resource')
+        self.ipmicmd.clear_bmc_configuration()
 
     def handle_sysconfigclear(self):
         if 'read' == self.op:

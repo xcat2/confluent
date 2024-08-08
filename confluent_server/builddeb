@@ -35,6 +35,8 @@ cd deb_dist/!(*.orig)/
 if [ "$OPKGNAME" = "confluent-server" ]; then
     if grep wheezy /etc/os-release; then
         sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex, python-dateutil, python-pyopenssl, python-msgpack/' debian/control
+    elif grep jammy /etc/os-release; then
+        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi, python3-paramiko, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd, python3-netifaces, python3-yaml, python3-dateutil/' debian/control
     else
         sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi, python3-paramiko, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd, python3-netifaces, python3-yaml, python3-dateutil, python3-pyasyncore/' debian/control
     fi

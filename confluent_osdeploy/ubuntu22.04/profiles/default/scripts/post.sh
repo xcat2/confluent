@@ -60,10 +60,12 @@ cp /custom-installation/confluent/bin/apiclient /target/opt/confluent/bin
 mount -o bind /dev /target/dev
 mount -o bind /proc /target/proc
 mount -o bind /sys /target/sys
+mount -o bind /run /target/run
 mount -o bind /sys/firmware/efi/efivars /target/sys/firmware/efi/efivars
 if [ 1 = $updategrub ]; then
     chroot /target update-grub
 fi
+
 echo "Port 22" >> /etc/ssh/sshd_config
 echo "Port 2222" >> /etc/ssh/sshd_config
 echo "Match LocalPort 22" >> /etc/ssh/sshd_config
@@ -88,8 +90,36 @@ chroot /target bash -c "source /etc/confluent/functions; run_remote_parts post.d
 source /target/etc/confluent/functions
 
 run_remote_config post
+
+if [ -f /etc/confluent_lukspass ]; then
+    numdevs=$(lsblk -lo name,uuid|grep $(awk '{print $2}' < /target/etc/crypttab |sed -e s/UUID=//)|wc -l)
+    if [ 0$numdevs -ne 1 ]; then
+        wall "Unable to identify the LUKS device, halting install"
+        while :; do sleep 86400; done
+    fi
+    CRYPTTAB_SOURCE=$(awk '{print $2}' /target/etc/crypttab)
+    . /target/usr/lib/cryptsetup/functions
+    crypttab_resolve_source
+
+    if [ ! -e $CRYPTTAB_SOURCE ]; then
+        wall "Unable to find $CRYPTTAB_SOURCE, halting install"
+        while :; do sleep 86400; done
+    fi
+    cp /etc/confluent_lukspass /target/etc/confluent/luks.key
+    chmod 000 /target/etc/confluent/luks.key
+    lukspass=$(cat /etc/confluent_lukspass)
+    chroot /target apt install libtss2-rc0
+    PASSWORD=$lukspass chroot /target  systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs="" $CRYPTTAB_SOURCE
+    fetch_remote  systemdecrypt
+    mv systemdecrypt /target/etc/initramfs-tools/scripts/local-top/systemdecrypt
+    fetch_remote systemdecrypt-hook
+    mv systemdecrypt-hook /target/etc/initramfs-tools/hooks/systemdecrypt
+    chmod 755 /target/etc/initramfs-tools/scripts/local-top/systemdecrypt /target/etc/initramfs-tools/hooks/systemdecrypt
+    chroot /target update-initramfs -u
+fi
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
 
-umount /target/sys /target/dev /target/proc
+
+umount /target/sys /target/dev /target/proc /target/run
 ) &
 tail --pid $! -n 0 -F /target/var/log/confluent/confluent-post.log > /dev/console
