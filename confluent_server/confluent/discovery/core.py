@@ -1410,7 +1410,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
         elif manual or not util.cert_matches(lastfp, handler.https_cert):
             # only 'discover' if it is not the same as last time
             try:
-                handler.config(nodename)
+                await handler.config(nodename)
             except Exception as e:
                 info['discofailure'] = 'bug'
                 if manual:
@@ -1448,7 +1448,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 for checkattr in newnodeattribs:
                     checkval = currattrs.get(nodename, {}).get(checkattr, {}).get('value', None)
                     if checkval != newnodeattribs[checkattr]:
-                        cfg.set_node_attributes({nodename: newnodeattribs})
+                        await cfg.set_node_attributes({nodename: newnodeattribs})
                         break
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})

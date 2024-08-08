@@ -12,32 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import confluent.discovery.handlers.generic as generic
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
-import eventlet
-import eventlet.support.greendns
 import json
 try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
 
-getaddrinfo = eventlet.support.greendns.getaddrinfo
+from socket import getaddrinfo
 
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
 
-def get_host_interface_urls(wc, mginfo):
+async def get_host_interface_urls(wc, mginfo):
     returls = []
     hifurl = mginfo.get('HostInterfaces', {}).get('@odata.id', None)
     if not hifurl:
         return None
-    hifinfo = wc.grab_json_response(hifurl)
+    hifinfo = await wc.grab_json_response(hifurl)
     hifurls = hifinfo.get('Members', [])
     for hifurl in hifurls:
         hifurl = hifurl['@odata.id']
-        hifinfo = wc.grab_json_response(hifurl)
+        hifinfo = await wc.grab_json_response(hifurl)
         acturl = hifinfo.get('ManagerEthernetInterface', {}).get('@odata.id', None)
         if acturl:
             returls.append(acturl)
@@ -61,30 +60,32 @@ class NodeHandler(generic.NodeHandler):
         self._mgrinfo = None
         super(NodeHandler, self).__init__(info, configmanager)
 
-    def srvroot(self, wc):
+    async def srvroot(self, wc):
         if not self._srvroot:
-            srvroot, status = wc.grab_json_response_with_status('/redfish/v1/')
+            srvroot, status = await wc.grab_json_response_with_status('/redfish/v1/')
             if status == 200:
                 self._srvroot = srvroot
         return self._srvroot
 
-    def mgrinfo(self, wc):
+    async def mgrinfo(self, wc):
         if not self._mgrinfo:
-            mgrs = self.srvroot(wc)['Managers']['@odata.id']
-            rsp = wc.grab_json_response(mgrs)
+            svroot = await self.srvroot(wc)
+            mgrs = svroot['Managers']['@odata.id']
+            rsp = await wc.grab_json_response(mgrs)
             if len(rsp['Members']) != 1:
                 raise Exception("Can not handle multiple Managers")
             mgrurl = rsp['Members'][0]['@odata.id']
-            self._mgrinfo = wc.grab_json_response(mgrurl)
+            self._mgrinfo = await wc.grab_json_response(mgrurl)
         return self._mgrinfo
 
 
     def get_firmware_default_account_info(self):
         raise Exception('This must be subclassed')
 
-    def scan(self):
-        c = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
-        i = c.grab_json_response('/redfish/v1/')
+    async def scan(self):
+        await self.get_https_cert()
+        c = webclient.WebConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        i = await c.grab_json_response('/redfish/v1/')
         uuid = i.get('UUID', None)
         if uuid:
             self.info['uuid'] = uuid.lower()
@@ -95,18 +96,19 @@ class NodeHandler(generic.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
-    def enable_ipmi(self, wc):
-        npu = self.mgrinfo(wc).get(
+    async def enable_ipmi(self, wc):
+        mgrinfo = await self.mgrinfo(wc)
+        npu =mgrinfo.get(
             'NetworkProtocol', {}).get('@odata.id', None)
         if not npu:
             raise Exception('Cannot enable IPMI, no NetworkProtocol on BMC')
-        npi = wc.grab_json_response(npu)
+        npi = await wc.grab_json_response(npu)
         if not npi.get('IPMI', {}).get('ProtocolEnabled'):
             wc.set_header('If-Match', '*')
-            wc.grab_json_response_with_status(
+            await wc.grab_json_response_with_status(
                 npu, {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
-        acctinfo = wc.grab_json_response_with_status(
-            self.target_account_url(wc))
+        acctinfo = await wc.grab_json_response_with_status(
+            await self.target_account_url(wc))
         acctinfo = acctinfo[0]
         actypes = acctinfo['AccountTypes']
         candidates = acctinfo['AccountTypes@Redfish.AllowableValues']
@@ -116,18 +118,19 @@ class NodeHandler(generic.NodeHandler):
                 'AccountTypes': actypes,
                 'Password': self.currpass,
                 }
-            rsp = wc.grab_json_response_with_status(
-                self.target_account_url(wc), acctupd, method='PATCH')
+            rsp = await wc.grab_json_response_with_status(
+                await self.target_account_url(wc), acctupd, method='PATCH')
 
-    def _get_wc(self):
+    async def _get_wc(self):
+        await self.get_https_cert()
         defuser, defpass = self.get_firmware_default_account_info()
-        wc = webclient.SecureHTTPConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
+        wc = webclient.WebConnection(self.ipaddr, 443, verifycallback=self.validate_cert)
         wc.set_basic_credentials(defuser, defpass)
         wc.set_header('Content-Type', 'application/json')
         wc.set_header('Accept', 'application/json')
         authmode = 0
         if not self.trieddefault:
-            rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+            rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
             if status == 403:
                 self.trieddefault = True
                 chgurl = None
@@ -144,30 +147,30 @@ class NodeHandler(generic.NodeHandler):
                     if self.targpass == defpass:
                         raise Exception("Must specify a non-default password to onboard this BMC")
                     wc.set_header('If-Match', '*')
-                    cpr = wc.grab_json_response_with_status(chgurl, {'Password': self.targpass}, method='PATCH')
+                    cpr = await wc.grab_json_response_with_status(chgurl, {'Password': self.targpass}, method='PATCH')
                     if cpr[1] >= 200 and cpr[1] < 300:
                         self.curruser = defuser
                         self.currpass = self.targpass
                         wc.set_basic_credentials(self.curruser, self.currpass)
-                        _, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+                        _, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
                         tries = 10
                         while status >= 300 and tries:
-                            eventlet.sleep(1)
-                            _, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+                            await asyncio.sleep(1)
+                            _, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
                     return wc
 
             if status > 400:
                 self.trieddefault = True
                 if status == 401:
                     wc.set_basic_credentials(defuser, self.targpass)
-                    rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+                    rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
                     if status == 200:  # Default user still, but targpass
                         self.currpass = self.targpass
                         self.curruser = defuser
                         return wc
                     elif self.targuser != defuser:
                         wc.set_basic_credentials(self.targuser, self.targpass)
-                        rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+                        rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
                     if status != 200:
                         raise Exception("Target BMC does not recognize firmware default credentials nor the confluent stored credential")
             else:
@@ -176,28 +179,29 @@ class NodeHandler(generic.NodeHandler):
                 return wc
         if self.curruser:
             wc.set_basic_credentials(self.curruser, self.currpass)
-            rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+            rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
             if status != 200:
                 return None
             return wc
         wc.set_basic_credentials(self.targuser, self.targpass)
-        rsp, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+        rsp, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
         if status != 200:
             return None
         self.curruser = self.targuser
         self.currpass = self.targpass
         return wc
 
-    def target_account_url(self, wc):
-        asrv = self.srvroot(wc).get('AccountService', {}).get('@odata.id')
-        rsp, status = wc.grab_json_response_with_status(asrv)
+    async def target_account_url(self, wc):
+        srvroot = await self.srvroot(wc)
+        asrv = srvroot.get('AccountService', {}).get('@odata.id')
+        rsp, status = await wc.grab_json_response_with_status(asrv)
         accts = rsp.get('Accounts', {}).get('@odata.id')
-        rsp, status = wc.grab_json_response_with_status(accts)
+        rsp, status = await wc.grab_json_response_with_status(accts)
         accts = rsp.get('Members', [])
         for accturl in accts:
             accturl = accturl.get('@odata.id', '')
             if accturl:
-                rsp, status = wc.grab_json_response_with_status(accturl)
+                rsp, status = await wc.grab_json_response_with_status(accturl)
                 if rsp.get('UserName', None) == self.curruser:
                     targaccturl = accturl
                     break
@@ -205,7 +209,7 @@ class NodeHandler(generic.NodeHandler):
             raise Exception("Unable to identify Account URL to modify on this BMC")
         return targaccturl
 
-    def config(self, nodename):
+    async def config(self, nodename):
         mgrs = None
         self.nodename = nodename
         creds = self.configmanager.get_node_attributes(
@@ -223,7 +227,7 @@ class NodeHandler(generic.NodeHandler):
         passwd = util.stringify(passwd)
         self.targuser = user
         self.targpass = passwd
-        wc = self._get_wc()
+        wc = await self._get_wc()
         curruserinfo = {}
         authupdate = {}
         wc.set_header('Content-Type', 'application/json')
@@ -232,23 +236,23 @@ class NodeHandler(generic.NodeHandler):
         if passwd != self.currpass:
             authupdate['Password'] = passwd
         if authupdate:
-            targaccturl = self.target_account_url(wc)
-            rsp, status = wc.grab_json_response_with_status(targaccturl, authupdate, method='PATCH')
+            targaccturl = await self.target_account_url(wc)
+            rsp, status = await wc.grab_json_response_with_status(targaccturl, authupdate, method='PATCH')
             if status >= 300:
                 raise Exception("Failed attempting to update credentials on BMC")
             self.curruser = user
             self.currpass = passwd
             wc.set_basic_credentials(user, passwd)
-            _, status = wc.grab_json_response_with_status('/redfish/v1/Managers')
+            _, status = await wc.grab_json_response_with_status('/redfish/v1/Managers')
             tries = 10
             while tries and status >= 300:
                 tries -= 1
-                eventlet.sleep(1.0)
-                _, status = wc.grab_json_response_with_status(
+                await asyncio.sleep(1.0)
+                _, status = await wc.grab_json_response_with_status(
                     '/redfish/v1/Managers')
         if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
                 or cd.get('console.method', {}).get('value', None) == 'ipmi'):
-            self.enable_ipmi(wc)
+            await self.enable_ipmi(wc)
         if ('hardwaremanagement.manager' in cd and
                 cd['hardwaremanagement.manager']['value'] and
                 not cd['hardwaremanagement.manager']['value'].startswith(
@@ -259,9 +263,9 @@ class NodeHandler(generic.NodeHandler):
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            hifurls = get_host_interface_urls(wc, self.mgrinfo(wc))
+            hifurls = await get_host_interface_urls(wc, self.mgrinfo(wc))
             mgtnicinfo = self.mgrinfo(wc)['EthernetInterfaces']['@odata.id']
-            mgtnicinfo = wc.grab_json_response(mgtnicinfo)
+            mgtnicinfo = await wc.grab_json_response(mgtnicinfo)
             mgtnics = [x['@odata.id'] for x in mgtnicinfo.get('Members', [])]
             actualnics = []
             for candnic in mgtnics:
@@ -270,7 +274,7 @@ class NodeHandler(generic.NodeHandler):
                 actualnics.append(candnic)
             if len(actualnics) != 1:
                 raise Exception("Multi-interface BMCs are not supported currently")
-            currnet = wc.grab_json_response(actualnics[0])
+            currnet = await wc.grab_json_response(actualnics[0])
             netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=newip)
             newconfig = {
                 "Address": newip,
@@ -286,11 +290,11 @@ class NodeHandler(generic.NodeHandler):
                     break
             else:
                 wc.set_header('If-Match', '*')
-                rsp, status = wc.grab_json_response_with_status(actualnics[0], {
+                rsp, status = await wc.grab_json_response_with_status(actualnics[0], {
                     'DHCPv4': {'DHCPEnabled': False},
                     'IPv4StaticAddresses': [newconfig]}, method='PATCH')
         elif self.ipaddr.startswith('fe80::'):
-            self.configmanager.set_node_attributes(
+            await self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
         else:
             raise exc.TargetEndpointUnreachable(

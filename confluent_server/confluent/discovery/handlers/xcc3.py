@@ -13,14 +13,9 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.redfishbmc as redfishbmc
-import eventlet.support.greendns
 import confluent.util as util
-
-webclient = eventlet.import_patched('pyghmi.util.webclient')
-
-
-
-getaddrinfo = eventlet.support.greendns.getaddrinfo
+import socket
+import aiohmi.util.webclient as webclient
 
 
 class NodeHandler(redfishbmc.NodeHandler):
@@ -29,12 +24,13 @@ class NodeHandler(redfishbmc.NodeHandler):
     def get_firmware_default_account_info(self):
         return ('USERID', 'PASSW0RD')
 
-    def scan(self):
-        ip, port = self.get_web_port_and_ip()
-        c = webclient.SecureHTTPConnection(ip, port,
+    async def scan(self):
+        ip, port = await self.get_web_port_and_ip()
+        await self.get_https_cert()
+        c = webclient.WebConnection(ip, port,
             verifycallback=self.validate_cert)
         c.set_header('Accept', 'application/json')
-        i = c.grab_json_response('/api/providers/logoninfo')
+        i = await c.grab_json_response('/api/providers/logoninfo')
         modelname = i.get('items', [{}])[0].get('machine_name', None)
         if modelname:
             self.info['modelname'] = modelname
@@ -84,7 +80,7 @@ def remote_nodecfg(nodename, cfm):
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
+    ipaddr = socket.getaddrinfo(ipaddr, 0)[0][-1]
     if not ipaddr:
         raise Exception('Cannot remote configure a system without known '
                         'address')

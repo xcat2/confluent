@@ -297,7 +297,7 @@ async def list_matching_macs(options, session, node=None, checknode=True):
         path += 'by-state/{0}/'.format(options.state).lower()
     if options.mac:
         path += 'by-mac/{0}'.format(options.mac)
-        result = list(session.read(path))[0]
+        result = list([x async for x in session.read(path)])[0]
         if 'error' in result:
             return
         yield options.mac.replace(':', '-')
@@ -331,7 +331,7 @@ async def assign_discovery(options, session, needid=True):
         sys.stderr.write("No matching discovery candidates found\n")
         sys.exit(1)
     exitcode = 0
-    for res in session.update('/discovery/by-mac/{0}'.format(matches[0]),
+    async for res in session.update('/discovery/by-mac/{0}'.format(matches[0]),
                    {'node': options.node}):
         if 'assigned' in res:
             print('Assigned: {0}'.format(res['assigned']))
