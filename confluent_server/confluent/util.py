@@ -64,9 +64,9 @@ def spawn(coro):
         tskid = random.random()
     tsks[tskid] = 1
     try:
-        tsks[tskid] = asyncio.create_task(_run(coro, tskid))
+        tsks[tskid] = asyncio.create_task(_run(coro, tskid), name=repr(coro))
     except AttributeError:
-        tsks[tskid] = asyncio.get_event_loop().create_task(_run(coro, tskid))
+        tsks[tskid] = asyncio.get_event_loop().create_task(_run(coro, tskid), name=repr(coro))
     return tsks[tskid]
 
 async def _run(coro, taskid):
