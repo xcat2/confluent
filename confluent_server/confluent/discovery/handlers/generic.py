@@ -70,7 +70,7 @@ class NodeHandler(object):
         # serial number and uuid to flesh out data as needed
         return
 
-    def preconfig(self, possiblenode):
+    async def preconfig(self, possiblenode):
         return
 
     def discoverable_by_switch(self, macs):

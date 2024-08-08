@@ -1213,7 +1213,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         handler.probe()  # unicast interrogation as possible to get more data
         # switch concurrently
         # do some preconfig, for example, to bring a SMM online if applicable
-        handler.preconfig(nodename)
+        await handler.preconfig(nodename)
     except Exception as e:
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentified'
@@ -1634,10 +1634,8 @@ async def blocking_scan():
     global scanner
     slpscan = util.spawn(slp.active_scan(safe_detected, slp))
     ssdpscan = util.spawn(ssdp.active_scan(safe_detected, ssdp))
-    print("beign slpscan")
     await slpscan
     await ssdpscan
-    print("end scan")
     #ssdpscan.wait()
     scanner = None
 

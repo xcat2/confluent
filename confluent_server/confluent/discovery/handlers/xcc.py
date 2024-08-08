@@ -157,12 +157,12 @@ class NodeHandler(immhandler.NodeHandler):
                 # We cannot try to enable SMM here without risking real credentials
                 # on the wire to untrusted parties
                 return
-            wc.grab_json_response('/api/providers/logout')
+            await wc.grab_json_response('/api/providers/logout')
             wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
-            rsp = wc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
+            rsp = await wc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
             if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
                 disableipmi = True
-                _, _ = wc.grab_json_response_with_status(
+                _, _ = await wc.grab_json_response_with_status(
                     '/redfish/v1/Managers/1/NetworkProtocol',
                     {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
         ipmicmd = None
@@ -175,13 +175,13 @@ class NodeHandler(immhandler.NodeHandler):
                     str(e) != 'Session no longer connected'):
                 # raise an issue if anything other than to be expected
                 if disableipmi:
-                    _, _ = wc.grab_json_response_with_status(
+                    _, _ = await wc.grab_json_response_with_status(
                         '/redfish/v1/Managers/1/NetworkProtocol',
                         {'IPMI': {'ProtocolEnabled': False}}, method='PATCH')
                 raise
             self.trieddefault = True
         if disableipmi:
-            _, _ = wc.grab_json_response_with_status(
+            _, _ = await wc.grab_json_response_with_status(
                 '/redfish/v1/Managers/1/NetworkProtocol',
                 {'IPMI': {'ProtocolEnabled': False}}, method='PATCH')
         #TODO: decide how to clean out if important
@@ -196,7 +196,7 @@ class NodeHandler(immhandler.NodeHandler):
         return util.cert_matches(fprint, certificate)
 
     async def get_webclient(self, username, password, newpassword):
-        wc = self._wc.dupe()
+        wc = self._wc  # .dupe()
         pwdchanged = False
         adata = {'username': util.stringify(username),
                  'password': util.stringify(password)}
@@ -207,15 +207,16 @@ class NodeHandler(immhandler.NodeHandler):
         if status == 200:
              nonce = rsp.get('nonce', None)
              headers['Content-Security-Policy'] = 'nonce={0}'.format(nonce)
-        rspdata = await wc.grab_json_response('/api/login', adata, headers=headers)
-        if rspdata and password == 'PASSW0RD':
+        rspdata, status = await wc.grab_json_response_with_status('/api/login', adata, headers=headers)
+        if status != 200 and password == 'PASSW0RD':
+            rspdata = json.loads(rspdata)
             if rspdata.get('locktime', 0) > 0:
                 raise LockedUserException(
                     'The user "{0}" has been locked out for too many incorrect password attempts'.format(username))
-            adata = json.dumps({
+            adata = {
                 'username': username,
                 'password': newpassword,
-                })
+                }
             headers = {'Connection': 'keep-alive',
                        'Content-Type': 'application/json'}
             if nonce:
@@ -236,7 +237,7 @@ class NodeHandler(immhandler.NodeHandler):
                     raise LockedUserException(
                         'The user "{0}" has been locked out for too many incorrect password attempts'.format(username))
                 return (None, rspdata)
-        if rsp.status == 200:
+        if status == 200:
             self._currcreds = (username, password)
             wc.set_basic_credentials(username, password)
             wc.set_header('Content-Type', 'application/json')
@@ -247,24 +248,23 @@ class NodeHandler(immhandler.NodeHandler):
                 if newpassword is None:
                     # a normal login hit expired condition
                     tmppassword = 'Tmp42' + password[5:]
-                    wc.request('POST', '/api/function', json.dumps(
-                        {'USER_UserPassChange': '1,{0}'.format(tmppassword)}))
-                    rsp = wc.getresponse()
-                    rsp.read()
+                    await wc.grab_json_response(
+                        '/api/function',
+                        {'USER_UserPassChange': '1,{0}'.format(tmppassword)})
                     # We must step down change interval and reusecycle to restore password
-                    wc.grab_json_response('/api/dataset', {'USER_GlobalMinPassChgInt': '0', 'USER_GlobalMinPassReuseCycle': '0'})
-                    wc.request('POST', '/api/function', json.dumps(
-                        {'USER_UserPassChange': '1,{0}'.format(password)}))
-                    rsp = wc.getresponse()
-                    rsp.read()
+                    await wc.grab_json_response(
+                        '/api/dataset',
+                        {'USER_GlobalMinPassChgInt': '0', 'USER_GlobalMinPassReuseCycle': '0'})
+                    await wc.grab_json_response(
+                        '/api/function',
+                        {'USER_UserPassChange': '1,{0}'.format(password)})
                     return (wc, {})
-                wc.request('POST', '/api/function', json.dumps(
-                    {'USER_UserPassChange': '1,{0}'.format(newpassword)}))
-                rsp = wc.getresponse()
-                rsp.read()
-                if rsp.status != 200:
+                rsp, status = await wc.grab_json_response_with_status(
+                    '/api/function',
+                    {'USER_UserPassChange': '1,{0}'.format(newpassword)})
+                if status != 200:
                     return (None, None)
-                wc.grab_json_response_with_status('/api/providers/logout')
+                await wc.grab_json_response_with_status('/api/providers/logout')
                 self._currcreds = (username, newpassword)
                 wc.set_basic_credentials(username, newpassword)
                 pwdchanged = True
@@ -274,7 +274,7 @@ class NodeHandler(immhandler.NodeHandler):
                 # Remove the minimum change interval, to allow sane 
                 # password changes after provisional changes
                 wc = await self.get_wc()
-                self.set_password_policy('', wc)
+                await self.set_password_policy('', wc)
             return (wc, pwdchanged)
         elif rspdata.get('locktime', 0) > 0:
             raise LockedUserException(
@@ -286,7 +286,7 @@ class NodeHandler(immhandler.NodeHandler):
         isdefault = True
         errinfo = {}
         if self._wc is None:
-            ip, port = self.get_web_port_and_ip()
+            ip, port = await self.get_web_port_and_ip()
             await self.get_https_cert()
             self._wc = webclient.WebConnection(
                 ip, port, verifycallback=self.validate_cert)
@@ -355,7 +355,7 @@ class NodeHandler(immhandler.NodeHandler):
                 raise Exception('The stored confluent password for user "{}" was not accepted by the XCC'.format(user))
             raise Exception('Error connecting to webservice: ' + repr(errinfo))
 
-    def set_password_policy(self, strruleset, wc):
+    async def set_password_policy(self, strruleset, wc):
         ruleset = {'USER_GlobalMinPassChgInt': '0'}
         for rule in strruleset.split(','):
             if '=' not in rule:
@@ -376,20 +376,20 @@ class NodeHandler(immhandler.NodeHandler):
             if name.lower() == 'reuse':
                 ruleset['USER_GlobalMinPassReuseCycle'] = value
         try:
-            wc.grab_json_response('/api/dataset', ruleset)
+            await wc.grab_json_response('/api/dataset', ruleset)
         except Exception as e:
             print(repr(e))
             pass
 
-    def _get_next_userid(self, wc):
-        userinfo = wc.grab_json_response('/api/dataset/imm_users')
+    async def _get_next_userid(self, wc):
+        userinfo = await wc.grab_json_response('/api/dataset/imm_users')
         userinfo = userinfo['items'][0]['users']
         for user in userinfo:
             if user['users_user_name'] == '':
                 return user['users_user_id']
 
     async def _setup_xcc_account(self, username, passwd, wc):
-        userinfo = wc.grab_json_response('/api/dataset/imm_users')
+        userinfo = await wc.grab_json_response('/api/dataset/imm_users')
         uid = None
         for user in userinfo['items'][0]['users']:
             if user['users_user_name'] == username:
@@ -404,26 +404,26 @@ class NodeHandler(immhandler.NodeHandler):
             raise Exception("XCC has neither the default user nor configured user")
         # The following will work if the password is force change or normal..
         if self._needpasswordchange and self.tmppasswd != passwd:
-            wc.grab_json_response('/api/function',
+            await wc.grab_json_response('/api/function',
                                 {'USER_UserPassChange': '{0},{1}'.format(uid, passwd)})
         if username != 'USERID':
-            rsp, status = wc.grab_json_response_with_status(
+            rsp, status = await wc.grab_json_response_with_status(
                 '/api/function',
                 {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,'.format(uid, username)})
             if status == 200 and rsp.get('return', 0) == 762:
-                rsp, status = wc.grab_json_response_with_status(
+                rsp, status = await wc.grab_json_response_with_status(
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,Administrator,0,0,0,0,,8,'.format(uid, username)})
             elif status == 200 and rsp.get('return', 0) == 13:
-                rsp, status = wc.grab_json_response_with_status(
+                rsp, status = await wc.grab_json_response_with_status(
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,,,'.format(uid, username)})
                 if status == 200 and rsp.get('return', 0) == 13:
-                    wc.grab_json_response('/api/providers/logout')
+                    await wc.grab_json_response('/api/providers/logout')
                     wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
                     status = 503
                     while status != 200:
-                        rsp, status = wc.grab_json_response_with_status(
+                        rsp, status = await wc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
                             {'UserName': username}, method='PATCH')
                         if status != 200:
@@ -436,12 +436,12 @@ class NodeHandler(immhandler.NodeHandler):
                     self._currcreds = (username, passwd)
                     return
             self.tmppasswd = None
-        wc.grab_json_response('/api/providers/logout')
+        await wc.grab_json_response('/api/providers/logout')
         self._currcreds = (username, passwd)
 
     async def _convert_sha256account(self, user, passwd, wc):
         # First check if the specified user is sha256...
-        userinfo = wc.grab_json_response('/api/dataset/imm_users')
+        userinfo = await wc.grab_json_response('/api/dataset/imm_users')
         curruser = None
         uid = None
         user = util.stringify(user)
@@ -453,59 +453,55 @@ class NodeHandler(immhandler.NodeHandler):
         if curruser.get('users_pass_is_sha256', 0):
             self._wc = None
             wc = await self.get_wc()
-            nwc = wc.dupe()
+            nwc = wc # .dupe()
             # Have to convert it for being useful with most Lenovo automation tools
             # This requires deleting the account entirely and trying again
-            tmpuid = self._get_next_userid(wc)
+            tmpuid = await self._get_next_userid(wc)
             try:
                 tpass = base64.b64encode(os.urandom(9)) + 'Iw47$'
                 userparams = "{0},6pmu0ezczzcp,{1},1,4,0,0,0,0,,8,".format(tmpuid, tpass)
-                result = wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
-                wc.grab_json_response('/api/providers/logout')
-                adata = json.dumps({
+                result = await wc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                await wc.grab_json_response('/api/providers/logout')
+                adata = {
                     'username': '6pmu0ezczzcp',
                     'password': tpass,
-                })
+                }
                 headers = {'Connection': 'keep-alive', 'Content-Type': 'application/json'}
-                wc.request('POST', '/api/providers/get_nonce', '{}')
-                rsp = wc.getresponse()
-                tokbody = rsp.read()
-                if rsp.status == 200:
-                    rsp = json.loads(tokbody)
+                rsp, status = await wc.grab_json_response('/api_providers/get_nonce', {})
+                if status == 200:
                     nonce = rsp.get('nonce', None)
                     headers['Content-Security-Policy'] = 'nonce={0}'.format(nonce)
-                nwc.request('POST', '/api/login', adata, headers)
-                rsp = nwc.getresponse()
-                if rsp.status == 200:
-                    rspdata = json.loads(rsp.read())
+                rsp, status = await nwc.grab_json_response_with_status('/api/login', adata, headers=headers)
+                if status == 200:
+                    rspdata = rsp
                     nwc.set_header('Content-Type', 'application/json')
                     nwc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
                     if '_csrf_token' in wc.cookies:
                         nwc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
                     if rspdata.get('reason', False):
                         newpass = base64.b64encode(os.urandom(9)) + 'q4J$'
-                        nwc.grab_json_response(
+                        await nwc.grab_json_response(
                             '/api/function',
                             {'USER_UserPassChange': '{0},{1}'.format(tmpuid, newpass)})
-                    nwc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(curruser['users_user_id'], user)})
+                    await nwc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(curruser['users_user_id'], user)})
                     userparams = "{0},{1},{2},1,4,0,0,0,0,,8,".format(curruser['users_user_id'], user, tpass)
-                    nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
-                    nwc.grab_json_response('/api/providers/logout')
+                    await nwc.grab_json_response('/api/function', {'USER_UserCreate': userparams})
+                    await nwc.grab_json_response('/api/providers/logout')
                     nwc, pwdchanged = await self.get_webclient(user, tpass, passwd)
                     if not nwc:
                         if not pwdchanged:
                             pwdchanged = 'Unknown'
                         raise Exception('Error converting from sha356account: ' + repr(pwdchanged))
                     if not pwdchanged:
-                        nwc.grab_json_response(
+                        await nwc.grab_json_response(
                             '/api/function',
                             {'USER_UserPassChange': '{0},{1}'.format(curruser['users_user_id'], passwd)})
-                    nwc.grab_json_response('/api/providers/logout')
+                    await nwc.grab_json_response('/api/providers/logout')
             finally:
                 self._wc = None
                 wc = await self.get_wc()
-                wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
-                wc.grab_json_response('/api/providers/logout')
+                await wc.grab_json_response('/api/function', {'USER_UserDelete': "{0},{1}".format(tmpuid, '6pmu0ezczzcp')})
+                await wc.grab_json_response('/api/providers/logout')
 
     async def config(self, nodename, reset=False):
         self.nodename = nodename
@@ -531,7 +527,7 @@ class NodeHandler(immhandler.NodeHandler):
             self.nodename, ['secret.hardwaremanagementuser',
             'secret.hardwaremanagementpassword'], decrypt=True)
         user, passwd, isdefault = self.get_node_credentials(nodename, creds, 'USERID', 'PASSW0RD')
-        self.set_password_policy(strruleset, wc)
+        await self.set_password_policy(strruleset, wc)
         if self._atdefaultcreds:
             if isdefault and self.tmppasswd:
                 raise Exception(
@@ -542,16 +538,16 @@ class NodeHandler(immhandler.NodeHandler):
         await self._convert_sha256account(user, passwd, wc)
         if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
                 or cd.get('console.method', {}).get('value', None) == 'ipmi'):
-            nwc = wc.dupe()
+            nwc = wc # wc.dupe()
             nwc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
-            rsp = nwc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
+            rsp = await nwc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
             if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
                 # User has indicated IPMI support, but XCC is currently disabled
                 # change XCC to be consistent
-                _, _ = nwc.grab_json_response_with_status(
+                _, _ = await nwc.grab_json_response_with_status(
                         '/redfish/v1/Managers/1/NetworkProtocol',
                         {'IPMI': {'ProtocolEnabled': True}}, method='PATCH')
-            rsp, status = nwc.grab_json_response_with_status(
+            rsp, status = await nwc.grab_json_response_with_status(
                 '/redfish/v1/AccountService/Accounts/1')
             if status == 200:
                 allowable = rsp.get('AccountTypes@Redfish.AllowableValues', [])
@@ -562,7 +558,7 @@ class NodeHandler(immhandler.NodeHandler):
                         'AccountTypes': current,
                         'Password': self._currcreds[1]
                     }
-                    rsp, status = nwc.grab_json_response_with_status(
+                    rsp, status = await nwc.grab_json_response_with_status(
                         '/redfish/v1/AccountService/Accounts/1',
                         updateinf, method='PATCH')
         if targbmc and not targbmc.startswith('fe80::'):
@@ -573,7 +569,7 @@ class NodeHandler(immhandler.NodeHandler):
                 raise exc.NotImplementedException('IPv6 remote config TODO')
             netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=targbmc)
             newmask = netutil.cidr_to_mask(netconfig['prefix'])
-            currinfo = wc.grab_json_response('/api/providers/logoninfo')
+            currinfo = await wc.grab_json_response('/api/providers/logoninfo')
             currip = currinfo.get('items', [{}])[0].get('ipv4_address', '')
             # do not change the ipv4_config if the current config looks right already
             if currip != newip:
@@ -585,7 +581,7 @@ class NodeHandler(immhandler.NodeHandler):
                     statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
                 elif not netutil.address_is_local(newip):
                     raise exc.InvalidArgumentException('Will not remotely configure a device with no gateway')
-                netset, status = wc.grab_json_response_with_status('/api/dataset', statargs)
+                netset, status = await wc.grab_json_response_with_status('/api/dataset', statargs)
                 print(repr(netset))
                 print(repr(status))
 
@@ -595,7 +591,7 @@ class NodeHandler(immhandler.NodeHandler):
         else:
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
-        wc.grab_json_response('/api/providers/logout')
+        await wc.grab_json_response('/api/providers/logout')
         ff = self.info.get('attributes', {}).get('enclosure-form-factor', '')
         if ff not in ('dense-computing', [u'dense-computing']):
             return
