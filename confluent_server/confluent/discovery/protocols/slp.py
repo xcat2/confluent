@@ -502,7 +502,13 @@ async def snoop(handler, protocol=None):
             srp = await pktq.get()
             while srp and len(deferpeers) < 256:
                 s, rsp, peer = srp
+                try:
+                    srp = await asyncio.wait_for(pktq.get(), 0.2)
+                except asyncio.exceptions.TimeoutError:
+                    srp = None
                 if peer in known_peers:
+                    continue
+                if peer in deferpeers:
                     continue
                 mac = neighutil.get_hwaddr(peer[0])
                 if not mac:
@@ -511,20 +517,10 @@ async def snoop(handler, protocol=None):
                         s.setblocking(1)
                         s.sendto(b'\x00', probepeer)
                     except Exception as e:
-                        try:
-                            srp = await asyncio.wait_for(pktq.get(), 0.2)
-                        except asyncio.exceptions.TimeoutError:
-                            break
                         continue
                     deferpeers.append(peer)
                     continue
                 await process_peer(newmacs, known_peers, peerbymacaddress, peer)
-                if len(deferpeers) >= 256:
-                    break
-                try:
-                    srp = await asyncio.wait_for(pktq.get(), 0.2)
-                except asyncio.exceptions.TimeoutError:
-                    break
             if deferpeers:
                 await asyncio.sleep(2.2)
                 for peer in deferpeers:
