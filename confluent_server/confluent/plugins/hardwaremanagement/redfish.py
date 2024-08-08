@@ -21,7 +21,6 @@ import copy
 import errno
 import eventlet
 import eventlet.event
-import eventlet.green.threading as threading
 import eventlet.greenpool as greenpool
 import eventlet.queue as queue
 import eventlet.support.greendns
