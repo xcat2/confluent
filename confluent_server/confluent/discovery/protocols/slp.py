@@ -488,7 +488,6 @@ async def snoop(handler, protocol=None):
     while True:
         try:
             newmacs.clear()
-            r, _, _ = select.select((net, net4), (), (), 60)
             # clear known_peers and peerbymacaddress
             # to avoid stale info getting in...
             # rely upon the select(0.2) to catch rapid fire and aggregate ip
