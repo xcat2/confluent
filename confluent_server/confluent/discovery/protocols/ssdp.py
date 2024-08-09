@@ -192,7 +192,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
             machandlers.clear()
             timeout = None
             srp = await pktq.get()
-            recent_peers = set([])
+            recent_peers.clear()
             while srp and len(deferrednotifies) < 256:
                 srp = None
                 if timeout is None:
