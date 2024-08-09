@@ -516,6 +516,8 @@ if __name__ == '__main__':
             netname_to_interfaces['default']['interfaces'] -= netname_to_interfaces[netn]['interfaces']
         if not netname_to_interfaces['default']['interfaces']:
             del netname_to_interfaces['default']
+    # Make sure VLAN/PKEY connections are created last
+    netname_to_interfaces = dict(sorted(netname_to_interfaces.items(), key=lambda item: 'vlan_id' in item[1]['settings']))
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/sbin/netplan'):
         nm = NetplanManager(dc)
