@@ -1615,9 +1615,7 @@ async def rescan():
     if scanner:
         return
     else:
-        print("begin")
         scanner = util.spawn(blocking_scan())
-        print("bg")
     await remotescan()
 
 async def remotescan():

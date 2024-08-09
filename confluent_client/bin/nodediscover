@@ -270,7 +270,8 @@ async def list_discovery(options, session):
             print(row)
 
 async def clear_discovery(options, session):
-    async for mac in list_matching_macs(options, session):
+    allmacs = [x async for x in list_matching_macs(options, session)]
+    for mac in allmacs:
         async for res in session.delete('/discovery/by-mac/{0}'.format(mac)):
             if 'deleted' in res:
                 print('Cleared info for {0}'.format(res['deleted']))
