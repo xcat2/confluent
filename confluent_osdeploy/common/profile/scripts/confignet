@@ -86,7 +86,7 @@ def map_idx_to_name():
     for line in subprocess.check_output(['ip', 'l']).decode('utf8').splitlines():
         if line.startswith(' ') and 'link/' in line:
             typ = line.split()[0].split('/')[1]
-            devtype[prevdev] = typ if type != 'ether' else 'ethernet'
+            devtype[prevdev] = typ if typ != 'ether' else 'ethernet'
         if line.startswith(' '):
             continue
         idx, iface, rst = line.split(':', 2)
@@ -413,7 +413,8 @@ class NetworkManager(object):
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
             if u:
-                cmdargs['connection.interface-name'] = iname
+                cargs.append('connection.interface-name')
+                cargs.append(iname)
                 subprocess.check_call(['nmcli', 'c', 'm', u] + cargs)
                 subprocess.check_call(['nmcli', 'c', 'u', u])
             else:
