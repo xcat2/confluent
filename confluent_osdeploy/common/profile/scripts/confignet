@@ -405,7 +405,10 @@ class NetworkManager(object):
         else:
             cname = stgs.get('connection_name', None)
             iname = list(cfg['interfaces'])[0]
-            ctype = self.devtypes[iname]
+            ctype = self.devtypes.get(iname, None)
+            if not ctype:
+                sys.stderr.write("Warning, no device found for interface_name ({0}), skipping setup\n".format(iname))
+                return
             if stgs.get('vlan_id', None):
                 vlan = stgs['vlan_id']
                 if ctype == 'infiniband':
