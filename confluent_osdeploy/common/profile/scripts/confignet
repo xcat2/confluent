@@ -405,20 +405,35 @@ class NetworkManager(object):
         else:
             cname = stgs.get('connection_name', None)
             iname = list(cfg['interfaces'])[0]
-            if not cname:
-                cname = iname
+            ctype = self.devtypes[iname]
+            if stgs.get('vlan_id', None):
+                vlan = stgs['vlan_id']
+                if ctype == 'infiniband':
+                    vlan = '0x{0}'.format(vlan) if not vlan.startswith('0x') else vlan
+                    cmdargs['infiniband.parent'] = iname
+                    cmdargs['infiniband.p-key'] = vlan
+                    iname = '{0}.{1}'.format(iname, vlan[2:])
+                    cname = iname if not cname else cname
+                elif ctype == 'ethernet':
+                    ctype = 'vlan'
+                    cmdargs['vlan.parent'] = iname
+                    cmdargs['vlan.id'] = vlan
+                    iname = '{0}.{1}'.format(iname, vlan)
+                    cname = iname if not cname else cname
+                else:
+                    sys.stderr.write("Warning, unknown interface_name ({0}) device type ({1}) for VLAN/PKEY, skipping setup\n".format(iname, ctype))
+                    return
+            cname = iname if not cname else cname
             u = self.uuidbyname.get(cname, None)
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
             if u:
-                cargs.append('connection.interface-name')
-                cargs.append(iname)
-                subprocess.check_call(['nmcli', 'c', 'm', u] + cargs)
+                subprocess.check_call(['nmcli', 'c', 'm', u, 'connection.interface-name', iname] + cargs)
                 subprocess.check_call(['nmcli', 'c', 'u', u])
             else:
-                subprocess.check_call(['nmcli', 'c', 'add', 'type', self.devtypes[iname], 'con-name', cname, 'connection.interface-name', iname] + cargs)
+                subprocess.check_call(['nmcli', 'c', 'add', 'type', ctype, 'con-name', cname, 'connection.interface-name', iname] + cargs)
                 self.read_connections()
                 u = self.uuidbyname.get(cname, None)
                 if u:
