@@ -243,8 +243,8 @@ class TLSCertVerifier(object):
             auditlog = log.Logger('audit')
             auditlog.log({'node': self.node, 'event': 'certautoadd',
                           'fingerprint': fingerprint})
-            self.cfm.set_node_attributes(
-                {self.node: {self.fieldname: fingerprint}})
+            spawn(self.cfm.set_node_attributes(
+                {self.node: {self.fieldname: fingerprint}}))
             return True
         elif cert_matches(storedprint[self.node][self.fieldname]['value'],
                           certificate):
