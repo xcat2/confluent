@@ -421,38 +421,38 @@ async def perform_requests(operator, nodes, element, cfg, inputdata, realop):
         pass
 
 
-
 async def perform_request(operator, node, element,
-                    configdata, inputdata, cfg, results, realop):
-        try:
-            ih = await IpmiHandler.create(operator, node, element, configdata, inputdata,
-                               cfg, results, realop)
-            return await ih.handle_request()
-        except pygexc.IpmiException as ipmiexc:
-            excmsg = str(ipmiexc)
-            if excmsg in ('Session no longer connected', 'timeout'):
-                await results.put(msg.ConfluentTargetTimeout(node))
-            else:
-                await results.put(msg.ConfluentNodeError(node, excmsg))
-                #raise
-        except exc.TargetEndpointUnreachable as tu:
-            await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
-        except ssl.SSLEOFError:
-            await results.put(msg.ConfluentNodeError(
-                node, 'Unable to communicate with the https server on '
-                      'the target BMC'))
-        except exc.PubkeyInvalid:
-            await results.put(msg.ConfluentNodeError(
-                node,
-                'Mismatch detected between target certificate fingerprint '
-                'and pubkeys.tls_hardwaremanager attribute'))
-        except pygexc.InvalidParameterValue as e:
-            await results.put(msg.ConfluentNodeError(node, str(e)))
-        except Exception as e:
-            await results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
-            traceback.print_exc()
-        finally:
-            await results.put('Done')
+                          configdata, inputdata, cfg, results, realop):
+    try:
+        ih = await IpmiHandler.create(
+            operator, node, element, configdata, inputdata, cfg, results,
+            realop)
+        return await ih.handle_request()
+    except pygexc.IpmiException as ipmiexc:
+        excmsg = str(ipmiexc)
+        if excmsg in ('Session no longer connected', 'timeout'):
+            await results.put(msg.ConfluentTargetTimeout(node))
+        else:
+            await results.put(msg.ConfluentNodeError(node, excmsg))
+            #raise
+    except exc.TargetEndpointUnreachable as tu:
+        await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+    except ssl.SSLEOFError:
+        await results.put(msg.ConfluentNodeError(
+            node, 'Unable to communicate with the https server on '
+                    'the target BMC'))
+    except exc.PubkeyInvalid:
+        await results.put(msg.ConfluentNodeError(
+            node,
+            'Mismatch detected between target certificate fingerprint '
+            'and pubkeys.tls_hardwaremanager attribute'))
+    except pygexc.InvalidParameterValue as e:
+        await results.put(msg.ConfluentNodeError(node, str(e)))
+    except Exception as e:
+        await results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
+        traceback.print_exc()
+    finally:
+        await results.put('Done')
 
 persistent_ipmicmds = {}
 
