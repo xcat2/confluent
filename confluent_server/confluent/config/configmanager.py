@@ -2519,19 +2519,21 @@ class ConfigManager(object):
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 
-    def _load_from_json(self, jsondata, sync=True, merge=False, keydata=None):
+    def _load_from_json(self, jsondata, sync=True, merge=False, keydata=None, skipped=None):
         self.inrestore = True
         try:
-            self._load_from_json_backend(jsondata, sync=True, merge=merge, keydata=keydata)
+            self._load_from_json_backend(jsondata, sync=True, merge=merge, keydata=keydata, skipped=skipped)
         finally:
             self.inrestore = False
 
-    def _load_from_json_backend(self, jsondata, sync=True, merge=False, keydata=None):
+    def _load_from_json_backend(self, jsondata, sync=True, merge=False, keydata=None, skipped=None):
         """Load fresh configuration data from jsondata
 
         :param jsondata: String of jsondata
         :return:
         """
+        if not skipped:
+            skipped = {'nodes': None, 'nodegroups': None}
         dumpdata = json.loads(jsondata)
         tmpconfig = {}
         for confarea in _config_areas:
@@ -2588,9 +2590,9 @@ class ConfigManager(object):
             if confarea not in tmpconfig:
                 continue
             if confarea == 'nodes':
-                self.set_node_attributes(tmpconfig[confarea], True, merge=attribmerge, keydata=keydata)
+                self.set_node_attributes(tmpconfig[confarea], True, merge=attribmerge, keydata=keydata, skipped=skipped['nodes'])
             elif confarea == 'nodegroups':
-                self.set_group_attributes(tmpconfig[confarea], True, merge=attribmerge, keydata=keydata)
+                self.set_group_attributes(tmpconfig[confarea], True, merge=attribmerge, keydata=keydata, skipped=skipped['nodegroups'])
             elif confarea == 'usergroups':
                 if merge:
                     continue
@@ -2934,7 +2936,7 @@ def _dump_keys(password, dojson=True):
     return keydata
 
 
-def restore_db_from_directory(location, password, merge=False):
+def restore_db_from_directory(location, password, merge=False, skipped=None):
     kdd = None
     try:
         with open(os.path.join(location, 'keys.json'), 'r') as cfgfile:
@@ -2973,7 +2975,7 @@ def restore_db_from_directory(location, password, merge=False):
                 raise
     with open(os.path.join(location, 'main.json'), 'r') as cfgfile:
         cfgdata = cfgfile.read()
-        ConfigManager(tenant=None)._load_from_json(cfgdata, merge=merge, keydata=kdd)
+        ConfigManager(tenant=None)._load_from_json(cfgdata, merge=merge, keydata=kdd, skipped=skipped)
     ConfigManager.wait_for_sync(True)
 
 

@@ -1,7 +1,7 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2017 Lenovo
+# Copyright 2017,2024 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,9 +72,19 @@ if args[0] in ('restore', 'merge'):
         stateless = args[0] == 'restore'
         cfm.init(stateless)
         cfm.statelessmode = stateless
+        skipped = {'nodes': [], 'nodegroups': []}
         cfm.restore_db_from_directory(
             dumpdir, password,
-            merge="skip" if args[0] == 'merge' else False)
+            merge="skip" if args[0] == 'merge' else False, skipped=skipped)
+        if skipped['nodes']:
+            skippedn = ','.join(skipped['nodes'])
+            print('The following nodes were skipped during merge: '
+                  '{}'.format(skippedn))
+        if skipped['nodegroups']:
+            skippedn = ','.join(skipped['nodegroups'])
+            print('The following node groups were skipped during merge: '
+                  '{}'.format(skippedn))
+
         cfm.statelessmode = False
         cfm.ConfigManager.wait_for_sync(True)
         if owner != 0:
