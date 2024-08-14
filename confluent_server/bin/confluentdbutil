@@ -30,7 +30,7 @@ import confluent.config.conf as conf
 import confluent.main as main
 
 argparser = optparse.OptionParser(
-    usage="Usage: %prog [options] [dump|restore] [path]")
+    usage="Usage: %prog [options] [dump|restore|merge] [path]")
 argparser.add_option('-p', '--password',
                      help='Password to use to protect/unlock a protected dump')
 argparser.add_option('-i', '--interactivepassword', help='Prompt for password',
@@ -51,13 +51,13 @@ argparser.add_option('-s', '--skipkeys', action='store_true',
                            'data is needed.  keys do not change and as such '
                            'they do not require incremental backup')
 (options, args) = argparser.parse_args()
-if len(args) != 2 or args[0] not in ('dump', 'restore'):
+if len(args) != 2 or args[0] not in ('dump', 'restore', 'merge'):
     argparser.print_help()
     sys.exit(1)
 dumpdir = args[1]
 
 
-if args[0] == 'restore':
+if args[0] in ('restore', 'merge'):
     pid = main.is_running()
     if pid is not None:
         print("Confluent is running, must shut down to restore db")
@@ -69,9 +69,12 @@ if args[0] == 'restore':
     if options.interactivepassword:
         password = getpass.getpass('Enter password to restore backup: ')
     try:
-        cfm.init(True)
-        cfm.statelessmode = True
-        cfm.restore_db_from_directory(dumpdir, password)
+        stateless = args[0] == 'restore'
+        cfm.init(stateless)
+        cfm.statelessmode = stateless
+        cfm.restore_db_from_directory(
+            dumpdir, password,
+            merge="skip" if args[0] == 'merge' else False)
         cfm.statelessmode = False
         cfm.ConfigManager.wait_for_sync(True)
         if owner != 0:
