@@ -215,12 +215,13 @@ def initialize_root_key(generate, automation=False):
         suffix = 'rootpubkey'
     keyname = '/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
             myname, suffix)
+    if authorized:
+        with open(keyname, 'w'):
+            pass
     for auth in authorized:
-        local_key = open(auth, 'r')
-        dest = open(keyname, 'a')
-        dest.write(local_key.read())
-        local_key.close()
-        dest.close()
+        with open(auth, 'r') as local_key:
+            with open(keyname, 'a') as dest:
+                dest.write(local_key.read())
     if os.path.exists(keyname):
         os.chmod(keyname, 0o644)
         os.chown(keyname, neededuid, -1)
