@@ -210,17 +210,18 @@ async def initialize_root_key(generate, automation=False):
         suffix = 'automationpubkey'
     else:
         suffix = 'rootpubkey'
-    # if myname suffix is rootpubkey, and file exists, zero it 
-    # append instead of replace
+    keyname = '/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
+            myname, suffix)
+    if authorized:
+        with open(keyname, 'w'):
+            pass
     for auth in authorized:
-        shutil.copy(
-            auth,
-            '/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
-                    myname, suffix))
-        os.chmod('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
-                myname, suffix), 0o644)
-        os.chown('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
-                myname, suffix), neededuid, -1)
+        with open(auth, 'r') as local_key:
+            with open(keyname, 'a') as dest:
+                dest.write(local_key.read())
+    if os.path.exists(keyname):
+        os.chmod(keyname, 0o644)
+        os.chown(keyname, neededuid, -1)
     if alreadyexist:
         raise AlreadyExists()
 

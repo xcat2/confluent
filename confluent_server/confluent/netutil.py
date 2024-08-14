@@ -193,6 +193,9 @@ class NetManager(object):
         iname = attribs.get('interface_names', None)
         if iname:
             myattribs['interface_names'] = iname
+        vlanid = attribs.get('vlan_id', None)
+        if vlanid:
+            myattribs['vlan_id'] = vlanid
         teammod = attribs.get('team_mode', None)
         if teammod:
             myattribs['team_mode'] = teammod
