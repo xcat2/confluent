@@ -350,11 +350,11 @@ class IpmiConsole(conapi.Console):
         except socket.gaierror as err:
             raise exc.TargetEndpointUnreachable(str(err))
 
-    def close(self):
+    async def close(self):
         if self.solconnection is not None:
             # break the circular reference here
             self.solconnection.out_handler = _donothing
-            self.solconnection.close()
+            await self.solconnection.close()
         self.solconnection = None
         self.datacallback = None
         self.broken = True

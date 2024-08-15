@@ -429,7 +429,7 @@ class ConsoleHandler(object):
 
     async def _got_disconnected(self):
         if self.connectstate != 'unconnected':
-            self._console.close()
+            await self._console.close()
             self.connectstate = 'unconnected'
             self.log(
                 logdata='console disconnected', ltype=log.DataTypes.event,
