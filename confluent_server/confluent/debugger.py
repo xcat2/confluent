@@ -24,6 +24,8 @@ async def interact(cloop, cnn):
         newinput = b''
         while b'\n' not in newinput:
             rcv = await cloop.sock_recv(cnn, 4)
+            if not rcv:
+                return
             newinput += rcv
         somecode += newinput.decode()
         if newinput.startswith(b' '):
@@ -48,7 +50,6 @@ async def interact(cloop, cnn):
             finally:
                 sys.stdin, sys.stderr, sys.stdout = saved
                 cnn.settimeout(0)
-            print("done")
             somecode = ''
             prompt = b'>>> '
 
@@ -56,9 +57,10 @@ async def interact(cloop, cnn):
 async def srv_debug(sock):
     cloop = asyncio.get_event_loop()
     while True:
+        print("waiting")
         cnn, addr = await cloop.sock_accept(sock)
-        cnn.settimeout(0)
         util.spawn(interact(cloop, cnn))
+        print("next time")
 
 
 def start_dbgif():
