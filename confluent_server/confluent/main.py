@@ -32,6 +32,7 @@ import atexit
 import confluent.auth as auth
 import confluent.config.conf as conf
 import confluent.config.configmanager as configmanager
+import confluent.debugger as debugger
 try:
     import anydbm as dbm
 except ModuleNotFoundError:
@@ -50,13 +51,6 @@ except ImportError:
     #only for now
     pass
 import confluent.discovery.core as disco
-import eventlet
-dbgif = False
-try:
-    import eventlet.backdoor as backdoor
-    dbgif = True
-except Exception:
-    pass
 havefcntl = True
 try:
     import fcntl
@@ -336,19 +330,7 @@ async def run(args):
         configmanager.set_global('confluent_uuid', confluentuuid)
     if not configmanager._masterkey:
         configmanager.init_masterkey()
-    if dbgif:
-        oumask = os.umask(0o077)
-        try:
-            os.remove('/var/run/confluent/dbg.sock')
-        except OSError:
-            pass  # We are not expecting the file to exist
-        try:
-            dbgsock = eventlet.listen("/var/run/confluent/dbg.sock",
-                                       family=socket.AF_UNIX)
-            eventlet.spawn_n(backdoor.backdoor_server, dbgsock)
-        except AttributeError:
-            pass  # Windows...
-        os.umask(oumask)
+    debugger.start_dbgif()
     auth.check_for_yaml()
     collective.startup()
     await consoleserver.initialize()
@@ -369,7 +351,7 @@ async def run(args):
             break
         except Exception:
             await asyncio.sleep(0.5)
-    eventlet.spawn_n(disco.start_detection)
+    disco.start_detection()
     await asyncio.sleep(1)
     await consoleserver.start_console_sessions()
     while 1:

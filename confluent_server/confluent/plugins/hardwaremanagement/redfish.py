@@ -38,7 +38,7 @@ pci_cache = {}
 
 def get_dns_txt(qstring):
     return None
-    # return eventlet.support.greendns.resolver.query(
+    # return support.greendns.resolver.query(
     #     qstring, 'TXT')[0].strings[0].replace('i=', '')
 
 def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
@@ -65,24 +65,6 @@ def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     if vendorstr and devstr:
         pci_cache[fqpi] = vendorstr, devstr
     return vendorstr, devstr
-
-
-# There is something not right with the RLocks used in pyghmi when
-# eventlet comes into play.  It seems like sometimes on acquire,
-# it calls _get_ident and it isn't the id(greenlet) and so
-# a thread deadlocks itself due to identity crisis?
-# However, since we are not really threaded, the operations being protected
-# are not actually dangerously multiplexed...  so we can replace with
-# a null context manager for now
-class NullLock(object):
-
-    def donothing(self, *args, **kwargs):
-        return 1
-
-    __enter__ = donothing
-    __exit__ = donothing
-    acquire = donothing
-    release = donothing
 
 
 sensor_categories = {
@@ -150,9 +132,6 @@ class IpmiCommandWrapper(ipmicommand.Command):
             cfm, node, 'pubkeys.tls_hardwaremanager').verify_cert
         kwargs['verifycallback'] = kv
         self = await super().create(**kwargs)
-        #kwargs['pool'] = eventlet.greenpool.GreenPool(4)
-        #Some BMCs at the time of this writing crumble under the weight
-        #of 4 concurrent requests.  For now give up on this optimization.
         self.cfm = cfm
         self.node = node
         self._inhealth = False

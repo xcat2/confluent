@@ -47,7 +47,7 @@ pci_cache = {}
 
 def get_dns_txt(qstring):
     return None
-    # return eventlet.support.greendns.resolver.query(
+    # return support.greendns.resolver.query(
     #    qstring, 'TXT')[0].strings[0].replace('i=', '')
 
 def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
@@ -77,7 +77,7 @@ def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
 
 
 # There is something not right with the RLocks used in pyghmi when
-# eventlet comes into play.  It seems like sometimes on acquire,
+# greenthreads comes into play.  It seems like sometimes on acquire,
 # it calls _get_ident and it isn't the id(greenlet) and so
 # a thread deadlocks itself due to identity crisis?
 # However, since we are not really threaded, the operations being protected
@@ -93,14 +93,6 @@ class NullLock(object):
     acquire = donothing
     release = donothing
 
-#console.session.select = eventlet.green.select
-#console.session.threading = eventlet.green.threading
-#console.session.WAITING_SESSIONS = NullLock()
-#console.session.KEEPALIVE_SESSIONS = NullLock()
-#console.session.socket.getaddrinfo = eventlet.support.greendns.getaddrinfo
-
-
-#_ipmiworkers = greenpool.GreenPool(512)
 
 _ipmithread = None
 _ipmiwaiters = []

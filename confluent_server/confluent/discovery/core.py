@@ -85,17 +85,12 @@ import confluent.noderange as noderange
 import confluent.util as util
 import inspect
 import json
-import eventlet
 import traceback
 import shlex
 import struct
-#import eventlet.green.socket as socket
 import socket
 import socket as nsocket
-#webclient = eventlet.import_patched('pyghmi.util.webclient')
 
-
-import eventlet
 
 autosensors = set()
 scanner = None
