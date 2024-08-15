@@ -155,11 +155,12 @@ def update_boot_esxi(profiledir, profile, label):
 
 
 def find_glob(loc, fileglob):
+    grubcfgs = []
     for cdir, _, fs in os.walk(loc):
         for f in fs:
             if fnmatch(f, fileglob):
-                return [os.path.join(cdir, f)]
-    return None
+                grubcfgs.append(os.path.join(cdir, f))
+    return grubcfgs
 
 
 def update_boot_linux(profiledir, profile, label):
