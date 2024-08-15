@@ -648,10 +648,13 @@ def show_user(name, configmanager):
 
 
 
-def stripnode(iterablersp, node):
-    for i in iterablersp:
+async def stripnode(iterablersp, node):
+    async for i in iterablersp:
         if i is None:
             raise exc.NotImplementedException("Not Implemented")
+        if isinstance(i, console.Console):
+            yield i
+            continue
         i.strip_node(node)
         yield i
 
@@ -1071,8 +1074,6 @@ async def handle_node_request(configmanager, inputdata, operation,
             inputdata=msginputdata)
         if isnoderange:
             return passvalue
-        elif isinstance(passvalue, console.Console):
-            return [passvalue]
         else:
             return stripnode(passvalue, nodes[0])
     elif 'pluginattrs' in plugroute:

@@ -311,7 +311,7 @@ class IpmiConsole(conapi.Console):
         except KeyError:
             pass
 
-    def handle_data(self, data):
+    async def handle_data(self, data):
         if type(data) == dict:
             if 'error' in data:
                 self.solconnection = None
@@ -319,9 +319,9 @@ class IpmiConsole(conapi.Console):
                 self.error = data['error']
                 if self.connected:
                     self.connected = False
-                    self.datacallback(conapi.ConsoleEvent.Disconnect)
+                    await self.datacallback(conapi.ConsoleEvent.Disconnect)
         else:
-            self.datacallback(data)
+            await self.datacallback(data)
 
     async def connect(self, callback):
         self.datacallback = callback

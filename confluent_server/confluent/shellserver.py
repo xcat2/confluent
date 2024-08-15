@@ -130,12 +130,14 @@ class ShellSession(consoleserver.ConsoleSession):
             pass
         return await super(ShellSession, self).destroy()
 
-def create(nodes, element, configmanager, inputdata):
+
+async def create(nodes, element, configmanager, inputdata):
     # For creating a resource, it really has to be handled
     # in httpapi/sockapi specially, like a console.
     raise exc.InvalidArgumentException('Special client code required')
 
-def retrieve(nodes, element, configmanager, inputdata):
+
+async def retrieve(nodes, element, configmanager, inputdata):
     tenant = configmanager.tenant
     user = configmanager.current_user
     if (tenant, nodes[0], user) in activesessions:

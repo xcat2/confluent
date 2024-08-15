@@ -90,10 +90,10 @@ class OpenBmcConsole(conapi.Console):
         while self.connected:
             pendingdata = await self.ws.receive()
             if pendingdata.type == aiohttp.WSMsgType.BINARY:
-                self.datacallback(pendingdata.data)
+                await self.datacallback(pendingdata.data)
                 continue
             elif pendingdata.type ==  aiohttp.WSMsgType.CLOSE:
-                self.datacallback(conapi.ConsoleEvent.Disconnect)
+                await self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
             else:
                 print("Unknown response in WSConsoleHandler")

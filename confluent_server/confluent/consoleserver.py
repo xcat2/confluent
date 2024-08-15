@@ -309,7 +309,7 @@ class ConsoleHandler(object):
             self.log(
                 logdata='console disconnected', ltype=log.DataTypes.event,
                 event=log.Events.consoledisconnect)
-            self._console.close()
+            await self._console.close()
             self._console = None
             self.connectstate = 'unconnected'
             await self._send_rcpts({'connectstate': self.connectstate})
@@ -455,10 +455,10 @@ class ConsoleHandler(object):
             self.cfgmgr.remove_watcher(self._attribwatcher)
             self._attribwatcher = None
 
-    def get_console_output(self, data):
+    async def get_console_output(self, data):
         # Spawn as a greenthread, return control as soon as possible
         # to the console object
-        util.spawn(self._handle_console_output(data))
+        await self._handle_console_output(data)
 
     async def attachsession(self, session):
         edata = 1
