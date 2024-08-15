@@ -328,7 +328,7 @@ async def term_interact(authdata, authname, ccons, cfm, connection, consession,
                 consession.send_break()
                 continue
             elif data['operation'] == 'reopen':
-                consession.reopen()
+                await consession.reopen()
                 continue
             elif data['operation'] == 'pause':
                 ccons.xmit = False

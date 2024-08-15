@@ -329,7 +329,7 @@ class ConsoleHandler(object):
 
     async def _connect_backend(self):
         if self._console:
-            self._console.close()
+            await self._console.close()
             self._console = None
         self.connectstate = 'connecting'
         await self._send_rcpts({'connectstate': self.connectstate})
@@ -499,13 +499,13 @@ class ConsoleHandler(object):
             self._disconnect()
 
 
-    def reopen(self):
-        self._got_disconnected()
+    async def reopen(self):
+        await self._got_disconnected()
 
     async def _handle_console_output(self, data):
         if type(data) == int:
             if data == conapi.ConsoleEvent.Disconnect:
-                self._got_disconnected()
+                await self._got_disconnected()
             return
         elif data in (b'', u''):
             # ignore empty strings from a cconsole provider
@@ -816,7 +816,7 @@ class ConsoleSession(object):
         Returns False if no data buffered yet"""
         return self.conshdl.get_buffer_age()
 
-    def reopen(self):
+    async def reopen(self):
         """Reopen the session
 
         This can be useful if there is suspicion that the remote console is
@@ -825,7 +825,7 @@ class ConsoleSession(object):
         automatically detecting an unusable console in the underlying
         technology that cannot be unambiguously autodetected.
         """
-        self.conshdl.reopen()
+        await self.conshdl.reopen()
 
     async def destroy(self):
         if self.registered:
