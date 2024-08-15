@@ -1,6 +1,5 @@
 #!/usr/bin/python
 import asyncio
-import eventlet
 from fnmatch import fnmatch
 import glob
 import logging
