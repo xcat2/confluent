@@ -652,7 +652,7 @@ async def resourcehandler_backend(req, make_response):
     reqtype = None
     reqpath = req.rel_url.path
     if reqpath.startswith('/self/'):
-        return await selfservice.handle_request(req, make_response)
+        return await selfservice.handle_request(req, make_response, mimetype)
     if reqpath.startswith('/boot/'):
         request = reqpath.split('/')
         if not request[0]:

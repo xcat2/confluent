@@ -64,8 +64,8 @@ class CredServer(object):
             hmackey = None
             hmacval = None
             cloop = asyncio.get_event_loop()
-            await cloop.sock_send(client, b'\xc2\xd1-\xa8\x80\xd8j\xba')
-            tlv = bytearray(cloop.sock_recv(client, 2))
+            await cloop.sock_sendall(client, b'\xc2\xd1-\xa8\x80\xd8j\xba')
+            tlv = bytearray(await cloop.sock_recv(client, 2))
             if tlv[0] != 1:
                 client.close()
                 return
@@ -94,7 +94,7 @@ class CredServer(object):
                         if not isinstance(sealed, bytes):
                             sealed = sealed.encode('utf8')
                         reply = b'\x80' + struct.pack('>H', len(sealed) + 1) + sealed + b'\x00'
-                        await cloop.sock_send(client, reply)
+                        await cloop.sock_sendall(client, reply)
                     client.close()
                     return
                 if apiarmed not in ('once', 'continuous'):
@@ -104,10 +104,10 @@ class CredServer(object):
                         self.cfm.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
                         client.close()
                         return
-            await cloop.sock_send(client, b'\x02\x20')
+            await cloop.sock_sendall(client, b'\x02\x20')
             rttoken = os.urandom(32)
-            await cloop.sock_send(client, rttoken)
-            await cloop.sock_send(client, b'\x00\x00')
+            await cloop.sock_sendall(client, rttoken)
+            await cloop.sock_sendall(client, b'\x00\x00')
             tlv = bytearray(await cloop.sock_recv(client, 2))
             if tlv[0] != 3:
                 client.close()
@@ -127,9 +127,9 @@ class CredServer(object):
                     client.close()
                     return
             cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': echotoken}}}
-            self.cfm.set_node_attributes(cfgupdate)
+            await self.cfm.set_node_attributes(cfgupdate)
             await cloop.sock_recv(client, 2)  # drain end of message
-            await cloop.sock_send(client, b'\x05\x00') # report success
+            await cloop.sock_sendall(client, b'\x05\x00') # report success
             if hmackey and apiarmed != 'continuous':
                 self.cfm.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
             if apiarmed != 'continuous':
@@ -140,7 +140,7 @@ class CredServer(object):
             except Exception:
                 pass
             if disarm:
-                self.cfm.set_node_attributes(disarm)
+                await self.cfm.set_node_attributes(disarm)
 
 
 async def main():
