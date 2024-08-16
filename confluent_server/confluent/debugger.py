@@ -57,10 +57,8 @@ async def interact(cloop, cnn):
 async def srv_debug(sock):
     cloop = asyncio.get_event_loop()
     while True:
-        print("waiting")
         cnn, addr = await cloop.sock_accept(sock)
         util.spawn(interact(cloop, cnn))
-        print("next time")
 
 
 def start_dbgif():
