@@ -409,14 +409,14 @@ async def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     if disco['uuid'] == '03000200-0400-0500-0006-000700080009':
         # Ignore common malformed dhcpv6 request from firmware
         return
-    mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
+    mac = await neighutil.get_hwaddr(ip.split('%', 1)[0])
     if not mac:
         net.sendto(b'\x00', addr)
     tries = 5
     while tries and not mac:
         await asyncio.sleep(0.01)
         tries -= 1
-        mac = neighutil.get_hwaddr(ip.split('%', 1)[0])
+        mac = await neighutil.get_hwaddr(ip.split('%', 1)[0])
     info = {'hwaddr': mac, 'uuid': disco['uuid'],
             'architecture': disco['arch'], 'services': ('pxe-client',)}
     if ignoredisco.get(mac, 0) + 90 < time.time():

@@ -16,11 +16,11 @@
 
 # A consolidated manage of neighbor table information management.
 
+import asyncio
 import confluent.netutil as netutil
 import confluent.util as util
 import os
-import eventlet.semaphore as semaphore
-import eventlet.green.socket as socket
+import socket
 import struct
 
 
@@ -33,24 +33,27 @@ neightime = 0
 
 import re
 
-neighlock = semaphore.Semaphore()
+neighlock = asyncio.Lock()
 
-def _update_neigh():
+async def _update_neigh():
     global neightable
     global neightime
     neightime = os.times()[4]
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
     s.bind((0, 0))
+    s.settimeout(0)
     # RTM_GETNEIGH
     # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
     nlhdr = b'\x1c\x00\x00\x00\x1e\x00\x01\x03\x00\x00\x00\x00\x00\x00\x00\x00'
     # ndmsg struct u8 family u8 pad, u16 pad, s32 ifidx, u16 state, u8 flags, u8 type
     ndmsg=  b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-    s.sendall(nlhdr + ndmsg)
+    cloop = asyncio.get_event_loop()
+    await cloop.sock_sendall(s, nlhdr + ndmsg)
+    #s.sendall(nlhdr + ndmsg)
     neightable = {}
     try:
         while True:
-            pdata = s.recv(65536)
+            pdata = await cloop.sock_recv(s, 65536)
             v = memoryview(pdata)
             if struct.unpack('H', v[4:6])[0] == 3:
                 break
@@ -81,7 +84,7 @@ def _update_neigh():
         s.close()
 
 
-def get_hwaddr(ipaddr):
+async def get_hwaddr(ipaddr):
     if '%' in ipaddr:
         ipaddr, _ = ipaddr.split('%', 1)
     hwaddr = None
@@ -91,16 +94,16 @@ def get_hwaddr(ipaddr):
         ipaddr = socket.inet_pton(socket.AF_INET6, ipaddr)
     elif '.' in ipaddr:
         ipaddr = socket.inet_pton(socket.AF_INET, ipaddr)
-    with neighlock:
+    async with neighlock:
         updated = False
         if os.times()[4] > (neightime + 30):
-            _update_neigh()
+            await _update_neigh()
             updated = True
         hwaddr = neightable.get(ipaddr, None)
         if not hwaddr and not netutil.ipn_is_local(ipaddr):
             hwaddr = False
         if hwaddr == None and not updated:
-            _update_neigh()
+            await _update_neigh()
             hwaddr = neightable.get(ipaddr, None)
     if hwaddr:
         hwaddr = ':'.join(['{:02x}'.format(x) for x in bytearray(hwaddr)])

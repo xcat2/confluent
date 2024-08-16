@@ -61,7 +61,7 @@ async def active_scan(handler, protocol=None):
             addr = addr[0:1] + addr[2:]
             if addr in known_peers:
                 break
-            hwaddr = neighutil.get_hwaddr(addr[0])
+            hwaddr = await neighutil.get_hwaddr(addr[0])
             if not hwaddr:
                 continue
             if not scanned.get('hwaddr', None):
@@ -216,7 +216,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                     if peer in known_peers:
                         continue
                     recent_peers.add(peer)
-                    mac = neighutil.get_hwaddr(peer[0])
+                    mac = await neighutil.get_hwaddr(peer[0])
                     if mac == False:
                         # neighutil determined peer ip is not local, skip attempt
                         # to probe and critically, skip growing deferrednotifiers
@@ -312,7 +312,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 await asyncio.sleep(2.2)
             for peerrsp in deferrednotifies:
                 peer, rsp = peerrsp
-                mac = neighutil.get_hwaddr(peer[0])
+                mac = await neighutil.get_hwaddr(peer[0])
                 if not mac:
                     continue
                 _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
@@ -412,7 +412,7 @@ async def _find_service(service, target):
         except asyncio.exceptions.TimeoutError:
             break
         s, rsp, peer = srp
-        if not neighutil.get_hwaddr(peer[0]):
+        if not await neighutil.get_hwaddr(peer[0]):
             probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
             try:
                 s.sendto(b'\x00', probepeer)
@@ -422,7 +422,7 @@ async def _find_service(service, target):
             deferparse.append((rsp, peer))
             srp = True
             continue
-        _parse_ssdp(peer, rsp, peerdata)
+        await _parse_ssdp(peer, rsp, peerdata)
         timeout = deadline - util.monotonic_time()
         if timeout < 0:
             timeout = 0
@@ -430,7 +430,7 @@ async def _find_service(service, target):
         await asyncio.sleep(2.2)
     for dp in deferparse:
         rsp, peer = dp
-        _parse_ssdp(peer, rsp, peerdata)
+        await _parse_ssdp(peer, rsp, peerdata)
     pooltargs = []
     for nid in peerdata:
         if peerdata[nid].get('services', [None])[0] == 'urn::service:affluent:1':
@@ -514,10 +514,10 @@ async def check_fish(urldata, port=443, verifycallback=None):
             return data
     return None
 
-def _parse_ssdp(peer, rsp, peerdata):
+async def _parse_ssdp(peer, rsp, peerdata):
     nid = peer[0]
     mac = None
-    mac = neighutil.get_hwaddr(peer[0])
+    mac = await neighutil.get_hwaddr(peer[0])
     if mac:
         nid = mac
     headlines = rsp.split(b'\r\n')

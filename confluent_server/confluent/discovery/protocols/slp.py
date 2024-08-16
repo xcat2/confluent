@@ -101,12 +101,12 @@ def _parse_SrvRply(parsed):
         parsed['urls'].append(url)
 
 
-def _parse_slp_packet(packet, peer, rsps, xidmap, defer=None, sock=None):
+async def _parse_slp_packet(packet, peer, rsps, xidmap, defer=None, sock=None):
     parsed = _parse_slp_header(packet)
     if not parsed:
         return
     addr = peer[0]
-    mac = neighutil.get_hwaddr(addr)
+    mac = await neighutil.get_hwaddr(addr)
     if mac:
         identifier = mac
     else:
@@ -421,7 +421,7 @@ async def rescan(handler):
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
-            macaddr = neighutil.get_hwaddr(addr[0])
+            macaddr = await neighutil.get_hwaddr(addr[0])
             if not macaddr:
                 continue
             known_peers.add(addr)
@@ -510,7 +510,7 @@ async def snoop(handler, protocol=None):
                     continue
                 if peer in deferpeers:
                     continue
-                mac = neighutil.get_hwaddr(peer[0])
+                mac = await neighutil.get_hwaddr(peer[0])
                 if not mac:
                     probepeer = (peer[0], struct.unpack('H', os.urandom(2))[0] | 1025) + peer[2:]
                     try:
@@ -550,7 +550,7 @@ async def snoop(handler, protocol=None):
                          event=log.Events.stacktrace)
 
 async def process_peer(newmacs, known_peers, peerbymacaddress, peer):
-    mac = neighutil.get_hwaddr(peer[0])
+    mac = await neighutil.get_hwaddr(peer[0])
     if not mac:
         return
     known_peers.add(peer)
@@ -589,7 +589,7 @@ async def active_scan(handler, protocol=None):
         for addr in scanned['addresses']:
             if addr in known_peers:
                 break
-            macaddr = neighutil.get_hwaddr(addr[0])
+            macaddr = await neighutil.get_hwaddr(addr[0])
             if not macaddr:
                 continue
             if not scanned.get('hwaddr', None):
@@ -646,7 +646,7 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
         try:
             srp = await asyncio.wait_for(pktq.get(), 1.0)
             sock, rsp, peer = srp
-            _parse_slp_packet(rsp, peer, rsps, xidmap, deferrals, sock)
+            await _parse_slp_packet(rsp, peer, rsps, xidmap, deferrals, sock)
         except asyncio.exceptions.TimeoutError:
             break
     cloop.remove_reader(net)
@@ -655,7 +655,7 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
         await asyncio.sleep(1.2)  # already have a one second pause from select above
         for defer in deferrals:
             rsp, peer = defer
-            _parse_slp_packet(rsp, peer, rsps, xidmap)
+            await _parse_slp_packet(rsp, peer, rsps, xidmap)
     # now to analyze and flesh out the responses
     handleids = set([])
     tsks = []
