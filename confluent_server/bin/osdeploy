@@ -72,7 +72,7 @@ async def main(args):
     if cmdset.command == 'initialize':
         return await initialize(cmdset)
     if cmdset.command == 'updateboot':
-        return updateboot(cmdset.profile)
+        return await updateboot(cmdset.profile)
     if cmdset.command == 'rebase':
         return rebase(cmdset.profile)
     ap.print_help()
@@ -461,7 +461,7 @@ async def initialize(cmdset):
     finally:
         os.umask(oum)
     if cmdset.g:
-        updateboot('genesis-x86_64')
+        await updateboot('genesis-x86_64')
     if totar:
         tmptarname = tmpname.replace('cpio', 'tgz')
         tarcmd = ['tar', '-czf', tmptarname] + totar
@@ -485,12 +485,12 @@ async def initialize(cmdset):
     # httpd available and enabled?
 
 
-def updateboot(profilename):
+async def updateboot(profilename):
     if not os.path.exists('/var/lib/confluent/public/site/initramfs.cpio'):
         emprint('Must generate site content first (TLS (-t) and/or SSH (-s))')
         return 1
     c = client.Command()
-    for rsp in c.update('/deployment/profiles/{0}'.format(profilename),
+    async for rsp in c.update('/deployment/profiles/{0}'.format(profilename),
             {'updateboot': 1}):
         if 'updated' in rsp:
             print('Updated: {0}'.format(rsp['updated']))
