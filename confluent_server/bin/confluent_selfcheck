@@ -19,7 +19,6 @@ import confluent.config.configmanager as configmanager
 import confluent.netutil as netutil
 import tempfile
 import shutil
-import greenlet
 import pwd
 import signal
 import confluent.collective.manager as collective

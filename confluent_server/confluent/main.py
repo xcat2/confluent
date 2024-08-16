@@ -59,7 +59,6 @@ except ImportError:
 #import multiprocessing
 import asyncio
 import gc
-from greenlet import greenlet
 import sys
 import os
 import glob
@@ -203,13 +202,6 @@ def dumptrace(signalname, frame):
     ht = open('/var/log/confluent/hangtraces', 'a')
     ht.write('Dumping active trace on ' + time.strftime('%X %x\n'))
     ht.write(''.join(traceback.format_stack(frame)))
-    for o in gc.get_objects():
-        if not isinstance(o, greenlet):
-            continue
-        if not o:
-            continue
-        ht.write('Thread trace: ({0})\n'.format(id(o)))
-        ht.write(''.join(traceback.format_stack(o.gr_frame)))
     for atask in asyncio.all_tasks():
         ht.write('Async trace: ({0})\n'.format(id(atask)))
         ht.write(''.join([x for x in format_stack(atask)]))

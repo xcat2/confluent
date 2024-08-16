@@ -28,7 +28,6 @@ import ssl
 import confluent.sortutil as sortutil
 import ctypes
 import ctypes.util
-import greenlet
 import random
 import time
 import sys
@@ -208,8 +207,6 @@ async def follow_leader(remote, leader):
     try:
         exitcause = await cfm.follow_channel(remote)
         newleader = exitcause.get('newleader', None)
-    except greenlet.GreenletExit:
-        cleanexit = True
     finally:
         if cleanexit:
             log.log({'info': 'Previous following cleanly closed',

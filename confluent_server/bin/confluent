@@ -18,10 +18,10 @@
 import asyncio
 import sys
 import os
-import eventlet
-import eventlet.hubs
-eventlet.hubs.use_hub("eventlet.hubs.asyncio")
-from eventlet.asyncio import spawn_for_awaitable
+#import eventlet
+#import eventlet.hubs
+#eventlet.hubs.use_hub("eventlet.hubs.asyncio")
+#from eventlet.asyncio import spawn_for_awaitable
 
 
 path = os.path.dirname(os.path.realpath(__file__))
@@ -43,8 +43,9 @@ async def main():
 if __name__ == '__main__':
     #multiprocessing.freeze_support()
     #asyncio.get_event_loop().run_until_complete(main())
-    gt = spawn_for_awaitable(confluent.main.run(sys.argv))
-    gt.wait()
+    asyncio.get_event_loop().run_until_complete(main())
+    #gt = spawn_for_awaitable(confluent.main.run(sys.argv))
+    #gt.wait()
 #except:
 #   pass
 #p.disable()
