@@ -45,6 +45,13 @@ class WebClient(object):
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute'))
             return {}
+        except (socket.gaierror, socket.herror, TimeoutError) as e:
+            results.put(msg.ConfluentTargetTimeout(e.strerror))
+            return {}
+        except Exception as e:
+            results.put(msg.ConfluentNodeError(self.node,
+                repr(e)))
+            return {}
         if status == 401:
             results.put(msg.ConfluentTargetInvalidCredentials(self.node, 'Unable to authenticate'))
             return {}
@@ -115,9 +122,7 @@ def retrieve(nodes, element, configmanager, inputdata):
     results = queue.LightQueue()
     workers = set([])
     if element == ['power', 'state']:
-        for node in nodes:
-            yield msg.PowerState(node=node, state='on')
-        return
+        _run_method(retrieve_power, workers, results, configmanager, nodes, element)
     elif element == ['health', 'hardware']:
         _run_method(retrieve_health, workers, results, configmanager, nodes, element)
     elif element[:3] == ['inventory', 'hardware', 'all']:
@@ -188,9 +193,15 @@ def retrieve_sensors(configmanager, creds, node, results, element):
 
 
 
+def retrieve_power(configmanager, creds, node, results, element):
+    wc = WebClient(node, configmanager, creds)
+    hinfo = wc.fetch('/affluent/health', results)
+    if hinfo:
+        results.put(msg.PowerState(node=node, state='on'))
+
 def retrieve_health(configmanager, creds, node, results, element):
     wc = WebClient(node, configmanager, creds)
-    hinfo = wc.fetch('/affluent/health', results) 
+    hinfo = wc.fetch('/affluent/health', results)
     if hinfo:
         results.put(msg.HealthSummary(hinfo.get('health', 'unknown'), name=node))
         results.put(msg.SensorReadings(hinfo.get('sensors', []), name=node))
