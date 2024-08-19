@@ -408,6 +408,34 @@ class NodeHandler(immhandler.NodeHandler):
             if user['users_user_name'] == '':
                 return user['users_user_id']
 
+    def create_tmp_account(self, wc):
+        rsp, status = wc.grab_json_response_with_status('/redfish/v1/AccountService/Accounts')
+        if status != 200:
+            raise Exception("Unable to list current accounts")
+        usednames = set([])
+        tmpnam = '6pmu0ezczzcp'
+        tpass = base64.b64encode(os.urandom(9)).decode() + 'Iw47$'
+        ntpass = base64.b64encode(os.urandom(9)).decode() + 'Iw47$'
+        for acct in rsp.get("Members", []):
+            url = acct.get("@odata.id", None)
+            if url:
+                uinfo = wc.grab_json_response(url)
+                usednames.add(uinfo.get('UserName', None))
+        if tmpnam in usednames:
+            raise Exception("Tmp account already exists")
+        rsp, status = wc.grab_json_response_with_status(
+            '/redfish/v1/AccountService/Accounts',
+            {'UserName': tmpnam, 'Password': tpass, 'RoleId': 'Administrator'})
+        if status >= 300:
+            raise Exception("Failure creating tmp account: " + repr(rsp))
+        tmpurl = rsp['@odata.id']
+        wc.set_basic_credentials(tmpnam, tpass)
+        rsp, status = wc.grab_json_response_with_status(
+            tmpurl, {'Password': ntpass}, method='PATCH')
+        wc.set_basic_credentials(tmpnam, ntpass)
+        return tmpurl
+
+
     def _setup_xcc_account(self, username, passwd, wc):
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         uid = None
@@ -442,16 +470,29 @@ class NodeHandler(immhandler.NodeHandler):
                     wc.grab_json_response('/api/providers/logout')
                     wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
                     status = 503
+                    tries = 2
+                    tmpaccount = None
                     while status != 200:
+                        tries -= 1
                         rsp, status = wc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
                             {'UserName': username}, method='PATCH')
                         if status != 200:
                             rsp = json.loads(rsp)
                             if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError'):
-                                eventlet.sleep(4)
+                                if tries:
+                                    eventlet.sleep(4)
+                                elif tmpaccount:
+                                    wc.grab_json_response_with_status(tmpaccount, method='DELETE')
+                                    raise Exception('Failed renaming main account')
+                                else:
+                                    tmpaccount = self.create_tmp_account(wc)
+                                    tries = 8
                             else:
                                 break
+                    if tmpaccount:
+                        wc.set_basic_credentials(username, passwd)
+                        wc.grab_json_response_with_status(tmpaccount, method='DELETE')
                     self.tmppasswd = None
                     self._currcreds = (username, passwd)
                     return
