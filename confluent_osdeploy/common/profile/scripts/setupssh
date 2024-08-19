@@ -3,6 +3,9 @@
 [ -f /opt/confluent/bin/apiclient ] && confapiclient=/opt/confluent/bin/apiclient
 [ -f /etc/confluent/apiclient ] && confapiclient=/etc/confluent/apiclient
 for pubkey in /etc/ssh/ssh_host*key.pub; do
+    if [ "$pubkey" = /etc/ssh/ssh_host_key.pub ]; then
+        continue
+    fi
     certfile=${pubkey/.pub/-cert.pub}
     rm $certfile
     confluentpython $confapiclient /confluent-api/self/sshcert $pubkey -o $certfile
