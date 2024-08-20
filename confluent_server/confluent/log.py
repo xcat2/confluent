@@ -68,6 +68,7 @@ import collections
 import confluent.config.configmanager
 import confluent.config.conf as conf
 import confluent.exceptions as exc
+import inspect
 import glob
 import json
 import os
@@ -117,7 +118,9 @@ _loggers = {}
 
 async def _sleep_and_run(sleeptime, func, args):
     await asyncio.sleep(sleeptime)
-    await func(*args)
+    awt = func(*args)
+    if inspect.isawaitable(awt):
+        await awt
 
 
 def spawn_after(sleeptime, func, *args):
