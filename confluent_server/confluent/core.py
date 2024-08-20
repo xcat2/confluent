@@ -183,12 +183,12 @@ class PluginRoute(object):
 
 
 
-def handle_storage(configmanager, inputdata, pathcomponents, operation):
+async def handle_storage(configmanager, inputdata, pathcomponents, operation):
     if len(pathcomponents) == 1:
         yield msg.ChildCollection('remote/')
         return
     if pathcomponents[1] == 'remote':
-        for rsp in mountmanager.handle_request(configmanager, inputdata, pathcomponents[2:], operation):
+        async for rsp in mountmanager.handle_request(configmanager, inputdata, pathcomponents[2:], operation):
             yield rsp
 
 async def handle_deployment(configmanager, inputdata, pathcomponents,
@@ -243,7 +243,8 @@ async def handle_deployment(configmanager, inputdata, pathcomponents,
                     return
     if pathcomponents[1] == 'fingerprint':
         if operation == 'create':
-            importer = osimage.MediaImporter(inputdata['filename'], configmanager, checkonly=True)
+            importer = osimage.MediaImporter()
+            await importer.init(inputdata['filename'], configmanager, checkonly=True)
             medinfo = {
                 'targetpath': importer.targpath,
                 'name': importer.osname,

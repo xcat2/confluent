@@ -4,7 +4,7 @@ import eventlet
 import confluent.messages as msg
 import confluent.exceptions as exc
 import struct
-import eventlet.green.socket as socket
+import socket
 import os
 mountsbyuser = {}
 _browserfsd = None
@@ -23,7 +23,7 @@ async def assure_browserfs():
             await asyncio.sleep(0.5)
 
 
-def handle_request(configmanager, inputdata, pathcomponents, operation):
+async def handle_request(configmanager, inputdata, pathcomponents, operation):
     curruser = configmanager.current_user
     if len(pathcomponents) == 0:
         mounts = mountsbyuser.get(curruser, [])
@@ -39,7 +39,7 @@ def handle_request(configmanager, inputdata, pathcomponents, operation):
             curridx = 1
             while curridx in usedidx:
                 curridx += 1
-            currmount = requestmount(curruser, inputdata['name'])
+            currmount = await requestmount(curruser, inputdata['name'])
             currmount['index'] = curridx
             if curruser not in mountsbyuser:
                 mountsbyuser[curruser] = []
