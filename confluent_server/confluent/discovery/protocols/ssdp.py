@@ -124,7 +124,7 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
             util.spawn(check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype))
 
 async def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype):
-    retdata = await check_fish(('/DeviceDescription.json', peerdata))
+    retdata = await check_fish(('/DeviceDescription.json', peerdata, targtype))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
