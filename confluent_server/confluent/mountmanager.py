@@ -52,24 +52,23 @@ async def handle_request(configmanager, inputdata, pathcomponents, operation):
 
 async def requestmount(subdir, filename):
     await assure_browserfs()
+    cloop = asyncio.get_event_loop()
     a = socket.socket(socket.AF_UNIX)
-    a.connect('/var/run/confluent/browserfs/control')
+    a.settimeout(0)
+    await cloop.sock_connect(a, '/var/run/confluent/browserfs/control')
     subname = subdir.encode()
-    a.send(struct.pack('!II', 1, len(subname)))
-    a.send(subname)
     fname = filename.encode()
-    a.send(struct.pack('!I', len(fname)))
-    a.send(fname)
-    rsp = a.recv(4)
+    await cloop.sock_sendall(a, struct.pack('!II', 1, len(subname)) + subname + struct.pack('!I', len(fname)) + fname)
+    rsp = await cloop.sock_recv(a, 4)
     retcode = struct.unpack('!I', rsp)[0]
     if retcode != 0:
         raise Exception("Bad return code")
-    rsp = a.recv(4)
+    rsp = await cloop.sock_recv(a, 4)
     nlen = struct.unpack('!I', rsp)[0]
-    idstr = a.recv(nlen).decode('utf8')
-    rsp = a.recv(4)
+    idstr = (await cloop.sock_recv(a, nlen)).decode('utf8')
+    rsp = await cloop.sock_recv(a, 4)
     nlen = struct.unpack('!I', rsp)[0]
-    authtok = a.recv(nlen).decode('utf8')
+    authtok = (await cloop.sock_recv(a, nlen)).decode('utf8')
     thismount = {
             'id': idstr,
             'path': '{}/{}/{}'.format(idstr, subdir, filename),
