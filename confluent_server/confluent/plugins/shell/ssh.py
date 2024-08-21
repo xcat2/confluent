@@ -22,6 +22,7 @@
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
+import confluent.tasks as tasks
 import confluent.util as util
 
 import hashlib
@@ -78,7 +79,7 @@ class SshShell(conapi.Console):
 
     def logon(self):
         self.inputmode = -3
-        util.spawn(self.do_logon())
+        tasks.spawn(self.do_logon())
     
     async def do_logon(self):
         sco = asyncssh.SSHClientConnectionOptions()
@@ -120,7 +121,7 @@ class SshShell(conapi.Console):
         self.connected = True
         await self.datacallback('Connected\r\n')
         self.shell = await self.ssh.open_session(term_type='vt100', term_size=(self.width, self.height))
-        self.rxthread = util.spawn(self.recvdata())
+        self.rxthread = tasks.spawn_task(self.recvdata())
 
     async def write(self, data):
         if self.inputmode == -2:

@@ -3,7 +3,7 @@ import code
 import os
 import socket
 import sys
-import confluent.util as util
+import confluent.tasks as tasks
 
 #this will ultimately fill the role of the 'backdoor' of eventlet
 
@@ -58,7 +58,7 @@ async def srv_debug(sock):
     cloop = asyncio.get_event_loop()
     while True:
         cnn, addr = await cloop.sock_accept(sock)
-        util.spawn(interact(cloop, cnn))
+        tasks.spawn(interact(cloop, cnn))
 
 
 def start_dbgif():
@@ -76,4 +76,4 @@ def start_dbgif():
     os.chmod("/var/run/confluent/dbg.sock",
              0o600)
     os.umask(oumask)
-    util.spawn(srv_debug(unixsocket))
+    tasks.spawn(srv_debug(unixsocket))

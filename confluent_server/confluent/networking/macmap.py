@@ -53,6 +53,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
 import confluent.noderange as noderange
+import confluent.tasks as tasks
 import confluent.util as util
 import fcntl
 import msgpack
@@ -471,7 +472,7 @@ async def update_macmap(configmanager, impatient=False):
         except GeneratorExit:
             # the calling function has stopped caring, but we want to finish
             # the sweep, background it
-            util.spawn(_finish_update(completions))
+            tasks.spawn(_finish_update(completions))
             raise
 
 
@@ -586,7 +587,7 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
             pathcomponents == ['networking', 'macs', 'rescan']):
         if inputdata != {'rescan': 'start'}:
             raise exc.InvalidArgumentException('Input must be rescan=start')
-        util.spawn(rescan(configmanager))
+        tasks.spawn(rescan(configmanager))
         return [msg.KeyValueData({'rescan': 'started'})]
     raise exc.NotImplementedException(
         'Operation {0} on {1} not implemented'.format(
@@ -722,7 +723,7 @@ async def offloader_main(cloop):
         data = await sreader.read(512)
         upacker.feed(data)
         for cmd in upacker:
-            util.spawn(_snmp_map_switch_relay(*cmd))
+            tasks.spawn(_snmp_map_switch_relay(*cmd))
     sys.exit(0)
 
 async def test_main(cloop):

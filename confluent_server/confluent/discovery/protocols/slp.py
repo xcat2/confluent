@@ -16,6 +16,7 @@
 
 import asyncio
 import confluent.neighutil as neighutil
+import confluent.tasks as tasks
 import confluent.util as util
 import confluent.log as log
 import os
@@ -673,7 +674,7 @@ async def scan(srvtypes=_slp_services, addresses=None, localonly=False):
                     break
             else:
                 continue
-        tsks.append(util.spawn(_add_attributes(rsps[id])))
+        tsks.append(tasks.spawn_task(_add_attributes(rsps[id])))
         handleids.add(id)
     if tsks:
         await asyncio.wait(tsks)

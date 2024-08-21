@@ -23,6 +23,7 @@ import confluent.log as log
 import confluent.noderange as noderange
 import confluent.asynctlvdata as tlvdata
 import confluent.util as util
+import confluent.tasks as tasks
 import socket
 import ssl
 import confluent.sortutil as sortutil
@@ -194,7 +195,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
             currentleader = leader
         #spawn this as a thread...
         #remote.settimeout(90)
-        follower = util.spawn(follow_leader(remote, leader))
+        follower = tasks.spawn_task(follow_leader(remote, leader))
     return True
 
 
@@ -228,7 +229,7 @@ async def follow_leader(remote, leader):
         await cfm.stop_following()
         currentleader = None
         if retrythread is None:  # start a recovery
-            retrythread = util.spawn_after(
+            retrythread = tasks.spawn_task_after(
                 random.random(), start_collective)
 
 async def _create_tls_connection(host, port):
@@ -476,7 +477,7 @@ async def handle_connection(connection, cert, request, local=False):
             f.close()
             log.log({'info': 'Connecting to collective due to join',
                      'subsystem': 'collective'})
-            util.spawn(connect_to_leader(rsp['collective'][
+            tasks.spawn(connect_to_leader(rsp['collective'][
                 'fingerprint'], name))
     if 'enroll' == operation:
         async with enrolling:
@@ -591,7 +592,7 @@ async def handle_connection(connection, cert, request, local=False):
         await connection[1].wait_closed()
         if not await connect_to_leader(None, None, leader=newleader):
             if retrythread is None:
-                retrythread = util.spawn_after(random.random(),
+                retrythread = tasks.spawn_task_after(random.random(),
                                                    start_collective)
     if 'getinfo' == operation:
         drone = request['name']
@@ -656,7 +657,7 @@ async def handle_connection(connection, cert, request, local=False):
             if not await connect_to_leader(
                 None, None, peername):
                 if retrythread is None:
-                    retrythread = util.spawn_after(5 + random.random(),
+                    retrythread = tasks.spawn_task_after(5 + random.random(),
                                                    start_collective)
             return
         if retrythread is not None:
@@ -691,7 +692,7 @@ async def handle_connection(connection, cert, request, local=False):
                      'subsystem': 'collective'})
             if retrythread is None:  # start a recovery if everyone else seems
                 # to have disappeared
-                retrythread = util.spawn_after(5 + random.random(),
+                retrythread = tasks.spawn_task_after(5 + random.random(),
                                                    start_collective)
         # ok, we have a connecting member whose certificate checks out
         # He needs to bootstrap his configuration and subscribe it to updates
@@ -741,7 +742,7 @@ async def try_assimilate(drone, followcount, remote):
         cnn = remote[1].transport.get_extra_info('socket')
         if not await connect_to_leader(None, None, leader=cnn.getpeername()[0]):
             if retrythread is None:
-                retrythread = util.spawn_after(random.random(),
+                retrythread = tasks.spawn_task_after(random.random(),
                                                     start_collective)
         return False
     if 'leader' in answer:
@@ -803,7 +804,7 @@ async def become_leader(connection):
     skipaddr = cnn.getpeername()[0]
     if reassimilate is not None:
         reassimilate.cancel()
-    reassimilate = util.spawn(reassimilate_missing())
+    reassimilate = tasks.spawn_task(reassimilate_missing())
     cfm._ready = True
     if await _assimilate_missing(skipaddr):
         schedule_rebalance()
@@ -835,7 +836,7 @@ async def _assimilate_missing(skipaddr=None):
         return True
     connections = []
     for ct in connecto:
-        connections.append(util.spawn(create_connection(ct)))
+        connections.append(tasks.spawn_task(create_connection(ct)))
     for ent in connections:
         ent = await ent
         member, remote = ent
@@ -851,7 +852,7 @@ def startup():
     if len(members) < 2:
         # Not in collective mode, return
         return
-    util.spawn(start_collective())
+    tasks.spawn(start_collective())
 
 async def check_managers():
     global failovercheck
@@ -903,7 +904,7 @@ def schedule_rebalance():
     global failovercheck
     if not failovercheck:
         failovercheck = True
-        failovercheck = util.spawn_after(10, check_managers)
+        failovercheck = tasks.spawn_task_after(10, check_managers)
 
 async def start_collective():
     global follower
@@ -939,7 +940,7 @@ async def start_collective():
             connecto.append(ldrcandidate)
         connections = []
         for ct in connecto:
-            connections.append(util.spawn(create_connection(ct)))
+            connections.append(tasks.spawn_task(create_connection(ct)))
         pnding = connections
         while pnding:
             rdy, pnding = await asyncio.wait(pnding, return_when=asyncio.FIRST_COMPLETED)
@@ -961,6 +962,6 @@ async def start_collective():
     finally:
         if retrythread is None and follower is None:
             #retrythread = asyncio.create_task(start_collective())
-            retrythread = util.spawn_after(5 + random.random(),
+            retrythread = tasks.spawn_task_after(5 + random.random(),
                                                start_collective)
         initting = False

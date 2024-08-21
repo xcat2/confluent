@@ -68,6 +68,7 @@ import collections
 import confluent.config.configmanager
 import confluent.config.conf as conf
 import confluent.exceptions as exc
+import confluent.tasks as tasks
 import inspect
 import glob
 import json
@@ -114,40 +115,6 @@ except ImportError:
 
 MIDNIGHT = 24 * 60 * 60
 _loggers = {}
-
-
-async def _sleep_and_run(sleeptime, func, args):
-    await asyncio.sleep(sleeptime)
-    awt = func(*args)
-    if inspect.isawaitable(awt):
-        await awt
-
-
-def spawn_after(sleeptime, func, *args):
-    if func is None:
-        raise Exception('tf')
-    return spawn(_sleep_and_run(sleeptime, func, args))
-
-
-tsks = {}
-
-
-def spawn(coro):
-    tskid = random.random()
-    while tskid in tsks:
-        tskid = random.random()
-    tsks[tskid] = 1
-    try:
-        tsks[tskid] = asyncio.create_task(_run(coro, tskid), name=repr(coro))
-    except AttributeError:
-        tsks[tskid] = asyncio.get_event_loop().create_task(_run(coro, tskid), name=repr(coro))
-    return tsks[tskid]
-
-
-async def _run(coro, taskid):
-    ret = await coro
-    del tsks[taskid]
-    return ret
 
 
 class Events(object):
@@ -665,7 +632,7 @@ class Logger(object):
                 self.logentries.appendleft([DataTypes.event, tstamp, roll_data,
                                             Events.logrollover, None])
         if self.closer is None:
-            self.closer = spawn_after(15, self.closelog)
+            self.closer = tasks.spawn_task_after(15, self.closelog)
         self.writer = None
 
     def read_recent_text(self, size):
@@ -814,7 +781,7 @@ class Logger(object):
                 [ltype, timestamp, logdata, event, eventdata])
         if self.buffered:
             if self.writer is None:
-                self.writer = spawn_after(2, self.writedata)
+                self.writer = tasks.spawn_task_after(2, self.writedata)
         else:
             self.writedata()
 
@@ -840,3 +807,5 @@ def logtrace():
         tracelog = Logger('trace', buffered=False)
     tracelog.log(traceback.format_exc(), ltype=DataTypes.event,
                  event=Events.stacktrace)
+
+tasks.logtrace = logtrace

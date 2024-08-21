@@ -19,6 +19,7 @@ if __name__ == '__main__':
 
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.tasks as tasks
 import confluent.util as util
 
 COPY = 1
@@ -847,7 +848,7 @@ async def generate_stock_profiles(defprofile, distpath, targpath, osname,
         await util.check_call(
             'sh', '{0}/initprofile.sh'.format(dirname),
              targpath, dirname)
-        bootupdates.append(util.spawn(update_boot(dirname)))
+        bootupdates.append(tasks.spawn_task(update_boot(dirname)))
         profilelist.append(profname)
     for upd in bootupdates:
         await upd
@@ -911,7 +912,7 @@ class MediaImporter(object):
         importing[importkey] = self
         self.filename = os.path.abspath(media)
         self.error = ''
-        self.importer = util.spawn(self.importmedia())
+        self.importer = tasks.spawn_task(self.importmedia())
 
     def stop(self):
         if self.worker and self.worker.returncode is None:

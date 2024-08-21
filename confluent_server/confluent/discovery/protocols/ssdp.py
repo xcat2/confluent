@@ -36,6 +36,7 @@ import confluent.noderange as noderange
 import confluent.util as util
 import confluent.log as log
 import confluent.netutil as netutil
+import confluent.tasks as tasks
 import socket
 import os
 import time
@@ -121,7 +122,7 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 else:
                     return
         if handler:
-            util.spawn(check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype))
+            tasks.spawn(check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype))
 
 async def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype):
     retdata = await check_fish(('/DeviceDescription.json', peerdata, targtype))
@@ -468,7 +469,7 @@ async def _find_service(service, target):
         #    pooltargs.append(('/redfish/v1/', peerdata[nid]))
     tsks = []
     for targ in pooltargs:
-        tsks.append(util.spawn_task(check_fish(targ)))
+        tsks.append(tasks.spawn_task(check_fish(targ)))
     while tsks:
         done, tsks = await asyncio.wait(tsks, return_when=asyncio.FIRST_COMPLETED)
         for dt in done:

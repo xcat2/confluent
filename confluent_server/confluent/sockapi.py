@@ -46,6 +46,7 @@ import confluent.log as log
 import confluent.core as pluginapi
 import confluent.shellserver as shellserver
 import confluent.collective.manager as collective
+import confluent.tasks as tasks
 import confluent.util as util
 
 tracelog = None
@@ -386,9 +387,9 @@ async def _tlshandler(bind_host, bind_port):
     while (1):  # TODO: exithook
         cnn, addr = await cloop.sock_accept(plainsocket)
         if addr[1] < 1000:
-            asyncio.create_task(cs.handle_client(cnn, addr))
+            tasks.spawn(cs.handle_client(cnn, addr))
         else:
-            asyncio.create_task(_tlsstartup(cnn))
+            tasks.spawn(_tlsstartup(cnn))
 
 
 @ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
@@ -443,7 +444,7 @@ async def _tlsstartup(cnn):
         #cnn = ctx.wrap_socket(cnn, server_side=True)
     except AttributeError:
         raise Exception('Unable to find workable SSL support')
-    asyncio.create_task(sessionhdl(cnn, authname, cert=cert))
+    tasks.spawn(sessionhdl(cnn, authname, cert=cert))
 
 def removesocket():
     try:
@@ -489,7 +490,7 @@ async def _unixdomainhandler():
             except KeyError:
                 cnn.close()
                 return
-        util.spawn(sessionhdl(cnn, authname, skipauth))
+        tasks.spawn(sessionhdl(cnn, authname, skipauth))
         #asyncio.create_task(sessionhdl(cnn, authname, skipauth))
 
 
@@ -510,8 +511,8 @@ class SockApi(object):
             self.start_remoteapi()
         else:
             cloop = asyncio.get_event_loop()
-            cloop.create_task(self.watch_for_cert())
-        self.unixdomainserver = asyncio.create_task(_unixdomainhandler())
+            tasks.spawn(self.watch_for_cert())
+        self.unixdomainserver = tasks.spawn_task(_unixdomainhandler())
 
     async def watch_for_cert(self):
         watcher = libc.inotify_init1(os.O_NONBLOCK)
@@ -547,5 +548,5 @@ class SockApi(object):
     def start_remoteapi(self):
         if self.tlsserver is not None:
             return
-        self.tlsserver = asyncio.get_event_loop().create_task(
+        self.tlsserver = tasks.spawn_task(
             _tlshandler(self.bind_host, self.bind_port))

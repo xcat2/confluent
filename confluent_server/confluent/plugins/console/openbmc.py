@@ -23,6 +23,7 @@ import asyncio
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
+import confluent.tasks as tasks
 import confluent.util as util
 import aiohmi.exceptions as pygexc
 import aiohmi.redfish.command as rcmd
@@ -129,7 +130,7 @@ class OpenBmcConsole(conapi.Console):
         self.ws = await self.clisess.ws_connect('wss://{0}/console0'.format(self.bmc), protocols=protos, ssl=self.ssl)
     #self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']), subprotocols=[wc.cookies['XSRF-TOKEN']])
         self.connected = True
-        self.recvr = util.spawn_task(self.recvdata())
+        self.recvr = tasks.spawn_task(self.recvdata())
         return
 
     async def write(self, data):

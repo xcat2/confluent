@@ -55,6 +55,7 @@ try:
     import confluent.shellmodule as shellmodule
 except ImportError:
     pass
+import confluent.tasks as tasks
 import confluent.util as util
 import inspect
 import itertools
@@ -885,7 +886,7 @@ async def handle_dispatch(connection, cert, dispatch, peername):
         await connection[1].wait_closed()
         return
     xmitlock = asyncio.Lock()
-    keepalive = util.spawn(_keepalivefn(connection, xmitlock))
+    keepalive = tasks.spawn_task(_keepalivefn(connection, xmitlock))
     dispatch = msgpack.unpackb(dispatch[2:], raw=False)
     configmanager = cfm.ConfigManager(dispatch['tenant'])
     nodes = dispatch['nodes']
@@ -1120,7 +1121,7 @@ async def handle_node_request(configmanager, inputdata, operation,
         numworkers = 0
         for hfunc in nodesbyhandler:
             numworkers += 1
-            util.spawn(addtoqueue(passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
+            tasks.spawn(addtoqueue(passvalues, hfunc, {'nodes': nodesbyhandler[hfunc],
                                            'element': pathcomponents,
                 'configmanager': configmanager,
                 'inputdata': _get_input_data(_plugin, pathcomponents,
@@ -1128,7 +1129,7 @@ async def handle_node_request(configmanager, inputdata, operation,
                                              isnoderange, configmanager)}))
         for manager in nodesbymanager:
             numworkers += 1
-            util.spawn(addtoqueue(passvalues, dispatch_request, {
+            tasks.spawn(addtoqueue(passvalues, dispatch_request, {
                 'nodes': nodesbymanager[manager], 'manager': manager,
                 'element': pathcomponents, 'configmanager': configmanager,
                 'inputdata': inputdata, 'operation': operation, 'isnoderange': isnoderange}))

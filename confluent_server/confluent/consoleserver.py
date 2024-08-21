@@ -31,6 +31,7 @@ import confluent.interface.console as conapi
 import confluent.log as log
 import confluent.core as plugin
 import confluent.asynctlvdata as tlvdata
+import confluent.tasks as tasks
 import confluent.util as util
 import socket
 import random
@@ -160,7 +161,7 @@ class ConsoleHandler(object):
         if self._genwatchattribs:
             self._attribwatcher = self.cfgmgr.watch_attributes(
                 (self.node,), self._genwatchattribs, self._attribschanged)
-        util.spawn(self.ondemand_init())
+        tasks.spawn(self.ondemand_init())
 
     async def ondemand_init(self):
         await self.check_isondemand()
@@ -325,7 +326,7 @@ class ConsoleHandler(object):
         if self.connectionthread:
             self.connectionthread.cancel()
             self.connectionthread = None
-        self.connectionthread = util.spawn(self._connect_backend())
+        self.connectionthread = tasks.spawn_task(self._connect_backend())
 
     async def _connect_backend(self):
         if self._console:
@@ -393,7 +394,7 @@ class ConsoleHandler(object):
                               'error': self.error})
             retrytime = self._get_retry_time()
             if not self.reconnect:
-                self.reconnect = util.spawn_after(retrytime, self._connect)
+                self.reconnect = tasks.spawn_task_after(retrytime, self._connect)
             return
         except (exc.TargetEndpointUnreachable, socket.gaierror) as se:
             self.clearbuffer()
@@ -403,7 +404,7 @@ class ConsoleHandler(object):
                               'error': self.error})
             retrytime = self._get_retry_time()
             if not self.reconnect:
-                self.reconnect = util.spawn_after(retrytime, self._connect)
+                self.reconnect = tasks.spawn_task_after(retrytime, self._connect)
             return
         except Exception:
             self.clearbuffer()
@@ -415,7 +416,7 @@ class ConsoleHandler(object):
                               'error': self.error})
             retrytime = self._get_retry_time()
             if not self.reconnect:
-                self.reconnect = util.spawn_after(retrytime, self._connect)
+                self.reconnect = tasks.spawn_task_after(retrytime, self._connect)
             return
         await self._got_connected()
 
@@ -713,7 +714,7 @@ class ProxyConsole(object):
         await tlvdata.recv(remote)
         await tlvdata.send(remote, termreq)
         self.remote = remote
-        util.spawn(self.relay_data())
+        tasks.spawn(self.relay_data())
 
     async def detachsession(self, session):
         # we will disappear, so just let that happen...
@@ -774,11 +775,11 @@ class ConsoleSession(object):
         self._evt = None
         self.node = node
         self.write = self.conshdl.write
-        util.spawn(self.delayinit(datacallback, skipreplay))
+        tasks.spawn(self.delayinit(datacallback, skipreplay))
 
     async def delayinit(self, datacallback, skipreplay):
         if datacallback is None:
-            self.reaper = util.spawn_after(15, self.destroy)
+            self.reaper = tasks.spawn_task_after(15, self.destroy)
             self.databuffer = collections.deque([])
             self.data_handler = self.got_data
             if not skipreplay:

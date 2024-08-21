@@ -33,6 +33,7 @@ import msgpack
 import multiprocessing
 import os
 import pwd
+import confluent.tasks as tasks
 import confluent.userutil as userutil
 import confluent.util as util
 pam = None
@@ -316,7 +317,7 @@ async def check_user_passphrase(name, passphrase, operation=None, element=None, 
             authworkers = ProcessPoolExecutor(max_workers=1) # multiprocessing.Pool(processes=1)
         else:
             authcleaner.cancel()
-        authcleaner = util.spawn_after(30, _clean_authworkers)
+        authcleaner = tasks.spawn_task_after(30, _clean_authworkers)
         crypted = await _do_pbkdf(passphrase, salt)
         del _passchecking[(user, tenant)]
         await asyncio.sleep(

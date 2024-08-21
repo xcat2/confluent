@@ -22,7 +22,7 @@
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
 import confluent.messages as msg
-import confluent.util as util
+import confluent.tasks as tasks
 activesessions = {}
 
 
@@ -48,7 +48,7 @@ class _ShellHandler(consoleserver.ConsoleHandler):
 
     def _got_disconnected(self):
         self.connectstate = 'closed'
-        util.spawn(self._bgdisconnect())
+        tasks.spawn(self._bgdisconnect())
 
     async def _bgdisconnect(self):
         await self._send_rcpts({'connectstate': self.connectstate})

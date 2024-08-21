@@ -30,6 +30,7 @@ import confluent.neighutil as neighutil
 import confluent.log as log
 import confluent.netutil as netutil
 import confluent.util as util
+import confluent.tasks as tasks
 import ctypes
 import ctypes.util
 import netifaces
@@ -335,7 +336,7 @@ async def proxydhcp(handler, nodeguess):
 
 
 def start_proxydhcp(handler, nodeguess=None):
-    util.spawn(proxydhcp(handler, nodeguess))
+    tasks.spawn(proxydhcp(handler, nodeguess))
 
 
 def new_dhcp_packet(handler, nodeguess, cfg, net4):
@@ -360,7 +361,7 @@ def new_dhcp6_packet(handler, net6, cfg, nodeguess):
         return
     rqv = memoryview(pkt)
     if rqv[0] in (1, 3):
-        util.spawn(process_dhcp6req(handler, rqv, addr, net6, cfg, nodeguess))
+        tasks.spawn(process_dhcp6req(handler, rqv, addr, net6, cfg, nodeguess))
 
 
 async def snoop(handler, protocol=None, nodeguess=None):

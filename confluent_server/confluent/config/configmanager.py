@@ -72,6 +72,7 @@ import confluent.config.attributes as allattributes
 import confluent.config.conf as conf
 import confluent.noderange as noderange
 import confluent.util
+import confluent.tasks as tasks
 import confluent.netutil as netutil
 import confluent.exceptions as exc
 import confluent.log
@@ -2174,7 +2175,7 @@ class ConfigManager(object):
         for watcher in notifdata:
             watcher = notifdata[watcher]
             callback = watcher['callback']
-            confluent.util.spawn(_do_notifier(self, watcher, callback))
+            tasks.spawn(_do_notifier(self, watcher, callback))
 
     async def del_nodes(self, nodes):
         if isinstance(nodes, set):
@@ -2330,7 +2331,7 @@ class ConfigManager(object):
             nodecollwatchers = self._nodecollwatchers[self.tenant]
             for watcher in nodecollwatchers:
                 watcher = nodecollwatchers[watcher]
-                confluent.util.spawn(_do_add_watcher(watcher, (), self, renamemap))
+                tasks.spawn(_do_add_watcher(watcher, (), self, renamemap))
         self._bg_sync_to_file()
 
     async def rename_nodegroups(self, renamemap):
@@ -2525,7 +2526,7 @@ class ConfigManager(object):
                 nodecollwatchers = self._nodecollwatchers[self.tenant]
                 for watcher in nodecollwatchers:
                     watcher = nodecollwatchers[watcher]
-                    confluent.util.spawn(_do_add_watcher(watcher, newnodes, self))
+                    tasks.spawn(_do_add_watcher(watcher, newnodes, self))
         self._bg_sync_to_file()
         #TODO: wait for synchronization to suceed/fail??)
 

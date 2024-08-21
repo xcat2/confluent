@@ -82,6 +82,7 @@ import confluent.log as log
 import confluent.messages as msg
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
+import confluent.tasks as tasks
 import confluent.util as util
 import inspect
 import json
@@ -688,7 +689,7 @@ async def _recheck_nodes_backend(nodeattribs, configmanager):
             if info['handler'] is None:
                 next
             handler = info['handler'].NodeHandler(info, configmanager)
-            util.spawn(eval_node(configmanager, handler, info, nodename))
+            tasks.spawn(eval_node(configmanager, handler, info, nodename))
         except Exception:
             traceback.print_exc()
             log.log({'error': 'Unexpected error during discovery of {0}, check debug '
@@ -733,7 +734,7 @@ async def _recheck_single_unknown_info(configmanager, info):
         # if cancel did not result in dead, then we are in progress
         if rechecker is None or rechecker.done():
             rechecktime = util.monotonic_time() + 300
-            rechecker = util.spawn_after(300, _periodic_recheck,
+            rechecker = tasks.spawn_task_after(300, _periodic_recheck,
                                              configmanager)
         return
     nodename, info['maccount'] = await get_nodename(configmanager, handler, info)
@@ -748,7 +749,7 @@ async def _recheck_single_unknown_info(configmanager, info):
                 known_nodes[nodename][info['hwaddr']] = info
                 info['discostatus'] = 'discovered'
                 return  # already known, no need for more
-        util.spawn(eval_node(configmanager, handler, info, nodename))
+        tasks.spawn(eval_node(configmanager, handler, info, nodename))
 
 
 def safe_detected(info):
@@ -757,7 +758,7 @@ def safe_detected(info):
     if info['hwaddr'] in runningevals:
         # Do not evaluate the same mac multiple times at once
         return
-    runningevals[info['hwaddr']] = util.spawn(eval_detected(info))
+    runningevals[info['hwaddr']] = tasks.spawn_task(eval_detected(info))
 
 
 async def eval_detected(info):
@@ -786,7 +787,7 @@ async def detected(info):
         return
     if (handler and not handler.NodeHandler.adequate(info) and
             info.get('protocol', None)):
-        util.spawn_after(10, info['protocol'].fix_info, info,
+        tasks.spawn_after(10, info['protocol'].fix_info, info,
                              safe_detected)
         return
     if info['hwaddr'] in known_info and 'addresses' in info:
@@ -865,7 +866,7 @@ async def detected(info):
             rechecker.cancel()
         if rechecker is None or rechecker.done():
             rechecktime = util.monotonic_time() + 300
-            rechecker = util.spawn_after(300, _periodic_recheck, cfg)
+            rechecker = tasks.spawn_task_after(300, _periodic_recheck, cfg)
         unknown_info[info['hwaddr']] = info
         info['discostatus'] = 'unidentfied'
         #TODO, eventlet spawn after to recheck sooner, or somehow else
@@ -1461,7 +1462,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
 
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):
-            util.spawn(_recheck_single_unknown_info(cfg, i))
+            tasks.spawn(_recheck_single_unknown_info(cfg, i))
         try:
             del pending_by_uuid[curruuid]
         except KeyError:
@@ -1550,7 +1551,7 @@ async def _handle_nodelist_change(configmanager):
     await _recheck_nodes((), configmanager)
     if needaddhandled:
         needaddhandled = False
-        nodeaddhandler = util.spawn(_handle_nodelist_change(configmanager))
+        nodeaddhandler = tasks.spawn_task(_handle_nodelist_change(configmanager))
     else:
         nodeaddhandler = None
 
@@ -1578,7 +1579,7 @@ async def newnodes(added, deleting, renamed, configmanager):
     if nodeaddhandler:
         needaddhandled = True
     else:
-        nodeaddhandler = util.spawn(_handle_nodelist_change(configmanager))
+        nodeaddhandler = tasks.spawn_task(_handle_nodelist_change(configmanager))
 
 
 
@@ -1600,7 +1601,7 @@ async def _periodic_recheck(configmanager):
     # for rechecker was requested in the course of recheck_nodes
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
-        rechecker = util.spawn_after(900, _periodic_recheck,
+        rechecker = tasks.spawn_task_after(900, _periodic_recheck,
                                          configmanager)
 
 
@@ -1610,7 +1611,7 @@ async def rescan():
     if scanner:
         return
     else:
-        scanner = util.spawn(blocking_scan())
+        scanner = tasks.spawn_task(blocking_scan())
     await remotescan()
 
 async def remotescan():
@@ -1625,8 +1626,8 @@ async def remotescan():
 
 async def blocking_scan():
     global scanner
-    slpscan = util.spawn(slp.active_scan(safe_detected, slp))
-    ssdpscan = util.spawn(ssdp.active_scan(safe_detected, ssdp))
+    slpscan = tasks.spawn_task(slp.active_scan(safe_detected, slp))
+    ssdpscan = tasks.spawn_task(ssdp.active_scan(safe_detected, ssdp))
     await slpscan
     await ssdpscan
     #ssdpscan.wait()
@@ -1649,20 +1650,20 @@ def start_detection():
         start_autosense()
     if rechecker is None:
         rechecktime = util.monotonic_time() + 900
-        rechecker = util.spawn_after(900, _periodic_recheck, cfg)
-    util.spawn(ssdp.snoop(safe_detected, None, ssdp, get_node_by_uuid_or_mac))
+        rechecker = tasks.spawn_task_after(900, _periodic_recheck, cfg)
+    tasks.spawn(ssdp.snoop(safe_detected, None, ssdp, get_node_by_uuid_or_mac))
 
 def stop_autosense():
     for watcher in list(autosensors):
-        watcher.kill()
+        watcher.cancel()
         autosensors.discard(watcher)
 
 def start_autosense():
-    autosensors.add(util.spawn(slp.snoop(safe_detected, slp)))
+    autosensors.add(tasks.spawn_task(slp.snoop(safe_detected, slp)))
     #autosensors.add(eventlet.spawn(mdns.snoop, safe_detected, mdns))
-    util.spawn(pxe.snoop(safe_detected, pxe, get_node_guess_by_uuid))
+    tasks.spawn(pxe.snoop(safe_detected, pxe, get_node_guess_by_uuid))
     #autosensors.add(eventlet.spawn(pxe.snoop, safe_detected, pxe, get_node_guess_by_uuid))
-    util.spawn(remotescan())
+    tasks.spawn(remotescan())
 
 
 nodes_by_fprint = {}

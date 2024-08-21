@@ -29,6 +29,7 @@ import ssl
 import struct
 import random
 import subprocess
+import confluent.tasks as tasks
 
 
 def mkdirp(path, mode=0o777):
@@ -45,54 +46,7 @@ async def check_call(*cmd, **kwargs):
     if rc != 0:
         raise subprocess.CalledProcessError(rc, cmd)
 
-async def _sleep_and_run(sleeptime, func, args):
-    await asyncio.sleep(sleeptime)
-    await func(*args)
 
-
-def spawn_after(sleeptime, func, *args):
-    if func is None:
-        raise Exception('tf')
-    return spawn(_sleep_and_run(sleeptime, func, args))
-
-tsks = {}
-
-
-tasksitter = None
-
-
-async def _sit_tasks():
-    while True:
-        while not tsks:
-            await asyncio.sleep(15)
-        tsk_list = [tsks[x] for x in tsks]
-        cmpl, pnding = await asyncio.wait(tsk_list, return_when=asyncio.FIRST_COMPLETED, timeout=15)
-        for tskid in list(tsks):
-            if tsks[tskid].done():
-                try:
-                    tsk = tsks[tskid]
-                    del tsks[tskid]
-                    await tsk
-                except Exception as e:
-                    print(repr(e))
-
-
-def spawn_task(coro):
-    try:
-        return asyncio.create_task(coro)
-    except AttributeError:
-        return asyncio.get_event_loop().create_task(coro)
-
-
-def spawn(coro):
-    global tasksitter
-    if not tasksitter:
-        tasksitter = spawn_task(_sit_tasks())
-    tskid = random.random()
-    while tskid in tsks:
-        tskid = random.random()
-    tsks[tskid] = spawn_task(coro)
-    return tsks[tskid]
 
 
 
@@ -264,7 +218,7 @@ class TLSCertVerifier(object):
             auditlog = log.Logger('audit')
             auditlog.log({'node': self.node, 'event': 'certautoadd',
                           'fingerprint': fingerprint})
-            spawn(self.cfm.set_node_attributes(
+            tasks.spawn(self.cfm.set_node_attributes(
                 {self.node: {self.fieldname: fingerprint}}))
             return True
         elif cert_matches(storedprint[self.node][self.fieldname]['value'],

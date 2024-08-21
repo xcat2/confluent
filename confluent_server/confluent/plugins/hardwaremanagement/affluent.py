@@ -19,6 +19,7 @@ import socket
 import confluent.exceptions as exc
 import aiohmi.util.webclient as webclient
 import confluent.messages as msg
+import confluent.tasks as tasks
 import confluent.util as util
 
 class SwitchSensor(object):
@@ -120,7 +121,7 @@ def _run_method(method, workers, results, configmanager, nodes, element):
         creds = configmanager.get_node_attributes(
                 nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
         for node in nodes:
-            workers.add(util.spawn(method(configmanager, creds,
+            workers.add(tasks.spawn_task(method(configmanager, creds,
                                        node, results, element)))
 
 async def retrieve(nodes, element, configmanager, inputdata):
