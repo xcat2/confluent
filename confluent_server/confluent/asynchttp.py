@@ -33,6 +33,8 @@ import collections
 import confluent.exceptions as exc
 import confluent.messages as messages
 import confluent.util as util
+import confluent.core as core
+import confluent.log as log
 import time
 
 _asyncsessions = {}
@@ -90,13 +92,12 @@ class AsyncSession(object):
 
     async def run_handler(self, handler, requestid):
         try:
-            # iterate_responses from core maybe? handler might return other stuff
-            handler = await handler
-            async for rsp in handler:
+            async for rsp in core.iterate_responses(handler):
                 await self.add(requestid, rsp)
             await self.add(requestid, messages.AsyncCompletion())
         except Exception as e:
             print(repr(e))
+            log.logtrace()
             await self.add(requestid, e)
 
 async def run_handler(hdlr, req):

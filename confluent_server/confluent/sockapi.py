@@ -207,9 +207,6 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
 async def send_response(responses, connection):
     if responses is None:
         return
-    responses = await responses
-    if responses is None:
-        return
     async for rsp in pluginapi.iterate_responses(responses):
         await send_data(connection, rsp.raw())
     await send_data(connection, {'_requestdone': 1})

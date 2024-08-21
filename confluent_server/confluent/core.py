@@ -91,6 +91,10 @@ async def iterate_responses(responses):
         return
     elif inspect.isawaitable(responses):
         responses = await responses
+    if inspect.isasyncgen(responses):
+        async for rsp in responses:
+            yield rsp
+        return
     for rsp in responses:
         yield rsp
 
@@ -933,7 +937,7 @@ async def handle_dispatch(connection, cert, dispatch, peername):
         numworkers = 0
         for hfunc in nodesbyhandler:
             numworkers += 1
-            asyncio.create_task(addtoqueue(passvalues, hfunc, {
+            tasks.spawn(addtoqueue(passvalues, hfunc, {
                 'nodes': nodesbyhandler[hfunc],
                 'element': pathcomponents,
                 'configmanager': configmanager,

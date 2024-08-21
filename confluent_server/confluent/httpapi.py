@@ -1005,7 +1005,7 @@ async def _assemble_json(responses, resource=None, url=None, extension=None):
         else:
             links['collection'] = {"href": "./" + extension}
     rspdata = {}
-    async for rsp in await responses:
+    async for rsp in pluginapi.iterate_responses(responses):
         if isinstance(rsp, confluent.messages.LinkRelation):
             haldata = rsp.raw()
             for hk in haldata:

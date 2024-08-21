@@ -15,7 +15,7 @@
 import confluent.core as core
 import confluent.messages as msg
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     locationinfo = configmanager.get_node_attributes(nodes,
             (u'enclosure.manager', u'enclosure.bay', u'location.rack',
              u'location.row', u'location.u', u'location.height'))
@@ -89,10 +89,10 @@ def retrieve(nodes, element, configmanager, inputdata):
             needheight.add(node)
     needheight = ','.join(needheight)
     if needheight:
-        for rsp in core.handle_path(
+        async for rsp in core.iterate_responses(core.handle_path(
             '/noderange/{0}/description'.format(needheight),
             'retrieve', configmanager,
-            inputdata=None):
+            inputdata=None)):
                 if not hasattr(rsp, 'kvpairs'):
                     results['errors'].append((rsp.node, rsp.error))
                     continue
