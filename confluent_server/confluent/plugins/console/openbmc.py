@@ -119,6 +119,7 @@ class TsmConsole(conapi.Console):
         self.datacallback = None
         self.nodeconfig = config
         self.connected = False
+        self.recvr = None
 
 
     def recvdata(self):
@@ -148,13 +149,16 @@ class TsmConsole(conapi.Console):
         self.ws.set_verify_callback(kv)
         self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']), subprotocols=[wc.cookies['XSRF-TOKEN']])
         self.connected = True
-        eventlet.spawn_n(self.recvdata)
+        self.recvr = eventlet.spawn(self.recvdata)
         return
 
     def write(self, data):
         self.ws.send(data)
 
     def close(self):
+        if self.recvr:
+            self.recvr.kill()
+            self.recvr = None
         if self.ws:
             self.ws.close()
         self.connected = False
