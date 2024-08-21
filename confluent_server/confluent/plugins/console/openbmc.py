@@ -19,6 +19,7 @@
 # specification.  consoleserver or shellserver would be equally likely
 # to use this.
 
+import asyncio
 import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
@@ -84,19 +85,23 @@ class OpenBmcConsole(conapi.Console):
         self.datacallback = None
         self.nodeconfig = config
         self.connected = False
+        self.recvr = None
 
 
     async def recvdata(self):
-        while self.connected:
-            pendingdata = await self.ws.receive()
-            if pendingdata.type == aiohttp.WSMsgType.BINARY:
-                await self.datacallback(pendingdata.data)
-                continue
-            elif pendingdata.type ==  aiohttp.WSMsgType.CLOSE:
-                await self.datacallback(conapi.ConsoleEvent.Disconnect)
-                return
-            else:
-                print("Unknown response in WSConsoleHandler")
+        try:
+            while self.connected:
+                pendingdata = await self.ws.receive()
+                if pendingdata.type == aiohttp.WSMsgType.BINARY:
+                    await self.datacallback(pendingdata.data)
+                    continue
+                elif pendingdata.type ==  aiohttp.WSMsgType.CLOSE:
+                    await self.datacallback(conapi.ConsoleEvent.Disconnect)
+                    return
+                else:
+                    print("Unknown response in WSConsoleHandler")
+        except asyncio.CancelledError:
+            pass
 
 
     async def connect(self, callback):
@@ -124,13 +129,16 @@ class OpenBmcConsole(conapi.Console):
         self.ws = await self.clisess.ws_connect('wss://{0}/console0'.format(self.bmc), protocols=protos, ssl=self.ssl)
     #self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']), subprotocols=[wc.cookies['XSRF-TOKEN']])
         self.connected = True
-        util.spawn(self.recvdata())
+        self.recvr = util.spawn_task(self.recvdata())
         return
 
     async def write(self, data):
         await self.ws.send_str(data.decode())
 
     async def close(self):
+        if self.recvr:
+            self.recvr.cancel()
+            self.recvr = None
         if self.ws:
             await self.ws.close()
         self.connected = False

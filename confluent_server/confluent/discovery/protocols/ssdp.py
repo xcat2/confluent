@@ -468,7 +468,7 @@ async def _find_service(service, target):
         #    pooltargs.append(('/redfish/v1/', peerdata[nid]))
     tsks = []
     for targ in pooltargs:
-        tsks.append(util.spawn(check_fish(targ)))
+        tsks.append(util.spawn_task(check_fish(targ)))
     while tsks:
         done, tsks = await asyncio.wait(tsks, return_when=asyncio.FIRST_COMPLETED)
         for dt in done:

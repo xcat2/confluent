@@ -90,6 +90,7 @@ class AsyncSession(object):
 
     async def run_handler(self, handler, requestid):
         try:
+            # iterate_responses from core maybe? handler might return other stuff
             handler = await handler
             async for rsp in handler:
                 await self.add(requestid, rsp)
