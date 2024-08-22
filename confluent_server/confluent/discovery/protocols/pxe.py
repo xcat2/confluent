@@ -614,7 +614,7 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr):
             return
         return reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
     else:
-        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile)
+        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock)
 
 def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     myaddrs = netutil.get_my_addresses(addr[-1], socket.AF_INET6)
@@ -698,7 +698,7 @@ def get_my_duid():
     return _myuuid
 
 
-def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
+def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None):
     replen = 275  # default is going to be 286
     # while myipn is describing presumed destination, it's really
     # vague in the face of aliases, need to convert to ifidx and evaluate
@@ -787,6 +787,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     myipn = socket.inet_aton(myipn)
     orepview[12:16] = myipn
     repview[20:24] = myipn
+    repview[24:28] = relayip
     repview[236:240] = b'\x63\x82\x53\x63'
     repview[240:242] = b'\x35\x01'
     if rqtype == 1:  # if discover, then offer
@@ -856,7 +857,10 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         ipinfo = 'without address, served from {0}'.format(myip)
     log.log({
         'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
-    send_raw_packet(repview, replen + 28, reqview, info)
+    if relayip != b'\x00\x00\x00\x00':
+        sock.sendto(repview[28:28 + replen], (socket.inet_ntoa(relayip), 67))
+    else:
+        send_raw_packet(repview, replen + 28, reqview, info)
 
 def send_raw_packet(repview, replen, reqview, info):
     ifidx = info['netinfo']['ifidx']
@@ -881,9 +885,10 @@ def send_raw_packet(repview, replen, reqview, info):
     sendto(tsock.fileno(), pkt, replen, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
 
-def ack_request(pkt, rq, info):
+def ack_request(pkt, rq, info, sock=None):
     hwlen = bytearray(rq[2:3].tobytes())[0]
     hwaddr = rq[28:28+hwlen].tobytes()
+    relayip = rq[24:28].tobytes()
     myipn = myipbypeer.get(hwaddr, None)
     if not myipn or pkt.get(54, None) != myipn:
         return
@@ -902,7 +907,10 @@ def ack_request(pkt, rq, info):
                      repview[12:len(rply)].tobytes())
     datasum = ~datasum & 0xffff
     repview[26:28] = struct.pack('!H', datasum)
-    send_raw_packet(repview, len(rply), rq, info)
+    if relayip != b'\x00\x00\x00\x00':
+        sock.sendto(repview[28:], (socket.inet_ntoa(relayip), 67))
+    else:
+        send_raw_packet(repview, len(rply), rq, info)
 
 def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None):
     if info.get('hwaddr', None) in macmap and info.get('uuid', None):
@@ -910,7 +918,7 @@ def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None):
     elif info.get('uuid', None) in uuidmap:
         check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr)
     elif packet.get(53, None) == b'\x03':
-        ack_request(packet, reqview, info)
+        ack_request(packet, reqview, info, sock)
     elif info.get('uuid', None) and info.get('hwaddr', None):
         if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
             ignoremacs[info['hwaddr']] = time.time()
