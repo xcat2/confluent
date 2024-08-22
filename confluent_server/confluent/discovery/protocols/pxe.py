@@ -652,9 +652,10 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     repview[10:11] = b'\x80'  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
+    relayip = reqview[24:28].tobytes()
     gateway = None
     netmask = None
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'])
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip)
     nicerr = niccfg.get('error_msg', False)
     if nicerr:
         log.log({'error': nicerr})
