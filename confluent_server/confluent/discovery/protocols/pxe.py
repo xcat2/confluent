@@ -731,7 +731,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     relayip = reqview[24:28].tobytes()
     gateway = None
     netmask = None
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayip=relayip)
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip)
     nicerr = niccfg.get('error_msg', False)
     if nicerr:
         log.log({'error': nicerr})
