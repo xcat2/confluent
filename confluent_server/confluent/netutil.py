@@ -408,7 +408,7 @@ def noneify(cfgdata):
 # the ip as reported by recvmsg to match the subnet of that net.* interface
 # if switch and port available, that should match.
 def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
-                   serverip=None):
+                   serverip=None, relayipn=b'\x00\x00\x00\x00'):
     """Fetch network configuration parameters for a nic
 
     For a given node and interface, find and retrieve the pertinent network
@@ -489,6 +489,10 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         bestsrvbyfam = {}
         for myaddr in myaddrs:
             fam, svrip, prefix = myaddr[:3]
+            if fam == socket.AF_INET and relayipn != b'\x00\x00\x00\x00':
+                bootsvrip = relayipn
+            else:
+                bootsvrip = svrip
             candsrvs.append((fam, svrip, prefix))
             if fam == socket.AF_INET:
                 nver = '4'
@@ -508,6 +512,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 candip = cfgbyname[candidate].get('ipv{}_address'.format(nver), None)
                 if candip and '/' in candip:
                     candip, candprefix = candip.split('/')
+                    if fam == socket.AF_INET and relayipn != b'\x00\x00\x00\x00':
+                        prefix = int(candprefix)
                     if int(candprefix) != prefix:
                         continue
                 candgw = cfgbyname[candidate].get('ipv{}_gateway'.format(nver), None)
@@ -515,7 +521,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     try:
                         for inf in socket.getaddrinfo(candip, 0, fam, socket.SOCK_STREAM):
                             candipn = socket.inet_pton(fam, inf[-1][0])
-                        if ipn_on_same_subnet(fam, svrip, candipn, prefix):
+                        if ipn_on_same_subnet(fam, bootsvrip, candipn, prefix):
                             bestsrvbyfam[fam] = svrip
                             cfgdata['ipv{}_address'.format(nver)] = candip
                             cfgdata['ipv{}_method'.format(nver)] = ipmethod
@@ -533,7 +539,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 elif candgw:
                     for inf in socket.getaddrinfo(candgw, 0, fam, socket.SOCK_STREAM):
                         candgwn = socket.inet_pton(fam, inf[-1][0])
-                    if ipn_on_same_subnet(fam, svrip, candgwn, prefix):
+                    if ipn_on_same_subnet(fam, bootsvrip, candgwn, prefix):
                         candgws.append((fam, candgwn, prefix))
         if foundaddr:
             return noneify(cfgdata)
