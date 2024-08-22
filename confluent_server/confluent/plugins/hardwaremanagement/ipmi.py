@@ -584,7 +584,7 @@ class IpmiHandler:
         elif self.element == ['support', 'servicedata']:
             self.handle_servicedata_fetch()
         elif self.element == ['description']:
-            self.handle_description()
+            await self.handle_description()
         else:
             raise Exception('Not Implemented')
 
@@ -1600,9 +1600,10 @@ class IpmiHandler:
                 self.ipmicmd.delete_license(lic['name'])
             else:
                 self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
-    def handle_description(self):
-        dsc = self.ipmicmd.get_description()
-        self.output.put(msg.KeyValueData(dsc, self.node))
+
+    async def handle_description(self):
+        dsc = await self.ipmicmd.get_description()
+        await self.output.put(msg.KeyValueData(dsc, self.node))
 
     def handle_graphical_console(self):
         args = self.ipmicmd.get_graphical_console()

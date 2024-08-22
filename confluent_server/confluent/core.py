@@ -95,6 +95,8 @@ async def iterate_responses(responses):
         async for rsp in responses:
             yield rsp
         return
+    if inspect.isawaitable(responses):
+        responses = await responses
     for rsp in responses:
         yield rsp
 
