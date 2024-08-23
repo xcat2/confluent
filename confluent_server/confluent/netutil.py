@@ -408,7 +408,8 @@ def noneify(cfgdata):
 # the ip as reported by recvmsg to match the subnet of that net.* interface
 # if switch and port available, that should match.
 def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
-                   serverip=None, relayipn=b'\x00\x00\x00\x00'):
+                   serverip=None, relayipn=b'\x00\x00\x00\x00',
+                   clientip=None):
     """Fetch network configuration parameters for a nic
 
     For a given node and interface, find and retrieve the pertinent network
@@ -429,6 +430,25 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     #TODO(jjohnson2): ip address, prefix length, mac address,
     # join a bond/bridge, vlan configs, etc.
     # also other nic criteria, physical location, driver and index...
+    clientfam = None
+    clientipn = None
+    serverfam = None
+    serveripn = None
+    llaipn = socket.inet_pton(socket.AF_INET6, 'fe80::')
+    if serverip is not None:
+        if '.' in serverip:
+            serverfam = socket.AF_INET
+        elif ':' in serverip:
+            serverfam = socket.AF_INET6
+        if serverfam:
+            serveripn = socket.inet_pton(serverfam, serverip)
+    if clientip is not None:
+        if '.' in clientip:
+            clientfam = socket.AF_INET
+        elif ':' in clientip:
+            clientfam = socket.AF_INET6
+        if clientfam:
+            clientipn = socket.inet_pton(clientfam, clientip)
     nodenetattribs = configmanager.get_node_attributes(
         node, 'net*').get(node, {})
     cfgbyname = {}
@@ -466,9 +486,22 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             cfgdata['ipv4_broken'] = True
         if v6broken:
             cfgdata['ipv6_broken'] = True
+    isremote = False
     if serverip is not None:
         dhcprequested = False
         myaddrs = get_addresses_by_serverip(serverip)
+        if serverfam == socket.AF_INET6 and ipn_on_same_subnet(serverfam, serveripn, llaipn, 64):
+            isremote = False
+        elif clientfam:
+            for myaddr in myaddrs:
+                # we may have received over a local vlan, wrong aliased subnet
+                # so have to check for *any* potential matches
+                fam, svrip, prefix = myaddr[:3]
+                if fam == clientfam:
+                    if ipn_on_same_subnet(fam, clientipn, svrip, prefix):
+                        break
+            else:
+                isremote = True
     genericmethod = 'static'
     ipbynodename = None
     ip6bynodename = None
@@ -514,14 +547,15 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     candip, candprefix = candip.split('/')
                     if fam == socket.AF_INET and relayipn != b'\x00\x00\x00\x00':
                         prefix = int(candprefix)
-                    if int(candprefix) != prefix:
+                    if (not isremote) and int(candprefix) != prefix:
                         continue
                 candgw = cfgbyname[candidate].get('ipv{}_gateway'.format(nver), None)
                 if candip:
                     try:
                         for inf in socket.getaddrinfo(candip, 0, fam, socket.SOCK_STREAM):
                             candipn = socket.inet_pton(fam, inf[-1][0])
-                        if ipn_on_same_subnet(fam, bootsvrip, candipn, prefix):
+                        if ((isremote and ipn_on_same_subnet(fam, clientipn, candipn, int(candprefix)))
+                                or ipn_on_same_subnet(fam, bootsvrip, candipn, prefix)):
                             bestsrvbyfam[fam] = svrip
                             cfgdata['ipv{}_address'.format(nver)] = candip
                             cfgdata['ipv{}_method'.format(nver)] = ipmethod
