@@ -455,6 +455,12 @@ if __name__ == '__main__':
     srvs, _ = apiclient.scan_confluents()
     doneidxs = set([])
     dc = None
+    if not srvs:  # the multicast scan failed, fallback to deploycfg cfg file
+        with open('/etc/confluent/confluent.deploycfg', 'r') as dci:
+            for cfgline in dci.read().split('\n'):
+                if cfgline.startswith('deploy_server:'):
+                    srvs = [cfgline.split()[1]]
+                    break
     for srv in srvs:
         try:
             s = socket.create_connection((srv, 443))
