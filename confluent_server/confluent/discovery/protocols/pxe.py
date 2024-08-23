@@ -341,7 +341,7 @@ def start_proxydhcp(handler, nodeguess=None):
 
 
 def new_dhcp_packet(handler, nodeguess, cfg, net4):
-    data, cmsgs, flags, peer = net4.recvmsg(9000, 9000)
+    data, cmsgs, flags, client = net4.recvmsg(9000, 9000)
     if len(data) < 64:
         return
     for cmsg in cmsgs:
@@ -351,7 +351,7 @@ def new_dhcp_packet(handler, nodeguess, cfg, net4):
             recv = ipfromint(recv)
         rqv = memoryview(data)
         if rqv[0] == 1:
-            process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv)
+            process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client)
 
 
 def new_dhcp6_packet(handler, net6, cfg, nodeguess):
