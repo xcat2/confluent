@@ -731,7 +731,7 @@ async def rebase_profile(dirname):
         profiledir = dirname
     else:
         profiledir = '/var/lib/confluent/public/os/{0}'.format(dirname)
-    currhashes = get_hashes(profiledir)
+    currhashes = await get_hashes(profiledir)
     festfile = os.path.join(profiledir, 'manifest.yaml')
     try:
         with open(festfile, 'r') as festfile:

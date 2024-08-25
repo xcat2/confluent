@@ -401,11 +401,10 @@ async def snoop(handler, protocol=None, nodeguess=None):
     cloop.add_reader(net6, new_dhcp6_packet, handler, net6, cfg, nodeguess)
 
 
-async def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
-
 _mac_to_uuidmap = {}
 
 
+async def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     ip = addr[0]
     req, disco = v6opts_to_dict(bytearray(rqv[4:]))
     req['txid'] = rqv[1:4]

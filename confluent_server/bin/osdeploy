@@ -74,7 +74,7 @@ async def main(args):
     if cmdset.command == 'updateboot':
         return await updateboot(cmdset.profile)
     if cmdset.command == 'rebase':
-        return rebase(cmdset.profile)
+        return await rebase(cmdset.profile)
     ap.print_help()
 
 def symlinkp(src, trg):
@@ -498,9 +498,9 @@ async def updateboot(profilename):
             print(repr(rsp))
 
 
-def rebase(profilename):
+async def rebase(profilename):
     c = client.Command()
-    for rsp in c.update('/deployment/profiles/{0}'.format(profilename), {'rebase': 1}):
+    async for rsp in c.update('/deployment/profiles/{0}'.format(profilename), {'rebase': 1}):
         if 'updated' in rsp:
             print('Updated: {0}'.format(rsp['updated']))
         elif 'customized' in rsp:
@@ -510,7 +510,7 @@ def rebase(profilename):
             sys.exit(rsp['errorcode'])
         else:
             print(repr(rsp))
-
+/opt/confluent/bin/confluent
 def oslist():
     c = client.Command()
     print("Distributions:")
