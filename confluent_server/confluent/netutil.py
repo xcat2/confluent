@@ -443,7 +443,10 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         if serverfam:
             serveripn = socket.inet_pton(serverfam, serverip)
     if clientip is not None:
-        if '.' in clientip:
+        if '%' in clientip:
+            # link local, don't even bother'
+            clientfam = None
+        elif '.' in clientip:
             clientfam = socket.AF_INET
         elif ':' in clientip:
             clientfam = socket.AF_INET6
