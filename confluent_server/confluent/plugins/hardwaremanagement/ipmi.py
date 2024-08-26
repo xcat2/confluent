@@ -659,9 +659,9 @@ class IpmiHandler(object):
         elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
             return self.handle_bmcconfig(True)
         elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
-            return self.handle_bmcconfig(True, extended=True)
+            return self.handle_bmcconfig(advanced=False, extended=True)
         elif self.element[1:4] == ['management_controller', 'extended', 'extra_advanced']:
-            return self.handle_bmcconfig(True, advanced=True, extended=True)
+            return self.handle_bmcconfig(advanced=True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
