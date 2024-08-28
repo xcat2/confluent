@@ -487,6 +487,11 @@ async def check_fish(urldata, port=443, verifycallback=None):
         url, data = urldata
         targtype = 'service:redfish-bmc'
     try:
+        url, data, targtype = urldata
+    except ValueError:
+        url, data = urldata
+        targtype = 'service:redfish-bmc'
+    try:
         wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback)
         peerinfo = await wc.grab_json_response(url, headers={'Accept': 'application/json'})
     except socket.error:
