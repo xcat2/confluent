@@ -380,6 +380,10 @@ def _init_core():
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
                     }),
+                    'extra_advanced': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
                 },
             },
             'storage': {

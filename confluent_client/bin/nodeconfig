@@ -304,9 +304,14 @@ async def main():
                             '/noderange/{0}/configuration/management_controller/extended/all'.format(noderange),
                             session, printbmc, options, attrprefix='bmc.')
             if options.extra:
-                rcode |= await client.print_attrib_path(
-                        '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
-                        session, printextbmc, options)
+                if options.advanced:
+                        rcode |= await client.print_attrib_path(
+                            '/noderange/{0}/configuration/management_controller/extended/extra_advanced'.format(noderange),
+                            session, printextbmc, options)
+                else:
+                    rcode |= await client.print_attrib_path(
+                            '/noderange/{0}/configuration/management_controller/extended/extra'.format(noderange),
+                            session, printextbmc, options)
         if printsys or options.exclude:
             if printsys == 'all':
                 printsys = []
