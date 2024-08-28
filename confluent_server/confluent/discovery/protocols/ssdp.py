@@ -451,7 +451,11 @@ def _find_service(service, target):
 def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
         verifycallback = lambda x: True
-    url, data, targtype = urldata
+    try:
+        url, data, targtype = urldata
+    except ValueError:
+        url, data = urldata
+        targtype = 'service:redfish-bmc'
     try:
         wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)
         peerinfo = wc.grab_json_response(url, headers={'Accept': 'application/json'})
