@@ -856,7 +856,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         repview[replen - 1:replen + 1] = b'\x03\x04'
         repview[replen + 1:replen + 5] = gateway
         replen += 6
-    elif relayip != b'\x00\x00\x00\x00':
+    elif relayip != b'\x00\x00\x00\x00' and clipn:
         log.log({'error': 'Relay DHCP offer to {} will fail due to missing gateway information'.format(node)})
     if 82 in packet:
         reloptionslen = len(packet[82])
