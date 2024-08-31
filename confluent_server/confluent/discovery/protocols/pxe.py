@@ -677,6 +677,9 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
     if (not isboot) and relayip == b'\x00\x00\x00\x00':
         # Ignore local DHCP packets if it isn't a firmware request
         return
+    relayipa = None
+    if relayip != b'\x00\x00\x00\x00':
+        relayipa = socket.inet_ntoa(relayip)
     gateway = None
     netmask = None
     niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip)
@@ -775,7 +778,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         repview[replen - 1:replen + 1] = b'\x03\x04'
         repview[replen + 1:replen + 5] = gateway
         replen += 6
-    elif relayip != b'\x00\x00\x00\x00':
+    elif relayip != b'\x00\x00\x00\x00' and clipn:
         log.log({'error': 'Relay DHCP offer to {} will fail due to missing gateway information'.format(node)})
     if 82 in packet:
         reloptionslen = len(packet[82])
@@ -806,6 +809,8 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         ipinfo = 'with static address {0}'.format(niccfg['ipv4_address'])
     else:
         ipinfo = 'without address, served from {0}'.format(myip)
+    if relayipa:
+        ipinfo += ' (relayed to {} via {})'.format(relayipa, requestor[0])
     if isboot:
         log.log({
             'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
