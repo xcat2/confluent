@@ -33,7 +33,7 @@ Url: https://github.com/lenovo/confluent
 Server for console management and systems management aggregation
 
 %prep
-%setup -n %{name}-%{version} -n %{name}-%{version}
+%setup -n %{name}-%{lua: print(string.gsub("#VERSION#", "[~+]", "-"))}
 
 %build
 %if "%{dist}" == ".el7"

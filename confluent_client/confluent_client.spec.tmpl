@@ -21,7 +21,7 @@ This package enables python development and command line access to
 a confluent server.
 
 %prep
-%setup -n %{name}-%{version} -n %{name}-%{version}
+%setup -n %{name}-%{lua: print(string.gsub("#VERSION#", "[~+]", "-"))}
 
 %build
 %if "%{dist}" == ".el7"
