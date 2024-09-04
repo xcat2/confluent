@@ -1,12 +1,16 @@
 %define name confluent_server
 %define version #VERSION#
+%define fversion %{lua:
+sv, _ = string.gsub("#VERSION#", "[~+]", "-")
+print(sv)
+}
 %define release 1
 
 Summary: confluent systems management server
 Name: %{name}
 Version: %{version}
 Release: %{release}
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{fversion}.tar.gz
 License: Apache2
 Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
@@ -33,7 +37,7 @@ Url: https://github.com/lenovo/confluent
 Server for console management and systems management aggregation
 
 %prep
-%setup -n %{name}-%{lua: print(string.gsub("#VERSION#", "[~+]", "-"))}
+%setup -n %{name}-%{fversion}
 
 %build
 %if "%{dist}" == ".el7"

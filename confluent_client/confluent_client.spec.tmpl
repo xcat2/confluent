@@ -1,12 +1,16 @@
 %define name confluent_client
 %define version #VERSION#
+%define fversion %{lua:
+sv, _ = string.gsub("#VERSION#", "[~+]", "-")
+print(sv)
+}
 %define release 1
 
 Summary: Client libraries and utilities for confluent
 Name: %{name}
 Version: %{version}
 Release: %{release}
-Source0: %{name}-%{version}.tar.gz
+Source0: %{name}-%{fversion}.tar.gz
 License: Apache2
 Group: Development/Libraries
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
@@ -21,7 +25,7 @@ This package enables python development and command line access to
 a confluent server.
 
 %prep
-%setup -n %{name}-%{lua: print(string.gsub("#VERSION#", "[~+]", "-"))}
+%setup -n %{name}-%{fversion}
 
 %build
 %if "%{dist}" == ".el7"
