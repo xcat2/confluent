@@ -17,7 +17,9 @@ cd /tmp/confluent/$PKGNAME
 if [ -x ./makeman ]; then
     ./makeman
 fi
-./makesetup
+sed -e 's/~/./' ./makesetup > ./makesetup.deb
+chmod +x ./makesetup.deb
+./makesetup.deb
 VERSION=`cat VERSION`
 cat > setup.cfg << EOF
 [install]
