@@ -46,6 +46,36 @@ def get_url(nodename, inputdata):
     elif method == 'unix':
         return request_session(nodename)
 
+_usersessions = {}
+def close_session(sessionid):
+    sessioninfo = _usersessions.get(sessionid, None)
+    if not sessioninfo:
+        return
+    del _usersessions[sessionid]
+    nodename = sessioninfo['nodename']
+    wc = sessioninfo['webclient']
+    cfg = configmanager.ConfigManager(None)
+    c = cfg.get_node_attributes(
+        nodename,
+        ['secret.hardwaremanagementuser',
+         'secret.hardwaremanagementpassword',
+        ], decrypt=True)
+    bmcuser = c.get(nodename, {}).get(
+        'secret.hardwaremanagementuser', {}).get('value', None)
+    bmcpass = c.get(nodename, {}).get(
+        'secret.hardwaremanagementpassword', {}).get('value', None)
+    if not isinstance(bmcuser, str):
+        bmcuser = bmcuser.decode()
+    if not isinstance(bmcpass, str):
+        bmcpass = bmcpass.decode()
+    if bmcuser and bmcpass:
+        wc.grab_json_response_with_status(
+            '/logout', {'data': [bmcuser, bmcpass]},
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-XSRF-TOKEN': wc.cookies['XSRF-TOKEN']})
+
 
 def send_grant(conn, nodename):
     cfg = configmanager.ConfigManager(None)
@@ -74,6 +104,10 @@ def send_grant(conn, nodename):
                      'Accept': 'application/json'})
         sessionid = wc.cookies['SESSION']
         sessiontok = wc.cookies['XSRF-TOKEN']
+        _usersessions[sessionid] = {
+            'webclient': wc,
+            'nodename': nodename,
+        }
         url = '/kvm/0'
         fprintinfo = cfg.get_node_attributes(nodename, 'pubkeys.tls_hardwaremanager')
         fprint = fprintinfo.get(
@@ -102,32 +136,34 @@ def evaluate_request(conn):
         if uid != os.getuid():
             return
         rqcode, fieldlen = struct.unpack('!BI', conn.recv(5))
-        if rqcode != 1:
-            return
         authtoken = conn.recv(fieldlen).decode()
         if authtoken != _vinztoken:
             return
-        fieldlen = struct.unpack('!I', conn.recv(4))[0]
-        nodename = conn.recv(fieldlen).decode()
-        idtype = struct.unpack('!B', conn.recv(1))[0]
-        if idtype == 1:
-            usernum = struct.unpack('!I', conn.recv(4))[0]
-            if usernum == 0:  # root is a special guy
+        if rqcode == 2:  # disconnect notification
+            fieldlen = struct.unpack('!I', conn.recv(4))[0]
+            sessionid = conn.recv(fieldlen).decode()
+            close_session(sessionid)
+            conn.recv(1)  # digest 0xff
+        if rqcode == 1:  # request for new connection
+            fieldlen = struct.unpack('!I', conn.recv(4))[0]
+            nodename = conn.recv(fieldlen).decode()
+            idtype = struct.unpack('!B', conn.recv(1))[0]
+            if idtype == 1:
+                usernum = struct.unpack('!I', conn.recv(4))[0]
+                if usernum == 0:  # root is a special guy
+                    send_grant(conn, nodename)
+                    return
+                try:
+                    authname = pwd.getpwuid(usernum).pw_name
+                except Exception:
+                    return
+                allow = auth.authorize(authname, f'/nodes/{nodename}/console/ikvm')
+                if not allow:
+                    return
                 send_grant(conn, nodename)
+            else:
                 return
-            try:
-                authname = pwd.getpwuid(usernum).pw_name
-            except Exception:
-                return
-            allow = auth.authorize(authname, f'/nodes/{nodename}/console/ikvm')
-            if not allow:
-                return
-            send_grant(conn, nodename)
-        else:
-            return
-        if conn.recv(1) != b'\xff':
-            return
-
+            conn.recv(1)  # should be 0xff
     finally:
         conn.close()
 
