@@ -37,14 +37,17 @@ def assure_vinz():
             eventlet.sleep(0.5)
         eventlet.spawn(monitor_requests)
 
-
+_unix_by_nodename = {}
 def get_url(nodename, inputdata):
     method = inputdata.inputbynode[nodename]
     assure_vinz()
     if method == 'wss':
         return f'/vinz/kvmsession/{nodename}'
     elif method == 'unix':
-        return request_session(nodename)
+        if nodename not in _unix_by_nodename:
+            _unix_by_nodename[nodename] = request_session(nodename)
+        return _unix_by_nodename[nodename]
+
 
 _usersessions = {}
 def close_session(sessionid):
