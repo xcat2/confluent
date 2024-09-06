@@ -11,6 +11,7 @@ import eventlet.green.subprocess as subprocess
 import base64
 import os
 import pwd
+import confluent.httpapi as httpapi
 mountsbyuser = {}
 _vinzfd = None
 _vinztoken = None
@@ -44,7 +45,7 @@ def get_url(nodename, inputdata):
     if method == 'wss':
         return f'/vinz/kvmsession/{nodename}'
     elif method == 'unix':
-        if nodename not in _unix_by_nodename:
+        if nodename not in _unix_by_nodename or not os.path.exists(_unix_by_nodename[nodename]):
             _unix_by_nodename[nodename] = request_session(nodename)
         return _unix_by_nodename[nodename]
 
@@ -132,6 +133,8 @@ def send_grant(conn, nodename):
         conn.send(b'\xff')
 
 def evaluate_request(conn):
+    allow = False
+    authname = None
     try:
         creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
                                 struct.calcsize('iII'))
@@ -160,13 +163,22 @@ def evaluate_request(conn):
                     authname = pwd.getpwuid(usernum).pw_name
                 except Exception:
                     return
-                allow = auth.authorize(authname, f'/nodes/{nodename}/console/ikvm')
-                if not allow:
+            elif idtype == 2:
+                fieldlen = struct.unpack('!I', conn.recv(4))[0]
+                sessionid = conn.recv(fieldlen)
+                fieldlen = struct.unpack('!I', conn.recv(4))[0]
+                sessiontok = conn.recv(fieldlen)
+                try:
+                    authname = httpapi.get_user_for_session(sessionid, sessiontok)
+                except Exception:
                     return
-                send_grant(conn, nodename)
             else:
                 return
             conn.recv(1)  # should be 0xff
+            if authname:
+                allow = auth.authorize(authname, f'/nodes/{nodename}/console/ikvm')
+            if allow:
+                send_grant(conn, nodename)
     finally:
         conn.close()
 

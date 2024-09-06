@@ -72,6 +72,20 @@ opmap = {
 }
 
 
+def get_user_for_session(sessionid, sessiontok):
+    if not isinstance(sessionid, str):
+        sessionid = sessionid.decode()
+    if not isinstance(sessiontok, str):
+        sessiontok = sessiontok.decode()
+    if not sessiontok or not sessionid:
+        raise Exception("invalid session id or token")
+    if sessiontok != httpsessions.get(sessionid, {}).get('csrftoken', None):
+        raise Exception("Invalid csrf token for session")
+    user = httpsessions[sessionid]['name']
+    if not isinstance(user, str):
+        user = user.decode()
+    return user
+
 def group_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
