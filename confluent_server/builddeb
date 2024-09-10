@@ -17,7 +17,9 @@ cd /tmp/confluent/$PKGNAME
 if [ -x ./makeman ]; then
     ./makeman
 fi
-./makesetup
+sed -e 's/~/./' ./makesetup > ./makesetup.deb
+chmod +x ./makesetup.deb
+./makesetup.deb
 VERSION=`cat VERSION`
 cat > setup.cfg << EOF
 [install]
@@ -74,7 +76,7 @@ else
     rm -rf $PKGNAME.egg-info dist setup.py
     rm -rf $(find deb_dist -mindepth 1 -maxdepth 1 -type d)
     if [ ! -z "$1" ]; then
-        mv deb_dist/* $1/
+        mv deb_dist/*.deb $1/
     fi
 fi
 exit 0

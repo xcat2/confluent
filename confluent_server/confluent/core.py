@@ -452,6 +452,7 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'ikvm': PluginRoute({'handler': 'ikvm'}),
         },
         'description': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
