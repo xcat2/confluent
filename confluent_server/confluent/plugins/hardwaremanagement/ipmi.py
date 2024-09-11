@@ -1378,10 +1378,8 @@ class IpmiHandler(object):
     def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
-            if self.inputdata.inputbynode[self.node] == 'blink':
-                raise exc.InvalidArgumentException(
-                    '"blink" is not supported with ipmi')
-            self.ipmicmd.set_identify(on=identifystate)
+            blinkstate = self.inputdata.inputbynode[self.node] == 'blink'
+            self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
             self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
