@@ -936,6 +936,29 @@ def resourcehandler_backend(env, start_response):
             yield rsp
             return
     
+
+    elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):    
+        url = env['PATH_INFO']
+        if 'application/json' in reqtype:
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
+            pbody = json.loads(reqbody)
+            args = pbody['args']
+            file_directory = '/var/lib/confluent/client_assets/{}'.format(args.split('/')[-1])  
+            filepath = '{0}/{1}'.format(file_directory, os.listdir(file_directory)[0])     # TODO find a way to validate that the file is found and its the expected one
+            args_dict = {'filename': filepath}
+            noderrs = {}
+            nodeurls = {}
+            hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)
+            for res in hdlr:
+                if isinstance(res, confluent.messages.CreatedResource):
+                    watchurl = res.kvpairs['created']
+                    currnode = watchurl.split('/')[1]
+                    nodeurls[currnode] = '/' + watchurl
+            yield json.dumps({'data': nodeurls})
+            start_response('200 OK', headers)
+            return
+    
     elif (operation == 'create' and ('/staging' in env['PATH_INFO'])):
         url = env['PATH_INFO']
         args_dict = {}
