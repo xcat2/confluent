@@ -936,6 +936,7 @@ def resourcehandler_backend(env, start_response):
             yield rsp
             return
     
+
     elif (operation == 'create' and ('/firmware/updates/active' in env['PATH_INFO'])):    
         url = env['PATH_INFO']
         if 'application/json' in reqtype:

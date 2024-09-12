@@ -163,7 +163,7 @@ def _merge_dict(original, custom):
 
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/' ,
+                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/',
                    'users/', 'uuid', 'version', 'staging/']
 
 
