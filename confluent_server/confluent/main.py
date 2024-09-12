@@ -220,16 +220,20 @@ def setlimits():
 def assure_ownership(path):
     try:
         if os.getuid() != os.stat(path).st_uid:
-            sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
+            if os.getuid() == 0:
+                sys.stderr.write('Attempting to run as root, when non-root usage is detected\n')
+            else:
+                sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
             sys.exit(1)
     except OSError as e:
         if e.errno == 13:
-            sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
+            if os.getuid() == 0:
+                sys.stderr.write('Attempting to run as root, when non-root usage is detected\n')
+            else:
+                sys.stderr.write('{} is not owned by confluent user, change ownership\n'.format(path))
             sys.exit(1)
 
 def sanity_check():
-    if os.getuid() == 0:
-        return True
     assure_ownership('/etc/confluent')
     assure_ownership('/etc/confluent/cfg')
     for filename in glob.glob('/etc/confluent/cfg/*'):

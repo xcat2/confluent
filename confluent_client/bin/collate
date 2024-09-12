@@ -21,6 +21,7 @@
 
 import optparse
 import os
+import re
 import select
 import sys
 
@@ -84,6 +85,7 @@ fullline = sys.stdin.readline()
 printpending = True
 clearpending = False
 holdoff = 0
+padded = None
 while fullline:
     for line in fullline.split('\n'):
         if not line:
@@ -92,13 +94,18 @@ while fullline:
             line = 'UNKNOWN: ' + line
         if options.log:
             node, output = line.split(':', 1)
-            output = output.lstrip()
+            if padded is None:
+                if output.startswith(' '):
+                    padded = True
+                else:
+                    padded = False
+            if padded:
+                output = re.sub(r'^ ', '', output)
             currlog = options.log.format(node=node, nodename=node)
             with open(currlog, mode='a')  as log:
                 log.write(output + '\n')
             continue
         node, output = line.split(':', 1)
-        output = output.lstrip()
         grouped.add_line(node, output)
         if options.watch:
             if not holdoff:

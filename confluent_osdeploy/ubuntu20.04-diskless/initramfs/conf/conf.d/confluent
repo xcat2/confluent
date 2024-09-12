@@ -1,4 +1,5 @@
 if ! grep console= /proc/cmdline > /dev/null; then
+    mkdir -p /custom-installation
     /opt/confluent/bin/autocons > /custom-installation/autocons.info
     cons=$(cat /custom-installation/autocons.info)
     if [ ! -z "$cons" ]; then

@@ -68,7 +68,7 @@ def main():
             else:
                 elem=(res['item']['href'].replace('/', ''))
                 list.append(elem)
-    print(options.delim.join(list))
+        print(options.delim.join(list))
 
     sys.exit(exitcode)
 

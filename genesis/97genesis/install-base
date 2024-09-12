@@ -5,16 +5,16 @@ dracut_install tpm2_create tpm2_pcrread tpm2_createpolicy tpm2_createprimary
 dracut_install tpm2_load tpm2_unseal tpm2_getcap tpm2_evictcontrol
 dracut_install tpm2_pcrextend tpm2_policypcr tpm2_flushcontext tpm2_startauthsession
 dracut_install openssl tar ipmitool cpio xz gzip lsmod ethtool
-dracut_install modprobe touch echo cut wc bash netstat uniq grep ip hostname
+dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname bc expr sort
 dracut_install ssh sshd vi reboot lspci parted tmux mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
 dracut_install efibootmgr
 dracut_install du df ssh-keygen scp clear dhclient lldpd lldpcli tee
-dracut_install /lib64/libnss_dns-2.28.so /lib64/libnss_dns.so.2 /lib64/libnss_myhostname.so.2
+dracut_install /lib64/libnss_dns.so.2 /lib64/libnss_dns.so.2 /lib64/libnss_myhostname.so.2
 dracut_install ldd uptime /usr/lib64/libnl-3.so.200
 dracut_install poweroff date /etc/nsswitch.conf /etc/services /etc/protocols
 dracut_install  /usr/share/terminfo/x/xterm /usr/share/terminfo/l/linux /usr/share/terminfo/v/vt100 /usr/share/terminfo/x/xterm-color /usr/share/terminfo/s/screen /usr/share/terminfo/x/xterm-256color /usr/share/terminfo/p/putty-256color /usr/share/terminfo/p/putty /usr/share/terminfo/d/dumb
-dracut_install chmod ifconfig whoami route head tail basename /etc/redhat-release ping tr lsusb /usr/share/hwdata/usb.ids
+dracut_install chmod whoami head tail basename /etc/redhat-release ping tr /usr/share/hwdata/usb.ids
 dracut_install dmidecode /usr/lib64/libstdc++.so.6
 dracut_install ps free find
 inst /bin/bash /bin/sh

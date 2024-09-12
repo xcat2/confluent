@@ -86,7 +86,7 @@ def map_idx_to_name():
     for line in subprocess.check_output(['ip', 'l']).decode('utf8').splitlines():
         if line.startswith(' ') and 'link/' in line:
             typ = line.split()[0].split('/')[1]
-            devtype[prevdev] = typ if type != 'ether' else 'ethernet'
+            devtype[prevdev] = typ if typ != 'ether' else 'ethernet'
         if line.startswith(' '):
             continue
         idx, iface, rst = line.split(':', 2)
@@ -151,13 +151,14 @@ class NetplanManager(object):
         needcfgapply = False
         for devname in devnames:
             needcfgwrite = False
-            if stgs['ipv6_method'] == 'static':
+            # ipv6_method missing at uconn...
+            if stgs.get('ipv6_method', None) == 'static':
                 curraddr = stgs['ipv6_address']
                 currips = self.getcfgarrpath([devname, 'addresses'])
                 if curraddr not in currips:
                     needcfgwrite = True
                     currips.append(curraddr)
-            if stgs['ipv4_method'] == 'static':
+            if stgs.get('ipv4_method', None) == 'static':
                 curraddr = stgs['ipv4_address']
                 currips = self.getcfgarrpath([devname, 'addresses'])
                 if curraddr not in currips:
@@ -180,7 +181,7 @@ class NetplanManager(object):
             if dnsips:
                 currdnsips = self.getcfgarrpath([devname, 'nameservers', 'addresses'])
                 for dnsip in dnsips:
-                    if dnsip not in currdnsips:
+                    if dnsip and dnsip not in currdnsips:
                         needcfgwrite = True
                         currdnsips.append(dnsip)
             if dnsdomain:
@@ -191,8 +192,10 @@ class NetplanManager(object):
             if needcfgwrite:
                 needcfgapply = True
                 newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
+                oumask = os.umask(0o77)
                 with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
                     planout.write(yaml.dump(newcfg))
+                os.umask(oumask)
         if needcfgapply:
             subprocess.call(['netplan', 'apply'])
 
@@ -294,7 +297,8 @@ class WickedManager(object):
 
 
 class NetworkManager(object):
-    def __init__(self, devtypes):
+    def __init__(self, devtypes, deploycfg):
+        self.deploycfg = deploycfg
         self.connections = {}
         self.uuidbyname = {}
         self.uuidbydev = {}
@@ -344,7 +348,7 @@ class NetworkManager(object):
                     bondcfg[stg] = deats[stg]
         if member in self.uuidbyname:
             subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[member]])
-        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
+        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
         if bondcfg:
             args = []
             for parm in bondcfg:
@@ -366,6 +370,20 @@ class NetworkManager(object):
             cmdargs['ipv4.gateway'] = stgs['ipv4_gateway']
         if stgs.get('ipv6_gateway', None):
             cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
+        dnsips = self.deploycfg.get('nameservers', [])
+        if not dnsips:
+            dnsips = []
+        dns4 = []
+        dns6 = []
+        for dnsip in dnsips:
+            if '.' in dnsip:
+                dns4.append(dnsip)
+            elif ':' in dnsip:
+                dns6.append(dnsip)
+        if dns4:
+            cmdargs['ipv4.dns'] = ','.join(dns4)
+        if dns6:
+            cmdargs['ipv6.dns'] = ','.join(dns6)
         if len(cfg['interfaces']) > 1:  # team time.. should be..
             if not cfg['settings'].get('team_mode', None):
                 sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(cfg['interfaces'])))
@@ -378,26 +396,45 @@ class NetworkManager(object):
             for arg in cmdargs:
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'team', 'con-name', cname, 'connection.interface-name', cname, 'team.runner', stgs['team_mode']] + cargs)
+            if stgs['team_mode'] == 'lacp':
+                stgs['team_mode'] = '802.3ad'
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'mode={}'.format(stgs['team_mode'])] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
             subprocess.check_call(['nmcli', 'c', 'u', cname])
         else:
             cname = stgs.get('connection_name', None)
             iname = list(cfg['interfaces'])[0]
-            if not cname:
-                cname = iname
+            ctype = self.devtypes.get(iname, None)
+            if not ctype:
+                sys.stderr.write("Warning, no device found for interface_name ({0}), skipping setup\n".format(iname))
+                return
+            if stgs.get('vlan_id', None):
+                vlan = stgs['vlan_id']
+                if ctype == 'infiniband':
+                    vlan = '0x{0}'.format(vlan) if not vlan.startswith('0x') else vlan
+                    cmdargs['infiniband.parent'] = iname
+                    cmdargs['infiniband.p-key'] = vlan
+                    iname = '{0}.{1}'.format(iname, vlan[2:])
+                elif ctype == 'ethernet':
+                    ctype = 'vlan'
+                    cmdargs['vlan.parent'] = iname
+                    cmdargs['vlan.id'] = vlan
+                    iname = '{0}.{1}'.format(iname, vlan)
+                else:
+                    sys.stderr.write("Warning, unknown interface_name ({0}) device type ({1}) for VLAN/PKEY, skipping setup\n".format(iname, ctype))
+                    return
+            cname = iname if not cname else cname
             u = self.uuidbyname.get(cname, None)
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
                 cargs.append(cmdargs[arg])
             if u:
-                cmdargs['connection.interface-name'] = iname
-                subprocess.check_call(['nmcli', 'c', 'm', u] + cargs)
+                subprocess.check_call(['nmcli', 'c', 'm', u, 'connection.interface-name', iname] + cargs)
                 subprocess.check_call(['nmcli', 'c', 'u', u])
             else:
-                subprocess.check_call(['nmcli', 'c', 'add', 'type', self.devtypes[iname], 'con-name', cname, 'connection.interface-name', iname] + cargs)
+                subprocess.check_call(['nmcli', 'c', 'add', 'type', ctype, 'con-name', cname, 'connection.interface-name', iname] + cargs)
                 self.read_connections()
                 u = self.uuidbyname.get(cname, None)
                 if u:
@@ -418,6 +455,12 @@ if __name__ == '__main__':
     srvs, _ = apiclient.scan_confluents()
     doneidxs = set([])
     dc = None
+    if not srvs:  # the multicast scan failed, fallback to deploycfg cfg file
+        with open('/etc/confluent/confluent.deploycfg', 'r') as dci:
+            for cfgline in dci.read().split('\n'):
+                if cfgline.startswith('deploy_server:'):
+                    srvs = [cfgline.split()[1]]
+                    break
     for srv in srvs:
         try:
             s = socket.create_connection((srv, 443))
@@ -435,10 +478,26 @@ if __name__ == '__main__':
                     curridx = addr[-1]
         if curridx in doneidxs:
             continue
-        status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+        for tries in (1, 2, 3):
+            try:
+                status, nc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/netcfg')
+                break
+            except Exception:
+                if tries == 3:
+                    raise
+                time.sleep(1)
+                continue
         nc = json.loads(nc)
         if not dc:
-            status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+            for tries in (1, 2, 3):
+                try:
+                    status, dc = apiclient.HTTPSClient(usejson=True, host=srv).grab_url_with_status('/confluent-api/self/deploycfg2')
+                    break
+                except Exception:
+                    if tries == 3:
+                        raise
+                    time.sleep(1)
+                    continue
             dc = json.loads(dc)
         iname = get_interface_name(idxmap[curridx], nc.get('default', {}))
         if iname:
@@ -464,11 +523,13 @@ if __name__ == '__main__':
             netname_to_interfaces['default']['interfaces'] -= netname_to_interfaces[netn]['interfaces']
         if not netname_to_interfaces['default']['interfaces']:
             del netname_to_interfaces['default']
+    # Make sure VLAN/PKEY connections are created last
+    netname_to_interfaces = dict(sorted(netname_to_interfaces.items(), key=lambda item: 'vlan_id' in item[1]['settings']))
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/sbin/netplan'):
         nm = NetplanManager(dc)
     if os.path.exists('/usr/bin/nmcli'):
-        nm = NetworkManager(devtypes)
+        nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
     for netn in netname_to_interfaces:

@@ -19,19 +19,38 @@ import json
 import os
 import time
 import yaml
+try:
+    from yaml import CSafeDumper as SafeDumper
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    from yaml import SafeLoader
+    from yaml import SafeDumper
 import confluent.discovery.protocols.ssdp as ssdp
 import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
-currtz = None
+currtz = 'UTC'
 keymap = 'us'
 currlocale = 'en_US.UTF-8'
 currtzvintage = None
 
 
 def yamldump(input):
-    return yaml.safe_dump(input, default_flow_style=False)
+    return yaml.dump_all([input], Dumper=SafeDumper, default_flow_style=False)
+
+def yamlload(input):
+    return yaml.load(input, Loader=SafeLoader)
+
+def listdump(input):
+    # special case yaml for flat dumb list
+    # this is about 25x faster than doing full yaml dump even with CSafeDumper
+    # with a 17,000 element list
+    retval = ''
+    for entry in input:
+        retval += '- ' + entry + '\n'
+    return retval
+
 
 def get_extra_names(nodename, cfg, myip=None):
     names = set([])
@@ -263,7 +282,7 @@ def handle_request(env, start_response):
                     ifidx = int(nici.read())
             ncfg = netutil.get_nic_config(cfg, nodename, ifidx=ifidx)
         else:
-            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
+            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip, clientip=clientip)
         if env['PATH_INFO'] == '/self/deploycfg':
             for key in list(ncfg):
                 if 'v6' in key:
@@ -359,6 +378,8 @@ def handle_request(env, start_response):
                 tdc = util.run(['timedatectl'])[0].split(b'\n')
             except subprocess.CalledProcessError:
                 tdc = []
+                currtzvintage = time.time()
+                ncfg['timezone'] = currtz
             for ent in tdc:
                 ent = ent.strip()
                 if ent.startswith(b'Time zone:'):
@@ -402,10 +423,13 @@ def handle_request(env, start_response):
                 yield node + '\n'
         else:
             start_response('200 OK', (('Content-Type', retype),))
-            yield dumper(list(util.natural_sort(nodes)))
+            if retype == 'application/yaml':
+                yield listdump(list(util.natural_sort(nodes)))
+            else:
+                yield dumper(list(util.natural_sort(nodes)))
     elif env['PATH_INFO'] == '/self/remoteconfigbmc' and reqbody:
         try:
-            reqbody = yaml.safe_load(reqbody)
+            reqbody = yamlload(reqbody)
         except Exception:
             reqbody = None
         cfgmod = reqbody.get('configmod', 'unspecified')
@@ -419,7 +443,7 @@ def handle_request(env, start_response):
         start_response('200 Ok', ())
         yield 'complete'
     elif env['PATH_INFO'] == '/self/updatestatus' and reqbody:
-        update = yaml.safe_load(reqbody)
+        update = yamlload(reqbody)
         statusstr = update.get('state', None)
         statusdetail = update.get('state_detail', None)
         didstateupdate = False
@@ -495,8 +519,8 @@ def handle_request(env, start_response):
             pals = get_extra_names(nodename, cfg, myip)
             result = syncfiles.start_syncfiles(
                 nodename, cfg, json.loads(reqbody), pals)
-            start_response(result, ())
-            yield ''
+            start_response(result[0], ())
+            yield result[1]
             return
         if 'GET' == operation:
             status, output = syncfiles.get_syncresult(nodename)
@@ -522,7 +546,7 @@ def handle_request(env, start_response):
             '/var/lib/confluent/public/os/{0}/scripts/{1}')
         if slist:
             start_response('200 OK', (('Content-Type', 'application/yaml'),))
-            yield yaml.safe_dump(util.natural_sort(slist), default_flow_style=False)
+            yield yamldump(util.natural_sort(slist))
         else:
             start_response('200 OK', ())
             yield ''

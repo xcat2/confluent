@@ -1,6 +1,6 @@
 . /lib/dracut-lib.sh
 confluent_whost=$confluent_mgr
-if [[ "$confluent_whost" == *:* ]]; then
+if [[ "$confluent_whost" == *:* ]] && [[ "$confluent_whost" != "["* ]]; then
     confluent_whost="[$confluent_mgr]"
 fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay

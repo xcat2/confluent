@@ -246,11 +246,11 @@ def _find_srvtype(net, net4, srvtype, addresses, xid):
             try:
                 net4.sendto(data, ('239.255.255.253', 427))
             except socket.error as se:
-                # On occasion, multicasting may be disabled
-                # tolerate this scenario and move on
-                if se.errno != 101:
-                    raise
-            net4.sendto(data, (bcast, 427))
+                pass
+            try:
+                net4.sendto(data, (bcast, 427))
+            except socket.error as se:
+                pass
 
 
 def _grab_rsps(socks, rsps, interval, xidmap, deferrals):
@@ -411,7 +411,7 @@ def query_srvtypes(target):
     parsed = _parse_slp_header(rs)
     if parsed:
         payload = parsed['payload']
-        if payload[:2] != '\x00\x00':
+        if payload[:2] != b'\x00\x00':
             return
         stypelen = struct.unpack('!H', bytes(payload[2:4]))[0]
         stypes = payload[4:4+stypelen].decode('utf-8')
@@ -471,10 +471,13 @@ def snoop(handler, protocol=None):
             # socket in use can occur when aliased ipv4 are encountered
     net.bind(('', 427))
     net4.bind(('', 427))
-
+    newmacs = set([])
+    known_peers = set([])
+    peerbymacaddress = {}
+    deferpeers = []
     while True:
         try:
-            newmacs = set([])
+            newmacs.clear()
             r, _, _ = select.select((net, net4), (), (), 60)
             # clear known_peers and peerbymacaddress
             # to avoid stale info getting in...
@@ -482,13 +485,15 @@ def snoop(handler, protocol=None):
             # addresses that come close together
             # calling code needs to understand deeper context, as snoop
             # will now yield dupe info over time
-            known_peers = set([])
-            peerbymacaddress = {}
-            deferpeers = []
+            known_peers.clear()
+            peerbymacaddress.clear()
+            deferpeers.clear()
             while r and len(deferpeers) < 256:
                 for s in r:
                     (rsp, peer) = s.recvfrom(9000)
                     if peer in known_peers:
+                        continue
+                    if peer in deferpeers:
                         continue
                     mac = neighutil.get_hwaddr(peer[0])
                     if not mac:

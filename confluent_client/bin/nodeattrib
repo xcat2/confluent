@@ -22,6 +22,7 @@ import optparse
 import os
 import signal
 import sys
+import shlex
 
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -125,13 +126,14 @@ elif options.set:
         argset = argset.strip()
         if argset:
             arglist += shlex.split(argset)
-        argset = argfile.readline() 
+        argset = argfile.readline()
     session.stop_if_noderange_over(noderange, options.maxnodes)
     exitcode=client.updateattrib(session,arglist,nodetype, noderange, options, None)
 if exitcode != 0:
     sys.exit(exitcode)
 
 # Lists all attributes
+
 if len(args) > 0:
     # setting output to all so it can search since if we do have something to search, we want to show all outputs even if it is blank.
     if requestargs is None:

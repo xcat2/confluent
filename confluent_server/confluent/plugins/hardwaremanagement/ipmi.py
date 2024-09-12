@@ -659,7 +659,9 @@ class IpmiHandler(object):
         elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
             return self.handle_bmcconfig(True)
         elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
-            return self.handle_bmcconfig(True, extended=True)
+            return self.handle_bmcconfig(advanced=False, extended=True)
+        elif self.element[1:4] == ['management_controller', 'extended', 'extra_advanced']:
+            return self.handle_bmcconfig(advanced=True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
@@ -860,6 +862,23 @@ class IpmiHandler(object):
         for sensor in sensors:
             resourcename = sensor['name']
             self.ipmicmd.sensormap[simplify_name(resourcename)] = resourcename
+
+    def read_normalized(self, sensorname):
+        readings = None
+        if sensorname == 'average_cpu_temp':
+            cputemp = self.ipmicmd.get_average_processor_temperature()
+            readings = [cputemp]
+        elif sensorname == 'inlet_temp':
+            inltemp = self.ipmicmd.get_inlet_temperature()
+            readings = [inltemp]
+        elif sensorname == 'total_power':
+            sensor = EmptySensor('Total Power')
+            sensor.states = []
+            sensor.units = 'W'
+            sensor.value = self.ipmicmd.get_system_power_watts()
+            readings = [sensor]
+        if readings:
+            self.output.put(msg.SensorReadings(readings, name=self.node))
 
     def read_sensors(self, sensorname):
         if sensorname == 'all':
@@ -1157,6 +1176,8 @@ class IpmiHandler(object):
         if len(self.element) < 3:
             return
         self.sensorcategory = self.element[2]
+        if self.sensorcategory == 'normalized':
+            return self.read_normalized(self.element[-1])
         # list sensors per category
         if len(self.element) == 3 and self.element[-2] == 'hardware':
             if self.sensorcategory == 'leds':
@@ -1357,10 +1378,8 @@ class IpmiHandler(object):
     def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
-            if self.inputdata.inputbynode[self.node] == 'blink':
-                raise exc.InvalidArgumentException(
-                    '"blink" is not supported with ipmi')
-            self.ipmicmd.set_identify(on=identifystate)
+            blinkstate = self.inputdata.inputbynode[self.node] == 'blink'
+            self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
             self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
@@ -1453,7 +1472,8 @@ class IpmiHandler(object):
         if 'read' == self.op:
             try:
                 if extended:
-                    bmccfg = self.ipmicmd.get_extended_bmc_configuration()
+                    bmccfg = self.ipmicmd.get_extended_bmc_configuration(
+                        hideadvanced=(not advanced))
                 else:
                     bmccfg = self.ipmicmd.get_bmc_configuration()
                 self.output.put(msg.ConfigSet(self.node, bmccfg))

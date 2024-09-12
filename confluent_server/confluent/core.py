@@ -44,6 +44,7 @@ import confluent.discovery.core as disco
 import confluent.interface.console as console
 import confluent.exceptions as exc
 import confluent.messages as msg
+import confluent.mountmanager as mountmanager
 import confluent.networking.macmap as macmap
 import confluent.noderange as noderange
 import confluent.osimage as osimage
@@ -73,7 +74,7 @@ import uuid
 import yaml
 
 pluginmap = {}
-dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos')
+dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos', b'enos', u'enos')
 
 PluginCollection = plugin.PluginCollection
 
@@ -161,8 +162,9 @@ def _merge_dict(original, custom):
 
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/' ,
+                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/',
                    'users/', 'uuid', 'version', 'staging/']
+
 
 
 class PluginRoute(object):
@@ -170,6 +172,14 @@ class PluginRoute(object):
         self.routeinfo = routedict
 
 
+
+def handle_storage(configmanager, inputdata, pathcomponents, operation):
+    if len(pathcomponents) == 1:
+        yield msg.ChildCollection('remote/')
+        return
+    if pathcomponents[1] == 'remote':
+        for rsp in mountmanager.handle_request(configmanager, inputdata, pathcomponents[2:], operation):
+            yield rsp
 
 def handle_deployment(configmanager, inputdata, pathcomponents,
                       operation):
@@ -193,8 +203,19 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
             for prof in osimage.list_profiles():
                 yield msg.ChildCollection(prof + '/')
             return
-        if len(pathcomponents) == 3:
-            profname = pathcomponents[-1]
+        if len(pathcomponents) >= 3:
+            profname = pathcomponents[2]
+        if len(pathcomponents) == 4:
+            if operation == 'retrieve':
+                if len(pathcomponents) == 4 and pathcomponents[-1] == 'info':
+                    with open('/var/lib/confluent/public/os/{}/profile.yaml'.format(profname)) as profyaml:
+                        profinfo = yaml.safe_load(profyaml)
+                        profinfo['name'] = profname
+                    yield msg.KeyValueData(profinfo)
+                    return
+        elif len(pathcomponents) == 3:
+            if operation == 'retrieve':
+                yield msg.ChildCollection('info')
             if operation == 'update':
                 if 'updateboot' in inputdata:
                     osimage.update_boot(profname)
@@ -210,6 +231,17 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                     for cust in customized:
                         yield msg.KeyValueData({'customized': cust})
                     return
+    if pathcomponents[1] == 'fingerprint':
+        if operation == 'create':
+            importer = osimage.MediaImporter(inputdata['filename'], configmanager, checkonly=True)
+            medinfo = {
+                'targetpath': importer.targpath,
+                'name': importer.osname,
+                'oscategory': importer.oscategory,
+                'errors': importer.errors,
+            }
+            yield msg.KeyValueData(medinfo)
+            return
     if pathcomponents[1] == 'importing':
         if len(pathcomponents) == 2 or not pathcomponents[-1]:
             if operation == 'retrieve':
@@ -217,8 +249,12 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                     yield imp
                 return
             elif operation == 'create':
-                importer = osimage.MediaImporter(inputdata['filename'],
-                                                 configmanager)
+                if inputdata.get('custname', None):
+                    importer = osimage.MediaImporter(inputdata['filename'],
+                                                    configmanager, inputdata['custname'])
+                else:
+                    importer = osimage.MediaImporter(inputdata['filename'],
+                                                    configmanager)
                 yield msg.KeyValueData({'target': importer.targpath,
                                         'name': importer.importkey})
                 return
@@ -324,6 +360,10 @@ def _init_core():
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
                     }),
+                    'extra_advanced': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
                 },
             },
             'storage': {
@@ -392,6 +432,7 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'ikvm': PluginRoute({'handler': 'ikvm'}),
         },
         'description': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
@@ -483,6 +524,20 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
+                'normalized': {
+                    'inlet_temp': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'average_cpu_temp': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'total_power': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                },
                 'energy': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
@@ -1314,6 +1369,9 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     elif pathcomponents[0] == 'deployment':
         return handle_deployment(configmanager, inputdata, pathcomponents,
                                  operation)
+    elif pathcomponents[0] == 'storage':
+        return handle_storage(configmanager, inputdata, pathcomponents,
+                              operation)
     elif pathcomponents[0] == 'nodegroups':
         return handle_nodegroup_request(configmanager, inputdata,
                                         pathcomponents,

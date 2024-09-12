@@ -10,6 +10,7 @@ import stat
 import struct
 import sys
 import subprocess
+import traceback
 
 bootuuid = None
 
@@ -206,6 +207,8 @@ def fixup(rootdir, vols):
             partnum = re.search('(\d+)$', targdev).group(1)
             targblock = re.search('(.*)\d+$', targdev).group(1)
     if targblock:
+        if targblock.endswith('p') and 'nvme' in targblock:
+            targblock = targblock[:-1]
         shimpath = subprocess.check_output(['find', os.path.join(rootdir, 'boot/efi'), '-name', 'shimx64.efi']).decode('utf8').strip()
         shimpath = shimpath.replace(rootdir, '/').replace('/boot/efi', '').replace('//', '/').replace('/', '\\')
         subprocess.check_call(['efibootmgr', '-c', '-d', targblock, '-l', shimpath, '--part', partnum])
@@ -422,5 +425,10 @@ def install_to_disk(imgpath):
 
 
 if __name__ == '__main__':
-    install_to_disk(os.environ['mountsrc'])
+    try:
+        install_to_disk(os.environ['mountsrc'])
+    except Exception:
+        traceback.print_exc()
+        time.sleep(86400)
+        raise
 

@@ -98,14 +98,15 @@ def initialize_ca():
          preexec_fn=normalize_uid)
     ouid = normalize_uid()
     try:
-        os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
-    except OSError as e:
-        if e.errno != 17:
-            raise
+        try:
+            os.makedirs('/var/lib/confluent/public/site/ssh/', mode=0o755)
+        except OSError as e:
+            if e.errno != 17:
+                raise
+        cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
+        shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
     finally:
         os.seteuid(ouid)
-    cafilename = '/var/lib/confluent/public/site/ssh/{0}.ca'.format(myname)
-    shutil.copy('/etc/confluent/ssh/ca.pub', cafilename)
     #    newent = '@cert-authority * ' + capub.read()
 
 
@@ -129,11 +130,21 @@ def prep_ssh_key(keyname):
             ap.write('#!/bin/sh\necho $CONFLUENT_SSH_PASSPHRASE\nrm {0}\n'.format(askpass))
         os.chmod(askpass, 0o700)
         os.environ['CONFLUENT_SSH_PASSPHRASE'] = get_passphrase()
+        olddisplay = os.environ.get('DISPLAY', None)
+        oldaskpass = os.environ.get('SSH_ASKPASS', None)
         os.environ['DISPLAY'] = 'NONE'
         os.environ['SSH_ASKPASS'] = askpass
-        with open(os.devnull, 'wb') as devnull:
-            subprocess.check_output(['ssh-add', keyname], stdin=devnull, stderr=devnull)
-        del os.environ['CONFLUENT_SSH_PASSPHRASE']
+        try:
+            with open(os.devnull, 'wb') as devnull:
+                subprocess.check_output(['ssh-add', keyname], stdin=devnull, stderr=devnull)
+        finally:
+            del os.environ['CONFLUENT_SSH_PASSPHRASE']
+            del os.environ['DISPLAY']
+            del os.environ['SSH_ASKPASS']
+            if olddisplay:
+                os.environ['DISPLAY'] = olddisplay
+            if oldaskpass:
+                os.environ['SSH_ASKPASS'] = oldaskpass
         ready_keys[keyname] = 1
     finally:
         adding_key = False
@@ -175,6 +186,14 @@ def initialize_root_key(generate, automation=False):
         if os.path.exists('/etc/confluent/ssh/automation'):
             alreadyexist = True
         else:
+            ouid = normalize_uid()
+            try:
+                os.makedirs('/etc/confluent/ssh', mode=0o700)
+            except OSError as e:
+                if e.errno != 17:
+                    raise
+            finally:
+                os.seteuid(ouid)
             subprocess.check_call(
                 ['ssh-keygen', '-t', 'ed25519',
                 '-f','/etc/confluent/ssh/automation', '-N', get_passphrase(),
@@ -194,15 +213,18 @@ def initialize_root_key(generate, automation=False):
         suffix = 'automationpubkey'
     else:
         suffix = 'rootpubkey'
+    keyname = '/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
+            myname, suffix)
+    if authorized:
+        with open(keyname, 'w'):
+            pass
     for auth in authorized:
-        shutil.copy(
-            auth,
-            '/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
-                    myname, suffix))
-        os.chmod('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
-                myname, suffix), 0o644)
-        os.chown('/var/lib/confluent/public/site/ssh/{0}.{1}'.format(
-                myname, suffix), neededuid, -1)
+        with open(auth, 'r') as local_key:
+            with open(keyname, 'a') as dest:
+                dest.write(local_key.read())
+    if os.path.exists(keyname):
+        os.chmod(keyname, 0o644)
+        os.chown(keyname, neededuid, -1)
     if alreadyexist:
         raise AlreadyExists()
 

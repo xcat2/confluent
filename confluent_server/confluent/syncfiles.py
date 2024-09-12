@@ -24,6 +24,7 @@ import confluent.noderange as noderange
 import eventlet
 import pwd
 import grp
+import sys
 
 def mkdirp(path):
     try:
@@ -193,8 +194,8 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
         targip = node
         if peerip:
             targip = peerip
-        output = util.run(
-            ['rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip)])[0]
+        output, stderr = util.run(
+            ['rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip)])
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
             # https://github.com/eventlet/eventlet/issues/413
@@ -212,6 +213,11 @@ def sync_list_to_node(sl, node, suffixes, peerip=None):
                     unreadablefiles.append(filename.replace(targdir, ''))
         if unreadablefiles:
             raise Exception("Syncing failed due to unreadable files: " + ','.join(unreadablefiles))
+        elif hasattr(e, 'stderr') and e.stderr and b'Permission denied, please try again.' in e.stderr:
+            raise Exception('Syncing failed due to authentication error, is the confluent automation key not set up (osdeploy initialize -a) or is there some process replacing authorized_keys on the host?')
+        elif hasattr(e, 'stderr') and e.stderr:
+            sys.stderr.write(e.stderr.decode('utf8'))
+            raise
         else:
             raise
     finally:
@@ -229,7 +235,7 @@ def stage_ent(currmap, ent, targdir, appendexist=False):
     everyfent = []
     allfents = ent.split()
     for tmpent in allfents:
-        fents = glob.glob(tmpent)
+        fents = glob.glob(tmpent) # TODO: recursive globbing?
         if not fents:
             raise Exception('No matching files for "{}"'.format(tmpent))
         everyfent.extend(fents)
@@ -279,9 +285,10 @@ def mkpathorlink(source, destination, appendexist=False):
 
 
 syncrunners = {}
-
+cleaner = None
 
 def start_syncfiles(nodename, cfg, suffixes, principals=[]):
+    global cleaner
     peerip = None
     if 'myips' in suffixes:
         targips = suffixes['myips']
@@ -305,13 +312,41 @@ def start_syncfiles(nodename, cfg, suffixes, principals=[]):
         raise Exception('Cannot perform syncfiles without profile assigned')
     synclist = '/var/lib/confluent/public/os/{}/syncfiles'.format(profile)
     if not os.path.exists(synclist):
-        return '200 OK'  # not running
+        return '200 OK', 'No synclist'  # not running
     sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
-        return '200 OK'  # the synclist has no actual entries
+        return '200 OK', 'Empty synclist'  # the synclist has no actual entries
+    if nodename in syncrunners:
+        if syncrunners[nodename].dead:
+            syncrunners[nodename].wait()
+        else:
+            return '503 Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
     syncrunners[nodename] = eventlet.spawn(
         sync_list_to_node, sl, nodename, suffixes, peerip)
-    return '202 Queued' # backgrounded
+    if not cleaner:
+        cleaner = eventlet.spawn(cleanit)
+    return '202 Queued', 'Background synchronization initiated'  # backgrounded
+
+
+def cleanit():
+    toreap = {}
+    while True:
+        for nn in list(syncrunners):
+            if syncrunners[nn].dead:
+                if nn in toreap:
+                    try:
+                        syncrunners[nn].wait()
+                    except Exception as e:
+                        print(repr(e))
+                        pass
+                    del syncrunners[nn]
+                    del toreap[nn]
+                else:
+                    toreap[nn] = 1
+            elif nn in toreap:
+                del toreap[nn]
+        eventlet.sleep(30)
+
 
 def get_syncresult(nodename):
     if nodename not in syncrunners:

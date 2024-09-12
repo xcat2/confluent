@@ -53,7 +53,7 @@ def execupdate(handler, filename, updateobj, type, owner, node, datfile):
                 return
         if type == 'ffdc' and os.path.isdir(filename):
             filename += '/' + node
-        if 'type' == 'ffdc':
+        if type == 'ffdc':
             errstr = False
             if os.path.exists(filename):
                 errstr = '{0} already exists on {1}, cannot overwrite'.format(

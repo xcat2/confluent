@@ -1,7 +1,12 @@
+cd $(dirname $0)
 VERSION=`git describe|cut -d- -f 1`
 NUMCOMMITS=`git describe|cut -d- -f 2`
 if [ "$NUMCOMMITS" != "$VERSION"  ]; then
-    VERSION=$VERSION.dev$NUMCOMMITS.g`git describe|cut -d- -f 3`
+    LASTNUM=$(echo $VERSION|rev|cut -d . -f 1|rev)
+    LASTNUM=$((LASTNUM+1))
+    FIRSTPART=$(echo $VERSION|rev|cut -d . -f 2- |rev)
+    VERSION=${FIRSTPART}.${LASTNUM}
+    VERSION=$VERSION~dev$NUMCOMMITS+`git describe|cut -d- -f 3`
 fi
 sed -e "s/#VERSION#/$VERSION/" confluent_osdeploy-aarch64.spec.tmpl > confluent_osdeploy-aarch64.spec
 cd ..
@@ -29,4 +34,5 @@ mv confluent_el8bin.tar.xz ~/rpmbuild/SOURCES/
 mv confluent_el9bin.tar.xz ~/rpmbuild/SOURCES/
 rm -rf el9bin
 rm -rf el8bin
-rpmbuild -ba confluent_osdeploy-aarch64.spec
+podman run --privileged --rm -v $HOME:/root el8builder rpmbuild -ba /root/confluent/confluent_osdeploy/confluent_osdeploy-aarch64.spec
+

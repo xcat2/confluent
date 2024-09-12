@@ -81,6 +81,12 @@ def main(args):
     if not args.profile and args.network:
         sys.stderr.write('Both noderange and a profile name are required arguments to request a network deployment\n')
         return 1
+    if args.clear and args.profile:
+        sys.stderr.write(
+            'The -c/--clear option should not be used with a profile, '
+            'it is a request to not deploy any profile, and will clear '
+            'whatever the current profile is without being specified\n')
+        return 1
     if extra:
         sys.stderr.write('Unrecognized arguments: ' + repr(extra) + '\n')
     c = client.Command()
@@ -90,17 +96,6 @@ def main(args):
         if 'error' in rsp:
             sys.stderr.write(rsp['error'] + '\n')
             sys.exit(1)
-    if not args.clear and args.network and not args.prepareonly:
-        rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
-                                        bootmode='uefi',
-                                        persistent=False,
-                                        errnodes=errnodes)
-        if errnodes:
-            sys.stderr.write(
-                'Unable to set boot device for following nodes: {0}\n'.format(
-                    ','.join(errnodes)))
-            return 1
-        rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
     if args.clear:
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
@@ -120,7 +115,7 @@ def main(args):
                 for profname in profnames:
                     sys.stderr.write('    ' + profname + '\n')
             else:
-                sys.stderr.write('No deployment profiles available, try osdeploy fiimport or imgutil capture\n')
+                sys.stderr.write('No deployment profiles available, try osdeploy import or imgutil capture\n')
             sys.exit(1)
         armonce(args.noderange, c)
         setpending(args.noderange, args.profile, c)
@@ -166,8 +161,17 @@ def main(args):
             else:
                 print('{0}: {1}{2}'.format(node, profile, armed))
         sys.exit(0)
-    if args.network and not args.prepareonly:
-        return rc
+    if not args.clear and args.network and not args.prepareonly:
+        rc = c.simple_noderange_command(args.noderange, '/boot/nextdevice', 'network',
+                                        bootmode='uefi',
+                                        persistent=False,
+                                        errnodes=errnodes)
+        if errnodes:
+            sys.stderr.write(
+                'Unable to set boot device for following nodes: {0}\n'.format(
+                    ','.join(errnodes)))
+            return 1
+        rc |= c.simple_noderange_command(args.noderange, '/power/state', 'boot')
     return 0
 
 if __name__ == '__main__':

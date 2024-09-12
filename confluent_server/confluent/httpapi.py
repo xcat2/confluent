@@ -72,6 +72,20 @@ opmap = {
 }
 
 
+def get_user_for_session(sessionid, sessiontok):
+    if not isinstance(sessionid, str):
+        sessionid = sessionid.decode()
+    if not isinstance(sessiontok, str):
+        sessiontok = sessiontok.decode()
+    if not sessiontok or not sessionid:
+        raise Exception("invalid session id or token")
+    if sessiontok != httpsessions.get(sessionid, {}).get('csrftoken', None):
+        raise Exception("Invalid csrf token for session")
+    user = httpsessions[sessionid]['name']
+    if not isinstance(user, str):
+        user = user.decode()
+    return user
+
 def group_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the group").html() + '<br>'
@@ -175,6 +189,8 @@ def _get_query_dict(env, reqbody, reqtype):
         qstring = None
     if qstring:
         for qpair in qstring.split('&'):
+            if '=' not in qpair:
+                continue
             qkey, qvalue = qpair.split('=')
             qdict[qkey] = qvalue
     if reqbody is not None:
@@ -618,7 +634,6 @@ def resourcehandler(env, start_response):
         yield '500 - ' + str(e)
         return
 
-
 def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
@@ -669,7 +684,11 @@ def resourcehandler_backend(env, start_response):
     if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
-    operation = opmap[env['REQUEST_METHOD']]
+    operation = opmap.get(env['REQUEST_METHOD'], None)
+    if not operation:
+        start_response('400 Bad Method', headers)
+        yield ''
+        return
     querydict = _get_query_dict(env, reqbody, reqtype)
     if operation != 'retrieve' and 'restexplorerop' in querydict:
         operation = querydict['restexplorerop']
@@ -728,7 +747,13 @@ def resourcehandler_backend(env, start_response):
     elif (env['PATH_INFO'].endswith('/forward/web') and
               env['PATH_INFO'].startswith('/nodes/')):
         prefix, _, _ = env['PATH_INFO'].partition('/forward/web')
-        _, _, nodename = prefix.rpartition('/')
+        #_, _, nodename = prefix.rpartition('/')
+        default = False
+        if 'default' in env['PATH_INFO']:
+            default = True
+            _,_,nodename,_ = prefix.split('/')
+        else:
+            _, _, nodename = prefix.rpartition('/')
         hm = cfgmgr.get_node_attributes(nodename, 'hardwaremanagement.manager')
         targip = hm.get(nodename, {}).get(
             'hardwaremanagement.manager', {}).get('value', None)
@@ -737,6 +762,29 @@ def resourcehandler_backend(env, start_response):
             yield 'No hardwaremanagement.manager defined for node'
             return
         targip = targip.split('/', 1)[0]
+        if default:
+            try:
+                ip_info = socket.getaddrinfo(targip, 0, 0, socket.SOCK_STREAM)
+            except socket.gaierror:
+                start_response('404 Not Found', headers)
+                yield 'hardwaremanagement.manager definition could not be resolved'
+                return
+            # this is just to future proof just in case the indexes of the address family change in future
+            for i in range(len(ip_info)):
+                if ip_info[i][0] == socket.AF_INET:
+                    url = 'https://{0}/'.format(ip_info[i][-1][0])
+                    start_response('302', [('Location', url)])
+                    yield 'Our princess is in another castle!'
+                    return
+                elif ip_info[i][0] == socket.AF_INET6:
+                    url = 'https://[{0}]/'.format(ip_info[i][-1][0])
+            if url.startswith('https://[fe80'):
+                start_response('405 Method Not Allowed', headers)
+                yield 'link local ipv6 address cannot be used in browser'
+                return
+            start_response('302', [('Location', url)])
+            yield 'Our princess is in another castle!'
+            return
         funport = forwarder.get_port(targip, env['HTTP_X_FORWARDED_FOR'],
                                      authorized['sessionid'])
         host = env['HTTP_X_FORWARDED_HOST']
@@ -1123,7 +1171,7 @@ def serve(bind_host, bind_port):
         pass  # we gave it our best shot there
     try:
         eventlet.wsgi.server(sock, resourcehandler, log=False, log_output=False,
-                             debug=False, socket_timeout=60)
+                             debug=False, socket_timeout=60, keepalive=False)
     except TypeError:
         # Older eventlet in place, skip arguments it does not understand
         eventlet.wsgi.server(sock, resourcehandler, log=False, debug=False)

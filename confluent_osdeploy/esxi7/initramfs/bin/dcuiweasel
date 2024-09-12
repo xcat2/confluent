@@ -116,4 +116,5 @@ profile=$(grep ^profile: /etc/confluent/confluent.deploycfg.new | sed -e 's/^pro
 mv /etc/confluent/confluent.deploycfg.new /etc/confluent/confluent.deploycfg
 export node mgr profile
 . /tmp/modinstall
+localcli network firewall load
 exec /bin/install
