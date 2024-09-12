@@ -76,7 +76,7 @@ def get_certificate_paths():
                     continue
                 kploc = check_apache_config(os.path.join(currpath,
                                                                        fname))
-                if keypath and kploc[0]:
+                if keypath and kploc[0] and keypath != kploc[0]:
                     return None, None # Ambiguous...
                 if kploc[0]:
                     keypath, certpath = kploc

@@ -17,7 +17,9 @@ cd /tmp/confluent/$PKGNAME
 if [ -x ./makeman ]; then
     ./makeman
 fi
-./makesetup
+sed -e 's/~/./' ./makesetup > ./makesetup.deb
+chmod +x ./makesetup.deb
+./makesetup.deb
 VERSION=`cat VERSION`
 cat > setup.cfg << EOF
 [install]
@@ -35,8 +37,10 @@ cd deb_dist/!(*.orig)/
 if [ "$OPKGNAME" = "confluent-server" ]; then
     if grep wheezy /etc/os-release; then
         sed -i 's/^\(Depends:.*\)/\1, python-confluent-client, python-lxml, python-eficompressor, python-pycryptodomex, python-dateutil, python-pyopenssl, python-msgpack/' debian/control
+    elif grep jammy /etc/os-release; then
+	    sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi(>=1.5.71), python3-paramiko, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd, python3-netifaces, python3-yaml, python3-dateutil/' debian/control
     else
-        sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi, python3-paramiko, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd, python3-netifaces, python3-yaml, python3-dateutil, python3-pyasyncore/' debian/control
+	    sed -i 's/^\(Depends:.*\)/\1, confluent-client, python3-lxml, python3-eficompressor, python3-pycryptodome, python3-websocket, python3-msgpack, python3-eventlet, python3-pyparsing, python3-pyghmi(>=1.5.71), python3-paramiko, python3-pysnmp4, python3-libarchive-c, confluent-vtbufferd, python3-netifaces, python3-yaml, python3-dateutil, python3-pyasyncore/' debian/control
     fi
     if grep wheezy /etc/os-release; then
         echo 'confluent_client python-confluent-client' >> debian/pydist-overrides
@@ -72,7 +76,7 @@ else
     rm -rf $PKGNAME.egg-info dist setup.py
     rm -rf $(find deb_dist -mindepth 1 -maxdepth 1 -type d)
     if [ ! -z "$1" ]; then
-        mv deb_dist/* $1/
+        mv deb_dist/*.deb $1/
     fi
 fi
 exit 0

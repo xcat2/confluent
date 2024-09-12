@@ -655,10 +655,27 @@ class DebHandler(OsHandler):
 
     def prep_root(self, args):
         shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
+        for listfile in glob.glob('/etc/apt/sources.list.d/*'):
+            shutil.copy(listfile, os.path.join(self.targpath, listfile[1:]))
         args.cmd = ['apt-get', 'update']
         run_constrainedx(fancy_chroot, (args, self.targpath))
         args.cmd = ['apt-get', '-y', 'install'] + self.includepkgs
         run_constrainedx(fancy_chroot, (args, self.targpath))
+        servicefile = os.path.join(
+            self.targpath, 'usr/lib/systemd/system/ssh.service')
+        if os.path.exists(servicefile):
+            targfile = os.path.join(
+                self.targpath,
+                'etc/systemd/system/multi-user.target.wants/ssh.service')
+            if not os.path.exists(targfile):
+                os.symlink('/usr/lib/systemd/system/ssh.service', targfile)
+        else:
+            targfile = os.path.join(
+                self.targpath,
+                'etc/systemd/system/multi-user.target.wants/sshd.service')
+            if not os.path.exists(targfile):
+                os.symlink('/usr/lib/systemd/system/sshd.service', targfile)
+
 
 
 class ElHandler(OsHandler):
@@ -934,6 +951,8 @@ def fancy_chroot(args, installroot):
     sourceresolv = '/etc/resolv.conf'
     if os.path.islink(sourceresolv):
         sourceresolv = os.readlink(sourceresolv)
+    # normalize and resolve relative and absolute paths
+    sourceresolv = os.path.normpath(os.path.join('/etc', sourceresolv))
     dstresolv = os.path.join(installroot, 'etc/resolv.conf')
     if os.path.islink(dstresolv):
         dstresolv = os.path.join(installroot, os.readlink(dstresolv)[1:])
@@ -944,8 +963,7 @@ def fancy_chroot(args, installroot):
     _mount('none', dstresolv, flags=MS_RDONLY|MS_REMOUNT|MS_BIND)
     os.chroot(installroot)
     os.chdir('/')
-    _mount('/', '/', flags=MS_BIND)  # Make / manifest as a mounted filesystem in exec
-    os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \W]$ '.format(imgname)
+    os.environ['PS1'] = '[\x1b[1m\x1b[4mIMGUTIL EXEC {0}\x1b[0m \\W]$ '.format(imgname)
     os.environ['CONFLUENT_IMGUTIL_MODE'] = 'exec'
     if oshandler:
         oshandler.set_source('/run/confluentdistro')
@@ -985,7 +1003,13 @@ def build_root_backend(optargs):
 
 
 def _mount_constrained_fs(args, installroot):
+    # This is prepping for a chroot.
+    # For the target environment to be content with having a root
+    # filesystem, installroot must be a 'mount' entry of it's own,
+    # so bind mount to itself to satisfy
+    _mount(installroot, installroot, flags=MS_BIND)
     _mount('/dev', os.path.join(installroot, 'dev'), flags=MS_BIND|MS_RDONLY)
+    _mount('/dev/pts', os.path.join(installroot, 'dev/pts'), flags=MS_BIND|MS_RDONLY)
     _mount('proc', os.path.join(installroot, 'proc'), fstype='proc')
     _mount('sys', os.path.join(installroot, 'sys'), fstype='sysfs')
     _mount('runfs', os.path.join(installroot, 'run'), fstype='tmpfs')

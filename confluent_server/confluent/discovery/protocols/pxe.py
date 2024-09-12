@@ -315,9 +315,9 @@ def proxydhcp(handler, nodeguess):
                 optidx = rqv.tobytes().index(b'\x63\x82\x53\x63') + 4
             except ValueError:
                 continue
-            hwlen = rq[2]
-            opts, disco = opts_to_dict(rq, optidx, 3)
-            disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rq[28:28+hwlen]])
+            hwlen = rqv[2]
+            opts, disco = opts_to_dict(rqv, optidx, 3)
+            disco['hwaddr'] = ':'.join(['{0:02x}'.format(x) for x in rqv[28:28+hwlen]])
             node = None
             if disco.get('hwaddr', None) in macmap:
                 node = macmap[disco['hwaddr']]
@@ -346,7 +346,7 @@ def proxydhcp(handler, nodeguess):
             profile = None
             if not myipn:
                 myipn = socket.inet_aton(recv)
-                profile = get_deployment_profile(node, cfg)
+                profile, stgprofile = get_deployment_profile(node, cfg)
                 if profile:
                     log.log({
                         'info': 'Offering proxyDHCP boot from {0} to {1} ({2})'.format(recv, node, client[0])})
@@ -356,7 +356,7 @@ def proxydhcp(handler, nodeguess):
                     continue
             if opts.get(77, None) == b'iPXE':
                 if not profile:
-                    profile = get_deployment_profile(node, cfg)
+                    profile, stgprofile = get_deployment_profile(node, cfg)
                 if not profile:
                     log.log({'info': 'No pending profile for {0}, skipping proxyDHCP reply'.format(node)})
                     continue
@@ -385,8 +385,9 @@ def proxydhcp(handler, nodeguess):
             rpv[268:280] = b'\x3c\x09PXEClient\xff'
             net4011.sendto(rpv[:281], client)
         except Exception as e:
-            tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
-                            event=log.Events.stacktrace)
+            log.logtrace()
+            # tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+            #                event=log.Events.stacktrace)
 
 
 def start_proxydhcp(handler, nodeguess=None):
@@ -453,13 +454,14 @@ def snoop(handler, protocol=None, nodeguess=None):
                     # with try/except
                     if i < 64:
                         continue
-                    _, level, typ = struct.unpack('QII', cmsgarr[:16])
-                    if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
-                        idx, recv = struct.unpack('II', cmsgarr[16:24])
-                        recv = ipfromint(recv)
-                    rqv = memoryview(rawbuffer)[:i]
                     if rawbuffer[0] == 1:  # Boot request
-                        process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv)
+                        _, level, typ = struct.unpack('QII', cmsgarr[:16])
+                        if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
+                            idx, recv = struct.unpack('II', cmsgarr[16:24])
+                            recv = ipfromint(recv)
+                        rqv = memoryview(rawbuffer)[:i]
+                        client = (ipfromint(clientaddr.sin_addr.s_addr), socket.htons(clientaddr.sin_port))
+                        process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client)
                 elif netc == net6:
                     recv = 'ff02::1:2'
                     pkt, addr = netc.recvfrom(2048)
@@ -475,6 +477,10 @@ def snoop(handler, protocol=None, nodeguess=None):
         except Exception as e:
             tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                             event=log.Events.stacktrace)
+
+
+_mac_to_uuidmap = {}
+
 
 def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     ip = addr[0]
@@ -501,7 +507,7 @@ def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
         handler(info)
     consider_discover(info, req, net, cfg, None, nodeguess, addr)
 
-def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
+def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client):
     rq = bytearray(rqv)
     addrlen = rq[2]
     if addrlen > 16 or addrlen == 0:
@@ -531,7 +537,12 @@ def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
                     # We will fill out service to have something to byte into,
                     # but the nature of the beast is that we do not have peers,
                     # so that will not be present for a pxe snoop
-    info = {'hwaddr': netaddr, 'uuid': disco['uuid'],
+    theuuid = disco['uuid']
+    if theuuid:
+        _mac_to_uuidmap[netaddr] = theuuid
+    elif netaddr in _mac_to_uuidmap:
+        theuuid = _mac_to_uuidmap[netaddr]
+    info = {'hwaddr': netaddr, 'uuid': theuuid,
                             'architecture': disco['arch'],
                             'netinfo': {'ifidx': idx, 'recvip': recv, 'txid': txid},
                             'services': ('pxe-client',)}
@@ -539,7 +550,7 @@ def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv):
                             and time.time() > ignoredisco.get(netaddr, 0) + 90):
         ignoredisco[netaddr] = time.time()
         handler(info)
-    consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess)
+    consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess, requestor=client)
 
 
 
@@ -583,29 +594,34 @@ def get_deployment_profile(node, cfg, cfd=None):
     if not cfd:
         cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile = cfd.get(node, {}).get('deployment.pendingprofile', {}).get('value', None)
-    if not profile:
-        return None
-    candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
-    if candmgrs:
-        try:
-            candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
-        except Exception: # fallback to unverified noderange
-            candmgrs = noderange.NodeRange(candmgrs).nodes
-        if collective.get_myname() not in candmgrs:
-            return None
-    return profile
+    stgprofile = cfd.get(node, {}).get('deployment.stagedprofile', {}).get('value', None)
+    if profile or stgprofile:
+        candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
+        if candmgrs:
+            try:
+                candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+            except Exception: # fallback to unverified noderange
+                candmgrs = noderange.NodeRange(candmgrs).nodes
+            if collective.get_myname() not in candmgrs:
+                return None, None
+    return profile, stgprofile
 
 staticassigns = {}
 myipbypeer = {}
-def check_reply(node, info, packet, sock, cfg, reqview, addr):
-    httpboot = info['architecture'] == 'uefi-httpboot'
+def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
+    if not requestor:
+        requestor = ('0.0.0.0', None)
+    if requestor[0] == '0.0.0.0' and not info.get('uuid', None):
+        return  # ignore DHCP from local non-PXE segment
+    httpboot = info.get('architecture', None) == 'uefi-httpboot'
     cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
-    profile = get_deployment_profile(node, cfg, cfd)
-    if not profile:
+    profile, stgprofile = get_deployment_profile(node, cfg, cfd)
+    if ((not profile)
+            and (requestor[0] == '0.0.0.0' or not stgprofile)):
         if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
             ignoremacs[info['hwaddr']] = time.time()
             log.log({'info': 'Ignoring boot attempt by {0} no deployment profile specified (uuid {1}, hwaddr {2})'.format(
-                node, info['uuid'], info['hwaddr']
+                node, info.get('uuid', 'NA'), info['hwaddr']
             )})
         return
     if addr:
@@ -614,7 +630,7 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr):
             return
         return reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock)
     else:
-        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile)
+        return reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock, requestor)
 
 def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     myaddrs = netutil.get_my_addresses(addr[-1], socket.AF_INET6)
@@ -651,14 +667,16 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
         ipass[4:16] = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x18'
         ipass[16:32] = socket.inet_pton(socket.AF_INET6, ipv6addr)
         ipass[32:40] = b'\x00\x00\x00\x78\x00\x00\x01\x2c'
-    elif (not packet['vci']) or not packet['vci'].startswith('HTTPClient:Arch:'):
-        return # do not send ip-less replies to anything but HTTPClient specifically
-    #1 msgtype
-    #3 txid
-    #22 - server ident
-    #len(packet[1]) + 4 - client ident
-    #len(ipass) + 4 or 0
-    #len(url) + 4
+    elif (not packet['vci']) or not packet['vci'].startswith(
+            'HTTPClient:Arch:'):
+        # do not send ip-less replies to anything but HTTPClient specifically
+        return
+    # 1 msgtype
+    # 3 txid
+    # 22 - server ident
+    # len(packet[1]) + 4 - client ident
+    # len(ipass) + 4 or 0
+    # len(url) + 4
     replylen = 50 + len(bootfile) + len(packet[1]) + 4
     if len(ipass):
         replylen += len(ipass)
@@ -698,26 +716,31 @@ def get_my_duid():
     return _myuuid
 
 
-def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
+def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None):
     replen = 275  # default is going to be 286
     # while myipn is describing presumed destination, it's really
     # vague in the face of aliases, need to convert to ifidx and evaluate
     # aliases for best match to guess
-
+    isboot = True
+    if requestor is None:
+        requestor = ('0.0.0.0', None)
+    if info.get('architecture', None) is None:
+        isboot = False
     rqtype = packet[53][0]
-    insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
-        {}).get('value', 'never')
-    if not insecuremode:
-        insecuremode = 'never'
-    if insecuremode == 'never' and not httpboot:
-        if rqtype == 1 and info['architecture']:
-            log.log(
-                {'info': 'Boot attempt by {0} detected in insecure mode, but '
-                        'insecure mode is disabled.  Set the attribute '
-                        '`deployment.useinsecureprotocols` to `firmware` or '
-                        '`always` to enable support, or use UEFI HTTP boot '
-                        'with HTTPS.'.format(node)})
-        return
+    if isboot:
+        insecuremode = cfd.get(node, {}).get('deployment.useinsecureprotocols',
+            {}).get('value', 'never')
+        if not insecuremode:
+            insecuremode = 'never'
+        if insecuremode == 'never' and not httpboot:
+            if rqtype == 1 and info.get('architecture', None):
+                log.log(
+                    {'info': 'Boot attempt by {0} detected in insecure mode, but '
+                            'insecure mode is disabled.  Set the attribute '
+                            '`deployment.useinsecureprotocols` to `firmware` or '
+                            '`always` to enable support, or use UEFI HTTP boot '
+                            'with HTTPS.'.format(node)})
+            return
     reply = bytearray(512)
     repview = memoryview(reply)
     repview[:20] = iphdr
@@ -728,9 +751,16 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
     repview[10:11] = b'\x80'  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
+    relayip = reqview[24:28].tobytes()
+    if (not isboot) and relayip == b'\x00\x00\x00\x00':
+        # Ignore local DHCP packets if it isn't a firmware request
+        return
+    relayipa = None
+    if relayip != b'\x00\x00\x00\x00':
+        relayipa = socket.inet_ntoa(relayip)
     gateway = None
     netmask = None
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'])
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip)
     nicerr = niccfg.get('error_msg', False)
     if nicerr:
         log.log({'error': nicerr})
@@ -754,7 +784,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
                 gateway = None
         netmask = (2**32 - 1) ^ (2**(32 - netmask) - 1)
         netmask = struct.pack('!I', netmask)
-    elif (not packet['vci']) or not (packet['vci'].startswith('HTTPClient:Arch:') or packet['vci'].startswith('PXEClient')):
+    elif (not packet.get('vci', None)) or not (packet['vci'].startswith('HTTPClient:Arch:') or packet['vci'].startswith('PXEClient')):
         return  # do not send ip-less replies to anything but netboot specifically
     myipn = niccfg['deploy_server']
     if not myipn:
@@ -774,9 +804,9 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
                     node, profile, len(bootfile) - 127)})
             return
         repview[108:108 + len(bootfile)] = bootfile
-    elif info['architecture'] == 'uefi-aarch64' and packet.get(77, None) == b'iPXE':
+    elif info.get('architecture', None) == 'uefi-aarch64' and packet.get(77, None) == b'iPXE':
         if not profile:
-            profile = get_deployment_profile(node, cfg)
+            profile, stgprofile = get_deployment_profile(node, cfg)
         if not profile:
             log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
             return
@@ -786,6 +816,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     myipn = socket.inet_aton(myipn)
     orepview[12:16] = myipn
     repview[20:24] = myipn
+    repview[24:28] = relayip
     repview[236:240] = b'\x63\x82\x53\x63'
     repview[240:242] = b'\x35\x01'
     if rqtype == 1:  # if discover, then offer
@@ -796,17 +827,19 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
     repview[245:249] = myipn
     repview[249:255] = b'\x33\x04\x00\x00\x00\xf0'  # fixed short lease time
     repview[255:257] = b'\x61\x11'
-    repview[257:274] = packet[97]
+    if packet.get(97, None) is not None:
+        repview[257:274] = packet[97]
     # Note that sending PXEClient kicks off the proxyDHCP procedure, ignoring
     # boot filename and such in the DHCP packet
     # we will simply always do it to provide the boot payload in a consistent
     # matter to both dhcp-elsewhere and fixed ip clients
-    if info['architecture'] == 'uefi-httpboot':
-        repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
-        replen += 12
-    else:
-        repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
-        replen += 11
+    if isboot:
+        if info.get('architecture', None) == 'uefi-httpboot':
+            repview[replen - 1:replen + 11] = b'\x3c\x0aHTTPClient'
+            replen += 12
+        else:
+            repview[replen - 1:replen + 10] = b'\x3c\x09PXEClient'
+            replen += 11
     hwlen = bytearray(reqview[2:3].tobytes())[0]
     fulladdr = repview[28:28+hwlen].tobytes()
     myipbypeer[fulladdr] = myipn
@@ -823,13 +856,14 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         repview[replen - 1:replen + 1] = b'\x03\x04'
         repview[replen + 1:replen + 5] = gateway
         replen += 6
+    elif relayip != b'\x00\x00\x00\x00' and clipn:
+        log.log({'error': 'Relay DHCP offer to {} will fail due to missing gateway information'.format(node)})
     if 82 in packet:
         reloptionslen = len(packet[82])
         reloptionshdr = struct.pack('BB', 82, reloptionslen)
         repview[replen - 1:replen + 1] = reloptionshdr
         repview[replen + 1:replen + reloptionslen + 1] = packet[82]
         replen += 2 + reloptionslen
-
     repview[replen - 1:replen] = b'\xff'  # end of options, should always be last byte
     repview = memoryview(reply)
     pktlen = struct.pack('!H', replen + 28)  # ip+udp = 28
@@ -853,9 +887,19 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile):
         ipinfo = 'with static address {0}'.format(niccfg['ipv4_address'])
     else:
         ipinfo = 'without address, served from {0}'.format(myip)
-    log.log({
-        'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
-    send_raw_packet(repview, replen + 28, reqview, info)
+    if relayipa:
+        ipinfo += ' (relayed to {} via {})'.format(relayipa, requestor[0])
+    if isboot:
+        log.log({
+            'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
+    else:
+        log.log({
+            'info': 'Offering DHCP {} to {}'.format(ipinfo, node)})
+    if relayip != b'\x00\x00\x00\x00':
+        sock.sendto(repview[28:28 + replen], requestor)
+    else:
+        send_raw_packet(repview, replen + 28, reqview, info)
+
 
 def send_raw_packet(repview, replen, reqview, info):
     ifidx = info['netinfo']['ifidx']
@@ -880,9 +924,10 @@ def send_raw_packet(repview, replen, reqview, info):
     sendto(tsock.fileno(), pkt, replen, 0, ctypes.byref(targ),
            ctypes.sizeof(targ))
 
-def ack_request(pkt, rq, info):
+def ack_request(pkt, rq, info, sock=None, requestor=None):
     hwlen = bytearray(rq[2:3].tobytes())[0]
     hwaddr = rq[28:28+hwlen].tobytes()
+    relayip = rq[24:28].tobytes()
     myipn = myipbypeer.get(hwaddr, None)
     if not myipn or pkt.get(54, None) != myipn:
         return
@@ -901,15 +946,20 @@ def ack_request(pkt, rq, info):
                      repview[12:len(rply)].tobytes())
     datasum = ~datasum & 0xffff
     repview[26:28] = struct.pack('!H', datasum)
-    send_raw_packet(repview, len(rply), rq, info)
+    if relayip != b'\x00\x00\x00\x00':
+        sock.sendto(repview[28:], requestor)
+    else:
+        send_raw_packet(repview, len(rply), rq, info)
 
-def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None):
-    if info.get('hwaddr', None) in macmap and info.get('uuid', None):
-        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr)
+def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None, requestor=None):
+    if packet.get(53, None) == b'\x03':
+        ack_request(packet, reqview, info, sock, requestor)
+    elif info.get('hwaddr', None) in macmap: #  and info.get('uuid', None):
+        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr, requestor)
     elif info.get('uuid', None) in uuidmap:
-        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr)
+        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr, requestor)
     elif packet.get(53, None) == b'\x03':
-        ack_request(packet, reqview, info)
+        ack_request(packet, reqview, info, sock, requestor)
     elif info.get('uuid', None) and info.get('hwaddr', None):
         if time.time() > ignoremacs.get(info['hwaddr'], 0) + 90:
             ignoremacs[info['hwaddr']] = time.time()

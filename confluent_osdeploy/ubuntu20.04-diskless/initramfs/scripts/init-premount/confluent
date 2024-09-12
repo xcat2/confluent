@@ -58,6 +58,10 @@ if ! grep console= /proc/cmdline > /dev/null; then
     echo "Automatic console configured for $autocons"
 fi
 echo sshd:x:30:30:SSH User:/var/empty/sshd:/sbin/nologin >> /etc/passwd
+modprobe ib_ipoib
+modprobe ib_umad
+modprobe hfi1
+modprobe mlx5_ib
 cd /sys/class/net
 for nic in *; do
     ip link set $nic up

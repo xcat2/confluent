@@ -70,10 +70,11 @@ import os
 import eventlet.green.socket as socket
 import struct
 import sys
+import uuid
 import yaml
 
 pluginmap = {}
-dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos')
+dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos', b'enos', u'enos')
 
 PluginCollection = plugin.PluginCollection
 
@@ -161,8 +162,9 @@ def _merge_dict(original, custom):
 
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/' ,
-                   'users/', 'uuid', 'version']
+                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/',
+                   'users/', 'uuid', 'version', 'staging/']
+
 
 
 class PluginRoute(object):
@@ -358,6 +360,10 @@ def _init_core():
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
                     }),
+                    'extra_advanced': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
                 },
             },
             'storage': {
@@ -426,6 +432,7 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
+            'ikvm': PluginRoute({'handler': 'ikvm'}),
         },
         'description': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
@@ -1262,6 +1269,87 @@ def handle_discovery(pathcomponents, operation, configmanager, inputdata):
     if pathcomponents[0] == 'detected':
         pass
 
+class Staging:
+    def __init__(self, user, uuid):
+        self.uuid_str = uuid
+        self.storage_folder = '/var/lib/confluent/client_assets/' + self.uuid_str
+        self.filename = None
+        self.user = user
+        self.base_folder = os.path.exists('/var/lib/confluent/client_assets/')
+
+        if not self.base_folder:
+            try:
+                os.mkdir('/var/lib/confluent/client_assets/')
+            except Exception as e:
+                raise OSError(str(e))
+             
+    def getUUID(self):
+        return self.uuid_str
+    
+    def get_push_url(self):
+        return 'staging/{0}/{1}'.format(self.user,self.uuid_str)
+    
+    def create_directory(self):
+        try:
+            os.mkdir(self.storage_folder)
+            return True
+        except OSError as e:
+            raise exc.InvalidArgumentException(str(e))
+    
+    def get_file_name(self):
+        stage_file = '{}/filename.txt'.format(self.storage_folder)
+        try:
+            with open(stage_file, 'r') as f:
+                filename = f.readline()
+            os.remove(stage_file)
+            return self.storage_folder + '/{}'.format(filename)
+        except FileNotFoundError:
+            file = None
+            return False
+        
+    def deldirectory(self):
+        pass
+
+def handle_staging(pathcomponents, operation, configmanager, inputdata):
+    '''
+    e.g push_url: /confluent-api/staging/user/<unique_id> 
+    '''
+    if operation == 'create':
+        if len(pathcomponents) == 1:
+                stage = Staging(inputdata['user'],str(uuid.uuid1()))
+                if stage.create_directory():
+                    if 'filename' in inputdata:
+                        data_file = stage.storage_folder + '/filename.txt'
+                        with open(data_file, 'w') as f:
+                            f.write(inputdata['filename'])     
+                    else:
+                        raise Exception('Error: Missing filename arg')
+                    push_url = stage.get_push_url()
+                    yield msg.CreatedResource(push_url)
+
+        elif len(pathcomponents) == 3:
+            stage = Staging(pathcomponents[1], pathcomponents[2])
+            file = stage.get_file_name()
+            if 'filedata' in inputdata and file:
+                content_length = inputdata['content_length']
+                remaining_length = content_length
+                filedata = inputdata['filedata']
+                chunk_size = 16384
+                progress = 0.0
+                with open(file, 'wb') as f:
+                    while remaining_length > 0:
+                        progress = (1 - (remaining_length/content_length)) * 100
+                        datachunk = filedata['wsgi.input'].read(min(chunk_size, remaining_length))
+                        f.write(datachunk)     
+                        remaining_length -= len(datachunk)
+                        yield msg.FileUploadProgress(progress)
+                    yield msg.FileUploadProgress(100) 
+                 
+
+    elif operation == 'retrieve':
+        pass
+    return 
+
 def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
 
@@ -1370,5 +1458,7 @@ def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     elif pathcomponents[0] == 'discovery':
         return handle_discovery(pathcomponents[1:], operation, configmanager,
                                 inputdata)
+    elif pathcomponents[0] == 'staging':
+        return handle_staging(pathcomponents, operation, configmanager, inputdata)
     else:
         raise exc.NotFoundException()

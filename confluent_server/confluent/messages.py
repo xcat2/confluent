@@ -262,10 +262,10 @@ class Generic(ConfluentMessage):
 
     def json(self):
         return json.dumps(self.data)
-    
+
     def raw(self):
         return self.data
-    
+
     def html(self):
         return json.dumps(self.data)
 
@@ -344,10 +344,10 @@ class ConfluentResourceCount(ConfluentMessage):
         self.myargs = [count]
         self.desc = 'Resource Count'
         self.kvpairs = {'count': count}
-    
+
     def strip_node(self, node):
         pass
-    
+
 class CreatedResource(ConfluentMessage):
     notnode = True
     readonly = True
@@ -569,6 +569,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputLicense(path, nodes, inputdata, configmanager)
     elif path == ['deployment', 'ident_image']:
         return InputIdentImage(path, nodes, inputdata)
+    elif path == ['console', 'ikvm']:
+        return InputIkvmParams(path, nodes, inputdata)
     elif inputdata:
         raise exc.InvalidArgumentException(
             'No known input handler for request')
@@ -637,6 +639,18 @@ class SavedFile(ConfluentMessage):
     def __init__(self, node, file):
         self.myargs = (node, file)
         self.kvpairs = {node: {'filename': file}}
+
+class FileUploadProgress(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, progress, name=None):
+        self.myargs = (progress)
+        self.stripped = False
+        self.notnode = name is None
+        if self.notnode:
+            self.kvpairs = {'progress': {'value': progress}}
+        else:
+            self.kvpairs = {name: {'progress': {'value': progress}}}
 
 class InputAlertData(ConfluentMessage):
 
@@ -936,6 +950,9 @@ class InputIdentImage(ConfluentInputMessage):
     keyname = 'ident_image'
     valid_values = ['create']
 
+class InputIkvmParams(ConfluentInputMessage):
+    keyname = 'method'
+    valid_values = ['unix', 'wss']
 
 class InputIdentifyMessage(ConfluentInputMessage):
     valid_values = set([

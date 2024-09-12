@@ -1,0 +1,17 @@
+#!/bin/sh
+case $1 in
+prereqs)
+        echo
+        exit 0
+        ;;
+esac
+
+systemdecryptnow() {
+. /usr/lib/cryptsetup/functions
+local CRYPTTAB_SOURCE=$(awk '{print $2}' /systemdecrypt/crypttab)
+local CRYPTTAB_NAME=$(awk '{print $1}' /systemdecrypt/crypttab)
+crypttab_resolve_source
+/lib/systemd/systemd-cryptsetup attach "${CRYPTTAB_NAME}" "${CRYPTTAB_SOURCE}" none tpm2-device=auto
+}
+
+systemdecryptnow

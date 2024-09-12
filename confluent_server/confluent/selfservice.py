@@ -282,7 +282,7 @@ def handle_request(env, start_response):
                     ifidx = int(nici.read())
             ncfg = netutil.get_nic_config(cfg, nodename, ifidx=ifidx)
         else:
-            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
+            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip, clientip=clientip)
         if env['PATH_INFO'] == '/self/deploycfg':
             for key in list(ncfg):
                 if 'v6' in key:
