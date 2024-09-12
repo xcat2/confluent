@@ -70,6 +70,7 @@ import eventlet.green.socket as socket
 import struct
 import sys
 import uuid
+import yaml
 
 pluginmap = {}
 dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos')
@@ -160,7 +161,7 @@ def _merge_dict(original, custom):
 
 
 rootcollections = ['deployment/', 'discovery/', 'events/', 'networking/',
-                   'noderange/', 'nodes/', 'nodegroups/', 'usergroups/' ,
+                   'noderange/', 'nodes/', 'nodegroups/', 'storage/', 'usergroups/' ,
                    'users/', 'uuid', 'version', 'staging/']
 
 
