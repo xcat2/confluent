@@ -394,7 +394,9 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             username = username.encode('utf8')
         req = json.loads(reqbody)
         rsp = authentication_response(req, username)
-        if start_response:
+        if rsp == 'Timeout':
+            start_response('408 Timeout', headers)
+        elif rsp['verified'] and start_response:
             start_response('200 OK', headers)
             sessinfo = {'username': username}
             if 'authtoken' in authorized:
