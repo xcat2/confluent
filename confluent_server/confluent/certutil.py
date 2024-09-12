@@ -76,7 +76,7 @@ def get_certificate_paths():
                     continue
                 kploc = check_apache_config(os.path.join(currpath,
                                                                        fname))
-                if keypath and kploc[0]:
+                if keypath and kploc[0] and keypath != kploc[0]:
                     return None, None # Ambiguous...
                 if kploc[0]:
                     keypath, certpath = kploc
@@ -206,7 +206,7 @@ def create_simple_ca(keyout, certout):
     finally:
         os.remove(tmpconfig)
 
-def create_certificate(keyout=None, certout=None):
+def create_certificate(keyout=None, certout=None, csrout=None):
     if not keyout:
         keyout, certout = get_certificate_paths()
     if not keyout:
@@ -214,9 +214,10 @@ def create_certificate(keyout=None, certout=None):
     assure_tls_ca()
     shortname = socket.gethostname().split('.')[0]
     longname = shortname # socket.getfqdn()
-    subprocess.check_call(
-        ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
-         keyout])
+    if not csrout:
+        subprocess.check_call(
+            ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
+             keyout])
     san = ['IP:{0}'.format(x) for x in get_ip_addresses()]
     # It is incorrect to put IP addresses as DNS type.  However
     # there exists non-compliant clients that fail with them as IP
@@ -229,21 +230,34 @@ def create_certificate(keyout=None, certout=None):
     os.close(tmphdl)
     tmphdl, extconfig = tempfile.mkstemp()
     os.close(tmphdl)
-    tmphdl, csrout = tempfile.mkstemp()
-    os.close(tmphdl)
+    needcsr = False
+    if csrout is None:
+        needcsr = True
+        tmphdl, csrout = tempfile.mkstemp()
+        os.close(tmphdl)
     shutil.copy2(sslcfg, tmpconfig)
-    serialnum = '0x' + ''.join(['{:02x}'.format(x) for x in bytearray(os.urandom(20))])
     try:
-        with open(tmpconfig, 'a') as cfgfile:
-            cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
-        with open(extconfig, 'a') as cfgfile:
-            cfgfile.write('\nbasicConstraints=CA:false\nsubjectAltName={0}'.format(san))
-        subprocess.check_call([
-            'openssl', 'req', '-new', '-key', keyout, '-out', csrout, '-subj',
-            '/CN={0}'.format(longname),
-            '-extensions', 'SAN', '-config', tmpconfig
-        ])
+        if needcsr:
+            with open(tmpconfig, 'a') as cfgfile:
+                cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
+            with open(extconfig, 'a') as cfgfile:
+                cfgfile.write('\nbasicConstraints=CA:false\nsubjectAltName={0}'.format(san))
+            subprocess.check_call([
+                'openssl', 'req', '-new', '-key', keyout, '-out', csrout, '-subj',
+                '/CN={0}'.format(longname),
+               '-extensions', 'SAN', '-config', tmpconfig
+            ])
+        else:
+            # when used manually, allow the csr SAN to stand
+            # may add explicit subj/SAN argument, in which case we would skip copy
+            with open(tmpconfig, 'a') as cfgfile:
+                cfgfile.write('\ncopy_extensions=copy\n')
+            with open(extconfig, 'a') as cfgfile:
+                cfgfile.write('\nbasicConstraints=CA:false\n')
         if os.path.exists('/etc/confluent/tls/cakey.pem'):
+            # simple style CA in effect, make a random serial number and
+            # hope for the best, and accept inability to backdate the cert
+            serialnum = '0x' + ''.join(['{:02x}'.format(x) for x in bytearray(os.urandom(20))])
             subprocess.check_call([
                 'openssl', 'x509', '-req', '-in', csrout,
                 '-CA', '/etc/confluent/tls/cacert.pem',
@@ -252,20 +266,40 @@ def create_certificate(keyout=None, certout=None):
                 '-extfile', extconfig
             ])
         else:
+            # we moved to a 'proper' CA, mainly for access to backdating
+            # start of certs for finicky system clocks
+            # this also provides a harder guarantee of serial uniqueness, but
+            # not of practical consequence (160 bit random value is as good as
+            # guaranteed unique)
+            # downside is certificate generation is serialized
+            cacfgfile = '/etc/confluent/tls/ca/openssl.cfg'
+            if needcsr:
+                tmphdl, tmpcafile = tempfile.mkstemp()
+                shutil.copy2(cacfgfile, tmpcafile)
+                os.close(tmphdl)
+                cacfgfile = tmpcafile
+            # with realcalock:  # if we put it in server, we must lock it
             subprocess.check_call([
-                'openssl', 'ca', '-config', '/etc/confluent/tls/ca/openssl.cfg',
+                'openssl', 'ca', '-config', cacfgfile,
                 '-in', csrout, '-out', certout, '-batch', '-notext',
                 '-startdate', '19700101010101Z', '-enddate', '21000101010101Z',
                 '-extfile', extconfig
             ])
     finally:
         os.remove(tmpconfig)
-        os.remove(csrout)
-        os.remove(extconfig)
+        if needcsr:
+            os.remove(csrout)
+        print(extconfig)  # os.remove(extconfig)
 
 
 if __name__ == '__main__':
+    import sys
     outdir = os.getcwd()
     keyout = os.path.join(outdir, 'key.pem')
-    certout = os.path.join(outdir, 'cert.pem')
-    create_certificate(keyout, certout)
+    certout = os.path.join(outdir, sys.argv[2] + 'cert.pem')
+    csrout = None
+    try:
+        csrout = sys.argv[1]
+    except IndexError:
+        csrout = None
+    create_certificate(keyout, certout, csrout)

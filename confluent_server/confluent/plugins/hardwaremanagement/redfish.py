@@ -516,12 +516,20 @@ class IpmiHandler(object):
             return self.handle_ntp()
         elif self.element[1:4] == ['management_controller', 'extended', 'all']:
             return self.handle_bmcconfig()
+        elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
+            return self.handle_bmcconfig(True)
+        elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
+            return self.handle_bmcconfig(advanced=False, extended=True)
+        elif self.element[1:4] == ['management_controller', 'extended', 'extra_advanced']:
+            return self.handle_bmcconfig(advanced=True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
             return self.handle_sysconfig(True)
         elif self.element[1:3] == ['system', 'clear']:
             return self.handle_sysconfigclear()
+        elif self.element[1:3] == ['management_controller', 'clear']:
+            return self.handle_bmcconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
             return self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
@@ -1310,18 +1318,27 @@ class IpmiHandler(object):
         if 'read' == self.op:
             lc = self.ipmicmd.get_location_information()
 
-    def handle_bmcconfig(self, advanced=False):
+    def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:
             try:
-                self.output.put(msg.ConfigSet(
-                    self.node,
-                    self.ipmicmd.get_bmc_configuration()))
+                if extended:
+                    bmccfg = self.ipmicmd.get_extended_bmc_configuration(
+                        hideadvanced=(not advanced))
+                else:
+                    bmccfg = self.ipmicmd.get_bmc_configuration()
+                self.output.put(msg.ConfigSet(self.node, bmccfg))
             except Exception as e:
                 self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
         elif 'update' == self.op:
             self.ipmicmd.set_bmc_configuration(
                 self.inputdata.get_attributes(self.node))
+
+    def handle_bmcconfigclear(self):
+        if 'read' == self.op:
+            raise exc.InvalidArgumentException(
+                'Cannot read the "clear" resource')
+        self.ipmicmd.clear_bmc_configuration()
 
     def handle_sysconfigclear(self):
         if 'read' == self.op:

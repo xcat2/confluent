@@ -119,6 +119,7 @@ class TsmConsole(conapi.Console):
         self.datacallback = None
         self.nodeconfig = config
         self.connected = False
+        self.recvr = None
 
 
     def recvdata(self):
@@ -134,22 +135,30 @@ class TsmConsole(conapi.Console):
         kv = util.TLSCertVerifier(
             self.nodeconfig, self.node, 'pubkeys.tls_hardwaremanager').verify_cert
         wc = webclient.SecureHTTPConnection(self.origbmc, 443, verifycallback=kv)
-        rsp = wc.grab_json_response_with_status('/login', {'data': [self.username.decode('utf8'), self.password.decode("utf8")]}, headers={'Content-Type': 'application/json'})
+        try:
+            rsp = wc.grab_json_response_with_status('/login', {'data': [self.username.decode('utf8'), self.password.decode("utf8")]}, headers={'Content-Type': 'application/json', 'Accept': 'application/json'})
+        except Exception as e:
+            raise cexc.TargetEndpointUnreachable(str(e))
+        if rsp[1] > 400:
+            raise cexc.TargetEndpointBadCredentials
         bmc = self.bmc
         if '%' in self.bmc:
             prefix = self.bmc.split('%')[0]
             bmc = prefix + ']'
         self.ws = WrappedWebSocket(host=bmc)
         self.ws.set_verify_callback(kv)
-        self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']))
+        self.ws.connect('wss://{0}/console0'.format(self.bmc), host=bmc, cookie='XSRF-TOKEN={0}; SESSION={1}'.format(wc.cookies['XSRF-TOKEN'], wc.cookies['SESSION']), subprotocols=[wc.cookies['XSRF-TOKEN']])
         self.connected = True
-        eventlet.spawn_n(self.recvdata)
+        self.recvr = eventlet.spawn(self.recvdata)
         return
 
     def write(self, data):
         self.ws.send(data)
 
     def close(self):
+        if self.recvr:
+            self.recvr.kill()
+            self.recvr = None
         if self.ws:
             self.ws.close()
         self.connected = False

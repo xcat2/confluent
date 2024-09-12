@@ -402,12 +402,16 @@ class NodeRange(object):
     def _expandstring(self, element, filternodes=None):
         prefix = ''
         if element[0][0] in ('/', '~'):
+            if self.purenumeric:
+                raise Exception('Regular expression not supported within "[]"')
             element = ''.join(element)
             nameexpression = element[1:]
             if self.cfm is None:
                 raise Exception('Verification configmanager required')
             return set(self.cfm.filter_nodenames(nameexpression, filternodes))
         elif '=' in element[0] or '!~' in element[0]:
+            if self.purenumeric:
+                raise Exception('Equality/Inequality operators (=, !=, =~, !~) are invalid within "[]"')
             element = ''.join(element)
             if self.cfm is None:
                 raise Exception('Verification configmanager required')

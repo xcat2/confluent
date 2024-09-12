@@ -247,6 +247,10 @@ class NodeHandler(immhandler.NodeHandler):
             if rsp.status == 200:
                 pwdchanged = True
                 password = newpassword
+                wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
+                if '_csrf_token' in wc.cookies:
+                    wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+                wc.grab_json_response_with_status('/api/providers/logout')
             else:
                 if rspdata.get('locktime', 0) > 0:
                     raise LockedUserException(
@@ -280,6 +284,7 @@ class NodeHandler(immhandler.NodeHandler):
                 rsp.read()
                 if rsp.status != 200:
                     return (None, None)
+                wc.grab_json_response_with_status('/api/providers/logout')
                 self._currcreds = (username, newpassword)
                 wc.set_basic_credentials(username, newpassword)
                 pwdchanged = True
@@ -403,6 +408,34 @@ class NodeHandler(immhandler.NodeHandler):
             if user['users_user_name'] == '':
                 return user['users_user_id']
 
+    def create_tmp_account(self, wc):
+        rsp, status = wc.grab_json_response_with_status('/redfish/v1/AccountService/Accounts')
+        if status != 200:
+            raise Exception("Unable to list current accounts")
+        usednames = set([])
+        tmpnam = '6pmu0ezczzcp'
+        tpass = base64.b64encode(os.urandom(9)).decode() + 'Iw47$'
+        ntpass = base64.b64encode(os.urandom(9)).decode() + 'Iw47$'
+        for acct in rsp.get("Members", []):
+            url = acct.get("@odata.id", None)
+            if url:
+                uinfo = wc.grab_json_response(url)
+                usednames.add(uinfo.get('UserName', None))
+        if tmpnam in usednames:
+            raise Exception("Tmp account already exists")
+        rsp, status = wc.grab_json_response_with_status(
+            '/redfish/v1/AccountService/Accounts',
+            {'UserName': tmpnam, 'Password': tpass, 'RoleId': 'Administrator'})
+        if status >= 300:
+            raise Exception("Failure creating tmp account: " + repr(rsp))
+        tmpurl = rsp['@odata.id']
+        wc.set_basic_credentials(tmpnam, tpass)
+        rsp, status = wc.grab_json_response_with_status(
+            tmpurl, {'Password': ntpass}, method='PATCH')
+        wc.set_basic_credentials(tmpnam, ntpass)
+        return tmpurl
+
+
     def _setup_xcc_account(self, username, passwd, wc):
         userinfo = wc.grab_json_response('/api/dataset/imm_users')
         uid = None
@@ -434,18 +467,35 @@ class NodeHandler(immhandler.NodeHandler):
                     '/api/function',
                     {'USER_UserModify': '{0},{1},,1,4,0,0,0,0,,8,,,'.format(uid, username)})
                 if status == 200 and rsp.get('return', 0) == 13:
+                    wc.grab_json_response('/api/providers/logout')
                     wc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
                     status = 503
+                    tries = 2
+                    tmpaccount = None
                     while status != 200:
+                        tries -= 1
                         rsp, status = wc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
                             {'UserName': username}, method='PATCH')
                         if status != 200:
                             rsp = json.loads(rsp)
-                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError'):
-                                eventlet.sleep(10)
+                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError'):
+                                if tries:
+                                    eventlet.sleep(4)
+                                elif tmpaccount:
+                                    wc.grab_json_response_with_status(tmpaccount, method='DELETE')
+                                    raise Exception('Failed renaming main account')
+                                else:
+                                    tmpaccount = self.create_tmp_account(wc)
+                                    tries = 8
                             else:
                                 break
+                    if tmpaccount:
+                        wc.set_basic_credentials(username, passwd)
+                        wc.grab_json_response_with_status(tmpaccount, method='DELETE')
+                    self.tmppasswd = None
+                    self._currcreds = (username, passwd)
+                    return
             self.tmppasswd = None
         wc.grab_json_response('/api/providers/logout')
         self._currcreds = (username, passwd)
@@ -596,7 +646,10 @@ class NodeHandler(immhandler.NodeHandler):
                     statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
                 elif not netutil.address_is_local(newip):
                     raise exc.InvalidArgumentException('Will not remotely configure a device with no gateway')
-                wc.grab_json_response('/api/dataset', statargs)
+                netset, status = wc.grab_json_response_with_status('/api/dataset', statargs)
+                print(repr(netset))
+                print(repr(status))
+
         elif self.ipaddr.startswith('fe80::'):
             self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
@@ -627,8 +680,9 @@ def remote_nodecfg(nodename, cfm):
     ipaddr = ipaddr.split('/', 1)[0]
     ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
     if not ipaddr:
-        raise Excecption('Cannot remote configure a system without known '
+        raise Exception('Cannot remote configure a system without known '
                          'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)
     nh.config(nodename)
+

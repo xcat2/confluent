@@ -659,7 +659,9 @@ class IpmiHandler(object):
         elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
             return self.handle_bmcconfig(True)
         elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
-            return self.handle_bmcconfig(True, extended=True)
+            return self.handle_bmcconfig(advanced=False, extended=True)
+        elif self.element[1:4] == ['management_controller', 'extended', 'extra_advanced']:
+            return self.handle_bmcconfig(advanced=True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
             return self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
@@ -1376,10 +1378,8 @@ class IpmiHandler(object):
     def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
-            if self.inputdata.inputbynode[self.node] == 'blink':
-                raise exc.InvalidArgumentException(
-                    '"blink" is not supported with ipmi')
-            self.ipmicmd.set_identify(on=identifystate)
+            blinkstate = self.inputdata.inputbynode[self.node] == 'blink'
+            self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
             self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
@@ -1472,7 +1472,8 @@ class IpmiHandler(object):
         if 'read' == self.op:
             try:
                 if extended:
-                    bmccfg = self.ipmicmd.get_extended_bmc_configuration()
+                    bmccfg = self.ipmicmd.get_extended_bmc_configuration(
+                        hideadvanced=(not advanced))
                 else:
                     bmccfg = self.ipmicmd.get_bmc_configuration()
                 self.output.put(msg.ConfigSet(self.node, bmccfg))

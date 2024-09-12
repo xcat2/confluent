@@ -10,8 +10,16 @@ import stat
 import struct
 import sys
 import subprocess
+import traceback
 
 bootuuid = None
+vgname = 'localstorage'
+oldvgname = None
+
+def convert_lv(oldlvname):
+    if oldvgname is None:
+        return None
+    return oldlvname.replace(oldvgname, vgname)
 
 def get_partname(devname, idx):
     if devname[-1] in '0123456789':
@@ -53,6 +61,8 @@ def get_image_metadata(imgpath):
         header = img.read(16)
         if header == b'\x63\x7b\x9d\x26\xb7\xfd\x48\x30\x89\xf9\x11\xcf\x18\xfd\xff\xa1':
             for md in get_multipart_image_meta(img):
+                if md.get('device', '').startswith('/dev/zram'):
+                    continue
                 yield md
         else:
             raise Exception('Installation from single part image not supported')
@@ -86,14 +96,14 @@ def fixup(rootdir, vols):
             if tab.startswith('#ORIGFSTAB#'):
                 if entry[1] in devbymount:
                     targetdev = devbymount[entry[1]]
-                    if targetdev.startswith('/dev/localstorage/'):
+                    if targetdev.startswith('/dev/{}/'.format(vgname)):
                         entry[0] = targetdev
                     else:
                         uuid = subprocess.check_output(['blkid', '-s', 'UUID', '-o', 'value', targetdev]).decode('utf8')
                         uuid = uuid.strip()
                         entry[0] = 'UUID={}'.format(uuid)
                 elif entry[2] == 'swap':
-                    entry[0] = '/dev/mapper/localstorage-swap'
+                    entry[0] = '/dev/mapper/{}-swap'.format(vgname.replace('-', '--'))
                 entry[0] = entry[0].ljust(42)
                 entry[1] = entry[1].ljust(16)
                 entry[3] = entry[3].ljust(28)
@@ -141,6 +151,46 @@ def fixup(rootdir, vols):
     grubsyscfg = os.path.join(rootdir, 'etc/sysconfig/grub')
     if not os.path.exists(grubsyscfg):
         grubsyscfg = os.path.join(rootdir, 'etc/default/grub')
+    kcmdline = os.path.join(rootdir, 'etc/kernel/cmdline')
+    if os.path.exists(kcmdline):
+        with open(kcmdline) as kcmdlinein:
+            kcmdlinecontent = kcmdlinein.read()
+        newkcmdlineent = []
+        for ent in kcmdlinecontent.split():
+            if ent.startswith('resume='):
+                newkcmdlineent.append('resume={}'.format(newswapdev))
+            elif ent.startswith('root='):
+                newkcmdlineent.append('root={}'.format(newrootdev))
+            elif ent.startswith('rd.lvm.lv='):
+                ent = convert_lv(ent)
+                if ent:
+                    newkcmdlineent.append(ent)
+            else:
+                newkcmdlineent.append(ent)
+        with open(kcmdline, 'w') as kcmdlineout:
+            kcmdlineout.write(' '.join(newkcmdlineent) + '\n')
+    for loadent in glob.glob(os.path.join(rootdir, 'boot/loader/entries/*.conf')):
+        with open(loadent) as loadentin:
+            currentry = loadentin.read().split('\n')
+        with open(loadent, 'w') as loadentout:
+            for cfgline in currentry:
+                cfgparts = cfgline.split()
+                if not cfgparts or cfgparts[0] != 'options':
+                    loadentout.write(cfgline + '\n')
+                    continue
+                newcfgparts = [cfgparts[0]]
+                for cfgpart in cfgparts[1:]:
+                    if cfgpart.startswith('root='):
+                        newcfgparts.append('root={}'.format(newrootdev))
+                    elif cfgpart.startswith('resume='):
+                        newcfgparts.append('resume={}'.format(newswapdev))
+                    elif cfgpart.startswith('rd.lvm.lv='):
+                        cfgpart = convert_lv(cfgpart)
+                        if cfgpart:
+                            newcfgparts.append(cfgpart)
+                    else:
+                        newcfgparts.append(cfgpart)
+                loadentout.write(' '.join(newcfgparts) + '\n')
     with open(grubsyscfg) as defgrubin:
         defgrub = defgrubin.read().split('\n')
     with open(grubsyscfg, 'w') as defgrubout:
@@ -148,9 +198,18 @@ def fixup(rootdir, vols):
             gline = gline.split()
             newline = []
             for ent in gline:
-                if ent.startswith('resume=') or ent.startswith('rd.lvm.lv'):
-                    continue
-                newline.append(ent)
+                if ent.startswith('resume='):
+                    newline.append('resume={}'.format(newswapdev))
+                elif ent.startswith('root='):
+                    newline.append('root={}'.format(newrootdev))
+                elif ent.startswith('rd.lvm.lv='):
+                    ent = convert_lv(ent)
+                    if ent:
+                        newline.append(ent)
+                    elif '""' in ent:
+                        newline.append('""')
+                else:
+                    newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
     grubcfg = subprocess.check_output(['find', os.path.join(rootdir, 'boot'), '-name', 'grub.cfg']).decode('utf8').strip().replace(rootdir, '/').replace('//', '/')
     grubcfg = grubcfg.split('\n')
@@ -227,8 +286,14 @@ def had_swap():
                 return True
     return False
 
+newrootdev = None
+newswapdev = None
 def install_to_disk(imgpath):
     global bootuuid
+    global newrootdev
+    global newswapdev
+    global vgname
+    global oldvgname
     lvmvols = {}
     deftotsize = 0
     mintotsize = 0
@@ -260,6 +325,13 @@ def install_to_disk(imgpath):
             biggestfs = fs
             biggestsize = fs['initsize']
         if fs['device'].startswith('/dev/mapper'):
+            oldvgname = fs['device'].rsplit('/', 1)[-1]
+            # if node has - then /dev/mapper will double up the hypen
+            if '_' in oldvgname and '-' in oldvgname.split('_')[-1]:
+                oldvgname = oldvgname.rsplit('-', 1)[0].replace('--', '-')
+                osname = oldvgname.split('_')[0]
+                nodename = socket.gethostname().split('.')[0]
+                vgname = '{}_{}'.format(osname, nodename)
             lvmvols[fs['device'].replace('/dev/mapper/', '')] = fs
             deflvmsize += fs['initsize']
             minlvmsize += fs['minsize']
@@ -304,6 +376,8 @@ def install_to_disk(imgpath):
             end = sectors
         parted.run('mkpart primary {}s {}s'.format(curroffset, end))
         vol['targetdisk'] = get_partname(instdisk, volidx)
+        if vol['mount'] == '/':
+            newrootdev = vol['targetdisk']
         curroffset += size + 1
     if not lvmvols:
         if swapsize:
@@ -313,13 +387,14 @@ def install_to_disk(imgpath):
             if end > sectors:
                 end = sectors
             parted.run('mkpart swap {}s {}s'.format(curroffset, end))
-            subprocess.check_call(['mkswap', get_partname(instdisk, volidx + 1)])
+            newswapdev = get_partname(instdisk, volidx + 1)
+            subprocess.check_call(['mkswap', newswapdev])
     else:
         parted.run('mkpart lvm {}s 100%'.format(curroffset))
         lvmpart = get_partname(instdisk, volidx + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
-        subprocess.check_call(['vgcreate', 'localstorage', lvmpart])
-        vginfo = subprocess.check_output(['vgdisplay', 'localstorage', '--units', 'b']).decode('utf8')
+        subprocess.check_call(['vgcreate', vgname, lvmpart])
+        vginfo = subprocess.check_output(['vgdisplay', vgname, '--units', 'b']).decode('utf8')
         vginfo = vginfo.split('\n')
         pesize = 0
         pes = 0
@@ -346,13 +421,17 @@ def install_to_disk(imgpath):
                 extents += 1
             if vol['mount'] == '/':
                 lvname = 'root'
+
             else:
                 lvname = vol['mount'].replace('/', '_')
-            subprocess.check_call(['lvcreate', '-l', '{}'.format(extents), '-y', '-n', lvname, 'localstorage'])
-            vol['targetdisk'] = '/dev/localstorage/{}'.format(lvname)
+            subprocess.check_call(['lvcreate', '-l', '{}'.format(extents), '-y', '-n', lvname, vgname])
+            vol['targetdisk'] = '/dev/{}/{}'.format(vgname, lvname)
+            if vol['mount'] == '/':
+                newrootdev = vol['targetdisk']
         if swapsize:
-            subprocess.check_call(['lvcreate', '-y', '-l', '{}'.format(swapsize // pesize), '-n', 'swap', 'localstorage'])
-            subprocess.check_call(['mkswap', '/dev/localstorage/swap'])
+            subprocess.check_call(['lvcreate', '-y', '-l', '{}'.format(swapsize // pesize), '-n', 'swap', vgname])
+            subprocess.check_call(['mkswap', '/dev/{}/swap'.format(vgname)])
+            newswapdev = '/dev/{}/swap'.format(vgname)
         os.makedirs('/run/imginst/targ')
         for vol in allvols:
             with open(vol['targetdisk'], 'wb') as partition:
@@ -426,4 +505,9 @@ def install_to_disk(imgpath):
 
 
 if __name__ == '__main__':
-    install_to_disk(os.environ['mountsrc'])
+    try:
+        install_to_disk(os.environ['mountsrc'])
+    except Exception:
+        traceback.print_exc()
+        time.sleep(86400)
+        raise

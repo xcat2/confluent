@@ -381,9 +381,10 @@ def list_info(parms, requestedparameter):
                 break
         else:
             candidate = info[requestedparameter]
-            candidate = candidate.strip()
-            if candidate != '':
-                results.add(_api_sanitize_string(candidate))
+            if candidate:
+                candidate = candidate.strip()
+                if candidate != '':
+                    results.add(_api_sanitize_string(candidate))
     return [msg.ChildCollection(x + suffix) for x in util.natural_sort(results)]
 
 def _handle_neighbor_query(pathcomponents, configmanager):

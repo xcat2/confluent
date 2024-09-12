@@ -30,7 +30,7 @@ import eventlet
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
-currtz = None
+currtz = 'UTC'
 keymap = 'us'
 currlocale = 'en_US.UTF-8'
 currtzvintage = None
@@ -282,7 +282,7 @@ def handle_request(env, start_response):
                     ifidx = int(nici.read())
             ncfg = netutil.get_nic_config(cfg, nodename, ifidx=ifidx)
         else:
-            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip)
+            ncfg = netutil.get_nic_config(cfg, nodename, serverip=myip, clientip=clientip)
         if env['PATH_INFO'] == '/self/deploycfg':
             for key in list(ncfg):
                 if 'v6' in key:
@@ -378,6 +378,8 @@ def handle_request(env, start_response):
                 tdc = util.run(['timedatectl'])[0].split(b'\n')
             except subprocess.CalledProcessError:
                 tdc = []
+                currtzvintage = time.time()
+                ncfg['timezone'] = currtz
             for ent in tdc:
                 ent = ent.strip()
                 if ent.startswith(b'Time zone:'):
@@ -517,8 +519,8 @@ def handle_request(env, start_response):
             pals = get_extra_names(nodename, cfg, myip)
             result = syncfiles.start_syncfiles(
                 nodename, cfg, json.loads(reqbody), pals)
-            start_response(result, ())
-            yield ''
+            start_response(result[0], ())
+            yield result[1]
             return
         if 'GET' == operation:
             status, output = syncfiles.get_syncresult(nodename)

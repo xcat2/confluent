@@ -157,7 +157,7 @@ def main():
                         elif attrib.endswith('.ipv6_address') and val:
                             ip6bynode[node][currnet] = val.split('/', 1)[0]
                         elif attrib.endswith('.hostname'):
-                            namesbynode[node][currnet] = re.split('\s+|,', val)
+                            namesbynode[node][currnet] = re.split(r'\s+|,', val)
         for node in ip4bynode:
             mydomain = domainsbynode.get(node, None)
             for ipdb in (ip4bynode, ip6bynode):

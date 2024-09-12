@@ -60,6 +60,7 @@ def active_scan(handler, protocol=None):
     known_peers = set([])
     for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
         for addr in scanned['addresses']:
+            addr = addr[0:1] + addr[2:]
             if addr in known_peers:
                 break
             hwaddr = neighutil.get_hwaddr(addr[0])
@@ -79,13 +80,20 @@ def scan(services, target=None):
 
 
 def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler):
-    if mac in peerbymacaddress and peer not in peerbymacaddress[mac]['addresses']:
-        peerbymacaddress[mac]['addresses'].append(peer)
+    if mac in peerbymacaddress:
+        normpeer = peer[0:1] + peer[2:]
+        for currpeer in peerbymacaddress[mac]['addresses']:
+            currnormpeer = currpeer[0:1] + peer[2:]
+            if currnormpeer == normpeer:
+                break
+        else:
+            peerbymacaddress[mac]['addresses'].append(peer)
     else:
         peerdata = {
             'hwaddr': mac,
             'addresses': [peer],
         }
+        targurl = None
         for headline in rsp[1:]:
             if not headline:
                 continue
@@ -105,13 +113,21 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 if not value.endswith('/redfish/v1/'):
                     return
             elif header == 'LOCATION':
-                if not value.endswith('/DeviceDescription.json'):
+                if '/eth' in value and value.endswith('.xml'):
+                    targurl = '/redfish/v1/'
+                    targtype = 'megarac-bmc'
+                    continue  # MegaRAC redfish
+                elif value.endswith('/DeviceDescription.json'):
+                    targurl = '/DeviceDescription.json'
+                    targtype = 'lenovo-xcc'
+                    continue
+                else:
                     return
-        if handler:
-            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
+        if handler and targurl:
+            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype)
 
-def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer):
-    retdata = check_fish(('/DeviceDescription.json', peerdata))
+def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer, targurl, targtype):
+    retdata = check_fish((targurl, peerdata, targtype))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -164,11 +180,14 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     net4.bind(('', 1900))
     net6.bind(('', 1900))
     peerbymacaddress = {}
+    newmacs = set([])
+    deferrednotifies = []
+    machandlers = {}
     while True:
         try:
-            newmacs = set([])
-            deferrednotifies = []
-            machandlers = {}
+            newmacs.clear()
+            deferrednotifies.clear()
+            machandlers.clear()
             r = select.select((net4, net6), (), (), 60)
             if r:
                 r = r[0]
@@ -251,7 +270,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                                 break
                                         candmgrs = cfd.get(node, {}).get('collective.managercandidates', {}).get('value', None)
                                         if candmgrs:
-                                            candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+                                            try:
+                                                candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+                                            except Exception:
+                                                candmgrs = noderange.NodeRange(candmgrs).nodes
                                             if collective.get_myname() not in candmgrs:
                                                 break
                                         currtime = time.time()
@@ -322,7 +344,7 @@ def _find_service(service, target):
                 host = '[{0}]'.format(host)
                 msg = smsg.format(host, service)
                 if not isinstance(msg, bytes):
-                    msg = msg.encode('utf8')               
+                    msg = msg.encode('utf8')
                 net6.sendto(msg, addr[4])
     else:
         net4.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -410,7 +432,11 @@ def _find_service(service, target):
         if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
             continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
-            pooltargs.append(('/DeviceDescription.json', peerdata[nid]))
+            pooltargs.append(('/DeviceDescription.json', peerdata[nid], 'lenovo-xcc'))
+        else:
+            for targurl in peerdata[nid]['urls']:
+                if '/eth' in targurl and targurl.endswith('.xml'):
+                    pooltargs.append(('/redfish/v1/', peerdata[nid], 'megarac-bmc'))
         # For now, don't interrogate generic redfish bmcs
         # This is due to a need to deduplicate from some supported SLP
         # targets (IMM, TSM, others)
@@ -425,21 +451,32 @@ def _find_service(service, target):
 def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
         verifycallback = lambda x: True
-    url, data = urldata
+    try:
+        url, data, targtype = urldata
+    except ValueError:
+        url, data = urldata
+        targtype = 'service:redfish-bmc'
     try:
         wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)
-        peerinfo = wc.grab_json_response(url)
+        peerinfo = wc.grab_json_response(url, headers={'Accept': 'application/json'})
     except socket.error:
         return None
     if url == '/DeviceDescription.json':
+        if not peerinfo:
+            return None
         try:
             peerinfo = peerinfo[0]
+        except KeyError:
+            peerinfo['xcc-variant'] = '3'
+        except IndexError:
+            return None
+        try:
             myuuid = peerinfo['node-uuid'].lower()
             if '-' not in myuuid:
                 myuuid = '-'.join([myuuid[:8], myuuid[8:12], myuuid[12:16], myuuid[16:20], myuuid[20:]])
             data['uuid'] = myuuid
             data['attributes'] = peerinfo
-            data['services'] = ['lenovo-xcc']
+            data['services'] = ['lenovo-xcc'] if 'xcc-variant' not in peerinfo else ['lenovo-xcc' + peerinfo['xcc-variant']]
             return data
         except (IndexError, KeyError):
             return None
@@ -447,7 +484,7 @@ def check_fish(urldata, port=443, verifycallback=None):
             peerinfo = wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
         if 'UUID' in peerinfo:
-            data['services'] = ['service:redfish-bmc']
+            data['services'] = [targtype]
             data['uuid'] = peerinfo['UUID'].lower()
             return data
     return None
@@ -466,7 +503,12 @@ def _parse_ssdp(peer, rsp, peerdata):
     if code == b'200':
         if nid in peerdata:
             peerdatum = peerdata[nid]
-            if peer not in peerdatum['addresses']:
+            normpeer = peer[0:1] + peer[2:]
+            for currpeer in peerdatum['addresses']:
+                currnormpeer = currpeer[0:1] + peer[2:]
+                if currnormpeer == normpeer:
+                    break
+            else:
                 peerdatum['addresses'].append(peer)
         else:
             peerdatum = {
@@ -501,5 +543,7 @@ def _parse_ssdp(peer, rsp, peerdata):
 
 if __name__ == '__main__':
     def printit(rsp):
-        print(repr(rsp))
+        pass # print(repr(rsp))
     active_scan(printit)
+
+

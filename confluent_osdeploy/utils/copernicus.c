@@ -31,6 +31,8 @@ int add_uuid(char* destination, int maxsize) {
     strncpy(destination, "/uuid=", maxsize);
     uuidsize = read(uuidf, destination + 6, maxsize - 6);
     close(uuidf);
+    if (uuidsize < 0) { return 0; }
+    if (uuidsize > 524288) { return 0; }
     if (destination[uuidsize + 5] == '\n') {
         destination[uuidsize + 5 ] = 0;
     }
@@ -45,6 +47,8 @@ int add_confluent_uuid(char* destination, int maxsize) {
     strncpy(destination, "/confluentuuid=", maxsize);
     uuidsize = read(uuidf, destination + 15, maxsize - 15);
     close(uuidf);
+    if (uuidsize < 0) { return 0; }
+    if (uuidsize > 524288) { return 0; }
     if (destination[uuidsize + 14] == '\n') {
         destination[uuidsize + 14] = 0;
     }

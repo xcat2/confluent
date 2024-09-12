@@ -22,6 +22,11 @@ import shutil
 import eventlet.green.socket as socket
 import eventlet
 import greenlet
+import pwd
+import signal
+import confluent.collective.manager as collective
+import confluent.noderange as noderange
+
 
 def fprint(txt):
     sys.stdout.write(txt)
@@ -109,6 +114,8 @@ def nics_missing_ipv6():
         iname, state = comps[:2]
         if iname == b'lo':
             continue
+        if iname == b'virbr0':
+            continue
         addrs = comps[2:]
         hasv6 = False
         hasv4 = False
@@ -157,6 +164,7 @@ def lookup_node(node):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description='Run configuration checks for a system running confluent service')
     ap.add_argument('-n', '--node', help='A node name to run node specific checks against')
+    ap.add_argument('-a', '--automation', help='Do checks against a deployed node for automation and syncfiles function', action='store_true')
     args, extra = ap.parse_known_args(sys.argv)
     if len(extra) > 1:
         ap.print_help()
@@ -217,6 +225,7 @@ if __name__ == '__main__':
                 print('OK')
             except subprocess.CalledProcessError:
                 emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
+            os.kill(int(sshutil.agent_pid), signal.SIGTERM)
         fprint('Checking for blocked insecure boot: ')
         if insecure_boot_attempts():
             emprint('Some nodes are attempting network boot using PXE or HTTP boot, but the node is not configured to allow this (Example resolution: nodegroupattrib everything deployment.useinsecureprotocols=firmware)')
@@ -252,6 +261,9 @@ if __name__ == '__main__':
             uuid = rsp.get('id.uuid', {}).get('value', None)
             if uuid:
                 uuidok = True
+            if 'collective.managercandidates' in rsp:
+                # Check if current node in candidates
+                pass
             if 'deployment.useinsecureprotocols' in rsp:
                 insec = rsp.get('deployment.useinsecureprotocols', {}).get('value', None)
                 if insec != 'firmware':
@@ -270,17 +282,40 @@ if __name__ == '__main__':
                     switch_value = rsp[key].get('value',None)
                     if switch_value and switch_value not in valid_nodes:
                         emprint(f'{switch_value} is not a valid node name (as referenced by attribute "{key}" of node {args.node}).')
-        print(f"Checking network configuration for {args.node}")
         cfg = configmanager.ConfigManager(None)
+        cfd = cfg.get_node_attributes(
+            args.node, ('deployment.*', 'collective.managercandidates'))
+        profile = cfd.get(args.node, {}).get(
+            'deployment.pendingprofile', {}).get('value', None)
+        if not profile:
+            emprint(
+                f'{args.node} is not currently set to deploy any '
+                'profile, network boot attempts will be ignored')
+        candmgrs = cfd.get(args.node, {}).get(
+            'collective.managercandidates', {}).get('value', None)
+        if candmgrs:
+            try:
+                candmgrs = noderange.NodeRange(candmgrs, cfg).nodes
+            except Exception:  # fallback to unverified noderange
+                candmgrs = noderange.NodeRange(candmgrs).nodes
+            if collective.get_myname() not in candmgrs:
+                emprint(f'{args.node} has deployment restricted to '
+                        'certain collective managers excluding the '
+                        'system running the selfcheck')
+        print(f"Checking network configuration for {args.node}")
         bootablev4nics = []
         bootablev6nics = []
+        targsships = []
         for nic in glob.glob("/sys/class/net/*/ifindex"):
             idx = int(open(nic, "r").read())
             nicname = nic.split('/')[-2]
             ncfg = netutil.get_nic_config(cfg, args.node, ifidx=idx)
+            if ncfg['ipv4_address']:
+                targsships.append(ncfg['ipv4_address'])
             if ncfg['ipv4_address'] or ncfg['ipv4_method'] == 'dhcp':
                 bootablev4nics.append(nicname)
             if ncfg['ipv6_address']:
+                targsships.append(ncfg['ipv6_address'])
                 bootablev6nics.append(nicname)
         if bootablev4nics:
             print("{} appears to have network configuration suitable for IPv4 deployment via: {}".format(args.node, ",".join(bootablev4nics)))
@@ -288,7 +323,7 @@ if __name__ == '__main__':
             print('{} appears to have networking configuration suitable for IPv6 deployment via: {}'.format(args.node, ",".join(bootablev6nics)))
         else:
             emprint(f"{args.node} may not have any viable IP network configuration (check name resolution (DNS or hosts file) "
-                    "and/or net.*ipv4_address, and verify that the deployment serer addresses and subnet mask/prefix length are accurate)")
+                    "and/or net.*ipv4_address, and verify that the deployment server addresses and subnet mask/prefix length are accurate)")
         if not uuidok and not macok:
             allok = False
             emprint(f'{args.node} does not have a uuid or mac address defined in id.uuid or net.*hwaddr, deployment will not work (Example resolution: nodeinventory {args.node} -s)')
@@ -311,6 +346,34 @@ if __name__ == '__main__':
             emprint('Name resolution failed for node, it is normally a good idea for the node name to resolve to an IP')
         if result:
             print("OK")
+        if args.automation:
+            print(f'Checking confluent automation access to {args.node}...')
+            child = os.fork()
+            if child > 0:
+                pid, extcode = os.waitpid(child, 0)
+            else:
+                sshutil.ready_keys = {}
+                sshutil.agent_pid = None
+                cuser = pwd.getpwnam('confluent')
+                os.setgid(cuser.pw_gid)
+                os.setuid(cuser.pw_uid)
+                sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+                for targ in targsships:
+                    srun = subprocess.run(
+                        ['ssh', '-Tn', '-o', 'BatchMode=yes', '-l', 'root',
+                        '-o', 'StrictHostKeyChecking=yes', targ, 'true'],
+                        stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                    if srun.returncode == 0:
+                        print(f'Confluent automation access to {targ} seems OK')
+                    else:
+                        if b'Host key verification failed' in srun.stderr:
+                            emprint(f'Confluent ssh unable to verify host key for {targ}, check /etc/ssh/ssh_known_hosts. (Example resolution: osdeploy initialize -k)')
+                        elif b'ermission denied' in srun.stderr:
+                            emprint(f'Confluent user unable to ssh in to {targ}, check /root/.ssh/authorized_keys on the target system versus /etc/confluent/ssh/automation.pub (Example resolution: osdeploy initialize -a)')
+                        else:
+                            emprint('Unknown error attempting confluent automation ssh:')
+                            sys.stderr.buffer.write(srun.stderr)
+                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
 # possible checks:
