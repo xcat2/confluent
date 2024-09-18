@@ -51,11 +51,13 @@ class User():
         self.credentials = credential 
 
     def __parse_credentials(self): 
-        return {"id": self.credentials.id, "signature_count": self.credentials.signature_count, "credential_public_key": self.credentials.credential_public_key} 
+        if self.credentials:
+            return {"id": self.credentials.id, "signature_count": self.credentials.signature_count, "credential_public_key": self.credentials.credential_public_key} 
 
 
     def __parse_challenges(self):
-        return {"id": self.challenges.id, 'request': self.challenges.request, 'timestamp_ms': self.challenges.timestamp_ms}
+        if self.challenges:
+            return {"id": self.challenges.id, 'request': self.challenges.request, 'timestamp_ms': self.challenges.timestamp_ms}
 
 
     @staticmethod
@@ -81,10 +83,10 @@ class User():
         if not isinstance(username, str):
             username = username.decode('utf8')
         authenticators = CONFIG_MANAGER.get_user(username).get('authenticators', {})
-        try:
-            credential = authenticators['credentials']       
-        except KeyError:
-            return None
+        credential = authenticators.get('credentials', None)  
+        if credential is None:
+            return None  
+
         if credential_id is None:
                 return Credential(id=credential["id"], signature_count=credential["signature_count"], public_key=credential["credential_public_key"])
         if credential["id"] == credential_id:
@@ -105,6 +107,8 @@ class User():
 
     @staticmethod
     def get(username):
+        challenges_return = None
+        credentials_return = None
         if not CONFIG_MANAGER:
             raise Exception('config manager is not set up')
         if not isinstance(username, str):
@@ -115,10 +119,12 @@ class User():
             return None
         authid = userinfo.get('webauthid', None)
         challenge = authenticators.get("challenges", None)
-        challenges_return = Challenge(challenge['request'], challenge['timestamp_ms'], id=challenge["id"])
-      
+        if challenge:
+            challenges_return = Challenge(challenge['request'], challenge['timestamp_ms'], id=challenge["id"])
+
         credential = authenticators.get("credentials", None)
-        credentials_return = (Credential(credential['id'], credential['signature_count'], credential["credential_public_key"]))
+        if credential:
+            credentials_return = (Credential(credential['id'], credential['signature_count'], credential["credential_public_key"]))
        
         return User(id=None, username=username, user_handle=authid, challenge=challenges_return, credential=credentials_return)
 
@@ -293,9 +299,8 @@ def authentication_request(username):
         return 'User not registered'
     
     credential = user_model.get_credential(None, username)
-    print(credential)
     if credential is None:
-        return f'No credential for User found {username}'
+        return 'No credential found'
     
     challenge_bytes = secrets.token_bytes(64)
     challenge = Challenge(request=challenge_bytes, timstamp_ms=timestamp_ms())
