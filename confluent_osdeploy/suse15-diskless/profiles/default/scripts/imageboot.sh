@@ -140,4 +140,5 @@ mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
+chroot /sysroot chkstat --system --set --noheader > /dev/null
 exec /opt/confluent/bin/start_root

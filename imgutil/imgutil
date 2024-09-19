@@ -612,6 +612,22 @@ class SuseHandler(OsHandler):
         else:
             subprocess.check_call(['zypper', '-n', '-R', self.targpath, 'install'] + self.zyppargs)
         os.symlink('/usr/lib/systemd/system/sshd.service', os.path.join(self.targpath, 'etc/systemd/system/multi-user.target.wants/sshd.service'))
+        with open(os.path.join(self.targpath, 'etc/permissions.local'), 'a') as permout:
+            permout.write(
+                '/usr/lib/ssh/ssh-keysign root:ssh_keys 2711\n'
+                '/etc/ssh/ssh_host_dsa_key root:ssh_keys 640\n'
+                '/etc/ssh/ssh_host_ecdsa_key root:ssh_keys 640\n'
+                '/etc/ssh/ssh_host_ed25519_key root:ssh_keys 640\n'
+                '/etc/ssh/ssh_host_rsa_key root:ssh_keys 640\n'
+            )
+        args.cmd = ['groupadd', 'ssh_keys']
+        run_constrainedx(fancy_chroot, (args,
+                                        self.targpath))
+        args.cmd = ['chkstat', '--system', '--set'],
+        run_constrainedx(fancy_chroot, (args,
+                                        self.targpath))
+
+
         if os.path.exists(os.path.join(self.targpath, 'sbin/mkinitrd')):
             args.cmd = ['mkinitrd']
         else:
