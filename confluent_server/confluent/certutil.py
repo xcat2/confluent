@@ -218,11 +218,17 @@ def create_certificate(keyout=None, certout=None, csrout=None):
         subprocess.check_call(
             ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
              keyout])
-    san = ['IP:{0}'.format(x) for x in get_ip_addresses()]
+    ipaddrs = list(get_ip_addresses())
+    san = ['IP:{0}'.format(x) for x in ipaddrs]
     # It is incorrect to put IP addresses as DNS type.  However
     # there exists non-compliant clients that fail with them as IP
-    san.extend(['DNS:{0}'.format(x) for x in get_ip_addresses()])
-    san.append('DNS:{0}'.format(shortname))
+    # san.extend(['DNS:{0}'.format(x) for x in ipaddrs])
+    dnsnames = set(ipaddrs)
+    dnsnames.add(shortname)
+    for currip in ipaddrs:
+        dnsnames.add(socket.getnameinfo((currip, 0), 0)[0])
+    for currname in dnsnames:
+        san.append('DNS:{0}'.format(currname))
     #san.append('DNS:{0}'.format(longname))
     san = ','.join(san)
     sslcfg = get_openssl_conf_location()
