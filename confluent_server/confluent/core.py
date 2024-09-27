@@ -1343,6 +1343,7 @@ def handle_staging(pathcomponents, operation, configmanager, inputdata):
                         datachunk = filedata['wsgi.input'].read(min(chunk_size, remaining_length))
                         f.write(datachunk)     
                         remaining_length -= len(datachunk)
+                        eventlet.sleep(0)
                         yield msg.FileUploadProgress(progress)
                     yield msg.FileUploadProgress(100) 
                  

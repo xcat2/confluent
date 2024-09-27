@@ -681,7 +681,7 @@ def resourcehandler_backend(env, start_response):
         start_response('302 Found', headers)
         yield ''
         return
-    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0:
+    if 'CONTENT_LENGTH' in env and int(env['CONTENT_LENGTH']) > 0 and not '/staging' in env['PATH_INFO']:
         reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
         reqtype = env['CONTENT_TYPE']
     operation = opmap.get(env['REQUEST_METHOD'], None)
