@@ -445,6 +445,8 @@ def websockify_data(data):
             data = data.decode('utf8')
         except UnicodeDecodeError:
             data = data.decode('cp437')
+        except AttributeError:  # already str
+            pass
         data = u' ' + data
     return data
 
