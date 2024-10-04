@@ -171,7 +171,9 @@ class GroupedData(object):
                     self.byoutput[outdata])))
                 currout += '\n====================================\n'
             currout += outdata
-            currout += '\n\n'
+            if currout[-1] != '\n':
+                currout += '\n'
+            currout += '\n'
             output.write(currout)
         output.flush()
 
@@ -211,7 +213,9 @@ class GroupedData(object):
             else:
                 currout += '\n'.join(colordiff(modaloutput.split('\n'),
                                                  outdata.split('\n')))
-            currout += '\n\n'
+            if currout[-1] != '\n':
+                currout += '\n'
+            currout += '\n'
             if reverse:
                 revoutput.append(currout)
             else:
