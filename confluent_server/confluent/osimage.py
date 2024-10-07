@@ -91,10 +91,13 @@ def update_boot_esxi(profiledir, profile, label):
     newbootcfg = ''
     efibootcfg = ''
     filesneeded = []
+    localabel = label
+    if 'installation of' not in localabel:
+        localabel = 'Confluent installation of {}'.format(localabel)
     for cfgline in bootcfg:
         if cfgline.startswith('title='):
-            newbootcfg += 'title={0}\n'.format(label)
-            efibootcfg += 'title={0}\n'.format(label)
+            newbootcfg += 'title={0}\n'.format(localabel)
+            efibootcfg += 'title={0}\n'.format(localabel)
         elif cfgline.startswith('kernelopt='):
             newbootcfg += 'kernelopt={0}\n'.format(kernelargs)
             efibootcfg += 'kernelopt={0}\n'.format(kernelargs)
