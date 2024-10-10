@@ -45,6 +45,7 @@ import eventlet
 import eventlet.greenthread
 import greenlet
 import json
+import os
 import socket
 import sys
 import traceback
@@ -981,7 +982,9 @@ def resourcehandler_backend(env, start_response):
                 start_response('401 Unauthorized', headers)
                 yield json.dumps({'data': 'You do not have permission to write to file'})
                 return 
-        elif 'application/json' in reqtype and (len(url.split('/')) == 2):
+        elif len(url.split('/')) == 2:
+            reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH']))
+            reqtype = env['CONTENT_TYPE']
             if not isinstance(reqbody, str):
                 reqbody = reqbody.decode('utf8')
             pbody = json.loads(reqbody)
