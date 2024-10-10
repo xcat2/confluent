@@ -705,10 +705,13 @@ class ProxyConsole(object):
             if not util.cert_matches(self.managerinfo['fingerprint'],
                                      remote.getpeercert(binary_form=True)):
                 raise Exception('Invalid peer certificate')
-        except Exception:
+        except Exception as e:
+            if _tracelog:
+                _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
+                              event=log.Events.stacktrace)
             eventlet.sleep(3)
             if self.clisession:
-                self.clisession.detach()
+                self.clisession.detach(False)
             self.detachsession(None)
             return
         tlvdata.recv(remote)
@@ -835,7 +838,7 @@ class ConsoleSession(object):
         self._evt = None
         self.reghdl = None
 
-    def detach(self):
+    def detach(self, reattach=True):
         """Handler for the console handler to detach so it can reattach,
         currently to facilitate changing from one collective.manager to
         another
@@ -843,9 +846,10 @@ class ConsoleSession(object):
         :return:
         """
         self.conshdl.detachsession(self)
-        self.connect_session()
-        self.conshdl.attachsession(self)
-        self.write = self.conshdl.write
+        if reattach:
+            self.connect_session()
+            self.conshdl.attachsession(self)
+            self.write = self.conshdl.write
 
     def got_data(self, data):
         """Receive data from console and buffer
