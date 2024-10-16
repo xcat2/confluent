@@ -2353,6 +2353,9 @@ class ConfigManager(object):
                 lidx = self._cfgstore['nodes'][node]['groups'].index(name)
                 self._cfgstore['nodes'][node]['groups'][lidx] = renamemap[name]
                 _mark_dirtykey('nodes', node, self.tenant)
+            for node in self._cfgstore['nodegroups'][renamemap[name]].get('nodes', []):
+                 self._node_removed_from_group(node, name, {})
+                 self._node_added_to_group(node, renamemap[name], {})
         self._bg_sync_to_file()
 
 
