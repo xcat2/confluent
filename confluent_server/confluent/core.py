@@ -72,6 +72,7 @@ import struct
 import sys
 import uuid
 import yaml
+import shutil
 
 
 pluginmap = {}
@@ -1308,8 +1309,14 @@ class Staging:
             file = None
             return False
         
-    def deldirectory(self):
-        pass
+    @staticmethod
+    def remove_directory(directory):
+        storage_folder = '/var/lib/confluent/client_assets/' + directory
+        if os.path.exists(storage_folder):
+            shutil.rmtree(storage_folder)
+        else:
+            raise FileNotFoundError
+        return directory
 
 def handle_staging(pathcomponents, operation, configmanager, inputdata):
     '''
@@ -1348,9 +1355,12 @@ def handle_staging(pathcomponents, operation, configmanager, inputdata):
                     yield msg.FileUploadProgress(100) 
                  
 
-    elif operation == 'retrieve':
-        pass
-    return 
+    elif operation == 'delete':
+        if len(pathcomponents) == 3:
+            asset = Staging.remove_directory(pathcomponents[2])
+            yield msg.DeletedResource(asset)
+        else:
+            raise Exception("Invalid url")
 
 def handle_path(path, operation, configmanager, inputdata=None, autostrip=True):
     """Given a full path request, return an object.
