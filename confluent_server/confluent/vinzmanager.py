@@ -16,27 +16,34 @@ mountsbyuser = {}
 _vinzfd = None
 _vinztoken = None
 webclient = eventlet.import_patched('pyghmi.util.webclient')
-
+startingup = False
 
 # Handle the vinz VNC session
 def assure_vinz():
     global _vinzfd
     global _vinztoken
-    if _vinzfd is None:
-        _vinztoken = base64.b64encode(os.urandom(33), altchars=b'_-').decode()
-        os.environ['VINZ_TOKEN'] = _vinztoken
-        os.makedirs('/var/run/confluent/vinz/sessions', exist_ok=True)
+    global startingup
+    while startingup:
+        eventlet.sleep(0.5)
+    try:
+        startingup = True
+        if _vinzfd is None:
+            _vinztoken = base64.b64encode(os.urandom(33), altchars=b'_-').decode()
+            os.environ['VINZ_TOKEN'] = _vinztoken
+            os.makedirs('/var/run/confluent/vinz/sessions', exist_ok=True)
 
-        _vinzfd = subprocess.Popen(
-            ['/opt/confluent/bin/vinz',
-             '-c', '/var/run/confluent/vinz/control',
-             '-w', '127.0.0.1:4007',
-             '-a', '/var/run/confluent/vinz/approval',
-             # vinz supports unix domain websocket, however apache reverse proxy is dicey that way in some versions
-             '-d', '/var/run/confluent/vinz/sessions'])
-        while not os.path.exists('/var/run/confluent/vinz/control'):
-            eventlet.sleep(0.5)
-        eventlet.spawn(monitor_requests)
+            _vinzfd = subprocess.Popen(
+                ['/opt/confluent/bin/vinz',
+                '-c', '/var/run/confluent/vinz/control',
+                '-w', '127.0.0.1:4007',
+                '-a', '/var/run/confluent/vinz/approval',
+                # vinz supports unix domain websocket, however apache reverse proxy is dicey that way in some versions
+                '-d', '/var/run/confluent/vinz/sessions'])
+            while not os.path.exists('/var/run/confluent/vinz/control'):
+                eventlet.sleep(0.5)
+            eventlet.spawn(monitor_requests)
+    finally:
+        startingup = False
 
 _unix_by_nodename = {}
 def get_url(nodename, inputdata):
