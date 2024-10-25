@@ -315,6 +315,7 @@ def check_alma(isoinfo):
     ver = None
     arch = None
     cat = None
+    suffix = ""
     for entry in isoinfo[0]:
         if 'almalinux-release-8' in entry:
             ver = entry.split('-')[2]
@@ -326,6 +327,12 @@ def check_alma(isoinfo):
             arch = entry.split('.')[-2]
             cat = 'el9'
             break
+        elif 'almalinux-kitten-release-10' in entry:
+            ver = entry.split('-')[3]
+            arch = entry.split('.')[-2]
+            cat = 'el10'
+            suffix = '_kitten'
+            break
     else:
         return None
     if arch == 'noarch' and '.discinfo' in isoinfo[1]:
@@ -333,7 +340,7 @@ def check_alma(isoinfo):
         arch = prodinfo.split(b'\n')[2]
         if not isinstance(arch, str):
             arch = arch.decode('utf-8')
-    return {'name': 'alma-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
+    return {'name': 'alma{0}-{1}-{2}'.format(suffix, ver, arch), 'method': EXTRACT, 'category': cat}
 
 
 def check_centos(isoinfo):
@@ -363,6 +370,12 @@ def check_centos(isoinfo):
             ver = entry.split('-')[3]
             arch = entry.split('.')[-2]
             cat = 'el9'
+            isstream = '_stream'
+            break
+        elif 'centos-stream-release-10' in entry:
+            ver = entry.split('-')[3]
+            arch = entry.split('.')[-2]
+            cat = 'el10'
             isstream = '_stream'
             break
         elif 'centos-linux-release-8' in entry:
