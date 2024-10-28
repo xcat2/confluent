@@ -124,7 +124,10 @@ class TsmConsole(conapi.Console):
 
     def recvdata(self):
         while self.connected:
-            pendingdata = self.ws.recv()
+            try:
+                pendingdata = self.ws.recv()
+            except websocket.WebSocketConnectionClosedException:
+                pendingdata = ''
             if pendingdata == '':
                 self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
@@ -153,7 +156,10 @@ class TsmConsole(conapi.Console):
         return
 
     def write(self, data):
-        self.ws.send(data)
+        try:
+            self.ws.send(data)
+        except websocket.WebSocketConnectionClosedException:
+            self.datacallback(conapi.ConsoleEvent.Disconnect)
 
     def close(self):
         if self.recvr:
