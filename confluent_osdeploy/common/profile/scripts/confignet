@@ -348,7 +348,8 @@ class NetworkManager(object):
                     bondcfg[stg] = deats[stg]
         if member in self.uuidbyname:
             subprocess.check_call(['nmcli', 'c', 'del', self.uuidbyname[member]])
-        subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond-slave', 'master', team, 'con-name', member, 'connection.interface-name', member])
+        devtype = self.devtypes.get(member, 'bond-slave')
+        subprocess.check_call(['nmcli', 'c', 'add', 'type', devtype, 'master', team, 'con-name', member, 'connection.interface-name', member])
         if bondcfg:
             args = []
             for parm in bondcfg:
