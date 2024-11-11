@@ -655,6 +655,15 @@ def resourcehandler_backend(env, start_response):
             yield res
         return
     reqpath = env.get('PATH_INFO', '')
+    if reqpath == '/httpapi_initialized':
+        if (len(configmanager.ConfigManager(None).list_usergroups()) > 0
+                or len(configmanager.ConfigManager(None).list_users()) > 0):
+            start_response('200 OK', headers)
+            yield ''
+            return
+        start_response('500 No authorized users', headers)
+        yield ''
+        return
     if reqpath.startswith('/boot/'):
         request = env['PATH_INFO'].split('/')
         if not request[0]:
