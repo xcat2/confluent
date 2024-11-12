@@ -31,7 +31,8 @@ def assure_vinz():
             _vinztoken = base64.b64encode(os.urandom(33), altchars=b'_-').decode()
             os.environ['VINZ_TOKEN'] = _vinztoken
             os.makedirs('/var/run/confluent/vinz/sessions', exist_ok=True)
-
+            os.chmod('/var/run/confluent/vinz', 0o711)
+            os.chmod('/var/run/confluent/vinz/sessions', 0o711)
             _vinzfd = subprocess.Popen(
                 ['/opt/confluent/bin/vinz',
                 '-c', '/var/run/confluent/vinz/control',
