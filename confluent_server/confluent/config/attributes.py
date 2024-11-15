@@ -94,8 +94,8 @@ node = {
                         'considered a member'),
     },
     'type': {
-        'description': ('Classification of node as server or switch.  By default a node is presumed to be a server.'),
-        'validvalues': ('switch', 'server'),
+        'description': ('The type of node.  This may be switch, server, rackmount, dense, enclosure or not set to be generic.'),
+        'validvalues': ('switch', 'server', 'rackmount', 'dense', 'enclosure', ''),
     },
     'crypted.rootpassword': {
         'description': 'The password of the local root password. '
