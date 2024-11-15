@@ -40,6 +40,9 @@ run_remote_parts post.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post.d
 
+# rebuild initrd, pick up new drivers if needed
+dracut -f /boot/initramfs-$(uname -r).img $(uname -r)
+
 curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_websrv/confluent-api/self/updatestatus
 
 kill $logshowpid
