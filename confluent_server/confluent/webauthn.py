@@ -254,11 +254,6 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
     credential_model = User.get_credential(credential_id=None, username=username)
     if not credential_model:
         raise Exception("No credential for user")
-
-    try:
-        print(request)
-    except Exception:
-        raise Exception("Could not parse input data")
     
     verification = verify_authentication_response(
         credential=request,
@@ -270,7 +265,7 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
         require_user_verification = True
 
     )
-    print(verification)
+
     return {"verified": True}
     
 class RpEntity(object):
@@ -341,7 +336,6 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             username = username.encode('utf8')
         rsp = registration_response(req, username, APP_RELYING_PARTY, APP_ORIGIN)
         if rsp.get('verified', False):
-            print('worked out')
             start_response('200 OK', headers)
             yield json.dumps({'status': 'Success'})
 
