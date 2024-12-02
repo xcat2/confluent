@@ -238,7 +238,6 @@ def authentication_request(username, APP_RELYING_PARTY):
     challenge = Challenge(options.challenge)
     user_model.add(challenge)
     user_model.save()
-    
     opts = options_to_json(options)
     return opts
 
@@ -300,7 +299,7 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             cfm.set_user(username, {'webauthid': b64authid})
         opts = registration_request(username, cfm, APP_RELYING_PARTY)
         start_response('200 OK', headers)
-        yield json.dumps(opts)
+        yield opts
     elif url.startswith('/registered_credentials/'):
         username = url.rsplit('/', 1)[-1]
         userinfo = cfm.get_user(username)
@@ -308,7 +307,7 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             username = username.encode('utf8')
         opts = authentication_request(username, APP_RELYING_PARTY)
         start_response('200 OK', headers)
-        yield json.dumps(opts)
+        yield opts
     elif url.startswith('/validate/'):
         username = url.rsplit('/', 1)[-1]
         userinfo = cfm.get_user(username)
