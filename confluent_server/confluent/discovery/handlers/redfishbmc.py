@@ -32,7 +32,7 @@ def get_host_interface_urls(wc, mginfo):
     returls = []
     hifurl = mginfo.get('HostInterfaces', {}).get('@odata.id', None)
     if not hifurl:
-        return None
+        return []
     hifinfo = wc.grab_json_response(hifurl)
     hifurls = hifinfo.get('Members', [])
     for hifurl in hifurls:
