@@ -75,6 +75,7 @@ import confluent.discovery.handlers.pxe as pxeh
 import confluent.discovery.handlers.smm as smm
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.xcc3 as xcc3
+import confluent.discovery.handlers.smm3 as smm3
 import confluent.discovery.handlers.megarac as megarac
 import confluent.exceptions as exc
 import confluent.log as log
@@ -114,6 +115,7 @@ class nesteddict(dict):
 nodehandlers = {
     'service:lenovo-smm': smm,
     'service:lenovo-smm2': smm,
+    'lenovo-smm3': smm3,
     'lenovo-xcc': xcc,
     'lenovo-xcc3': xcc3,
     'megarac-bmc': megarac,
@@ -134,6 +136,7 @@ servicenames = {
     'cumulus-switch': 'cumulus-switch',
     'service:lenovo-smm': 'lenovo-smm',
     'service:lenovo-smm2': 'lenovo-smm2',
+    'lenovo-smm3': 'lenovo-smm3',
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',
@@ -151,6 +154,7 @@ servicebyname = {
     'cumulus-switch': 'cumulus-switch',
     'lenovo-smm': 'service:lenovo-smm',
     'lenovo-smm2': 'service:lenovo-smm2',
+    'lenovo-smm3': 'lenovo-smm3',
     'affluent-switch': 'affluent-switch',
     'lenovo-xcc': 'lenovo-xcc',
     'lenovo-xcc3': 'lenovo-xcc3',

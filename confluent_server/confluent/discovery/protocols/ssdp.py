@@ -58,7 +58,7 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
 
 def active_scan(handler, protocol=None):
     known_peers = set([])
-    for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
+    for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::dmtf-org:service:redfish-rest:', 'urn::service:affluent']):
         for addr in scanned['addresses']:
             addr = addr[0:1] + addr[2:]
             if addr in known_peers:
@@ -429,10 +429,10 @@ def _find_service(service, target):
                     mya['enclosure-machinetype-model'] = [val]
             yield peerdata[nid]
             continue
-        if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
-            continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
             pooltargs.append(('/DeviceDescription.json', peerdata[nid], 'lenovo-xcc'))
+        elif '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
+            continue
         else:
             for targurl in peerdata[nid]['urls']:
                 if '/eth' in targurl and targurl.endswith('.xml'):
@@ -463,6 +463,12 @@ def check_fish(urldata, port=443, verifycallback=None):
         return None
     if url == '/DeviceDescription.json':
         if not peerinfo:
+            if data['services'] == ['urn::dmtf-org:service:redfish-rest:']:
+                peerinfo = wc.grab_json_response('/redfish/v1/')
+                if peerinfo:
+                    data['services'] = ['lenovo-smm3']
+                    data['uuid'] = peerinfo['UUID'].lower()
+                    return data
             return None
         try:
             peerinfo = peerinfo[0]

@@ -134,7 +134,14 @@ class NodeHandler(generic.NodeHandler):
                 rsp = json.loads(rsp)
                 currerr = rsp.get('error', {})
                 ecode = currerr.get('code', None)
-                if ecode.endswith('PasswordChangeRequired'):
+                if not ecode:
+                    for msg in rsp['@Message.ExtendedInfo']:
+                        if 'PasswordChangeRequired' in msg['MessageId']:
+                            chgurl = msg['MessageArgs'][0]
+                            break
+                    else:
+                        raise Exception("Failed to ascertain login failure reason")
+                elif ecode.endswith('PasswordChangeRequired'):
                     for einfo in currerr.get('@Message.ExtendedInfo', []):
                         if einfo.get('MessageId', None).endswith('PasswordChangeRequired'):
                             for msgarg in einfo.get('MessageArgs'):
