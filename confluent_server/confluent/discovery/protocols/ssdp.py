@@ -463,7 +463,7 @@ def check_fish(urldata, port=443, verifycallback=None):
         return None
     if url == '/DeviceDescription.json':
         if not peerinfo:
-            if data['services'] == ['urn::dmtf-org:service:redfish-rest:']:
+            if data.get('services', None) == ['urn::dmtf-org:service:redfish-rest:']:
                 peerinfo = wc.grab_json_response('/redfish/v1/')
                 if peerinfo:
                     data['services'] = ['lenovo-smm3']
@@ -485,6 +485,12 @@ def check_fish(urldata, port=443, verifycallback=None):
             data['services'] = ['lenovo-xcc'] if 'xcc-variant' not in peerinfo else ['lenovo-xcc' + peerinfo['xcc-variant']]
             return data
         except (IndexError, KeyError):
+            if 'type' in peerinfo and peerinfo['type'].lower() == 'lenovo-smm3':
+                del peerinfo['xcc-variant']
+                data['uuid'] = peerinfo['enclosure-uuid']
+                data['services'] = ['lenovo-smm3']
+                data['attributes'] = peerinfo
+                return data
             return None
             url = '/redfish/v1/'
             peerinfo = wc.grab_json_response('/redfish/v1/')

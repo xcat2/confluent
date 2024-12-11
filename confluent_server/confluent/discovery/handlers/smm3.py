@@ -26,6 +26,19 @@ getaddrinfo = eventlet.support.greendns.getaddrinfo
 class NodeHandler(redfishbmc.NodeHandler):
     devname = 'SMM3'
 
+    def scan(self):
+        attrs = self.info.get('attributes', {})
+        mtm = attrs.get('enclosure-machinetype-model', None)
+        if mtm:
+            self.info['modelnumber'] = mtm.strip()
+        sn = attrs.get('enclosure-serial-number', None)
+        if sn:
+            self.info['serialnumber'] = sn.strip()
+        modelname = attrs.get('enclosure-component-name', None)
+        if modelname:
+            modelname = modelname.split(' MT:')[0]
+            self.info['modelname'] = modelname
+
     def get_firmware_default_account_info(self):
         return ('USERID', 'PASSW0RD')
 
