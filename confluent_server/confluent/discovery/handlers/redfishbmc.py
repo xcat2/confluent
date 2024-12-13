@@ -109,7 +109,7 @@ class NodeHandler(generic.NodeHandler):
             self.target_account_url(wc))
         acctinfo = acctinfo[0]
         actypes = acctinfo['AccountTypes']
-        candidates = acctinfo['AccountTypes@Redfish.AllowableValues']
+        candidates = acctinfo.get('AccountTypes@Redfish.AllowableValues', [])
         if 'IPMI' not in actypes and 'IPMI' in candidates:
             actypes.append('IPMI')
             acctupd = {
