@@ -226,7 +226,11 @@ class WickedManager(object):
             self.cfgbydev[devname] = currcfg
             for cfg in open(ifcfg).read().splitlines():
                 cfg = cfg.split('#', 1)[0]
-                kv = ' '.join(shlex.split(cfg)).split('=', 1)
+                try:
+                    kv = ' '.join(shlex.split(cfg)).split('=', 1)
+                except Exception:
+                    # unparseable line, likely having something we can't handle
+                    del self.cfgbydev[devname]
                 if len(kv) != 2:
                     continue
                 k, v = kv
