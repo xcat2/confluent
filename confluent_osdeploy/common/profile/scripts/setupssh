@@ -10,6 +10,15 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     rm $certfile
     confluentpython $confapiclient /confluent-api/self/sshcert $pubkey -o $certfile
 done
+if [ -d /etc/ssh/sshd_config.d/ -a ! -e /etc/ssh/sshd_config.d/90-confluent.conf ]; then
+	for cert in /etc/ssh/ssh*-cert.pub; do
+		echo HostCertificate $cert >> /etc/ssh/sshd_config.d/90-confluent.conf
+	done
+	echo HostbasedAuthentication yes >> /etc/ssh/sshd_config.d/90-confluent.conf
+	echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config.d/90-confluent.conf
+	echo IgnoreRhosts no >> /etc/ssh/sshd_config.d/90-confluent.conf
+fi
+
 TMPDIR=$(mktemp -d)
 cd $TMPDIR
 confluentpython $confapiclient /confluent-public/site/initramfs.tgz -o initramfs.tgz
