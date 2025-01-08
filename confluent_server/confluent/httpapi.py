@@ -1195,8 +1195,17 @@ def serve(bind_host, bind_port):
     sock = None
     while not sock:
         try:
-            sock = eventlet.listen(
-                (bind_host, bind_port, 0, 0), family=socket.AF_INET6)
+            if '/' in bind_host:
+                try:
+                    os.remove(bind_host)
+                except Exception:
+                    pass
+                sock = eventlet.listen(
+                    bind_host, family=socket.AF_UNIX)
+                os.chmod(bind_host, 0o666)
+            else:
+                sock = eventlet.listen(
+                    (bind_host, bind_port, 0, 0), family=socket.AF_INET6)
         except socket.error as e:
             if e.errno != 98:
                 raise
