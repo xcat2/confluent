@@ -645,6 +645,18 @@ class SavedFile(ConfluentMessage):
         self.myargs = (node, file)
         self.kvpairs = {node: {'filename': file}}
 
+class FileUploadProgress(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, progress, name=None):
+        self.myargs = (progress)
+        self.stripped = False
+        self.notnode = name is None
+        if self.notnode:
+            self.kvpairs = {'progress': {'value': progress}}
+        else:
+            self.kvpairs = {name: {'progress': {'value': progress}}}
+
 class InputAlertData(ConfluentMessage):
 
     def __init__(self, path, inputdata, nodes=None):

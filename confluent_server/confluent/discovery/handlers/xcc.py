@@ -602,6 +602,7 @@ class NodeHandler(immhandler.NodeHandler):
                         '/redfish/v1/AccountService/Accounts/1',
                         updateinf, method='PATCH')
         if targbmc and not targbmc.startswith('fe80::'):
+            attribsuffix = ''
             newip = targbmc.split('/', 1)[0]
             newipinfo = socket.getaddrinfo(newip, 0)[0]
             newip = newipinfo[-1][0]
@@ -611,6 +612,25 @@ class NodeHandler(immhandler.NodeHandler):
             newmask = netutil.cidr_to_mask(netconfig['prefix'])
             currinfo = await wc.grab_json_response('/api/providers/logoninfo')
             currip = currinfo.get('items', [{}])[0].get('ipv4_address', '')
+            curreth1 = wc.grab_json_response('/api/dataset/imm_ethernet')
+            if curreth1:
+                if self.ipaddr.startswith('fe80::'):
+                    ipkey = 'ipv6_link_local_address'
+                elif '.' in self.ipaddr:
+                    ipkey = 'ipv4_address'
+                else:
+                    raise Exception('Non-Link-Local IPv6 TODO')
+                nic1ip = curreth1.get('items', [{}])[0].get(ipkey, None)
+                if nic1ip != self.ipaddr:
+                    # check second nic instead
+                    curreth2 = wc.grab_json_response('/api/dataset/imm_ethernet_2')
+                    if curreth2 and curreth2.get('items', [{}])[0].get('if_second_port_exist', 0):
+                        nic2ip = curreth2.get('items', [{}])[0].get(ipkey + '_2', None)
+                        if nic2ip != self.ipaddr:
+                            raise Exception("Unable to determine which NIC is active")
+                        # ok, second nic is active, target it
+                        currip = curreth2.get('items', [{}])[0].get("ipv4_address", None)
+                        attribsuffix = '_2'
             # do not change the ipv4_config if the current config looks right already
             if currip != newip:
                 statargs = {
@@ -621,6 +641,10 @@ class NodeHandler(immhandler.NodeHandler):
                     statargs['ENET_IPv4GatewayIPAddr'] = netconfig['ipv4_gateway']
                 elif not netutil.address_is_local(newip):
                     raise exc.InvalidArgumentException('Will not remotely configure a device with no gateway')
+                if attribsuffix:
+                    for currkey in list(statargs):
+                        statargs[currkey + attribsuffix] = statargs[currkey]
+                        del statargs[currkey]
                 netset, status = await wc.grab_json_response_with_status('/api/dataset', statargs)
                 print(repr(netset))
                 print(repr(status))

@@ -76,7 +76,7 @@ manuallicenses = [
     '/usr/share/licenses/lz4/LICENSE.BSD',
     '/usr/share/licenses/nss/LICENSE.APACHE', # http://www.apache.org/licenses/LICENSE-2.0
     '/usr/share/licenses/openssh/COPYING.blowfish', # from header of blowfish file in bsd-compat
-    '/usr/share/licenses/bc/COPYING.GPLv2',
+    '/usr/share/licenses/bc/COPYING.GPLv2', # generic copy of GPLv2
     '/usr/share/licenses/bind-license/LICENSE', # MPLv2 from the source code
     '/usr/share/licenses/procps-ng/COPYING.LIBv2.1', # fetched internet 
     # cp /usr/share/doc/lz4-libs/LICENSE /usr/share/licenses/lz4/LICENSE.BSD
@@ -87,7 +87,7 @@ manuallicenses = [
     '/usr/share/licenses/pcre/LICENSE.BSD2', # stack-less just in time compiler, Zoltan Herzeg
     '/usr/share/licenses/sqlite/LICENSE.md', # https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md
     '/usr/share/licenses/pcre2/LICENSE.BSD2',
-    '/usr/share/licenses/dhcp-common/NOTICE',
+    '/usr/share/licenses/dhcp-common/NOTICE', # from exlicenses
     '/usr/share/licenses/xz/COPYING.GPLv3', # manually extracted from xz source
     '/usr/share/licenses/bash/NOTICE',
     '/usr/share/licenses/libsepol/NOTICE',
@@ -111,6 +111,7 @@ manuallicenses = [
     '/usr/share/licenses/tmux/NOTICE', # built by extracttmuxlicenses.py
     '/usr/share/licenses/tmux/COPYING', # extracted from source
     '/usr/share/licenses/tmux/README', # extracted from source
+    # yum download kernel soruce, cp -a from LICENSES to kernel-extra
     '/usr/share/licenses/kernel-extra/preferred/BSD-2-Clause',
     '/usr/share/licenses/kernel-extra/preferred/BSD-3-Clause',
     '/usr/share/licenses/kernel-extra/preferred/BSD-3-Clause-Clear',
@@ -132,10 +133,10 @@ manuallicenses = [
     '/usr/share/licenses/kernel-extra/exceptions/GCC-exception-2.0',
     '/usr/share/licenses/kernel-extra/exceptions/Linux-syscall-note',
     '/usr/share/licenses/util-linux/COPYING.GPLv3', # extract from parse-date.c, from srpm
-    '/usr/share/licenses/kmod/COPYING', # GPL not LGPL, must extract from kmod srpm
+    '/usr/share/licenses/kmod/COPYING', # GPL not LGPL, must extract from kmod srpm, tools subdir
     '/usr/share/licenses/krb5-libs/NOTICE', # copy it verbatim from LICENSE, exact same file
     '/usr/share/doc/less/README',
-    '/usr/share/centos-release/EULA',
+    '/usr/share/almalinux-release/EULA',
     #'/usr/share/doc/almalinux-release/GPL',
     '/usr/share/licenses/libcap-ng-utils/COPYING',
     '/usr/share/licenses/libdb/copyright', # from libdb, db-5.3.28, lang/sql/odbc/debian/copyright

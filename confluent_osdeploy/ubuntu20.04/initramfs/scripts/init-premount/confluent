@@ -31,23 +31,26 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
             MYGW=""
         fi
         MYNM=$(grep ^ipv4_netmask: $tcfg | awk '{print $2}')
-        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
-            ip addr add dev $NICGUESS $v4addr
-            if [ ! -z "$MYGW" ]; then
-                ip route add default via $MYGW
-            fi
-            for dsrv in $deploysrvs; do
-                if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
-                    deploysrvs=$dsrv
-                    NIC=$NICGUESS
+        NIC=""
+        while [ -z "$NIC" ]; do
+            for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+                ip addr add dev $NICGUESS $v4addr
+                if [ ! -z "$MYGW" ]; then
+                    ip route add default via $MYGW
+                fi
+                for dsrv in $deploysrvs; do
+                    if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
+                        deploysrvs=$dsrv
+                        NIC=$NICGUESS
+                        break
+                    fi
+                done
+                if [ -z "$NIC" ]; then
+                    ip -4 a flush dev $NICGUESS
+                else
                     break
                 fi
             done
-            if [ -z "$NIC" ]; then
-                ip -4 a flush dev $NICGUESS
-            else
-                break
-            fi
         done
         ipconfig -d $MYIP::$MYGW:$MYNM::$NIC
         echo $NIC > /tmp/autodetectnic

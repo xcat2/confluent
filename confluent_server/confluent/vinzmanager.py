@@ -16,26 +16,36 @@ _vinztoken = None
 import socket
 import aiohmi.util.webclient as webclient
 
+startingup = False
+
 
 # Handle the vinz VNC session
 async def assure_vinz():
     global _vinzfd
     global _vinztoken
-    if _vinzfd is None:
-        _vinztoken = base64.b64encode(os.urandom(33), altchars=b'_-').decode()
-        os.environ['VINZ_TOKEN'] = _vinztoken
-        os.makedirs('/var/run/confluent/vinz/sessions', exist_ok=True)
-
-        _vinzfd = await asyncio.subprocess.create_subprocess_exec(
+    global startingup
+    while startingup:
+        await asyncio.sleep(0.5)
+    try:
+        startingup = True
+        if _vinzfd is None:
+            _vinztoken = base64.b64encode(os.urandom(33), altchars=b'_-').decode()
+            os.environ['VINZ_TOKEN'] = _vinztoken
+            os.makedirs('/var/run/confluent/vinz/sessions', exist_ok=True)
+            os.chmod('/var/run/confluent/vinz', 0o711)
+            os.chmod('/var/run/confluent/vinz/sessions', 0o711)
+            _vinzfd = await asyncio.subprocess.create_subprocess_exec(
             '/opt/confluent/bin/vinz',
              '-c', '/var/run/confluent/vinz/control',
              '-w', '127.0.0.1:4007',
              '-a', '/var/run/confluent/vinz/approval',
              # vinz supports unix domain websocket, however apache reverse proxy is dicey that way in some versions
              '-d', '/var/run/confluent/vinz/sessions')
-        while not os.path.exists('/var/run/confluent/vinz/control'):
-            await asyncio.sleep(0.5)
-        util.spawn(monitor_requests())
+            while not os.path.exists('/var/run/confluent/vinz/control'):
+                await asyncio.sleep(0.5)
+            util.spawn(monitor_requests)
+    finally:
+        startingup = False
 
 _unix_by_nodename = {}
 async def get_url(nodename, inputdata):

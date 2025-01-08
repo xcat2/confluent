@@ -44,6 +44,7 @@ import confluent.asynctlvdata as tlvdata
 import confluent.util as util
 import copy
 import json
+import os
 import socket
 import sys
 import traceback
@@ -435,6 +436,8 @@ def websockify_data(data):
             data = data.decode('utf8')
         except UnicodeDecodeError:
             data = data.decode('cp437')
+        except AttributeError:  # already str
+            pass
         data = u' ' + data
     return data
 
@@ -641,7 +644,6 @@ async def resourcehandler(request):
         rsp.content_type = mimetype
         await rsp.prepare(request)
         return rsp
-
     try:
         if 'Sec-WebSocket-Version' in request.headers:
             return await wsock_handler(request)
@@ -667,6 +669,11 @@ async def resourcehandler_backend(req, make_response):
     reqpath = req.rel_url.path
     if reqpath.startswith('/self/'):
         return await selfservice.handle_request(req, make_response, mimetype)
+    if reqpath == '/httpapi_initialized':
+        if (len(configmanager.ConfigManager(None).list_usergroups()) > 0
+                or len(configmanager.ConfigManager(None).list_users()) > 0):
+            return await make_response(mimetype, 200, "OK")
+        return await make_response(mimetype, 500, "No authorized users")
     if reqpath.startswith('/boot/'):
         request = reqpath.split('/')
         if not request[0]:
@@ -688,14 +695,14 @@ async def resourcehandler_backend(req, make_response):
         if not pprofile:
             return await make_response(mimetype, 404, 'Not Found')
         redir = '/confluent-public/os/{0}/boot.{1}'.format(pprofile, bootfile)
-        rsp = make_response(mimetype, 302, 'Found', {'Location': redir})
+        rsp = await make_response(mimetype, 302, 'Found', {'Location': redir})
         return
-    if req.content_length:
+    if req.content_length and nat '/staging' in reqpath:
         reqbody = await req.read()
         reqtype = req.content_type
     operation = opmap.get(req.method, None)
     if not operation:
-        rsp = make_response(mimetype, 400, 'Bad Request')
+        rsp = await make_response(mimetype, 400, 'Bad Request')
         await rsp.write(b'Unsupported method')
         return rsp
     querydict = _get_query_dict(req, reqbody, reqtype)
@@ -893,6 +900,67 @@ async def resourcehandler_backend(req, make_response):
             return rsp
         else:  # no keys, but a session, means it's hooking to receive data
             raise Exception("long polling console sessions are discontinued")
+======
+    elif (operation == 'create' and ('/firmware/updates/active' in reqpath)):
+        if 'application/json' in reqtype:
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
+            pbody = json.loads(reqbody)
+            args = pbody['args']
+            file_directory = '/var/lib/confluent/client_assets/{}'.format(args.split('/')[-1])  
+            filepath = '{0}/{1}'.format(file_directory, os.listdir(file_directory)[0])     # TODO find a way to validate that the file is found and its the expected one
+            args_dict = {'filename': filepath}
+            noderrs = {}
+            nodeurls = {}
+            hdlr = pluginapi.handle_path(reqpath, operation, cfgmgr, args_dict)
+            for res in hdlr:
+                if isinstance(res, confluent.messages.CreatedResource):
+                    watchurl = res.kvpairs['created']
+                    currnode = watchurl.split('/')[1]
+                    nodeurls[currnode] = '/' + watchurl
+
+            rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+            await rsp.write(json.dumps({'data': nodeurls}))
+            return
+    elif (operation == 'create' and ('/staging' in reqpath)):
+        url = reqpath
+        args_dict = {}
+        content_length = int(req.content_length)
+        if content_length > 0 and (len(url.split('/')) > 2):
+            # check if the user and the url defined user are the same 
+            if authorized['username'] == url.split('/')[2]:
+                args_dict.update({'filedata':env, 'content_length': content_length})  # TODO: replace env
+                hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)
+                for resp in hdlr:
+                    if isinstance(resp, confluent.messages.FileUploadProgress):
+                        if resp.kvpairs['progress']['value'] == 100:
+                            progress = resp.kvpairs['progress']['value']
+                rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+                await rsp.write(json.dumps({'data': 'done'}))
+                return       
+            else:
+                rsp = await make_response(mimetype, 401 'Unauthorized', headers=headers)
+                await rsp.write(json.dumps({'data': 'You do not have permission to write to file'}))
+                return 
+        elif len(url.split('/')) == 2:
+            reqbody = env['wsgi.input'].read(int(env['CONTENT_LENGTH'])) # TODO: replace env
+            reqtype = env['CONTENT_TYPE']
+            if not isinstance(reqbody, str):
+                reqbody = reqbody.decode('utf8')
+            pbody = json.loads(reqbody)
+            args = pbody['args']
+            args_dict.update({'filename': args, 'user': authorized['username']})
+            try:
+                args_dict.update({'bank': pbody['bank']})
+            except KeyError:
+                pass
+            hdlr = pluginapi.handle_path(url, operation, cfgmgr, args_dict)    
+            for res in hdlr:
+                if isinstance(res, confluent.messages.CreatedResource):
+                    stageurl = res.kvpairs['created']
+            rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+            await rsp.write(json.dumps({'data': stageurl}))
+            return
     else:
         # normal request
         url = reqpath

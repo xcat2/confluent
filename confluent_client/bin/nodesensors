@@ -67,7 +67,7 @@ argparser.add_option('-n', '--numreadings', type='int',
 argparser.add_option('-c', '--csv', action='store_true',
                      help='Output in CSV format')
 argparser.add_option('-s', '--skipnumberless', action='store_true',
-                     help='Output in CSV format')
+                     help='Do not show non-numeric sensors')
 (options, args) = argparser.parse_args()
 repeatmode = False
 if options.interval:

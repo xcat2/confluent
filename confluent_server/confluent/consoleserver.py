@@ -704,10 +704,11 @@ class ProxyConsole(object):
         try:
             remote = await collective.connect_to_collective(None, self.managerinfo['address'])
         except Exception as e:
-            print(repr(e))
+            if _tracelog:
+                _tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event, event=log.Events.stacktrace)
             await asyncio.sleep(3)
             if self.clisession:
-                await self.clisession.detach()
+                await self.clisession.detach(False)
             await self.detachsession(None)
             return
         await tlvdata.recv(remote)
@@ -836,7 +837,7 @@ class ConsoleSession(object):
         self._evt = None
         self.reghdl = None
 
-    async def detach(self):
+    async def detach(self, reattach=True):
         """Handler for the console handler to detach so it can reattach,
         currently to facilitate changing from one collective.manager to
         another
@@ -844,9 +845,10 @@ class ConsoleSession(object):
         :return:
         """
         await self.conshdl.detachsession(self)
-        self.connect_session()
-        await self.conshdl.attachsession(self)
-        self.write = self.conshdl.write
+        if reattach:
+            self.connect_session()
+            await self.conshdl.attachsession(self)
+            self.write = self.conshdl.write
 
     def got_data(self, data):
         """Receive data from console and buffer

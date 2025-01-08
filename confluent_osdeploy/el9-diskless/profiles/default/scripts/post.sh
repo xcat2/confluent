@@ -2,7 +2,10 @@
 
 # This script is executed 'chrooted' into a cloned disk target before rebooting
 #
-
+if [ -f /etc/dracut.conf.d/diskless.conf ]; then
+    rm /etc/dracut.conf.d/diskless.conf
+fi
+for kver in /lib/modules/*; do kver=$(basename $kver); kernel-install add $kver /boot/vmlinuz-$kver; done
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
@@ -16,6 +19,7 @@ if [[ "$confluent_mgr" == *:* ]]; then
 fi
 export nodename confluent_mgr confluent_profile confluent_websrv
 . /etc/confluent/functions
+run_remote setupssh
 mkdir -p /var/log/confluent
 chmod 700 /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
@@ -39,6 +43,9 @@ run_remote_parts post.d
 
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post.d
+
+# rebuild initrd, pick up new drivers if needed
+dracut -f /boot/initramfs-$(uname -r).img $(uname -r)
 
 curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_websrv/confluent-api/self/updatestatus
 

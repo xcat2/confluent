@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import subprocess
 import os
 
@@ -10,8 +11,9 @@ class DiskInfo(object):
         self.path = None
         self.model = ''
         self.size = 0
-        self.driver = None
+        self.driver = ''
         self.mdcontainer = ''
+        self.subsystype = ''
         devnode = '/dev/{0}'.format(devname)
         qprop = subprocess.check_output(
             ['udevadm', 'info', '--query=property', devnode])
@@ -46,7 +48,9 @@ class DiskInfo(object):
             elif (k == 'DRIVERS' and not self.driver
                     and v not in ('"sd"', '""')):
                 self.driver = v.replace('"', '')
-        if not self.driver and 'imsm' not in self.mdcontainer:
+            elif k == 'ATTRS{subsystype}':
+                self.subsystype = v.replace('"', '')
+        if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
             raise Exception("No driver detected")
         if os.path.exists('/sys/block/{0}/size'.format(self.name)):
             with open('/sys/block/{0}/size'.format(self.name), 'r') as sizesrc:

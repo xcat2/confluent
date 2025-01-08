@@ -31,7 +31,7 @@ async def get_host_interface_urls(wc, mginfo):
     returls = []
     hifurl = mginfo.get('HostInterfaces', {}).get('@odata.id', None)
     if not hifurl:
-        return None
+        return []
     hifinfo = await wc.grab_json_response(hifurl)
     hifurls = hifinfo.get('Members', [])
     for hifurl in hifurls:
@@ -111,7 +111,7 @@ class NodeHandler(generic.NodeHandler):
             await self.target_account_url(wc))
         acctinfo = acctinfo[0]
         actypes = acctinfo['AccountTypes']
-        candidates = acctinfo['AccountTypes@Redfish.AllowableValues']
+        candidates = acctinfo.get('AccountTypes@Redfish.AllowableValues', [])
         if 'IPMI' not in actypes and 'IPMI' in candidates:
             actypes.append('IPMI')
             acctupd = {
@@ -137,7 +137,14 @@ class NodeHandler(generic.NodeHandler):
                 rsp = json.loads(rsp)
                 currerr = rsp.get('error', {})
                 ecode = currerr.get('code', None)
-                if ecode.endswith('PasswordChangeRequired'):
+                if not ecode:
+                    for msg in rsp['@Message.ExtendedInfo']:
+                        if 'PasswordChangeRequired' in msg['MessageId']:
+                            chgurl = msg['MessageArgs'][0]
+                            break
+                    else:
+                        raise Exception("Failed to ascertain login failure reason")
+                elif ecode.endswith('PasswordChangeRequired'):
                     for einfo in currerr.get('@Message.ExtendedInfo', []):
                         if einfo.get('MessageId', None).endswith('PasswordChangeRequired'):
                             for msgarg in einfo.get('MessageArgs'):

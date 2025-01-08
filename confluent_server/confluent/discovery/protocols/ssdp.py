@@ -57,7 +57,7 @@ smsg = ('M-SEARCH * HTTP/1.1\r\n'
 
 async def active_scan(handler, protocol=None):
     known_peers = set([])
-    async for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::service:affluent']):
+    async for scanned in scan(['urn:dmtf-org:service:redfish-rest:1', 'urn::dmtf-org:service:redfish-rest:', 'urn::service:affluent']):
         for addr in scanned['addresses']:
             addr = addr[0:1] + addr[2:]
             if addr in known_peers:
@@ -452,10 +452,10 @@ async def _find_service(service, target):
                     mya['enclosure-machinetype-model'] = [val]
             yield peerdata[nid]
             continue
-        if '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
-            continue
         if '/DeviceDescription.json' in peerdata[nid]['urls']:
             pooltargs.append(('/DeviceDescription.json', peerdata[nid], 'lenovo-xcc'))
+        elif '/redfish/v1/' not in peerdata[nid].get('urls', ()) and '/redfish/v1' not in peerdata[nid].get('urls', ()):
+            continue
         else:
             for targurl in peerdata[nid]['urls']:
                 if '/eth' in targurl and targurl.endswith('.xml'):
@@ -493,6 +493,12 @@ async def check_fish(urldata, port=443, verifycallback=None):
         return None
     if url == '/DeviceDescription.json':
         if not peerinfo:
+            if data.get('services', None) == ['urn::dmtf-org:service:redfish-rest:']:
+                peerinfo = wc.grab_json_response('/redfish/v1/')
+                if peerinfo:
+                    data['services'] = ['lenovo-smm3']
+                    data['uuid'] = peerinfo['UUID'].lower()
+                    return data
             return None
         try:
             peerinfo = peerinfo[0]
@@ -509,6 +515,12 @@ async def check_fish(urldata, port=443, verifycallback=None):
             data['services'] = ['lenovo-xcc'] if 'xcc-variant' not in peerinfo else ['lenovo-xcc' + peerinfo['xcc-variant']]
             return data
         except (IndexError, KeyError):
+            if 'type' in peerinfo and peerinfo['type'].lower() == 'lenovo-smm3':
+                del peerinfo['xcc-variant']
+                data['uuid'] = peerinfo['enclosure-uuid']
+                data['services'] = ['lenovo-smm3']
+                data['attributes'] = peerinfo
+                return data
             return None
             url = '/redfish/v1/'
             peerinfo = await wc.grab_json_response('/redfish/v1/')

@@ -65,7 +65,11 @@ def get_image_metadata(imgpath):
                     continue
                 yield md
         else:
-            raise Exception('Installation from single part image not supported')
+            # plausible filesystem structure to apply to a nominally "diskless" image
+            yield {'mount': '/', 'filesystem': 'xfs', 'minsize': 39513563136, 'initsize': 954128662528, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/mapper/root', 'compressed_size': 27022069760}
+            yield {'mount': '/boot', 'filesystem': 'xfs', 'minsize': 232316928, 'initsize': 1006632960, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/nvme1n1p2', 'compressed_size': 171462656}
+            yield {'mount': '/boot/efi', 'filesystem': 'vfat', 'minsize': 7835648, 'initsize': 627900416, 'flags': 'rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro', 'device': '/dev/nvme1n1p1', 'compressed_size': 1576960}
+            #raise Exception('Installation from single part image not supported')
 
 class PartedRunner():
     def __init__(self, disk):
@@ -84,8 +88,17 @@ def fixup(rootdir, vols):
     for vol in vols:
         devbymount[vol['mount']] = vol['targetdisk']
     fstabfile = os.path.join(rootdir, 'etc/fstab')
-    with open(fstabfile) as tfile:
-        fstab = tfile.read().split('\n')
+    if os.path.exists(fstabfile):
+        with open(fstabfile) as tfile:
+            fstab = tfile.read().split('\n')
+    else:
+        #diskless image, need to invent fstab
+        fstab = [
+            "#ORIGFSTAB#/dev/mapper/root# /                       xfs     defaults        0 0",
+            "#ORIGFSTAB#UUID=aaf9e0f9-aa4d-4d74-9e75-3537620cfe23# /boot                   xfs     defaults        0 0",
+            "#ORIGFSTAB#UUID=C21D-B881#          /boot/efi               vfat    umask=0077,shortname=winnt 0 2",
+            "#ORIGFSTAB#/dev/mapper/swap# none                    swap    defaults        0 0",
+        ]
     while not fstab[0]:
         fstab = fstab[1:]
     if os.path.exists(os.path.join(rootdir, '.autorelabel')):
@@ -135,8 +148,10 @@ def fixup(rootdir, vols):
         newcfg = ifcfg.split('/')[-1]
         newcfg = os.path.join(rootdir, 'etc/NetworkManager/system-connections/{0}'.format(newcfg))
         shutil.copy2(ifcfg, newcfg)
-    shutil.rmtree(os.path.join(rootdir, 'etc/confluent/'))
-    shutil.copytree('/etc/confluent', os.path.join(rootdir, 'etc/confluent'))
+    rootconfluentdir = os.path.join(rootdir, 'etc/confluent/')
+    if os.path.exists(rootconfluentdir):
+        shutil.rmtree(rootconfluentdir)
+    shutil.copytree('/etc/confluent', rootconfluentdir)
     if policy:
         sys.stdout.write('Applying SELinux labeling...')
         sys.stdout.flush()
@@ -191,8 +206,24 @@ def fixup(rootdir, vols):
                     else:
                         newcfgparts.append(cfgpart)
                 loadentout.write(' '.join(newcfgparts) + '\n')
-    with open(grubsyscfg) as defgrubin:
-        defgrub = defgrubin.read().split('\n')
+    if os.path.exists(grubsyscfg):
+        with open(grubsyscfg) as defgrubin:
+            defgrub = defgrubin.read().split('\n')
+    else:
+        defgrub = [
+        'GRUB_TIMEOUT=5',
+        'GRUB_DISTRIBUTOR="$(sed ' + "'s, release .*$,,g'" + ' /etc/system-release)"',
+        'GRUB_DEFAULT=saved',
+        'GRUB_DISABLE_SUBMENU=true',
+        'GRUB_TERMINAL=""',
+        'GRUB_SERIAL_COMMAND=""',
+        'GRUB_CMDLINE_LINUX="crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"',
+        'GRUB_DISABLE_RECOVERY="true"',
+        'GRUB_ENABLE_BLSCFG=true',
+        ]
+    if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
+        with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
+            cmdlineout.write("root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root")
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
@@ -217,6 +248,12 @@ def fixup(rootdir, vols):
         grubcfg = grubcfg[:-1]
     if len(grubcfg) == 1:
         grubcfg = grubcfg[0]
+    elif not grubcfg:
+        grubcfg = '/boot/grub2/grub.cfg'
+        paths = glob.glob(os.path.join(rootdir, 'boot/efi/EFI/*'))
+        for path in paths:
+            with open(os.path.join(path, 'grub.cfg'), 'w') as stubgrubout:
+                stubgrubout.write("search --no-floppy --root-dev-only --fs-uuid --set=dev " + bootuuid + "\nset prefix=($dev)/grub2\nexport $prefix\nconfigfile $prefix/grub.cfg\n")
     else:
         for gcfg in grubcfg:
             rgcfg = os.path.join(rootdir, gcfg[1:])  # gcfg has a leading / to get rid of
@@ -272,10 +309,19 @@ def fixup(rootdir, vols):
         shimpath = subprocess.check_output(['find', os.path.join(rootdir, 'boot/efi'), '-name', 'shimx64.efi']).decode('utf8').strip()
         shimpath = shimpath.replace(rootdir, '/').replace('/boot/efi', '').replace('//', '/').replace('/', '\\')
         subprocess.check_call(['efibootmgr', '-c', '-d', targblock, '-l', shimpath, '--part', partnum])
+
+    try:
+        os.makedirs(os.path.join(rootdir, 'opt/confluent/bin'))
+    except Exception:
+        pass
+    shutil.copy2('/opt/confluent/bin/apiclient', os.path.join(rootdir, 'opt/confluent/bin/apiclient'))
     #other network interfaces
 
 
 def had_swap():
+    if not os.path.exists('/etc/fstab'):
+        # diskless source, assume swap
+        return True
     with open('/etc/fstab') as tabfile:
         tabs = tabfile.read().split('\n')
         for tab in tabs:
@@ -440,6 +486,8 @@ def install_to_disk(imgpath):
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ'])
             source = vol['mount'].replace('/', '_')
             source = '/run/imginst/sources/' + source
+            if not os.path.exists(source):
+                source = '/run/imginst/sources/_' + vol['mount']
             blankfsstat = os.statvfs('/run/imginst/targ')
             blankused = (blankfsstat.f_blocks - blankfsstat.f_bfree) * blankfsstat.f_bsize
             sys.stdout.write('\nWriting {0}: '.format(vol['mount']))

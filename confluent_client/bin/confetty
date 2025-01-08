@@ -961,8 +961,9 @@ def main():
                     except IOError:
                         pass
             if powerstate is None or powertime < time.time() - 10:  # Check powerstate every 10 seconds
+                if powerstate == None:
+                    powerstate = True
                 powertime = time.time()
-                powerstate = True
                 check_power_state()
         else:
             currcommand = prompt()

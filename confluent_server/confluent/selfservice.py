@@ -52,7 +52,7 @@ def listdump(input):
 
 
 def get_extra_names(nodename, cfg, myip=None):
-    names = set([])
+    names = set(['127.0.0.1', '::1', 'localhost', 'localhost.localdomain'])
     dnsinfo = cfg.get_node_attributes(nodename, ('dns.*', 'net.*hostname'))
     dnsinfo = dnsinfo.get(nodename, {})
     domain = dnsinfo.get('dns.domain', {}).get('value', None)
@@ -625,4 +625,8 @@ def get_cluster_list(nodename=None, cfg=None):
         nodes.add(myname)
         if domain and domain not in myname:
             nodes.add('{0}.{1}'.format(myname, domain))
+    nodes.add('::1')
+    nodes.add('127.0.0.1')
+    nodes.add('localhost')
+    nodes.add('localhost.domain')
     return nodes, domain

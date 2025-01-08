@@ -104,6 +104,17 @@ class OpenBmcConsole(conapi.Console):
         except asyncio.CancelledError:
             pass
 
+    def recvdata(self):
+        while self.connected:
+            try:
+                pendingdata = self.ws.recv()
+            except websocket.WebSocketConnectionClosedException:
+                pendingdata = ''
+            if pendingdata == '':
+                self.datacallback(conapi.ConsoleEvent.Disconnect)
+                return
+            self.datacallback(pendingdata)
+
 
     async def connect(self, callback):
         self.datacallback = callback
@@ -134,7 +145,11 @@ class OpenBmcConsole(conapi.Console):
         return
 
     async def write(self, data):
-        await self.ws.send_str(data.decode())
+        try:
+            await self.ws.send_str(data.decode())
+        except Exception as e:
+            print(repr(e))
+            await self.datacallback(conapi.ConsoleEvent.Disconnect)
 
     async def close(self):
         if self.recvr:
