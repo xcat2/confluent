@@ -1986,6 +1986,9 @@ class ConfigManager(object):
                             delnodes = noderange.NodeRange(
                                 attribmap[group][attr]['remove'],
                                 config=self).nodes
+                            for node in delnodes:
+                                if node not in currnodes:
+                                    raise ValueError('node "{0}" is not a member of {1}'.format(node, group))
                             attribmap[group][attr] = [
                                 x for x in currnodes if x not in delnodes]
                     if not isinstance(attribmap[group][attr], list):
@@ -2442,6 +2445,9 @@ class ConfigManager(object):
                         elif attribmap[node]['groups'].get('remove', False):
                             delgroups = attribmap[node]['groups'][
                                 'remove'].split(',')
+                            for group in delgroups:
+                                if group not in currgroups:
+                                    raise ValueError("node {0} is not a member of group {1}".format(node, group))
                             newgroups = [
                                 x for x in currgroups if x not in delgroups]
                             attribmap[node]['groups'] = newgroups
