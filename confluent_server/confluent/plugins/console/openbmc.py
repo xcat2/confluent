@@ -83,7 +83,10 @@ class WrappedWebSocket(wso):
         if not self._certverify(bincert):
             raise pygexc.UnrecognizedCertificate('Unknown certificate', bincert)
         try:
-            self.handshake_response = websocket._handshake.handshake(self.sock, *addrs, **options)
+            try:
+                self.handshake_response = websocket._handshake.handshake(self.sock, *addrs, **options)
+            except TypeError:
+                self.handshake_response = websocket._handshake.handshake(self.sock, url, *addrs, **options)
             if self.handshake_response.status in websocket._handshake.SUPPORTED_REDIRECT_STATUSES:
                 options['redirect_limit'] = options.pop('redirect_limit', 3) - 1
                 if options['redirect_limit'] < 0:
