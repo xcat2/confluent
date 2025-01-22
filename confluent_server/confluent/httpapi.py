@@ -30,6 +30,7 @@ import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
 import confluent.consoleserver as consoleserver
 import confluent.discovery.core as disco
+import confluent.discovery.protocols.pxe as pxe
 import confluent.forwarder as forwarder
 import confluent.exceptions as exc
 import confluent.log as log
@@ -640,6 +641,8 @@ def resourcehandler(env, start_response):
         yield '500 - ' + str(e)
         return
 
+
+
 def resourcehandler_backend(env, start_response):
     """Function to handle new wsgi requests
     """
@@ -648,7 +651,7 @@ def resourcehandler_backend(env, start_response):
                ('Pragma', 'no-cache'),
                ('X-Content-Type-Options', 'nosniff'),
                ('Content-Security-Policy', "default-src 'self'"),
-               ('X-XSS-Protection', '1; mode=block'), ('X-Frame-Options', 'deny'),
+               ('X-XySS-Protection', '1; mode=block'), ('X-Frame-Options', 'deny'),
                ('Strict-Transport-Security', 'max-age=86400'),
                ('X-Permitted-Cross-Domain-Policies', 'none')]
     reqbody = None
@@ -671,6 +674,16 @@ def resourcehandler_backend(env, start_response):
         request = env['PATH_INFO'].split('/')
         if not request[0]:
             request = request[1:]
+        if request[1] == 'su':  # shorturl
+            targurl = pxe.shorturls.get(request[2], None)
+            if not targurl:
+                start_response('404 Not Found', headers)
+                yield ''
+                return
+            headers.append(('Location', targurl))
+            start_response('302 Found', headers)
+            yield ''
+            return
         if len(request) != 4:
             start_response('400 Bad Request', headers)
             yield ''

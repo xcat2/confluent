@@ -22,6 +22,7 @@
 
 # option 97 = UUID (wireformat)
 
+import base64
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
@@ -35,6 +36,7 @@ import eventlet
 import eventlet.green.socket as socket
 import eventlet.green.select as select
 import netifaces
+import os
 import struct
 import time
 import traceback
@@ -163,6 +165,18 @@ pxearchs = {
     b'\x00\x0b': 'uefi-aarch64',
     b'\x00\x10': 'uefi-httpboot',
 }
+
+
+shorturls = {}
+def register_shorturl(url):
+    urlid = base64.urlsafe_b64encode(os.urandom(3))
+    while urlid in shorturls:
+        urlid = base64.urlsafe_b64encode(os.urandom(3))
+    urlid = urlid.decode()
+    shorturls[urlid] = url
+    returl = '/'.join(url.split('/')[:3])
+    returl += '/confluent-api/boot/su/' + urlid + '/' + os.path.basename(url)
+    return returl
 
 
 uuidmap = {}
@@ -369,12 +383,15 @@ def proxydhcp(handler, nodeguess):
             elif disco['arch'] == 'uefi-aarch64':
                 bootfile = b'confluent/aarch64/ipxe.efi'
             if len(bootfile) > 127:
-                log.log(
-                    {'info': 'Boot offer cannot be made to {0} as the '
-                    'profile name "{1}" is {2} characters longer than is supported '
-                    'for this boot method.'.format(
-                        node, profile, len(bootfile) - 127)})
-                continue
+                if bootfile.startswith(b'http'):
+                    bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
+                else:
+                    log.log(
+                        {'info': 'Boot offer cannot be made to {0} as the '
+                        'profile name "{1}" is {2} characters longer than is supported '
+                        'for this boot method.'.format(
+                            node, profile, len(bootfile) - 127)})
+                    continue
             rpv[:240] = rqv[:240].tobytes()
             rpv[0:1] = b'\x02'
             rpv[108:108 + len(bootfile)] = bootfile
@@ -797,12 +814,15 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         if not isinstance(bootfile, bytes):
             bootfile = bootfile.encode('utf8')
         if len(bootfile) > 127:
-            log.log(
-                {'info': 'Boot offer cannot be made to {0} as the '
-                'profile name "{1}" is {2} characters longer than is supported '
-                'for this boot method.'.format(
-                    node, profile, len(bootfile) - 127)})
-            return
+                if bootfile.startswith(b'http'):
+                    bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
+                else:
+                    log.log(
+                        {'info': 'Boot offer cannot be made to {0} as the '
+                        'profile name "{1}" is {2} characters longer than is supported '
+                        'for this boot method.'.format(
+                            node, profile, len(bootfile) - 127)})
+                    return
         repview[108:108 + len(bootfile)] = bootfile
     elif info.get('architecture', None) == 'uefi-aarch64' and packet.get(77, None) == b'iPXE':
         if not profile:
