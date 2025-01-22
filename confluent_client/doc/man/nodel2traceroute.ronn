@@ -1,0 +1,42 @@
+nodel2traceroute(8) -- returns the layer 2 route through an Ethernet network managed by confluent given 2 end points.
+==============================
+## SYNOPSIS
+`nodel2traceroute [options] <start_node> <end_noderange>`  
+
+## DESCRIPTION  
+**nodel2traceroute** is a command that returns the layer 2 route for the configered interfaces in nodeattrib.
+It can also be used with the -i and -e options to check against specific interfaces on the endpoints. If the 
+--interface or --eface option are not used then the command will check for routes against all the defined 
+interfaces in nodeattrib (net.*.switch) for the nodes.
+
+
+
+## PREREQUISITES
+**nodel2traceroute** the net.<interface>.switch attributes have to be set on the end points if endpoint is not a switch
+
+
+## OPTIONS
+* ` -e` EFACE, --eface=INTERFACE
+   interface to check against for the second end point or end points if using checking against multiple nodes 
+* ` -i` INTERFACE, --interface=INTERFACE
+   interface to check against for the first end point  
+* ` -c` CUMULUS, --cumulus=CUMULUS
+   return layer 2 route through cumulus switches only 
+* `-h`, `--help`:  
+  Show help message and exit      
+
+   
+## EXAMPLES
+ * Checking route between two nodes:  
+  `# nodel2traceroute n244 n1851`  
+  `n244 to n1851: ['switch114']`    
+    
+* Checking route from one node to multiple nodes:  
+  `# nodel2traceroute n244 n1833,n1851`    
+  `n244 to n1833: ['switch114', 'switch7', 'switch32', 'switch253', 'switch85', 'switch72', 'switch21', 'switch2', 'switch96', 'switch103', 'switch115']
+   n244 to n1851: ['switch114']`  
+
+
+
+ 
+

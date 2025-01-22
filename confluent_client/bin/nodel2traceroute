@@ -61,7 +61,10 @@ def get_neighbors(switch):
     switch_neigbors = []
     url = '/networking/neighbors/by-switch/{0}/by-peername/'.format(switch)
     for neighbor in session.read(url):
-        switch = neighbor['item']['href'].strip('/')
+        try:
+            switch = neighbor['item']['href'].strip('/')
+        except:
+            continue
         if switch in all_switches:
             switch_neigbors.append(switch)
     return switch_neigbors
