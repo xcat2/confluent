@@ -305,7 +305,7 @@ class NetworkManager(object):
             'lacp': '802.3ad',
             'loadbalance': 'balance-alb',
             'roundrobin': 'balance-rr',
-            'activebackup:' 'active-backup',
+            'activebackup': 'active-backup',
     }
     def __init__(self, devtypes, deploycfg):
         self.deploycfg = deploycfg
