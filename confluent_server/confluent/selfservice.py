@@ -135,6 +135,8 @@ def handle_request(env, start_response):
             return
         righthmac = hmac.new(hmackey, cryptkey, hashlib.sha256).digest()
         if righthmac == crypthmac:
+            if not isinstance(cryptkey, str):
+                cryptkey = cryptkey.decode()
             cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': cryptkey}}}
             cfg.set_node_attributes(cfgupdate)
             cfg.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
