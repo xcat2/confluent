@@ -84,13 +84,14 @@ def retrieve(nodes, element, configmanager, inputdata):
         else:
             allnodedata[enclosure]['children'] = enclosuremap[enclosure]
     needheight = set([])
+    needslots = set(enclosuremap)
     for node in allnodedata:
         if 'height' not in allnodedata[node]:
             needheight.add(node)
-    needheight = ','.join(needheight)
-    if needheight:
+    needheightrange = ','.join(needheight.union(needslots))
+    if needheightrange:
         for rsp in core.handle_path(
-            '/noderange/{0}/description'.format(needheight),
+            '/noderange/{0}/description'.format(needheightrange),
             'retrieve', configmanager,
             inputdata=None):
                 if not hasattr(rsp, 'kvpairs'):
@@ -98,7 +99,10 @@ def retrieve(nodes, element, configmanager, inputdata):
                     continue
                 kvp = rsp.kvpairs
                 for node in kvp:
-                    allnodedata[node]['height'] = kvp[node]['height']
+                    if node in needheight:
+                        allnodedata[node]['height'] = kvp[node]['height']
+                    if node in needslots:
+                        allnodedata[node]['slots'] = kvp[node]['slots']
     for node in allnodedata:
         if 'height' not in allnodedata[node]:
             allnodedata[node]['height'] = 1
