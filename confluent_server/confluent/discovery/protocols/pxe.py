@@ -459,7 +459,10 @@ def snoop(handler, protocol=None, nodeguess=None):
         try:
             # Just need some delay, picked a prime number so that overlap with other
             # timers might be reduced, though it really is probably nothing
-            ready = select.select([net4, net6], [], [], None)
+            ready = select.select([net4, net6], [], [], 1)
+            for txid in list(_recent_txids):
+                if _recent_txids[txid] < time.time():
+                    del _recent_txids[txid]
             if not ready or not ready[0]:
                 continue
             for netc in ready[0]:
@@ -732,6 +735,7 @@ def get_my_duid():
         _myuuid = uuid.uuid4().bytes
     return _myuuid
 
+_recent_txids = {}
 
 def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None):
     replen = 275  # default is going to be 286
@@ -766,6 +770,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
     repview = repview[28:]
     repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
+    thistxid = bytes(repview[4:8])
     repview[10:11] = b'\x80'  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
     relayip = reqview[24:28].tobytes()
@@ -783,7 +788,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
-        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system'.format(node)})
+        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system on interface index "{}"'.format(node, info['netinfo']['ifidx'])})
         return
     clipn = None
     if niccfg['ipv4_method'] == 'firmwarenone':
@@ -903,12 +908,26 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         boottype = 'HTTP'
     else:
         boottype = 'PXE'
+    deferanswer = None
     if clipn:
+        _recent_txids[thistxid] = time.time() + 1
         ipinfo = 'with static address {0}'.format(niccfg['ipv4_address'])
     else:
+        # use txid to track
+        # defer sending for a second if otherwise unserved...
+        deferanswer = thistxid
         ipinfo = 'without address, served from {0}'.format(myip)
     if relayipa:
         ipinfo += ' (relayed to {} via {})'.format(relayipa, requestor[0])
+    eventlet.spawn(send_rsp, repview, replen, requestor, relayip, reqview, info, deferanswer, isboot, node, boottype, ipinfo)
+
+
+def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid, isboot, node, boottype, ipinfo):
+    if defertxid:
+        eventlet.sleep(0.5)
+        if defertxid in _recent_txids:
+            log.log({'info': 'Skipping reply for {} over interface {} due to better offer being made over other interface'.format(node, info['netinfo']['ifidx'])})
+            return
     if isboot:
         log.log({
             'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})
