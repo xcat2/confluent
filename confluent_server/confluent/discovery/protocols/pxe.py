@@ -23,6 +23,7 @@
 # option 97 = UUID (wireformat)
 
 import base64
+import confluent.config.conf as inifile
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
@@ -410,12 +411,18 @@ def proxydhcp(handler, nodeguess):
 def start_proxydhcp(handler, nodeguess=None):
     eventlet.spawn_n(proxydhcp, handler, nodeguess)
 
-
+ignorenics = None
 def snoop(handler, protocol=None, nodeguess=None):
+    global ignorenics
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
     # injection into the neigh table before OFFER or using SOCK_RAW.
+    ignorenics = inifile.get_option('netboot', 'ignorenics')
+    if ignorenics:
+        if not isinstance(ignorenics, bytes):
+            ignorenics = ignorenics.encode()
+        ignorenics = ignorenics.split(b',')
     start_proxydhcp(handler, nodeguess)
     tracelog = log.Logger('trace')
     global attribwatcher
@@ -478,6 +485,14 @@ def snoop(handler, protocol=None, nodeguess=None):
                         _, level, typ = struct.unpack('QII', cmsgarr[:16])
                         if level == socket.IPPROTO_IP and typ == IP_PKTINFO:
                             idx, recv = struct.unpack('II', cmsgarr[16:24])
+                            if ignorenics:
+                                ignore = False
+                                for nic in ignorenics:
+                                    if libc.if_nametoindex(nic) == idx:
+                                        ignore = True
+                                        break # ignore DHCP from ignored NIC
+                                if ignore:
+                                    continue
                             recv = ipfromint(recv)
                         rqv = memoryview(rawbuffer)[:i]
                         client = (ipfromint(clientaddr.sin_addr.s_addr), socket.htons(clientaddr.sin_port))
@@ -633,6 +648,7 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
         requestor = ('0.0.0.0', None)
     if requestor[0] == '0.0.0.0' and not info.get('uuid', None):
         return  # ignore DHCP from local non-PXE segment
+
     httpboot = info.get('architecture', None) == 'uefi-httpboot'
     cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile, stgprofile = get_deployment_profile(node, cfg, cfd)
