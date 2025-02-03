@@ -53,6 +53,7 @@ function set_confluent_vars() {
     if [ -z "$confluent_profile" ]; then
         confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/[^ ]*: //')
     fi
+    export confluent_profile confluent_mgr nodename
 }
 
 fetch_remote() {
