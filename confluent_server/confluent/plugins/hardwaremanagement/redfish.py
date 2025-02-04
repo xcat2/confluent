@@ -1186,13 +1186,12 @@ class IpmiHandler(object):
             health = response['health']
             health = _str_health(health)
             self.output.put(msg.HealthSummary(health, self.node))
-            if 'badreadings' in response:
-                badsensors = []
-                for reading in response['badreadings']:
-                    if hasattr(reading, 'health'):
-                        reading.health = _str_health(reading.health)
-                    badsensors.append(reading)
-                self.output.put(msg.SensorReadings(badsensors, name=self.node))
+            badsensors = []
+            for reading in response.get('badreadings', []):
+                if hasattr(reading, 'health'):
+                    reading.health = _str_health(reading.health)
+                badsensors.append(reading)
+            self.output.put(msg.SensorReadings(badsensors, name=self.node))
         else:
             raise exc.InvalidArgumentException('health is read-only')
 
