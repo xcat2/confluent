@@ -22,13 +22,36 @@
 import confluent.consoleserver as consoleserver
 import confluent.exceptions as exc
 import confluent.messages as msg
+import eventlet
+import time
 activesessions = {}
 
+_reaper = None
+
+def reapsessions():
+    while True:
+        eventlet.sleep(30)
+        for clientid in activesessions:
+            currcli = activesessions[clientid]
+            for sesshdl in list(currcli):
+                currsess = currcli[sesshdl]
+                if currsess.numusers == 0 and currsess.expiry < time.time():
+                    currsess.close()
+                    del activesessions[clientid][sesshdl]
 
 class _ShellHandler(consoleserver.ConsoleHandler):
     _plugin_path = '/nodes/{0}/_shell/session'
     _genwatchattribs = False
     _logtobuffer = False
+
+    def __init__(self, node, configmanager, width=80, height=24, prefix=''):
+        super().__init__(node, configmanager, width, height)
+        self.termprefix = prefix
+        self.numusers = 0
+        global _reaper
+        if _reaper is None:
+            _reaper = eventlet.spawn(reapsessions)
+
 
     def check_collective(self, attrvalue):
         return
@@ -37,13 +60,13 @@ class _ShellHandler(consoleserver.ConsoleHandler):
         # suppress logging through proving a stub 'log' function
         return
 
-    def feedbuffer(self, data):
-        return
-        #return super().feedbuffer(data)
+    #def feedbuffer(self, data):
+    #    return
+    #    #return super().feedbuffer(data)
 
-    def get_recent(self):
-        retdata, connstate = super(_ShellHandler, self).get_recent()
-        return '', connstate
+    #def get_recent(self):
+    #    retdata, connstate = super(_ShellHandler, self).get_recent()
+    #    return '', connstate
 
     def _got_disconnected(self):
         self.connectstate = 'closed'
@@ -106,7 +129,7 @@ class ShellSession(consoleserver.ConsoleSession):
     def connect_session(self):
         global activesessions
         tenant = self.configmanager.tenant
-        if (self.configmanager.tenant, self.node) not in activesessions:
+        if (self.configmanager.tenant, self.node, self.username) not in activesessions:
             activesessions[(tenant, self.node, self.username)] = {}
         if self.sessionid is None:
             self.sessionid = 1
@@ -114,15 +137,16 @@ class ShellSession(consoleserver.ConsoleSession):
                 self.sessionid += 1
             self.sessionid = str(self.sessionid)
         if self.sessionid not in activesessions[(tenant, self.node, self.username)]:
-            activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager, width=self.width, height=self.height)
+            activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager, width=self.width, height=self.height, prefix='s_{}_{}'.format(self.username, self.sessionid))
         self.conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
+        self.conshdl.numusers += 1
 
     def destroy(self):
         try:
-            activesessions[(self.configmanager.tenant, self.node,
-                            self.username)][self.sessionid].close()
-            del activesessions[(self.configmanager.tenant, self.node,
-                                self.username)][self.sessionid]
+            self.conshdl.numusers -= 1
+            if self.conshdl.numusers == 0:
+                self.conshdl.expiry = time.time() + 120
+
         except KeyError:
             pass
         super(ShellSession, self).destroy()
