@@ -527,7 +527,11 @@ def wsock_handler(ws):
                                     else:
                                         delimit = '/shell/sessions'
                                         shellsession = True
-                                    node = targ.split(delimit, 1)[0]
+                                    nodesess = targ.split(delimit, 1)
+                                    node = nodesess[0]
+                                    sessidx = None
+                                    if len(nodesess) == 2 and len(nodesess[1]) > 1:
+                                        sessidx = nodesess[1][1:]
                                     node = node.rsplit('/', 1)[-1]
                                     auditmsg = {'operation': 'start', 'target': targ,
                                                 'user': util.stringify(username)}
@@ -538,7 +542,7 @@ def wsock_handler(ws):
                                             node=node, configmanager=cfgmgr,
                                             username=username, skipreplay=skipreplay,
                                             datacallback=datacallback,
-                                            width=width, height=height)
+                                            width=width, height=height, sessionid=sessidx)
                                     else:
                                         consession = consoleserver.ConsoleSession(
                                             node=node, configmanager=cfgmgr,
