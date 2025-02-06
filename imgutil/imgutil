@@ -224,7 +224,7 @@ def capture_remote(args):
         sys.exit(1)
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
-    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')        
+    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
     if oscat.startswith('ubuntu'):
         utillib = os.path.join(utillib, '{}/initramfs-tools/'.format(oscat))
         if not os.path.exists(utillib):
@@ -752,6 +752,10 @@ class ElHandler(OsHandler):
             subprocess.check_call(['yum'] + self.yumargs)
         else:
             subprocess.check_call(['yum', '-y'] + self.yumargs)
+        with open(os.path.join(self.targpath, 'etc/selinux/config'), 'r') as seconfigin:
+            seconfig = seconfigin.read().replace('SELINUX=enforcing', 'SELINUX=disabled')
+        with open(os.path.join(self.targpath, 'etc/selinux/config'), 'w') as seconfigout:
+            seconfigout.write(seconfig)
         with open('/proc/mounts') as mountinfo:
             for line in mountinfo.readlines():
                 if line.startswith('selinuxfs '):
@@ -761,7 +765,7 @@ class ElHandler(OsHandler):
 
     def relabel_targdir(self):
         subprocess.check_call(
-            ['setfiles', '-r', self.targpath, 
+            ['setfiles', '-r', self.targpath,
              '/etc/selinux/targeted/contexts/files/file_contexts',
              self.targpath])
 
