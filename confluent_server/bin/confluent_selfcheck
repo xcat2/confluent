@@ -223,7 +223,7 @@ if __name__ == '__main__':
             try:
                 sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
                 print('OK')
-            except subprocess.CalledProcessError:
+            except Exception:
                 emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
             os.kill(int(sshutil.agent_pid), signal.SIGTERM)
         fprint('Checking for blocked insecure boot: ')
