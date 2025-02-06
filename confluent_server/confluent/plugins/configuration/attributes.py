@@ -17,6 +17,7 @@ import ast
 import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.config.attributes as allattributes
+import confluent.config.configmanager as configmod
 import confluent.util as util
 from fnmatch import fnmatch
 
@@ -284,6 +285,9 @@ def update_nodes(nodes, element, configmanager, inputdata):
                         clearattribs.append(attrib)
                     else:
                         foundattrib = False
+                        for candattrib in configmod._attraliases:
+                            if fnmatch(candattrib, attrib):
+                                attrib = configmod._attraliases[candattrib]
                         for candattrib in allattributes.node:
                             if fnmatch(candattrib, attrib):
                                 clearattribs.append(candattrib)
