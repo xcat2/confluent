@@ -67,7 +67,7 @@ def retrieve(nodes, element, configmanager, inputdata):
                 rackmap[row][rack][u] = {'node': enclosure, 'children': enclosuremap[enclosure]['bays'], 'nodecoordinates': enclosuremap[enclosure]['coordinates']}
                 allnodedata[enclosure] = rackmap[row][rack][u]
                 if height:
-                    allnodedata[enclosure]['height'] = height
+                    allnodedata[enclosure]['height'] = int(height)
             else: # need to see if enclosure lands in the map naturally or need to pull it
                 needenclosures.add(enclosure)
         elif u:
@@ -78,7 +78,7 @@ def retrieve(nodes, element, configmanager, inputdata):
             rackmap[row][rack][u] = {'node': node}
             allnodedata[node] = rackmap[row][rack][u]
             if height:
-                allnodedata[node]['height'] = height
+                allnodedata[node]['height'] = int(height)
             locatednodes.add(node)
     cfgenc = needenclosures - locatednodes
     locationinfo = configmanager.get_node_attributes(cfgenc, (u'location.rack', u'location.row', u'location.u', u'location.height'))
@@ -91,7 +91,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         if u:
             allnodedata[enclosure] = {'node': enclosure, 'children': enclosuremap[enclosure]['bays'], 'nodecoordinates': enclosuremap[enclosure]['coordinates']}
             if height:
-                allnodedata[enclosure]['height'] = height
+                allnodedata[enclosure]['height'] = int(height)
             if row not in rackmap:
                 rackmap[row] = {}
             if rack not in rackmap[row]:
