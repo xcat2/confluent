@@ -935,10 +935,10 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         ipinfo = 'without address, served from {0}'.format(myip)
     if relayipa:
         ipinfo += ' (relayed to {} via {})'.format(relayipa, requestor[0])
-    eventlet.spawn(send_rsp, repview, replen, requestor, relayip, reqview, info, deferanswer, isboot, node, boottype, ipinfo)
+    eventlet.spawn(send_rsp, repview, replen, requestor, relayip, reqview, info, deferanswer, isboot, node, boottype, ipinfo, sock)
 
 
-def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid, isboot, node, boottype, ipinfo):
+def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid, isboot, node, boottype, ipinfo, sock):
     if defertxid:
         eventlet.sleep(0.5)
         if defertxid in _recent_txids:
