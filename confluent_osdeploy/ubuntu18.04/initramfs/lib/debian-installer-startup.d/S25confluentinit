@@ -55,25 +55,28 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         if [ ! -z "$v4gw" ]; then
             setdebopt netcfg/get_gateway $v4gw string
         fi
-        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
-            ip addr add dev $NICGUESS $v4addr
-            if [ ! -z "$v4gw" ]; then
-                ip route add default via $v4gw
-            fi
-            for dsrv in $deploysrvs; do
-                if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
-                    deploysrvs=$dsrv
-                    NIC=$NICGUESS
-                    setdebopt netcfg/choose_interface $NIC select
+        NIC=""
+        while [ -z "$NIC" ]; do
+            for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+                ip addr add dev $NICGUESS $v4addr
+                if [ ! -z "$v4gw" ]; then
+                    ip route add default via $v4gw
+                fi
+                for dsrv in $deploysrvs; do
+                    if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
+                        deploysrvs=$dsrv
+                        NIC=$NICGUESS
+                        setdebopt netcfg/choose_interface $NIC select
+                        break
+                    fi
+                done
+                if [ -z "$NIC" ]; then
+                    ip -4 a flush dev $NICGUESS
+                else
                     break
                 fi
             done
-            if [ -z "$NIC" ]; then
-                ip -4 a flush dev $NICGUESS
-            else
-                break
-            fi
-        done 
+        done
         #TODO: nameservers
     elif [ "$v4cfgmeth" = "dhcp" ]; then
         setdebopt netcfg/disable_dhcp false boolean
