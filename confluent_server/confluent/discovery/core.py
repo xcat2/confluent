@@ -1087,7 +1087,7 @@ def get_nodename(cfg, handler, info):
         # Ok, see if it is something with a chassis-uuid and discover by
         # chassis
         nodename = get_nodename_from_enclosures(cfg, info)
-    if not nodename and handler.devname == 'SMM':
+    if not nodename and handler.devname in ('SMM', 'SMM3'):
         nodename = get_nodename_from_chained_smms(cfg, handler, info)
     if not nodename:  # as a last resort, search switches for info
         # This is the slowest potential operation, so we hope for the
@@ -1095,7 +1095,7 @@ def get_nodename(cfg, handler, info):
         nodename, macinfo = macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
         maccount = macinfo['maccount']
         if nodename:
-            if handler.devname == 'SMM':
+            if handler.devname in ('SMM', 'SMM3'):
                 nl = list(cfg.filter_node_attributes(
                             'enclosure.extends=' + nodename))
                 if nl:
@@ -1118,7 +1118,7 @@ def get_nodename(cfg, handler, info):
                         return None, None
         if (nodename and
                 not handler.discoverable_by_switch(macinfo['maccount'])):
-            if handler.devname == 'SMM':
+            if handler.devname in ('SMM', 'SMM3'):
                 errorstr = 'Attempt to discover SMM by switch, but chained ' \
                            'topology or incorrect net attributes detected, ' \
                            'which is not compatible with switch discovery ' \
