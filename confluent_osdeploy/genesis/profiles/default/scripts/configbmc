@@ -210,16 +210,23 @@ def set_port_tsm(s, port, model):
 
 
 def set_port_xcc(s, port, model):
+    if '_' in port:
+        port_type = port.split('_')[0]
+        port_number = port.split('_')[1]  # this could be the number or the form sfp28 || rj45
+        port = port_type
     oport = port
     if port.lower() == 'dedicated':
         port = b'\x01'
     elif port.lower() in ('ml2', 'ocp'):
         port = b'\x02\x00'
-    elif port.lower() == 'lom':
-        if model == '7x58':
-            port = b'\x00\x02'
-        else:
-            port = b'\x00\x00'
+    elif port.lower() == 'lom':  # potentially have to change to port_form.lower() == 'sfp28 || or rj45  // if it is two port sfp28 it is usually the first port that is ncsi enabled'
+        if port_number == '1' or port_number.lower() == 'sfp28':
+            port = b'\x05\x00'
+        elif port_number == '3' or port_number.lower() == 'rj45':
+            if model == '7x58':
+                port = b'\x00\x02'
+            else:
+                port = b'\x00\x00'
     else:
         port = port.split(' ')
         port = bytes(bytearray([int(x) for x in port]))
