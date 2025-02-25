@@ -227,6 +227,11 @@ def set_port_xcc(s, port, model):
                 port = b'\x00\x02'
             else:
                 port = b'\x00\x00'
+        else:
+            if model == '7x58':
+                port = b'\x00\x02'
+            else:
+                port = b'\x00\x00'
     else:
         port = port.split(' ')
         port = bytes(bytearray([int(x) for x in port]))
