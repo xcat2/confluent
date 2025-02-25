@@ -22,7 +22,7 @@ else
 Host *
     HostbasedAuthentication yes
     EnableSSHKeysign yes
-    HostbasedKeyTypes *ed25519*
+#    HostbasedKeyTypes *ed25519*
 EOF
   fi
 fi
