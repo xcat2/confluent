@@ -310,6 +310,27 @@ def check_rocky(isoinfo):
             arch = arch.decode('utf-8')
     return {'name': 'rocky-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
 
+fedoracatmap = {
+        '41': 'el10',
+}
+def check_fedora(isoinfo):
+    if '.discinfo' not in isoinfo[1]:
+        return None
+    prodinfo = isoinfo[1]['.discinfo']
+    prodlines = prodinfo.split(b'\n')
+    if len(prodlines) < 3:
+        return None
+    prod = prodlines[1].split()[0]
+    if prod != b'Fedora':
+        return None
+    arch = prodlines[2]
+    ver = prodlines[1].split()[-1]
+    if not isinstance(arch, str):
+        arch = arch.decode('utf-8')
+        ver = ver.decode('utf-8')
+    if ver not in fedoracatmap:
+        return None
+    return {'name': 'fedora-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': fedoracatmap[ver]}
 
 def check_alma(isoinfo):
     ver = None
