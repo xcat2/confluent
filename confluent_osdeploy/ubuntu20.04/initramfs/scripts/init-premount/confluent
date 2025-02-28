@@ -56,6 +56,12 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         echo $NIC > /tmp/autodetectnic
     else
         configure_networking
+        for dsrv in $deploysrvs; do
+            if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
+                deploysrvs=$dsrv
+                break
+            fi
+        done
     fi
     MGR=$deploysrvs
     NODENAME=$(grep ^nodename: /tmp/idntmnt/cnflnt.yml | awk '{print $2}')
