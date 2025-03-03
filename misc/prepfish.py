@@ -24,6 +24,8 @@ import os
 import subprocess
 import sys
 import time
+import ssl
+import socket
 
 class IpmiMsg(ctypes.Structure):
     _fields_ = [('netfn', ctypes.c_ubyte),
@@ -193,6 +195,13 @@ class Session(object):
         fcntl.ioctl(self.ipmidev, IPMICTL_RECV, self.rsp)
         return self.parsed_rsp
 
+class Verifier(object):
+    def __init__(self, fprint):
+        self._fprint = fprint
+
+    def validate(self, certificate):
+        return hashlib.sha256(certificate).digest() == self._fprint
+
 
 def dotwait():
     sys.stderr.write('.')
@@ -204,20 +213,35 @@ def disable_host_interface():
     rsp = s.raw_command(netfn=0xc, command=1, data=(1, 0xc1, 0))
 
 def get_redfish_creds():
-    os.makedirs('/run/fauxonecli', exist_ok=True, mode=0o700)
-    s = Session('/dev/ipmi0')
+    os.makedirs('/run/redfish', exist_ok=True, mode=0o700)
     try:
-        with open('/run/fauxonecli/credentials', 'rb') as credin:
+        with open('/run/redfish/credentials', 'rb') as credin:
             cred = credin.read()
     except FileNotFoundError:
+        s = Session('/dev/ipmi0')
         rsp = s.raw_command(netfn=0x2c, command=2, data=(0x52, 0xa5))
         cred = bytes(rsp['data'])
-        with open('/run/fauxonecli/credentials', 'wb') as credout:
+        with open('/run/redfish/credentials', 'wb') as credout:
             credout.write(cred)
     if cred[0] == 0x52:
         cred = cred[1:]
         creds = cred.split(b'\x00')[:2]
     return creds
+
+
+def get_redfish_fingerprint():
+    os.makedirs('/run/redfish', exist_ok=True, mode=0o700)
+    try:
+        with open('/run/redfish/fingerprint', 'rb') as certin:
+            fprint = certin.read()
+    except FileNotFoundError:
+        s = Session('/dev/ipmi0')
+        rsp = s.raw_command(0x2c, 1, data=(0x52, 1))
+        if rsp['data'][:2] == b'\x52\x01':
+            fprint = rsp['data'][2:]
+        with open('/run/redfish/fingerprint', 'wb') as printout:
+            printout.write(fprint)
+    return fprint
 
 
 def enable_host_interface():
@@ -246,9 +270,23 @@ def enable_host_interface():
     sys.stderr.flush()
     return bmctarg
 
+def store_redfish_cert(bmc):
+    fprint = get_redfish_fingerprint()
+    verifier = Verifier(fprint)
+    peercert = None
+    with socket.create_connection((bmc, 443)) as plainsock:
+        finsock = ssl.wrap_socket(plainsock, cert_reqs=ssl.CERT_NONE)  # to allow fprint based cert
+        peercert = finsock.getpeercert(binary_form=True)
+        if not verifier.validate(peercert):
+            raise Exception("Mismatched certificate")
+    if peercert:
+        with open('/run/redfish/cert.der', 'wb') as certout:
+            certout.write(peercert)
+
 def main():
     bmcuser, bmcpass = get_redfish_creds()
     bmc = enable_host_interface()
+    store_redfish_cert(bmc)
     print('Redfish user: {}'.format(bmcuser.decode()))
     print('Redfish password: {}'.format(bmcpass.decode()))
     print('Redfish host: https://[{}]/'.format(bmc))
