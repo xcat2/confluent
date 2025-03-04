@@ -292,7 +292,7 @@ if [[ $confluent_websrv == *:* ]] && [[ $confluent_websrv != "["* ]]; then
     confluent_websrv="[$confluent_websrv]"
 fi
 echo -n "Initializing ssh..."
-ssh-keygen -A
+ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -C '' -N ''
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
