@@ -18,6 +18,7 @@ import fcntl
 import json
 from select import select
 import glob
+import hashlib
 import socket
 import struct
 import os
