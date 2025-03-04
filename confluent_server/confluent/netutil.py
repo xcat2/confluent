@@ -317,6 +317,20 @@ def add_netmask(ncfg):
 def get_full_net_config(configmanager, node, serverip=None):
     cfd = configmanager.get_node_attributes(node, ['net.*'])
     cfd = cfd.get(node, {})
+    bmc = configmanager.get_node_attributes(
+        node, 'hardwaremanagement.manager').get(node, {}).get(
+            'hardwaremanagement.manager', {}).get('value', None)
+    bmc4 = None
+    bmc6 = None
+    if bmc:
+        try:
+            bmc4 = socket.getaddrinfo(bmc, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
+        try:
+            bmc6 = socket.getaddrinfo(bmc, 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
     attribs = {}
     for attrib in cfd:
         val = cfd[attrib].get('value', None)
@@ -346,6 +360,12 @@ def get_full_net_config(configmanager, node, serverip=None):
     for netname in sorted(attribs):
         ppool.spawn(nm.process_attribs, netname, attribs[netname])
     ppool.waitall()
+    for iface in list(nm.myattribs):
+        if bmc4 and nm.myattribs[iface].get('ipv4_address', None) == bmc4:
+            del nm.myattribs[iface]
+            continue
+        if bmc6 and nm.myattribs[iface].get('ipv6_address', None) == bmc6:
+            del nm.myattribs[iface]
     retattrs = {}
     if None in nm.myattribs:
         retattrs['default'] = nm.myattribs[None]
@@ -454,6 +474,19 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             clientipn = socket.inet_pton(clientfam, clientip)
     nodenetattribs = configmanager.get_node_attributes(
         node, 'net*').get(node, {})
+    bmc = configmanager.get_node_attributes(
+        node, 'hardwaremanagement.manager').get(node, {}).get('hardwaremanagement.manager', {}).get('value', None)
+    bmc4 = None
+    bmc6 = None
+    if bmc:
+        try:
+            bmc4 = socket.getaddrinfo(bmc, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
+        try:
+            bmc6 = socket.getaddrinfo(bmc, 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
     cfgbyname = {}
     for attrib in nodenetattribs:
         segs = attrib.split('.')
@@ -554,6 +587,10 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                         continue
                 candgw = cfgbyname[candidate].get('ipv{}_gateway'.format(nver), None)
                 if candip:
+                    if bmc4 and candip == bmc4:
+                        continue
+                    if bmc6 and candip == bmc6:
+                        continue
                     try:
                         for inf in socket.getaddrinfo(candip, 0, fam, socket.SOCK_STREAM):
                             candipn = socket.inet_pton(fam, inf[-1][0])
