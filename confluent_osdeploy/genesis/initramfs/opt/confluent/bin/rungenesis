@@ -8,7 +8,8 @@ if [ -x /usr/bin/seatd-launch -a -x /usr/bin/sway ]; then
     export XDG_RUNTIME_DIR=/run/users/0
     mkdir -p $XDG_RUNTIME_DIR
     sed -i '/^output /d' /etc/sway/config
-    echo 'exec foot -t XTERM -T Terminal tmux a' > /etc/sway/config.d/genesis
+    echo 'exec foot -t xterm -T Terminal tmux a' > /etc/sway/config.d/genesis
+    (while :; do seatd-launch sway <> /dev/tty1 >& /dev/null; done) &
 else
     (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
 fi
