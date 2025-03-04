@@ -1,5 +1,20 @@
 #!/bin/bash
+if [ ! -x /usr/libexec/platform-python ]; then
+       ln -s /usr/bin/python3 /usr/libexec/platform-python
+fi
 export LANG=en_US.utf8
+
+if [ -x /usr/bin/seatd-launch -a -x /usr/bin/sway ]; then
+    export XDG_RUNTIME_DIR=/run/users/0
+    mkdir -p $XDG_RUNTIME_DIR
+    sed -i '/^output /d' /etc/sway/config
+    echo 'exec foot -t XTERM -T Terminal tmux a' > /etc/sway/config.d/genesis
+else
+    (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
+fi
+
+
+
 mkdir -p /etc/confluent
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
@@ -9,13 +24,9 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     if [ ! -z "$autocons" ]; then
         echo "Using $(cat /tmp/01-autocons.conf)"
         (while :; do TERM=xterm-256color tmux a <> $autocons >&0 2>&1; done) &
-        (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
-    else
-        (while :; do TERM=linux tmux a <> /dev/console >&0 2>&1; done) &
     fi
 else
     (while :; do TERM=xterm-256color tmux a <> /dev/console >&0 2>&1; done) &
-    (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
 fi
 (while :; do TERM=linux tmux <> /dev/tty2 >&0 2>&1; done) &
 echo -n "udevd: "
