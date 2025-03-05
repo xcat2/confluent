@@ -118,6 +118,7 @@ def main():
     ap.add_argument('-a', '--attrib', help='Pull ip addresses and hostnames from attribute database', action='store_true')
     ap.add_argument('-i', '--ip', help='Expression to generate addresses (e.g. 172.16.1.{n1} or fd2b:246f:8a50::{n1:x})')
     ap.add_argument('-n', '--name', help='Expression for name to add ({node}-compute, etc). If unspecified, "{node} {node}.{dns.domain}" will be used', action='append')
+    ap.add_argument('-f', '--fqdn-first', help='Put the FQDN first in the hosts entries', action='store_true')
     args = ap.parse_args()
     c = client.Command()
     if args.name:
@@ -173,7 +174,13 @@ def main():
                                     break
                             else:
                                 for name in list(names):
-                                    names.append('{0}.{1}'.format(name, mydomain))
+                                    fqdn = '{0}.{1}'.format(name, mydomain)
+                                    if args.fqdn_first:
+                                        # Insert FQDN at the beginning if --fqdn-first flag is set
+                                        names.insert(0, fqdn)
+                                    else:
+                                        # Otherwise, append FQDN at the end (original behavior)
+                                        names.append(fqdn)
                     names = ' '.join(names)
                     merger.add_entry(ipdb[node][currnet], names)
         merger.write_out('/etc/whatnowhosts')

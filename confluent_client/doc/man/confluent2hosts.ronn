@@ -13,7 +13,7 @@ noderange.  There are two general approaches.
 
 It can be used ad-hoc, using -i and -n to specify the address and name portions respectively.  This accepts the standard confluent expression syntax, allowing for things like 172.30.1.{n1} or {node}.{dns.domain} or {bmc}.
 
-It can also read from the confluent db, using `-a`.  In this mode, each net.<value>.<attribute> group is pulled together into hosts lines.  ipv4_address and ipv6_address fields are associated with the corresponding hostname attributes.
+It can also read from the confluent db, using `-a`.  In this mode, each net.<value>.<attribute> group is pulled together into hosts lines.  ipv4_address and ipv6_address fields are associated with the corresponding hostname attributes. You can use `-f` to put the FQDN first.
 
 ## EXAMPLES
 
