@@ -276,7 +276,25 @@ class NodeHandler(generic.NodeHandler):
                     continue
                 actualnics.append(candnic)
             if len(actualnics) != 1:
-                raise Exception("Multi-interface BMCs are not supported currently")
+                compip = self.ipaddr
+                if ':' in compip:
+                    compip = compip.split('%')[0]
+                    ipkey = 'IPv6Addresses'
+                else:
+                    ipkey = 'IPv6Addresses'
+                actualnic = None
+                for curractnic in actualnics:
+                    currnicinfo = wc.grab_json_response(curractnic)
+                    for targipaddr in currnicinfo.get(ipkey, []):
+                        targipaddr = targipaddr.get('Address', 'Z')
+                        if compip == targipaddr:
+                            actualnic = curractnic
+                            break
+                    if actualnic:
+                        break
+                else:
+                    raise Exception("Unable to detect active NIC of multi-nic bmc")
+                actualnics = [actualnic]
             currnet = wc.grab_json_response(actualnics[0])
             netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=newip)
             newconfig = {
