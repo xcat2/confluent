@@ -38,5 +38,8 @@ the json files (password protected, removed from the files, or unprotected).
   keys do not change and as such they do not require
   incremental backup.
   
+* `-y`, `--yaml
+  Use YAML instead of JSON as file format
+  
   * `-h`, `--help`:
   Show help message and exit
