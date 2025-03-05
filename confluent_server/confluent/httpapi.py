@@ -629,8 +629,11 @@ def wsock_handler(ws):
 
 def resourcehandler(env, start_response):
     for hdr in env['headers_raw']:
-        if hdr[0].startswith('CONFLUENT_'):
-            env['HTTP_' + hdr[0]] = hdr[1]
+        if hdr[0].lower().startswith('confluent'):
+            hdrname = hdr[0].upper()
+            if '_' not in hdrname:
+                hdrname = hdrname.replace('CONFLUENT', 'CONFLUENT_')
+            env['HTTP_' + hdrname] = hdr[1]
     try:
         if 'HTTP_SEC_WEBSOCKET_VERSION' in env: 
             for rsp in wsock_handler(env, start_response):
