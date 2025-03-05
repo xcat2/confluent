@@ -50,6 +50,8 @@ argparser.add_option('-s', '--skipkeys', action='store_true',
                            'protected keys.json file, and only the protected '
                            'data is needed.  keys do not change and as such '
                            'they do not require incremental backup')
+argparser.add_option('-y', '--yaml', action='store_true',
+                      help='Use YAML instead of JSON as file format')
 (options, args) = argparser.parse_args()
 if len(args) != 2 or args[0] not in ('dump', 'restore', 'merge'):
     argparser.print_help()
@@ -73,9 +75,16 @@ if args[0] in ('restore', 'merge'):
         cfm.init(stateless)
         cfm.statelessmode = stateless
         skipped = {'nodes': [], 'nodegroups': []}
+        
+        # Use the format parameter based on the --yaml option
+        format = 'yaml' if options.yaml else 'json'
+        
         cfm.restore_db_from_directory(
             dumpdir, password,
-            merge="skip" if args[0] == 'merge' else False, skipped=skipped)
+            merge="skip" if args[0] == 'merge' else False, 
+            skipped=skipped,
+            format=format)
+            
         if skipped['nodes']:
             skippedn = ','.join(skipped['nodes'])
             print('The following nodes were skipped during merge: '
@@ -114,8 +123,11 @@ elif args[0] == 'dump':
     main._initsecurity(conf.get_config())
     if not os.path.exists(dumpdir):
         os.makedirs(dumpdir)
+    
+    # Use the format parameter based on the --yaml option
+    format = 'yaml' if options.yaml else 'json'
     cfm.dump_db_to_directory(dumpdir, password, options.redact,
-                             options.skipkeys)
+                             options.skipkeys, format=format)
 
 
 
