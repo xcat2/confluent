@@ -2,7 +2,7 @@ is_suse=false
 is_rhel=false
 
 if test -f /boot/efi/EFI/redhat/grub.cfg; then
-    grubcfg="/boot/efi/EFI/redhat/grub.cfg"
+    grubcfg="/etc/default/grub"
     grub2-mkconfig -o $grubcfg
     is_rhel=true
 elif test -f /boot/efi/EFI/sle_hpc/grub.cfg; then
@@ -45,5 +45,6 @@ fi
 
 # Working on Redhat
 if $is_rhel; then
-    sed -i 's,^serial,#serial, ; s,^terminal,#terminal,' $grubcfg
+    sed -i '/^GRUB_TERMINAL/s/serial //' $grubcfg
+    grub2-mkconfig -o /boot/grub2/grub.cfg
 fi
