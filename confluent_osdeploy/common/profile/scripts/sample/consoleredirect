@@ -3,7 +3,6 @@ is_rhel=false
 
 if test -f /boot/efi/EFI/redhat/grub.cfg; then
     grubcfg="/etc/default/grub"
-    grub2-mkconfig -o $grubcfg
     is_rhel=true
 elif test -f /boot/efi/EFI/sle_hpc/grub.cfg; then
     grubcfg="/boot/efi/EFI/sle_hpc/grub.cfg"
