@@ -628,6 +628,8 @@ def wsock_handler(ws):
 
 
 def resourcehandler(env, start_response):
+    if env['PATH_INFO'].startswith('/confluent-api'):
+        env['PATH_INFO'] = env['PATH_INFO'].replace('/confluent-api', '')
     for hdr in env['headers_raw']:
         if hdr[0].lower().startswith('confluent'):
             hdrname = hdr[0].upper()
