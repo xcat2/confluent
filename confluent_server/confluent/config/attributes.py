@@ -557,7 +557,7 @@ node = {
         'description': 'Indicates that this interface should be a team and what mode or runner to use when teamed. '
                        'If this covers a deployment interface, one of the member interfaces may be brought up as '
                        'a standalone interface until deployment is complete, as supported by the OS deployment profile. '
-                       'To support this scenario, the switch should be set up to allow independent operation of member ports123654 (e.g. lacp bypass mode or fallback mode).',
+                       'To support this scenario, the switch should be set up to allow independent operation of member ports (e.g. lacp bypass mode or fallback mode).',
         'validvalues': ('lacp', 'loadbalance', 'roundrobin', 'activebackup', 'none')
     },
     'power.pdu': {
