@@ -7,6 +7,26 @@ import (
 	"fmt"
 )
 
+func get_confluent_server() (string, error) {
+	var confluentsrv string
+	dcfg, err := os.ReadFile("/etc/confluent/confluent.deploycfg")
+	if err == nil {
+		dcfglines := bytes.Split(dcfg, []byte("\n"))
+		for _, dcfgline := range(dcfglines) {
+			dkeyval := bytes.Split(dcfgline, []byte(" "))
+			if bytes.Contains(dkeyval[0], []byte("deploy_server")) && (bytes.Contains(dkeyval[1], []byte(".")) || bytes.Contains(dkeyval[1], []byte(":"))) {
+				confluentsrv = string(dkeyval[1])
+				return confluentsrv, nil
+			}
+		}
+	} else {
+		_, err := os.ReadFile("/etc/confluent/confluent.info")
+		if err != nil {
+			return "Unable to determine Confluent server", err
+		}
+	}
+	return "", err
+}
 func main() {
 	var nodename string
 	var cacerts string
@@ -29,32 +49,18 @@ func main() {
 	outputfile := invokeapi.String("o", "", "Filename to store download to")
 	invokeapi.StringVar(&confluentsrv, "s", "", "Confluent server to request from")
 
-	if confluentsrv == "" {
-		dcfg, err := os.ReadFile("/etc/confluent/confluent.deploycfg")
-		if err == nil {
-			dcfglines := bytes.Split(dcfg, []byte("\n"))
-			for _, dcfgline := range(dcfglines) {
-				dkeyval := bytes.Split(dcfgline, []byte(" "))
-				if bytes.Contains(dkeyval[0], []byte("deploy_server")) && (bytes.Contains(dkeyval[1], []byte(".")) || bytes.Contains(dkeyval[1], []byte(":"))) {
-					confluentsrv = string(dkeyval[1])
-				}
-			}
 
-
-		} else {
-			_, err := os.ReadFile("/etc/confluent/confluent.info")
-			if err != nil {
-				panic("Unable to determine Confluent server")
-			}
-		}
-	}
 
 	if len(os.Args) < 2 {
 		panic("Insufficient arguments, no subcommand")
 	}
 	switch os.Args[1] {
 		case "hmacregister":
+			var err error
 			hmacreg.Parse(os.Args[2:])
+			if confluentsrv == "" {
+				confluentsrv, err = get_confluent_server()
+			}
 			password, crypted, hmac, err := genpasshmac(*hmacKey)
 			if err != nil { panic(err) }
 			//apiclient(cacerts, "/confluent-api/self/registerapikey", apikey, nodename, usejson)
@@ -67,7 +73,11 @@ func main() {
 			defer outp.Close()
 			outp.Write([]byte(password))
 		case "invoke":
+			var err error
 			invokeapi.Parse(os.Args[2:])
+			if confluentsrv == "" {
+				confluentsrv, err = get_confluent_server()
+			}
 			apiclient, err := NewApiClient(cacerts, apikey, nodename, confluentsrv)
 			if err != nil { panic(err) }
 			mime := ""
