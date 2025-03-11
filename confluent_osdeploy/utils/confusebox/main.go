@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"os"
+	"io"
 	"fmt"
 )
 
@@ -48,6 +49,8 @@ func main() {
 	invokeapi.BoolVar(&usejson, "j", false, "Request JSON formatted reply")
 	outputfile := invokeapi.String("o", "", "Filename to store download to")
 	invokeapi.StringVar(&confluentsrv, "s", "", "Confluent server to request from")
+	invokedata := invokeapi.String("d", "", "Data to submit")
+	invokedatafile := invokeapi.String("i", "", "File containing data to submit")
 
 
 
@@ -74,7 +77,16 @@ func main() {
 			outp.Write([]byte(password))
 		case "invoke":
 			var err error
+			var body io.Reader
+			body = nil
 			invokeapi.Parse(os.Args[2:])
+			if *invokedata != "" {
+				body = bytes.NewBuffer([]byte(*invokedata))
+			}
+			if *invokedatafile != "" {
+				body, err = os.Open(*invokedatafile)
+				if err != nil { panic(err) }
+			}
 			if confluentsrv == "" {
 				confluentsrv, err = get_confluent_server()
 			}
@@ -85,9 +97,9 @@ func main() {
 				mime = "application/json"
 			}
 			if *outputfile != "" {
-				apiclient.Fetch(invokeapi.Arg(0), *outputfile, mime)
+				apiclient.Fetch(invokeapi.Arg(0), *outputfile, mime, body)
 			}
-			rsp, err := apiclient.GrabText(invokeapi.Arg(0), mime)
+			rsp, err := apiclient.GrabText(invokeapi.Arg(0), mime, body)
 			if err != nil { panic(err) }
 			fmt.Println(rsp)
 		default:

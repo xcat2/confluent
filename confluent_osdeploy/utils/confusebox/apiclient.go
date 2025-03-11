@@ -72,22 +72,23 @@ func NewApiClient(cafile string, keyfile string, nodename string, server string)
 
 func (apiclient *ApiClient) RegisterKey(crypted string, hmac string) (error) {
 	cryptbytes := []byte(crypted)
-	_, err := apiclient.request("/confluent-api/self/registerapikey", "", &cryptbytes, "", hmac)
+	cryptbuffer := bytes.NewBuffer(cryptbytes)
+	_, err := apiclient.request("/confluent-api/self/registerapikey", "", cryptbuffer, "", hmac)
 	return err
 }
 
-func (apiclient *ApiClient) Fetch(url string, outputfile string, mime string) (error)  {
+func (apiclient *ApiClient) Fetch(url string, outputfile string, mime string, body io.Reader) (error)  {
 	outp, err := os.Create(outputfile)
 	if err != nil { return err }
 	defer outp.Close()
-	rsp, err := apiclient.request(url, mime, nil, "", "")
+	rsp, err := apiclient.request(url, mime, body, "", "")
 	if err != nil { return err }
 	_, err = io.Copy(outp, rsp)
 	return err
 }
 
-func (apiclient *ApiClient) GrabText(url string, mime string) (string, error){
-	rsp, err := apiclient.request(url, mime, nil, "", "")
+func (apiclient *ApiClient) GrabText(url string, mime string, body io.Reader) (string, error){
+	rsp, err := apiclient.request(url, mime, body, "", "")
 	if err != nil { return "", err }
 	rspdata, err := io.ReadAll(rsp)
 	if err != nil { return "", err }
@@ -95,7 +96,7 @@ func (apiclient *ApiClient) GrabText(url string, mime string) (string, error){
 	return rsptxt, nil
 }
 
-func (apiclient *ApiClient) request(url string, mime string, body *[]byte, method string, hmac string) (io.ReadCloser, error) {
+func (apiclient *ApiClient) request(url string, mime string, body io.Reader, method string, hmac string) (io.ReadCloser, error) {
 	if ! strings.Contains(url, "https://") {
 		url = fmt.Sprintf("https://%s%s", apiclient.urlserver, url)
 	}
@@ -111,7 +112,7 @@ func (apiclient *ApiClient) request(url string, mime string, body *[]byte, metho
 	if body == nil {
 		rq, err = http.NewRequest(method, url, nil)
 	} else {
-		rq, err = http.NewRequest(method, url, bytes.NewBuffer(*body))
+		rq, err = http.NewRequest(method, url, body)
 	}
 	if err != nil { return nil, err }
 	if (mime != "") { rq.Header.Set("Accept", mime) }
