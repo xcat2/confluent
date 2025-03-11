@@ -367,7 +367,7 @@ class NetworkManager(object):
                 args.append(bondcfg[parm])
             subprocess.check_call(['nmcli', 'c', 'm', team] + args)
 
-    def apply_configuration(self, cfg):
+    def apply_configuration(self, cfg, lastchance=False):
         cmdargs = {}
         cmdargs['connection.autoconnect'] = 'yes'
         stgs = cfg['settings']
@@ -418,8 +418,9 @@ class NetworkManager(object):
             iname = list(cfg['interfaces'])[0]
             ctype = self.devtypes.get(iname, None)
             if not ctype:
-                sys.stderr.write("Warning, no device found for interface_name ({0}), skipping setup\n".format(iname))
-                return
+                if lastchance:
+                    sys.stderr.write("Warning, no device found for interface_name ({0}), skipping setup\n".format(iname))
+                return 1
             if stgs.get('vlan_id', None):
                 vlan = stgs['vlan_id']
                 if ctype == 'infiniband':
@@ -543,8 +544,21 @@ if __name__ == '__main__':
         nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
+    retrynics = []
     for netn in netname_to_interfaces:
-        nm.apply_configuration(netname_to_interfaces[netn])
+        redo = nm.apply_configuration(netname_to_interfaces[netn])
+        if redo == 1:
+            retrynics.append(netn)
+    if retrynics:
+        idxmap, devtypes = map_idx_to_name()
+        if os.path.exists('/usr/sbin/netplan'):
+            nm = NetplanManager(dc)
+        if os.path.exists('/usr/bin/nmcli'):
+            nm = NetworkManager(devtypes, dc)
+        elif os.path.exists('/usr/sbin/wicked'):
+            nm = WickedManager()
+        for netn in retrynics:
+            nm.apply_configuration(netname_to_interfaces[netn], lastchance=True)
     if havefirewall:
         subprocess.check_call(['systemctl', 'start', 'firewalld'])
     await_tentative()
