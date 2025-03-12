@@ -55,6 +55,13 @@ mkdir -p /etc/pki/tls/certs
 cat /tls/*.pem > /etc/pki/tls/certs/ca-bundle.crt
 TRIES=0
 touch /etc/confluent/confluent.info
+TRIES=5
+echo -n "Waitiing for disks..."
+while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
+    sleep 1
+    TRIES=$((TRIES - 1))
+done
+echo "Done"
 if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     mkdir -p /media/ident
     mount /dev/disk/by-label/CNFLNT_IDNT /media/ident
