@@ -78,8 +78,11 @@ exitcode = 0
 def format_event(evt):
     retparts = []
     if 'timestamp' in evt and evt['timestamp'] is not None:
-        display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
-        retparts.append(display.strftime('%m/%d/%Y %H:%M:%S'))
+        try:
+            display = dt.strptime(evt['timestamp'], '%Y-%m-%dT%H:%M:%S')
+            retparts.append(display.strftime('%m/%d/%Y %H:%M:%S'))
+        except ValueError:
+            display = ''    
     dscparts = []
     if evt.get('log_id', None):
         retparts.append(evt['log_id'] + ':')
