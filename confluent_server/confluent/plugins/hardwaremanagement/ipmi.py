@@ -38,6 +38,7 @@ ipmicommand = eventlet.import_patched('pyghmi.ipmi.command')
 import socket
 import ssl
 import traceback
+import confluent.vinzmanager as vinzmanager
 
 
 if not hasattr(ssl, 'SSLEOFError'):
@@ -175,6 +176,7 @@ def sanitize_invdata(indata):
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
+        self.confluentbmcname = kwargs['bmc']
         self.cfm = cfm
         self.node = node
         self.sensormap = {}
@@ -592,6 +594,10 @@ class IpmiHandler(object):
             self.handle_servicedata_fetch()
         elif self.element == ['description']:
             self.handle_description()
+        elif self.element == ['console', 'ikvm_methods']:
+            self.handle_ikvm_methods()
+        elif self.element == ['console', 'ikvm']:
+            self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
 
@@ -1609,6 +1615,26 @@ class IpmiHandler(object):
     def handle_description(self):
         dsc = self.ipmicmd.get_description()
         self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_methods(self):
+        dsc = self.ipmicmd.get_ikvm_methods()
+        dsc = {'ikvm_methods': dsc}
+        self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm(self):
+        methods = self.ipmicmd.get_ikvm_methods()
+        if 'openbmc' in methods:
+            url = vinzmanager.get_url(self.node, self.inputdata)
+            self.output.put(msg.ChildCollection(url))
+            return
+        launchdata = self.ipmicmd.get_ikvm_launchdata()
+        if 'url' in launchdata and not launchdata['url'].startswith('https://'):
+            mybmc = self.ipmicmd.confluentbmcname
+            if ':' in mybmc and not '[' in mybmc:
+                mybmc = '[{}]'.format(mybmc)
+            launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
+        self.output.put(msg.KeyValueData(launchdata, self.node))
+
 
     def handle_graphical_console(self):
         args = self.ipmicmd.get_graphical_console()

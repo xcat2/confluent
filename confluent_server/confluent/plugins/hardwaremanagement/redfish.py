@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import confluent.vinzmanager as vinzmanager
 import confluent.exceptions as exc
 import confluent.firmwaremanager as firmwaremanager
 import confluent.messages as msg
@@ -153,6 +154,7 @@ def sanitize_invdata(indata):
 
 class IpmiCommandWrapper(ipmicommand.Command):
     def __init__(self, node, cfm, **kwargs):
+        self.confluentbmcname = kwargs['bmc']
         #kwargs['pool'] = eventlet.greenpool.GreenPool(4)
         #Some BMCs at the time of this writing crumble under the weight
         #of 4 concurrent requests.  For now give up on this optimization.
@@ -449,6 +451,10 @@ class IpmiHandler(object):
             self.handle_servicedata_fetch()
         elif self.element == ['description']:
             self.handle_description()
+        elif self.element == ['console', 'ikvm_methods']:
+            self.handle_ikvm_methods()
+        elif self.element == ['console', 'ikvm']:
+            self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
 
@@ -1466,6 +1472,25 @@ class IpmiHandler(object):
     def handle_description(self):
         dsc = self.ipmicmd.get_description()
         self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_methods(self):
+        dsc = self.ipmicmd.get_ikvm_methods()
+        dsc = {'ikvm_methods': dsc}
+        self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm(self):
+        methods = self.ipmicmd.get_ikvm_methods()
+        if 'openbmc' in methods:
+            url = vinzmanager.get_url(self.node, self.inputdata)
+            self.output.put(msg.ChildCollection(url))
+            return
+        launchdata = self.ipmicmd.get_ikvm_launchdata()
+        if 'url' in launchdata and not launchdata['url'].startswith('https://'):
+            mybmc = self.ipmicmd.confluentbmcname
+            if ':' in mybmc and not '[' in mybmc:
+                mybmc = '[{}]'.format(mybmc)
+            launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
+        self.output.put(msg.KeyValueData(launchdata, self.node))
 
 
 def _str_health(health):

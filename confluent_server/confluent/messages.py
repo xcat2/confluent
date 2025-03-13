@@ -952,7 +952,7 @@ class InputIdentImage(ConfluentInputMessage):
 
 class InputIkvmParams(ConfluentInputMessage):
     keyname = 'method'
-    valid_values = ['unix', 'wss']
+    valid_values = ['unix', 'wss', 'url']
 
 class InputIdentifyMessage(ConfluentInputMessage):
     valid_values = set([
