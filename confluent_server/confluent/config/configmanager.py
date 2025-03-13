@@ -136,7 +136,7 @@ def attrib_supports_expression(attrib):
     if not isinstance(attrib, str):
         attrib = attrib.decode('utf8')
     attrib = _attraliases.get(attrib, attrib)
-    if attrib.startswith('secret.') or attrib.startswith('crypted.'):
+    if attrib.startswith('secret.') or attrib.startswith('crypted.') or attrib.startswith('custom.nodesecret.'):
         return False
     return True
 
@@ -1108,6 +1108,10 @@ class _ExpressionFormat(string.Formatter):
             field_name = val
         parsed = ast.parse(field_name)
         val = self._handle_ast_node(parsed.body[0].value)
+        try:
+            val = int(val)
+        except Exception:
+            pass
         return format(val, format_spec)
 
     def _handle_ast_node(self, node):
@@ -1373,7 +1377,7 @@ class ConfigManager(object):
             attribute, match = expression.split('=')
         else:
             raise Exception('Invalid Expression')
-        if attribute.startswith('secret.'):
+        if attribute.startswith('secret.') or attribute.startswith('custom.nodesecret.'):
             raise Exception('Filter by secret attributes is not supported')
         if attribute_name_is_invalid(attribute):
             raise ValueError(
@@ -2023,10 +2027,10 @@ class ConfigManager(object):
                     newdict = {'value': attribmap[group][attr]}
                 else:
                     newdict = attribmap[group][attr]
-                if keydata and attr.startswith('secret.') and 'cryptvalue' in newdict:
+                if keydata and (attr.startswith('secret.') or attr.startswith('custom.nodesecret.')) and 'cryptvalue' in newdict:
                     newdict['value'] = decrypt_value(newdict['cryptvalue'], keydata['cryptkey'], keydata['integritykey'])
                     del newdict['cryptvalue']
-                if 'value' in newdict and attr.startswith("secret."):
+                if 'value' in newdict and (attr.startswith('secret.') or attr.startswith('custom.nodesecret.')):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
                 if 'value' in newdict and attr.startswith("crypted."):
@@ -2485,10 +2489,10 @@ class ConfigManager(object):
                 # add check here, skip None attributes
                 if newdict is None:
                     continue
-                if keydata and attrname.startswith('secret.') and 'cryptvalue' in newdict:
+                if keydata and (attrname.startswith('secret.') or attrname.startswith('custom.nodesecret.')) and 'cryptvalue' in newdict:
                     newdict['value'] = decrypt_value(newdict['cryptvalue'], keydata['cryptkey'], keydata['integritykey'])
                     del newdict['cryptvalue']
-                if 'value' in newdict and attrname.startswith("secret."):
+                if 'value' in newdict and (attrname.startswith('secret.') or attrname.startswith('custom.nodesecret.')):
                     newdict['cryptvalue'] = crypt_value(newdict['value'])
                     del newdict['value']
                 if 'value' in newdict and attrname.startswith("crypted."):

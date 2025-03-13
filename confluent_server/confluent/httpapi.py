@@ -97,7 +97,7 @@ def group_creation_resources():
     for attr in sorted(attribs.node):
         if attr == 'groups':
             continue
-        if attr.startswith("secret."):
+        if attr.startswith('secret.') or attr.startswith('custom.nodesecret.'):
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -116,7 +116,7 @@ def node_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the node").html() + '<br>'
     for attr in sorted(attribs.node):
-        if attr.startswith("secret."):
+        if attr.startswith('secret.') or attr.startswith('custom.nodesecret.'):
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
