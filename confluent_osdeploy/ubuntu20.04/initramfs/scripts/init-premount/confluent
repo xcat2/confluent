@@ -88,8 +88,15 @@ if [ ! -z "$cons" ]; then
 fi
 echo "Preparing to deploy $osprofile from $MGR"
 echo $osprofile > /custom-installation/confluent/osprofile
-echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
-fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso"
+mv /usr/bin/openssl /usr/bin/ossl
+echo '#!/bin/sh' > /usr/bin/openssl
+echo 'args=$*' >> /usr/bin/openssl
+echo 'args=$(echo $args|sed -e "s/-verify_hostname.*//")' >> /usr/bin/openssl
+echo 'exec /usr/bin/ossl $args' >> /usr/bin/openssl
+chmod +x /usr/bin/openssl
+cp /tls/* /etc/ssl/certs/
+echo URL=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
+fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso"
 if [ ! -z "$cons" ]; then
     fcmdline="$fcmdline console=${cons#/dev/}"
 fi

@@ -1,3 +1,4 @@
+cp /tls/* /etc/ssl/certs/
 cd /sys/class/net
 for nic in *; do
     ip link set $nic up
@@ -91,8 +92,14 @@ echo $osprofile > /custom-installation/confluent/osprofile
 . /etc/os-release
 DIRECTISO=$(blkid -t TYPE=iso9660 |grep -Ei ' LABEL="Ubuntu-Server '$VERSION_ID)
 if [ -z "$DIRECTISO" ]; then
-    echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
-    fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso"
+    mv /usr/bin/openssl /usr/bin/ossl
+    echo '#!/bin/sh' > /usr/bin/openssl
+    echo 'args=$*' >> /usr/bin/openssl
+    echo 'args=$(echo $args|sed -e "s/-verify_hostname.*//")' >> /usr/bin/openssl
+    echo 'exec /usr/bin/ossl $args' >> /usr/bin/openssl
+    chmod +x /usr/bin/openssl
+    echo URL=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
+    fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso"
 fi
 if [ ! -z "$cons" ]; then
     fcmdline="$fcmdline console=${cons#/dev/}"
