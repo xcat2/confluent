@@ -479,7 +479,7 @@ class NodeHandler(immhandler.NodeHandler):
                             {'UserName': username}, method='PATCH')
                         if status != 200:
                             rsp = json.loads(rsp)
-                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError'):
+                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError', 'Base.1.18.GeneralError'):
                                 if tries:
                                     eventlet.sleep(4)
                                 elif tmpaccount:
