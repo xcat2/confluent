@@ -838,7 +838,7 @@ class IpmiHandler(object):
             self.output.put(errorneeded)
 
     def handle_update_status(self):
-        activeupdates = firmwaremanager.list_updates([self.node], None, [])
+        activeupdates = list(firmwaremanager.list_updates([self.node], None, []))
         if activeupdates:
             self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
         else:
