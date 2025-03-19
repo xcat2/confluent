@@ -572,6 +572,8 @@ class IpmiHandler(object):
             self.handle_configuration()
         elif self.element[:3] == ['inventory', 'firmware', 'updates']:
             self.handle_update()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
+            self.handle_update_status()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
         elif self.element == ['media', 'attach']:
@@ -977,6 +979,14 @@ class IpmiHandler(object):
         self.output.put(msg.Firmware(items, self.node))
         if errorneeded:
             self.output.put(errorneeded)
+
+    def handle_update_status(self):
+        activeupdates = firmwaremanager.list_updates([self.node], None, [])
+        if activeupdates:
+            self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
+        else:
+            status = self.ipmicmd.get_update_status()
+            self.output.put(msg.KeyValueData({'status': status}, self.node))
 
     def handle_inventory(self):
         if self.element[1] == 'firmware':
