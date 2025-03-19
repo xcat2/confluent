@@ -93,10 +93,21 @@ echo $osprofile > /custom-installation/confluent/osprofile
 DIRECTISO=$(blkid -t TYPE=iso9660 |grep -Ei ' LABEL="Ubuntu-Server '$VERSION_ID)
 if [ -z "$DIRECTISO" ]; then
     mv /usr/bin/openssl /usr/bin/ossl
-    echo '#!/bin/sh' > /usr/bin/openssl
-    echo 'args=$*' >> /usr/bin/openssl
-    echo 'args=$(echo $args|sed -e "s/-verify_hostname.*//")' >> /usr/bin/openssl
-    echo 'exec /usr/bin/ossl $args' >> /usr/bin/openssl
+    cat > /usr/bin/openssl << 'EOF'
+#!/bin/sh
+AMENDARGS=0
+nargs=""
+for arg in $*; do
+    if [ "$arg" == "-servername" ]; then
+        AMENDARGS=1
+    fi
+    if [ "$AMENDARGS" == "1" ]; then
+        arg=$(echo $arg|sed -e 's/:443$//' -e 's/\[//' -e 's/\]//' -e 's/%.*//')
+    fi
+    nargs="$nargs $arg"
+done
+exec /usr/bin/ossl $nargs
+EOF
     chmod +x /usr/bin/openssl
     echo URL=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
     fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso"
