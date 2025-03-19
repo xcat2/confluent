@@ -490,7 +490,7 @@ def _init_core():
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
-                'updatestatus': PluginCollection({
+                'updatestatus': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
