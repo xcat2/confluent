@@ -10,6 +10,9 @@
 # present
 run_remote_python syncfileclient
 
+run_remote_parts onboot.d
+
+
 # Induce execution of remote configuration, e.g. ansible plays in ansible/onboot.d/
 run_remote_config onboot
 
