@@ -98,7 +98,7 @@ if [ -z "$DIRECTISO" ]; then
 AMENDARGS=0
 nargs=""
 for arg in $*; do
-    if [ "$arg" == "-servername" ]; then
+    if [ "$arg" == "-servername" -o "$arg" == "-verify" ]; then
         AMENDARGS=1
     fi
     if [ "$AMENDARGS" == "1" ]; then
