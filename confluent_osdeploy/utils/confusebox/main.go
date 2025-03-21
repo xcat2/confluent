@@ -97,11 +97,13 @@ func main() {
 				mime = "application/json"
 			}
 			if *outputfile != "" {
-				apiclient.Fetch(invokeapi.Arg(0), *outputfile, mime, body)
+				err := apiclient.Fetch(invokeapi.Arg(0), *outputfile, mime, body)
+				if err != nil { panic(err) }
+			} else {
+				rsp, err := apiclient.GrabText(invokeapi.Arg(0), mime, body)
+				if err != nil { panic(err) }
+				fmt.Println(rsp)
 			}
-			rsp, err := apiclient.GrabText(invokeapi.Arg(0), mime, body)
-			if err != nil { panic(err) }
-			fmt.Println(rsp)
 		default:
 			panic("Unrecognized subcommand")
 	}
