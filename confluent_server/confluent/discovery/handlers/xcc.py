@@ -671,8 +671,6 @@ class NodeHandler(immhandler.NodeHandler):
                         statargs[currkey + attribsuffix] = statargs[currkey]
                         del statargs[currkey]
                 netset, status = wc.grab_json_response_with_status('/api/dataset', statargs)
-                print(repr(netset))
-                print(repr(status))
 
         elif self.ipaddr.startswith('fe80::'):
             self.configmanager.set_node_attributes(
