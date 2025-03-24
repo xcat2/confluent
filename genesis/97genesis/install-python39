@@ -217,4 +217,3 @@ dracut_install /usr/lib64/python3.9/distutils/util.py
 dracut_install /usr/lib64/python3.9/distutils/version.py
 dracut_install /usr/lib64/python3.9/distutils/versionpredicate.py
 dracut_install /usr/lib64/python3.9/getpass.py
-dracut_install /usr/libexec/openssh/sftp-server

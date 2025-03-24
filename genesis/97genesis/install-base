@@ -8,6 +8,7 @@ dracut_install openssl tar ipmitool cpio xz gzip lsmod ethtool
 dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname bc expr sort
 dracut_install ssh sshd vi reboot lspci parted tmux mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
+dracut_install /usr/libexec/openssh/sftp-server
 dracut_install efibootmgr
 dracut_install du df ssh-keygen scp clear dhclient lldpd lldpcli tee
 dracut_install /lib64/libnss_dns.so.2 /lib64/libnss_dns.so.2 /lib64/libnss_myhostname.so.2
