@@ -23,11 +23,21 @@ dracut_install killall chown chroot dd expr kill parted rsync shutdown sort bloc
 dracut_install /etc/udev/hwdb.bin
 dracut_install /usr/share/hwdata/pci.ids
 dracut_install ibstat ibstatus
-dracut_install opainfo
 dracut_install /usr/lib/udev/rules.d/10-dm.rules /usr/sbin/dmsetup /usr/lib/udev/rules.d/95-dm-notify.rules
+#dracut_install opainfo
 #dracut_install /usr/lib/opa-fm/bin/opafmd
 #dracut_install /usr/sbin/opensm /usr/libexec/opensm-launch
 dracut_install /usr/lib64/libibverbs/libhfi1verbs-rdmav34.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/lib64/libibverbs/libmlx4-rdmav34.so /usr/lib64/libibverbs/libmlx5-rdmav34.so
-inst /usr/lib/dracut/modules.d/40network/net-lib.sh /lib/net-lib.sh
+if [ -x /usr/libexec/openssh/sshd-session ]; then
+    dracut_install /usr/libexec/openssh/sshd-session
+fi
+if [ -e /usr/lib/dracut/modules.d/40network/net-lib.sh ]; then
+    inst /usr/lib/dracut/modules.d/40network/net-lib.sh /lib/net-lib.sh
+else
+    inst /usr/lib/dracut/modules.d/45net-lib/net-lib.sh /lib/net-lib.sh
+fi
+if [ -e /etc/crypto-policies/back-ends/opensslcnf.config ]; then
+    dracut_install /etc/crypto-policies/back-ends/opensslcnf.config
+fi
 
 #dracut_install mstflint This would have mlx update support, but it incurs gigantic dependencies, libicudata
