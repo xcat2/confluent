@@ -6,6 +6,7 @@ if [ ! -f /var/run/vmware/show-esx-shell-login ]; then
     chvt 2
     /etc/init.d/ESXShell start
 fi
+/opt/confluent/bin/apiclient -f
 uuid=$(vsish -e get /hardware/bios/dmiInfo|grep -A15 UUID|sed -e 's/.*://'|sed -e ':a;N;$!ba;s/\n//g' | sed -e 's/ *0x//g')
 uuid=${uuid:0:8}-${uuid:8:4}-${uuid:12:4}-${uuid:16:4}-${uuid:20:12}
 kargs=$(vsish -e get /system/bootCmdLine|grep "command line:")
