@@ -14,6 +14,8 @@ import ssl
 import sys
 import struct
 import time
+import re
+import json
 
 class InvalidApiKey(Exception):
     pass
@@ -412,8 +414,91 @@ class HTTPSClient(client.HTTPConnection, object):
                     self.node, [self.host], errout=self.errout)
         raise Exception(rsp.read())
 
+def get_current_vmnic_vswitch():
+    uplinkmatch = re.compile(r'^\s*Uplinks:\s*(.*)')
+    switchmatch = re.compile(r'^\s*Name:\s*(.*)')
+
+    vswinfo = subprocess.check_output(['localcli', 'network', 'vswitch', 'standard', 'list']).decode()
+
+    vmnic = None
+    vswitch_name = None
+
+    for info in vswinfo.split('\n'):
+        name_match = switchmatch.match(info)
+        if name_match:
+            vswitch_name = name_match.group(1).strip()
+
+        upinfo = uplinkmatch.match(info)
+        if upinfo:
+            vmnic = upinfo.group(1).strip()
+            if vmnic and 'vusb0' not in vmnic:
+                return vswitch_name, vmnic
+
+    return vswitch_name, vmnic
+
+def get_available_nics():
+    nicinfo = subprocess.check_output(['localcli', 'network', 'nic', 'list']).decode('utf8').split('\n')
+    available_nics = {}
+
+    # Skip headers and separators
+    parsing_started = False
+    for line in nicinfo:
+        if re.match(r'^-+', line):
+            parsing_started = True
+            continue
+        if not parsing_started or not line.strip():
+            continue
+
+        parts = re.split(r'\s{2,}', line.strip())
+        if len(parts) >= 5:
+            nic_name = parts[0]
+            nic_status = parts[4]  # "Link Status" este al 5-lea câmp
+            available_nics[nic_name] = nic_status
+
+    return available_nics
+
+def is_esxi():
+    return os.path.isdir("/etc/vmware")
+
+def fix_vswitch():
+    if is_esxi():
+        start_time = time.time()
+        while True:
+
+            current_vswitch, current_vmnic = get_current_vmnic_vswitch()
+            if current_vswitch is None:
+                raise RuntimeError("Panic: current vswitch is None")
+            if current_vmnic is None:
+                raise RuntimeError("Panic: current vmnic is None")
+
+            available_nics = get_available_nics()
+
+            if current_vmnic and available_nics.get(current_vmnic) == 'Up':
+                break
+
+            new_vmnic = next((nic for nic, status in available_nics.items() if status == 'Up'), None)
+
+            if new_vmnic and new_vmnic != current_vmnic:
+                subprocess.check_call(['localcli', 'network', 'vswitch', 'standard', 'uplink', 'remove',
+                                       '--uplink-name', current_vmnic, '--vswitch-name', current_vswitch])
+                subprocess.check_call(['localcli', 'network', 'vswitch', 'standard', 'uplink', 'add',
+                                       '--uplink-name', new_vmnic, '--vswitch-name', current_vswitch])
+            elif not new_vmnic:
+                if time.time() - start_time > 300:
+                    break
+            time.sleep(5)
+
+        time.sleep(5)
+
 if __name__ == '__main__':
     data = None
+
+    if '-f' in sys.argv:
+        try:
+            fix_vswitch()
+        except Exception as e:
+            print(f"fix_vswitch() error: {e}")
+        sys.argv.remove('-f')
     usejson = False
     if '-j' in sys.argv:
         usejson = True
@@ -468,6 +553,7 @@ if __name__ == '__main__':
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
+
     client = HTTPSClient(usejson, errout=errout, phmac=phmac, checkonly=checkonly)
     if waitfor:
         status = 201
