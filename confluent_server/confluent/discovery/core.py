@@ -533,9 +533,14 @@ def register_remote_addrs(addresses, configmanager):
             sd = ssdp.check_fish(('/DeviceDescription.json', nd))
             if not sd:
                 return addr, False
-
-            sd['hwaddr'] = sd['attributes']['mac-address']
-            nh = xcc.NodeHandler(sd, configmanager)
+            if 'macaddress' in sd['attributes']:
+                sd['hwaddr'] = sd['attributes']['macaddress']
+            else:
+                sd['hwaddr'] = sd['attributes']['mac-address']
+            if 'lenovo-xcc3' in sd['services']:
+                nh = xcc3.NodeHandler(sd, configmanager)
+            elif 'lenovo-xcc' in sd['services']:
+                nh = xcc.NodeHandler(sd, configmanager)
             nh.scan()
             detected(nh.info)
         except Exception:
