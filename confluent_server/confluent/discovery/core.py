@@ -529,13 +529,17 @@ def register_remote_addrs(addresses, configmanager):
         nd = {
             'addresses': [(addr, 443)]
         }
-        sd = ssdp.check_fish(('/DeviceDescription.json', nd))
-        if not sd:
+        try:
+            sd = ssdp.check_fish(('/DeviceDescription.json', nd))
+            if not sd:
+                return addr, False
+
+            sd['hwaddr'] = sd['attributes']['mac-address']
+            nh = xcc.NodeHandler(sd, configmanager)
+            nh.scan()
+            detected(nh.info)
+        except Exception:
             return addr, False
-        sd['hwaddr'] = sd['attributes']['mac-address']
-        nh = xcc.NodeHandler(sd, configmanager)
-        nh.scan()
-        detected(nh.info)
         return addr, True
     rpool = eventlet.greenpool.GreenPool(512)
     for count in iterate_addrs(addresses, True):
