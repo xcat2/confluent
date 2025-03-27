@@ -39,14 +39,17 @@ def add_sensedata(component, sensedata, name=None):
         senseinfo['value'] = attrs['drawnCurr']
         senseinfo['units'] = 'A'
         sensedata.append(senseinfo)
+        senseinfo = {}
         senseinfo['name'] = 'PSU {} Input Current'.format(attrs['id'])
         senseinfo['value'] = attrs['inputCurr']
         senseinfo['units'] = 'A'
         sensedata.append(senseinfo)
+        senseinfo = {}
         senseinfo['name'] = 'PSU {} Output Voltage'.format(attrs['id'])
         senseinfo['value'] = attrs['volt']
         senseinfo['units'] = 'V'
         sensedata.append(senseinfo)
+        senseinfo = {}
     elif 'eqptPsuSlot' in component:
         attrs = component['eqptPsuSlot']['attributes']
         senseinfo['name'] = 'PSU Slot {}'.format(attrs['physId'])
@@ -55,7 +58,6 @@ def add_sensedata(component, sensedata, name=None):
         if attrs['operSt'] == 'empty':
             senseinfo['health'] = 'critical'
             senseinfo['states'] = 'Absent'
-        sensedata.append(senseinfo)
     if senseinfo:
         sensedata.append(senseinfo)
     for key in component:
