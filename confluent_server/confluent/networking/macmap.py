@@ -54,6 +54,7 @@ import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
 import confluent.noderange as noderange
+import confluent.networking.nxapi as nxapi
 import confluent.util as util
 from eventlet.greenpool import GreenPool
 import eventlet.green.subprocess as subprocess
@@ -151,19 +152,54 @@ def _nodelookup(switch, ifname):
             return _switchportmap[switch][portdesc]
     return None
 
-
-def _affluent_map_switch(args):
+_fastbackends = {}
+def _fast_map_switch(args):
     switch, password, user, cfgm = args
+    macdata = None
+    backend = _fastbackends.get(switch, None)
     kv = util.TLSCertVerifier(cfgm, switch,
-                                  'pubkeys.tls_hardwaremanager').verify_cert
-    wc =  webclient.SecureHTTPConnection(
-                switch, 443, verifycallback=kv, timeout=5)
-    wc.set_basic_credentials(user, password)
-    macs, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
-    if retcode != 200:
-        raise Exception("No affluent detected")
-    _macsbyswitch[switch] = macs
+                              'pubkeys.tls_hardwaremanager').verify_cert
+    if not backend:
+        wc =  webclient.SecureHTTPConnection(
+            switch, 443, verifycallback=kv, timeout=5)
+        wc.set_basic_credentials(user, password)
+        macdata, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
+        if retcode == 200:
+            _fastbackends[switch] = 'affluent'
+        else:
+            apicheck, retcode = wc.grab_json_response_with_status('/api/')
+            if retcode == 400:
+                if apicheck.startswith(b'{"imdata":['):
+                    _fastbackends[switch] = 'nxapi'
+    backend = _fastbackends.get(switch, None)
+    if backend == 'affluent':
+        return _affluent_map_switch(switch, password, user, cfgm, macdata)
+    elif backend == 'nxapi':
+        return _nxapi_map_switch(switch, password, user, cfgm)
+    raise Exception("No fast backend match")
 
+def _nxapi_map_switch(switch, password, user, cfgm):
+        cli = nxapi.NxApiClient(switch, user, password, cfgm)
+        mt = cli.get_mac_table()
+        _macsbyswitch[switch] = mt
+        _fast_backend_fixup(mt, switch)
+
+
+
+def _affluent_map_switch(switch, password, user, cfgm, macs):
+    if not macs:
+        kv = util.TLSCertVerifier(cfgm, switch,
+                                    'pubkeys.tls_hardwaremanager').verify_cert
+        wc =  webclient.SecureHTTPConnection(
+                    switch, 443, verifycallback=kv, timeout=5)
+        wc.set_basic_credentials(user, password)
+        macs, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
+        if retcode != 200:
+            raise Exception("No affluent detected")
+    _macsbyswitch[switch] = macs
+    _fast_backend_fixup(macs, switch)
+
+def _fast_backend_fixup(macs, switch):
     for iface in macs:
         nummacs = len(macs[iface])
         for mac in macs[iface]:
@@ -267,13 +303,13 @@ def _map_switch_backend(args):
         user = None
     if switch not in noaffluent:
         try:
-            return _affluent_map_switch(args)
+            return _fast_map_switch(args)
         except exc.PubkeyInvalid:
             log.log({'error': 'While trying to gather ethernet mac addresses '
                               'from {0}, the TLS certificate failed validation. '
                               'Clear pubkeys.tls_hardwaremanager if this was '
                               'expected due to reinstall or new certificate'.format(switch)})
-        except Exception:
+        except Exception as e:
             pass
     mactobridge, ifnamemap, bridgetoifmap = _offload_map_switch(
         switch, password, user)

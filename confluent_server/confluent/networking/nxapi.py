@@ -82,6 +82,11 @@ class NxApiClient:
             cv = lambda x: True
         self.user = user
         self.password = password
+        try:
+            self.user = self.user.decode()
+            self.password = self.password.decode()
+        except Exception:
+            pass
         self.wc = webclient.SecureHTTPConnection(switch, port=443, verifycallback=cv)
         self.login()
 
@@ -182,6 +187,7 @@ class NxApiClient:
             mactable = macinfo['l2MacAddressTable']['children']
             for macent in mactable:
                 mace = macent['l2MacAddressEntry']['attributes']
+                mace['macAddress'] = mace['macAddress'].lower()
                 if mace['port'] in macdict:
                     macdict[mace['port']].append(mace['macAddress'])
                 else:
