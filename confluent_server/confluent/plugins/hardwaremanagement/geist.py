@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pyghmi.util.webclient as wc
+
 import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
 import eventlet.green.time as time
 import eventlet
 import eventlet.greenpool as greenpool
+wc = eventlet.import_patched('pyghmi.util.webclient')
 
 
 

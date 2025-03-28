@@ -18,12 +18,13 @@ import confluent.messages as msg
 import confluent.exceptions as exc
 import eventlet
 import eventlet.green.socket as socket
-import pyghmi.util.webclient as wc
+wc = eventlet.import_patched('pyghmi.util.webclient')
 import confluent.util as util
 import re
 import hashlib
 import json
 import time
+
 
 def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-').replace(

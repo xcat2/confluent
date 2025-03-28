@@ -1,8 +1,8 @@
 
-import pyghmi.util.webclient as webclient
 import confluent.util as util
 import time
-from pprint import pprint
+import eventlet
+webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 _healthmap = {
     'normal': 'ok',
@@ -222,6 +222,7 @@ class NxApiClient:
 if __name__ == '__main__':
     import sys
     import os
+    from pprint import pprint
     myuser = os.environ['SWITCHUSER']
     mypass = os.environ['SWITCHPASS']
     na = NxApiClient(sys.argv[1], myuser, mypass, None)

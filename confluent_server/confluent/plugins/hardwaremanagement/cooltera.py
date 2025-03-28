@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from xml.etree.ElementTree import fromstring as rfromstring
-import pyghmi.util.webclient as wc
 import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
@@ -21,6 +20,7 @@ import eventlet.green.time as time
 import eventlet.green.socket as socket
 import eventlet.greenpool as greenpool
 import eventlet
+wc = eventlet.import_patched('pyghmi.util.webclient')
 try:
     import Cookie
     httplib = eventlet.import_patched('httplib')

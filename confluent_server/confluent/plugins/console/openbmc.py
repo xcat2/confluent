@@ -25,9 +25,9 @@ import confluent.log as log
 import confluent.util as util
 import pyghmi.exceptions as pygexc
 import pyghmi.redfish.command as rcmd
-import pyghmi.util.webclient as webclient
 import eventlet
 import eventlet.green.ssl as ssl
+webclient = eventlet.import_patched('pyghmi.util.webclient')
 try:
     websocket = eventlet.import_patched('websocket')
     wso = websocket.WebSocket
