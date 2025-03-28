@@ -62,7 +62,7 @@ def add_sensedata(component, sensedata, name=None):
         senseinfo['states'] = ['Present']
         if attrs['operSt'] == 'empty':
             senseinfo['health'] = 'critical'
-            senseinfo['states'] = 'Absent'
+            senseinfo['states'] = ['Absent']
     if senseinfo:
         sensedata.append(senseinfo)
     for key in component:
