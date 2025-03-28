@@ -20,7 +20,10 @@ def add_sensedata(component, sensedata, name=None):
         if units == 'Celsius':
             units = '°C'
         senseinfo['units'] = units
-        senseinfo['health'] = _healthmap.get(attrs['operSt'], attrs['operSt'])
+        senseinfo['health'] = _healthmap.get(attrs['operSt'], 'unknown')
+        if senseinfo['health'] == 'unknown':
+            print(senseinfo['health'] + ' not recognized')
+            senseinfo['health'] = 'critical'
     elif 'eqptFtSlot' in component:
         attrs = component['eqptFtSlot']['attributes']
         name = '{} {}'.format(attrs['descr'], attrs['physId'])
@@ -52,6 +55,8 @@ def add_sensedata(component, sensedata, name=None):
         senseinfo = {}
     elif 'eqptPsuSlot' in component:
         attrs = component['eqptPsuSlot']['attributes']
+        senseinfo['value'] = None
+        senseinfo['units'] = None
         senseinfo['name'] = 'PSU Slot {}'.format(attrs['physId'])
         senseinfo['health'] = 'ok'
         senseinfo['states'] = ['Present']
@@ -64,10 +69,6 @@ def add_sensedata(component, sensedata, name=None):
         if 'children' in component[key]:
             for child in component[key]['children']:
                 add_sensedata(child, sensedata, name)
-
-
-
-
 
 
 class NxApiClient:
@@ -104,19 +105,6 @@ class NxApiClient:
             firmdata['BIOS'] = {'version': attrs['biosVersion'], 'date': attrs['biosCompileTime']}
         return firmdata
 
-
-
-    def get_serial(self):
-        for imdata in self.grab_imdata('/api/mo/sys/ch.json'):
-            for keyn in imdata:
-                currinfo = imdata[keyn]
-                model = currinfo.get('model', 'Unknown')
-                serial = currinfo.get('ser', 'Unknown')
-                modelname = currinfo.get('descr', 'Uknonwn')
-
-        self.wc.grab_json_response_with_status('/api/mo/sys.json')
-        rsp['imdata'][0]['topSystem']['attributes'][serial]
-
     def get_sensors(self):
         sensedata = []
         for imdata in self.grab_imdata('/api/mo/sys/ch.json?rsp-subtree=full'):
@@ -124,6 +112,18 @@ class NxApiClient:
             for component in hwinfo:
                 add_sensedata(component, sensedata)
         return sensedata
+
+    def get_health(self):
+        healthdata = {'health': 'ok', 'sensors': []}
+        for sensor in self.get_sensors():
+            currhealth = sensor.get('health', 'ok')
+            if currhealth != 'ok':
+                healthdata['sensors'].append(sensor)
+                if sensor['health'] == 'critical':
+                    healthdata['health'] = 'critical'
+                elif sensor['health'] == 'warning' and healthdata['health'] != 'critical':
+                    healthdata['health'] = 'warning'
+        return healthdata
 
     def get_inventory(self):
         invdata = []
@@ -154,11 +154,6 @@ class NxApiClient:
                             }
                     invdata.append(invinfo)
         return invdata
-
-
-
-
-
 
     def grab(self, url, cache=True, retry=True):
         if cache is True:
