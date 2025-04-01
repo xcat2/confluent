@@ -77,12 +77,14 @@ cd ..
 cp -a esxi7out esxi6out
 cp -a esxi7 esxi6
 cp -a esxi7out esxi8out
+cp -a esxi7out esxi9out
 cp -a esxi7 esxi8
+cp -a esxi7 esxi9
 
 %install
 mkdir -p %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
 cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
-for os in rhvh4 el7 el8 el9 el10 genesis suse15 ubuntu20.04 ubuntu18.04 ubuntu22.04 ubuntu24.04 esxi6 esxi7 esxi8 coreos; do
+for os in rhvh4 el7 el8 el9 el10 genesis suse15 ubuntu20.04 ubuntu18.04 ubuntu22.04 ubuntu24.04 esxi6 esxi7 esxi8 esxi9 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/profiles
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs
