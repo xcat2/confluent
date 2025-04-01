@@ -43,7 +43,7 @@ if __name__ == '__main__':
     import confluent.snmputil as snmp
 
 
-from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
+from confluent.networking.lldp import detect_backend, _handle_neighbor_query, get_fingerprint
 from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
 import eventlet.green.select as select
 
@@ -157,7 +157,7 @@ def _fast_map_switch(args):
     macdata = None
     kv = util.TLSCertVerifier(cfgm, switch,
                               'pubkeys.tls_hardwaremanager').verify_cert
-    backend = lldp.detect_backend(switch, kv)
+    backend = detect_backend(switch, kv)
     if backend == 'affluent':
         return _affluent_map_switch(switch, password, user, cfgm, macdata)
     elif backend == 'nxapi':
