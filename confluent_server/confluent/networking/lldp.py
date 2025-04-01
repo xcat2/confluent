@@ -34,6 +34,7 @@ if __name__ == '__main__':
     import sys
     import confluent.config.configmanager as cfm
 import base64
+import confluent.networking.nxapi as nxapi
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -174,11 +175,54 @@ def _init_lldp(data, iname, idx, idxtoportid, switch):
         data[iname] = {'port': iname, 'portid': str(idxtoportid[idx]),
                        'chassisid': _chassisidbyswitch[switch]}
 
-def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata):
+_fastbackends = {}
+def detect_backend(switch, verifier)
+        backend = _fastbackends.get(switch, None)
+        if backend:
+            return backend
+        wc =  webclient.SecureHTTPConnection(
+            switch, 443, verifycallback=verifier, timeout=5)
+        wc.set_basic_credentials(user, password)
+        apicheck, retcode = wc.grab_json_response_with_status('/affluent/')
+        if retcode == 401 and apicheck == b'{}':
+            _fastbackends[switch] = 'affluent'
+        else:
+            apicheck, retcode = wc.grab_json_response_with_status('/api/')
+            if retcode == 400 and apicheck.startswith(b'{"imdata":['):
+                    _fastbackends[switch] = 'nxapi'
+        return _fastbackends.get(switch, None)
+
+def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
     kv = util.TLSCertVerifier(cfm, switch,
                                   'pubkeys.tls_hardwaremanager').verify_cert
+    backend = detect_backend(switch, kv)
+    if not backend:
+        raise Exception("No HTTPS backend identified")
     wc =  webclient.SecureHTTPConnection(
                 switch, 443, verifycallback=kv, timeout=5)
+    if backend == 'affluent':
+        return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
+    elif backend == 'nxapi':
+        return _nxapi_map_switch(switch, password, user, cfgm)
+
+
+
+def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
+    cli = nxapi.NxApiClient(switch, user, password, cfm)
+    lldipinfo = cli.get_lldp()
+    for port in lldpinfo:
+        portdata = lldpinfo[port]
+        peerid = '{0}.{1}'.format(
+            portdata.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
+            portdata.get('peerportid', '').replace(':', '-').replace('/', '-'),
+        )
+        _extract_extended_desc(portdata, portdata['peerdescription'], True)
+
+
+        mt = cli.get_mac_table()
+        _macsbyswitch[switch] = mt
+        _fast_backend_fixup(mt, switch)
+def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     wc.set_basic_credentials(user, password)
     neighdata = wc.grab_json_response('/affluent/lldp/all')
     chassisid = neighdata['chassis']['id']
@@ -219,7 +263,7 @@ def _extract_neighbor_data_b(args):
         return
     lldpdata = {'!!vintage': now}
     try:
-        return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata)
+        return _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
     except Exception:
         pass
     conn = snmp.Session(switch, password, user)

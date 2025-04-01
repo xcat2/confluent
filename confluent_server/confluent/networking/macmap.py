@@ -152,26 +152,12 @@ def _nodelookup(switch, ifname):
             return _switchportmap[switch][portdesc]
     return None
 
-_fastbackends = {}
 def _fast_map_switch(args):
     switch, password, user, cfgm = args
     macdata = None
-    backend = _fastbackends.get(switch, None)
     kv = util.TLSCertVerifier(cfgm, switch,
                               'pubkeys.tls_hardwaremanager').verify_cert
-    if not backend:
-        wc =  webclient.SecureHTTPConnection(
-            switch, 443, verifycallback=kv, timeout=5)
-        wc.set_basic_credentials(user, password)
-        macdata, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
-        if retcode == 200:
-            _fastbackends[switch] = 'affluent'
-        else:
-            apicheck, retcode = wc.grab_json_response_with_status('/api/')
-            if retcode == 400:
-                if apicheck.startswith(b'{"imdata":['):
-                    _fastbackends[switch] = 'nxapi'
-    backend = _fastbackends.get(switch, None)
+    backend = lldp.detect_backend(switch, kv)
     if backend == 'affluent':
         return _affluent_map_switch(switch, password, user, cfgm, macdata)
     elif backend == 'nxapi':

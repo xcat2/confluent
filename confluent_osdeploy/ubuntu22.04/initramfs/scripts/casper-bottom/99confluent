@@ -28,7 +28,15 @@ if [ -e /tmp/cnflnthmackeytmp ]; then
     DEVICE=$(cat /tmp/autodetectnic)
     IP=done
 else
+    APIKEY=
     chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
+    APIKEY=$(cat /root/custom-installation/confluent.apikey)
+    while [ -z "$APIKEY" ]; do
+	echo "Failure trying to get confluent node token registered, check nodedeploy status, retrying in 5 seconds..."
+        sleep 5
+        chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
+        APIKEY=$(cat /root/custom-installation/confluent.apikey)
+    done
     MGR=[$MGR]
     nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
     nic=$(ip link |grep ^$nic:|awk '{print $2}')
