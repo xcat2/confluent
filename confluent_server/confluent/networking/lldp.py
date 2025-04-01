@@ -182,14 +182,13 @@ def detect_backend(switch, verifier):
             return backend
         wc =  webclient.SecureHTTPConnection(
             switch, 443, verifycallback=verifier, timeout=5)
-        wc.set_basic_credentials(user, password)
         apicheck, retcode = wc.grab_json_response_with_status('/affluent/')
-        if retcode == 401 and apicheck == b'{}':
+        if retcode == 401 and apicheck.startswith(b'{}'):
             _fastbackends[switch] = 'affluent'
         else:
             apicheck, retcode = wc.grab_json_response_with_status('/api/')
             if retcode == 400 and apicheck.startswith(b'{"imdata":['):
-                    _fastbackends[switch] = 'nxapi'
+                _fastbackends[switch] = 'nxapi'
         return _fastbackends.get(switch, None)
 
 def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
@@ -203,19 +202,20 @@ def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
     if backend == 'affluent':
         return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
     elif backend == 'nxapi':
-        return _nxapi_map_switch(switch, password, user, cfgm)
+        return _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc)
 
 
 
 def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
     cli = nxapi.NxApiClient(switch, user, password, cfm)
-    lldipinfo = cli.get_lldp()
+    lldpinfo = cli.get_lldp()
     for port in lldpinfo:
         portdata = lldpinfo[port]
         peerid = '{0}.{1}'.format(
             portdata.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
             portdata.get('peerportid', '').replace(':', '-').replace('/', '-'),
         )
+        portdata['peerid'] = peerid
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
         _neighbypeerid[peerid] = portdata
         lldpdata[port] = portdata
@@ -263,7 +263,7 @@ def _extract_neighbor_data_b(args):
     lldpdata = {'!!vintage': now}
     try:
         return _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
-    except Exception:
+    except Exception as e:
         pass
     conn = snmp.Session(switch, password, user)
     sid = None
