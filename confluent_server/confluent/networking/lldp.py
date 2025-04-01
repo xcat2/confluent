@@ -176,7 +176,7 @@ def _init_lldp(data, iname, idx, idxtoportid, switch):
                        'chassisid': _chassisidbyswitch[switch]}
 
 _fastbackends = {}
-def detect_backend(switch, verifier)
+def detect_backend(switch, verifier):
         backend = _fastbackends.get(switch, None)
         if backend:
             return backend
@@ -217,11 +217,10 @@ def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
             portdata.get('peerportid', '').replace(':', '-').replace('/', '-'),
         )
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
+        _neighbypeerid[peerid] = portdata
+        lldpdata[port] = portdata
+    _neighdata[switch] = lldpdata
 
-
-        mt = cli.get_mac_table()
-        _macsbyswitch[switch] = mt
-        _fast_backend_fixup(mt, switch)
 def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     wc.set_basic_credentials(user, password)
     neighdata = wc.grab_json_response('/affluent/lldp/all')
@@ -248,7 +247,7 @@ def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
         _neighbypeerid[peerid] = portdata
         lldpdata[localport] = portdata
-    neighdata[switch] = lldpdata
+    _neighdata[switch] = lldpdata
 
 
 def _extract_neighbor_data_b(args):
