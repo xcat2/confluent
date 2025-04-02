@@ -499,6 +499,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"fix_vswitch() error: {e}")
         sys.argv.remove('-f')
+        sys.exit(0)
     usejson = False
     if '-j' in sys.argv:
         usejson = True
