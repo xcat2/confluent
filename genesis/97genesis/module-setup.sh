@@ -6,7 +6,9 @@ check() {
 }
 install() {
         . $moddir/install-base
-        #. $moddir/install-gui
+	if [ -x /usr/bin/sway ]; then
+            . $moddir/install-gui
+	fi
 
         if [ -d /usr/lib64/python3.13/ ]; then
             . $moddir/install-python313
