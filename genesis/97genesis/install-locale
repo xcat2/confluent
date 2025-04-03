@@ -1,0 +1,14 @@
+dracut_install /usr/lib/locale/en_US.utf8/LC_ADDRESS
+dracut_install /usr/lib/locale/en_US.utf8/LC_COLLATE
+dracut_install /usr/lib/locale/en_US.utf8/LC_CTYPE
+dracut_install /usr/lib/locale/en_US.utf8/LC_IDENTIFICATION
+dracut_install /usr/lib/locale/en_US.utf8/LC_MEASUREMENT
+dracut_install /usr/lib/locale/en_US.utf8/LC_MESSAGES
+dracut_install /usr/lib/locale/en_US.utf8/LC_MESSAGES/SYS_LC_MESSAGES
+dracut_install /usr/lib/locale/en_US.utf8/LC_MONETARY
+dracut_install /usr/lib/locale/en_US.utf8/LC_NAME
+dracut_install /usr/lib/locale/en_US.utf8/LC_NUMERIC
+dracut_install /usr/lib/locale/en_US.utf8/LC_PAPER
+dracut_install /usr/lib/locale/en_US.utf8/LC_TELEPHONE
+dracut_install /usr/lib/locale/en_US.utf8/LC_TIME
+dracut_install /usr/share/locale/locale.alias
