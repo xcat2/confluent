@@ -1,3 +1,7 @@
+if [ -e /usr/lib/locale/locale-archive ]; then
+    dracut_install /usr/lib/locale/locale-archive
+fi
+if [ -d /usr/lib/locale/en_US.utf8 ]; then
 dracut_install /usr/lib/locale/en_US.utf8/LC_ADDRESS
 dracut_install /usr/lib/locale/en_US.utf8/LC_COLLATE
 dracut_install /usr/lib/locale/en_US.utf8/LC_CTYPE
@@ -12,3 +16,4 @@ dracut_install /usr/lib/locale/en_US.utf8/LC_PAPER
 dracut_install /usr/lib/locale/en_US.utf8/LC_TELEPHONE
 dracut_install /usr/lib/locale/en_US.utf8/LC_TIME
 dracut_install /usr/share/locale/locale.alias
+fi
