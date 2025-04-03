@@ -1,0 +1,10 @@
+dracut_install /usr/bin/sway /usr/bin/foot
+dracut_install swaynag swaymsg
+cp -a /etc/sway $initdir/etc/sway
+cp -a /usr/share/X11 $initdir/usr/share/X11
+cp -a /usr/share/fonts $initdir/usr/share/fonts
+dracut_install /usr/share/glvnd/egl_vendor.d/50_mesa.json
+dracut_install seatd seatd-launch
+if [ -e /usr/lib/sysusers.d/seatd.conf ]; then
+	dracut_install /usr/lib/sysusers.d/seatd.conf
+fi
