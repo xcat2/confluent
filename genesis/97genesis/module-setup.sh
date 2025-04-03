@@ -10,6 +10,7 @@ install() {
             . $moddir/install-gui
 	fi
 
+        . $moddir/install-locale
         if [ -d /usr/lib64/python3.13/ ]; then
             . $moddir/install-python313
         elif [ -d /usr/lib64/python3.9/ ]; then
