@@ -1,6 +1,11 @@
 #!/bin/sh
+if [ -d /usr/lib/x86_64-linux-gnu ]; then # Debian style
+	IMPLIBDIR=lib/x86_64-linux-gnu
+else
+	IMPLIBDIR=lib64
+fi
 dracut_install mktemp
-dracut_install /lib64/libtss2-tcti-device.so.0
+dracut_install /$IMPLIBDIR/libtss2-tcti-device.so.0
 dracut_install tpm2_create tpm2_pcrread tpm2_createpolicy tpm2_createprimary
 dracut_install tpm2_load tpm2_unseal tpm2_getcap tpm2_evictcontrol
 dracut_install tpm2_pcrextend tpm2_policypcr tpm2_flushcontext tpm2_startauthsession
@@ -11,12 +16,12 @@ dracut_install ssh sshd vi reboot lspci parted tmux mkfs mkfs.ext4 mkfs.xfs xfs_
 dracut_install /usr/libexec/openssh/sftp-server
 dracut_install efibootmgr
 dracut_install du df ssh-keygen scp clear dhclient lldpd lldpcli tee
-dracut_install /lib64/libnss_dns.so.2 /lib64/libnss_dns.so.2 /lib64/libnss_myhostname.so.2
-dracut_install ldd uptime /usr/lib64/libnl-3.so.200
+dracut_install /$IMPLIBDIR/libnss_dns.so.2 /$IMPLIBDIR/libnss_dns.so.2 /$IMPLIBDIR/libnss_myhostname.so.2
+dracut_install ldd uptime /usr/$IMPLIBDIR/libnl-3.so.200
 dracut_install poweroff date /etc/nsswitch.conf /etc/services /etc/protocols
 dracut_install  /usr/share/terminfo/x/xterm /usr/share/terminfo/l/linux /usr/share/terminfo/v/vt100 /usr/share/terminfo/x/xterm-color /usr/share/terminfo/s/screen /usr/share/terminfo/x/xterm-256color /usr/share/terminfo/p/putty-256color /usr/share/terminfo/p/putty /usr/share/terminfo/d/dumb
 dracut_install chmod whoami head tail basename /etc/redhat-release ping tr /usr/share/hwdata/usb.ids
-dracut_install dmidecode /usr/lib64/libstdc++.so.6
+dracut_install dmidecode /usr/$IMPLIBDIR/libstdc++.so.6
 dracut_install ps free find
 inst /bin/bash /bin/sh
 #inst_hook cmdline 10 $moddir/cmdline.sh # moved to addons.cpio
@@ -28,7 +33,7 @@ dracut_install /usr/lib/udev/rules.d/10-dm.rules /usr/sbin/dmsetup /usr/lib/udev
 #dracut_install opainfo
 #dracut_install /usr/lib/opa-fm/bin/opafmd
 #dracut_install /usr/sbin/opensm /usr/libexec/opensm-launch
-dracut_install /usr/lib64/libibverbs/libhfi1verbs-rdmav34.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/lib64/libibverbs/libmlx4-rdmav34.so /usr/lib64/libibverbs/libmlx5-rdmav34.so
+dracut_install /usr/$IMPLIBDIR/libibverbs/libhfi1verbs-rdmav34.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/$IMPLIBDIR/libibverbs/libmlx4-rdmav34.so /usr/$IMPLIBDIR/libibverbs/libmlx5-rdmav34.so
 if [ -x /usr/libexec/openssh/sshd-session ]; then
     dracut_install /usr/libexec/openssh/sshd-session
 fi
