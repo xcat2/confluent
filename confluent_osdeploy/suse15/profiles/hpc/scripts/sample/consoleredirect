@@ -1,15 +1,11 @@
 is_suse=false
-is_rhel=false
 
-if test -f /boot/efi/EFI/redhat/grub.cfg; then
-    grubcfg="/etc/default/grub"
-    is_rhel=true
-elif test -f /boot/efi/EFI/sle_hpc/grub.cfg; then
+if test -f /boot/efi/EFI/sle_hpc/grub.cfg; then
     grubcfg="/boot/efi/EFI/sle_hpc/grub.cfg"
     grub2-mkconfig -o $grubcfg
     is_suse=true
 else
-    echo "Expected File missing: Check if os sle_hpc or redhat"
+    echo "Expected File missing: Check if os sle_hpc"
     exit
 fi
 
@@ -40,10 +36,4 @@ if $is_suse; then
         sed -i "${line_num},^,#," $grubcfg
     done
     sed -i 's,^terminal,#terminal,' $grubcfg
-fi
-
-# Working on Redhat
-if $is_rhel; then
-    sed -i '/^GRUB_TERMINAL/s/serial //' $grubcfg
-    grub2-mkconfig -o /boot/grub2/grub.cfg
 fi

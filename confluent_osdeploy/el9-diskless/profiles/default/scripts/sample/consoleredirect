@@ -1,0 +1,15 @@
+is_rhel=false
+
+if test -f /boot/efi/EFI/redhat/grub.cfg; then
+    grubcfg="/etc/default/grub"
+    is_rhel=true
+else
+    echo "Expected File missing: Check if os redhat"
+    exit
+fi
+
+# Working on Redhat
+if $is_rhel; then
+    sed -i '/^GRUB_TERMINAL/s/serial //' $grubcfg
+    grub2-mkconfig -o /boot/grub2/grub.cfg
+fi
