@@ -1,4 +1,8 @@
 #!/bin/sh
+if grep Ubuntu /etc/os-release > /dev/null; then # must include specific drivers
+    instmods hid usbhid hid_generic xhci_pci xhci_pci_renesas
+    instmods virtio_gpu ast bochs dmi_sysfs
+fi
 instmods virtio_net
 instmods e1000 e1000e igb sfc mlx5_ib mlx5_core mlx4_en cxgb3 cxgb4 tg3 bnx2 bnx2x bna ixgb ixgbe qlge mptsas mpt2sas mpt3sas megaraid_sas ahci xhci-hcd sd_mod pmcraid be2net vfat ext3 ext4 usb_storage scsi_wait_scan ipmi_si ipmi_devintf qlcnic xfs
 instmods nvme
