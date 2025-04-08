@@ -55,8 +55,8 @@ def retrieve(nodes, element, configmanager, inputdata):
         while gp.running():
             try:
                 nrsp = rspq.get(timeout=0.1)
-            if nrsp is not None and not isinstance(nrsp, TaskDone):
-                yield nrsp
+                if nrsp is not None and not isinstance(nrsp, TaskDone):
+                    yield nrsp
             except queue.Empty:
                 continue
         while not rspq.empty():
