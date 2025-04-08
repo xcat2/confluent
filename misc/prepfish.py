@@ -285,6 +285,7 @@ def store_redfish_cert(bmc):
             certout.write(peercert)
 
 def main():
+    get_redfish_fingerprint()
     bmcuser, bmcpass = get_redfish_creds()
     bmc = enable_host_interface()
     store_redfish_cert(bmc)
