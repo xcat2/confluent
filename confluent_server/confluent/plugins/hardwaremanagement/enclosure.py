@@ -59,9 +59,12 @@ def update(nodes, element, configmanager, inputdata):
     for encmgr in baysbyencmgr:
         gp.spawn_n(reseat_bays, encmgr, baysbyencmgr[encmgr], configmanager, rspq)
     while gp.running():
-        nrsp = rspq.get()
-        if nrsp is not None:
-            yield nrsp
+        try:
+            nrsp = rspq.get(timeout=0.1)
+            if nrsp is not None:
+                yield nrsp
+        except queue.Empty:
+            continue
     while not rspq.empty():
         nrsp = rspq.get()
         if nrsp is not None:
