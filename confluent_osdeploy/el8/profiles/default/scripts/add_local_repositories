@@ -42,7 +42,7 @@ try:
 except AttributeError:
     f = cStringIO.StringIO(cfgdata)
     c.readfp(f)
-gpgkeys = glob.glob('/etc/pki/rpm-gpg/RPM-GG-KEY-*')
+gpgkeys = glob.glob('/etc/pki/rpm-gpg/RPM-GPG-KEY-*')
 for sec in c.sections():
     if sec.startswith('variant-'):
         try:
