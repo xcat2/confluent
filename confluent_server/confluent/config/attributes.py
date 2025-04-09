@@ -265,8 +265,7 @@ node = {
     },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
-                        'and identified nodes. Valid values are "manual", '
-                        '"permissive", or "open". "manual" means nodes are '
+                        'and identified nodes. "manual" means nodes are '
                         'detected, but not autoconfigured until a user '
                         'approves. "permissive" indicates to allow discovery, '
                         'so long as the node has no existing public key. '
@@ -361,9 +360,8 @@ node = {
 #                        'to suppress serial console configuration')
 #    },
     'console.logging': {
-        'description': ('Indicate logging level to apply to console.  Valid '
-                        'values are currently "full", "interactive", "memory", and '
-                        '"none". Defaults to "full".'),
+        'description': ('Indicate logging level to apply to console. '
+                        'Defaults to "full".'),
         'validvalues': ('full', 'memory', 'interactive', 'none'),
     },
     'console.method': {
