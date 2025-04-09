@@ -33,6 +33,8 @@ def reseat_bays(encmgr, bays, configmanager, rspq):
                 rspq.put(msg.ConfluentNodeError(node, str(uf)))
             except exc.TargetEndpointUnreachable as uf:
                 rspq.put(msg.ConfluentNodeError(node, str(uf)))
+            except Exception as e:
+                rspq.put(msg.ConfluentNodeError(node, str(e)))
     finally:
         rspq.put(None)
 
