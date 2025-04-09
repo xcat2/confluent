@@ -1060,7 +1060,7 @@ class InputReseatMessage(ConfluentInputMessage):
     keyname = 'reseat'
 
     def is_valid_key(self, key):
-        return key in self.valid_values or isinstance(key, int)
+        return key in self.valid_values or isinstance(key, int) or len(key) < 4
 
 
 class InputBMCReset(ConfluentInputMessage):

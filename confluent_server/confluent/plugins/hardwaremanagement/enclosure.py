@@ -27,7 +27,7 @@ def reseat_bays(encmgr, bays, configmanager, rspq):
                 for rsp in core.handle_path(
                         '/nodes/{0}/_enclosure/reseat_bay'.format(encmgr),
                         'update', configmanager,
-                        inputdata={'reseat': int(encbay)}):
+                        inputdata={'reseat': encbay}):
                     rspq.put(rsp)
             except pygexc.UnsupportedFunctionality as uf:
                 rspq.put(msg.ConfluentNodeError(node, str(uf)))
