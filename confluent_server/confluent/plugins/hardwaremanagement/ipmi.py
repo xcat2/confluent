@@ -55,6 +55,15 @@ def get_dns_txt(qstring):
     return eventlet.support.greendns.resolver.query(
         qstring, 'TXT')[0].strings[0].replace('i=', '')
 
+def match_aliases(first, second):
+    aliases = {
+        ('bmc', 'xcc')
+        }
+    for alias in aliases:
+        if first in alias and second in alias:
+            return True
+    return False
+
 def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     fqpi = '{0}.{1}.{2}.{3}'.format(subdevice, subvendor, device, vendor)
     if fqpi in pci_cache:
@@ -960,7 +969,8 @@ class IpmiHandler(object):
             complist = () if component == 'all' else (component,)
             for id, data in self.ipmicmd.get_firmware(complist):
                 if (component in ('core', 'all') or
-                        component == simplify_name(id)):
+                        component == simplify_name(id) or
+                        match_aliases(component, simplify_name(id))):
                     items.append({id: data})
         except ssl.SSLEOFError:
             errorneeded = msg.ConfluentNodeError(
