@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2016-2017 Lenovo
@@ -42,6 +42,8 @@ def run():
         usage="Usage: %prog [options] noderange")
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of commands to run at a time')
+    argparser.add_option('-o', '--origname', action='store_true',
+                         help='Use original nodename in print out even if substituted')
     argparser.add_option('-s', '--substitutename',
                          help='Use a different name other than the nodename for ping, with {}, it is the entire name evaluated as an expression, otherwise it is used as a suffix')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
@@ -83,7 +85,10 @@ def run():
             cmdv = ['ping', '-c', '1', '-W', '1', pingnode]
             if currprocs < concurrentprocs:
                 currprocs += 1
-                run_cmdv(pingnode, cmdv, all, pipedesc)
+                if options.origname:
+                    run_cmdv(node, cmdv, all, pipedesc)
+                else:
+                    run_cmdv(pingnode, cmdv, all, pipedesc)
             else:
                 pendingexecs.append((pingnode, cmdv))
     if not all or exitcode:
