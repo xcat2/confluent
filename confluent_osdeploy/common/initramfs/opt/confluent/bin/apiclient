@@ -91,8 +91,11 @@ def scan_confluents():
                 confluentuuid = line.split(': ')[1]
                 msg += '/confluentuuid=' + confluentuuid
                 break
-    with open('/sys/devices/virtual/dmi/id/product_uuid') as uuidin:
-        msg += '/uuid=' + uuidin.read().strip()
+    try:
+        with open('/sys/devices/virtual/dmi/id/product_uuid') as uuidin:
+            msg += '/uuid=' + uuidin.read().strip()
+    except Exception:
+        pass
     for addrf in glob.glob('/sys/class/net/*/address'):
         with open(addrf) as addrin:
             hwaddr = addrin.read().strip()
