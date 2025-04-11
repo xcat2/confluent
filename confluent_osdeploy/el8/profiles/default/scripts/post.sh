@@ -34,6 +34,11 @@ run_remote_python add_local_repositories
 # run_remote_python will use the appropriate python interpreter path to run the specified script
 # A post.custom is provided to more conveniently hold customizations, see the post.custom file.
 
+# This will do some serial console fixup for bad grub configuration when serial is firmware
+# managed. See script for details
+run_remote_python autoconsole
+
+
 # This will induce server side processing of the syncfile contents if
 # present
 run_remote_python syncfileclient
