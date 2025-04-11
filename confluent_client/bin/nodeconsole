@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import optparse
 import os
 import subprocess
@@ -46,6 +47,8 @@ argparser.add_option('-l', '--log', action='store_true', default=False,
 argparser.add_option('-T', '--Timestamp', action='store_true', default=False,
                      help= 'Dump log in stdout with timestamps')
 
+argparser.add_option('-s', '--screenshot', action='store_true', default=False,
+                     help='Attempt to grab screenshot and render using kitty image protocol')
 argparser.add_option('-w','--windowed', action='store_true', default=False,
                      help='Open terminal windows for each node.  The '
                           'environment variable NODECONSOLE_WINDOWED_COMMAND '
@@ -68,6 +71,16 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'default.')
 
 (options, args) = argparser.parse_args()
+
+def kitty_draw(data):
+    while data:
+        chunk, data = data[:4096], data[4096:]
+        m = 1 if data else 0
+        sys.stdout.write('\x1b_Ga=T,f=100,m={};'.format(m))
+        sys.stdout.write(chunk.decode('utf8'))
+        sys.stdout.write('\x1b\\')
+        sys.stdout.flush()
+    sys.stdout.write('\n')
 
 pass_through_args = []
 killcon = False
@@ -104,6 +117,16 @@ if options.Timestamp:
         sys.stderr.write('Unable to locate {0} on local system\n'.format(logname))
         sys.exit(1)
     logreader.dump_to_console(logname)
+    sys.exit(0)
+
+if options.screenshot:
+    sess = client.Command()
+    for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
+        for node in res.get('databynode', {}):
+            imgdata = res['databynode'][node]['image']['imgdata']
+            sys.stdout.write('{}: '.format(node))
+            kitty_draw(imgdata.encode())
+            sys.stdout.write('\n')
     sys.exit(0)
 
 def kill(noderange):

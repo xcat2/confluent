@@ -28,6 +28,7 @@ import eventlet.greenpool as greenpool
 import eventlet.queue as queue
 import eventlet.support.greendns
 from fnmatch import fnmatch
+import io
 import os
 import pwd
 import pyghmi.constants as pygconstants
@@ -50,6 +51,14 @@ except NameError:
     pass
 
 pci_cache = {}
+
+class RetainedIO(io.BytesIO):
+    # Need to retain buffer after close
+    def __init__(self):
+        self.resultbuffer = None
+    def close(self):
+        self.resultbuffer = self.getbuffer()
+        super().close()
 
 def get_dns_txt(qstring):
     return eventlet.support.greendns.resolver.query(
@@ -607,6 +616,8 @@ class IpmiHandler(object):
             self.handle_description()
         elif self.element == ['console', 'ikvm_methods']:
             self.handle_ikvm_methods()
+        elif self.element == ['console', 'ikvm_screenshot']:
+            self.handle_ikvm_screenshot()
         elif self.element == ['console', 'ikvm']:
             self.handle_ikvm()
         else:
@@ -1640,6 +1651,14 @@ class IpmiHandler(object):
         dsc = self.ipmicmd.get_ikvm_methods()
         dsc = {'ikvm_methods': dsc}
         self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_screenshot(self):
+        # good background for the webui, and kitty
+        imgdata = RetainedIO()
+        imgformat = self.ipmicmd.get_screenshot(imgdata)
+        imgdata = imgdata.getvalue()
+        if imgdata:
+            self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
 
     def handle_ikvm(self):
         methods = self.ipmicmd.get_ikvm_methods()

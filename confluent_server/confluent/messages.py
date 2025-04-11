@@ -18,6 +18,7 @@
 # This module implements client/server messages emitted from plugins.
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
+import base64
 import confluent.exceptions as exc
 import confluent.config.configmanager as cfm
 import confluent.config.conf as cfgfile
@@ -1881,6 +1882,12 @@ class GraphicalConsole(ConfluentMessage):
             self.kvpairs = {'Launcher': kv}
         else:
             self.kvpairs = {name: {'Launcher': kv}}
+
+class ScreenShot(ConfluentMessage):
+    readonly = True
+    def __init__(self, imgdata, node, imgformat=None):
+        self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata)}}}
+
 
 class CryptedAttributes(Attributes):
     defaulttype = 'password'
