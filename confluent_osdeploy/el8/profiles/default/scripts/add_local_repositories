@@ -59,4 +59,5 @@ for sec in c.sections():
             repout.write('baseurl=https://{}/confluent-public/os/{}/distribution/{}\n'.format(server, profile, repopath))
             repout.write('enabled=1\n')
             if gpgkeys:
-                repout.write('gpgkey=file://' + gpgkeys[0] + '\n')
+                gpgkeyvals = ['file://{}'.format(x) for x in gpgkeys]
+		repout.write('gpgkey=' + ' '.join(gpgkeyvals) + '\n')
