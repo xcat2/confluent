@@ -1,5 +1,13 @@
 #cloud-config
 autoinstall:
+#  The following can help an Ubuntu system skip install-time updates
+#  Only uncomment if you know you really want to do this or plan to manage the updates
+#  a different way.
+#
+#  updates: security
+#  apt:
+#    disable_suites: [security]
+#    fallback: offline-install
   version: 1
   early-commands:
     - /custom-installation/pre.sh
