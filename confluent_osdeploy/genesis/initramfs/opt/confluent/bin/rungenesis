@@ -66,14 +66,14 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     mkdir -p /media/ident
     mount /dev/disk/by-label/CNFLNT_IDNT /media/ident
     if [ -e /media/ident/genesis_bootstrap.sh ]; then
-        exec sh /media/ident/genesis_bootstrap.sh
+        exec bash /media/ident/genesis_bootstrap.sh
     fi
 fi
 if [ -e /dev/disk/by-label/GENESIS-X86 ]; then
     mkdir -p /media/genesis
     mount /dev/disk/by-label/GENESIS-X86 /media/genesis
     if [ -e /media/genesis/genesis_bootstrap.sh ]; then
-        exec sh /media/genesis/genesis_bootstrap.sh
+        exec bash /media/genesis/genesis_bootstrap.sh
     fi
 fi
 cd /sys/class/net
