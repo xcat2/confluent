@@ -60,4 +60,4 @@ for sec in c.sections():
             repout.write('enabled=1\n')
             if gpgkeys:
                 gpgkeyvals = ['file://{}'.format(x) for x in gpgkeys]
-		repout.write('gpgkey=' + ' '.join(gpgkeyvals) + '\n')
+                repout.write('gpgkey=' + ' '.join(gpgkeyvals) + '\n')
