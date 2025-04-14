@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
@@ -654,13 +654,17 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
 def get_session_node(shellargs):
     # straight to node console
     if len(shellargs) == 1 and ' ' not in shellargs[0]:
-        return shellargs[0]
+        targ = "/nodes/%s/console/session" % shellargs[0]
+        return targ, shellargs[0]
     if len(shellargs) == 2 and shellargs[0] == 'start':
         args = [s for s in shellargs[1].split('/') if s]
         if len(args) == 4 and args[0] == 'nodes' and args[2] == 'console' and \
                 args[3] == 'session':
-            return args[1]
-    return None
+            return shellargs[1], args[1]
+        if len(args) == 5 and args[0] == 'nodes' and args[2] == 'shell' and \
+                args[3] == 'sessions':
+            return shellargs[1], args[1]
+    return None, None
 
 
 def run_inline_command(path, arg, completion, **kwargs):
@@ -917,10 +921,10 @@ def main():
     doexit = False
     inconsole = False
     pendingcommand = ""
-    session_node = get_session_node(shellargs)
+    targ, session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
-        do_command("start /nodes/%s/console/session" % session_node, netserver)
+        do_command("start %s" % targ, netserver)
         doexit = True
     elif shellargs:
         do_command(shellargs, netserver)

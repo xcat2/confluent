@@ -73,6 +73,7 @@ class _ShellHandler(consoleserver.ConsoleHandler):
         self._send_rcpts({'connectstate': self.connectstate})
         for session in list(self.livesessions):
             session.destroy()
+        self.feedbuffer('\x1bc')
 
 
 
@@ -136,9 +137,14 @@ class ShellSession(consoleserver.ConsoleSession):
             while str(self.sessionid) in activesessions[(tenant, self.node, self.username)]:
                 self.sessionid += 1
             self.sessionid = str(self.sessionid)
-        if self.sessionid not in activesessions[(tenant, self.node, self.username)]:
+        conshdl = activesessions[(tenant, self.node, self.username)].get(self.sessionid, None)
+        if conshdl and conshdl.connectstate == 'closed':
+            del activesessions[(tenant, self.node, self.username)][self.sessionid]
+            conshdl = None
+        if not conshdl:
             activesessions[(tenant, self.node, self.username)][self.sessionid] = _ShellHandler(self.node, self.configmanager, width=self.width, height=self.height, prefix='s_{}_{}'.format(self.username, self.sessionid))
-        self.conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
+            conshdl = activesessions[(self.configmanager.tenant, self.node, self.username)][self.sessionid]
+        self.conshdl = conshdl
         self.conshdl.numusers += 1
 
     def destroy(self):

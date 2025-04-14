@@ -93,7 +93,10 @@ class SshShell(conapi.Console):
         self.height = height
         if not self.connected:
             return
-        self.shell.resize_pty(width=width, height=height)
+        try:
+            self.shell.resize_pty(width=width, height=height)
+        except Exception:
+            pass
 
     def recvdata(self):
         while self.connected:
@@ -254,6 +257,7 @@ class SshShell(conapi.Console):
             self.shell.sendall(data)
 
     def close(self):
+        self.connected = False
         if self.ssh is not None:
             self.ssh.close()
         self.datacallback = None
