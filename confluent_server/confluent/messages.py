@@ -1886,7 +1886,7 @@ class GraphicalConsole(ConfluentMessage):
 class ScreenShot(ConfluentMessage):
     readonly = True
     def __init__(self, imgdata, node, imgformat=None):
-        self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata)}}}
+        self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
 
 
 class CryptedAttributes(Attributes):
