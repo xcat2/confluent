@@ -123,10 +123,11 @@ if options.screenshot:
     sess = client.Command()
     for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
         for node in res.get('databynode', {}):
-            imgdata = res['databynode'][node]['image']['imgdata']
-            sys.stdout.write('{}: '.format(node))
-            kitty_draw(imgdata.encode())
-            sys.stdout.write('\n')
+            imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
+            if imgdata:
+                sys.stdout.write('{}: '.format(node))
+                kitty_draw(imgdata.encode())
+                sys.stdout.write('\n')
     sys.exit(0)
 
 def kill(noderange):
