@@ -297,7 +297,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                             continue
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
-                                        s.sendto(reply, peer)
+                                        try:
+                                            s.sendto(reply, peer)
+                                        except Exception:
+                                            pass
                                         break
                 r = select.select((net4, net6), (), (), 0.2)
                 if r:
