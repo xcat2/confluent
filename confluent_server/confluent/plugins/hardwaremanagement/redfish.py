@@ -1526,6 +1526,9 @@ class IpmiHandler(object):
         launchdata = self.ipmicmd.get_ikvm_launchdata()
         if 'url' in launchdata and not launchdata['url'].startswith('https://'):
             mybmc = self.ipmicmd.confluentbmcname
+            if mybmc.startswith('fe80::'):  # link local, need to adjust
+                lancfg = self.ipmicmd.get_net_configuration()
+                mybmc = lancfg['ipv4_address'].split('/')[0]
             if ':' in mybmc and not '[' in mybmc:
                 mybmc = '[{}]'.format(mybmc)
             launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
