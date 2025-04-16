@@ -32,6 +32,20 @@ import time
 import socket
 import re
 
+try:
+    # sixel is optional, attempt to import but stub out if unavailable
+    import io
+    import sixel
+
+    class DumbWriter(sixel.SixelWriter):
+        def restore_position(self, output):
+            return
+except ImportError:
+    class DumbWriter():
+        def draw(self, imgfile):
+            sys.stderr.write("PySixel not detected, Sixel format display not supported\n")
+
+
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
     usage="Usage: %prog [options] <noderange> [kill][-- [passthroughoptions]]",
@@ -71,6 +85,34 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'default.')
 
 (options, args) = argparser.parse_args()
+
+
+def draw_image(data):
+    imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
+    if imageformat == 'sixel':
+        sixel_draw(data)
+    elif imageformat == 'iterm':
+        iterm_draw(data)
+    else:
+        kitty_draw(data)
+
+
+def sixel_draw(data):
+    bindata = base64.b64decode(data)
+    binfile = io.BytesIO()
+    binfile.write(bindata)
+    binfile.seek(0)
+    DumbWriter().draw(binfile)
+
+def iterm_draw(data):
+    bindata = base64.b64decode(data)
+    datalen = len(bindata)
+    sys.stdout.write(
+        '\x1b]1337;File=inline=1;size={}:'.format(datalen))
+    sys.stdout.write(data.decode('utf8'))
+    sys.stdout.write('\a')
+    sys.stdout.write('\n')
+    sys.stdout.flush()
 
 def kitty_draw(data):
     while data:
@@ -126,7 +168,7 @@ if options.screenshot:
             imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
             if imgdata:
                 sys.stdout.write('{}: '.format(node))
-                kitty_draw(imgdata.encode())
+                draw_image(imgdata.encode())
                 sys.stdout.write('\n')
     sys.exit(0)
 
