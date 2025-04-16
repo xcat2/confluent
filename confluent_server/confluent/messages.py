@@ -87,7 +87,13 @@ def _htmlify_structure(indict):
 
 
 def msg_deserialize(packed):
-    m = msgpack.unpackb(packed, raw=False)
+    try:
+        m = msgpack.unpackb(packed, raw=False)
+    except UnicodeDecodeError:  # binary data, likely imagedata
+        # strings will be made binary, so binary messages
+        # must tolerate either string or bytes
+        m = msgpack.unpackb(packed)
+        m[0] = m[0].decode()
     cls = globals()[m[0]]
     if issubclass(cls, ConfluentMessage) or issubclass(cls, ConfluentNodeError):
         return cls(*m[1:])
@@ -1885,7 +1891,13 @@ class GraphicalConsole(ConfluentMessage):
 
 class ScreenShot(ConfluentMessage):
     readonly = True
+
     def __init__(self, imgdata, node, imgformat=None):
+        if isinstance(node, bytes):
+            node = node.decode()
+        if isinstance(imgformat, bytes):
+            imgformat = imgformat.decode()
+        self.myargs = (imgdata, node, imgformat)
         self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
 
 
