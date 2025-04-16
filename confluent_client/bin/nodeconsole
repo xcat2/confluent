@@ -167,6 +167,9 @@ if options.screenshot:
         for node in res.get('databynode', {}):
             imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
             if imgdata:
+                if len(imgdata) < 32: # We were subjected to error
+                    sys.stderr.write(f'{node}: Unable to get screenshot\n')
+                    continue
                 sys.stdout.write('{}: '.format(node))
                 draw_image(imgdata.encode())
                 sys.stdout.write('\n')
