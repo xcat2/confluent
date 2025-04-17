@@ -29,8 +29,12 @@ import confluent.client as client
 import confluent.sortutil as sortutil
 import confluent.logreader as logreader
 import time
+import select
 import socket
 import re
+import tty
+import termios
+import fcntl
 
 try:
     # sixel is optional, attempt to import but stub out if unavailable
@@ -63,6 +67,9 @@ argparser.add_option('-T', '--Timestamp', action='store_true', default=False,
 
 argparser.add_option('-s', '--screenshot', action='store_true', default=False,
                      help='Attempt to grab screenshot and render using kitty image protocol')
+argparser.add_option('-i', '--interval', type='float',
+                     help='Interval in seconds to redraw the screenshot. Currently only '
+                          'works for one node')
 argparser.add_option('-w','--windowed', action='store_true', default=False,
                      help='Open terminal windows for each node.  The '
                           'environment variable NODECONSOLE_WINDOWED_COMMAND '
@@ -85,6 +92,50 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'default.')
 
 (options, args) = argparser.parse_args()
+
+oldtcattr = None
+oldfl = None
+
+def get_coords():
+    sys.stdout.write('\x1b[6n') #
+    sys.stdout.flush()
+    gotreply = select.select([sys.stdin,], [], [], 0.250)[0]
+    if gotreply:
+        response = ''
+        while select.select([sys.stdin,], [], [], 0.1)[0] and 'R' not in response:
+            response += sys.stdin.read()
+        coords = response.replace('R', '').split('[')[1].split(';')
+    #sys.stdout.write('\x1b[{}:{}H'.format(*coords))
+
+def direct_console():
+    global oldtcattr
+    global oldfl
+    oldtcattr = termios.tcgetattr(sys.stdin.fileno())
+    oldfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+    tty.setraw(sys.stdin.fileno())
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, oldfl | os.O_NONBLOCK)
+
+def indirect_console():
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, oldfl & ~os.O_NONBLOCK)
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+
+cursor_saved = False
+def sticky_cursor():
+    global cursor_saved
+# get cursor restore_position
+    if sys.stdin.isatty() and not cursor_saved:
+        try:
+            direct_console()
+            sys.stdout.write('\x1b7')
+            cursor_saved = True
+        finally:
+            indirect_console()
+    elif cursor_saved:
+        try:
+            direct_console()
+            sys.stdout.write('\x1b8')
+        finally:
+            indirect_console()
 
 
 def draw_image(data):
@@ -163,16 +214,33 @@ if options.Timestamp:
 
 if options.screenshot:
     sess = client.Command()
-    for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
-        for node in res.get('databynode', {}):
-            imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
-            if imgdata:
-                if len(imgdata) < 32: # We were subjected to error
-                    sys.stderr.write(f'{node}: Unable to get screenshot\n')
-                    continue
-                sys.stdout.write('{}: '.format(node))
-                draw_image(imgdata.encode())
-                sys.stdout.write('\n')
+    firstnodename = None
+    dorefresh = True
+    if options.interval is not None:
+        sys.stdout.write('\x1bc')
+    while dorefresh:
+        for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
+            for node in res.get('databynode', {}):
+                if not firstnodename:
+                    firstnodename = node
+                imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
+                if imgdata:
+                    if len(imgdata) < 32: # We were subjected to error
+                        sys.stderr.write(f'{node}: Unable to get screenshot\n')
+                        continue
+                    if options.interval is not None:
+                        if node != firstnodename:
+                            sys.stderr.write('Multiple nodes not supported for interval')
+                            sys.exit(1)
+                        sticky_cursor()
+                    sys.stdout.write('{}: '.format(node))
+                    draw_image(imgdata.encode())
+                    sys.stdout.write('\n')
+            if options.interval is None:
+                dorefresh = False
+            else:
+                dorefresh = True
+                time.sleep(options.interval)
     sys.exit(0)
 
 def kill(noderange):
