@@ -312,6 +312,7 @@ def check_rocky(isoinfo):
 
 fedoracatmap = {
         '41': 'el10',
+        '42': 'el10',
 }
 def check_fedora(isoinfo):
     if '.discinfo' not in isoinfo[1]:

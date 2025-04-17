@@ -1,5 +1,8 @@
 #!/bin/bash
 BUNDLENAME=/sysroot/etc/pki/tls/certs/ca-bundle.crt
+if [ ! -e "$BUNDLENAME" ]; then
+    BUNDLENAME=/sysroot/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+fi
 while [ -h $BUNDLENAME ]; do
     BUNDLENAME=/sysroot/$(readlink $BUNDLENAME)
 done
