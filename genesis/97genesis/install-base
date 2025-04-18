@@ -9,7 +9,7 @@ dracut_install /$IMPLIBDIR/libtss2-tcti-device.so.0
 dracut_install tpm2_create tpm2_pcrread tpm2_createpolicy tpm2_createprimary
 dracut_install tpm2_load tpm2_unseal tpm2_getcap tpm2_evictcontrol
 dracut_install tpm2_pcrextend tpm2_policypcr tpm2_flushcontext tpm2_startauthsession
-dracut_install openssl tar ipmitool cpio xz gzip lsmod ethtool
+dracut_install openssl tar ipmitool cpio zstd xz gzip lsmod ethtool
 dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname bc expr sort
 dracut_install ssh sshd vi reboot lspci parted tmux mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
