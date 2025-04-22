@@ -171,7 +171,7 @@ def draw_image(data, width, height):
     if imageformat == 'sixel':
         sixel_draw(data)
     elif imageformat == 'iterm':
-        iterm_draw(data)
+        iterm_draw(data, width, height)
     else:
         kitty_draw(data, width, height)
 
@@ -183,11 +183,15 @@ def sixel_draw(data):
     binfile.seek(0)
     DumbWriter().draw(binfile)
 
-def iterm_draw(data):
+def iterm_draw(data, width, height):
+    if not height:
+        height = 'auto'
+    if not width:
+        width = 'auto'
     bindata = base64.b64decode(data)
     datalen = len(bindata)
     sys.stdout.write(
-        '\x1b]1337;File=inline=1;size={}:'.format(datalen))
+        '\x1b]1337;File=inline=1;width={};height={};size={}:'.format(width,height,datalen))
     sys.stdout.write(data.decode('utf8'))
     sys.stdout.write('\a')
     sys.stdout.write('\n')
@@ -282,6 +286,10 @@ if options.screenshot:
     cheight = None
     sess = client.Command()
     if options.tile:
+        imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
+        if imageformat not in ('kitty', 'iterm'):
+            sys.stderr.write('Tiled screenshots only supported with kitty or iterm protocol')
+            sys.exit(1)
         allnodes = []
         numnodes = 0
         for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
@@ -323,10 +331,11 @@ if options.screenshot:
                                 sys.exit(1)
                             sticky_cursor()
                         sys.stdout.write('{}: '.format(node))
-                    draw_image(imgdata.encode(), cwidth, cheight - 1)
-                    sys.stdout.write(f'\x1b[{cwidth}D')
-                    sys.stdout.write(f'\x1b[{cheight - 1}A')
+                    # one row is used by our own name, so cheight - 1 for that allowance
+                    draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
                     if node in nodepositions:
+                        sys.stdout.write(f'\x1b[{cwidth}D')
+                        sys.stdout.write(f'\x1b[{cheight - 1}A')
                         reset_cursor(node)
                     else:
                         sys.stdout.write('\n')
