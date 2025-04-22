@@ -35,6 +35,11 @@ import re
 import tty
 import termios
 import fcntl
+import confluent.screensqueeze as sq
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 try:
     # sixel is optional, attempt to import but stub out if unavailable
@@ -119,6 +124,29 @@ def indirect_console():
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, oldfl & ~os.O_NONBLOCK)
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
 
+def determine_tile_size(numnodes):
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
+    ratio = (pixwidth / 16) / (pixheight / 10)
+    bestdeviation = None
+    bestdims = []
+    for i in range(1, numnodes + 1):
+        number = numnodes
+        while number % i != 0:
+            number += 1
+        columns = i
+        rows = number // i
+        deviation = abs(ratio -  (columns / rows))
+        if bestdeviation is None:
+            bestdeviation = deviation
+            bestdims = [columns, rows]
+        elif deviation < bestdeviation:
+            bestdeviation = deviation
+            bestdims = [columns, rows]
+    cellswide = cwidth // bestdims[0]
+    cellshigh = cheight // bestdims[1]
+    bestdims = bestdims + [cellswide, cellshigh]
+    return bestdims
+
 cursor_saved = False
 def sticky_cursor():
     global cursor_saved
@@ -138,14 +166,14 @@ def sticky_cursor():
             indirect_console()
 
 
-def draw_image(data):
+def draw_image(data, width, height):
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
     if imageformat == 'sixel':
         sixel_draw(data)
     elif imageformat == 'iterm':
         iterm_draw(data)
     else:
-        kitty_draw(data)
+        kitty_draw(data, width, height)
 
 
 def sixel_draw(data):
@@ -165,11 +193,30 @@ def iterm_draw(data):
     sys.stdout.write('\n')
     sys.stdout.flush()
 
-def kitty_draw(data):
+def kitty_draw(data, width, height):
+    if Image:
+        bindata = base64.b64decode(data)
+        binfile = io.BytesIO()
+        binfile.write(bindata)
+        binfile.seek(0)
+        img = Image.open(binfile)
+        outfile = io.BytesIO()
+        img.save(outfile, format='PNG')
+        data = base64.b64encode(outfile.getbuffer())
+    preamble = '\x1b_Ga=T,f=100'
+    if height:
+        preamble += f',r={height - 2},c={width}'
+    #sys.stdout.write(repr(preamble))
+    #sys.stdout.write('\xb[{}D'.format(len(repr(preamble))))
+    #return
+    first = True
     while data:
         chunk, data = data[:4096], data[4096:]
         m = 1 if data else 0
-        sys.stdout.write('\x1b_Ga=T,f=100,m={};'.format(m))
+        if first:
+            sys.stdout.write('{},m={};'.format(preamble, m))
+        else:
+            sys.stdout.write('\x1b_Gm={};'.format(m))
         sys.stdout.write(chunk.decode('utf8'))
         sys.stdout.write('\x1b\\')
         sys.stdout.flush()
@@ -212,8 +259,47 @@ if options.Timestamp:
     logreader.dump_to_console(logname)
     sys.exit(0)
 
+def prep_node_tile(node):
+    currcolcell, currrowcell = nodepositions[node]
+    if currcolcell:
+        sys.stdout.write(f'\x1b[{currcolcell}C')
+    if currrowcell:
+        sys.stdout.write(f'\x1b[{currrowcell}B')
+    sys.stdout.write(node)
+    sys.stdout.write('\x1b[{}D'.format(len(node)))
+    sys.stdout.write(f'\x1b[1B')
+
+def reset_cursor(node):
+    currcolcell, currrowcell = nodepositions[node]
+    if currcolcell:
+        sys.stdout.write(f'\x1b[{currcolcell}D')
+    sys.stdout.write(f'\x1b[{currrowcell + 1}A')
+
+
+nodepositions = {}
 if options.screenshot:
+    cwidth = None
+    cheight = None
     sess = client.Command()
+    if options.tile:
+        allnodes = []
+        numnodes = 0
+        for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
+            allnodes.append(res['item']['href'].replace('/', ''))
+            numnodes += 1
+        cols, rows, cwidth, cheight = determine_tile_size(numnodes)
+        currcol = 1
+        currcolcell = 0
+        currrowcell = 0
+        for node in allnodes:
+            nodepositions[node] = currcolcell, currrowcell
+            if currcol < cols:
+                currcol += 1
+                currcolcell += cwidth
+            else:
+                currcol = 1
+                currcolcell = 0
+                currrowcell += cheight
     firstnodename = None
     dorefresh = True
     if options.interval is not None:
@@ -228,19 +314,28 @@ if options.screenshot:
                     if len(imgdata) < 32: # We were subjected to error
                         sys.stderr.write(f'{node}: Unable to get screenshot\n')
                         continue
-                    if options.interval is not None:
-                        if node != firstnodename:
-                            sys.stderr.write('Multiple nodes not supported for interval')
-                            sys.exit(1)
-                        sticky_cursor()
-                    sys.stdout.write('{}: '.format(node))
-                    draw_image(imgdata.encode())
-                    sys.stdout.write('\n')
-            if options.interval is None:
-                dorefresh = False
-            else:
-                dorefresh = True
-                time.sleep(options.interval)
+                    if node in nodepositions:
+                        prep_node_tile(node)
+                    else:
+                        if options.interval is not None:
+                            if node != firstnodename:
+                                sys.stderr.write('Multiple nodes not supported for interval')
+                                sys.exit(1)
+                            sticky_cursor()
+                        sys.stdout.write('{}: '.format(node))
+                    draw_image(imgdata.encode(), cwidth, cheight - 1)
+                    sys.stdout.write(f'\x1b[{cwidth}D')
+                    sys.stdout.write(f'\x1b[{cheight - 1}A')
+                    if node in nodepositions:
+                        reset_cursor(node)
+                    else:
+                        sys.stdout.write('\n')
+                    sys.stdout.flush()
+        if options.interval is None:
+            dorefresh = False
+        else:
+            dorefresh = True
+            time.sleep(options.interval)
     sys.exit(0)
 
 def kill(noderange):
