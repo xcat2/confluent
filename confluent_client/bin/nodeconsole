@@ -125,8 +125,18 @@ def indirect_console():
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
 
 def determine_tile_size(numnodes):
+    # for now, smash everything to a common aspect ratio.  16:11
+    # is pretty much wrong for everything, making 4:3 a bit too wide
+    # and 16:9 significantly too narrow, but it is serviceable
+    # An improvement could come with us owning the scaling
+    # instead of delegating to Kitty, which says if we specify both,
+    # we get stretching.  In theory we should be able to get aspect correct
+    # from kitty by omitting, but:
+    # then we don't know how much to move the cursor left after draw_image
+    # Konsole won't scale at all with only partial scaling specified
     cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
-    ratio = (pixwidth / 16) / (pixheight / 10)
+    # 16:12 is to roughly account for the 'titles' of the tiles
+    ratio = (pixwidth / 16) / (pixheight / 12)
     bestdeviation = None
     bestdims = []
     for i in range(1, numnodes + 1):
@@ -144,6 +154,14 @@ def determine_tile_size(numnodes):
             bestdims = [columns, rows]
     cellswide = cwidth // bestdims[0]
     cellshigh = cheight // bestdims[1]
+    tilewidth = cellswide * pixwidth / cwidth
+    tileheight = cellshigh * pixheight / cheight
+    if tilewidth > (tileheight * 16 / 11):
+        tilewidth = tileheight * 16 / 11
+        cellswide = int(tilewidth // (pixwidth / cwidth))
+    if tileheight > (tilewidth * 11 /16):
+        tileheight = tilewidth * 11 / 16
+        cellshigh = int(tileheight // (pixheight / cheight))
     bestdims = bestdims + [cellswide, cellshigh]
     return bestdims
 
