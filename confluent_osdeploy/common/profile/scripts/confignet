@@ -409,7 +409,7 @@ class NetworkManager(object):
                 cargs.append(cmdargs[arg])
             if stgs['team_mode'] in self.bondtypes:
                 stgs['team_mode'] = self.bondtypes[stgs['team_mode']]
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'mode={}'.format(stgs['team_mode'])] + cargs)
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'miimon=100,mode={}'.format(stgs['team_mode'])] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
             subprocess.check_call(['nmcli', 'c', 'u', cname])
