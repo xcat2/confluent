@@ -152,6 +152,13 @@ def determine_tile_size(numnodes):
         elif deviation < bestdeviation:
             bestdeviation = deviation
             bestdims = [columns, rows]
+    # ok, the above algorithm can still pick things like
+    # 1 2 3
+    # 4
+    # So we will let it pick the number of rows, and
+    # then see if we can chop columns and still fit
+    while (bestdims[0] - 1) * bestdims[1] >= numnodes:
+        bestdims[0] = bestdims[0] - 1
     cellswide = cwidth // bestdims[0]
     cellshigh = cheight // bestdims[1]
     tilewidth = cellswide * pixwidth / cwidth
