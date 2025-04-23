@@ -201,6 +201,10 @@ def cursor_save():
     sys.stdout.write('\x1b7')
 def cursor_restore():
     sys.stdout.write('\x1b8')
+def cursor_hide():
+    sys.stdout.write('\x1b[?25l')
+def cursor_show():
+    sys.stdout.write('\x1b[?25h')
 
 def draw_image(data, width, height):
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
@@ -383,10 +387,12 @@ def do_screenshot():
 
 if options.screenshot:
     try:
+        cursor_hide()
         do_screenshot()
     except KeyboardInterrupt:
         pass
     finally:
+        cursor_show()
         cursor_down(numrows)
         sys.stdout.write('\n')
     sys.exit(0)
