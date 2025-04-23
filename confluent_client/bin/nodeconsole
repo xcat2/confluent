@@ -313,9 +313,9 @@ def reset_cursor(node):
         cursor_left(currcolcell)
     cursor_up(currrowcell + 1)
 
-
 nodepositions = {}
-if options.screenshot:
+def do_screenshot():
+    global numrows
     cwidth = None
     cheight = None
     sess = client.Command()
@@ -381,6 +381,15 @@ if options.screenshot:
             time.sleep(options.interval)
     sys.exit(0)
 
+if options.screenshot:
+    try:
+        do_screenshot()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        cursor_down(numrows)
+        sys.stdout.write('\n')
+    sys.exit(0)
 def kill(noderange):
     sess = client.Command()
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
