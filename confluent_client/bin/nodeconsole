@@ -318,6 +318,7 @@ def reset_cursor(node):
     cursor_up(currrowcell + 1)
 
 nodepositions = {}
+numrows = 0
 def do_screenshot():
     global numrows
     cwidth = None
