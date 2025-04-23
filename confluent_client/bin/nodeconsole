@@ -162,7 +162,13 @@ def determine_tile_size(numnodes):
     if tileheight > (tilewidth * 11 /16):
         tileheight = tilewidth * 11 / 16
         cellshigh = int(tileheight // (pixheight / cheight))
-    bestdims = bestdims + [cellswide, cellshigh]
+    bestdims = bestdims + [cellswide, cellshigh, cellshigh * bestdims[1]]
+    # incur any scrolling we might get. This allows us to accurately
+    # save/restore cursor or even get coordinates without scrolling fouling
+    # the desired target
+    sys.stdout.write('\n' * bestdims[4])
+    sys.stdout.flush()
+    cursor_up(bestdims[4])
     return bestdims
 
 cursor_saved = False
@@ -183,6 +189,18 @@ def sticky_cursor():
         finally:
             indirect_console()
 
+def cursor_up(count=1):
+    sys.stdout.write(f'\x1b[{count}A')
+def cursor_down(count=1):
+    sys.stdout.write(f'\x1b[{count}B')
+def cursor_right(count=1):
+    sys.stdout.write(f'\x1b[{count}C')
+def cursor_left(count=1):
+    sys.stdout.write(f'\x1b[{count}D')
+def cursor_save():
+    sys.stdout.write('\x1b7')
+def cursor_restore():
+    sys.stdout.write('\x1b8')
 
 def draw_image(data, width, height):
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
@@ -212,7 +230,6 @@ def iterm_draw(data, width, height):
         '\x1b]1337;File=inline=1;width={};height={};size={}:'.format(width,height,datalen))
     sys.stdout.write(data.decode('utf8'))
     sys.stdout.write('\a')
-    sys.stdout.write('\n')
     sys.stdout.flush()
 
 def kitty_draw(data, width, height):
@@ -227,7 +244,7 @@ def kitty_draw(data, width, height):
         data = base64.b64encode(outfile.getbuffer())
     preamble = '\x1b_Ga=T,f=100'
     if height:
-        preamble += f',r={height - 2},c={width}'
+        preamble += f',r={height},c={width}'
     #sys.stdout.write(repr(preamble))
     #sys.stdout.write('\xb[{}D'.format(len(repr(preamble))))
     #return
@@ -242,7 +259,6 @@ def kitty_draw(data, width, height):
         sys.stdout.write(chunk.decode('utf8'))
         sys.stdout.write('\x1b\\')
         sys.stdout.flush()
-    sys.stdout.write('\n')
 
 pass_through_args = []
 killcon = False
@@ -284,18 +300,18 @@ if options.Timestamp:
 def prep_node_tile(node):
     currcolcell, currrowcell = nodepositions[node]
     if currcolcell:
-        sys.stdout.write(f'\x1b[{currcolcell}C')
+        cursor_right(currcolcell)
     if currrowcell:
-        sys.stdout.write(f'\x1b[{currrowcell}B')
+        cursor_down(currrowcell)
     sys.stdout.write(node)
-    sys.stdout.write('\x1b[{}D'.format(len(node)))
-    sys.stdout.write(f'\x1b[1B')
+    cursor_left(len(node))
+    cursor_down()
 
 def reset_cursor(node):
     currcolcell, currrowcell = nodepositions[node]
     if currcolcell:
-        sys.stdout.write(f'\x1b[{currcolcell}D')
-    sys.stdout.write(f'\x1b[{currrowcell + 1}A')
+        cursor_left(currcolcell)
+    cursor_up(currrowcell + 1)
 
 
 nodepositions = {}
@@ -313,7 +329,7 @@ if options.screenshot:
         for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
             allnodes.append(res['item']['href'].replace('/', ''))
             numnodes += 1
-        cols, rows, cwidth, cheight = determine_tile_size(numnodes)
+        cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
         currcol = 1
         currcolcell = 0
         currrowcell = 0
@@ -326,10 +342,10 @@ if options.screenshot:
                 currcol = 1
                 currcolcell = 0
                 currrowcell += cheight
+    elif options.interval is not None:
+        sys.stdout.write('\x1bc')
     firstnodename = None
     dorefresh = True
-    if options.interval is not None:
-        sys.stdout.write('\x1bc')
     while dorefresh:
         for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
             for node in res.get('databynode', {}):
@@ -342,6 +358,7 @@ if options.screenshot:
                         continue
                     if node in nodepositions:
                         prep_node_tile(node)
+                        cursor_save()
                     else:
                         if options.interval is not None:
                             if node != firstnodename:
@@ -352,8 +369,7 @@ if options.screenshot:
                     # one row is used by our own name, so cheight - 1 for that allowance
                     draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
                     if node in nodepositions:
-                        sys.stdout.write(f'\x1b[{cwidth}D')
-                        sys.stdout.write(f'\x1b[{cheight - 1}A')
+                        cursor_restore()
                         reset_cursor(node)
                     else:
                         sys.stdout.write('\n')
