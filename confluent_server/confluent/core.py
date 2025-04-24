@@ -74,7 +74,7 @@ import uuid
 import yaml
 import shutil
 
-
+vinz = None
 pluginmap = {}
 dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos', b'enos', u'enos')
 
@@ -213,6 +213,7 @@ def handle_deployment(configmanager, inputdata, pathcomponents,
                     with open('/var/lib/confluent/public/os/{}/profile.yaml'.format(profname)) as profyaml:
                         profinfo = yaml.safe_load(profyaml)
                         profinfo['name'] = profname
+                    #check if boot.ipxe is older than profile.yaml
                     yield msg.KeyValueData(profinfo)
                     return
         elif len(pathcomponents) == 3:
@@ -972,6 +973,7 @@ def _forward_rsp(connection, res):
 
 def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
+    global vinz
     if log.logfull:
         raise exc.TargetResourceUnavailable('Filesystem full, free up space and restart confluent service')
     iscollection = False
@@ -1090,6 +1092,10 @@ def handle_node_request(configmanager, inputdata, operation,
                     plugpath = plugroute['default']
             if plugpath in dispatch_plugins:
                 cfm.check_quorum()
+                if pathcomponents == ['console', 'ikvm']:
+                    if not vinz:
+                        import confluent.vinzmanager as vinz
+                        vinz.assure_vinz()
                 manager = nodeattr[node].get('collective.manager', {}).get(
                     'value', None)
                 if manager:
