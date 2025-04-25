@@ -52,8 +52,11 @@ def listdump(input):
     return retval
 
 
-def get_extra_names(nodename, cfg, myip=None, preferadjacent=False):
-    names = set(['127.0.0.1', '::1', 'localhost', 'localhost.localdomain'])
+def get_extra_names(nodename, cfg, myip=None, preferadjacent=False, addlocalhost=True):
+    if addlocalhost:
+        names = set(['127.0.0.1', '::1', 'localhost', 'localhost.localdomain'])
+    else:
+        names = set([])
     dnsinfo = cfg.get_node_attributes(nodename, ('dns.*', 'net.*hostname'))
     dnsinfo = dnsinfo.get(nodename, {})
     domain = dnsinfo.get('dns.domain', {}).get('value', None)
@@ -528,7 +531,7 @@ def handle_request(env, start_response):
             return
     elif env['PATH_INFO'].startswith('/self/remotesyncfiles'):
         if 'POST' == operation:
-            pals = get_extra_names(nodename, cfg, myip, preferadjacent=True)
+            pals = get_extra_names(nodename, cfg, myip, preferadjacent=True, addlocalhost=False)
             if clientip in pals:
                 pals = [clientip]
             result = syncfiles.start_syncfiles(
