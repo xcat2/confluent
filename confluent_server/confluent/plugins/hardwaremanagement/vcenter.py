@@ -38,6 +38,7 @@ class VmConsole(conapi.Console):
         self.socket.sendall(data)
 
     def close(self):
+        self.connected = False
         if self.socket:
             self.socket.close()
 
@@ -46,12 +47,38 @@ class VmConsole(conapi.Console):
             try:
                 pendingdata = self.socket.recv(1024)
             except Exception as e:
-                print(repr(e))
                 pendingdata = ''
             if pendingdata == '':
+                self.connected = False
                 self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
-            self.datacallback(pendingdata)
+            reply = b''
+            while pendingdata and pendingdata[0] == 255:
+                cmd = pendingdata[1]
+                if cmd == 255:
+                    pendingdata = pendingdata[1:]
+                    break
+                subcmd = pendingdata[2]
+                if cmd == 253:  # DO
+                    # binary, suppress go ohaed
+                    if subcmd in (0, 3):
+                        reply += b'\xff\xfb' + bytes([subcmd])  # will
+                    else:
+                        reply += b'\xff\xfc' + bytes([subcmd]) # won't do anything else
+                    pendingdata = pendingdata[3:]
+                elif cmd == 251:  # will
+                    # binary, suppress go ahead, echo
+                    if subcmd in (0, 1, 3):
+                        reply += b'\xff\xfd' + bytes([subcmd])  # do the implemented things
+                    else:
+                        reply += B'\xff\xfe' + bytes([subcmd])  # don't do others'
+                    pendingdata = pendingdata[3:]
+                else:
+                    raise Exception(repr(pendingdata[:3]))
+            if reply:
+                self.write(reply)
+            if pendingdata:
+                self.datacallback(pendingdata)
 
 
 
