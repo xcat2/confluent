@@ -52,7 +52,7 @@ def listdump(input):
     return retval
 
 
-def get_extra_names(nodename, cfg, myip=None):
+def get_extra_names(nodename, cfg, myip=None, preferadjacent=False):
     names = set(['127.0.0.1', '::1', 'localhost', 'localhost.localdomain'])
     dnsinfo = cfg.get_node_attributes(nodename, ('dns.*', 'net.*hostname'))
     dnsinfo = dnsinfo.get(nodename, {})
@@ -74,11 +74,19 @@ def get_extra_names(nodename, cfg, myip=None):
         ncfgs.append(fncfg.get('default', {}))
         for ent in fncfg.get('extranets', []):
             ncfgs.append(fncfg['extranets'][ent])
+        addall = True
+        routedaddrs = set([])
         for ncfg in ncfgs:
             for nip in (ncfg.get('ipv4_address', None), ncfg.get('ipv6_address', None)):
                 if nip:
                     nip = nip.split('/', 1)[0]
-                    names.add(nip)
+                    if not preferadjacent or netutil.address_is_local(nip):
+                        names.add(nip)
+                        addall = False
+                    else:
+                        routedaddrs.add(nip)
+        if addall:
+            names.update(routedaddrs)
     return names
 
 def handle_request(env, start_response):
@@ -520,7 +528,9 @@ def handle_request(env, start_response):
             return
     elif env['PATH_INFO'].startswith('/self/remotesyncfiles'):
         if 'POST' == operation:
-            pals = get_extra_names(nodename, cfg, myip)
+            pals = get_extra_names(nodename, cfg, myip, preferadjacent=True)
+            if clientip in pals:
+                pals = [clientip]
             result = syncfiles.start_syncfiles(
                 nodename, cfg, json.loads(reqbody), pals)
             start_response(result[0], ())
