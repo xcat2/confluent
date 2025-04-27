@@ -9,7 +9,16 @@ webclient = eventlet.import_patched('pyghmi.util.webclient')
 import eventlet.green.socket as socket
 import eventlet
 import confluent.interface.console as conapi
+import io
 
+
+class RetainedIO(io.BytesIO):
+    # Need to retain buffer after close
+    def __init__(self):
+        self.resultbuffer = None
+    def close(self):
+        self.resultbuffer = self.getbuffer()
+        super().close()
 
 def fixuuid(baduuid):
     # VMWare changes the endian stuff in BIOS
@@ -112,6 +121,15 @@ class VmwApiClient:
         del self.wc.stdheaders['Authorization']
         self.wc.set_header('vmware-api-session-id', body)
 
+    def get_screenshot(self, vm, outfile):
+        vm = self.index_vm(vm)
+        url = f'/screen?id={vm}'
+        wc = self.wc.dupe()
+        wc.set_basic_credentials(self.user, self.password)
+        fd = webclient.FileDownloader(wc, url, outfile)
+        fd.start()
+        fd.join()
+
     def list_vms(self):
         rsp = self.wc.grab_json_response('/api/vcenter/vm')
         self.vmlist = {}
@@ -212,8 +230,11 @@ class VmwApiClient:
         if rsp[0]['enter_setup_mode']:
             return 'setup'
         rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot/device')
-        if rsp[0][0]['type'] == 'ETHERNET':
-            return 'network'
+        try:
+            if rsp[0][0]['type'] == 'ETHERNET':
+                return 'network'
+        except IndexError:
+            pass
         return 'default'
 
     def get_vm_power(self, vm):
@@ -298,6 +319,18 @@ def retrieve(nodes, element, configmanager, inputdata):
         elif element[:2] == ['inventory', 'hardware'] and len(element) == 4:
             for rsp in currclient.get_vm_inventory(node):
                 yield rsp
+        elif element == ['console', 'ikvm_methods']:
+            dsc = {'ikvm_methods': ['screenshot']}
+            yield msg.KeyValueData(dsc, node)
+        elif element == ['console', 'ikvm_screenshot']:
+            # good background for the webui, and kitty
+            imgdata = RetainedIO()
+            imgformat = currclient.get_screenshot(node, imgdata)
+            imgdata = imgdata.getvalue()
+            if imgdata:
+                yield msg.ScreenShot(imgdata, node, imgformat=imgformat)
+
+
 
 
 
