@@ -637,6 +637,9 @@ node = {
         'description':  ('Fingerprint of the TLS certificate recognized as'
                          'belonging to the hardware manager of the server'),
     },
+    'pubkeys.tls': {
+        'description': ('Fingerprint of the TLS certificate for service running on host.'),
+    },
     'pubkeys.ssh': {
         'description': ('Fingerprint of the SSH key of the OS running on the '
                         'system.'),
