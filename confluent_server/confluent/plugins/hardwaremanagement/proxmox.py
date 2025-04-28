@@ -137,7 +137,7 @@ class PmxApiClient:
         if currstatus == 'running':
             return 'on'
         elif currstatus == 'stopped':
-            return off
+            return 'off'
         raise Exception("Unknnown response to status query")
 
     def set_vm_power(self, vm, state):
@@ -153,7 +153,6 @@ class PmxApiClient:
         elif state == 'off':
             state = 'stop'
         rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
-        print(repr(rsp))
 
     def set_vm_bootdev(self, vm, bootdev):
         host, guest = self.get_vm(vm)
