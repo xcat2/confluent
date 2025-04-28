@@ -404,6 +404,7 @@ if options.screenshot:
         cursor_down(numrows)
         sys.stdout.write('\n')
     sys.exit(0)
+
 def kill(noderange):
     sess = client.Command()
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
@@ -411,29 +412,23 @@ def kill(noderange):
         envstring = 'xterm'
 
     nodes = []
-    for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
+    for res in sess.read('/noderange/{0}/nodes/'.format(noderange)):
         node = res.get('item', {}).get('href', '/').replace('/', '')
         if not node:
             sys.stderr.write(res.get('error', repr(res)) + '\n')
             sys.exit(1)
         nodes.append(node) 
 
-    for node in nodes:
-        s=socket.socket(socket.AF_UNIX)
-        winid=None
+    for node in nodes:    
+        command = "ps auxww | grep {0} | grep console | egrep '\\b{1}\\b' | grep -v grep | awk '{{print $2}}'".format(envstring, node)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
         try:
-            win=subprocess.Popen(['xwininfo', '-tree', '-root'], stdout=subprocess.PIPE)
-            wintr=win.communicate()[0]
-            for line in wintr.decode('utf-8').split('\n'):
-                if 'console: {0}'.format(node) in line or 'confetty' in line:
-                    win_obj = [ele for ele in line.split(' ') if ele.strip()]
-                    winid = win_obj[0]
-        except:
-            print("Error: cannot retrieve window id of node {}".format(node))
-
-        if winid:
-            ps_data=subprocess.Popen(['xkill', '-id', winid ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
+            process_id = stdout.decode('utf-8').split()[0]
+        except IndexError:
+            sys.stderr.write(node + ": console window not found \n")
+            continue
+        subprocess.Popen(["kill", process_id], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     sys.exit(0)
 
 def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):    
