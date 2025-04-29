@@ -209,6 +209,9 @@ def update_nodegroup(group, element, configmanager, inputdata):
 
 
 def _expand_expression(nodes, configmanager, inputdata):
+    if not nodes:
+        raise exc.InvalidArgumentException(
+                'Specified noderange contains no nodes')
     expression = inputdata.get_attributes(list(nodes)[0])
     if type(expression) is dict:
         expression = expression['expression']
