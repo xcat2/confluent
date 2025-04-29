@@ -233,6 +233,7 @@ def get_apikey(nodename, hosts, errout=None):
 
 class HTTPSClient(client.HTTPConnection, object):
     def __init__(self, usejson=False, port=443, host=None, errout=None, phmac=None, checkonly=False):
+        self.ignorehosts = set([])
         self.phmac = phmac
         self.errout = None
         if errout:
@@ -320,6 +321,8 @@ class HTTPSClient(client.HTTPConnection, object):
         ctx.check_hostname = True
         for timeo in (0.1, 5):
             for host in hosts:
+                if host in self.ignorehosts:
+                    continue
                 try:
                     addrinf = socket.getaddrinfo(host, self.port)[0]
                     psock = socket.socket(addrinf[0])
@@ -415,6 +418,12 @@ class HTTPSClient(client.HTTPConnection, object):
                     akfile.write('')
                 self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(
                     self.node, [self.host], errout=self.errout)
+            if rsp.status == 503:  # confluent is down, but the server running confluent is otherwise up
+                authed = False
+                self.ignorehosts.add(self.host)
+                host = self.check_connections()
+                client.HTTPConnection.__init__(self, host, self.port)
+
         raise Exception(rsp.read())
 
 def get_current_vmnic_vswitch():
@@ -558,13 +567,13 @@ if __name__ == '__main__':
                 chunk = reader.read(16384)
         sys.exit(0)
 
-    client = HTTPSClient(usejson, errout=errout, phmac=phmac, checkonly=checkonly)
+    mclient = HTTPSClient(usejson, errout=errout, phmac=phmac, checkonly=checkonly)
     if waitfor:
         status = 201
         while status != waitfor:
-            status, rsp = client.grab_url_with_status(sys.argv[1], data)
+            status, rsp = mclient.grab_url_with_status(sys.argv[1], data)
             sys.stdout.write(rsp.decode())
     elif checkonly:
-        sys.stdout.write(client.check_connections())
+        sys.stdout.write(mclient.check_connections())
     else:
-        sys.stdout.write(client.grab_url(sys.argv[1], data).decode())
+        sys.stdout.write(mclient.grab_url(sys.argv[1], data).decode())
