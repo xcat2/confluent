@@ -38,8 +38,11 @@ class VmConsole(conapi.Console):
         self.socket = None
 
     def connect(self, callback):
+        try:
+            self.socket = socket.create_connection((self.host, self.port))
+        except Exception:
+            callback(conapi.ConsoleEvent.Disconnect)
         self.connected = True
-        self.socket = socket.create_connection((self.host, self.port))
         self.datacallback = callback
         self.recvr = eventlet.spawn(self.recvdata)
 
@@ -56,8 +59,8 @@ class VmConsole(conapi.Console):
             try:
                 pendingdata = self.socket.recv(1024)
             except Exception as e:
-                pendingdata = ''
-            if pendingdata == '':
+                pendingdata = b''
+            if pendingdata == b'':
                 self.connected = False
                 self.datacallback(conapi.ConsoleEvent.Disconnect)
                 return
