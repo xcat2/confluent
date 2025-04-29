@@ -7,6 +7,7 @@ import json
 import struct
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 import eventlet.green.socket as socket
+import eventlet.green.ssl as ssl
 import eventlet
 import confluent.interface.console as conapi
 import io
@@ -30,18 +31,30 @@ def fixuuid(baduuid):
     return '-'.join(uuid).lower()
 
 class VmConsole(conapi.Console):
-    def __init__(self, host, port, tls):
-        if tls:
-            raise Exception('TODO') # need to have a framework for storing host certificate
+    def __init__(self, host, port, tls, configmanager=None):
+        self.tls = tls
         self.host = host
         self.port = port
         self.socket = None
+        self.nodeconfig = configmanager
 
     def connect(self, callback):
         try:
             self.socket = socket.create_connection((self.host, self.port))
         except Exception:
             callback(conapi.ConsoleEvent.Disconnect)
+        if self.tls:
+            if not self.nodeconfig:
+                raise Exception('config manager instance required for TLS operation')
+            kv = util.TLSCertVerifier(
+                self.nodeconfig, self.host, 'pubkeys.tls').verify_cert
+            sock = ssl.wrap_socket(self.socket, cert_reqs=ssl.CERT_NONE)
+            # The above is supersedeed by the _certverify, which provides
+            # known-hosts style cert validaiton
+            bincert = sock.getpeercert(binary_form=True)
+            if not kv(bincert):
+                raise pygexc.UnrecognizedCertificate('Unknown certificate', bincert)
+            self.socket = sock
         self.connected = True
         self.datacallback = callback
         self.recvr = eventlet.spawn(self.recvdata)
@@ -354,7 +367,7 @@ def create(nodes, element, configmanager, inputdata):
     clientsbynode = prep_vcsa_clients(nodes, configmanager)
     for node in nodes:
         serialdata = clientsbynode[node].get_vm_serial(node)
-        return VmConsole(serialdata['server'], serialdata['port'], serialdata['tls'])
+        return VmConsole(serialdata['server'], serialdata['port'], serialdata['tls'], configmanager)
 
 
 
