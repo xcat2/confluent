@@ -34,6 +34,10 @@ console process which will result in the console window closing.
  Dump the log with Timpstamps on the current, local log in /var/log/confluent/consoles.
   If in collective mode, this only makes sense to use on the current collective
   manager at this time.
+
+* `-s`, `--screenshot`:
+  Attempt to grab screenshot and render using kitty
+  image protocol. 
   
 * `-w`, `--windowed`:
   Open terminal windows for each node.  The
