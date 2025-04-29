@@ -79,6 +79,24 @@ fi
 cd /sys/class/net
 echo -n "Scanning for network configuration..."
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 30 ]; do
+    if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+	echo ""
+	echo "Media bootstrap detected, switching to media based boot"
+        mkdir -p /media/ident
+        mount /dev/disk/by-label/CNFLNT_IDNT /media/ident
+        if [ -e /media/ident/genesis_bootstrap.sh ]; then
+            exec bash /media/ident/genesis_bootstrap.sh
+        fi
+    fi
+    if [ -e /dev/disk/by-label/GENESIS-X86 ]; then
+	echo ""
+	echo "Media bootstrap detected, switching to media based boot"
+        mkdir -p /media/genesis
+        mount /dev/disk/by-label/GENESIS-X86 /media/genesis
+        if [ -e /media/genesis/genesis_bootstrap.sh ]; then
+            exec bash /media/genesis/genesis_bootstrap.sh
+        fi
+    fi
     TRIES=$((TRIES + 1))
     for i in *; do
         ip link set $i up
