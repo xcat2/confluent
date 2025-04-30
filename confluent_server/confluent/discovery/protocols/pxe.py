@@ -673,7 +673,7 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     if not myaddrs:
         log.log({'info': 'Unable to provide IPv6 boot services to {0}, no viable IPv6 configuration on interface index "{1}" to respond through.'.format(node, addr[-1])})
         return
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=addr[-1])
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
     ipv6addr = niccfg.get('ipv6_address', None)
     ipv6prefix = niccfg.get('ipv6_prefix', None)
     ipv6method = niccfg.get('ipv6_method', 'static')
@@ -798,7 +798,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         relayipa = socket.inet_ntoa(relayip)
     gateway = None
     netmask = None
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip)
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip, onlyfamily=socket.AF_INET)
     nicerr = niccfg.get('error_msg', False)
     if nicerr:
         log.log({'error': nicerr})
@@ -827,6 +827,9 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
     myipn = niccfg['deploy_server']
     if not myipn:
         myipn = info['netinfo']['recvip']
+    if niccfg['ipv4_address'] == myipn:
+        log.log({'error': 'Unable to serve {0} due to duplicated address between node and interface index "{}"'.format(node, info['netinfo']['ifidx'])})
+        return
     if httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(

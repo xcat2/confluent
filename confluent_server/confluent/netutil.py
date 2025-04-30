@@ -429,7 +429,7 @@ def noneify(cfgdata):
 # if switch and port available, that should match.
 def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                    serverip=None, relayipn=b'\x00\x00\x00\x00',
-                   clientip=None):
+                   clientip=None, onlyfamily=None):
     """Fetch network configuration parameters for a nic
 
     For a given node and interface, find and retrieve the pertinent network
@@ -508,9 +508,11 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         'ipv6_method': None,
     }
     myaddrs = []
+    if onlyfamily is None:
+        onlyfamily = 0
     if ifidx is not None:
         dhcprequested = False
-        myaddrs = get_my_addresses(ifidx)
+        myaddrs = get_my_addresses(ifidx, family=onlyfamily)
         v4broken = True
         v6broken = True
         for addr in myaddrs:
