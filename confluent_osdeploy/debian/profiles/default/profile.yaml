@@ -1,0 +1,3 @@
+label: %%DISTRO%% %%VERSION%% %%ARCH%% (Default Profile)
+kernelargs: quiet osprofile=%%PROFILE%%
+#installedargs: example # These arguments would be added to the installed system

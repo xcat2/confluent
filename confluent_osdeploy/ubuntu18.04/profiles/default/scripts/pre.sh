@@ -85,3 +85,4 @@ wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_APIKEY: $apike
 #curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/getinstalldisk > /tmp/getinstalldisk
 #python3 /tmp/getinstalldisk
 #sed -i s!%%INSTALLDISK%%!/dev/$(cat /tmp/installdisk)! /autoinstall.yaml
+umount /media
