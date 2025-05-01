@@ -30,6 +30,7 @@ import confluent.sortutil as sortutil
 import confluent.logreader as logreader
 import time
 import select
+import signal
 import socket
 import re
 import tty
@@ -53,7 +54,6 @@ except ImportError:
     class DumbWriter():
         def draw(self, imgfile):
             sys.stderr.write("PySixel not detected, Sixel format display not supported\n")
-
 
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
@@ -326,10 +326,34 @@ def reset_cursor(node):
 
 nodepositions = {}
 numrows = 0
+cwidth = 0
+cheight = 0
+imagedatabynode = {}
+
+def redraw():
+    for node in imagedatabynode:
+        imgdata = imagedatabynode[node]
+        if node in nodepositions:
+            prep_node_tile(node)
+            cursor_save()
+        else:
+            if options.interval is not None:
+                if node != firstnodename:
+                    sys.stderr.write('Multiple nodes not supported for interval')
+                    sys.exit(1)
+                sticky_cursor()
+            sys.stdout.write('{}: '.format(node))
+        # one row is used by our own name, so cheight - 1 for that allowance
+        draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
+        if node in nodepositions:
+            cursor_restore()
+            reset_cursor(node)
+        else:
+            sys.stdout.write('\n')
+        sys.stdout.flush()
+
 def do_screenshot():
     global numrows
-    cwidth = None
-    cheight = None
     sess = client.Command()
     if options.tile:
         imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
@@ -341,19 +365,31 @@ def do_screenshot():
         for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
             allnodes.append(res['item']['href'].replace('/', ''))
             numnodes += 1
-        cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
-        currcol = 1
-        currcolcell = 0
-        currrowcell = 0
-        for node in allnodes:
-            nodepositions[node] = currcolcell, currrowcell
-            if currcol < cols:
-                currcol += 1
-                currcolcell += cwidth
-            else:
-                currcol = 1
-                currcolcell = 0
-                currrowcell += cheight
+        def do_resize(a=None, b=None):
+            if a:
+                # on a window resize, clear the old stuff
+                # ideally we'd retain the images and redraw them
+                sys.stdout.write('\x1bc')
+            global numrows
+            global cwidth
+            global cheight
+            cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
+            currcol = 1
+            currcolcell = 0
+            currrowcell = 0
+            for node in allnodes:
+                nodepositions[node] = currcolcell, currrowcell
+                if currcol < cols:
+                    currcol += 1
+                    currcolcell += cwidth
+                else:
+                    currcol = 1
+                    currcolcell = 0
+                    currrowcell += cheight
+            if a:
+                redraw()
+        do_resize()
+        signal.signal(signal.SIGWINCH, do_resize)
     elif options.interval is not None:
         sys.stdout.write('\x1bc')
     firstnodename = None
@@ -368,6 +404,7 @@ def do_screenshot():
                     if len(imgdata) < 32: # We were subjected to error
                         sys.stderr.write(f'{node}: Unable to get screenshot\n')
                         continue
+                    imagedatabynode[node] = imgdata
                     if node in nodepositions:
                         prep_node_tile(node)
                         cursor_save()
