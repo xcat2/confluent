@@ -433,6 +433,27 @@ def check_esxi(isoinfo):
             'category': 'esxi{0}'.format(version.split('.', 1)[0])
         }
 
+def check_debian(isoinfo):
+    if '.disk/info' not in isoinfo[1]:
+        return None
+    diskinfo = isoinfo[1]['.disk/info']
+    diskbits = diskinfo.split(b' ')
+    if diskbits[0] == b'Debian':
+        if b'mini.iso' not in diskbits:
+            raise Exception("Debian only supports the 'netboot mini.iso' type images")
+        version = diskbits[2].decode()
+        arch = diskbits[4].decode()
+        if arch != 'amd64':
+            raise Exception("Unsupported debian architecture {}".format(arch))
+        arch = 'x86_64'
+        name = 'debian-{0}-{1}'.format(version, arch)
+        return {
+            'name': name,
+            'method': EXTRACT,
+            'category': 'debian',
+        }
+
+
 def check_ubuntu(isoinfo):
     if '.disk/info' not in isoinfo[1]:
         return None
