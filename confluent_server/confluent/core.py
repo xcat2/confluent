@@ -453,6 +453,9 @@ def _init_core():
             'default': 'ipmi',
         }),
         'deployment': {
+            'lock': PluginRoute({
+                'handler': 'attributes'
+            }),
             'ident_image': PluginRoute({
                 'handler': 'identimage'
             })

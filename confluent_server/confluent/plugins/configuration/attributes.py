@@ -109,6 +109,13 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata, clearwarnby
 
 def retrieve_nodes(nodes, element, configmanager, inputdata, clearwarnbynode):
     attributes = configmanager.get_node_attributes(nodes)
+    if element[-1] == 'lock':
+        for node in nodes:
+            lockstate = attributes.get(node, {}).get('deployment.lock', {}).get('value', None)
+            if lockstate not in ('locked', 'autolock'):
+                lockstate = 'unlocked'
+            yield msg.DeploymentLock(node, lockstate)
+        return
     if element[-1] == 'all':
         for node in util.natural_sort(nodes):
             if clearwarnbynode and node in clearwarnbynode:
@@ -247,12 +254,20 @@ def yield_rename_resources(namemap, isnode):
         else:
             yield msg.RenamedResource(node, namemap[node])
 
+def update_locks(nodes, configmanager, inputdata):
+    for node in nodes:
+        updatestate = inputdata.inputbynode[node]
+        configmanager.set_node_attributes({node: {'deployment.lock': updatestate}})
+        yield msg.DeploymentLock(node, updatestate)
+
 def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
     if not nodes:
         raise exc.InvalidArgumentException(
             'No action to take, noderange is empty (if trying to define '
             'group attributes, use nodegroupattrib)')
+    if element[-1] == 'lock':
+        return update_locks(nodes, configmanager, inputdata)
     if element[-1] == 'check':
         for node in nodes:
             check = inputdata.get_attributes(node, allattributes.node)
@@ -273,6 +288,15 @@ def update_nodes(nodes, element, configmanager, inputdata):
         configmanager.rename_nodes(namemap)
         return yield_rename_resources(namemap, isnode=True)
     clearwarnbynode = {}
+    for node in nodes:
+        updatenode = inputdata.get_attributes(node, allattributes.node)
+        if updatenode and 'deployment.lock' in updatenode:
+            raise exc.InvalidArgumentException('Deployment lock must be manipulated by {node}/deployment/lock api')
+        if updatenode and ('deployment.pendingprofile' in updatenode or 'deployment.apiarmed' in updatenode):
+            lockcheck = configmanager.get_node_attributes(node, 'deployment.lock')
+            lockstate = lockcheck.get(node, {}).get('deployment.lock', {}).get('value', None)
+            if lockstate == 'locked':
+                raise exc.InvalidArgumentException('Request to set deployment for a node that has locked deployment')
     for node in nodes:
         updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []

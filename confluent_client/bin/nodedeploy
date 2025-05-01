@@ -117,6 +117,16 @@ def main(args):
             else:
                 sys.stderr.write('No deployment profiles available, try osdeploy import or imgutil capture\n')
             sys.exit(1)
+        lockednodes = []
+        for lockinfo in c.read('/noderange/{0}/deployment/lock'.format(args.noderange)):
+            for node in lockinfo.get('databynode', {}):
+                lockstate = lockinfo['databynode'][node]['lock']['value']
+                if lockstate == 'locked':
+                    lockednodes.append(node)
+        if lockednodes:
+            sys.stderr.write('Requested noderange has nodes with locked deployment: ' + ','.join(lockednodes))
+            sys.stderr.write('\n')
+            sys.exit(1)
         armonce(args.noderange, c)
         setpending(args.noderange, args.profile, c)
     else:

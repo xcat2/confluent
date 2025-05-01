@@ -574,6 +574,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
         return InputLicense(path, nodes, inputdata, configmanager)
+    elif path == ['deployment', 'lock'] and inputdata:
+        return InputDeploymentLock(path, nodes, inputdata)
     elif path == ['deployment', 'ident_image']:
         return InputIdentImage(path, nodes, inputdata)
     elif path == ['console', 'ikvm']:
@@ -956,6 +958,18 @@ class ConfluentInputMessage(ConfluentMessage):
 class InputIdentImage(ConfluentInputMessage):
     keyname = 'ident_image'
     valid_values = ['create']
+
+class InputDeploymentLock(ConfluentInputMessage):
+    keyname = 'lock'
+    valid_values = ['autolock', 'unlocked', 'locked']
+
+class DeploymentLock(ConfluentChoiceMessage):
+    valid_values = set([
+        'autolock',
+        'locked',
+        'unlocked',
+    ])
+    keyname = 'lock'
 
 class InputIkvmParams(ConfluentInputMessage):
     keyname = 'method'

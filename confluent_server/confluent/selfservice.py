@@ -490,6 +490,10 @@ def handle_request(env, start_response):
             updates['deployment.pendingprofile'] = {'value': ''}
             if targattr == 'deployment.profile':
                 updates['deployment.stagedprofile'] = {'value': ''}
+                dls = cfg.get_node_attributes(nodename, 'deployment.lock')
+                dls = dls.get(nodename, {}).get('deployment.lock', {}).get('value', None)
+                if dls == 'autolock':
+                    updates['deployment.lock'] = 'locked'
             currprof = currattr.get(targattr, {}).get('value', '')
             if currprof != pending:
                 updates[targattr] = {'value': pending}

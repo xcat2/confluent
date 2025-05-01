@@ -215,6 +215,13 @@ node = {
                         'Using this requires that collective members be '
                         'defined as nodes for noderange expansion')
     },
+    'deployment.lock': {
+        'description': ('Indicates whether deployment actions should be impeded. '
+                        'If locked, it indicates that a pending profile should not be applied. '
+                        'If "autolock", then locked will be set when current pending deployment completes. '
+                         ),
+        'validlist':    ('autolock', 'locked')
+    },
     'deployment.pendingprofile': {
         'description': ('An OS profile that is pending deployment.  This indicates to '
                         'the network boot subsystem what should be offered when a potential '
