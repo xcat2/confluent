@@ -441,8 +441,17 @@ def check_debian(isoinfo):
     if diskbits[0] == b'Debian':
         if b'mini.iso' not in diskbits:
             raise Exception("Debian only supports the 'netboot mini.iso' type images")
-        version = diskbits[2].decode()
+        major = diskbits[2].decode()
         arch = diskbits[4].decode()
+        buildtag = diskbits[-1].decode().strip() # 20230607+deb12u10
+        minor = '0'
+        if '+' in buildtag:
+            _, variant = buildtag.split('+')
+            variant = variant.replace('deb', '')
+            if 'u' in variant:
+                minor = variant.split('u')[1]
+        version = '{0}.{1}'.format(major, minor)
+
         if arch != 'amd64':
             raise Exception("Unsupported debian architecture {}".format(arch))
         arch = 'x86_64'

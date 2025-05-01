@@ -1,0 +1,4 @@
+#!/bin/bash
+# Add this to firstboot.d
+apt-get install proxmox-ve postfix open-iscsi chrony
+

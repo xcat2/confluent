@@ -1,0 +1,18 @@
+#!/bin/bash
+# This script would run in post.d
+#
+echo "deb [arch=amd64] http://download.proxmox.com/debian/pve bookworm pve-no-subscription" > /etc/apt/sources.list.d/pve-install-repo.list
+wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
+sum=$(sha512sum /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg)
+if [ "$sum" -ne "7da6fe34168adc6e479327ba517796d4702fa2f8b4f0a9833f5ea6e6b48f6507a6da403a274fe201595edc86a84463d50383d07f64bdde2e3658108db7d6dc87" ]; then
+	echo "Mismatch in fingerprint!"
+	exit 1
+fi
+apt-get update && apt-get full-upgrade
+
+apt-get install proxmox-default-kernel
+apt-get remove linux-image-amd64 'linux-image-6.1*'
+update-grub
+apt-get remove os-probec
+
+
