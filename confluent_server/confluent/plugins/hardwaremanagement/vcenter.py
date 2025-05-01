@@ -265,18 +265,23 @@ class VmwApiClient:
         raise Exception("Unknown response {}".format(repr(rsp)))
 
     def set_vm_power(self, vm, state):
+        current = None
+        targstate = state
         vm = self.index_vm(vm)
         if state == 'boot':
             current = self.get_vm_power(vm)
             if current == 'on':
                 state = 'reset'
+                targstate = state
             else:
+                targstate = 'on'
                 state = 'start'
         elif state == 'on':
             state = 'start'
         elif state == 'off':
             state = 'stop'
         rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/power?action={state}', method='POST')
+        return targstate, current
 
 
     def set_vm_bootdev(self, vm, bootdev):
@@ -356,8 +361,8 @@ def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         currclient = clientsbynode[node]
         if element == ['power', 'state']:
-            currclient.set_vm_power(node, inputdata.powerstate(node))
-            yield  msg.PowerState(node, currclient.get_vm_power(node))
+            newstate, oldstate = currclient.set_vm_power(node, inputdata.powerstate(node))
+            yield  msg.PowerState(node, newstate, oldstate)
         elif element == ['boot', 'nextdevice']:
             currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
             yield msg.BootDevice(node, currclient.get_vm_bootdev(node))

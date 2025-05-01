@@ -12,6 +12,7 @@ import confluent.interface.console as conapi
 import io
 import urllib.parse as urlparse
 import eventlet.green.ssl as ssl
+import eventlet
 
 
 try:
@@ -282,17 +283,38 @@ class PmxApiClient:
 
     def set_vm_power(self, vm, state):
         host, guest = self.get_vm(vm)
+        current = None
+        newstate = ''
+        targstate = state
+        if targstate == 'boot':
+            targstate = 'on'
         if state == 'boot':
             current = self.get_vm_power(vm)
             if current == 'on':
                 state = 'reset'
+                newstate = 'reset'
             else:
                 state = 'start'
         elif state == 'on':
             state = 'start'
         elif state == 'off':
             state = 'stop'
-        rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
+        if state == 'reset': # check for pending config
+            cfg = self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
+            for datum in cfg['data']:
+                if datum['key'] == 'boot' and 'pending' in datum:
+                    self.set_vm_power(vm, 'off')
+                    self.set_vm_power(vm, 'on')
+                    state = ''
+                    newstate = 'reset'
+        if state:
+            rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
+        if state and state != 'reset':
+            newstate = self.get_vm_power(vm)
+            while newstate != targstate:
+                eventlet.sleep(0.1)
+                newstate = self.get_vm_power(vm)
+        return newstate, current
 
     def set_vm_bootdev(self, vm, bootdev):
         host, guest = self.get_vm(vm)
@@ -370,8 +392,8 @@ def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         currclient = clientsbynode[node]
         if element == ['power', 'state']:
-            currclient.set_vm_power(node, inputdata.powerstate(node))
-            yield  msg.PowerState(node, currclient.get_vm_power(node))
+            newstate, oldstate = currclient.set_vm_power(node, inputdata.powerstate(node))
+            yield  msg.PowerState(node, newstate, oldstate)
         elif element == ['boot', 'nextdevice']:
             currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
             yield msg.BootDevice(node, currclient.get_vm_bootdev(node))
