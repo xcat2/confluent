@@ -1091,6 +1091,8 @@ def resourcehandler_backend(env, start_response):
             yield e.get_error_body()
 
 def _assemble_html(responses, resource, querydict, url, extension):
+    yield '<html><body>HTML API Explorer is discontinued, notify developers if you want this back</body></html>'
+    return
     yield '<html><head><meta charset="UTF-8"><title>' \
           'Confluent REST Explorer: ' + url + '</title></head>' \
                                               '<body><form action="' + \
