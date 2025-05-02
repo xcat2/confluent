@@ -1,4 +1,5 @@
 #!/bin/bash
 # Add this to firstboot.d
-apt-get install proxmox-ve postfix open-iscsi chrony
+export DEBIAN_FRONTEND=noninteractive
+apt-get -y install proxmox-ve postfix open-iscsi chrony < /dev/null
 
