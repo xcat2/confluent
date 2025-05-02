@@ -1226,8 +1226,9 @@ def serve(bind_host, bind_port):
                     bind_host, family=socket.AF_UNIX)
                 os.chmod(bind_host, 0o666)
             else:
+                addrinfo = socket.getaddrinfo(bind_host, bind_port)[0]
                 sock = eventlet.listen(
-                    (bind_host, bind_port, 0, 0), family=socket.AF_INET6)
+                    addrinfo[-1], family=addrinfo[0])
         except socket.error as e:
             if e.errno != 98:
                 raise
@@ -1251,7 +1252,7 @@ def serve(bind_host, bind_port):
 class HttpApi(object):
     def __init__(self, bind_host=None, bind_port=None):
         self.server = None
-        self.bind_host = bind_host or '::'
+        self.bind_host = bind_host or '127.0.0.1'
         self.bind_port = bind_port or 4005
 
     def start(self):
