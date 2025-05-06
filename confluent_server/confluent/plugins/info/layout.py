@@ -131,6 +131,8 @@ def retrieve(nodes, element, configmanager, inputdata):
                         enclosuremap[needcoord[node]]['coordinates'][node] = kvp[node]['slotcoord']
                         del needcoord[node]
     for enclosure in enclosuremap:
+        if enclosure not in allnodedata:
+            continue
         if 'slots' not in allnodedata[enclosure]:
             # if slots not described by chassis, assume a double-wide form factor
             allnodedata[enclosure]['slots'] = [2, allnodedata[enclosure]['height']]
