@@ -213,19 +213,34 @@ if __name__ == '__main__':
         else:
             emprint('No trusted ssh keys for root user, passwordless SSH from managers to nodes may not work (Example resolution: osdeploy initialize -u)')
         if sshutil.sshver() > 7.6:
-            fprint('Checking SSH Certificate authority: ')
-            try:
-                sshutil.prep_ssh_key('/etc/confluent/ssh/ca')
-                print('OK')
-            except Exception:
-                emprint('Failed to load SSH authority key, deployed servers will not have host certificates for known_hosts and users may be unable to ssh between nodes without a password (Example resolution: osdeploy initialize -s)')            
-            fprint('Checking confluent SSH automation key: ')
-            try:
-                sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
-                print('OK')
-            except Exception:
-                emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
-            os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+            child = os.fork()
+            if child > 0:
+                pid, extcode = os.waitpid(child, 0)
+            else:
+                sshutil.ready_keys = {}
+                sshutil.agent_pid = None
+                cuser = pwd.getpwnam('confluent')
+                os.setgid(cuser.pw_gid)
+                os.setuid(cuser.pw_uid)
+                fprint('Checking SSH Certificate authority: ')
+                try:
+                    sshutil.prep_ssh_key('/etc/confluent/ssh/ca')
+                    print('OK')
+                except Exception as e:
+                    if type(e).__name__ == 'CalledProcessError' and 'UNPROTECTED' in e.stderr.decode():
+                        emprint('Permissions incorrect on /etc/confluent/ssh/ca (Example resolution: chmod 600 /etc/confluent/ssh/ca)')
+                    else:
+                        emprint('Failed to load SSH authority key, deployed servers will not have host certificates for known_hosts and users may be unable to ssh between nodes without a password (Example resolution: osdeploy initialize -s)')
+                fprint('Checking confluent SSH automation key: ')
+                try:
+                    sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+                    print('OK')
+                except Exception as e:
+                    if type(e).__name__ == 'CalledProcessError' and 'UNPROTECTED' in e.stderr.decode():
+                        emprint('Permissions incorrect on /etc/confluent/ssh/automation (Example resolution: chmod 600 /etc/confluent/ssh/automation)')
+                    else:
+                        emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
+                sys.exit(0)
         fprint('Checking for blocked insecure boot: ')
         if insecure_boot_attempts():
             emprint('Some nodes are attempting network boot using PXE or HTTP boot, but the node is not configured to allow this (Example resolution: nodegroupattrib everything deployment.useinsecureprotocols=firmware)')

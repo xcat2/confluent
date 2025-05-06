@@ -136,7 +136,7 @@ def prep_ssh_key(keyname):
         os.environ['SSH_ASKPASS'] = askpass
         try:
             with open(os.devnull, 'wb') as devnull:
-                subprocess.check_output(['ssh-add', keyname], stdin=devnull, stderr=devnull)
+                subprocess.check_output(['ssh-add', keyname], stdin=devnull, stderr=subprocess.PIPE)
         finally:
             del os.environ['CONFLUENT_SSH_PASSPHRASE']
             del os.environ['DISPLAY']
