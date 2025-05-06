@@ -752,10 +752,13 @@ class ElHandler(OsHandler):
             subprocess.check_call(['yum'] + self.yumargs)
         else:
             subprocess.check_call(['yum', '-y'] + self.yumargs)
-        with open(os.path.join(self.targpath, 'etc/selinux/config'), 'r') as seconfigin:
-            seconfig = seconfigin.read().replace('SELINUX=enforcing', 'SELINUX=disabled')
-        with open(os.path.join(self.targpath, 'etc/selinux/config'), 'w') as seconfigout:
-            seconfigout.write(seconfig)
+        try:
+            with open(os.path.join(self.targpath, 'etc/selinux/config'), 'r') as seconfigin:
+                seconfig = seconfigin.read().replace('SELINUX=enforcing', 'SELINUX=disabled')
+            with open(os.path.join(self.targpath, 'etc/selinux/config'), 'w') as seconfigout:
+                seconfigout.write(seconfig)
+        except Exception:  # this might not exist in all images
+            pass
         with open('/proc/mounts') as mountinfo:
             for line in mountinfo.readlines():
                 if line.startswith('selinuxfs '):
