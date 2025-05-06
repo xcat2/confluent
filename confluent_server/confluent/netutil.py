@@ -575,6 +575,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 cfgdata[srvkey] = socket.inet_ntop(fam, svrip)
             for candidate in cfgbyname:
                 ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
+                if not ipmethod:
+                    ipmethod = 'static'
                 if ipmethod == 'dhcp':
                     dhcprequested = True
                     continue
