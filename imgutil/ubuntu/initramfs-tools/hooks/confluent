@@ -46,3 +46,4 @@ manual_add_modules xfs nvme cdc_ether mptctl mlx4_ib mlx5_ub ib_umad ib_ipoib
 manual_add_modules ice i40e hfi1 bnxt_en qed qede dm-mod dm-log raid0 raid1
 manual_add_modules raid10 raid456 dm-raid dm-thin-pool dm-crypt dm-snapshot
 manual_add_modules linear dm-era fuse overlay squashfs loop zram
+manual_add_modules vmxnet3 r8169
