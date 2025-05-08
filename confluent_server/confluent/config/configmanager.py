@@ -1112,7 +1112,10 @@ class _ExpressionFormat(string.Formatter):
             val = int(val)
         except Exception:
             pass
-        return format(val, format_spec)
+        formatted = format(val, format_spec)
+        if len(formatted) > 16384:
+            raise Exception('Field length exceeded during formatting')
+        return formatted
 
     def _handle_ast_node(self, node):
         if isinstance(node, ast.Num):
