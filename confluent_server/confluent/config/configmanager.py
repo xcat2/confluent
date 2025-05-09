@@ -132,6 +132,16 @@ _validroles = ['Administrator', 'Operator', 'Monitor', 'Stub']
 
 membership_callback = None
 
+
+class ExpressionChecker(string.Formatter):
+    def format_field(self, val, format_spec):
+        if len(format_spec) > 8:
+            raise Exception(f'Format specification {format_spec} exceeds maximum supported length of 8')
+        return '1'
+
+    def get_value(self, first, args, kwargs):
+        return 1
+
 def attrib_supports_expression(attrib):
     if not isinstance(attrib, str):
         attrib = attrib.decode('utf8')
@@ -1925,6 +1935,8 @@ class ConfigManager(object):
                                 curr[attrib]['value'])
                     if 'value' in curr[attrib]:
                         del curr[attrib]['value']
+                if 'expression' in curr[attrib]:
+                    ExpressionChecker().format(curr[attrib]['expression'])
         if cfgleader:  # currently config slave to another
             return exec_on_leader('_rpc_master_set_group_attributes',
                                   self.tenant, attribmap, autocreate)
@@ -2374,6 +2386,8 @@ class ConfigManager(object):
         for node in attribmap:
             curr = attribmap[node]
             for attrib in curr:
+                if 'expression' in curr[attrib]:
+                    ExpressionChecker().format(curr[attrib]['expression'])
                 if attrib.startswith('crypted.'):
                     if not isinstance(curr[attrib], dict):
                         curr[attrib] = {'value': curr[attrib]}
