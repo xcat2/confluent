@@ -139,6 +139,9 @@ class ExpressionChecker(string.Formatter):
             raise Exception(f'Format specification {format_spec} exceeds maximum supported length of 8')
         return '1'
 
+    def get_field(self, field_name, args, kwargs):
+        return field_name, field_name
+
     def get_value(self, first, args, kwargs):
         return 1
 
