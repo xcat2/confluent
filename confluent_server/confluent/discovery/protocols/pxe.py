@@ -169,14 +169,18 @@ pxearchs = {
 
 
 shorturls = {}
-def register_shorturl(url):
+urlidbyurl = {}
+def register_shorturl(url, can302=True, relurl=None, filename=None):
+    if url in urlidbyurl:
+        return urlidbyurl[url]
     urlid = base64.urlsafe_b64encode(os.urandom(3))
     while urlid in shorturls:
         urlid = base64.urlsafe_b64encode(os.urandom(3))
     urlid = urlid.decode()
-    shorturls[urlid] = url
+    shorturls[urlid] = (url, can302, relurl, filename)
     returl = '/'.join(url.split('/')[:3])
     returl += '/confluent-api/boot/su/' + urlid + '/' + os.path.basename(url)
+    urlidbyurl[url] = returl
     return returl
 
 
@@ -830,16 +834,20 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
     if niccfg['ipv4_address'] == myipn:
         log.log({'error': 'Unable to serve {0} due to duplicated address between node and interface index "{}"'.format(node, info['netinfo']['ifidx'])})
         return
+    can302 = True
     if httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
             proto, myipn, profile
         )
+        bootshorturl = '/confluent-public/os/{0}/boot.img'.format(profile)
+        bootfilename = '/var/lib/confluent/public/os/{0}/boot.img'.format(profile)
+        can302 = False
         if not isinstance(bootfile, bytes):
             bootfile = bootfile.encode('utf8')
         if len(bootfile) > 127:
                 if bootfile.startswith(b'http'):
-                    bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
+                    bootfile = register_shorturl(bootfile.decode('utf8'), can302, bootshorturl, bootfilename).encode('utf8')
                 else:
                     log.log(
                         {'info': 'Boot offer cannot be made to {0} as the '

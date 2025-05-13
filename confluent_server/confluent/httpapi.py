@@ -684,14 +684,26 @@ def resourcehandler_backend(env, start_response):
         if not request[0]:
             request = request[1:]
         if request[1] == 'su':  # shorturl
-            targurl = pxe.shorturls.get(request[2], None)
+            targurl, can302, relurl, bootfilename = pxe.shorturls.get(request[2], (None, None, None, None))
             if not targurl:
                 start_response('404 Not Found', headers)
                 yield ''
                 return
-            headers.append(('Location', targurl))
-            start_response('302 Found', headers)
-            yield ''
+            if can302:  # Maximum transparency helps iPXE and whatever else know the most
+                headers.append(('Location', targurl))
+                start_response('302 Found', headers)
+                yield ''
+            else: # The user agent is too dumb, check headers for server side redirects
+                delegatemethod = env.get('HTTP_X_DELEGATE_METHOD', None)
+                if delegatemethod == 'accel':
+                    headers = [('Content-Type', 'application/octet-stream')]
+                    headers.append(('X-Accel-Redirect', relurl))
+                    start_response('200 OK', headers)
+                    yield ''
+                else:
+                    start_response('502 Bad Gateway', headers)
+                    yield 'URL shortening for a limited client without proxy advertised accel support'
+                    log.log({'error': f'Profile name exceeded DHCP limits, and reverse proxy capabilities not detected, switch to the nginx configuration or shorten the profile name: {relurl}'})
             return
         if len(request) != 4:
             start_response('400 Bad Request', headers)
