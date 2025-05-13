@@ -38,7 +38,7 @@ import termios
 import fcntl
 import confluent.screensqueeze as sq
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw
 except ImportError:
     Image = None
 
@@ -213,6 +213,27 @@ def cursor_hide():
 def cursor_show():
     sys.stdout.write('\x1b[?25h')
 
+def draw_text(text, width, height):
+    if Image:
+        maxfntsize = 256
+        nerr = Image.new(mode='RGB', size=(1024,768), color='green')
+        nd = ImageDraw.Draw(nerr)
+        for txtpiece in text.split('\n'):
+            fntsize = 8
+            while nd.textlength(txtpiece, font_size=fntsize) < 896:
+                fntsize += 1
+            fntsize -= 1
+            if fntsize < maxfntsize:
+                maxfntsize = fntsize
+        nd.text((64, 64), text, font_size=maxfntsize)
+        outfile = io.BytesIO()
+        nerr.save(outfile, format='PNG')
+        data = base64.b64encode(outfile.getbuffer())
+        draw_image(data, width, height)
+    else:
+        sys.stdout.write(text)
+        cursor_left(len(txt))
+
 def draw_image(data, width, height):
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
     if imageformat == 'sixel':
@@ -243,7 +264,6 @@ def iterm_draw(data, width, height):
     sys.stdout.write('\a')
     sys.stdout.flush()
 
-svgared= ';eNrtwgEJAAAAAqD+n64DTVBsUlVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVXVd2vglgY='
 
 def kitty_draw(data, width, height):
     if Image:
@@ -254,18 +274,14 @@ def kitty_draw(data, width, height):
         try:
             img = Image.open(binfile)
         except Exception as e:
-            errstr = 'Error rendering image: ' + str(e)
-            sys.stdout.write(errstr)
-            cursor_left(len(errstr))
-            sys.stdout.write('\x1b_Ga=T,f=24,s=640,v=480,z=-1,o=z')
-            if height:
-                sys.stdout.write(f',r={height},c={width}')
-            sys.stdout.write(svgared)
-            sys.stdout.write('\x1b\\')
-            sys.stdout.flush()
-            return
+            errstr = 'Error rendering image:\n' + str(e)
+            return draw_text(errstr, width, height)
+        nimg = Image.new(mode='RGB', size=(img.width + 4, img.height + 4), color='black')
+        nd = ImageDraw.Draw(nimg)
+        nd.rectangle((0, 0, nimg.width - 1, nimg.height -1), outline='white', width=1)
+        nimg.paste(img, box=(2, 2))
         outfile = io.BytesIO()
-        img.save(outfile, format='PNG')
+        nimg.save(outfile, format='PNG')
         data = base64.b64encode(outfile.getbuffer())
     preamble = '\x1b_Ga=T,f=100'
     if height:
@@ -328,8 +344,8 @@ def prep_node_tile(node):
         cursor_right(currcolcell)
     if currrowcell:
         cursor_down(currrowcell)
-    sys.stdout.write(node)
-    cursor_left(len(node))
+    sys.stdout.write('▏' + node)
+    cursor_left(len(node) + 1)
     cursor_down()
 
 def reset_cursor(node):
@@ -415,9 +431,9 @@ def do_screenshot():
                     firstnodename = node
                 imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
                 if imgdata:
+                    errorstr = ''
                     if len(imgdata) < 32: # We were subjected to error
-                        sys.stderr.write(f'{node}: Unable to get screenshot\n')
-                        continue
+                        errorstr = f'Unable to get screenshot'
                     imagedatabynode[node] = imgdata
                     if node in nodepositions:
                         prep_node_tile(node)
@@ -430,7 +446,10 @@ def do_screenshot():
                             sticky_cursor()
                         sys.stdout.write('{}: '.format(node))
                     # one row is used by our own name, so cheight - 1 for that allowance
-                    draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
+                    if errorstr:
+                        draw_text(errorstr, cwidth, cheight -1 if cheight else cheight)
+                    else:
+                        draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
                     if node in nodepositions:
                         cursor_restore()
                         reset_cursor(node)
