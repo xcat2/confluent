@@ -77,6 +77,8 @@ def fixup_ubuntu_grub_serial():
 def get_serial_config():
     if not os.path.exists('/sys/firmware/efi'):
         return None
+    if not os.path.exists('/sys/firmware/acpi/tables/SPCR'):
+        return None
     spcr = open("/sys/firmware/acpi/tables/SPCR", "rb")
     spcr = bytearray(spcr.read())
     if spcr[8] != 2 or spcr[36] != 0 or spcr[40] != 1:
