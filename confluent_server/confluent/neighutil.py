@@ -48,14 +48,15 @@ def _update_neigh():
     ndmsg=  b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
     s.sendall(nlhdr + ndmsg)
     neightable = {}
+    inprogress = True
     try:
-        while True:
+        while inprogress:
             pdata = s.recv(65536)
             v = memoryview(pdata)
-            if struct.unpack('H', v[4:6])[0] == 3:
-                break
             while len(v):
                 length, typ = struct.unpack('IH', v[:6])
+                if typ == 3:
+                    inprogress = False
                 if typ == 28:
                     hlen = struct.calcsize('BIHBB')
                     _, idx, state, flags, typ = struct.unpack('BIHBB', v[16:16+hlen])
