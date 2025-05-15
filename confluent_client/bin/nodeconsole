@@ -213,19 +213,28 @@ def cursor_hide():
 def cursor_show():
     sys.stdout.write('\x1b[?25h')
 
+def get_pix_dimensions(width, height):
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
+    imgwidth = int(pixwidth / cwidth * width)
+    imgheight = int(pixheight / cheight * height)
+    return imgwidth, imgheight
+
 def draw_text(text, width, height):
     if Image:
         maxfntsize = 256
-        nerr = Image.new(mode='RGB', size=(1024,768), color='green')
+        imgwidth, imgheight = get_px_dimensions(width, height)
+        nerr = Image.new(mode='RGB', size=(imgwidth, imgwidth), color='green')
         nd = ImageDraw.Draw(nerr)
         for txtpiece in text.split('\n'):
             fntsize = 8
-            while nd.textlength(txtpiece, font_size=fntsize) < 896:
+            while nd.textlength(txtpiece, font_size=fntsize) < int(imgwidth * 0.90):
                 fntsize += 1
             fntsize -= 1
             if fntsize < maxfntsize:
                 maxfntsize = fntsize
-        nd.text((64, 64), text, font_size=maxfntsize)
+        hmargin = int(imgwidth * 0.05)
+        vmargin = int(imgheight * 0.10)
+        nd.text((hmargin, vmargin), text, font_size=maxfntsize)
         outfile = io.BytesIO()
         nerr.save(outfile, format='PNG')
         data = base64.b64encode(outfile.getbuffer())
@@ -276,6 +285,8 @@ def kitty_draw(data, width, height):
         except Exception as e:
             errstr = 'Error rendering image:\n' + str(e)
             return draw_text(errstr, width, height)
+        imgwidth, imgheight = get_pix_dimensions(width, height)
+        img = img.resize((imgwidth - 4, imgheight - 4))
         nimg = Image.new(mode='RGB', size=(img.width + 4, img.height + 4), color='black')
         nd = ImageDraw.Draw(nimg)
         nd.rectangle((0, 0, nimg.width - 1, nimg.height -1), outline='white', width=1)
