@@ -222,8 +222,8 @@ def get_pix_dimensions(width, height):
 def draw_text(text, width, height):
     if Image:
         maxfntsize = 256
-        imgwidth, imgheight = get_px_dimensions(width, height)
-        nerr = Image.new(mode='RGB', size=(imgwidth, imgwidth), color='green')
+        imgwidth, imgheight = get_pix_dimensions(width, height)
+        nerr = Image.new(mode='RGB', size=(imgwidth, imgheight), color='green')
         nd = ImageDraw.Draw(nerr)
         for txtpiece in text.split('\n'):
             fntsize = 8
@@ -235,16 +235,36 @@ def draw_text(text, width, height):
         hmargin = int(imgwidth * 0.05)
         vmargin = int(imgheight * 0.10)
         nd.text((hmargin, vmargin), text, font_size=maxfntsize)
+        nd.rectangle((0, 0, nerr.width - 1, nerr.height -1), outline='white', width=1)
         outfile = io.BytesIO()
         nerr.save(outfile, format='PNG')
         data = base64.b64encode(outfile.getbuffer())
-        draw_image(data, width, height)
+        draw_image(data, width, height, doscale=False)
     else:
         sys.stdout.write(text)
         cursor_left(len(txt))
 
-def draw_image(data, width, height):
+def draw_image(data, width, height, doscale=True):
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
+    if doscale and Image and width:
+        bindata = base64.b64decode(data)
+        binfile = io.BytesIO()
+        binfile.write(bindata)
+        binfile.seek(0)
+        try:
+            img = Image.open(binfile)
+        except Exception as e:
+            errstr = 'Error rendering image:\n' + str(e)
+            return draw_text(errstr, width, height)
+        imgwidth, imgheight = get_pix_dimensions(width, height)
+        img = img.resize((imgwidth - 4, imgheight - 4))
+        nimg = Image.new(mode='RGB', size=(img.width + 4, img.height + 4), color='black')
+        nd = ImageDraw.Draw(nimg)
+        nd.rectangle((0, 0, nimg.width - 1, nimg.height -1), outline='white', width=1)
+        nimg.paste(img, box=(2, 2))
+        outfile = io.BytesIO()
+        nimg.save(outfile, format='PNG')
+        data = base64.b64encode(outfile.getbuffer())
     if imageformat == 'sixel':
         sixel_draw(data)
     elif imageformat == 'iterm':
@@ -275,25 +295,6 @@ def iterm_draw(data, width, height):
 
 
 def kitty_draw(data, width, height):
-    if Image:
-        bindata = base64.b64decode(data)
-        binfile = io.BytesIO()
-        binfile.write(bindata)
-        binfile.seek(0)
-        try:
-            img = Image.open(binfile)
-        except Exception as e:
-            errstr = 'Error rendering image:\n' + str(e)
-            return draw_text(errstr, width, height)
-        imgwidth, imgheight = get_pix_dimensions(width, height)
-        img = img.resize((imgwidth - 4, imgheight - 4))
-        nimg = Image.new(mode='RGB', size=(img.width + 4, img.height + 4), color='black')
-        nd = ImageDraw.Draw(nimg)
-        nd.rectangle((0, 0, nimg.width - 1, nimg.height -1), outline='white', width=1)
-        nimg.paste(img, box=(2, 2))
-        outfile = io.BytesIO()
-        nimg.save(outfile, format='PNG')
-        data = base64.b64encode(outfile.getbuffer())
     preamble = '\x1b_Ga=T,f=100'
     if height:
         preamble += f',r={height},c={width}'
