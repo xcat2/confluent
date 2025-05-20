@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2016-2017 Lenovo
@@ -109,6 +109,7 @@ def run():
             ex = exp.get('databynode', ())
             for node in ex:
                 cmdparms.append((node, ex[node]['value']))
+    poller = select.epoll()
     for node, cmd in cmdparms:
         sshnode = nodemap.get(node, node)
         if not isinstance(cmd, str) and not isinstance(cmd, bytes):
@@ -121,19 +122,23 @@ def run():
         cmdv += [sshnode, cmd]
         if currprocs < concurrentprocs:
             currprocs += 1
-            run_cmdv(node, cmdv, all, pipedesc)
+            run_cmdv(node, cmdv, all, poller, pipedesc)
         else:
             pendingexecs.append((node, cmdv))
     if not all or exitcode:
         sys.exit(exitcode)
-    rdy, _, _ = select.select(all, [], [], 10)
+    rdy = poller.poll(10)
     while all:
         pernodeout = {}
         for r in rdy:
+            r = r[0]
             desc = pipedesc[r]
+            r = desc['file']
             node = desc['node']
             data = True
-            while data and select.select([r], [], [], 0)[0]:
+            singlepoller = select.epoll()
+            singlepoller.register(r, select.EPOLLIN)
+            while data and singlepoller.poll(0):
                 data = r.readline()
                 if data:
                     if desc['type'] == 'stdout':
@@ -153,10 +158,12 @@ def run():
                     if ret is not None:
                         exitcode = exitcode | ret
                         all.discard(r)
+                        poller.unregister(r)
                         r.close()
                         if desc['type'] == 'stdout' and pendingexecs:
                             node, cmdv = pendingexecs.popleft()
-                            run_cmdv(node, cmdv, all, pipedesc)
+                            run_cmdv(node, cmdv, all, poller, pipedesc)
+            singlepoller.close()
         for node in sortutil.natural_sort(pernodeout):
             for line in pernodeout[node]:
                 line = client.stringify(line)
@@ -167,19 +174,21 @@ def run():
                     sys.stdout.write('{0}: {1}'.format(node, line))
         sys.stdout.flush()
         if all:
-            rdy, _, _ = select.select(all, [], [], 10)
+            rdy = poller.poll(10)
     sys.exit(exitcode)
 
 
-def run_cmdv(node, cmdv, all, pipedesc):
+def run_cmdv(node, cmdv, all, poller, pipedesc):
     nopen = subprocess.Popen(
         cmdv, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    pipedesc[nopen.stdout] = {'node': node, 'popen': nopen,
-                              'type': 'stdout'}
-    pipedesc[nopen.stderr] = {'node': node, 'popen': nopen,
-                              'type': 'stderr'}
+    pipedesc[nopen.stdout.fileno()] = {'node': node, 'popen': nopen,
+                              'type': 'stdout', 'file': nopen.stdout}
+    pipedesc[nopen.stderr.fileno()] = {'node': node, 'popen': nopen,
+                              'type': 'stderr', 'file': nopen.stderr}
     all.add(nopen.stdout)
     all.add(nopen.stderr)
+    poller.register(nopen.stdout, select.EPOLLIN)
+    poller.register(nopen.stderr, select.EPOLLIN)
 
 
 if __name__ == '__main__':
