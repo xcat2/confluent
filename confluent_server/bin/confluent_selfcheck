@@ -27,6 +27,15 @@ import signal
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
 
+def check_neigh_overflow():
+    dmesgout = subprocess.check_output(['dmesg'])
+    if b'_cache: neighbor table overflow!' in subprocess.check_output(['dmesg']):
+        return True
+    return False
+    #dmesg snippets
+    #[1203637.865870] neighbour: ndisc_cache: neighbor table overflow!
+    #[1205244.122606] neighbour: arp_cache: neighbor table overflow!
+
 
 def fprint(txt):
     sys.stdout.write(txt)
@@ -202,6 +211,11 @@ if __name__ == '__main__':
                     emprint('Failed access, if selinux is enabled, `setsebool -P httpd_can_network_connect=1`, otherwise check web proxy configuration')
         else:
             emprint('Not Running (Example resolution: systemctl enable httpd --now)')
+        fprint('IP neighbor table issue check:')
+        if check_neigh_overflow():
+            emprint('ARP/Neighbor table problem detected, evaluate and increase net.ipv*.neigh.default.gc_thresh*')
+        else:
+            print('OK')
         fprint('TFTP Status: ')
         if tftp_works():
             print('OK')
