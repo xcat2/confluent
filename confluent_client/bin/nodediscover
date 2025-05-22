@@ -123,7 +123,7 @@ def process_header(header):
             fields.append('serial')
         elif datum == 'uuid':
             fields.append('uuid')
-        elif datum in ('bmc', 'imm', 'xcc'):
+        elif datum in ('bmc', 'imm', 'xcc', 'ip'):
             fields.append('hardwaremanagement.manager')
         elif datum in ('bmc gateway', 'xcc gateway', 'imm gateway'):
             fields.append('net.bmc.ipv4_gateway')
@@ -191,6 +191,7 @@ def import_csv(options, session):
             if field in unique_fields:
                 unique_data[field] = set([])
         broken = False
+        alldata=[]
         for record in records:
             currfields = list(fields)
             nodedatum = {}
@@ -207,9 +208,15 @@ def import_csv(options, session):
                 nodedatum[currfield] = datum
             if not datum_complete(nodedatum):
                 sys.exit(1)
+            alldata.append(nodedatum)
+        allthere = True
+        for nodedatum in alldata:
             if not search_record(nodedatum, options, session) and not broken:
+                allthere = False
                 blocking_scan(session)
-            if not search_record(nodedatum, options, session):
+                break
+        for nodedatum in alldata:
+            if not allthere and not search_record(nodedatum, options, session):
                 sys.stderr.write(
                     "Could not match the following data: " +
                     repr(nodedatum) + '\n')
@@ -230,8 +237,12 @@ def import_csv(options, session):
                 print('Defined ' + res['created'])
             else:
                 print(repr(res))
+        child = os.fork()
+        if child:
+            continue
         for mac in maclist:
-            for res in session.update('/discovery/by-mac/{0}'.format(mac),
+            mysess = client.Command()
+            for res in mysess.update('/discovery/by-mac/{0}'.format(mac),
                                       {'node': nodename}):
                 if 'error' in res:
                     sys.stderr.write(res['error'] + '\n')
@@ -241,6 +252,12 @@ def import_csv(options, session):
                     print('Discovered ' + res['assigned'])
                 else:
                     print(repr(res))
+        sys.exit(0)
+    while True:
+        try:
+            os.wait()
+        except ChildProcessError:
+            break
     if exitcode:
         sys.exit(exitcode)
 
