@@ -625,6 +625,7 @@ def check_rhel(isoinfo):
         elif 'redhat-release-10' in entry:
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
+            break
     else:
         if '.discinfo' in isoinfo[1]:
             prodinfo = isoinfo[1]['.discinfo']
