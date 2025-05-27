@@ -240,8 +240,8 @@ def get_redfish_fingerprint():
         rsp = s.raw_command(0x2c, 1, data=(0x52, 1))
         if rsp['data'][:2] == b'\x52\x01':
             fprint = rsp['data'][2:]
-        with open('/run/redfish/fingerprint', 'wb') as printout:
-            printout.write(fprint)
+            with open('/run/redfish/fingerprint', 'wb') as printout:
+                printout.write(fprint)
     return fprint
 
 
