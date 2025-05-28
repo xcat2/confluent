@@ -301,6 +301,11 @@ def check_rocky(isoinfo):
             arch = entry.split('.')[-2]
             cat = 'el9'
             break
+        if 'rocky-release-10' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el10'
+            break
     else:
         return None
     if arch == 'noarch' and '.discinfo' in isoinfo[1]:
@@ -348,6 +353,11 @@ def check_alma(isoinfo):
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
             cat = 'el9'
+            break
+        elif 'almalinux-release-10' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el10'
             break
         elif 'almalinux-kitten-release-10' in entry:
             ver = entry.split('-')[3]
