@@ -447,44 +447,95 @@ def do_screenshot():
         sys.stdout.write('\x1bc')
     firstnodename = None
     dorefresh = True
+    vnconly = set([])
     while dorefresh:
         for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
             for node in res.get('databynode', {}):
+                errorstr = ''
                 if not firstnodename:
                     firstnodename = node
+                error = res['databynode'][node].get('error')
+                if error and 'vnc available' in error:
+                    vnconly.add(node)
+                    continue
+                elif error:
+                    errorstr = error
                 imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
                 if imgdata:
-                    errorstr = ''
                     if len(imgdata) < 32: # We were subjected to error
                         errorstr = f'Unable to get screenshot'
-                    imagedatabynode[node] = imgdata
-                    if node in nodepositions:
-                        prep_node_tile(node)
-                        cursor_save()
-                    else:
-                        if options.interval is not None:
-                            if node != firstnodename:
-                                sys.stderr.write('Multiple nodes not supported for interval')
-                                sys.exit(1)
-                            sticky_cursor()
-                        sys.stdout.write('{}: '.format(node))
-                    # one row is used by our own name, so cheight - 1 for that allowance
-                    if errorstr:
-                        draw_text(errorstr, cwidth, cheight -1 if cheight else cheight)
-                    else:
-                        draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
-                    if node in nodepositions:
-                        cursor_restore()
-                        reset_cursor(node)
-                    else:
-                        sys.stdout.write('\n')
-                    sys.stdout.flush()
+                if errorstr or imgdata:
+                    draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
+        if asyncvnc:
+            urlbynode = {}
+            for node in vnconly:
+                for res in sess.update(f'/nodes/{node}/console/ikvm', {'method': 'unix'}):
+                    url = res.get('item', {}).get('href')
+                    if url:
+                        urlbynode[node] = url
+            draw_vnc_grabs(urlbynode, cwidth, cheight)
+        elif vnconly:
+            sys.stderr.write("Require asyncvnc installed to do VNC screenshotting\n")
         if options.interval is None:
             dorefresh = False
         else:
             dorefresh = True
             time.sleep(options.interval)
     sys.exit(0)
+
+try:
+    import asyncio, asyncvnc
+except ImportError:
+    asyncvnc = None
+
+def draw_vnc_grabs(urlbynode, cwidth, cheight):
+    asyncio.run(grab_vncs(urlbynode, cwidth, cheight))
+async def grab_vncs(urlbynode, cwidth, cheight):
+    tasks = []
+    for node in urlbynode:
+        url = urlbynode[node]
+        tasks.append(asyncio.create_task(do_vnc_screenshot(node, url, cwidth, cheight)))
+    await asyncio.gather(*tasks)
+
+async def my_opener(host, port):
+    # really, host is the unix
+    return await asyncio.open_unix_connection(host)
+
+async def do_vnc_screenshot(node, url, cwidth, cheight):
+    async with asyncvnc.connect(url, opener=my_opener) as client:
+        # Retrieve pixels as a 3D numpy array
+        pixels = await client.screenshot()
+        # Save as PNG using PIL/pillow
+        image = Image.fromarray(pixels)
+        outfile = io.BytesIO()
+        image.save(outfile, format='PNG')
+        imgdata = base64.b64encode(outfile.getbuffer()).decode()
+        if imgdata:
+            draw_node(node, imgdata, '', '', cwidth, cheight)
+
+def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
+    imagedatabynode[node] = imgdata
+    if node in nodepositions:
+        prep_node_tile(node)
+        cursor_save()
+    else:
+        if options.interval is not None:
+            if node != firstnodename:
+                sys.stderr.write('Multiple nodes not supported for interval')
+                sys.exit(1)
+            sticky_cursor()
+        sys.stdout.write('{}: '.format(node))
+    # one row is used by our own name, so cheight - 1 for that allowance
+    if errorstr:
+        draw_text(errorstr, cwidth, cheight -1 if cheight else cheight)
+    else:
+        draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
+    if node in nodepositions:
+        cursor_restore()
+        reset_cursor(node)
+    else:
+        sys.stdout.write('\n')
+    sys.stdout.flush()
 
 if options.screenshot:
     try:
