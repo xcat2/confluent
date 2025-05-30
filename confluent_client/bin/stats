@@ -19,6 +19,7 @@ import argparse
 import base64
 import csv
 import io
+import os
 import numpy as np
 import sys
 
