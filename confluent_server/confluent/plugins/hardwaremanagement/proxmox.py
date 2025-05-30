@@ -1,4 +1,5 @@
 
+import confluent.vinzmanager as vinzmanager
 import codecs
 import confluent.util as util
 import confluent.messages as msg
@@ -28,6 +29,42 @@ class RetainedIO(io.BytesIO):
     def close(self):
         self.resultbuffer = self.getbuffer()
         super().close()
+
+class KvmConnection:
+    def __init__(self, consdata):
+        #self.ws = WrappedWebSocket(host=bmc)
+        #self.ws.set_verify_callback(kv)
+        ticket = consdata['ticket']
+        user = consdata['user']
+        port = consdata['port']
+        urlticket = urlparse.quote(ticket)
+        host = consdata['host']
+        guest = consdata['guest']
+        pac = consdata['pac']  # fortunately, we terminate this on our end, but it does kind of reduce the value of the
+        # 'ticket' approach, as the general cookie must be provided as cookie along with the VNC ticket
+        hosturl = host
+        if ':' in hosturl:
+            hosturl = '[' + hosturl + ']'
+        self.url = f'/api2/json/nodes/{host}/{guest}/vncwebsocket?port={port}&vncticket={urlticket}'
+        self.fprint = consdata['fprint']
+        self.cookies = {
+            'PVEAuthCookie': pac,
+            }
+        self.protos = ['binary']
+        self.host = host
+        self.portnum = 8006
+        self.password = consdata['ticket']
+
+
+class KvmConnHandler:
+    def __init__(self, pmxclient, node):
+        self.pmxclient = pmxclient
+        self.node = node
+
+    def connect(self):
+        consdata = self.pmxclient.get_vm_ikvm(self.node)
+        consdata['fprint'] = self.pmxclient.fprint
+        return KvmConnection(consdata)
 
 class WrappedWebSocket(wso):
 
@@ -175,6 +212,7 @@ class PmxApiClient:
             pass
         self.server = server
         self.wc = webclient.SecureHTTPConnection(server, port=8006, verifycallback=cv)
+        self.fprint = configmanager.get_node_attributes(server, 'pubkeys.tls').get(server, {}).get('pubkeys.tls', {}).get('value', None)
         self.vmmap = {}
         self.login()
         self.vmlist = {}
@@ -243,11 +281,15 @@ class PmxApiClient:
         yield msg.KeyValueData({'inventory': invitems}, vm)
 
 
+    def get_vm_ikvm(self, vm):
+        return self.get_vm_consproxy(vm, 'vnc')
+
     def get_vm_serial(self, vm):
-        # This would be termproxy
-        # Example url
+        return self.get_vm_consproxy(vm, 'term')
+
+    def get_vm_consproxy(self, vm, constype):
         host, guest = self.get_vm(vm)
-        rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/termproxy', method='POST')
+        rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/{constype}proxy', method='POST')
         consdata = rsp[0]['data']
         consdata['server'] = self.server
         consdata['host'] = host
@@ -372,20 +414,12 @@ def retrieve(nodes, element, configmanager, inputdata):
             for rsp in currclient.get_vm_inventory(node):
                 yield rsp
         elif element == ['console', 'ikvm_methods']:
-            dsc = {'ikvm_methods': ['screenshot']}
+            dsc = {'ikvm_methods': ['vnc']}
             yield msg.KeyValueData(dsc, node)
         elif element == ['console', 'ikvm_screenshot']:
             # good background for the webui, and kitty
-            imgdata = RetainedIO()
-            imgformat = currclient.get_screenshot(node, imgdata)
-            imgdata = imgdata.getvalue()
-            if imgdata:
-                yield msg.ScreenShot(imgdata, node, imgformat=imgformat)
-
-
-
-
-
+            yield msg.ConfluentNodeError(node, "vnc available, screenshot not available")
+            return
 
 def update(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)
@@ -397,11 +431,29 @@ def update(nodes, element, configmanager, inputdata):
         elif element == ['boot', 'nextdevice']:
             currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
             yield msg.BootDevice(node, currclient.get_vm_bootdev(node))
+        elif element == ['console', 'ikvm']:
+            try:
+                currclient = clientsbynode[node]
+                url = vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
+            except Exception as e:
+                print(repr(e))
+                return
+            yield msg.ChildCollection(url)
+            return
 
 # assume this is only console for now
 def create(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
+        if element == ['console', 'ikvm']:
+            try:
+                currclient = clientsbynode[node]
+                url = vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
+            except Exception as e:
+                print(repr(e))
+                return
+            yield msg.ChildCollection(url)
+            return
         serialdata = clientsbynode[node].get_vm_serial(node)
         return PmxConsole(serialdata, node, configmanager, clientsbynode[node])
 

@@ -47,7 +47,9 @@ def assure_vinz():
         startingup = False
 
 _unix_by_nodename = {}
-def get_url(nodename, inputdata):
+_nodeparms = {}
+def get_url(nodename, inputdata, nodeparmcallback=None):
+    _nodeparms[nodename] = nodeparmcallback
     method = inputdata.inputbynode[nodename]
     assure_vinz()
     if method == 'wss':
@@ -89,56 +91,120 @@ def close_session(sessionid):
                 'X-XSRF-TOKEN': wc.cookies['XSRF-TOKEN']})
 
 
-def send_grant(conn, nodename):
-    cfg = configmanager.ConfigManager(None)
-    c = cfg.get_node_attributes(
-        nodename,
-        ['secret.hardwaremanagementuser',
-         'secret.hardwaremanagementpassword',
-         'hardwaremanagement.manager'], decrypt=True)
-    bmcuser = c.get(nodename, {}).get(
-        'secret.hardwaremanagementuser', {}).get('value', None)
-    bmcpass = c.get(nodename, {}).get(
-        'secret.hardwaremanagementpassword', {}).get('value', None)
-    bmc = c.get(nodename, {}).get(
-        'hardwaremanagement.manager', {}).get('value', None)
-    if bmcuser and bmcpass and bmc:
-        kv = util.TLSCertVerifier(cfg, nodename,
-                                  'pubkeys.tls_hardwaremanager').verify_cert
-        wc = webclient.SecureHTTPConnection(bmc, 443, verifycallback=kv)
-        if not isinstance(bmcuser, str):
-            bmcuser = bmcuser.decode()
-        if not isinstance(bmcpass, str):
-            bmcpass = bmcpass.decode()
-        rsp = wc.grab_json_response_with_status(
-            '/login', {'data': [bmcuser, bmcpass]},
-            headers={'Content-Type': 'application/json',
-                     'Accept': 'application/json'})
-        sessionid = wc.cookies['SESSION']
-        sessiontok = wc.cookies['XSRF-TOKEN']
+def send_grant(conn, nodename, rqtype):
+    parmcallback = _nodeparms.get(nodename, None)
+    cookies = {}
+    protos = []
+    passwd = None
+    sessionid = os.urandom(8).hex()
+    while sessionid in _usersessions:
+            sessionid = os.urandom(8).hex()
+    if parmcallback:  # plugin that handles the specifics of the vnc wrapping
+        if rqtype == 1:
+            raise Exception("Plugin managed login data not supported with legacy grant request")
+        cxnmgr = parmcallback()
         _usersessions[sessionid] = {
-            'webclient': wc,
+            'cxnmgr': cxnmgr,
             'nodename': nodename,
         }
-        url = '/kvm/0'
-        fprintinfo = cfg.get_node_attributes(nodename, 'pubkeys.tls_hardwaremanager')
-        fprint = fprintinfo.get(
-            nodename, {}).get('pubkeys.tls_hardwaremanager', {}).get('value', None)
-        if not fprint:
-            return
+        url = cxnmgr.url
+        fprint = cxnmgr.fprint
+        cookies = cxnmgr.cookies
+        protos = cxnmgr.protos
+        host = cxnmgr.host
+        portnum = cxnmgr.portnum
+        passwd = cxnmgr.password
+        #url, fprint, cookies, protos = parmcallback(nodename)
+    else:
+        # original openbmc dialect
+        portnum = 443
+        cfg = configmanager.ConfigManager(None)
+        c = cfg.get_node_attributes(
+            nodename,
+            ['secret.hardwaremanagementuser',
+            'secret.hardwaremanagementpassword',
+            'hardwaremanagement.manager'], decrypt=True)
+        bmcuser = c.get(nodename, {}).get(
+            'secret.hardwaremanagementuser', {}).get('value', None)
+        bmcpass = c.get(nodename, {}).get(
+            'secret.hardwaremanagementpassword', {}).get('value', None)
+        host = c.get(nodename, {}).get(
+            'hardwaremanagement.manager', {}).get('value', None)
+        if bmcuser and bmcpass and host:
+            kv = util.TLSCertVerifier(cfg, nodename,
+                                    'pubkeys.tls_hardwaremanager').verify_cert
+            wc = webclient.SecureHTTPConnection(host, 443, verifycallback=kv)
+            if not isinstance(bmcuser, str):
+                bmcuser = bmcuser.decode()
+            if not isinstance(bmcpass, str):
+                bmcpass = bmcpass.decode()
+            rsp = wc.grab_json_response_with_status(
+                '/login', {'data': [bmcuser, bmcpass]},
+                headers={'Content-Type': 'application/json',
+                        'Accept': 'application/json'})
+            cookies['SESSION'] = wc.cookies['SESSION']
+            cookies['XSRF-TOKEN'] = wc.cookies['XSRF-TOKEN']
+            if rqtype == 1:
+                # unfortunately, the original protocol failed to
+                # provide a means for separate tracking bmc side
+                # and confluent side
+                # chances are pretty good still
+                sessionid = wc.cookies['SESSION']
+            sessiontok = wc.cookies['XSRF-TOKEN']
+            protos.append(sessiontok)
+            _usersessions[sessionid] = {
+                'webclient': wc,
+                'nodename': nodename,
+            }
+            url = '/kvm/0'
+            fprintinfo = cfg.get_node_attributes(nodename, 'pubkeys.tls_hardwaremanager')
+            fprint = fprintinfo.get(
+                nodename, {}).get('pubkeys.tls_hardwaremanager', {}).get('value', None)
+            if not fprint:
+                return
+    if '$' in fprint:
         fprint = fprint.split('$', 1)[1]
-        fprint = bytes.fromhex(fprint)
-        conn.send(struct.pack('!BI', 1, len(bmc)))
-        conn.send(bmc.encode())
-        conn.send(struct.pack('!I', len(sessionid)))
-        conn.send(sessionid.encode())
+    fprint = bytes.fromhex(fprint)
+    conn.send(struct.pack('!BI', rqtype, len(host)))
+    conn.send(host.encode())
+    conn.send(struct.pack('!I', len(sessionid)))
+    conn.send(sessionid.encode())
+    if rqtype == 1:
         conn.send(struct.pack('!I', len(sessiontok)))
         conn.send(sessiontok.encode())
         conn.send(struct.pack('!I', len(fprint)))
         conn.send(fprint)
         conn.send(struct.pack('!I', len(url)))
         conn.send(url.encode())
-        conn.send(b'\xff')
+    else:  # newer TLV style protocol
+        conn.send(struct.pack('!H', portnum))
+        conn.send(struct.pack('!BI', 4, len(url)))
+        conn.send(url.encode())
+        for cook in cookies:
+            v = cookies[cook]
+            totlen = len(cook) + len(v) + 4
+            conn.send(struct.pack('!BIH', 1, totlen, len(cook.encode())))
+            conn.send(cook.encode())
+            conn.send(struct.pack('!H', len(v.encode())))
+            conn.send(v.encode())
+        for proto in protos:
+            conn.send(struct.pack('!BI', 2, len(proto.encode())))
+            conn.send(proto.encode())
+        conn.send(struct.pack('!BI', 3, len(fprint)))
+        conn.send(fprint)
+        if passwd:
+            conn.send(struct.pack('!BI', 5, len(passwd.encode()[:8])))
+            conn.send(passwd.encode()[:8])
+    conn.send(b'\xff')
+
+def recv_exact(conn, n):
+    retdata = b''
+    while len(retdata) < n:
+        currdata = conn.recv(n - len(retdata))
+        if not currdata:
+            raise Exception("Error receiving")
+        retdata += currdata
+    return retdata
 
 def evaluate_request(conn):
     allow = False
@@ -149,33 +215,37 @@ def evaluate_request(conn):
         pid, uid, gid = struct.unpack('iII', creds)
         if uid != os.getuid():
             return
-        rqcode, fieldlen = struct.unpack('!BI', conn.recv(5))
-        authtoken = conn.recv(fieldlen).decode()
+        rqcode, fieldlen = struct.unpack('!BI', recv_exact(conn, 5))
+        authtoken = recv_exact(conn, fieldlen).decode()
         if authtoken != _vinztoken:
             return
         if rqcode == 2:  # disconnect notification
-            fieldlen = struct.unpack('!I', conn.recv(4))[0]
-            sessionid = conn.recv(fieldlen).decode()
+            fieldlen = struct.unpack('!I', recv_exact(conn, 4))[0]
+            sessionid = recv_exact(conn, fieldlen).decode()
             close_session(sessionid)
             conn.recv(1)  # digest 0xff
-        if rqcode == 1:  # request for new connection
-            fieldlen = struct.unpack('!I', conn.recv(4))[0]
-            nodename = conn.recv(fieldlen).decode()
+        # if rqcode == 3:  # new form connection request
+            # this will generalize things, to allow describing
+            # arbitrary cookies and subprotocols
+            # for the websocket connection
+        if rqcode in (1, 3):  # request for new connection
+            fieldlen = struct.unpack('!I', recv_exact(conn, 4))[0]
+            nodename = recv_exact(conn, fieldlen).decode()
             idtype = struct.unpack('!B', conn.recv(1))[0]
             if idtype == 1:
-                usernum = struct.unpack('!I', conn.recv(4))[0]
+                usernum = struct.unpack('!I', recv_exact(conn, 4))[0]
                 if usernum == 0:  # root is a special guy
-                    send_grant(conn, nodename)
+                    send_grant(conn, nodename, rqcode)
                     return
                 try:
                     authname = pwd.getpwuid(usernum).pw_name
                 except Exception:
                     return
             elif idtype == 2:
-                fieldlen = struct.unpack('!I', conn.recv(4))[0]
-                sessionid = conn.recv(fieldlen)
-                fieldlen = struct.unpack('!I', conn.recv(4))[0]
-                sessiontok = conn.recv(fieldlen)
+                fieldlen = struct.unpack('!I', recv_exact(conn, 4))[0]
+                sessionid = recv_exact(conn, fieldlen)
+                fieldlen = struct.unpack('!I', recv_exact(conn, 4))[0]
+                sessiontok = recv_exact(conn, fieldlen)
                 try:
                     authname = httpapi.get_user_for_session(sessionid, sessiontok)
                 except Exception:
@@ -186,7 +256,7 @@ def evaluate_request(conn):
             if authname:
                 allow = auth.authorize(authname, f'/nodes/{nodename}/console/ikvm')
             if allow:
-                send_grant(conn, nodename)
+                send_grant(conn, nodename, rqcode)
     finally:
         conn.close()
 
