@@ -250,7 +250,10 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                         reply = 'HTTP/1.1 200 OK\r\n\r\nCONFLUENT: PRESENT\r\n'
                                         if not isinstance(reply, bytes):
                                             reply = reply.encode('utf8')
-                                        s.sendto(reply, peer)
+                                        try:
+                                            s.sendto(reply, peer)
+                                        except Exception:
+                                            break
                                     elif query.startswith('uuid='):
                                         curruuid = query.split('=', 1)[1].lower()
                                         node = uuidlookup(curruuid)
