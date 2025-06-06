@@ -404,8 +404,9 @@ def redraw():
         else:
             sys.stdout.write('\n')
         sys.stdout.flush()
-
+resized = False
 def do_screenshot():
+    global resized
     global numrows
     sess = client.Command()
     if options.tile:
@@ -418,8 +419,11 @@ def do_screenshot():
         for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
             allnodes.append(res['item']['href'].replace('/', ''))
             numnodes += 1
+        resized = False
         def do_resize(a=None, b=None):
+            global resized
             if a:
+                resized = True
                 # on a window resize, clear the old stuff
                 # ideally we'd retain the images and redraw them
                 sys.stdout.write('\x1bc')
@@ -474,6 +478,9 @@ def do_screenshot():
                     if url:
                         urlbynode[node] = url
             draw_vnc_grabs(urlbynode, cwidth, cheight)
+            if resized:
+                do_resize(True)
+                resized = False
         elif vnconly:
             sys.stderr.write("Require asyncvnc installed to do VNC screenshotting\n")
         if options.interval is None:
