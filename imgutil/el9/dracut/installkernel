@@ -5,6 +5,7 @@ instmods nvme
 instmods cdc_ether r8152
 instmods r8169
 instmods vmxnet3 virtio_net
+instmods virtio_scsi vmw_pvscsi
 instmods mptctl
 instmods mlx4_ib mlx5_ub ib_umad ib_ipoib
 instmods ice i40e hfi1 bnxt_en qed qede
