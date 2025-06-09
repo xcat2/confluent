@@ -37,7 +37,6 @@ def msg_align(len):
 def mask_to_cidr(mask):
     cidr = 32
     fam = socket.AF_INET
-    fmt =
     if ':' in mask:  # ipv6
         fam = socket.AF_INET6
         cidr = 128
