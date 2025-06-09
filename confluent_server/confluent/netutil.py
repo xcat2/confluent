@@ -41,7 +41,7 @@ def mask_to_cidr(mask):
         fam = socket.AF_INET6
         cidr = 128
     maskn = socket.inet_pton(fam, mask)
-    if len(maskn) == 4
+    if len(maskn) == 4:
         maskn = struct.unpack('!I', maskn)[0]
     else:
         first, second = struct.unpack('!QQ', maskn)
