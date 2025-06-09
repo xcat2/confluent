@@ -20,7 +20,10 @@ import base64
 import confluent.exceptions as cexc
 import confluent.log as log
 import hashlib
-import netifaces
+try:
+    import psutil
+except ImportError:
+    import netifaces
 import os
 import re
 import socket
@@ -85,11 +88,18 @@ def list_interface_indexes():
 def list_ips():
     # Used for getting addresses to indicate the multicast address
     # as well as getting all the broadcast addresses
-    for iface in netifaces.interfaces():
-        addrs = netifaces.ifaddresses(iface)
-        if netifaces.AF_INET in addrs:
-            for addr in addrs[netifaces.AF_INET]:
-                yield addr
+    if psutil:
+        ifas = psutil.net_if_addrs()
+        for intf in ifas:
+            for addr in ifas[intf]:
+                if addr.family == socket.AF_INET and addr.broadcast:
+                    yield {'broadcast': addr.broadcast, 'addr': addr.address}
+    else:
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface)
+            if netifaces.AF_INET in addrs:
+                for addr in addrs[netifaces.AF_INET]:
+                    yield addr
 
 def randomstring(length=20):
     """Generate a random string of requested length

@@ -18,7 +18,10 @@
 
 import confluent.exceptions as exc
 import codecs
-import netifaces
+try:
+    import psutil
+except ImportError:
+    import netifaces
 import struct
 import eventlet.green.socket as socket
 import eventlet.support.greendns
@@ -32,9 +35,18 @@ def msg_align(len):
     return (len + 3) & ~3
 
 def mask_to_cidr(mask):
-    maskn = socket.inet_pton(socket.AF_INET, mask)
-    maskn = struct.unpack('!I', maskn)[0]
     cidr = 32
+    fam = socket.AF_INET
+    fmt =
+    if ':' in mask:  # ipv6
+        fam = socket.AF_INET6
+        cidr = 128
+    maskn = socket.inet_pton(fam, mask)
+    if len(maskn) == 4
+        maskn = struct.unpack('!I', maskn)[0]
+    else:
+        first, second = struct.unpack('!QQ', maskn)
+        maskn = first << 64 | second
     while maskn & 0b1 == 0 and cidr > 0:
         cidr -= 1
         maskn >>= 1
@@ -101,16 +113,25 @@ def ipn_is_local(ipn):
 
 
 def address_is_local(address):
-    for iface in netifaces.interfaces():
-        for i4 in netifaces.ifaddresses(iface).get(2, []):
-            cidr = mask_to_cidr(i4['netmask'])
-            if ip_on_same_subnet(i4['addr'], address, cidr):
-                return True
-        for i6 in netifaces.ifaddresses(iface).get(10, []):
-            cidr = int(i6['netmask'].split('/')[1])
-            laddr = i6['addr'].split('%')[0]
-            if ip_on_same_subnet(laddr, address, cidr):
-                return True
+    if psutil:
+        ifas = psutil.net_if_addrs()
+        for iface in ifas:
+            for addr in ifas[iface]:
+                if addr.family in (socket.AF_INET, socket.AF_INET6):
+                    cidr = mask_to_cidr(addr.netmask)
+                    if ip_on_same_subnet(addr.address, address, cidr):
+                        return True
+    else:
+        for iface in netifaces.interfaces():
+            for i4 in netifaces.ifaddresses(iface).get(2, []):
+                cidr = mask_to_cidr(i4['netmask'])
+                if ip_on_same_subnet(i4['addr'], address, cidr):
+                    return True
+            for i6 in netifaces.ifaddresses(iface).get(10, []):
+                cidr = int(i6['netmask'].split('/')[1])
+                laddr = i6['addr'].split('%')[0]
+                if ip_on_same_subnet(laddr, address, cidr):
+                    return True
     return False
 
 
@@ -126,20 +147,35 @@ def _rebuildidxmap():
 
 
 def myiptonets(svrip):
-    fam = netifaces.AF_INET
+    fam = socket.AF_INET
     if ':' in svrip:
-        fam = netifaces.AF_INET6
+        fam = socket.AF_INET6
     relevantnic = None
-    for iface in netifaces.interfaces():
-        for addr in netifaces.ifaddresses(iface).get(fam, []):
-            addr = addr.get('addr', '')
-            addr = addr.split('%')[0]
-            if addresses_match(addr, svrip):
-                relevantnic = iface
-                break
-        else:
-            continue
-        break
+    if psutil:
+        ifas = psutil.net_if_addrs()
+        for iface in ifas:
+            for addr in ifas[iface]:
+                if addr.fam != fam:
+                    continue
+                addr = addr.address
+                addr = addr.split('%')[0]
+                if addresses_match(addr, svrip):
+                    relevantnic = iface
+                    break
+            else:
+                continue
+            break
+    else:
+        for iface in netifaces.interfaces():
+            for addr in netifaces.ifaddresses(iface).get(fam, []):
+                addr = addr.get('addr', '')
+                addr = addr.split('%')[0]
+                if addresses_match(addr, svrip):
+                    relevantnic = iface
+                    break
+            else:
+                continue
+            break
     return inametonets(relevantnic)
 
 
@@ -150,11 +186,22 @@ def _iftonets(ifidx):
     return inametonets(ifidx)
 
 def inametonets(iname):
-    addrs = netifaces.ifaddresses(iname)
-    try:
-        addrs = addrs[netifaces.AF_INET]
-    except KeyError:
-        return
+    addrs = []
+    if psutil:
+        ifaces = psutil.net_if_addrs()
+        if iname not in ifaces:
+            return
+        for iface in ifaces:
+            for addrent in ifaces[iface]:
+                if addrent.family != socket.AF_INET:
+                    continue
+                addrs.append({'addr': addrent.address, 'netmask': addrent.netmask})
+    else:
+        addrs = netifaces.ifaddresses(iname)
+        try:
+            addrs = addrs[netifaces.AF_INET]
+        except KeyError:
+            return
     for addr in addrs:
         ip = struct.unpack('!I', socket.inet_aton(addr['addr']))[0]
         mask = struct.unpack('!I', socket.inet_aton(addr['netmask']))[0]

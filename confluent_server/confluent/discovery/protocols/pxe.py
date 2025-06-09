@@ -36,7 +36,11 @@ import ctypes.util
 import eventlet
 import eventlet.green.socket as socket
 import eventlet.green.select as select
-import netifaces
+try:
+    import psutil
+except ImportError:
+    psutil = None
+    import netifaces
 import os
 import struct
 import time
@@ -136,7 +140,12 @@ def idxtoname(idx):
 _idxtobcast = {}
 def get_bcastaddr(idx):
     if idx not in _idxtobcast:
-        bc = netifaces.ifaddresses(idxtoname(idx))[17][0]['broadcast']
+        if psutil:
+            for addr in psutil.net_if_addrs()[idxtoname(idx)]:
+                if addr.family == socket.AF_PACKET:
+                    bc = addr.broadcast
+        else:
+            bc = netifaces.ifaddresses(idxtoname(idx))[17][0]['broadcast']
         bc = bytearray([int(x, 16) for x in bc.split(':')])
         _idxtobcast[idx] = bc
     return _idxtobcast[idx]
