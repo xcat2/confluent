@@ -10,10 +10,10 @@ BuildRoot: /tmp/
 %if "%{dist}" == ".el8"
 Requires: squashfs-tools cpio
 %else
-%if "%{dist}" == ".el9" || "${dist}" == ".el10"
+%if "%{dist}" == ".el9"
 Requires: squashfs-tools cpio
 %else
-%if "%{dist}" == ".el7"
+%if "%{dist}" == ".el10"
 Requires: squashfs-tools cpio
 %else
 Requires: squashfs
