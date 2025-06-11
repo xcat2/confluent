@@ -701,7 +701,6 @@ if options.windowed:
         screenheight -= wmyo
         currx = window_width
         curry = 0
-        maxcol = int(screenwidth/window_width)
 
     for node in sortutil.natural_sort(nodes):
         if options.tile and envlist[0] == 'xterm':
@@ -709,7 +708,7 @@ if options.windowed:
             corrected_y = curry
             xgeometry = '{0}+{1}+{2}'.format(sizegeometry, corrected_x, corrected_y)
             currx += window_width
-            if currx >= screenwidth:
+            if currx + window_width >= screenwidth:
                 currx=0
                 curry += window_height
                 if curry > screenheight:
