@@ -373,7 +373,7 @@ def install_to_disk(imgpath):
         if fs['device'].startswith('/dev/mapper'):
             oldvgname = fs['device'].rsplit('/', 1)[-1]
             # if node has - then /dev/mapper will double up the hypen
-            if '_' in oldvgname and '-' in oldvgname.split('_')[-1]:
+            if '_' in oldvgname and '-' in oldvgname.split('_', 1)[-1]:
                 oldvgname = oldvgname.rsplit('-', 1)[0].replace('--', '-')
                 osname = oldvgname.split('_')[0]
                 nodename = socket.gethostname().split('.')[0]
