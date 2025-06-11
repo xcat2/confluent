@@ -31,6 +31,7 @@ READFILES = set([
     '.DISCINFO',
     '.discinfo',
     'zipl.prm',
+    'sources/idwbinfo.txt',
 ])
 
 HEADERSUMS = set([b'\x85\xeddW\x86\xc5\xbdhx\xbe\x81\x18X\x1e\xb4O\x14\x9d\x11\xb7C8\x9b\x97R\x0c-\xb8Ht\xcb\xb3'])
@@ -774,10 +775,16 @@ def printit(info):
 
 
 def list_distros():
-    return sorted(os.listdir('/var/lib/confluent/distributions'))
+    try:
+        return sorted(os.listdir('/var/lib/confluent/distributions'))
+    except FileNotFoundError:
+        return []
 
 def list_profiles():
-    return sorted(os.listdir('/var/lib/confluent/public/os/'))
+    try:
+        return sorted(os.listdir('/var/lib/confluent/public/os/'))
+    except FileNotFoundError:
+        return []
 
 def get_profile_label(profile):
     with open('/var/lib/confluent/public/os/{0}/profile.yaml') as metadata:
