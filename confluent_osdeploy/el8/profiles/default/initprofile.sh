@@ -5,6 +5,7 @@ if grep Fedora $2/profile.yaml > /dev/null; then
 fi
 if grep ^label: $2/profile.yaml | grep 10 > /dev/null; then
 	echo 'echo openssh-keysign >> /tmp/addonpackages' > $2/scripts/pre.d/enablekeysign
+	chmod 644 $2/scripts/pre.d/enablekeysign
 fi
 ln -s $1/images/pxeboot/vmlinuz $2/boot/kernel && \
 ln -s $1/images/pxeboot/initrd.img $2/boot/initramfs/distribution
