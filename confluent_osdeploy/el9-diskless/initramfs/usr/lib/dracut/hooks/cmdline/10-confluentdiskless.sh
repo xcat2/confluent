@@ -102,6 +102,14 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
         ip link set $i up
     done
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+    echo -n .
+done
+TRIES=0
+while ! grep ^NODENAME: /etc/confluent/confluent.info >& /dev/null && [ "$TRIES" -lt 300 ]; do
+    sleep 0.5
+    echo -n .
+    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+    TRIES=$((TRIES + 1))
 done
 cd /
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
