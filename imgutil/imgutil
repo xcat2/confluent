@@ -1128,7 +1128,7 @@ def fingerprint_host_el(args, hostpath='/'):
         ts = rpm.TransactionSet(hostpath)
         rpms = ts.dbMatch('provides', 'system-release')
         for inf in rpms:
-            if 'el8' not in inf.release and 'el7' not in inf.release and 'el9' not in inf.release 'el10' not in inf.release:
+            if 'el8' not in inf.release and 'el7' not in inf.release and 'el9' not in inf.release and 'el10' not in inf.release:
                 continue
             osname = inf.name
             version = inf.version
