@@ -1195,7 +1195,9 @@ def search_smms_by_cert(currsmm, cert, cfg):
         cd = cfg.get_node_attributes(currsmm, ['hardwaremanagement.manager',
                                                'pubkeys.tls_hardwaremanager'])
         smmaddr = cd.get(currsmm, {}).get('hardwaremanagement.manager', {}).get('value', None)
-        wc = webclient.SecureHTTPConnection(currsmm, verifycallback=cv)
+        if not smmaddr:
+            smmaddr = currsmm
+        wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
         neighs = wc.grab_json_response('/scripts/neighdata.json')
     except Exception:
         return None
