@@ -26,11 +26,14 @@ mkdir -p opt/confluent/bin
 mkdir -p stateless-bin
 cp -a el8bin/* .
 ln -s el8 el9
-for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 coreos el9; do
+ln -s el8 el10
+for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 coreos el9 el10; do
     mkdir ${os}out
     cd ${os}out
     if [ -d ../${os}bin ]; then 
         cp -a ../${os}bin/opt .
+    elif [ $os = el10 ]; then
+        cp -a ../el9bin/opt .
     else
         cp -a ../opt .
     fi
@@ -40,7 +43,7 @@ for os in rhvh4 el7 genesis el8 suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 coreo
     mv ../addons.cpio .
     cd ..
 done
-for os in el7 el8 suse15 el9 ubuntu20.04; do
+for os in el7 el8 suse15 el9 el10 ubuntu20.04; do
     mkdir ${os}disklessout
     cd ${os}disklessout
     if [ -d ../${os}bin ]; then
@@ -76,7 +79,7 @@ cp -a esxi7 esxi8
 %install
 mkdir -p %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
 #cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
-for os in rhvh4 el7 el8 el9 genesis suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 esxi6 esxi7 esxi8 coreos; do
+for os in rhvh4 el7 el8 el9 el10 genesis suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 esxi6 esxi7 esxi8 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs/aarch64/
     cp ${os}out/addons.* %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs/aarch64/
     if [ -d ${os}disklessout ]; then

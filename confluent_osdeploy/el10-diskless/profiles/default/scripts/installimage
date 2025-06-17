@@ -1,0 +1,49 @@
+#!/bin/bash
+. /etc/confluent/functions
+# the image will be used to deploy itself
+# provide both access to image (for parsing metadata)
+# and existing mounts of image (to take advantage of caching)
+mount -o bind /sys /sysroot/sys
+mount -o bind /dev /sysroot/dev
+mount -o bind /proc /sysroot/proc
+mount -o bind /run /sysroot/run
+
+
+if [ ! -f /tmp/mountparts.sh ]; then
+    mkdir -p /sysroot/run/imginst/sources/_
+    mount -o bind /mnt/remote /sysroot/run/imginst/sources/_
+else
+    for srcmount in $(cat /tmp/mountparts.sh | awk '{print $2}'); do
+        srcname=${srcmount#/dev/mapper/mproot}
+        srcdir=$(echo $srcmount | sed -e 's!/dev/mapper/mproot!/mnt/remote!' -e 's!_!/!g')
+        mkdir -p /sysroot/run/imginst/sources/$srcname
+        mount -o bind $srcdir /sysroot/run/imginst/sources/$srcname
+    done
+fi
+cd /sysroot/run
+chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_python getinstalldisk"
+chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_parts pre.d"
+if [ ! -f /sysroot/tmp/installdisk ]; then
+    echo 'Unable to find a suitable installation target device, ssh to port 2222 to investigate'
+    while [ ! -f /sysroot/tmp/installdisk ]; do
+        sleep 1
+    done
+fi
+lvm vgchange -a n
+/sysroot/usr/sbin/wipefs -a /dev/$(cat /sysroot/tmp/installdisk)
+udevadm control -e
+if [ -f /sysroot/etc/lvm/devices/system.devices ]; then
+    rm /sysroot/etc/lvm/devices/system.devices
+fi
+chroot /sysroot /usr/lib/systemd/systemd-udevd --daemon
+chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python image2disk.py"
+echo "Port 22" >> /etc/ssh/sshd_config
+echo 'Match LocalPort 22' >> /etc/ssh/sshd_config
+echo '    ChrootDirectory /sysroot/run/imginst/targ' >> /etc/ssh/sshd_config
+kill -HUP $(cat /run/sshd.pid)
+cp /sysroot/etc/pki/ca-trust/source/anchors/* /sysroot/run/imginst/targ/etc/pki/ca-trust/source/anchors/
+chroot /sysroot/run/imginst/targ update-ca-trust
+
+chroot /sysroot/run/imginst/targ bash -c "source /etc/confluent/functions; run_remote post.sh"
+chroot /sysroot bash -c "umount \$(tac /proc/mounts|awk '{print \$2}'|grep ^/run/imginst/targ)"
+

@@ -1095,7 +1095,7 @@ def fingerprint_source_suse(files, sourcepath, args):
 
 def fingerprint_source_el(files, sourcepath, args):
     for filen in files:
-        if '-release-8' in filen or '-release-7' in filen or '-release-9' in filen:
+        if '-release-10' in filen or '-release-8' in filen or '-release-7' in filen or '-release-9' in filen:
             parts = filen.split('-')
             osname = '_'.join(parts[:-3])
             if osname == 'centos_linux':
@@ -1128,7 +1128,7 @@ def fingerprint_host_el(args, hostpath='/'):
         ts = rpm.TransactionSet(hostpath)
         rpms = ts.dbMatch('provides', 'system-release')
         for inf in rpms:
-            if 'el8' not in inf.release and 'el7' not in inf.release and 'el9' not in inf.release:
+            if 'el8' not in inf.release and 'el7' not in inf.release and 'el9' not in inf.release 'el10' not in inf.release:
                 continue
             osname = inf.name
             version = inf.version
@@ -1152,7 +1152,7 @@ def fingerprint_host_el(args, hostpath='/'):
                     version = v
         except (subprocess.SubprocessError, FileNotFoundError):
             return None
-    if 'el8' not in release and 'el7' not in release and 'el9' not in release:
+    if 'el8' not in release and 'el7' not in release and 'el9' not in release and 'el10' not in release:
         return None
     osname = osname.replace('-release', '').replace('-', '_')
     if osname == 'centos_linux':

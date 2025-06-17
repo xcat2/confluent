@@ -1,0 +1,99 @@
+#!/usr/bin/python3
+import subprocess
+import os
+
+class DiskInfo(object):
+    def __init__(self, devname):
+        if devname.startswith('nvme') and 'c' in devname:
+            raise Exception("Skipping multipath devname")
+        self.name = devname
+        self.wwn = None
+        self.path = None
+        self.model = ''
+        self.size = 0
+        self.driver = ''
+        self.mdcontainer = ''
+        self.subsystype = ''
+        devnode = '/dev/{0}'.format(devname)
+        qprop = subprocess.check_output(
+            ['udevadm', 'info', '--query=property', devnode])
+        if not isinstance(qprop, str):
+            qprop = qprop.decode('utf8')
+        for prop in qprop.split('\n'):
+            if '=' not in prop:
+                continue
+            k, v = prop.split('=', 1)
+            if k == 'DEVTYPE' and v != 'disk':
+                raise Exception('Not a disk')
+            elif k == 'DM_NAME':
+                raise Exception('Device Mapper')
+            elif k == 'ID_MODEL':
+                self.model = v
+            elif k == 'DEVPATH':
+                self.path = v
+            elif k == 'ID_WWN':
+                self.wwn = v
+            elif k == 'MD_CONTAINER':
+                self.mdcontainer = v
+        attrs = subprocess.check_output(['udevadm', 'info', '-a', devnode])
+        if not isinstance(attrs, str):
+            attrs = attrs.decode('utf8')
+        for attr in attrs.split('\n'):
+            if '==' not in attr:
+                continue
+            k, v = attr.split('==', 1)
+            k = k.strip()
+            if k == 'ATTRS{size}':
+                self.size = v.replace('"', '')
+            elif (k == 'DRIVERS' and not self.driver
+                    and v not in ('"sd"', '""')):
+                self.driver = v.replace('"', '')
+            elif k == 'ATTRS{subsystype}':
+                self.subsystype = v.replace('"', '')
+        if not self.driver and 'imsm' not in self.mdcontainer and self.subsystype != 'nvm':
+            raise Exception("No driver detected")
+        if os.path.exists('/sys/block/{0}/size'.format(self.name)):
+            with open('/sys/block/{0}/size'.format(self.name), 'r') as sizesrc:
+                self.size = int(sizesrc.read()) * 512
+        if int(self.size) < 536870912:
+            raise Exception("Device too small for install")
+
+    @property
+    def priority(self):
+        if self.model.lower() in ('m.2 nvme 2-bay raid kit', 'thinksystem_m.2_vd', 'thinksystem m.2', 'thinksystem_m.2'):
+            return 0
+        if 'imsm' in self.mdcontainer:
+            return 1
+        if self.driver == 'ahci':
+            return 2
+        if self.driver.startswith('megaraid'):
+            return 3
+        if self.driver.startswith('mpt'):
+            return 4
+        return 99
+
+    def __repr__(self):
+        return repr({
+            'name': self.name,
+            'path': self.path,
+            'wwn': self.wwn,
+            'driver': self.driver,
+            'size': self.size,
+            'model': self.model,
+        })
+
+
+def main():
+    disks = []
+    for disk in sorted(os.listdir('/sys/class/block')):
+        try:
+            disk = DiskInfo(disk)
+            disks.append(disk)
+        except Exception as e:
+            print("Skipping {0}: {1}".format(disk, str(e)))
+    nd = [x.name for x in sorted(disks, key=lambda x: x.priority)]
+    if nd:
+        open('/tmp/installdisk', 'w').write(nd[0])
+
+if __name__ == '__main__':
+    main()

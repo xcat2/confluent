@@ -46,7 +46,7 @@ for os in rhvh4 el7 genesis el8 suse15 debian ubuntu18.04 ubuntu20.04 ubuntu22.0
     mv ../addons.cpio .
     cd ..
 done
-for os in el7 el8 suse15 el9 ubuntu20.04 ubuntu22.04 ubuntu24.04; do
+for os in el7 el8 suse15 el9 el10 ubuntu20.04 ubuntu22.04 ubuntu24.04; do
     mkdir ${os}disklessout
     cd ${os}disklessout
     if [ -d ../${os}bin ]; then

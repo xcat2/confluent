@@ -1,0 +1,35 @@
+dracut_install mktemp
+dracut_install /lib64/libtss2-tcti-device.so.0
+dracut_install tpm2_create tpm2_pcrread tpm2_createpolicy tpm2_createprimary
+dracut_install tpm2_load tpm2_unseal tpm2_getcap tpm2_evictcontrol
+dracut_install tpm2_pcrextend tpm2_policypcr tpm2_flushcontext tpm2_startauthsession
+dracut_install curl openssl tar cpio gzip lsmod ethtool xz lsmod ethtool
+dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
+dracut_install awk egrep dirname expr sort
+dracut_install ssh sshd reboot parted mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
+dracut_install efibootmgr uuidgen
+dracut_install du df ssh-keygen scp
+dracut_install /lib64/libnss_dns*
+dracut_install /usr/lib64/libnl-3.so.200
+dracut_install /etc/nsswitch.conf /etc/services /etc/protocols
+dracut_install chmod whoami head tail basename tr
+dracut_install /usr/sbin/arping dhcpcd logger hostnamectl
+inst /bin/bash /bin/sh
+dracut_install /lib64/libfuse.so.2
+dracut_install chown chroot dd expr kill parted rsync sort blockdev findfs insmod lvm
+dracut_install /usr/lib/udev/rules.d/10-dm.rules /usr/sbin/dmsetup /usr/lib/udev/rules.d/95-dm-notify.rules
+dracut_install /usr/lib/udev/rules.d/60-net.rules /lib/udev/rename_device /usr/lib/systemd/network/99-default.link
+dracut_install /lib64/libpthread.so.0
+dracut_install losetup # multipart support
+
+#this would be nfs with lock, but not needed, go nolock
+dracut_install mount.nfs rpcbind rpc.statd /etc/netconfig sm-notify
+dracut_install mount.nfs  /etc/netconfig
+inst /usr/lib/dracut/modules.d/45net-lib/net-lib.sh /lib/net-lib.sh
+
+
+
+# network mount, and disk imaging helpers can come from a second stage
+# this is narrowly focused on getting network up and fetching images
+# and those images may opt to do something with cloning or whatever
+
