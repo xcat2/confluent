@@ -23,6 +23,7 @@ import hashlib
 try:
     import psutil
 except ImportError:
+    psutil = None
     import netifaces
 import os
 import re
