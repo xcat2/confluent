@@ -48,6 +48,8 @@ for os in el7 el8 suse15 el9 el10 ubuntu20.04; do
     cd ${os}disklessout
     if [ -d ../${os}bin ]; then
         cp -a ../${os}bin/opt .
+    elif [ $os = el10 ]; then
+        cp -a ../el9bin/opt .
     else
         cp -a ../opt .
     fi
