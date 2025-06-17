@@ -21,6 +21,7 @@ import codecs
 try:
     import psutil
 except ImportError:
+    psutil = None
     import netifaces
 import struct
 import eventlet.green.socket as socket
