@@ -42,7 +42,9 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
     autoconsdev=${autocons%,*}
     autocons=${autocons##*/}
-    echo "Automatic console configured for $autocons"
+    if [ ! -z "$autocons" ]; then
+        echo "Automatic console configured for $autocons"
+    fi
 fi
 echo "Initializing confluent diskless environment"
 echo -n "udevd: "
@@ -310,7 +312,10 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     fi
     echo HostKey $privfile >> /etc/ssh/sshd_config
 done
-/usr/sbin/sshd
+if grep "debugssh" /proc/cmdline > /dev/null; then
+    /usr/sbin/sshd
+fi
+echo "done"
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 confluent_proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 confluent_urls=""

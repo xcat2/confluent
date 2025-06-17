@@ -7,6 +7,7 @@ dracut_install curl openssl tar cpio gzip lsmod ethtool xz lsmod ethtool
 dracut_install modprobe touch echo cut wc bash uniq grep ip hostname
 dracut_install awk egrep dirname expr sort
 dracut_install ssh sshd reboot parted mkfs mkfs.ext4 mkfs.xfs xfs_db mkswap
+dracut_install /usr/libexec/openssh/sshd-session
 dracut_install efibootmgr uuidgen
 dracut_install du df ssh-keygen scp
 dracut_install /lib64/libnss_dns*
