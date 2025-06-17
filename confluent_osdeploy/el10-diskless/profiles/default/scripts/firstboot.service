@@ -1,11 +1,1 @@
-[Unit]
-Description=First Boot Process
-Requires=network-online.target
-After=network-online.target
-
-[Service]
-ExecStart=/opt/confluent/bin/firstboot.sh
-
-[Install]
-WantedBy=multi-user.target
-
+../../../../el9-diskless/profiles/default/scripts/firstboot.service
