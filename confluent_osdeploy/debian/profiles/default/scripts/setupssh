@@ -7,7 +7,6 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
         continue
     fi
     certfile=${pubkey/.pub/-cert.pub}
-    rm $certfile
     confluentpython $confapiclient /confluent-api/self/sshcert $pubkey -o $certfile
 done
 if [ -d /etc/ssh/sshd_config.d/ -a ! -e /etc/ssh/sshd_config.d/90-confluent.conf ]; then
@@ -25,6 +24,7 @@ confluentpython $confapiclient /confluent-public/site/initramfs.tgz -o initramfs
 tar xf initramfs.tgz
 for ca in ssh/*.ca; do
 	LINE=$(cat $ca)
+        if [ -z "$LINE" ]; then continue; fi
 	cp -af /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts.new
 	grep -v "$LINE" /etc/ssh/ssh_known_hosts > /etc/ssh/ssh_known_hosts.new
 	echo '@cert-authority *' $LINE >> /etc/ssh/ssh_known_hosts.new
@@ -32,6 +32,7 @@ for ca in ssh/*.ca; do
 done
 for pubkey in ssh/*.*pubkey; do
 	LINE=$(cat $pubkey)
+        if [ -z "$LINE" ]; then continue; fi
 	cp -af /root/.ssh/authorized_keys /root/.ssh/authorized_keys.new
 	grep -v "$LINE" /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.new
 	echo "$LINE" >> /root/.ssh/authorized_keys.new
