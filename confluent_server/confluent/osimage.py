@@ -9,6 +9,11 @@ logging.getLogger('libarchive').addHandler(logging.NullHandler())
 import libarchive
 import hashlib
 import os
+try:
+    from io import BytesIO
+    import pycdlib
+except ImportError:
+    pycdlib = None
 import shutil
 import sys
 import time
@@ -24,6 +29,7 @@ import confluent.messages as msg
 
 COPY = 1
 EXTRACT = 2
+EXTRACTUDF = 4
 READFILES = set([
     '.disk/info',
     'media.1/products',
@@ -268,8 +274,33 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
     return float(sizedone) / float(totalsize)
 
 
-def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extractlist=None):
+def extract_udf(archfile, callback=lambda x: None):
+    """Extracts a UDF archive from a file into the current directory."""
+    dfd = os.dup(archfile.fileno())
+    os.lseek(dfd, 0, 0)
+    fp = os.fdopen(dfd, 'rb')
+    udf = pycdlib.PyCdlib()
+    udf.open_fp(fp)
+    for dirent in udf.walk(udf_path='/'):
+        for filent in dirent[2]:
+            currfile = os.path.join(dirent[0], filent)
+            relfile = currfile
+            if currfile[0] == '/':
+                relfile = currfile[1:]
+            targfile = os.path.join('.', relfile)
+            if os.path.exists(targfile):
+                os.unlink(targfile)
+            os.makedirs(os.path.dirname(targfile), exist_ok=True)
+            udf.get_file_from_iso(targfile, udf_path=currfile)
+    udf.close()
+    fp.close()
+    return True
+
+
+def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extractlist=None, method=EXTRACT):
     """Extracts an archive from a file into the current directory."""
+    if EXTRACTUDF & method:
+        return extract_udf(archfile, callback)
     totalsize = 0
     for img in imginfo:
         if not imginfo[img]:
@@ -604,7 +635,28 @@ def check_coreos(isoinfo):
                         'method': EXTRACT, 'category': 'coreos'}
 
 
-
+def check_windows(isoinfo):
+    idwbinfo = isoinfo[1].get('sources/idwbinfo.txt', b'')
+    idwbinfo = idwbinfo.decode()
+    idwbinfo = idwbinfo.split('\n')
+    version = ''
+    for line in idwbinfo:
+        if 'BuildBranch=' in line:
+            branch = line.strip().split('=')[1]
+            if branch == 'rs5_release':
+                version = '2019'
+            elif branch == 'fe_release':
+                version = '2022'
+            elif branch == 'ge_release':
+                version = '2025'
+    category = f'windows{version}'
+    if version:
+        defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(category)
+        if not os.path.exists(defprofile):
+            return None
+        return {'name': 'windows-{0}-x86_64'.format(version), 'method': EXTRACTUDF, 'category': category}
+    return None
+        
 def check_rhel(isoinfo):
     ver = None
     arch = None
@@ -659,24 +711,46 @@ def check_rhel(isoinfo):
 
 
 def scan_iso(archive):
+    scanudf = False
     filesizes = {}
     filecontents = {}
     dfd = os.dup(archive.fileno())
     os.lseek(dfd, 0, 0)
     try:
-        with libarchive.fd_reader(dfd) as reader:
+        with libarchive.fd_reader(dfd, ) as reader:
             for ent in reader:
                 if str(ent).endswith('TRANS.TBL'):
                     continue
                 eventlet.sleep(0)
                 filesizes[str(ent)] = ent.size
+                if str(ent) == 'README.TXT':
+                    readmecontents = b''
+                    for block in ent.get_blocks():
+                        readmecontents += bytes(block)
+                    if b'ISO-13346' in readmecontents:
+                        scanudf = True
                 if str(ent) in READFILES:
                     filecontents[str(ent)] = b''
                     for block in ent.get_blocks():
                         filecontents[str(ent)] += bytes(block)
+        if scanudf:
+            return scan_udf(dfd)
     finally:
         os.close(dfd)
     return filesizes, filecontents
+
+def scan_udf(dfd):
+    fp = os.fdopen(dfd, 'rb')
+    iso = pycdlib.PyCdlib()
+    iso.open_fp(fp)
+    try:
+        extracted = BytesIO()
+        iso.get_file_from_iso_fp(extracted, udf_path='/sources/idwbinfo.txt')
+        idwbinfo = extracted.getvalue()
+        return {}, {'sources/idwbinfo.txt': idwbinfo}
+    except Exception:
+        return {}, {}
+      
 
 
 def fingerprint(archive):
@@ -736,9 +810,9 @@ def import_image(filename, callback, backend=False, mfd=None, custtargpath=None,
         print('Importing OS to ' + targpath + ':')
     callback({'progress': 0.0})
     pct = 0.0
-    if EXTRACT & identity['method']:
+    if EXTRACT & identity['method'] or EXTRACTUDF & identity['method']:
         pct = extract_file(archive, callback=callback, imginfo=imginfo,
-                           extractlist=identity.get('extractlist', None))
+                           extractlist=identity.get('extractlist', None), method=identity['method'])
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targiso = os.path.join(targpath, basename)
