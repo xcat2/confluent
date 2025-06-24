@@ -497,6 +497,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     #TODO(jjohnson2): ip address, prefix length, mac address,
     # join a bond/bridge, vlan configs, etc.
     # also other nic criteria, physical location, driver and index...
+    if not onlyfamily:
+        onlyfamily = 0
     clientfam = None
     clientipn = None
     serverfam = None
@@ -527,11 +529,13 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     bmc6 = None
     if bmc:
         try:
-            bmc4 = socket.getaddrinfo(bmc, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+            if onlyfamily in (0, socket.AF_INET):
+                bmc4 = socket.getaddrinfo(bmc, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
         except Exception:
             pass
         try:
-            bmc6 = socket.getaddrinfo(bmc, 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][0]
+            if onlyfamily in (0, socket.AF_INET6):
+                bmc6 = socket.getaddrinfo(bmc, 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][0]
         except Exception:
             pass
     cfgbyname = {}
@@ -555,8 +559,6 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
         'ipv6_method': None,
     }
     myaddrs = []
-    if onlyfamily is None:
-        onlyfamily = 0
     if ifidx is not None:
         dhcprequested = False
         myaddrs = get_my_addresses(ifidx, family=onlyfamily)
@@ -591,13 +593,15 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     ipbynodename = None
     ip6bynodename = None
     try:
-        for addr in socket.getaddrinfo(node, 0, socket.AF_INET, socket.SOCK_DGRAM):
-            ipbynodename = addr[-1][0]
+        if onlyfamily in (socket.AF_INET, 0):
+            for addr in socket.getaddrinfo(node, 0, socket.AF_INET, socket.SOCK_DGRAM):
+                ipbynodename = addr[-1][0]
     except socket.gaierror:
         pass
     try:
-        for addr in socket.getaddrinfo(node, 0, socket.AF_INET6, socket.SOCK_DGRAM):
-                ip6bynodename = addr[-1][0]
+        if onlyfamily in (socket.AF_INET6, 0):
+            for addr in socket.getaddrinfo(node, 0, socket.AF_INET6, socket.SOCK_DGRAM):
+                    ip6bynodename = addr[-1][0]
     except socket.gaierror:
         pass
     if myaddrs:
@@ -753,7 +757,7 @@ def get_addresses_by_serverip(serverip):
     elif ':' in serverip:
         fam = socket.AF_INET6
     else:
-        raise ValueError('"{0}" is not a valid ip argument')
+        raise ValueError('"{0}" is not a valid ip argument'.format(serverip))
     ipbytes = socket.inet_pton(fam, serverip)
     if ipbytes[:8] == b'\xfe\x80\x00\x00\x00\x00\x00\x00':
         myaddrs = get_my_addresses(matchlla=ipbytes)
