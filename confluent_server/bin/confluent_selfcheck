@@ -223,7 +223,26 @@ if __name__ == '__main__':
             emprint('TFTP failure, PXE will not work, though media and HTTP boot can still work. (Example resolution: osdeploy initialize -p)')
         fprint('SSH root user public key: ')
         if glob.glob('/var/lib/confluent/public/site/ssh/*.rootpubkey'):
-            print('OK')
+            if not glob.glob('/root/.ssh/id_*.pub'):
+                emprint('No SSH keys for root user, passwordless SSH from managers to nodes may not work (Example resolution: osdeploy initialize -u)')
+            for userpub in glob.glob('/root/.ssh/id_*.pub'):
+                with open(userpub) as f:
+                    pubkey = f.read().strip()
+                for sitepubkey in glob.glob('/var/lib/confluent/public/site/ssh/*.rootpubkey'):
+                    with open(sitepubkey) as sf:
+                        spubkey = sf.read().strip()
+                        for keyline in spubkey.split('\n'):
+                            if keyline == pubkey:
+                                print('OK')
+                                break
+                        else:
+                            continue
+                        break
+                else:
+                    continue
+                break
+            else:
+                emprint('No matching public key found for root user (Example resolution: osdeploy initialize -u)')
         else:
             emprint('No trusted ssh keys for root user, passwordless SSH from managers to nodes may not work (Example resolution: osdeploy initialize -u)')
         if sshutil.sshver() > 7.6:
