@@ -38,7 +38,7 @@ import termios
 import fcntl
 import confluent.screensqueeze as sq
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageFont
 except ImportError:
     Image = None
 
@@ -227,15 +227,17 @@ def draw_text(text, width, height):
         nd = ImageDraw.Draw(nerr)
         for txtpiece in text.split('\n'):
             fntsize = 8
-            while nd.textlength(txtpiece, font_size=fntsize) < int(imgwidth * 0.90):
+            txtfont = ImageFont.truetype('DejaVuSans.ttf', size=fntsize)
+            while nd.textlength(txtpiece, font=txtfont) < int(imgwidth * 0.90):
                 fntsize += 1
+                txtfont = ImageFont.truetype('DejaVuSans.ttf', size=fntsize)
             fntsize -= 1
             if fntsize < maxfntsize:
                 maxfntsize = fntsize
         hmargin = int(imgwidth * 0.05)
         vmargin = int(imgheight * 0.10)
-        nd.text((hmargin, vmargin), text, font_size=maxfntsize)
-        nd.rectangle((0, 0, nerr.width - 1, nerr.height -1), outline='white', width=1)
+        nd.text((hmargin, vmargin), text, font=txtfont)
+        nd.rectangle((0, 0, nerr.width - 1, nerr.height -1), outline='white')
         outfile = io.BytesIO()
         nerr.save(outfile, format='PNG')
         data = base64.b64encode(outfile.getbuffer())
@@ -270,8 +272,8 @@ def draw_image(data, width, height, doscale=True):
             rzheight = imgheight
         img = img.resize((rzwidth, rzheight))
         nd = ImageDraw.Draw(nimg)
-        nd.rectangle((1, 1, rzwidth + 2, rzheight + 2), outline='black', width=1)
-        nd.rectangle((0, 0, rzwidth + 3, rzheight + 3), outline='white', width=1)
+        nd.rectangle((1, 1, rzwidth + 2, rzheight + 2), outline='black')
+        nd.rectangle((0, 0, rzwidth + 3, rzheight + 3), outline='white')
         nimg.paste(img, box=(2, 2))
         outfile = io.BytesIO()
         nimg.save(outfile, format='PNG')
