@@ -127,6 +127,7 @@ _attraliases = {
     'switchuser': 'secret.hardwaremanagementuser',
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
+    'net.bond_mode': 'net.team_mode'
 }
 _validroles = ['Administrator', 'Operator', 'Monitor', 'Stub']
 
