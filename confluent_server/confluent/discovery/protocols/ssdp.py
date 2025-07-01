@@ -316,7 +316,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 if not mac:
                     continue
                 _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
-            for mac in newmacs:
+            for mac in list(newmacs):
                 thehandler = machandlers.get(mac, None)
                 if thehandler:
                     thehandler(peerbymacaddress[mac])
