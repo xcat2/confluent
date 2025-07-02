@@ -19,5 +19,6 @@ scp prepadopt.sh $TARGNODE:/tmp/
 scp finalizeadopt.sh $TARGNODE:/tmp/
 ssh $TARGNODE bash /tmp/prepadopt.sh $TARGNODE $TARGPROF
 nodeattrib $TARGNODE deployment.pendingprofile=
+nodeattrib $TARGNODE -c deployment.useinsecureprotocols
 nodeapply $TARGNODE -k
 ssh $TARGNODE sh /tmp/finalizeadopt.sh
