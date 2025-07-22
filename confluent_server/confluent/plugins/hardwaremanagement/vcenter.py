@@ -372,7 +372,8 @@ def create(nodes, element, configmanager, inputdata):
     clientsbynode = prep_vcsa_clients(nodes, configmanager)
     for node in nodes:
         serialdata = clientsbynode[node].get_vm_serial(node)
-        return VmConsole(serialdata['server'], serialdata['port'], serialdata['tls'], configmanager)
+        yield VmConsole(serialdata['server'], serialdata['port'], serialdata['tls'], configmanager)
+        return
 
 
 

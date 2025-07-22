@@ -454,8 +454,8 @@ def create(nodes, element, configmanager, inputdata):
             yield msg.ChildCollection(url)
             return
         serialdata = clientsbynode[node].get_vm_serial(node)
-        return PmxConsole(serialdata, node, configmanager, clientsbynode[node])
-
+        yield PmxConsole(serialdata, node, configmanager, clientsbynode[node])
+        return
 
 
 if __name__ == '__main__':
