@@ -43,6 +43,8 @@ libc = ctypes.CDLL(ctypes.util.find_library('c'))
 
 
 def address_is_somewhat_trusted(address, nodename, cfm):
+    if netutil.ip_on_same_subnet(address.split('%')[0], 'fe80::', 64):
+        return True
     if netutil.address_is_local(address):
         return True
     authnets = cfm.get_node_attributes(nodename, 'trusted.subnets')
