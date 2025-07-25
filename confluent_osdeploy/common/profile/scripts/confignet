@@ -164,6 +164,9 @@ class NetplanManager(object):
                 if curraddr not in currips:
                     needcfgwrite = True
                     currips.append(curraddr)
+            if stgs.get('mtu', None):
+                devdict = self.getcfgarrpath([devname])
+                devdict['mtu'] = int(stgs['mtu'])
             gws = []
             gws.append(stgs.get('ipv4_gateway', None))
             gws.append(stgs.get('ipv6_gateway', None))
