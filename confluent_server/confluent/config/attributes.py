@@ -478,6 +478,9 @@ node = {
                        'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
                        'a team or a single interface for VLAN/PKEY connections.'
     },
+    'net.mtu': {
+            'description': 'MTU to apply to this connection',
+    },
     'net.vlan_id': {
         'description': 'Ethernet VLAN or InfiniBand PKEY to use for this connection. '
                        'Specify the parent device using net.interface_names.'
