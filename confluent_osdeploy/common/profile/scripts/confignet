@@ -381,6 +381,8 @@ class NetworkManager(object):
             cmdargs['ipv4.gateway'] = stgs['ipv4_gateway']
         if stgs.get('ipv6_gateway', None):
             cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
+        if stgs.get('mtu', None):
+            cmdargs['802-3-ethernet.mtu'] = stgs['mtu']
         dnsips = self.deploycfg.get('nameservers', [])
         if not dnsips:
             dnsips = []
@@ -406,7 +408,7 @@ class NetworkManager(object):
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
-                cargs.append(cmdargs[arg])
+                cargs.append('{}'.format(cmdargs[arg]))
             if stgs['team_mode'] in self.bondtypes:
                 stgs['team_mode'] = self.bondtypes[stgs['team_mode']]
             subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'miimon=100,mode={}'.format(stgs['team_mode'])] + cargs)
@@ -441,7 +443,7 @@ class NetworkManager(object):
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
-                cargs.append(cmdargs[arg])
+                cargs.append('{}'.format(cmdargs[arg]))
             if u:
                 subprocess.check_call(['nmcli', 'c', 'm', u, 'connection.interface-name', iname] + cargs)
                 subprocess.check_call(['nmcli', 'c', 'u', u])
