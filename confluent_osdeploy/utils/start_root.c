@@ -3,8 +3,11 @@
 #include <sys/mount.h>
 #define __USE_GNU
 #include <sched.h>
+#include <string.h>
 int main(int argc, char* argv[]) {
-    unshare(CLONE_NEWNS);
+    if (argc < 2 || strcmp(argv[1], "-s")) {
+        unshare(CLONE_NEWNS);
+    }
     mount("/dev", "/sysroot/dev", NULL, MS_MOVE, NULL);
     mount("/proc", "/sysroot/proc", NULL, MS_MOVE, NULL);
     mount("/sys", "/sysroot/sys", NULL, MS_MOVE, NULL);
