@@ -13,7 +13,7 @@ If you're coming from xCAT, check out [this comparison](https://hpc.lenovo.com/u
 
 # Documentation
 
-Confluent documentation is hosted on hpc.lenovo.com: https://hpc.lenovo.com/users/documentation/
+Confluent documentation is hosted on: https://xcat2.github.io/confluent-docs/
 
 # Download
 
