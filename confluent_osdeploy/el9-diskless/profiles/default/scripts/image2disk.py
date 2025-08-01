@@ -11,6 +11,10 @@ import struct
 import sys
 import subprocess
 import traceback
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 bootuuid = None
 vgname = 'localstorage'
@@ -334,13 +338,16 @@ def had_swap():
 
 newrootdev = None
 newswapdev = None
+vgmap = None
 def install_to_disk(imgpath):
+    global vgmap
     global bootuuid
     global newrootdev
     global newswapdev
     global vgname
     global oldvgname
     lvmvols = {}
+    vgmap = {}
     deftotsize = 0
     mintotsize = 0
     deflvmsize = 0
@@ -365,24 +372,30 @@ def install_to_disk(imgpath):
     mintotsize = swapsize
     for fs in get_image_metadata(imgpath):
         allvols.append(fs)
-        deftotsize += fs['initsize']
-        mintotsize += fs['minsize']
-        if fs['initsize'] > biggestsize:
-            biggestfs = fs
-            biggestsize = fs['initsize']
+
         if fs['device'].startswith('/dev/mapper'):
-            oldvgname = fs['device'].rsplit('/', 1)[-1]
+            odevname = fs['device'].rsplit('/', 1)[-1]
             # if node has - then /dev/mapper will double up the hypen
-            if '_' in oldvgname and '-' in oldvgname.split('_', 1)[-1]:
-                oldvgname = oldvgname.rsplit('-', 1)[0].replace('--', '-')
+            if '_' in odevname and '-' in odevname.split('_', 1)[-1]:
+                oldvgname = odevname.rsplit('-', 1)[0].replace('--', '-')
                 osname = oldvgname.split('_')[0]
                 nodename = socket.gethostname().split('.')[0]
                 vgname = '{}_{}'.format(osname, nodename)
-            lvmvols[fs['device'].replace('/dev/mapper/', '')] = fs
+            elif '-' in odevname: # unique one
+                vgmap[odevname] = odevname.split('-')[0]
+                lvmvols[odevname] = fs
+
+                continue
+            lvmvols[odevname] = fs
             deflvmsize += fs['initsize']
             minlvmsize += fs['minsize']
         else:
             plainvols[int(re.search('(\d+)$', fs['device'])[0])] = fs
+        if fs['initsize'] > biggestsize:
+            biggestfs = fs
+            biggestsize = fs['initsize']
+        deftotsize += fs['initsize']
+        mintotsize += fs['minsize']
     with open('/tmp/installdisk') as diskin:
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
@@ -440,6 +453,28 @@ def install_to_disk(imgpath):
         lvmpart = get_partname(instdisk, volidx + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', vgname, lvmpart])
+        vgroupmap = {}
+        if yaml and vgmap:
+            with open('/tmp/volumegroupmap.yml') as mapin:
+                vgroupmap = yaml.safe_load(mapin)
+        donedisks = {}
+        for morevolname in vgmap:
+            morevg = vgmap[morevolname]
+            if morevg not in vgroupmap:
+                raise Exception("No mapping defined to create volume group {}".format(morevg))
+            targdisk = vgroupmap[morevg]
+            if targdisk not in donedisks:
+                moreparted = PartedRunner(targdisk)
+                moreparted.run('mklabel gpt')
+                moreparted.run('mkpart lvm 0% 100%')
+                morelvmpart = get_partname(targdisk, 1)
+                subprocess.check_call(['pvcreate', '-ff', '-y', morelvmpart])
+                subprocess.check_call(['vgcreate', morevg, morelvmpart])
+                donedisks[targdisk] = 1
+            morelvname = morevolname.split('-', 1)[1]
+            subprocess.check_call(['lvcreate', '-L', '{}b'.format(lvmvols[morevolname]['initsize']), '-y', '-n', morelvname, morevg])
+            lvmvols[morevolname]['targetdisk'] = '/dev/{}/{}'.format(morevg, morelvname)
+
         vginfo = subprocess.check_output(['vgdisplay', vgname, '--units', 'b']).decode('utf8')
         vginfo = vginfo.split('\n')
         pesize = 0
@@ -452,6 +487,9 @@ def install_to_disk(imgpath):
                 pes = int(infline[4])
         takeaway = swapsize // pesize
         for volidx in lvmvols:
+            if volidx in vgmap:
+                # was handled previously
+                continue
             vol = lvmvols[volidx]
             if vol is biggestfs:
                 continue
@@ -460,6 +498,10 @@ def install_to_disk(imgpath):
         biggestextents = pes - takeaway
         for volidx in lvmvols:
             vol = lvmvols[volidx]
+            if volidx in vgmap:
+                # was handled previously
+                continue
+
             if vol is biggestfs:
                 extents = biggestextents
             else:
