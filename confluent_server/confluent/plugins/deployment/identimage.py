@@ -21,6 +21,7 @@
 import confluent.messages as msg
 import confluent.netutil as netutil
 import eventlet.green.subprocess as subprocess
+import confluent.config.configmanager as cfm
 import os
 import shutil
 import tempfile
@@ -51,6 +52,7 @@ def create_ident_image(node, configmanager):
     # It would be a reasonable enhancement to list all collective server addresses
     # restricted by 'managercandidates'
     ident['deploy_servers'] = []
+    ident['confluent_uuid'] = cfm.get_global('confluent_uuid')
     for myaddr in netutil.get_my_addresses():
         myaddr = socket.inet_ntop(myaddr[0], myaddr[1])
         ident['deploy_servers'].append(myaddr)
