@@ -244,7 +244,7 @@ def draw_text(text, width, height):
         draw_image(data, width, height, doscale=False)
     else:
         sys.stdout.write(text)
-        cursor_left(len(txt))
+        cursor_left(len(text))
 
 def draw_image(data, width, height, doscale=True):
     imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
