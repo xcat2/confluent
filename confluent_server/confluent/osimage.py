@@ -358,6 +358,8 @@ def check_fedora(isoinfo):
     prodlines = prodinfo.split(b'\n')
     if len(prodlines) < 3:
         return None
+    if not prodlines[1].split():
+        return None
     prod = prodlines[1].split()[0]
     if prod != b'Fedora':
         return None
