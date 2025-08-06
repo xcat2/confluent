@@ -107,7 +107,11 @@ if [ ! -z "$confluentsrv" ]; then
         /usr/libexec/nm-initrd-generator ip=:dhcp6
     else
         confluenthttpsrv=$confluentsrv
-        ifname=$(ip -br link|grep LOWER_UP|grep -v UNKNOWN|head -n 1|awk '{print $1}')
+        ifname=""
+        while [ -z "$ifname" ]; do
+            ifname=$(ip -br link|grep LOWER_UP|grep -v ib|grep -v UNKNOWN|head -n 1|awk '{print $1}')
+            sleep 0.5
+        done
         echo -n "Attempting to use dhcp to bring up $ifname..."
         dhclient $ifname
         while ! ip -br addr show dev $ifname | grep \\. > /dev/null; do
