@@ -1,8 +1,9 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 import optparse
 import signal
 import sys
 import os
+
 try:
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 except AttributeError:
@@ -23,12 +24,15 @@ def lookupdata(data, key):
         ret = ''
     return ret
 
+
 def main():
     argparser = optparse.OptionParser(
-    usage='''\n       %prog noderange -o ansible.hosts
-             \n ''')
+        usage='''\n       %prog noderange -o ansible.hosts -a
+        ''')
     argparser.add_option('-o', '--output',
-                         help='Ansible hosts file')
+                         help='Writes an Ansible hosts file')
+    argparser.add_option('-a', '--append', action='store_true',
+                         help='Appends to existing hosts file')
     (options, args) = argparser.parse_args()
     try:
         noderange = args[0]
@@ -45,24 +49,43 @@ def main():
             if node not in databynode:
                 databynode[node] = {}
             databynode[node].update(res['databynode'][node])
+
     nodesbygroup = {}
-    with open(options.output, 'w') as importfile:
-        needempty = False
-        for node in sortutil.natural_sort(databynode):
-            data = databynode[node]
-            if not data.get('groups', []):
-                importfile.write(node + '\n')
-                needempty = True
-            for g in data.get('groups', []):
-                if g not in nodesbygroup:
-                    nodesbygroup[g] = set([node])
+    for node in sortutil.natural_sort(databynode):
+        data = databynode[node]
+        groups = data.get('groups', [])
+        if not groups:
+            nodesbygroup.setdefault('', set()).add(node.strip().lower())
+        else:
+            for g in groups:
+                nodesbygroup.setdefault(g, set()).add(node.strip().lower())
+
+    existing_data = {}
+    if options.append and os.path.exists(options.output):
+        current_group = ''
+        with open(options.output, 'r') as f:
+            for line in f:
+                line = line.strip().lower()
+                if not line:
+                    continue
+                if line.startswith('[') and line.endswith(']'):
+                    current_group = line[1:-1]
+                    existing_data.setdefault(current_group, set())
                 else:
-                    nodesbygroup[g].add(node)
-        if needempty:
-            importfile.write('\n')
-        for group in sortutil.natural_sort(nodesbygroup):
-            importfile.write('[{0}]\n'.format(group))
-            for node in sortutil.natural_sort(nodesbygroup[group]):
+                    existing_data.setdefault(current_group, set()).add(line)
+
+    for group, nodes in nodesbygroup.items():
+        nodes = {n.strip().lower() for n in nodes}
+        current_nodes = existing_data.get(group, set())
+        new_nodes = nodes - current_nodes
+        if new_nodes:
+            existing_data.setdefault(group, set()).update(nodes)
+
+    with open(options.output, 'w') as importfile:
+        for group in sortutil.natural_sort(existing_data.keys()):
+            if group:
+                importfile.write('[{0}]\n'.format(group))
+            for node in sortutil.natural_sort(existing_data[group]):
                 importfile.write('{0}\n'.format(node))
             importfile.write('\n')
 
