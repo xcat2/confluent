@@ -318,6 +318,16 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
     return pctdone
 
 
+def check_openeuler(isoinfo):
+    for entry in isoinfo[0]:
+        if 'openEuler-release-24.03' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el9'
+            break
+    else:
+        return None
+    return {'name': 'openeuler-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
 def check_rocky(isoinfo):
     ver = None
     arch = None

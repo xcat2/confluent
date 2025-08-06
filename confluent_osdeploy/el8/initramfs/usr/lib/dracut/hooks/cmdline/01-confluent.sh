@@ -3,10 +3,12 @@ echo -n "" >> /tmp/net.ifaces
 echo -n "" > /tmp/01-autocons.devnode
 BUNDLENAME=/etc/pki/tls/certs/ca-bundle.crt
 if [ ! -e "$BUNDLENAME" ]; then
-    BUNDLENAME=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
     mkdir -p /etc/pki/tls/certs
-    ln -s $BUNDLENAME /etc/pki/tls/certs/ca-bundle.crt
-fi
+    if [ -e /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem ]; then
+        BUNDLENAME=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+        ln -s $BUNDLENAME /etc/pki/tls/certs/ca-bundle.crt
+    fi
+fi	
 cat /tls/*.0 >> $BUNDLENAME
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
