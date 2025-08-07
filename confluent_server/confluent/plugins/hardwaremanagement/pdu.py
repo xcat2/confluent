@@ -42,6 +42,8 @@ def retrieve(nodes, element, configmanager, inputdata):
         inletname = element[-1]
         outlets = get_outlets(nodes, emebs, inletname)
         for node in outlets:
+            if not outlets[node]:
+                yield msg.ConfluentTargetNotFound(node, 'No matching inlets defined for node in "power.*" attributes')
             for pgroup in outlets[node]:
                 pdu = outlets[node][pgroup]['pdu']
                 outlet = outlets[node][pgroup]['outlet']
@@ -109,6 +111,8 @@ def update(nodes, element, configmanager, inputdata):
     gp = greenpool.GreenPool(64)
     outlets = get_outlets(nodes, emebs, inletname)
     for node in outlets:
+        if not outlets[node]:
+                yield msg.ConfluentTargetNotFound(node, 'No matching inlets defined for node in "power.*" attributes')
         for pgroup in outlets[node]:
             pdu = outlets[node][pgroup]['pdu']
             outlet = outlets[node][pgroup]['outlet']
