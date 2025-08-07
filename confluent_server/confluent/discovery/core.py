@@ -316,6 +316,8 @@ def list_matching_nodes(criteria):
     retnodes = []
     for node in known_nodes:
         for mac in known_nodes[node]:
+            if mac not in known_info:
+                continue
             info = known_info[mac]
             if _info_matches(info, criteria):
                 retnodes.append(node)
@@ -613,7 +615,11 @@ def handle_api_request(configmanager, inputdata, operation, pathcomponents):
         return [msg.AssignedResource(inputdata['node'])]
     elif operation == 'delete':
         mac = _get_mac_from_query(pathcomponents)
-        del known_info[mac]
+        for node in known_nodes:
+            if mac in known_nodes[node]:
+                del known_nodes[node][mac]
+        if mac in known_info:
+            del known_info[mac]
         return [msg.DeletedResource(mac)]
     raise exc.NotImplementedException(
         'Unable to {0} to {1}'.format(operation, '/'.join(pathcomponents)))
