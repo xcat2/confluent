@@ -53,22 +53,61 @@ def get_ip_addresses():
 def check_apache_config(path):
     keypath = None
     certpath = None
+    chainpath = None
     with open(path, 'r') as openf:
         webconf = openf.read()
+    insection = False
+    # we always manipulate the first VirtualHost section
+    # since we are managing IP based SANs, then SNI
+    # can never match anything but the first VirtualHost
     for line in webconf.split('\n'):
         line = line.strip()
         line = line.split('#')[0]
-        if line.startswith('SSLCertificateFile'):
-            _, certpath = line.split(None, 1)
-        if line.startswith('SSLCertificateKeyFile'):
+        if not certpath and line.startswith('SSLCertificateFile'):
+            insection = True
+            if not certpath:
+                _, certpath = line.split(None, 1)
+        if not keypath and line.startswith('SSLCertificateKeyFile'):
+            insection = True
             _, keypath = line.split(None, 1)
+        if not chainpath and line.startswith('SSLCertificateChainFile'):
+            insection = True
+            _, chainpath = line.split(None, 1)
+        if insection and line.startswith('</VirtualHost>'):
+            break
+    return keypath, certpath, chainpath
+
+def check_nginx_config(path):
+    keypath = None
+    certpath = None
+    # again, we only care about the first server section
+    # since IP won't trigger SNI matches down the configuration
+    with open(path, 'r') as openf:
+        webconf = openf.read()
+    for line in webconf.split('\n'):
+        if keypath and certpath:
+            break
+        line = line.strip()
+        line = line.split('#')[0]
+        for segment in line.split(';'):
+            if not certpath and segment.startswith('ssl_certificate'):
+                _, certpath = segment.split(None, 1)
+            if not keypath and segment.startswith('ssl_certificate_key'):
+                _, keypath = segment.split(None, 1)
+    if keypath:
+        keypath = keypath.strip('"')
+    if certpath:
+        certpath = certpath.strip('"')
     return keypath, certpath
 
 def get_certificate_paths():
     keypath = None
     certpath = None
+    chainpath = None
+    ngkeypath = None
+    ngbundlepath = None
     if os.path.exists('/etc/httpd/conf.d/ssl.conf'): # redhat way
-        keypath, certpath = check_apache_config('/etc/httpd/conf.d/ssl.conf')
+        keypath, certpath, chainpath = check_apache_config('/etc/httpd/conf.d/ssl.conf')
     if not keypath and os.path.exists('/etc/apache2'): # suse way
         for currpath, _, files in os.walk('/etc/apache2'):
             for fname in files:
@@ -80,8 +119,30 @@ def get_certificate_paths():
                     return None, None # Ambiguous...
                 if kploc[0]:
                     keypath, certpath = kploc
+    if os.path.exists('/etc/nginx'): # nginx way
+        for currpath, _, files in os.walk('/etc/nginx'):
+            if ngkeypath:
+                break
+            for fname in files:
+                if not fname.endswith('.conf'):
+                    continue
+                ngkeypath, ngbundlepath = check_nginx_config(os.path.join(currpath,
+                                                                       fname)) 
+                if ngkeypath:
+                    break
+    tlsmateriallocation = {}
+    if keypath:
+        tlsmateriallocation.setdefault('keys', []).append(keypath)
+    if ngkeypath:
+        tlsmateriallocation.setdefault('keys', []).append(ngkeypath)
+    if certpath:
+        tlsmateriallocation.setdefault('certs', []).append(certpath)
+    if chainpath:
+        tlsmateriallocation.setdefault('chains', []).append(chainpath)
+    if ngbundlepath:
+        tlsmateriallocation.setdefault('bundles', []).append(ngbundlepath)
+    return tlsmateriallocation
 
-    return keypath, certpath
 
 def assure_tls_ca():
     keyout, certout = ('/etc/confluent/tls/cakey.pem', '/etc/confluent/tls/cacert.pem')
@@ -208,8 +269,12 @@ def create_simple_ca(keyout, certout):
 
 def create_certificate(keyout=None, certout=None, csrout=None):
     if not keyout:
-        keyout, certout = get_certificate_paths()
-    if not keyout:
+        tlsmateriallocation = get_certificate_paths()
+        keyout = tlsmateriallocation.get('keys', [None])[0]
+        certout = tlsmateriallocation.get('certs', [None])[0]
+        if not certout:
+            certout = tlsmateriallocation.get('bundles', [None])[0]
+    if not keyout or not certout:
         raise Exception('Unable to locate TLS certificate path automatically')
     assure_tls_ca()
     shortname = socket.gethostname().split('.')[0]
@@ -291,6 +356,29 @@ def create_certificate(keyout=None, certout=None, csrout=None):
                 '-startdate', '19700101010101Z', '-enddate', '21000101010101Z',
                 '-extfile', extconfig
             ])
+        for keycopy in tlsmateriallocation.get('keys', []):
+            if keycopy != keyout:
+                shutil.copy2(keyout, keycopy)
+        for certcopy in tlsmateriallocation.get('certs', []):
+            if certcopy != certout:
+                shutil.copy2(certout, certcopy)
+        cacert = None
+        with open('/etc/confluent/tls/cacert.pem', 'rb') as cacertfile:
+            cacert = cacertfile.read()
+        for bundlecopy in tlsmateriallocation.get('bundles', []):
+            if bundlecopy != certout:
+                shutil.copy2(certout, bundlecopy)
+            with open(bundlecopy, 'ab') as bundlefile:
+                bundlefile.write(b'\n')
+                bundlefile.write(cacert)
+        for chaincopy in tlsmateriallocation.get('chains', []):
+            if chaincopy != certout:
+                with open(chaincopy, 'wb') as chainfile:
+                    chainfile.write(cacert)
+            else:
+                with open(chaincopy, 'ab') as chainfile:
+                    chainfile.write(b'\n')
+                    chainfile.write(cacert)
     finally:
         os.remove(tmpconfig)
         if needcsr:
