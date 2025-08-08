@@ -19,7 +19,9 @@ interval of 1 second is used.
 ## OPTIONS
 
 * `-c`, `--csv`:
-  Organize output into CSV format, one sensor per column.
+  Organize output into CSV format, one sensor per column. Note that while normally nodesensors reports
+  sensors in order as returned by server, CSV output enforces consistency by sorting after receiving
+  the results, which may have a different ordering than non-CSV usage of nodesensors.
 
 * `-i`, `--interval`=**SECONDS**:
   Repeat data gathering waiting, waiting the specified time between samples.  Unless `-n` is
