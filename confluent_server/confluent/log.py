@@ -386,14 +386,18 @@ class TimedAndSizeRotatingFileHandler(BaseRotatingHandler):
                   f['time'] in t_list[:-(self.backupCount - 1)]]
         return result
 
+    dirContents = {}
     def initSizeRollingCount(self):
         """
         Init the max number of log files for current time.
         """
         dirName, baseName = os.path.split(self.textpath)
         prefix = baseName + "."
-        filePaths = glob.glob(os.path.join(dirName, "%s*" % prefix))
-        fileNames = [os.path.split(f)[1] for f in filePaths]
+        if dirName not in self.dirContents or self.dirContents[dirName][1] < time.time():
+            self.dirContents[dirName] = (os.listdir(dirName), time.time() + 5)
+        matchexp = re.compile(f'^{prefix}\.\d+$')
+        fileNames = [f for f in self.dirContents[dirName][0]
+                     if matchexp.match(f)]
         plen = len(prefix)
         for fileName in fileNames:
             suffix = fileName[plen:]
