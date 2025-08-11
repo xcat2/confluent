@@ -509,7 +509,7 @@ if __name__ == '__main__':
         try:
             fix_vswitch()
         except Exception as e:
-            print(f"fix_vswitch() error: {e}")
+            print("fix_vswitch() error: {}".format(e))
         sys.argv.remove('-f')
         sys.exit(0)
     usejson = False
