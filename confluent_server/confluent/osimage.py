@@ -510,10 +510,15 @@ def check_debian(isoinfo):
             raise Exception("Unsupported debian architecture {}".format(arch))
         arch = 'x86_64'
         name = 'debian-{0}-{1}'.format(version, arch)
+        major = int(major)
+        if major > 12:
+            category = 'debian13'
+        else:
+            category = 'debian'
         return {
             'name': name,
             'method': EXTRACT,
-            'category': 'debian',
+            'category': category,
         }
 
 
