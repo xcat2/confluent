@@ -319,6 +319,12 @@ def update_nodes(nodes, element, configmanager, inputdata):
                             if fnmatch(candattrib, attrib):
                                 clearattribs.append(candattrib)
                                 foundattrib = True
+                        currnodeattrs = configmanager.get_node_attributes(node, attrib)
+                        for matchattrib in currnodeattrs.get(node, {}):
+                            if matchattrib != attrib:
+                                continue
+                            clearattribs.append(matchattrib)
+                            foundattrib = True
                         if not foundattrib:
                             raise exc.InvalidArgumentException("No attribute matches '" + attrib + "' (try wildcard if trying to clear a group)")
                 elif '*' in attrib:
