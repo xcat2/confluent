@@ -250,8 +250,13 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
         for entry in entries:
             if str(entry).endswith('TRANS.TBL'):
                 continue
-            if extractlist and str(entry).lower() not in extractlist:
-                continue
+            if extractlist:
+                normname = str(entry).lower()
+                for extent in extractlist:
+                    if fnmatch(normname, extent):
+                        break
+                else:
+                    continue
             write_header(write_p, entry._entry_p)
             read_p = entry._archive_p
             while 1:
@@ -553,11 +558,11 @@ def check_ubuntu(isoinfo):
                 'method': EXTRACT,
                 'category': 'ubuntu{0}'.format(major)}
         elif 'efi/boot/bootaa64.efi' in isoinfo[0]:
-            exlist = ['casper/vmlinuz', 'casper/initrd',
+            exlist = ['casper/*vmlinuz', 'casper/*initrd',
                     'efi/boot/bootaa64.efi', 'efi/boot/grubaa64.efi'
                     ]
         else:
-            exlist = ['casper/vmlinuz', 'casper/initrd',
+            exlist = ['casper/*vmlinuz', 'casper/*initrd', 
                     'efi/boot/bootx64.efi', 'efi/boot/grubx64.efi'
                     ]
         return {'name': 'ubuntu-{0}-{1}'.format(ver, arch),
