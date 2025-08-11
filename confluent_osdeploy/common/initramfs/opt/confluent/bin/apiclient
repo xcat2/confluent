@@ -464,7 +464,7 @@ def get_available_nics():
         parts = re.split(r'\s{2,}', line.strip())
         if len(parts) >= 5:
             nic_name = parts[0]
-            nic_status = parts[4]  # "Link Status" este al 5-lea câmp
+            nic_status = parts[4]  # "Link Status" is the 5th field
             available_nics[nic_name] = nic_status
 
     return available_nics
