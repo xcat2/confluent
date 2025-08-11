@@ -29,8 +29,8 @@ ln -s el8 el9
 ln -s el8 el10
 mv el10/initramfs/usr el10/initramfs/var
 cp -a debian debian13
-mkdir -p debian13/initrafms/usr
-mv debian13/initrafms/lib debian13/initrafms/usr/
+mkdir -p debian13/initramfs/usr
+mv debian13/initramfs/lib debian13/initramfs/usr/
 mv el10/initramfs/usr el10/initramfs/var
 for os in rhvh4 el7 genesis el8 suse15 debian debian13 ubuntu20.04 ubuntu22.04 ubuntu24.04 coreos el9 el10; do
     mkdir ${os}out
