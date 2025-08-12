@@ -376,7 +376,7 @@ node = {
                         'the managed node.  If not specified, then console '
                         'is disabled.  "ipmi" should be specified for most '
                         'systems if console is desired.'),
-        'validvalues': ('ssh', 'ipmi', 'openbmc', 'tsmsol', 'vcenter'),
+        'validvalues': ('ssh', 'ipmi', 'openbmc', 'tsmsol', 'vcenter', 'proxmox'),
     },
 #    'virtualization.host': {
 #        'description': ('Hypervisor where this node does/should reside'),
