@@ -116,9 +116,9 @@ def get_certificate_paths():
                 kploc = check_apache_config(os.path.join(currpath,
                                                                        fname))
                 if keypath and kploc[0] and keypath != kploc[0]:
-                    return None, None # Ambiguous...
+                    return {'error': 'Ambiguous...'}
                 if kploc[0]:
-                    keypath, certpath = kploc
+                    keypath, certpath, chainpath = kploc
     if os.path.exists('/etc/nginx'): # nginx way
         for currpath, _, files in os.walk('/etc/nginx'):
             if ngkeypath:
@@ -142,7 +142,6 @@ def get_certificate_paths():
     if ngbundlepath:
         tlsmateriallocation.setdefault('bundles', []).append(ngbundlepath)
     return tlsmateriallocation
-
 
 def assure_tls_ca():
     keyout, certout = ('/etc/confluent/tls/cakey.pem', '/etc/confluent/tls/cacert.pem')
