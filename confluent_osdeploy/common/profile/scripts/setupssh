@@ -42,3 +42,4 @@ confluentpython $confapiclient /confluent-api/self/nodelist | sed -e 's/^- //' >
 cat /etc/ssh/shosts.equiv > /root/.shosts
 cd -
 rm -rf $TMPDIR
+systemctl try-restart sshd
