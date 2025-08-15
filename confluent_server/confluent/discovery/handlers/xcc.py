@@ -478,6 +478,13 @@ class NodeHandler(immhandler.NodeHandler):
                     while status != 200:
                         tries -= 1
                         rsp, status = wc.grab_json_response_with_status(
+                            '/redfish/v1/AccountService/Accounts/{0}'.format(uid))
+                        if status >= 500:
+                            if tries < 0:
+                                raise Exception('Redfish account management failure')
+                            eventlet.sleep(30)
+                            continue
+                        rsp, status = wc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
                             {'UserName': username}, method='PATCH')
                         if status != 200:
