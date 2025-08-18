@@ -70,9 +70,9 @@ def get_image_metadata(imgpath):
                 yield md
         else:
             # plausible filesystem structure to apply to a nominally "diskless" image
-            yield {'mount': '/', 'filesystem': 'xfs', 'minsize': 39513563136, 'initsize': 954128662528, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/mapper/root', 'compressed_size': 27022069760}
-            yield {'mount': '/boot', 'filesystem': 'xfs', 'minsize': 232316928, 'initsize': 1006632960, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/nvme1n1p2', 'compressed_size': 171462656}
-            yield {'mount': '/boot/efi', 'filesystem': 'vfat', 'minsize': 7835648, 'initsize': 627900416, 'flags': 'rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro', 'device': '/dev/nvme1n1p1', 'compressed_size': 1576960}
+            yield {'mount': '/', 'filesystem': 'xfs', 'minsize': 4294967296, 'initsize': 954128662528, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/mapper/root', 'compressed_size': 27022069760}
+            yield {'mount': '/boot', 'filesystem': 'xfs', 'minsize': 536870912, 'initsize': 1006632960, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/nvme1n1p2', 'compressed_size': 171462656}
+            yield {'mount': '/boot/efi', 'filesystem': 'vfat', 'minsize': 33554432, 'initsize': 627900416, 'flags': 'rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro', 'device': '/dev/nvme1n1p1', 'compressed_size': 1576960}
             #raise Exception('Installation from single part image not supported')
 
 class PartedRunner():
