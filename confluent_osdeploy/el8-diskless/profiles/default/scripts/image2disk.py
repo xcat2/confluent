@@ -181,6 +181,8 @@ def fixup(rootdir, vols):
             newline = []
             for ent in gline:
                 if ent.startswith('resume=') or ent.startswith('rd.lvm.lv'):
+                    if ent.endswith('"'):
+                        newline.append('"')
                     continue
                 newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
