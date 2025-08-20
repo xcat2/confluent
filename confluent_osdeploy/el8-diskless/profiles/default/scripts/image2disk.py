@@ -141,7 +141,7 @@ def fixup(rootdir, vols):
         shutil.copy2(ifcfg, newcfg)
     rootconfluentdir = os.path.join(rootdir, 'etc/confluent/')
     if os.path.exists(rootconfluentdir):
-        shutil.rmtree(rootconfluentdir))
+        shutil.rmtree(rootconfluentdir)
     shutil.copytree('/etc/confluent', rootconfluentdir)
     if policy:
         sys.stdout.write('Applying SELinux labeling...')
