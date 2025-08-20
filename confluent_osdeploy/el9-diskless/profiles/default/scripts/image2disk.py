@@ -181,8 +181,10 @@ def fixup(rootdir, vols):
             elif ent.startswith('root='):
                 newkcmdlineent.append('root={}'.format(newrootdev))
             elif ent.startswith('rd.lvm.lv='):
-                ent = convert_lv(ent)
-                if ent:
+                nent = convert_lv(ent)
+                if nent:
+                    newkcmdlineent.append(ent)
+                else:
                     newkcmdlineent.append(ent)
             else:
                 newkcmdlineent.append(ent)
@@ -204,8 +206,10 @@ def fixup(rootdir, vols):
                     elif cfgpart.startswith('resume='):
                         newcfgparts.append('resume={}'.format(newswapdev))
                     elif cfgpart.startswith('rd.lvm.lv='):
-                        cfgpart = convert_lv(cfgpart)
-                        if cfgpart:
+                        ncfgpart = convert_lv(cfgpart)
+                        if ncfgpart:
+                            newcfgparts.append(ncfgpart)
+                        else:
                             newcfgparts.append(cfgpart)
                     else:
                         newcfgparts.append(cfgpart)
@@ -238,11 +242,11 @@ def fixup(rootdir, vols):
                 elif ent.startswith('root='):
                     newline.append('root={}'.format(newrootdev))
                 elif ent.startswith('rd.lvm.lv='):
-                    ent = convert_lv(ent)
-                    if ent:
+                    nent = convert_lv(ent)
+                    if nent:
+                        newline.append(nent)
+                    else
                         newline.append(ent)
-                    elif '""' in ent:
-                        newline.append('""')
                 else:
                     newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
