@@ -16,6 +16,13 @@ if [ -d /etc/ssh/sshd_config.d/ -a ! -e /etc/ssh/sshd_config.d/90-confluent.conf
 	echo HostbasedAuthentication yes >> /etc/ssh/sshd_config.d/90-confluent.conf
 	echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config.d/90-confluent.conf
 	echo IgnoreRhosts no >> /etc/ssh/sshd_config.d/90-confluent.conf
+elif [ ! -d /etc/ssh/sshd_config.d/ ] && ! grep HostCertificate /etc/ssh/sshd_config > /dev/null; then
+	for cert in /etc/ssh/ssh*-cert.pub; do
+		echo HostCertificate $cert >> /etc/ssh/sshd_config
+	done
+	echo HostbasedAuthentication yes >> /etc/ssh/sshd_config
+	echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config
+	echo IgnoreRhosts no >> /etc/ssh/sshd_config
 fi
 
 TMPDIR=$(mktemp -d)
@@ -30,6 +37,9 @@ for ca in ssh/*.ca; do
 	echo '@cert-authority *' $LINE >> /etc/ssh/ssh_known_hosts.new
 	mv /etc/ssh/ssh_known_hosts.new /etc/ssh/ssh_known_hosts
 done
+mkdir -p /root/.ssh/
+chmod 700 /root/.ssh/
+touch /root/.ssh/authorized_keys
 for pubkey in ssh/*.*pubkey; do
 	LINE=$(cat $pubkey)
         if [ -z "$LINE" ]; then continue; fi
