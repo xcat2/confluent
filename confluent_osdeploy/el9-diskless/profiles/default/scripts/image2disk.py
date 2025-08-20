@@ -245,7 +245,7 @@ def fixup(rootdir, vols):
                     nent = convert_lv(ent)
                     if nent:
                         newline.append(nent)
-                    else
+                    else:
                         newline.append(ent)
                 else:
                     newline.append(ent)
