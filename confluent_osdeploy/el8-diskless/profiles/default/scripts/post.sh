@@ -2,13 +2,17 @@
 
 # This script is executed 'chrooted' into a cloned disk target before rebooting
 #
-
+if [ -f /etc/dracut.conf.d/diskless.conf ]; then
+    rm /etc/dracut.conf.d/diskless.conf
+fi
+for kver in /lib/modules/*; do kver=$(basename $kver); kernel-install add $kver /boot/vmlinuz-$kver; done
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
 confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 export nodename confluent_mgr confluent_profile
 . /etc/confluent/functions
+run_remote setupssh
 mkdir -p /var/log/confluent
 chmod 700 /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log

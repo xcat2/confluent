@@ -40,6 +40,8 @@ echo "Port 22" >> /etc/ssh/sshd_config
 echo 'Match LocalPort 22' >> /etc/ssh/sshd_config
 echo '    ChrootDirectory /sysroot/run/imginst/targ' >> /etc/ssh/sshd_config
 kill -HUP $(cat /run/sshd.pid)
+cp /sysroot/etc/pki/ca-trust/source/anchors/* /sysroot/run/imginst/targ/etc/pki/ca-trust/source/anchors/
+chroot /sysroot/run/imginst/targ update-ca-trust
 
 chroot /sysroot/run/imginst/targ bash -c "source /etc/confluent/functions; run_remote post.sh"
 chroot /sysroot bash -c "umount \$(tac /proc/mounts|awk '{print \$2}'|grep ^/run/imginst/targ)"
