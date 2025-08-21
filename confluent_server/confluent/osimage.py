@@ -88,6 +88,14 @@ def update_boot(profilename):
         update_boot_linux(profiledir, profile, label)
     elif ostype == 'esxi':
         update_boot_esxi(profiledir, profile, label)
+    elif ostype == 'windows':
+        update_boot_windows(profiledir, profile, label)
+
+def update_boot_windows(profiledir, profile, label):
+    profname = os.path.basename(profiledir)
+    subprocess.check_call(
+        ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
+         '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
 
 def update_boot_esxi(profiledir, profile, label):
     profname = os.path.basename(profiledir)
