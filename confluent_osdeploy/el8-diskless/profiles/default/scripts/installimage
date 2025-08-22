@@ -5,6 +5,7 @@
 # and existing mounts of image (to take advantage of caching)
 mount -o bind /sys /sysroot/sys
 mount -o bind /dev /sysroot/dev
+mount -o bind /dev/pts /sysroot/dev/pts
 mount -o bind /proc /sysroot/proc
 mount -o bind /run /sysroot/run
 
@@ -21,8 +22,14 @@ else
     done
 fi
 cd /sysroot/run
+cp /run/sshd.pid /tmp/dbgssh.pid
+chroot /sysroot/ bash -c "/usr/sbin/sshd"
 chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_python getinstalldisk"
 chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_parts pre.d"
+for nameserver in $(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //'); do
+    echo "nameserver $nameserver" >> /sysroot/etc/resolv.conf
+done
+#chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_python confignet"
 if [ ! -f /sysroot/tmp/installdisk ]; then
     echo 'Unable to find a suitable installation target device, ssh to port 2222 to investigate'
     while [ ! -f /sysroot/tmp/installdisk ]; do
@@ -39,7 +46,8 @@ chroot /sysroot bash -c "source /etc/confluent/functions; run_remote_python imag
 echo "Port 22" >> /etc/ssh/sshd_config
 echo 'Match LocalPort 22' >> /etc/ssh/sshd_config
 echo '    ChrootDirectory /sysroot/run/imginst/targ' >> /etc/ssh/sshd_config
-kill -HUP $(cat /run/sshd.pid)
+kill $(cat /sysroot/var/run/sshd.pid)
+kill -HUP $(cat /tmp/dbgssh.pid)
 cp /sysroot/etc/pki/ca-trust/source/anchors/* /sysroot/run/imginst/targ/etc/pki/ca-trust/source/anchors/
 chroot /sysroot/run/imginst/targ update-ca-trust
 

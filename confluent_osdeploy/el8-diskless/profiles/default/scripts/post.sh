@@ -37,6 +37,8 @@ run_remote_parts post.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post.d
 
+cd /root/
+fetch_remote confignet
 curl -sf -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
 
 kill $logshowpid

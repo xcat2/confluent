@@ -25,7 +25,8 @@ if [ ! -f /etc/confluent/firstboot.ran ]; then
     touch /etc/confluent/firstboot.ran
 
     cat /etc/confluent/tls/*.pem >> /etc/pki/tls/certs/ca-bundle.crt
-
+    confluentpython /root/confignet
+    rm /root/confignet
     run_remote firstboot.custom
     # Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
     run_remote_parts firstboot.d

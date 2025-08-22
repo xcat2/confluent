@@ -31,9 +31,11 @@ confluentpython $confapiclient /confluent-public/site/initramfs.tgz -o initramfs
 tar xf initramfs.tgz
 for ca in ssh/*.ca; do
 	LINE=$(cat $ca)
-        if [ -z "$LINE" ]; then continue; fi
-	cp -af /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts.new
-	grep -v "$LINE" /etc/ssh/ssh_known_hosts > /etc/ssh/ssh_known_hosts.new
+	if [ -z "$LINE" ]; then continue; fi
+	if [ -f /etc/ssh/ssh_known_hosts ]; then
+		cp -af /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts.new
+		grep -v "$LINE" /etc/ssh/ssh_known_hosts > /etc/ssh/ssh_known_hosts.new
+	fi
 	echo '@cert-authority *' $LINE >> /etc/ssh/ssh_known_hosts.new
 	mv /etc/ssh/ssh_known_hosts.new /etc/ssh/ssh_known_hosts
 done
