@@ -648,6 +648,32 @@ def fixup_coreos(targpath):
                 bootimg.write(b'\x01')
 
 
+def is_windows_executable(filename):
+    with open(filename, 'rb') as f:
+        header = f.read(2)
+        if header == b'MZ':
+            # seems to be DOS, but let's also make sure it is PE32
+            f.seek(0x3c)
+            pe_offset = f.read(4)
+            offset = int.from_bytes(pe_offset, byteorder='little')
+            f.seek(offset)
+            pe_header = f.read(4)
+            if pe_header == b'PE\x00\x00':
+                return True
+    return False
+
+
+def fixup_windows(targpath):
+    # windows needs the executable file to be executable, which samba
+    # manifests as following the executable bit
+    for root, _, files in os.walk(targpath):
+        for fname in files:
+            if fname.endswith('.exe'):
+                fpath = os.path.join(root, fname)
+                if is_windows_executable(fpath):
+                    st = os.stat(fpath)
+                    os.chmod(fpath, st.st_mode | 0o111)
+
 def check_coreos(isoinfo):
     arch = 'x86_64'  # TODO: would check magic of vmlinuz to see which arch
     if 'zipl.prm' in isoinfo[1]:
