@@ -273,6 +273,8 @@ if __name__ == '__main__':
                         emprint('Permissions incorrect on /etc/confluent/ssh/automation (Example resolution: chmod 600 /etc/confluent/ssh/automation)')
                     else:
                         emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
+                if sshutil.agent_pid:
+                    os.kill(int(sshutil.agent_pid), signal.SIGTERM)
                 sys.exit(0)
         fprint('Checking for blocked insecure boot: ')
         if insecure_boot_attempts():
@@ -421,7 +423,9 @@ if __name__ == '__main__':
                         else:
                             emprint('Unknown error attempting confluent automation ssh:')
                             sys.stderr.buffer.write(srun.stderr)
-                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+                if sshutil.agent_pid:
+                    os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+                sys.exit(0)
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
 # possible checks:
