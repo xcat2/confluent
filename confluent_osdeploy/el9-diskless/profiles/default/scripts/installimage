@@ -8,6 +8,9 @@ mount -o bind /dev /sysroot/dev
 mount -o bind /dev/pts /sysroot/dev/pts
 mount -o bind /proc /sysroot/proc
 mount -o bind /run /sysroot/run
+mount -t efivarfs none /sysroot/sys/firmware/efi/efivars
+
+
 
 
 if [ ! -f /tmp/mountparts.sh ]; then
@@ -24,6 +27,7 @@ fi
 cd /sysroot/run
 [ -f /run/sshd.pid ] && 
 cp /run/sshd.pid /tmp/dbgssh.pid
+chmod 0600 /sysroot/etc/ssh/ssh*key
 chroot /sysroot/ bash -c "/usr/sbin/sshd"
 chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_python getinstalldisk"
 chroot /sysroot/ bash -c "source /etc/confluent/functions; run_remote_parts pre.d"
