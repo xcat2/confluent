@@ -170,6 +170,15 @@ def fixup(rootdir, vols):
     grubsyscfg = os.path.join(rootdir, 'etc/sysconfig/grub')
     if not os.path.exists(grubsyscfg):
         grubsyscfg = os.path.join(rootdir, 'etc/default/grub')
+    currcmdline = []
+    with open('/proc/cmdline') as cmdlinein:
+        cmdline = cmdlinein.read().strip()
+        for arg in cmdline.split():
+            if arg.startswith('console='):
+                currcmdline.append(arg)
+            elif arg == 'quiet':
+                currcmdline.append(arg)
+    currcmdlinestr = ' '.join(currcmdline)
     kcmdline = os.path.join(rootdir, 'etc/kernel/cmdline')
     if os.path.exists(kcmdline):
         with open(kcmdline) as kcmdlinein:
@@ -225,13 +234,13 @@ def fixup(rootdir, vols):
         'GRUB_DISABLE_SUBMENU=true',
         'GRUB_TERMINAL=""',
         'GRUB_SERIAL_COMMAND=""',
-        'GRUB_CMDLINE_LINUX="crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"',
+        'GRUB_CMDLINE_LINUX="{}crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
         'GRUB_DISABLE_RECOVERY="true"',
         'GRUB_ENABLE_BLSCFG=true',
         ]
     if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
         with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
-            cmdlineout.write("root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root")
+            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(currcmdlinestr))
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
@@ -592,7 +601,13 @@ def install_to_disk(imgpath):
 
 
 
-            subprocess.check_call(['umount', '/run/imginst/targ'])
+            while True:
+                try:
+                    subprocess.check_call(['umount', '/run/imginst/targ'])
+                    break
+                except subprocess.CalledProcessError:
+                    print("Failed to unmount /run/imginst/targ, retrying")
+                    time.sleep(1)
         for vol in allvols:
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
         fixup('/run/imginst/targ', allvols)
