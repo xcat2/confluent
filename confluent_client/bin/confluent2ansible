@@ -18,11 +18,6 @@ import confluent.client as client
 import confluent.sortutil as sortutil
 
 
-def lookupdata(data, key):
-    ret = data.get(key, {}).get('value', '')
-    if ret is None:
-        ret = ''
-    return ret
 
 
 def main():
@@ -59,7 +54,6 @@ def main():
         else:
             for g in groups:
                 nodesbygroup.setdefault(g, set()).add(node.strip().lower())
-
     existing_data = {}
     if options.append and os.path.exists(options.output):
         current_group = ''
