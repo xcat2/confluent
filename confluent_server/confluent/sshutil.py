@@ -5,6 +5,7 @@ import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.util as util
 import eventlet.green.subprocess as subprocess
+import eventlet.green.socket as socket
 import eventlet
 import glob
 import eventlet.green.os as os
@@ -119,6 +120,15 @@ def prep_ssh_key(keyname):
         eventlet.sleep(0.1)
     adding_key = True
     if agent_pid:
+        if os.path.exists(os.environ['SSH_AUTH_SOCK']):
+            try:
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.connect(os.environ['SSH_AUTH_SOCK'])
+            except Exception:
+                os.unlink(os.environ['SSH_AUTH_SOCK'])
+                os.rmdir(os.path.dirname(os.environ['SSH_AUTH_SOCK']))
+            finally:
+                sock.close()
         if not os.path.exists(os.environ['SSH_AUTH_SOCK']):
             agent_pid = None
             ready_keys.clear()
