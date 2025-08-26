@@ -4,10 +4,10 @@ mdadm --detail /dev/md*|grep 'Version : 1.0' >& /dev/null || (
 lvm vgchange -a n
 mdadm -S -s
 NUMDEVS=$(for dev in $DEVICES; do
-   echo wipefs -a $dev
+   echo wipefs -a -f $dev
 done|wc -l)
 for dev in $DEVICES; do
-   wipefs -a $dev
+   wipefs -a -f $dev
 done
 # must use older metadata format to leave disks looking normal for uefi
 mdadm -C /dev/md/raid $DEVICES -n $NUMDEVS -e 1.0 -l $RAIDLEVEL
@@ -15,5 +15,9 @@ mdadm -C /dev/md/raid $DEVICES -n $NUMDEVS -e 1.0 -l $RAIDLEVEL
 mdadm -S -s
 mdadm --assemble --scan
 )
+while [ ! -e /dev/md/raid ]; do
+    echo 'Waiting on array to be linked...'
+    sleep 0.5
+done
 readlink /dev/md/raid|sed -e 's/.*\///' > /tmp/installdisk
 
