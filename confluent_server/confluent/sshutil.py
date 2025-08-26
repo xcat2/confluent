@@ -7,7 +7,7 @@ import confluent.util as util
 import eventlet.green.subprocess as subprocess
 import eventlet
 import glob
-import os
+import eventlet.green.os as os
 import shutil
 import tempfile
 
@@ -34,6 +34,7 @@ def normalize_uid():
     return curruid
 
 agent_starting = False
+
 def assure_agent():
     global agent_starting
     global agent_pid
@@ -54,7 +55,7 @@ def assure_agent():
                     k = k.decode('utf8')
                     v = v.decode('utf8')
                 if k == 'SSH_AGENT_PID':
-                    agent_pid = v
+                    agent_pid = int(v)
                 os.environ[k] = v
         finally:
             agent_starting = False
@@ -113,9 +114,14 @@ def initialize_ca():
 adding_key = False
 def prep_ssh_key(keyname):
     global adding_key
+    global agent_pid
     while adding_key:
         eventlet.sleep(0.1)
     adding_key = True
+    if agent_pid:
+        if not os.path.exists(os.environ['SSH_AUTH_SOCK']):
+            agent_pid = None
+            ready_keys.clear()
     if keyname in ready_keys:
         adding_key = False
         return
