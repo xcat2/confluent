@@ -129,4 +129,10 @@ ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
-exec /opt/confluent/bin/start_root
+if grep debugssh /proc/cmdline >& /dev/null; then
+    exec /opt/confluent/bin/start_root
+else
+    rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
+    exec /opt/confluent/bin/start_root -s  # share mount namespace, keep kernel callbacks intact
+fi
+
