@@ -790,7 +790,9 @@ def scan_iso(archive):
                     for block in ent.get_blocks():
                         filecontents[str(ent)] += bytes(block)
         if scanudf:
-            return scan_udf(dfd)
+            ndfd = os.dup(archive.fileno())
+            os.lseek(ndfd, 0, 0)
+            return scan_udf(ndfd)
     finally:
         os.close(dfd)
     return filesizes, filecontents
@@ -799,14 +801,18 @@ def scan_udf(dfd):
     fp = os.fdopen(dfd, 'rb')
     iso = pycdlib.PyCdlib()
     iso.open_fp(fp)
+    imginfo = {}
     try:
         extracted = BytesIO()
         iso.get_file_from_iso_fp(extracted, udf_path='/sources/idwbinfo.txt')
         idwbinfo = extracted.getvalue()
-        return {}, {'sources/idwbinfo.txt': idwbinfo}
+        imginfo = {'sources/idwbinfo.txt': idwbinfo}
     except Exception:
-        return {}, {}
-      
+        pass
+    finally:
+        iso.close()
+        fp.close()
+    return {}, imginfo
 
 
 def fingerprint(archive):
