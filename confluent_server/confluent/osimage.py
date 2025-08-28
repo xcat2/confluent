@@ -94,8 +94,10 @@ def update_boot(profilename):
 def update_boot_windows(profiledir, profile, label):
     profname = os.path.basename(profiledir)
     subprocess.check_call(
-        ['/opt/confluent/bin/dir2img', '{0}/boot'.format(profiledir),
-         '{0}/boot.img'.format(profiledir), profname], preexec_fn=relax_umask)
+        ['/usr/bin/genisoimage', '-o',
+         '{0}/boot.img'.format(profiledir), '-udf', '-b', 'dvd/etfsboot.com',
+         '-no-emul-boot', '-eltorito-alt-boot', '-eltorito-boot',
+         'dvd/efisys_noprompt.bin', '{0}/boot'.format(profiledir)], preexec_fn=relax_umask)
 
 def update_boot_esxi(profiledir, profile, label):
     profname = os.path.basename(profiledir)
