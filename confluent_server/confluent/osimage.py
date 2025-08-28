@@ -668,11 +668,12 @@ def fixup_windows(targpath):
     # manifests as following the executable bit
     for root, _, files in os.walk(targpath):
         for fname in files:
-            if fname.endswith('.exe'):
-                fpath = os.path.join(root, fname)
-                if is_windows_executable(fpath):
-                    st = os.stat(fpath)
-                    os.chmod(fpath, st.st_mode | 0o111)
+            for ext in ('.exe', '.dll', '.sys', '.mui', '.efi'):
+                if fname.endswith(ext):
+                    fpath = os.path.join(root, fname)
+                    if is_windows_executable(fpath):
+                        st = os.stat(fpath)
+                        os.chmod(fpath, st.st_mode | 0o111)
 
 def check_coreos(isoinfo):
     arch = 'x86_64'  # TODO: would check magic of vmlinuz to see which arch
