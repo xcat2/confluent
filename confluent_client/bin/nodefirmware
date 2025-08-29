@@ -153,9 +153,13 @@ def show_firmware(session):
     firmware_shown = False
     nodes_matched = False
     for component in components:
+        category = 'all'
+        if component in ('adapters', 'disks', 'misc', 'core'):
+            category = component
+            component = 'all'    
         for res in session.read(
-                '/noderange/{0}/inventory/firmware/all/{1}'.format(
-                    noderange, component)):
+                '/noderange/{0}/inventory/firmware/{2}/{1}'.format(
+                    noderange, component, category)):
             nodes_matched = True
             exitcode |= client.printerror(res)
             if 'databynode' not in res:

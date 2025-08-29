@@ -973,12 +973,12 @@ class IpmiHandler(object):
         for id, data in self.ipmicmd.get_firmware():
             self.output.put(msg.ChildCollection(simplify_name(id)))
 
-    def read_firmware(self, component):
+    def read_firmware(self, component, category):
         items = []
         errorneeded = False
         try:
             complist = () if component == 'all' else (component,)
-            for id, data in self.ipmicmd.get_firmware(complist):
+            for id, data in self.ipmicmd.get_firmware(complist, category):
                 if (component in ('core', 'all') or
                         component == simplify_name(id) or
                         match_aliases(component, simplify_name(id))):
@@ -1014,7 +1014,7 @@ class IpmiHandler(object):
             if len(self.element) == 3:
                 return self.list_firmware()
             elif len(self.element) == 4:
-                return self.read_firmware(self.element[-1])
+                return self.read_firmware(self.element[-1], self.element[-2])
         elif self.element[1] == 'hardware':
             if len(self.element) == 3:  # list things in inventory
                 return self.list_inventory()
