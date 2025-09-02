@@ -27,6 +27,16 @@ import signal
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
 
+def check_sysctl_tuning():
+    with open('/proc/sys/net/ipv4/tcp_sack', 'r') as f:
+        value = f.read().strip()
+        if value == '1':
+            print('OK')
+            return
+        else:
+            emprint('TCP SACK is disabled, network operations to BMCs may be particularly impacted, including firmware updates and virtual media')
+
+
 def check_neigh_overflow():
     dmesgout = subprocess.check_output(['dmesg'])
     if b'_cache: neighbor table overflow!' in subprocess.check_output(['dmesg']):
@@ -216,6 +226,8 @@ if __name__ == '__main__':
             emprint('ARP/Neighbor table problem detected, evaluate and increase net.ipv*.neigh.default.gc_thresh*')
         else:
             print('OK')
+        fprint('Checking sysctl tunables: ')
+        check_sysctl_tuning()
         fprint('TFTP Status: ')
         if tftp_works():
             print('OK')
