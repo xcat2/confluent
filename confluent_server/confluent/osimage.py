@@ -36,6 +36,7 @@ READFILES = set([
     'media.2/products',
     '.DISCINFO',
     '.discinfo',
+    'ISOLINUX.CFG',
     'zipl.prm',
     'sources/idwbinfo.txt',
 ])
@@ -495,9 +496,24 @@ def check_esxi(isoinfo):
             _, version = line.split(b' ', 1)
             if not isinstance(version, str):
                 version = version.decode('utf8')
+    edition = ''
     if isesxi and version:
+        if 'ISOLINUX.CFG' in isoinfo[1]:
+            for line in isoinfo[1]['ISOLINUX.CFG'].split(b'\n'):
+                if line.startswith(b'MENU TITLE'):
+                   words = line.split()
+                   if len(words) > 2:
+                       edition = words[2].decode('utf8')
+                       break
+            if edition:
+                for vnd in ('LNV', 'LVO', 'LVN'):
+                   if edition.startswith(vnd):
+                       edition = '_' + edition.split('-', 1)[1].strip()
+                       break
+                else:
+                   edition = ''
         return {
-            'name': 'esxi-{0}'.format(version),
+            'name': 'esxi-{0}{1}'.format(version, edition),
             'method': EXTRACT,
             'category': 'esxi{0}'.format(version.split('.', 1)[0])
         }
