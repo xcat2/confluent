@@ -844,7 +844,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         log.log({'error': 'Unable to serve {0} due to duplicated address between node and interface index "{}"'.format(node, info['netinfo']['ifidx'])})
         return
     can302 = True
-    if httpboot:
+    if isboot and httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
             proto, myipn, profile
@@ -865,13 +865,16 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
                             node, profile, len(bootfile) - 127)})
                     return
         repview[108:108 + len(bootfile)] = bootfile
-    elif info.get('architecture', None) == 'uefi-aarch64' and packet.get(77, None) == b'iPXE':
-        if not profile:
-            profile, stgprofile = get_deployment_profile(node, cfg)
-        if not profile:
-            log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
-            return
-        bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+    elif isboot and info.get('architecture', None) == 'uefi-aarch64':
+        if packet.get(77, None) == b'iPXE':
+            if not profile:
+                profile, stgprofile = get_deployment_profile(node, cfg)
+            if not profile:
+                log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
+                return
+            bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+        else:
+            bootfile = b'confluent/aarch64/ipxe.efi'
         repview[108:108 + len(bootfile)] = bootfile
     myip = myipn
     myipn = socket.inet_aton(myipn)
