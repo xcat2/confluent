@@ -72,7 +72,7 @@ def symlink(src, targ):
             raise
 
 
-def update_boot(profilename):
+def update_boot(profilename, initialimport=False):
     if profilename.startswith('/var/lib/confluent/public'):
         profiledir = profilename
     else:
@@ -90,15 +90,20 @@ def update_boot(profilename):
     elif ostype == 'esxi':
         update_boot_esxi(profiledir, profile, label)
     elif ostype == 'windows':
-        update_boot_windows(profiledir, profile, label)
+        update_boot_windows(profiledir, profile, label, initialimport)
 
-def update_boot_windows(profiledir, profile, label):
+def update_boot_windows(profiledir, profile, label, initialimport):
     profname = os.path.basename(profiledir)
-    subprocess.check_call(
-        ['/usr/bin/genisoimage', '-o',
-         '{0}/boot.img'.format(profiledir), '-udf', '-b', 'dvd/etfsboot.com',
-         '-no-emul-boot', '-eltorito-alt-boot', '-eltorito-boot',
-         'dvd/efisys_noprompt.bin', '{0}/boot'.format(profiledir)], preexec_fn=relax_umask)
+    try:
+        subprocess.check_call(
+            ['/usr/bin/genisoimage', '-o',
+             '{0}/boot.img'.format(profiledir), '-udf', '-b', 'dvd/etfsboot.com',
+             '-no-emul-boot', '-eltorito-alt-boot', '-eltorito-boot',
+             'dvd/efisys_noprompt.bin', '{0}/boot'.format(profiledir)], preexec_fn=relax_umask)
+    except Exception:
+        if initialimport:
+            return
+        raise
 
 def update_boot_esxi(profiledir, profile, label):
     profname = os.path.basename(profiledir)
@@ -1090,7 +1095,7 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
         subprocess.check_call(
             ['sh', '{0}/initprofile.sh'.format(dirname),
              targpath, dirname])
-        bootupdates.append(eventlet.spawn(update_boot, dirname))
+        bootupdates.append(eventlet.spawn(update_boot, dirname, True))
         profilelist.append(profname)
     for upd in bootupdates:
         upd.wait()
