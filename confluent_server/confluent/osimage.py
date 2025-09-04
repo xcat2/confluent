@@ -789,6 +789,31 @@ def check_rhel(isoinfo):
     major = ver.split('.', 1)[0]
     return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
 
+def fingerprint_initramfs(archive):
+    curroffset = archive.tell()
+    dfd = os.dup(archive.fileno())
+    os.lseek(dfd, curroffset, 0)
+    try:
+        with libarchive.fd_reader(dfd) as reader:
+            for ent in reader:
+                if str(ent) == 'usr/lib/initrd-release':
+                    osrelcontents = b''
+                    for block in ent.get_blocks():
+                        osrelcontents += bytes(block)
+                    osrelease = osrelcontents.decode('utf-8').strip()
+                    osid = ''
+                    osver = ''
+                    for line in osrelease.split('\n'):
+                        if line.startswith('ID='):
+                            osid = line.split('=', 1)[1].strip().strip('"')
+                        if line.startswith('VERSION_ID='):
+                            osver = line.split('=', 1)[1].strip().strip('"')
+                    if osid and osver:
+                        return (osid, osver)
+    finally:
+        os.close(dfd)
+    return None
+
 
 def scan_iso(archive):
     scanudf = False
@@ -839,6 +864,32 @@ def scan_udf(dfd):
     return {}, imginfo
 
 
+def parse_bfb(archive):
+    currtype = 0
+    # we want to find the initramfs image (id 63) and dig around to see the OS version
+    while currtype != 63:
+        currhdr = archive.read(24)
+        if currhdr[:5] != b'Bf\x02\x13!':
+            return None
+        currsize = int.from_bytes(currhdr[8:12], byteorder='little')
+        # currsize needs to be rounded up to nearest 8 byte boundary
+        if currsize % 8:
+            currsize += 8 - (currsize % 8)
+        currtype = currhdr[7]
+        if currtype == 63:
+            ossig = fingerprint_initramfs(archive)
+            if ossig:
+                osinfo = {
+                    'name': f'bluefield_{ossig[0]}-{ossig[1]}-aarch64',
+                    'method': COPY,
+                    'category': f'bluefield_{ossig[0]}{ossig[1]}'
+                }
+                if os.path.exists(f'/opt/confluent/lib/osdeploy/{osinfo["category"]}'):
+                    return osinfo
+        else:
+            archive.seek(currsize, os.SEEK_CUR)
+    return None
+
 def fingerprint(archive):
     archive.seek(0)
     header = archive.read(32768)
@@ -853,6 +904,12 @@ def fingerprint(archive):
                 if name:
                     return name, isoinfo[0], fun.replace('check_', '')
         return None
+    elif header[:4] == b'Bf\x02\x13':
+        # BFB payload for Bluefield
+        archive.seek(0)
+        imginfo = parse_bfb(archive)
+        if imginfo:
+            return imginfo, None, 'bluefield'
     else:
         sum = hashlib.sha256(header)
         if sum.digest() in HEADERSUMS:
