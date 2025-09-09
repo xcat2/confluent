@@ -545,7 +545,7 @@ if __name__ == '__main__':
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/sbin/netplan'):
         nm = NetplanManager(dc)
-    if os.path.exists('/usr/bin/nmcli'):
+    elif os.path.exists('/usr/bin/nmcli'):
         nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
