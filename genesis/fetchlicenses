@@ -39,6 +39,6 @@ cp -a /root/rpmbuild/BUILD/kernel-*/linux-*/LICENSES/* /usr/share/licenses/kerne
 cp /usr/share/licenses/krb5-libs/LICENSE /usr/share/licenses/krb5-libs/NOTICE
 mkdir -p /usr/share/licenses/libdb
 cp /root/rpmbuild/BUILD/db-5.3.28/lang/sql/odbc/debian/copyright /usr/share/licenses/libdb/copyright
-head -n 105 $(pwd)/util-linux-2.37.4/sys-utils/hwclock-parse-date.c|tail -n 34 > /usr/share/licenses/util-linux/COPYING.GPLv3
+head -n 105 /root/rpmbuild/BUILD/util-linux-2.37.4/sys-utils/hwclock-parse-date.c|tail -n 34 > /usr/share/licenses/util-linux/COPYING.GPLv3
 
 
