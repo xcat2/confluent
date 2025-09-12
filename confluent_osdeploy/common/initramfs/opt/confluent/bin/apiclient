@@ -16,12 +16,13 @@ import sys
 import struct
 import time
 import re
-import hmac
 import hashlib
 try:
     import json
+    import hmac
 except ImportError:
     json = None
+    hmac = None
 
 class InvalidApiKey(Exception):
     pass
