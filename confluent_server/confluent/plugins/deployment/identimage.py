@@ -62,6 +62,9 @@ def create_ident_image(node, configmanager):
     with open(os.path.join(tmpd, 'cnflnt.jsn'), 'w') as jsonout:
         json.dump(ident, jsonout)
     shutil.copytree('/var/lib/confluent/public/site/tls', os.path.join(tmpd, 'tls'))
+    mkdirp('/var/lib/confluent/private/identity_files/')
+    shutil.copy(os.path.join(tmpd, 'cnflnt.yml'), '/var/lib/confluent/private/identity_files/{0}.yml'.format(node))
+    shutil.copy(os.path.join(tmpd, 'cnflnt.jsn'), '/var/lib/confluent/private/identity_files/{0}.json'.format(node))
     mkdirp('/var/lib/confluent/private/identity_images/')
     imgname = '/var/lib/confluent/private/identity_images/{0}.img'.format(node)
     if os.path.exists(imgname):
