@@ -97,7 +97,7 @@ def update_boot_windows(profiledir, profile, label, initialimport):
     try:
         subprocess.check_call(
             ['/usr/bin/genisoimage', '-o',
-             '{0}/boot.img'.format(profiledir), '-udf', '-b', 'dvd/etfsboot.com',
+             '{0}/boot.iso'.format(profiledir), '-udf', '-b', 'dvd/etfsboot.com',
              '-no-emul-boot', '-eltorito-alt-boot', '-eltorito-boot',
              'dvd/efisys_noprompt.bin', '{0}/boot'.format(profiledir)], preexec_fn=relax_umask)
     except Exception:
