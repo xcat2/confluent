@@ -7,6 +7,7 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
         continue
     fi
     certfile=${pubkey/.pub/-cert.pub}
+    echo -n > $certfile
     confluentpython $confapiclient /confluent-api/self/sshcert $pubkey -o $certfile
 done
 if [ -d /etc/ssh/sshd_config.d/ -a ! -e /etc/ssh/sshd_config.d/90-confluent.conf ]; then
