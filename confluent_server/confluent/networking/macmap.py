@@ -535,7 +535,10 @@ def _full_updatemacmap(configmanager):
             if incollective:
                 candmgrs = cfg.get('collective.managercandidates', {}).get('value', None)
                 if candmgrs:
-                    candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+                    try:
+                        candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+                    except Exception:
+                        candmgrs = noderange.NodeRange(candmgrs).nodes
                     if mycollectivename not in candmgrs:
                         # do not think about trying to find nodes that we aren't possibly
                         # supposed to be a manager for in a collective

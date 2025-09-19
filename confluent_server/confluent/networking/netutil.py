@@ -29,7 +29,10 @@ def get_switchcreds(configmanager, switches):
             continue
         candmgrs = switchcfg.get(switch, {}).get('collective.managercandidates', {}).get('value', None)
         if candmgrs:
-            candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+            try:
+                candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+            except Exception:
+                candmgrs = noderange.NodeRange(candmgrs).nodes
             if collective.get_myname() not in candmgrs:
                 continue
         switchparms = switchcfg.get(switch, {})
