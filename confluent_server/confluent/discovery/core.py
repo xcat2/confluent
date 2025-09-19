@@ -1362,7 +1362,8 @@ def eval_node(cfg, handler, info, nodename, manual=False):
                 errorstr = 'The detected node {0} was detected using switch, ' \
                            'however the relevant port has too many macs learned ' \
                            'for this type of device ({1}) to be discovered by ' \
-                           'switch.'.format(nodename, handler.devname)
+                           'switch.  If this should be an enclosure, make sure there are ' \
+                           'defined nodes for the enclosure'.format(nodename, handler.devname)
                 log.log({'error': errorstr})
                 return
         if not discover_node(cfg, handler, info, nodename, manual):
