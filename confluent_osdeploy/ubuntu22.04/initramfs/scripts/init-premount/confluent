@@ -54,10 +54,16 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
             echo $NIC > /tmp/autodetectnic
         else
             configure_networking
-            for dsrv in $deploysrvs; do
-                if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
-                    deploysrvs=$dsrv
-                    break
+            while [ -z "$NIC" ]; do
+                for dsrv in $deploysrvs; do
+                    if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
+                        deploysrvs=$dsrv
+                        NIC=1
+                        break
+                    fi
+                done
+                if [ -z "$NIC" ]; then
+                    echo "No connectivity to deployment servers, retrying..."
                 fi
             done
         fi
