@@ -49,7 +49,9 @@ def pretty(text):
 
 def print_mem_info(node, prefix, meminfo):
     memdescfmt = '{0}GB PC'
-    if meminfo['memory_type'] == 'DDR3 SDRAM':
+    if meminfo['memory_type'] is None:
+        memdescfmt = '{0}GB '
+    elif meminfo['memory_type'] == 'DDR3 SDRAM':
         memdescfmt += '3-{1} '
     elif 'DDR4' in meminfo['memory_type']:
         memdescfmt += '4-{1} '
