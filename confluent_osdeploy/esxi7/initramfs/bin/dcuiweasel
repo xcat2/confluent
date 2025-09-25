@@ -84,6 +84,7 @@ if [ -e /tmp/confluentident/cnflnt.yml ]; then
             echo "A debug session has been made available on Alt-F1"
             sleep 30
             maxwait=30
+	fi
     done
     echo
     echo -n 'Registering new API key with deployment server: '
