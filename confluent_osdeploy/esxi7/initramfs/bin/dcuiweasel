@@ -73,6 +73,19 @@ if [ -e /tmp/confluentident/cnflnt.yml ]; then
     hmacfile=$(mktemp)
     ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
     /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+    echo -n 'Checking connectivity to server: '
+    maxwait=30
+    while ! /opt/confluent/bin/apiclient -c >& /dev/null; do
+        echo -n '.'
+        sleep 1
+        maxwait=$((maxwait - 1))
+        if [ $maxwait -le 0 ]; then
+            echo "Unable to contact deployment server, verify network connectivity"
+            echo "A debug session has been made available on Alt-F1"
+            sleep 30
+            maxwait=30
+    done
+    echo
     echo -n 'Registering new API key with deployment server: '
     /opt/confluent/bin/apiclient -p $hmacfile /confluent-api/self/registerapikey $passcrypt
     echo
