@@ -210,7 +210,7 @@ def update_boot_linux(profiledir, profile, label):
                             needefi = True
     lincmd = 'linuxefi' if needefi else 'linux'
     initrdcmd = 'initrdefi' if needefi else 'initrd'
-    grubcfg = "set timeout=5\nmenuentry '"
+    grubcfg = "set timeout=0\nhiddenmenu\nmenuentry '"
     grubcfg += label
     grubcfg += "' {\n    " + lincmd + " /kernel " + kernelargs + "\n"
     initrds = []
