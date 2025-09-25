@@ -53,8 +53,8 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
             ipconfig -d $MYIP::$MYGW:$MYNM::$NIC
             echo $NIC > /tmp/autodetectnic
         else
-            configure_networking
             while [ -z "$NIC" ]; do
+                configure_networking
                 for dsrv in $deploysrvs; do
                     if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
                         deploysrvs=$dsrv
