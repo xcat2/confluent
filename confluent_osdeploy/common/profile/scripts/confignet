@@ -460,6 +460,9 @@ class NetworkManager(object):
 
 
 if __name__ == '__main__':
+    checktarg = None
+    if '-c' in sys.argv:
+        checktarg = sys.argv[sys.argv.index('-c') + 1]
     havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'])
     havefirewall = havefirewall == 0
     if havefirewall:
@@ -576,4 +579,18 @@ if __name__ == '__main__':
         except Exception:
             maxwait -= 1
             time.sleep(1)
+    maxwait = 10
+    if checktarg:
+        while maxwait:
+            try:
+                addrinf = socket.getaddrinfo(checktarg, 443)[0]
+                psock = socket.socket(addrinf[0], socket.SOCK_STREAM)
+                psock.settimeout(10)
+                psock.connect(addrinf[4])
+                psock.close()
+                break
+            except Exception:
+                maxwait -= 1
+                time.sleep(1)
+
 
