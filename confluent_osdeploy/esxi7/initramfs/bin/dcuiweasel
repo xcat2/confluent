@@ -62,8 +62,8 @@ if [ -e /tmp/confluentident/cnflnt.yml ]; then
         fi
         v4nm=$(grep ipv4_netmask: $tcfg)
         v4nm=${v4nm#ipv4_netmask: }
-        localcli network ip interface ipv4 set -i vmk0 -I $v4addr -N $v4nm -g $v4gw -t static
-        localcli network ip route ipv4 add -n default -g $v4gw
+        while ! localcli network ip interface ipv4 set -i vmk0 -I $v4addr -N $v4nm -g $v4gw -t static; do echo "Retrying..."; sleep 5; done
+        while ! localcli network ip route ipv4 add -n default -g $v4gw; do sleep 1; done
     fi
     hmackeyfile=$(mktemp)
     echo -n $(grep ^apitoken: /tmp/confluentident/cnflnt.yml|awk '{print $2}') > $hmackeyfile
