@@ -53,19 +53,39 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
             ipconfig -d $MYIP::$MYGW:$MYNM::$NIC
             echo $NIC > /tmp/autodetectnic
         else
-            while [ -z "$NIC" ]; do
+	    rmmod cdc_ether 2> /dev/null
+            while [ ! -f /run/confirmednic ]; do
+                ALLNETDEVS=$(ip a|grep LOWER_UP|grep MULTICAST|awk '{print $2}'|sed -e s/://)
+
+                rm -rf /run/net* /run/dhcpcd /var/lib/dhcpcd
+                for dev in $(ip a|grep MULTICAST|awk '{print $2}'|sed -e s/://); do
+                   ip a flush $dev
+                   echo 1 > /proc/sys/net/ipv6/conf/$dev/addr_gen_mode
+                   echo 0 > /proc/sys/net/ipv6/conf/$dev/addr_gen_mode
+                done
+                unset DEVICE DEVICE6 IP IP6 dev
+        		[ -z "$1" ] || DEVICE=$1
+		        shift
                 configure_networking
                 for dsrv in $deploysrvs; do
-                    if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
-                        deploysrvs=$dsrv
-                        NIC=1
+                    (if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
+                        echo $dsrv > /run/confirmednic
                         break
-                    fi
+                    fi) &
+		            chkpid=$!
+		            ( sleep 10 && kill $chkpid ) &
+		            timeoutpid=$!
+		            wait $chkpid
+		            kill $timeoutpid 2> /dev/null
+		            unset chkpid timeoutpid
                 done
-                if [ -z "$NIC" ]; then
+                if [ ! -f /run/confirmednic ]; then
                     echo "No connectivity to deployment servers, retrying..."
+		            [ -z "$1" ] && set -- $ALLNETDEVS
                 fi
             done
+            deploysrvs=$(cat /run/confirmednic)
+            rm /run/confirmednic
         fi
         MGR=$deploysrvs
         NODENAME=$(grep ^nodename: /tmp/idntmnt/cnflnt.yml | awk '{print $2}')
