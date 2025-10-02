@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2019 Lenovo
@@ -65,16 +65,30 @@ client.check_globbing(noderange)
 
 def install_license(session, filename):
     global exitcode
+    
     resource = '/noderange/{0}/configuration/' \
                'management_controller/licenses/'.format(noderange)
     filename = os.path.abspath(filename)
     instargs = {'filename': filename}
     if session.unixdomain:
-        of = open(filename, 'rb')
-        try:
-            session.add_file(filename, of.fileno(), 'rb')
-        except Exception:
-            pass
+        filesbynode = {}
+        for exp in session.create('/noderange/{0}/attributes/expression'.format(noderange),
+                        {'expression': filename}):
+            if 'error' in exp:
+                sys.stderr.write(exp['error'] + '\n')
+                exitcode |= exp.get('errorcode', 1)
+            ex = exp.get('databynode', ())
+            for node in ex:
+                filesbynode[node] = ex[node]['value']
+                if not isinstance(filesbynode[node], bytes) and not isinstance(filesbynode[node], str):
+                    filesbynode[node] = filesbynode[node].encode('utf-8')
+        for node in filesbynode:
+            endfilename = filesbynode[node]
+            of = open(endfilename, 'rb')
+            try:
+                session.add_file(endfilename, of.fileno(), 'rb')
+            except Exception:
+                pass
     for res in session.create(resource, instargs):
         for node in res.get('databynode', []):
             if 'error' in res['databynode'][node]:
