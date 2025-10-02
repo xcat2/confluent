@@ -65,6 +65,7 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
                 [ -z "$1" ] || DEVICE=$1
                 shift
                 configure_networking
+                echo $DEVICE > /tmp/autodetectnic
                 for dsrv in $deploysrvs; do
                     (if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
                         echo $dsrv > /run/confirmednic
@@ -84,6 +85,7 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
             done
             deploysrvs=$(cat /run/confirmednic)
             rm /run/confirmednic
+
         fi
         MGR=$deploysrvs
         NODENAME=$(grep ^nodename: /tmp/idntmnt/cnflnt.yml | awk '{print $2}')
