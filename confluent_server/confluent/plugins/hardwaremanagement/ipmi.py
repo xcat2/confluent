@@ -773,6 +773,7 @@ class IpmiHandler(object):
                     hwaddr=lancfg['mac_address'],
                     staticv6addrs=v6cfg.get('static_addrs', ''),
                     staticv6gateway=v6cfg.get('static_gateway', ''),
+                    vlan_id=lancfg.get('vlan_id', None)
                 ))
             elif self.op == 'update':
                 config = self.inputdata.netconfig(self.node)
@@ -780,7 +781,8 @@ class IpmiHandler(object):
                     self.ipmicmd.set_net_configuration(
                         ipv4_address=config['ipv4_address'],
                         ipv4_configuration=config['ipv4_configuration'],
-                        ipv4_gateway=config['ipv4_gateway'])
+                        ipv4_gateway=config['ipv4_gateway'],
+                        vlan_id=config.get('vlan_id', None))
                     v6addrs = config.get('static_v6_addresses', None)
                     if v6addrs is not None:
                         v6addrs = v6addrs.split(',')

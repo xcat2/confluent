@@ -1,7 +1,7 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2017 Lenovo
+# Copyright 2025 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -96,6 +96,12 @@ cfgpaths = {
     'bmc.static_ipv6_gateway': (
         'configuration/management_controller/net_interfaces/management',
         'static_v6_gateway'),
+    'bmc.vlan_id': (
+        'configuration/management_controller/net_interfaces/management',
+        'vlan_id'),
+    'bmc.mac_address': (
+        'configuration/management_controller/net_interfaces/management',
+        'hw_addr'),
     'bmc.hostname': (
         'configuration/management_controller/hostname', 'hostname'),
 }

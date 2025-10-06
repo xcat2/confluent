@@ -1148,6 +1148,9 @@ class InputNetworkConfiguration(ConfluentInputMessage):
         if 'ipv4_gateway' not in inputdata:
             inputdata['ipv4_gateway'] = None
 
+        if 'vlan_id' not in inputdata:
+            inputdata['vlan_id'] = None
+
         if 'ipv4_configuration' in inputdata and inputdata['ipv4_configuration']:
             if inputdata['ipv4_configuration'].lower() not in ['dhcp','static']:
                 raise exc.InvalidArgumentException(
@@ -1736,8 +1739,8 @@ class NetworkConfiguration(ConfluentMessage):
     desc = 'Network configuration'
 
     def __init__(self, name=None, ipv4addr=None, ipv4gateway=None,
-                 ipv4cfgmethod=None, hwaddr=None, staticv6addrs=(), staticv6gateway=None):
-        self.myargs = (name, ipv4addr, ipv4gateway, ipv4cfgmethod, hwaddr)
+                 ipv4cfgmethod=None, hwaddr=None, staticv6addrs=(), staticv6gateway=None, vlan_id=None):
+        self.myargs = (name, ipv4addr, ipv4gateway, ipv4cfgmethod, hwaddr, staticv6addrs, staticv6gateway, vlan_id)
         self.notnode = name is None
         self.stripped = False
         v6addrs = ','.join(staticv6addrs)
@@ -1748,7 +1751,8 @@ class NetworkConfiguration(ConfluentMessage):
             'ipv4_configuration': {'value': ipv4cfgmethod},
             'hw_addr': {'value': hwaddr},
             'static_v6_addresses': {'value': v6addrs},
-            'static_v6_gateway': {'value': staticv6gateway}
+            'static_v6_gateway': {'value': staticv6gateway},
+            'vlan_id': {'value': vlan_id}
         }
         if self.notnode:
             self.kvpairs = kvpairs
