@@ -48,7 +48,18 @@ def armonce(nr, cli):
         pass
 
 
-def setpending(nr, profile, cli):
+def setpending(nr, profile, profilebynodes, cli):
+    if profilebynodes:
+        for node in sortutil.natural_sort(profilebynodes):
+            prof = profilebynodes[node]
+            args = {'deployment.pendingprofile': prof, 'deployment.state': '', 'deployment.state_detail': ''}
+            if not prof.startswith('genesis-'):
+                args['deployment.stagedprofile'] = ''
+                args['deployment.profile'] = ''
+            for rsp in cli.update('/nodes/{0}/attributes/current'.format(node),
+                                  args):
+                pass
+        return
     args = {'deployment.pendingprofile': profile, 'deployment.state': '', 'deployment.state_detail': ''}
     if not profile.startswith('genesis-'):
         args['deployment.stagedprofile'] = ''
@@ -69,6 +80,7 @@ def main(args):
     ap.add_argument('-n', '--network', help='Initiate deployment over PXE/HTTP', action='store_true')
     ap.add_argument('-p', '--prepareonly', help='Prepare only, skip any interaction with a BMC associated with this deployment action', action='store_true')
     ap.add_argument('-m', '--maxnodes', help='Specifiy a maximum nodes to be deployed')
+    ap.add_argument('-r', '--redeploy', help='Redeploy nodes with the current or pending profile', action='store_true')
     ap.add_argument('noderange', help='Set of nodes to deploy')
     ap.add_argument('profile', nargs='?', help='Profile name to deploy')
     args, extra = ap.parse_known_args(args)
@@ -78,7 +90,7 @@ def main(args):
     if args.profile and not args.network:
         sys.stderr.write('-n is a required argument currently to perform an install, optionally with -p\n')
         return 1
-    if not args.profile and args.network:
+    if not args.profile and args.network and not args.redeploy:
         sys.stderr.write('Both noderange and a profile name are required arguments to request a network deployment\n')
         return 1
     if args.clear and args.profile:
@@ -96,27 +108,38 @@ def main(args):
         if 'error' in rsp:
             sys.stderr.write(rsp['error'] + '\n')
             sys.exit(1)
+    profilebynode = {}
     if args.clear:
         cleararm(args.noderange, c)
         clearpending(args.noderange, c)
-    elif args.profile:
-        profnames = []
-        for prof in c.read('/deployment/profiles/'):
-            profname = prof.get('item', {}).get('href', None)
-            if profname:
-                profname = profname.replace('/', '')
-                profnames.append(profname)
-                if profname == args.profile:
-                    break
-        else:
-            sys.stderr.write('The specified profile "{}" is not an available profile\n'.format(args.profile))
-            if profnames:
-                sys.stderr.write('The following profiles are available:\n')
-                for profname in profnames:
-                    sys.stderr.write('    ' + profname + '\n')
-            else:
-                sys.stderr.write('No deployment profiles available, try osdeploy import or imgutil capture\n')
-            sys.exit(1)
+    elif args.redeploy:
+        hadpending = {}
+        for rsp in c.read('/noderange/{0}/attributes/current'.format(args.noderange)):
+            for node in rsp.get('databynode', {}):
+                nodeinfo = rsp['databynode'][node]
+                for attr in nodeinfo:
+                    if attr == 'deployment.pendingprofile':
+                        curr = nodeinfo[attr].get('value', '')
+                        if curr:
+                            hadpending[node] = True
+                            profilebynode[node] = curr
+                    if attr == 'deployment.stagedprofile':
+                        curr = nodeinfo[attr].get('value', '')
+                        if curr and node not in hadpending:
+                            profilebynode[node] = curr
+                    if attr == 'deployment.profile':
+                        curr = nodeinfo[attr].get('value', '')
+                        if curr and node not in profilebynode:
+                            profilebynode[node] = curr
+        for lockinfo in c.read('/noderange/{0}/deployment/lock'.format(args.noderange)):
+            for node in lockinfo.get('databynode', {}):
+                lockstate = lockinfo['databynode'][node]['lock']['value']
+                if lockstate == 'locked':
+                    lockednodes.append(node)     
+    if args.profile and profilebynode:
+        sys.stderr.write('The -r/--redeploy option cannot be used with a profile, it redeploys the current or pending profile\n')
+        return 1
+    if args.profile or profilebynode:
         lockednodes = []
         for lockinfo in c.read('/noderange/{0}/deployment/lock'.format(args.noderange)):
             for node in lockinfo.get('databynode', {}):
@@ -127,8 +150,26 @@ def main(args):
             sys.stderr.write('Requested noderange has nodes with locked deployment: ' + ','.join(lockednodes))
             sys.stderr.write('\n')
             sys.exit(1)
+        if args.profile:
+            profnames = []
+            for prof in c.read('/deployment/profiles/'):
+                profname = prof.get('item', {}).get('href', None)
+                if profname:
+                    profname = profname.replace('/', '')
+                    profnames.append(profname)
+                    if profname == args.profile:
+                        break
+            else:
+                sys.stderr.write('The specified profile "{}" is not an available profile\n'.format(args.profile))
+                if profnames:
+                    sys.stderr.write('The following profiles are available:\n')
+                    for profname in profnames:
+                        sys.stderr.write('    ' + profname + '\n')
+                else:
+                    sys.stderr.write('No deployment profiles available, try osdeploy import or imgutil capture\n')
+                sys.exit(1)
         armonce(args.noderange, c)
-        setpending(args.noderange, args.profile, c)
+        setpending(args.noderange, args.profile, profilebynode, c)
     else:
         databynode = {}
         for r in c.read('/noderange/{0}/attributes/current'.format(args.noderange)):
