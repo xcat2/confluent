@@ -975,10 +975,10 @@ sgr_parameters_re = re.compile(r'\x1b\[([0-9;]*)m')
 fgcolor = None
 bgcolor = None
 fgshifted = False
-
+pendseq = ''
 def consume_termdata(fh, bufferonly=False):
     global clearpowermessage
-    global fgcolor, bgcolor, fgshifted
+    global fgcolor, bgcolor, fgshifted, pendseq
     try:
         data = tlvdata.recv(fh)
     except Exception:
@@ -987,9 +987,9 @@ def consume_termdata(fh, bufferonly=False):
         updatestatus(data)
         return ''
     if data is not None:
-        indata = client.stringify(data)
+        indata = pendseq + client.stringify(data)
+        pendseq = ''
         data = ''
-        # this logic currently doesn't manage to catch SGRs that span multiple payloads
         for segment in sgr_re.split(indata):
             if sgr_re.match(segment):  # it is an sgr, analyze, maybe replace
                 params = []
@@ -1027,6 +1027,19 @@ def consume_termdata(fh, bufferonly=False):
                             params.append(str(fgcolor))
                 segment = '\x1b[' + ';'.join(str(p) for p in params) + 'm'
             data += segment
+        # defer any partial ansi escape sequence for a later pass
+        escidx = segment.rfind('\x1b[')
+        if escidx >= 0:
+            for chr in segment[escidx + 1:]:
+                if 0x40 <= ord(chr) <= 0x7e:
+                    break
+            else:
+                # incomplete escape sequence, don't print it yet
+                data = data[:-len(segment) + escidx]
+                pendseq = segment[escidx:]
+        if not pendseq and segment and segment[-1] == '\x1b':
+            data = data[:-1]
+            pendseq = '\x1b'
         if clearpowermessage:
             sys.stdout.write("\x1b[2J\x1b[;H")
             clearpowermessage = False
