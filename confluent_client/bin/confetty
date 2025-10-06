@@ -972,9 +972,13 @@ def main():
 
 sgr_re = re.compile(r'(\x1b\[[0-9;]*m)')
 sgr_parameters_re = re.compile(r'\x1b\[([0-9;]*)m')
+fgcolor = None
+bgcolor = None
+fgshifted = False
 
 def consume_termdata(fh, bufferonly=False):
     global clearpowermessage
+    global fgcolor, bgcolor, fgshifted
     try:
         data = tlvdata.recv(fh)
     except Exception:
@@ -985,23 +989,42 @@ def consume_termdata(fh, bufferonly=False):
     if data is not None:
         indata = client.stringify(data)
         data = ''
+        # this logic currently doesn't manage to catch SGRs that span multiple payloads
         for segment in sgr_re.split(indata):
             if sgr_re.match(segment):  # it is an sgr, analyze, maybe replace
                 params = []
-                bold = False
                 for parameters in sgr_parameters_re.findall(segment):
                     for param in parameters.split(';'):
-                        if param == '1':
-                            bold = True
-                        params.append(param)  
-                for idx, param in enumerate(params):
-                    try:
-                        ival = int(param)
-                    except ValueError:
-                        continue
-                    if bold and (30 <= ival <= 37):
-                        ival += 60
-                        params[idx] = str(ival)
+                        params.append(param)
+                        if param == '0':
+                            fgcolor = None
+                            bgcolor = None
+                        try:
+                            ival = int(param)
+                        except ValueError:
+                            continue
+                        if 40 <= ival <= 47 or 100 <= ival <= 107:
+                            bgcolor = ival
+                        if 30 <= ival <= 37 or 90 <= ival <= 97:
+                            fgcolor = ival
+                if bgcolor is not None:
+                    fgindicated = False
+                    for idx, param in enumerate(params):
+                        try:
+                            ival = int(param)
+                        except ValueError:
+                            continue
+                        if 30 <= ival <= 37 and (bgcolor % 10 == ival % 10):
+                            fgindicated = True
+                            fgshifted = True
+                            ival += 60
+                            params[idx] = str(ival)
+                    if not fgindicated and fgcolor is not None:
+                        if bgcolor and (bgcolor % 10) == (fgcolor % 10):
+                            fgshifted = True
+                            params.append(str((fgcolor % 10) + 90))
+                        elif fgshifted:
+                            params.append(str(fgcolor))
                 segment = '\x1b[' + ';'.join(str(p) for p in params) + 'm'
             data += segment
         if clearpowermessage:
