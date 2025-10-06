@@ -45,6 +45,7 @@ import math
 import getpass
 import optparse
 import os
+import re
 import select
 import shlex
 import signal
@@ -969,6 +970,9 @@ def main():
                     sys.stdout.write('Lost connection to server')
     quitconfetty(fullexit=True)
 
+sgr_re = re.compile(r'(\x1b\[[0-9;]*m)')
+sgr_parameters_re = re.compile(r'\x1b\[([0-9;]*)m')
+
 def consume_termdata(fh, bufferonly=False):
     global clearpowermessage
     try:
@@ -979,7 +983,27 @@ def consume_termdata(fh, bufferonly=False):
         updatestatus(data)
         return ''
     if data is not None:
-        data = client.stringify(data)
+        indata = client.stringify(data)
+        data = ''
+        for segment in sgr_re.split(indata):
+            if sgr_re.match(segment):  # it is an sgr, analyze, maybe replace
+                params = []
+                bold = False
+                for parameters in sgr_parameters_re.findall(segment):
+                    for param in parameters.split(';'):
+                        if param == '1':
+                            bold = True
+                        params.append(param)  
+                for idx, param in enumerate(params):
+                    try:
+                        ival = int(param)
+                    except ValueError:
+                        continue
+                    if bold and (30 <= ival <= 37):
+                        ival += 60
+                        params[idx] = str(ival)
+                segment = '\x1b[' + ';'.join(str(p) for p in params) + 'm'
+            data += segment
         if clearpowermessage:
             sys.stdout.write("\x1b[2J\x1b[;H")
             clearpowermessage = False
