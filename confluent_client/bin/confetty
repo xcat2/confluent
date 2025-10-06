@@ -1030,7 +1030,7 @@ def consume_termdata(fh, bufferonly=False):
         # defer any partial ansi escape sequence for a later pass
         escidx = segment.rfind('\x1b[')
         if escidx >= 0:
-            for chr in segment[escidx + 1:]:
+            for chr in segment[escidx + 2:]:
                 if 0x40 <= ord(chr) <= 0x7e:
                     break
             else:
