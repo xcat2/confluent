@@ -68,14 +68,19 @@ class NodeHandler(generic.NodeHandler):
                 self._srvroot = srvroot
         return self._srvroot
 
+    def get_manager_url(self, wc):
+        mgrs = self.srvroot(wc).get('Managers', {}).get('@odata.id', None)
+        if not mgrs:
+            raise Exception("No Managers resource on BMC")
+        rsp = wc.grab_json_response(mgrs)
+        if len(rsp.get('Members', [])) != 1:
+            raise Exception("Can not handle multiple Managers")
+        mgrurl = rsp['Members'][0]['@odata.id']
+        return mgrurl
+
     def mgrinfo(self, wc):
         if not self._mgrinfo:
-            mgrs = self.srvroot(wc)['Managers']['@odata.id']
-            rsp = wc.grab_json_response(mgrs)
-            if len(rsp['Members']) != 1:
-                raise Exception("Can not handle multiple Managers")
-            mgrurl = rsp['Members'][0]['@odata.id']
-            self._mgrinfo = wc.grab_json_response(mgrurl)
+            self._mgrinfo = wc.grab_json_response(self.get_manager_url(wc))
         return self._mgrinfo
 
 

@@ -29,6 +29,9 @@ class NodeHandler(redfishbmc.NodeHandler):
     def get_firmware_default_account_info(self):
         return ('USERID', 'PASSW0RD')
 
+    def get_manager_url(self, wc):
+        return '/redfish/v1/Managers/1'
+
     def scan(self):
         ip, port = self.get_web_port_and_ip()
         c = webclient.SecureHTTPConnection(ip, port,
