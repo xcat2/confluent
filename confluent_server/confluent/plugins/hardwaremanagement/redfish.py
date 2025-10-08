@@ -632,7 +632,7 @@ class IpmiHandler(object):
                     ipv4cfgmethod=lancfg['ipv4_configuration'],
                     hwaddr=lancfg['mac_address'],
                     staticv6addrs=v6cfg['static_addrs'],
-                    staticv6gateway=v6cfg['static_gateway'],
+                    staticv6gateway=v6cfg.get('static_gateway', None),
                     vlan_id=lancfg.get('vlan_id', None)
                 ))
             elif self.op == 'update':
