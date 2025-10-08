@@ -261,6 +261,10 @@ def handle_request(env, start_response):
             res['bmcvlan'] = vlan
         bmcaddr = hmattr.get('hardwaremanagement.manager', {}).get('value',
                                                                    None)
+        if not bmcaddr:
+            start_response('500 Internal Server Error', [])
+            yield 'Missing value in hardwaremanagement.manager'
+            return
         bmcaddr = bmcaddr.split('/', 1)[0]
         bmcaddr = socket.getaddrinfo(bmcaddr, 0)[0]
         bmcaddr = bmcaddr[-1][0]
