@@ -517,6 +517,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
             path[:4] == ['configuration', 'management_controller', 'alerts',
                          'destinations'] and operation != 'retrieve'):
         return InputAlertDestination(path, nodes, inputdata, multinode)
+    elif len(path) == 3 and path[:3] == ['configuration', 'management_controller', 'certificate_authorities'] and operation not in ('retrieve', 'delete'):
+        return InputCertificateAuthority(path, nodes, inputdata)
     elif path == ['identify'] and operation != 'retrieve':
         return InputIdentifyMessage(path, nodes, inputdata)
     elif path == ['events', 'hardware', 'decode']:
@@ -955,6 +957,16 @@ class ConfluentInputMessage(ConfluentMessage):
         return key in self.valid_values
 
 
+class InputCertificateAuthority(ConfluentInputMessage):
+    keyname = 'pem'
+    # anything is valid, since it is a blob of text
+
+    def get_pem(self, node):
+        return self.inputbynode[node]
+
+    def is_valid_key(self, key):
+        return key.strip().startswith('-----BEGIN') and '-----END' in key
+
 class InputIdentImage(ConfluentInputMessage):
     keyname = 'ident_image'
     valid_values = ['create']
@@ -1344,6 +1356,11 @@ class ReseatResult(ConfluentChoiceMessage):
     ])
     keyname = 'reseat'
 
+
+class CertificateAuthority(ConfluentMessage):
+    def __init__(self, node, pem, subject, san):
+        self.myargs = (node, pem, subject, san)
+        self.kvpairs = {node: {'pem': {'value': pem}, 'subject': {'value': subject}, 'san': {'value': san}}}
 
 class PowerState(ConfluentChoiceMessage):
     valid_values = set([

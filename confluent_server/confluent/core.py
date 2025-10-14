@@ -300,6 +300,10 @@ def _init_core():
                         'default': 'ipmi',
                     }),
                 },
+                'certificate_authorities': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
                 'clear': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',

@@ -526,6 +526,8 @@ class IpmiHandler(object):
     def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
             return self.handle_alerts()
+        elif self.element[1:3] == ['management_controller', 'certificate_authorities']:
+            return self.handle_cert_authorities()
         elif self.element[1:3] == ['management_controller', 'users']:
             return self.handle_users()
         elif self.element[1:3] == ['management_controller', 'net_interfaces']:
@@ -575,6 +577,28 @@ class IpmiHandler(object):
         event = self.ipmicmd.decode_pet(specifictrap, varbinddata)
         self.pyghmi_event_to_confluent(event)
         self.output.put(msg.EventCollection((event,), name=self.node))
+
+    def handle_cert_authorities(self):
+        if len(self.element) == 3:
+            if self.op == 'read':
+                for cert in self.ipmicmd.get_trusted_cas():
+                    self.output.put(msg.ChildCollection(cert['id']))
+            elif self.op == 'update':
+                cert = self.inputdata.get_pem(self.node)
+                self.ipmicmd.add_trusted_ca(cert)
+        elif len(self.element) == 4:
+            certid = self.element[-1]
+            if self.op == 'read':
+                for certdata in self.ipmicmd.get_trusted_cas():
+                    if certdata['id'] == certid:
+                        self.output.put(msg.CertificateAuthority(
+                            pem=certdata['pem'],
+                            node=self.node,
+                            subject=certdata['subject'],
+                            san=certdata.get('san', None)))
+            elif self.op == 'delete':
+                self.ipmicmd.del_trusted_ca(certid)
+            return
 
     def handle_alerts(self):
         if self.element[3] == 'destinations':
