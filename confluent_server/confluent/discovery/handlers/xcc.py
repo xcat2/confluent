@@ -15,6 +15,7 @@
 import base64
 import codecs
 import confluent.discovery.handlers.imm as immhandler
+import confluent.discovery.handlers.xcc3 as xcc3handler
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
@@ -715,6 +716,13 @@ def remote_nodecfg(nodename, cfm):
         raise Exception('Cannot remote configure a system without known '
                          'address')
     info = {'addresses': [ipaddr]}
-    nh = NodeHandler(info, cfm)
+    ipaddr = ipaddr[0]
+    wc = webclient.SecureHTTPConnection(
+                ipaddr, 443, verifycallback=lambda x: True)
+    rsp = wc.grab_json_response('/DeviceDescription.json')
+    if isinstance(rsp, list):
+        nh = NodeHandler(info, cfm)
+    else:
+        nh = xcc3handler.NodeHandler(info, cfm)
     nh.config(nodename)
 
