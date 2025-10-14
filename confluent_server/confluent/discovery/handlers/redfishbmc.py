@@ -286,7 +286,7 @@ class NodeHandler(generic.NodeHandler):
                     compip = compip.split('%')[0]
                     ipkey = 'IPv6Addresses'
                 else:
-                    ipkey = 'IPv6Addresses'
+                    ipkey = 'IPv4Addresses'
                 actualnic = None
                 for curractnic in actualnics:
                     currnicinfo = wc.grab_json_response(curractnic)
