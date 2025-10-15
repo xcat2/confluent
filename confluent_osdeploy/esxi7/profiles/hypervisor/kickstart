@@ -1,6 +1,5 @@
 accepteula
-clearpart --firstdisk --overwritevmfs
-install --firstdisk --overwritevmfs
+%include /tmp/storagecfg
 %include /tmp/ksnet
 %include /tmp/rootpw
 reboot

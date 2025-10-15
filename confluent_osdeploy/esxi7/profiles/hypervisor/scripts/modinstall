@@ -1,9 +1,11 @@
 #!/bin/sh
 mv /etc/confluent/confluent.deploycfg /etc/confluent/confluent.newdeploycfg
 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/makeksnet >> /tmp/makeksnet
+/opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/getinstalldisk >> /tmp/getinstalldisk
 mv /etc/confluent/confluent.newdeploycfg /etc/confluent/confluent.deploycfg
 chmod +x /tmp/makeksnet
 /tmp/makeksnet > /tmp/ksnet
+python3 /tmp/getinstalldisk
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 echo rootpw --iscrypted $rootpw > /tmp/rootpw
 export BOOT_CMDLINE=ks=/etc/confluent/ks.cfg
