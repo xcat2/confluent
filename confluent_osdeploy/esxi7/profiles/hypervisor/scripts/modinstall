@@ -5,6 +5,7 @@ mv /etc/confluent/confluent.deploycfg /etc/confluent/confluent.newdeploycfg
 mv /etc/confluent/confluent.newdeploycfg /etc/confluent/confluent.deploycfg
 chmod +x /tmp/makeksnet
 /tmp/makeksnet > /tmp/ksnet
+localcli system hostname set --host $node
 python3 /tmp/getinstalldisk
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|sed -e 's/^rootpassword: //')
 echo rootpw --iscrypted $rootpw > /tmp/rootpw
