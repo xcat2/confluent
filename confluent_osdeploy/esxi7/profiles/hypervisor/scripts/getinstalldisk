@@ -96,22 +96,36 @@ def list_disks():
                 adp = ' '.join(line.split()[1:])
                 disks[dev]['adapter'] = adp
                 devbyadp.setdefault(adp, []).append(dev)
+    adapterlist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'list'])
+    if not isinstance(adapterlist, str):
+        adapterlist = adapterlist.decode('utf8')
+    driverbyadp = {}
+    linenum = 0
+    for line in adapterlist.split('\n'):
+        linenum += 1
+        if not line.strip():
+            continue
+        if linenum < 3:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        adp = parts[0]
+        driver = parts[1]
+        driverbyadp[adp] = driver
     for adp in devbyadp:
-        adaplist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'listdetailed', '--adapter', adp])
-        if not isinstance(adaplist, str):
-            adaplist = adaplist.decode('utf8')
-        for line in adaplist.split('\n'):
-            if not line.strip():
-                continue
-            if 'Driver Name:' in line:
-                driver = ' '.join(line.split()[2:])
-                for dev in devbyadp[adp]:
-                    disks[dev]['adapter_driver'] = driver
+        driver = driverbyadp.get(adp, 'Unknown')
+        for dev in devbyadp[adp]:
+            disks[dev]['adapter_driver'] = driver
     return disks
         
 def main():
     disks = []
-    alldisks = list_disks()
+    try:
+        alldisks = list_disks()
+    except Exception as e:
+        print("Error listing disks: {0}".format(str(e)))
+        alldisks = {}
     for disk in alldisks:
         try:
             disks.append(DiskInfo(disk, alldisks[disk]))
