@@ -215,6 +215,9 @@ node = {
                         'Using this requires that collective members be '
                         'defined as nodes for noderange expansion')
     },
+    'deployment.client_ip': {
+        'description': ('Client IP used when most recently reporting state.')
+    },
     'deployment.lock': {
         'description': ('Indicates whether deployment actions should be impeded. '
                         'If locked, it indicates that a pending profile should not be applied. '

@@ -466,6 +466,9 @@ def handle_request(env, start_response):
         statusstr = update.get('state', None)
         statusdetail = update.get('state_detail', None)
         didstateupdate = False
+        if statusstr or 'status' in update:
+            cfg.set_node_attributes({nodename: {
+                'deployment.client_ip': {'value': clientip}}})
         if statusstr:
             cfg.set_node_attributes({nodename: {'deployment.state': statusstr}})
             didstateupdate = True
