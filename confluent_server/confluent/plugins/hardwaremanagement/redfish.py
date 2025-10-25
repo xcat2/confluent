@@ -184,8 +184,12 @@ class IpmiCommandWrapper(ipmicommand.Command):
             (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 
                       'hardwaremanagement.manager'), self._attribschanged)
+        htn = cfm.get_node_attributes(node, 'hardwaremanagement.manager_tls_name')
+        subject = htn.get(node, {}).get('hardwaremanagement.manager_tls_name', {}).get('value', None)
+        if not subject:
+            subject = kwargs['bmc']
         kv = util.TLSCertVerifier(cfm, node,
-                                  'pubkeys.tls_hardwaremanager').verify_cert
+                                  'pubkeys.tls_hardwaremanager', subject).verify_cert
         kwargs['verifycallback'] = kv
         try:
             super(IpmiCommandWrapper, self).__init__(**kwargs)

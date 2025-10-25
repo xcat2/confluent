@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2019 Lenovo
+# Copyright 2015-2025 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -407,6 +407,12 @@ node = {
                        'is the address of, for example, the Lenovo XCC.  It may optionally '
                        'include /<prefixlen> CIDR suffix to indicate subnet length, which is '
                        'autodetected by default where possible.',
+    },
+    'hardwaremanagement.manager_tls_name': {
+        'description': 'A name to use in lieu of the value in hardwaremanagement.manager for '
+                       'TLS certificate verification purposes. Some strategies involve a non-IP, '
+                       'non-resolvable name, or this can be used to access by IP while using name-based '
+                       'validation',
     },
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '

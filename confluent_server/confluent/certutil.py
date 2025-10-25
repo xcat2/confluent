@@ -179,6 +179,16 @@ def assure_tls_ca():
     finally:
         os.seteuid(ouid)
 
+#def is_self_signed(pem):
+#    cert = ssl.PEM_cert_to_DER_cert(pem)
+#    return cert.get('subjectAltName', []) == cert.get('issuer', [])
+# x509 certificate issuer subject comparison..
+#>>> b.issuer
+#<Name(C=US,ST=NC,L=RTP,O=Lenovo,CN=XCC-7D9D-J102MM2T)>
+#>>> b.subject
+#<Name(C=US,ST=NC,L=RTP,O=Lenovo,CN=XCC-7D9D-J102MM2T)>
+
+
 def substitute_cfg(setting, key, val, newval, cfgfile, line):
     if key.strip() == setting:
         cfgfile.write(line.replace(val, newval) + '\n')
@@ -266,8 +276,9 @@ def create_simple_ca(keyout, certout):
     finally:
         os.remove(tmpconfig)
 
-def create_certificate(keyout=None, certout=None, csrout=None):
-    if not keyout:
+def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=None):
+    tlsmateriallocation = {}
+    if not certout:
         tlsmateriallocation = get_certificate_paths()
         keyout = tlsmateriallocation.get('keys', [None])[0]
         certout = tlsmateriallocation.get('certs', [None])[0]
@@ -276,60 +287,64 @@ def create_certificate(keyout=None, certout=None, csrout=None):
     if not keyout or not certout:
         raise Exception('Unable to locate TLS certificate path automatically')
     assure_tls_ca()
-    shortname = socket.gethostname().split('.')[0]
-    longname = shortname # socket.getfqdn()
-    if not csrout:
+    if not subj:
+        shortname = socket.gethostname().split('.')[0]
+        longname = shortname # socket.getfqdn()
+        subj = '/CN={0}'.format(longname)
+    elif '/CN=' not in subj:
+        subj = '/CN={0}'.format(subj)
+    if not csrfile:
         subprocess.check_call(
             ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
              keyout])
-    ipaddrs = list(get_ip_addresses())
-    san = ['IP:{0}'.format(x) for x in ipaddrs]
-    # It is incorrect to put IP addresses as DNS type.  However
-    # there exists non-compliant clients that fail with them as IP
-    # san.extend(['DNS:{0}'.format(x) for x in ipaddrs])
-    dnsnames = set(ipaddrs)
-    dnsnames.add(shortname)
-    for currip in ipaddrs:
-        dnsnames.add(socket.getnameinfo((currip, 0), 0)[0])
-    for currname in dnsnames:
-        san.append('DNS:{0}'.format(currname))
-    #san.append('DNS:{0}'.format(longname))
-    san = ','.join(san)
+    if not san:
+        ipaddrs = list(get_ip_addresses())
+        san = ['IP:{0}'.format(x) for x in ipaddrs]
+        # It is incorrect to put IP addresses as DNS type.  However
+        # there exists non-compliant clients that fail with them as IP
+        # san.extend(['DNS:{0}'.format(x) for x in ipaddrs])
+        dnsnames = set(ipaddrs)
+        dnsnames.add(shortname)
+        for currip in ipaddrs:
+            dnsnames.add(socket.getnameinfo((currip, 0), 0)[0])
+        for currname in dnsnames:
+            san.append('DNS:{0}'.format(currname))
+        #san.append('DNS:{0}'.format(longname))
+        san = ','.join(san)
     sslcfg = get_openssl_conf_location()
     tmphdl, tmpconfig = tempfile.mkstemp()
     os.close(tmphdl)
     tmphdl, extconfig = tempfile.mkstemp()
     os.close(tmphdl)
     needcsr = False
-    if csrout is None:
+    if csrfile is None:
         needcsr = True
-        tmphdl, csrout = tempfile.mkstemp()
+        tmphdl, csrfile = tempfile.mkstemp()
         os.close(tmphdl)
     shutil.copy2(sslcfg, tmpconfig)
     try:
+        with open(extconfig, 'a') as cfgfile:
+            cfgfile.write('\nbasicConstraints=critical,CA:false\nsubjectAltName={0}'.format(san))
         if needcsr:
             with open(tmpconfig, 'a') as cfgfile:
                 cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
-            with open(extconfig, 'a') as cfgfile:
-                cfgfile.write('\nbasicConstraints=CA:false\nsubjectAltName={0}'.format(san))
             subprocess.check_call([
-                'openssl', 'req', '-new', '-key', keyout, '-out', csrout, '-subj',
-                '/CN={0}'.format(longname),
-               '-extensions', 'SAN', '-config', tmpconfig
+                'openssl', 'req', '-new', '-key', keyout, '-out', csrfile, '-subj',
+                subj, '-extensions', 'SAN', '-config', tmpconfig
             ])
-        else:
-            # when used manually, allow the csr SAN to stand
-            # may add explicit subj/SAN argument, in which case we would skip copy
-            with open(tmpconfig, 'a') as cfgfile:
-                cfgfile.write('\ncopy_extensions=copy\n')
-            with open(extconfig, 'a') as cfgfile:
-                cfgfile.write('\nbasicConstraints=CA:false\n')
+        #else:
+        #    # when used manually, allow the csr SAN to stand
+        #    # may add explicit subj/SAN argument, in which case we would skip copy
+        #    #with open(tmpconfig, 'a') as cfgfile:
+        #    #    cfgfile.write('\ncopy_extensions=copy\n')
+        #    with open(extconfig, 'a') as cfgfile:
+        #        cfgfile.write('\nbasicConstraints=CA:false\n')
         if os.path.exists('/etc/confluent/tls/cakey.pem'):
             # simple style CA in effect, make a random serial number and
             # hope for the best, and accept inability to backdate the cert
             serialnum = '0x' + ''.join(['{:02x}'.format(x) for x in bytearray(os.urandom(20))])
             subprocess.check_call([
-                'openssl', 'x509', '-req', '-in', csrout,
+                'openssl', 'x509', '-req', '-in', csrfile,
                 '-CA', '/etc/confluent/tls/cacert.pem',
                 '-CAkey', '/etc/confluent/tls/cakey.pem',
                 '-set_serial', serialnum, '-out', certout, '-days', '27300',
@@ -351,9 +366,9 @@ def create_certificate(keyout=None, certout=None, csrout=None):
             # with realcalock:  # if we put it in server, we must lock it
             subprocess.check_call([
                 'openssl', 'ca', '-config', cacfgfile,
-                '-in', csrout, '-out', certout, '-batch', '-notext',
+                '-in', csrfile, '-out', certout, '-batch', '-notext',
                 '-startdate', '19700101010101Z', '-enddate', '21000101010101Z',
-                '-extfile', extconfig
+                '-extfile', extconfig, '-subj', subj
             ])
         for keycopy in tlsmateriallocation.get('keys', []):
             if keycopy != keyout:
@@ -381,7 +396,7 @@ def create_certificate(keyout=None, certout=None, csrout=None):
     finally:
         os.remove(tmpconfig)
         if needcsr:
-            os.remove(csrout)
+            os.remove(csrfile)
         print(extconfig)  # os.remove(extconfig)
 
 
@@ -389,10 +404,20 @@ if __name__ == '__main__':
     import sys
     outdir = os.getcwd()
     keyout = os.path.join(outdir, 'key.pem')
-    certout = os.path.join(outdir, sys.argv[2] + 'cert.pem')
+    certout = os.path.join(outdir, 'cert.pem')
     csrout = None
+    subj, san = (None, None)
+    try:
+        bindex = sys.argv.index('-b')
+        bmcnode = sys.argv.pop(bindex + 1)  # Remove bmcnode argument
+        sys.argv.pop(bindex)      # Remove -b flag
+        import confluent.config.configmanager as cfm
+        c = cfm.ConfigManager(None)
+        subj, san = util.get_bmc_subject_san(c, bmcnode)
+    except ValueError:
+        bindex = None
     try:
         csrout = sys.argv[1]
     except IndexError:
         csrout = None
-    create_certificate(keyout, certout, csrout)
+    create_certificate(keyout, certout, csrout, subj, san)
