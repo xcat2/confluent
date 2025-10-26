@@ -2,6 +2,7 @@ import os
 import confluent.collective.manager as collective
 import confluent.util as util
 from os.path import exists
+import datetime
 import shutil
 import socket
 import eventlet.green.subprocess as subprocess
@@ -232,7 +233,7 @@ def create_full_ca(certout):
                         cfgfile.write(line.strip() + '\n')
                     continue
                 cfgfile.write(line.strip() + '\n')
-            cfgfile.write('\n[CACert]\nbasicConstraints = CA:true\n\n[ca_confluent]\n')
+            cfgfile.write('\n[CACert]\nbasicConstraints = critical,CA:true\nkeyUsage = critical,keyCertSign,cRLSign\n[ca_confluent]\n')
     subprocess.check_call(
         ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
         keyout])
@@ -267,7 +268,7 @@ def create_simple_ca(keyout, certout):
         if len(subj) > 68:
             subj = subj[:68]
         with open(tmpconfig, 'a') as cfgfile:
-            cfgfile.write('\n[CACert]\nbasicConstraints = CA:true\n')
+            cfgfile.write('\n[CACert]\nbasicConstraints = critical,CA:true\n')
         subprocess.check_call([
                 'openssl', 'req', '-new', '-x509', '-key', keyout, '-days',
                 '27300', '-out', certout, '-subj', subj,
@@ -276,7 +277,18 @@ def create_simple_ca(keyout, certout):
     finally:
         os.remove(tmpconfig)
 
-def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=None):
+def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=None, backdate=True, days=None):
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    if backdate:
+        # To deal with wildly off clocks, we backdate certificates.
+        startdate = '20000101010101Z'
+    else:
+        # apply a mild backdate anyway, even if these are supposed to be for more accurate clocks
+        startdate = (now_utc - datetime.timedelta(hours=24)).strftime('%Y%m%d%H%M%SZ')
+    if days is None:
+        enddate = '21000101010101Z'
+    else:
+        enddate = (now_utc + datetime.timedelta(days=days)).strftime('%Y%m%d%H%M%SZ')
     tlsmateriallocation = {}
     if not certout:
         tlsmateriallocation = get_certificate_paths()
@@ -324,7 +336,7 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
     shutil.copy2(sslcfg, tmpconfig)
     try:
         with open(extconfig, 'a') as cfgfile:
-            cfgfile.write('\nbasicConstraints=critical,CA:false\nsubjectAltName={0}'.format(san))
+            cfgfile.write('\nbasicConstraints=critical,CA:false\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth,clientAuth\nsubjectAltName={0}'.format(san))
         if needcsr:
             with open(tmpconfig, 'a') as cfgfile:
                 cfgfile.write('\n[SAN]\nsubjectAltName={0}'.format(san))
@@ -363,11 +375,10 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
                 shutil.copy2(cacfgfile, tmpcafile)
                 os.close(tmphdl)
                 cacfgfile = tmpcafile
-            # with realcalock:  # if we put it in server, we must lock it
             subprocess.check_call([
-                'openssl', 'ca', '-config', cacfgfile,
+                'openssl', 'ca', '-config', cacfgfile, '-rand_serial',
                 '-in', csrfile, '-out', certout, '-batch', '-notext',
-                '-startdate', '19700101010101Z', '-enddate', '21000101010101Z',
+                '-startdate', startdate, '-enddate', enddate,
                 '-extfile', extconfig, '-subj', subj
             ])
         for keycopy in tlsmateriallocation.get('keys', []):
@@ -420,4 +431,4 @@ if __name__ == '__main__':
         csrout = sys.argv[1]
     except IndexError:
         csrout = None
-    create_certificate(keyout, certout, csrout, subj, san)
+    create_certificate(keyout, certout, csrout, subj, san, backdate=False, days=3650)
