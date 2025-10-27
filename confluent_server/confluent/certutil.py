@@ -242,7 +242,7 @@ def create_full_ca(certout):
     subprocess.check_call(
         ['openssl', 'ca', '-config', newcfg, '-batch', '-selfsign',
         '-extensions', 'CACert', '-extfile', newcfg, 
-        '-notext', '-startdate',
+        '-notext', '-startdate', '-md', 'sha384',
          '19700101010101Z', '-enddate', '21000101010101Z', '-keyfile',
          keyout, '-out', '/etc/confluent/tls/ca/cacert.pem', '-in', csrout]
     )
@@ -378,7 +378,7 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
             subprocess.check_call([
                 'openssl', 'ca', '-config', cacfgfile, '-rand_serial',
                 '-in', csrfile, '-out', certout, '-batch', '-notext',
-                '-startdate', startdate, '-enddate', enddate,
+                '-startdate', startdate, '-enddate', enddate, '-md', 'sha384',
                 '-extfile', extconfig, '-subj', subj
             ])
         for keycopy in tlsmateriallocation.get('keys', []):
