@@ -34,7 +34,10 @@ import ssl
 import struct
 import eventlet.green.subprocess as subprocess
 import cryptography.x509 as x509
-import cryptography.x509.verification as verification
+try:
+    import cryptography.x509.verification as verification
+except ImportError:
+    verification = None
 
 
 
@@ -307,7 +310,7 @@ class TLSCertVerifier(object):
         # Mismatches, but try more traditional validation using the site CAs
         if self.subject:
             try:
-                if self.verify_by_ca(certificate):
+                if verification and self.verify_by_ca(certificate):
                     auditlog = log.Logger('audit')
                     auditlog.log({'node': self.node, 'event': 'certautoupdate',
                                   'fingerprint': fingerprint})
