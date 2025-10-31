@@ -490,7 +490,7 @@ class NodeHandler(immhandler.NodeHandler):
                             {'UserName': username}, method='PATCH')
                         if status != 200:
                             rsp = json.loads(rsp)
-                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError', 'Base.1.18.GeneralError'):
+                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError', 'Base.1.18.GeneralError', 'Base.1.21.GeneralError'):
                                 if tries:
                                     eventlet.sleep(4)
                                 elif tmpaccount:
@@ -522,7 +522,7 @@ class NodeHandler(immhandler.NodeHandler):
             if userent['users_user_name'] == user:
                 curruser = userent
                 break
-        if curruser.get('users_pass_is_sha256', 0):
+        if curruser and curruser.get('users_pass_is_sha256', 0):
             self._wc = None
             wc = self.wc
             nwc = wc.dupe()
