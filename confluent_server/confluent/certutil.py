@@ -296,7 +296,7 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
         certout = tlsmateriallocation.get('certs', [None])[0]
         if not certout:
             certout = tlsmateriallocation.get('bundles', [None])[0]
-    if not keyout or not certout:
+    if (not keyout and not csrfile) or not certout:
         raise Exception('Unable to locate TLS certificate path automatically')
     assure_tls_ca()
     if not subj:

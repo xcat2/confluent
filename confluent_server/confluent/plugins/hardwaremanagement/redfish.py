@@ -20,6 +20,7 @@ import confluent.messages as msg
 import confluent.util as util
 import copy
 import errno
+from confluent import certutil
 import eventlet
 import eventlet.event
 import eventlet.green.threading as threading
@@ -37,6 +38,7 @@ ipmicommand = eventlet.import_patched('pyghmi.redfish.command')
 import socket
 import ssl
 import traceback
+import tempfile
 
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
@@ -532,6 +534,8 @@ class IpmiHandler(object):
             return self.handle_alerts()
         elif self.element[1:3] == ['management_controller', 'certificate_authorities']:
             return self.handle_cert_authorities()
+        elif self.element[1:3] == ['management_controller', 'certificate']:
+            return self.handle_certificate()
         elif self.element[1:3] == ['management_controller', 'users']:
             return self.handle_users()
         elif self.element[1:3] == ['management_controller', 'net_interfaces']:
@@ -581,6 +585,26 @@ class IpmiHandler(object):
         event = self.ipmicmd.decode_pet(specifictrap, varbinddata)
         self.pyghmi_event_to_confluent(event)
         self.output.put(msg.EventCollection((event,), name=self.node))
+
+    def handle_certificate(self):
+        self.element = self.element[3:]
+        if len(self.element) != 1:
+            raise Exception('Not implemented')
+        if self.element[0] == 'sign' and self.op == 'update':
+            csr = self.ipmicmd.get_bmc_csr()
+            subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_san(self.node))
+            with tempfile.NamedTemporaryFile() as tmpfile:
+                tmpfile.write(csr.encode())
+                tmpfile.flush()
+                certfile = tempfile.NamedTemporaryFile(delete=False)
+                certname = certfile.name
+                certfile.close()
+                certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
+                                            days=self.inputdata.get_days(self.node))
+            with open(certname, 'rb') as certf:
+                cert = certf.read()
+            os.unlink(certname)
+            self.ipmicmd.install_bmc_certificate(cert)
 
     def handle_cert_authorities(self):
         if len(self.element) == 3:

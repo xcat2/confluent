@@ -519,6 +519,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputAlertDestination(path, nodes, inputdata, multinode)
     elif len(path) == 3 and path[:3] == ['configuration', 'management_controller', 'certificate_authorities'] and operation not in ('retrieve', 'delete'):
         return InputCertificateAuthority(path, nodes, inputdata)
+    elif len(path) == 4 and path[:4] == ['configuration', 'management_controller', 'certificate', 'sign'] and operation not in ('retrieve', 'delete'):
+        return InputSigningParameters(path, inputdata, nodes, configmanager)
     elif path == ['identify'] and operation != 'retrieve':
         return InputIdentifyMessage(path, nodes, inputdata)
     elif path == ['events', 'hardware', 'decode']:
@@ -956,6 +958,20 @@ class ConfluentInputMessage(ConfluentMessage):
     def is_valid_key(self, key):
         return key in self.valid_values
 
+class InputSigningParameters(InputConfigChangeSet):
+
+    def get_days(self, node):
+        attribs = self.get_attributes(node)
+        return int(attribs['days'])
+    
+    def get_added_san(self, node):
+        attribs = self.get_attributes(node)
+        addsans = []
+        for subj in attribs.get('added_san', '').split(','):
+            if subj:
+                addsans.append(subj.strip())
+        return addsans
+        
 
 class InputCertificateAuthority(ConfluentInputMessage):
     keyname = 'pem'

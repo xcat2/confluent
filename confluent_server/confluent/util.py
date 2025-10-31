@@ -94,13 +94,17 @@ def list_interface_indexes():
         return
 
 
-def get_bmc_subject_san(configmanager, nodename, addip=None):
+def get_bmc_subject_san(configmanager, nodename, addnames=()):
     bmc_san = []
     subject = ''
     ipas = set([])
-    if addip:
-        ipas.add(addip)
     dnsnames = set([])
+    for addname in addnames:
+        try:
+            addr = ipaddress.ip_address(addname)
+            ipas.add(addname)
+        except Exception:
+            dnsnames.add(addname)
     nodecfg = configmanager.get_node_attributes(nodename,
                                              ('dns.domain', 'hardwaremanagement.manager', 'hardwaremanagement.manager_tls_name'))
     bmcaddr = nodecfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
