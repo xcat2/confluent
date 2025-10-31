@@ -723,6 +723,9 @@ class InputConfigChangeSet(InputExpression):
         endattrs = {}
         for attr in attrs:
             origval = attrs[attr]
+            if isinstance(origval, int):
+                endattrs[attr] = origval
+                continue
             if isinstance(origval, bytes) or isinstance(origval, unicode):
                 origval = {'expression': origval}
             if 'expression' not in origval:
@@ -963,15 +966,15 @@ class InputSigningParameters(InputConfigChangeSet):
     def get_days(self, node):
         attribs = self.get_attributes(node)
         return int(attribs['days'])
-    
-    def get_added_san(self, node):
+
+    def get_added_names(self, node):
         attribs = self.get_attributes(node)
-        addsans = []
-        for subj in attribs.get('added_san', '').split(','):
+        addnames = []
+        for subj in (attribs.get('added_names') or '').split(','):
             if subj:
-                addsans.append(subj.strip())
-        return addsans
-        
+                addnames.append(subj.strip())
+        return addnames
+
 
 class InputCertificateAuthority(ConfluentInputMessage):
     keyname = 'pem'

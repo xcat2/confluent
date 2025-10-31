@@ -592,7 +592,7 @@ class IpmiHandler(object):
             raise Exception('Not implemented')
         if self.element[0] == 'sign' and self.op == 'update':
             csr = self.ipmicmd.get_bmc_csr()
-            subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_san(self.node))
+            subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_names(self.node))
             with tempfile.NamedTemporaryFile() as tmpfile:
                 tmpfile.write(csr.encode())
                 tmpfile.flush()
