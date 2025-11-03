@@ -23,6 +23,7 @@ try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
+import eventlet.green.subprocess as subprocess
 
 getaddrinfo = eventlet.support.greendns.getaddrinfo
 
@@ -326,6 +327,14 @@ class NodeHandler(generic.NodeHandler):
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
 
+    def autosign_certificate(self):
+        nodename = self.nodename
+        hwmgt_method = self.configmanager.get_node_attributes(
+            nodename, 'hardwaremanagement.method').get(
+                nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
+        if hwmgt_method != 'redfish':
+            return
+        subprocess.check_call(['/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'])
 
 def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(

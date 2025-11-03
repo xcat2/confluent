@@ -98,6 +98,7 @@ import eventlet
 import eventlet.greenpool
 import eventlet.semaphore
 
+
 autosensors = set()
 scanner = None
 
@@ -1472,7 +1473,7 @@ def discover_node(cfg, handler, info, nodename, manual):
                         break
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
-            if nodeconfig:
+            if nodeconfig or handler.current_cert_self_signed():
                 bmcaddr = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
                 bmcaddr = bmcaddr.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
                 if not bmcaddr:
@@ -1481,9 +1482,12 @@ def discover_node(cfg, handler, info, nodename, manual):
                     bmcaddr = bmcaddr.split('/', 1)[0]
                     wait_for_connection(bmcaddr)
                     socket.getaddrinfo(bmcaddr, 443)
+            if nodeconfig:
                     subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
+            if handler.current_cert_self_signed():
+                handler.autosign_certificate()
 
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):

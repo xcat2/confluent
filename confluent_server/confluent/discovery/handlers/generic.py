@@ -17,6 +17,10 @@ import errno
 import eventlet
 import socket
 webclient = eventlet.import_patched('pyghmi.util.webclient')
+try:
+    import cryptography.x509 as x509
+except ImportError:
+    x509 = None
 
 class NodeHandler(object):
     https_supported = True
@@ -58,6 +62,40 @@ class NodeHandler(object):
         # Check if the referenced info is really enough, if false, a rescan
         # may occur against the target in a short while
         return True
+
+    def current_cert_self_signed(self):
+        if not x509:
+            return
+        if not self._ipaddr:
+            return
+        try:
+            wc = webclient.SecureHTTPConnection(self._ipaddr, verifycallback=self._savecert, port=443)
+            wc.connect()
+            wc.close()
+            if not self._fp:
+                return False
+            # Check if certificate is self-signed by comparing issuer and subject
+            cert = self._fp
+            certobj = x509.load_der_x509_certificate(cert)
+            skid = None
+            akid = None
+            for ext in certobj.extensions:
+                if ext.oid == x509.ExtensionOID.SUBJECT_KEY_IDENTIFIER:
+                    skid = ext.value
+                elif ext.oid == x509.ExtensionOID.AUTHORITY_KEY_IDENTIFIER:
+                    akid = ext.value
+            if akid:
+                if skid.digest == akid.key_identifier:
+                    return True
+            elif certobj.issuer == certobj.subject:
+                return True
+        except Exception:
+            pass
+        return False
+    
+    def autosign_certificate(self):
+        # A no-op by default
+        return
 
     def scan(self):
         # Do completely passive things to enhance data.

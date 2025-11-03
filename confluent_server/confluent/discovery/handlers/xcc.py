@@ -29,6 +29,7 @@ import eventlet.green.socket as socket
 webclient = eventlet.import_patched('pyghmi.util.webclient')
 import struct
 getaddrinfo = eventlet.support.greendns.getaddrinfo
+import eventlet.green.subprocess as subprocess
 
 
 def fixuuid(baduuid):
@@ -704,6 +705,15 @@ class NodeHandler(immhandler.NodeHandler):
             if em:
                 self.configmanager.set_node_attributes(
                     {em: {'id.uuid': enclosureuuid}})
+    def autosign_certificate(self):
+        nodename = self.nodename
+        hwmgt_method = self.configmanager.get_node_attributes(
+            nodename, 'hardwaremanagement.method').get(
+                nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
+        if hwmgt_method != 'redfish':
+            return
+        subprocess.check_call(['/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'])
+
 
 def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
