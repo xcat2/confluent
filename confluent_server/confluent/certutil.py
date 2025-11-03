@@ -7,6 +7,10 @@ import shutil
 import socket
 import eventlet.green.subprocess as subprocess
 import tempfile
+try:
+    import cryptography.x509 as x509
+except ImportError:
+    x509 = None
 
 def mkdirp(targ):
     try:
@@ -179,6 +183,7 @@ def assure_tls_ca():
         os.symlink(certname, hashname)
     finally:
         os.seteuid(ouid)
+    return certout
 
 #def is_self_signed(pem):
 #    cert = ssl.PEM_cert_to_DER_cert(pem)
@@ -298,7 +303,7 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
             certout = tlsmateriallocation.get('bundles', [None])[0]
     if (not keyout and not csrfile) or not certout:
         raise Exception('Unable to locate TLS certificate path automatically')
-    assure_tls_ca()
+    cacertname = assure_tls_ca()
     if not subj:
         shortname = socket.gethostname().split('.')[0]
         longname = shortname # socket.getfqdn()
@@ -309,16 +314,42 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
         subprocess.check_call(
             ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
              keyout])
+    permitdomains = []
+    if x509:
+        # check if this CA has name constraints, and avoid violating them
+        with open(cacertname, 'rb') as f:
+            cer = x509.load_pem_x509_certificate(f.read())
+        for extension in cer.extensions:
+            if extension.oid == x509.ExtensionOID.NAME_CONSTRAINTS:
+                nc = extension.value
+                for pname in nc.permitted_subtrees:
+                    permitdomains.append(pname.value)
     if not san:
         ipaddrs = list(get_ip_addresses())
-        san = ['IP:{0}'.format(x) for x in ipaddrs]
-        # It is incorrect to put IP addresses as DNS type.  However
-        # there exists non-compliant clients that fail with them as IP
-        # san.extend(['DNS:{0}'.format(x) for x in ipaddrs])
-        dnsnames = set(ipaddrs)
-        dnsnames.add(shortname)
+        if not permitdomains:
+            san = ['IP:{0}'.format(x) for x in ipaddrs]
+            # It is incorrect to put IP addresses as DNS type.  However
+            # there exists non-compliant clients that fail with them as IP
+            # san.extend(['DNS:{0}'.format(x) for x in ipaddrs])
+            dnsnames = set(ipaddrs)
+            dnsnames.add(shortname)
+            dnsnames.add(longname)
+            # nameconstraints preclude IP and shortname
+            san = []
+            dnsnames = set()
+            for suffix in permitdomains:
+                if longname.endswith(suffix):
+                    dnsnames.add(longname)
+                    break
+                    break
         for currip in ipaddrs:
-            dnsnames.add(socket.getnameinfo((currip, 0), 0)[0])
+            currname = socket.getnameinfo((currip, 0), 0)[0]
+            for suffix in permitdomains:
+                if currname.endswith(suffix):
+                    dnsnames.add(currname)
+                    break
+            if not permitdomains:
+                dnsnames.add(currname)
         for currname in dnsnames:
             san.append('DNS:{0}'.format(currname))
         #san.append('DNS:{0}'.format(longname))
