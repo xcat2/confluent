@@ -439,7 +439,7 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
         os.remove(tmpconfig)
         if needcsr:
             os.remove(csrfile)
-        print(extconfig)  # os.remove(extconfig)
+        os.remove(extconfig)
 
 
 if __name__ == '__main__':
