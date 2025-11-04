@@ -3,7 +3,7 @@ confluent_whost=$confluent_mgr
 if [[ "$confluent_whost" == *:* ]] && [[ "$confluent_whost" != "["* ]]; then
     confluent_whost="[$confluent_mgr]"
 fi
-mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
+mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay /sysroot
 if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
@@ -45,15 +45,40 @@ memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
 memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
 mkfs.xfs /dev/zram0 > /dev/null
-mount -o discard /dev/zram0 /mnt/overlay
-if [ ! -f /tmp/mountparts.sh ]; then
-    mkdir -p /mnt/overlay/upper /mnt/overlay/work
-    mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
+if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
+    mount -o discard /dev/zram0 /sysroot
+    echo -en "Decrypting and extracting root filesystem: 0%\r"
+    srcsz=$(du -sk /mnt/remote | awk '{print $1}')
+    while [ -f /mnt/remoteimg/rootimg.sfs ]; do
+        dstsz=$(du -sk /sysroot | awk '{print $1}')
+        pct=$((dstsz * 100 / srcsz))
+        if [ $pct -gt 99 ]; then
+            pct=99
+        fi
+        echo -en "Decrypting and extracting root filesystem: $pct%\r"
+        sleep 0.25
+    done &
+    cp -ax /mnt/remote/* /sysroot/
+    umount /mnt/remote
+    if [ -e /dev/mapper/cryptimg ]; then
+        dmsetup remove cryptimg
+    fi
+    losetup -d $loopdev
+    rm /mnt/remoteimg/rootimg.sfs
+    umount /mnt/remoteimg
+    wait
+    echo -e "Decrypting and extracting root filesystem: 100%"
 else
-    for srcmount in $(cat /tmp/mountparts.sh | awk '{print $3}'); do
-        mkdir -p /mnt/overlay${srcmount}/upper /mnt/overlay${srcmount}/work
-        mount -t overlay -o upperdir=/mnt/overlay${srcmount}/upper,workdir=/mnt/overlay${srcmount}/work,lowerdir=${srcmount} disklesspart /sysroot${srcmount#/mnt/remote}
-    done
+    mount -o discard /dev/zram0 /mnt/overlay
+    if [ ! -f /tmp/mountparts.sh ]; then
+        mkdir -p /mnt/overlay/upper /mnt/overlay/work
+        mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
+    else
+        for srcmount in $(cat /tmp/mountparts.sh | awk '{print $3}'); do
+            mkdir -p /mnt/overlay${srcmount}/upper /mnt/overlay${srcmount}/work
+            mount -t overlay -o upperdir=/mnt/overlay${srcmount}/upper,workdir=/mnt/overlay${srcmount}/work,lowerdir=${srcmount} disklesspart /sysroot${srcmount#/mnt/remote}
+        done
+    fi
 fi
 mkdir -p /sysroot/etc/ssh
 mkdir -p /sysroot/etc/confluent
