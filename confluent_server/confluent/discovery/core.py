@@ -107,6 +107,11 @@ try:
 except NameError:
     unicode = str
 
+try:
+    import cryptography.x509.verification as verification
+except ImportError:
+    verification = None
+
 class nesteddict(dict):
 
     def __missing__(self, key):
@@ -1486,7 +1491,7 @@ def discover_node(cfg, handler, info, nodename, manual):
                     subprocess.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
-            if handler.current_cert_self_signed():
+            if verification and handler.current_cert_self_signed():
                 handler.autosign_certificate()
 
         info['discostatus'] = 'discovered'
