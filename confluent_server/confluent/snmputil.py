@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2025 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,16 +26,54 @@ import eventlet
 from eventlet.support.greendns import getaddrinfo
 import pysnmp.smi.error as snmperr
 import socket
+import asyncio
 snmp = eventlet.import_patched('pysnmp.hlapi')
+asyn = False
+if not hasattr(snmp, 'UsmUserData'):
+    # pysnmp that dropped the sync support
+    import pysnmp.hlapi.v3arch.asyncio as snmp
+    asyn = True
+    import pysnmp.smi.rfc1902 as rfc1902
 
+
+def get_loop():
+    try:
+        return asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+def _run_coro(coro):
+    loop = get_loop()
+    fun = asyncio.wait_for(coro, None)
+    if loop.is_running():
+        task = asyncio.ensure_future(fun)
+        return loop.run_until_complete(task)
+    return loop.run_until_complete(fun)
+
+async def _agen_to_list(agen):
+    out = []
+    async for item in agen:
+        out.append(item)
+    return out
+
+def _sync_gen(agen):
+    return _run_coro(_agen_to_list(agen))
 
 def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
     res = getaddrinfo(name, 161, 0, socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
-        return snmp.Udp6TransportTarget(res[0][4], 2)
+        if asyn:
+            return _run_coro(snmp.Udp6TransportTarget.create(res[0][4], 2))
+        else:
+            return snmp.Udp6TransportTarget(res[0][4], 2)
     else:
-        return snmp.UdpTransportTarget(res[0][4], 2)
+        if asyn:
+            return _run_coro(snmp.UdpTransportTarget.create(res[0][4], 2))
+        else:
+            return snmp.UdpTransportTarget(res[0][4], 2)
 
 
 class Session(object):
@@ -83,12 +121,22 @@ class Session(object):
         if '::' in oid:
             resolvemib = True
             mib, field = oid.split('::')
-            obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
+            if asyn:
+                obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(mib, field))
+            else:
+                obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
         else:
-            obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
-
-        walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
-                               lexicographicMode=False, lookupMib=resolvemib)
+            if asyn:
+                obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(oid))
+            else:
+                obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
+        if asyn:
+            walking = snmp.bulk_walk_cmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+                                   lexicographicMode=False, lookupMib=resolvemib)
+            walking = _sync_gen(walking)
+        else:
+            walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+                                   lexicographicMode=False, lookupMib=resolvemib)
         try:
             for rsp in walking:
                 errstr, errnum, erridx, answers = rsp
