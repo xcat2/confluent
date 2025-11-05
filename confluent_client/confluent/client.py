@@ -39,6 +39,7 @@ _attraliases = {
     'switchuser': 'secret.hardwaremanagementuser',
     'bmcpass': 'secret.hardwaremanagementpassword',
     'switchpass': 'secret.hardwaremanagementpassword',
+    'net.bond_mode': 'net.team_mode'
 }
 
 try:
