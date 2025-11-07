@@ -334,13 +334,13 @@ def create_certificate(keyout=None, certout=None, csrfile=None, subj=None, san=N
             dnsnames = set(ipaddrs)
             dnsnames.add(shortname)
             dnsnames.add(longname)
+        else:
             # nameconstraints preclude IP and shortname
             san = []
             dnsnames = set()
             for suffix in permitdomains:
                 if longname.endswith(suffix):
                     dnsnames.add(longname)
-                    break
                     break
         for currip in ipaddrs:
             currname = socket.getnameinfo((currip, 0), 0)[0]
