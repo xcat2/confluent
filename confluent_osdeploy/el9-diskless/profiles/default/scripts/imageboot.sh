@@ -154,6 +154,7 @@ mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
+rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
 if grep debugssh /proc/cmdline >& /dev/null; then
     exec /opt/confluent/bin/start_root
