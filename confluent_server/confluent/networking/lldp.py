@@ -255,7 +255,13 @@ def _extract_neighbor_data_b(args):
 
     args are carried as a tuple, because of eventlet convenience
     """
-    switch, password, user, cfm, force = args[:5]
+    # Safely unpack args with defaults to avoid IndexError
+    switch = args[0] if len(args) > 0 else None
+    password = args[1] if len(args) > 1 else None
+    user = args[2] if len(args) > 2 else None
+    cfm = args[3] if len(args) > 3 else None
+    privproto = args[4] if len(args) > 4 else None
+    force = args[5] if len(args) > 5 else False
     vintage = _neighdata.get(switch, {}).get('!!vintage', 0)
     now = util.monotonic_time()
     if vintage > (now - 60) and not force:
@@ -265,7 +271,7 @@ def _extract_neighbor_data_b(args):
         return _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
     except Exception as e:
         pass
-    conn = snmp.Session(switch, password, user)
+    conn = snmp.Session(switch, password, user, privacy_protocol=privproto)
     sid = None
     for sysid in conn.walk('1.3.6.1.2.1.1.2'):
         sid = str(sysid[1][6:])
@@ -364,8 +370,8 @@ def _extract_neighbor_data(args):
             return _extract_neighbor_data_b(args)
     except Exception as e:
         yieldexc = False
-        if len(args) >= 6:
-            yieldexc = args[5]
+        if len(args) >= 7:
+            yieldexc = args[6]
         if yieldexc:
             return e
         else:

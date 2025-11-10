@@ -605,6 +605,10 @@ node = {
         'description': ('SNMPv1 community string, it is highly recommended to'
                         'step up to SNMPv3'),
     },
+    'snmp.privacyprotocol': {
+        'description': 'The privacy protocol to use for SNMPv3',
+        'valid_values': ('aes', 'des'),
+    },
 #    'secret.snmplocalizedkey': {
 #        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
 #                        'This can be used in lieu of snmppassphrase to avoid'

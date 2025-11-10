@@ -213,14 +213,14 @@ def _fast_backend_fixup(macs, switch):
                 else:
                     _nodesbymac[mac] = (nodename, nummacs)
 
-def _offload_map_switch(switch, password, user):
+def _offload_map_switch(switch, password, user, privprotocol=None):
     if _offloader is None:
         _start_offloader()
     evtid = random.randint(0, 4294967295)
     while evtid in _offloadevts:
         evtid = random.randint(0, 4294967295)
     _offloadevts[evtid] = eventlet.Event()
-    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user),
+    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user, privprotocol),
                                          use_bin_type=True))
     _offloader.stdin.flush()
     result = _offloadevts[evtid].wait()
@@ -280,12 +280,11 @@ def _map_switch_backend(args):
     #   fallback if ifName is empty
     #
     global _macmap
-    if len(args) == 4:
-        switch, password, user, _ = args  # 4th arg is for affluent only
-        if not user:
-            user = None
-    else:
-        switch, password = args
+    switch = args[0] if len(args) > 0 else None
+    password = args[1] if len(args) > 1 else None
+    user = args[2] if len(args) > 2 else None
+    privprotocol = args[4] if len(args) > 4 else None
+    if not user:  # make '' be treated as None
         user = None
     if switch not in noaffluent:
         try:
@@ -298,7 +297,7 @@ def _map_switch_backend(args):
         except Exception as e:
             pass
     mactobridge, ifnamemap, bridgetoifmap = _offload_map_switch(
-        switch, password, user)
+        switch, password, user, privprotocol)
     maccounts = {}
     bridgetoifvalid = False
     for mac in mactobridge:
@@ -367,9 +366,9 @@ def _map_switch_backend(args):
                 _nodesbymac[mac] = (nodename, maccounts[ifname])
     _macsbyswitch[switch] = newmacs
 
-def _snmp_map_switch_relay(rqid, switch, password, user):
+def _snmp_map_switch_relay(rqid, switch, password, user, privprotocol=None):
     try:
-        res = _snmp_map_switch(switch, password, user)
+        res = _snmp_map_switch(switch, password, user, privprotocol)
         payload = msgpack.packb((rqid,) + res, use_bin_type=True)
         try:
             sys.stdout.buffer.write(payload)
@@ -391,10 +390,10 @@ def _snmp_map_switch_relay(rqid, switch, password, user):
     finally:
         sys.stdout.flush()
 
-def _snmp_map_switch(switch, password, user):
+def _snmp_map_switch(switch, password, user, privprotocol=None):
     haveqbridge = False
     mactobridge = {}
-    conn = snmp.Session(switch, password, user)
+    conn = snmp.Session(switch, password, user, privacy_protocol=privprotocol)
     ifnamemap = get_portnamemap(conn)
     for vb in conn.walk('1.3.6.1.2.1.17.7.1.2.2.1.2'):
         haveqbridge = True

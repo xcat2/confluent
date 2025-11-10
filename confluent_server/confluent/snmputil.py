@@ -78,7 +78,7 @@ def _get_transport(name):
 
 class Session(object):
 
-    def __init__(self, server, secret, username=None, context=None):
+    def __init__(self, server, secret, username=None, context=None, privacy_protocol=None):
         """Create a new session to interrogate a switch
 
         If username is not given, it is assumed that
@@ -97,9 +97,17 @@ class Session(object):
             # SNMP v2c
             self.authdata = snmp.CommunityData(secret, mpModel=1)
         else:
+            if privacy_protocol == 'aes':
+                privproto = snmp.usmAesCfb128Protocol
+            elif privacy_protocol in ('des', None):
+                privproto = snmp.usmDESPrivProtocol
+            else:
+                raise exc.ConfluentException('Unsupported SNMPv3 privacy protocol '
+                                             '{0}'.format(privacy_protocol))
             self.authdata = snmp.UsmUserData(
                 username, authKey=secret, privKey=secret,
-                authProtocol=snmp.usmHMACSHAAuthProtocol)
+                authProtocol=snmp.usmHMACSHAAuthProtocol,
+                privProtocol=privproto)
         self.eng = snmp.SnmpEngine()
 
     def walk(self, oid):
