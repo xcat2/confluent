@@ -68,5 +68,10 @@ run_remote_parts onboot.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/onboot.d/
 run_remote_config onboot.d
 
+if [ -f /run/confluent/onboot_sleep.pid ]; then
+    sleeppid=$(cat /run/confluent/onboot_sleep.pid)
+    kill "$sleeppid"
+    rm -f /run/confluent/onboot_sleep.pid
+fi
 #curl -X POST -d 'status: booted' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
 kill $logshowpid
