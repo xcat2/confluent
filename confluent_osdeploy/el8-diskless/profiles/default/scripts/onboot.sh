@@ -69,6 +69,10 @@ run_remote_parts onboot.d
 run_remote_config onboot.d
 
 if [ -f /run/confluent/onboot_sleep.pid ]; then
+    loopdev=$(losetup -j /mnt/remoteimg/rootimg.sfs|cut -d: -f 1)
+    if [ -n "$loopdev" ]; then
+        losetup "$loopdev" --direct-io=on
+    fi
     sleeppid=$(cat /run/confluent/onboot_sleep.pid)
     kill "$sleeppid"
     rm -f /run/confluent/onboot_sleep.pid

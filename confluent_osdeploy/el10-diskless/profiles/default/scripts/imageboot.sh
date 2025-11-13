@@ -169,7 +169,6 @@ if [ $TETHERED -eq 1 ]; then
         mkdir -p /run/confluent
         echo $ONBOOTPID > /run/confluent/onboot_sleep.pid
         wait $ONBOOTPID
-        losetup /sysroot/$loopdev --direct-io=on
         dd if=/mnt/remoteimg/rootimg.sfs iflag=nocache count=0 >& /dev/null
         rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
     ) &

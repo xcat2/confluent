@@ -139,7 +139,6 @@ if [ $TETHERED -eq 1 ]; then
         mkdir -p /run/confluent
         echo $ONBOOTPID > /run/confluent/onboot_sleep.pid
         wait $ONBOOTPID
-        losetup $loopdev --direct-io=on
         dd if=/mnt/remoteimg/rootimg.sfs iflag=nocache count=0 >& /dev/null
     ) &
     while [ ! -f /run/confluent/onboot_sleep.pid ]; do
