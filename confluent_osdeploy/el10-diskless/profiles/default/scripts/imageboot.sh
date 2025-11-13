@@ -4,7 +4,7 @@ if [[ "$confluent_whost" == *:* ]] && [[ "$confluent_whost" != "["* ]]; then
     confluent_whost="[$confluent_mgr]"
 fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay /sysroot
-if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
+if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
@@ -40,14 +40,20 @@ fi
 
 
 #mount -t tmpfs overlay /mnt/overlay
-modprobe zram
-memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
-memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
-echo $memtot > /sys/block/zram0/disksize
-mkfs.xfs /dev/zram0 > /dev/null
+if [ ! "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
+    modprobe zram
+    memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
+    memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
+    echo $memtot > /sys/block/zram0/disksize
+    mkfs.xfs /dev/zram0 > /dev/null
+fi
 TETHERED=0
-if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
-    mount -o discard /dev/zram0 /sysroot
+if [ "untethered" = "$(getarg confluent_imagemethod)" -o "uncompressed" = "$(getarg confluent_imagemethod)" ]; then
+    if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
+        mount -o discard /dev/zram0 /sysroot
+    else
+        mount -t tmpfs disklessroot /sysroot
+    fi
     echo -en "Decrypting and extracting root filesystem: 0%\r"
     srcsz=$(du -sk /mnt/remote | awk '{print $1}')
     while [ -f /mnt/remoteimg/rootimg.sfs ]; do
@@ -160,17 +166,22 @@ if [ $TETHERED -eq 1 ]; then
     (
         sleep 86400 &
         ONBOOTPID=$!
-        mkdir -p /sysroot/run/confluent
-        echo $ONBOOTPID > /sysroot/run/confluent/onboot_sleep.pid
+        mkdir -p /run/confluent
+        echo $ONBOOTPID > /run/confluent/onboot_sleep.pid
         wait $ONBOOTPID
-        losetup $loopdev --direct-io=on
+        losetup /sysroot/$loopdev --direct-io=on
         dd if=/mnt/remoteimg/rootimg.sfs iflag=nocache count=0 >& /dev/null
+        rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
     ) &
+    while [ ! -f /run/confluent/onboot_sleep.pid ]; do
+        sleep 0.1
+    done
+else
+    rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
 fi
 if grep debugssh /proc/cmdline >& /dev/null; then
     exec /opt/confluent/bin/start_root
 else
-    rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
     exec /opt/confluent/bin/start_root -s  # share mount namespace, keep kernel callbacks intact
 fi
 

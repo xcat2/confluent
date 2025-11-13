@@ -164,6 +164,11 @@ mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
 rm -f /sysroot/etc/dracut.conf.d/diskless.conf # remove diskless dracut from runtime, to make kdump happier
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
+if grep debugssh /proc/cmdline >& /dev/null; then
+    debugssh=1
+else
+    debugssh=0
+fi
 if [ $TETHERED -eq 1 ]; then
     # In tethered mode, the double-caching is useful to get through tricky part of
     # onboot with confignet. After that, it's excessive cache usage.
@@ -172,16 +177,23 @@ if [ $TETHERED -eq 1 ]; then
     (
         sleep 86400 &
         ONBOOTPID=$!
-        mkdir -p /sysroot/run/confluent
-        echo $ONBOOTPID > /sysroot/run/confluent/onboot_sleep.pid
+        mkdir -p /run/confluent
+        echo $ONBOOTPID > /run/confluent/onboot_sleep.pid
         wait $ONBOOTPID
-        losetup $loopdev --direct-io=on
+        losetup /sysroot/$loopdev --direct-io=on
         dd if=/mnt/remoteimg/rootimg.sfs iflag=nocache count=0 >& /dev/null
+        if [ $debugssh -eq 0 ]; then
+            rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
+        fi
     ) &
+    while [ ! -f /run/confluent/onboot_sleep.pid ]; do
+        sleep 0.1
+    done
+elif [ $debugssh -eq 0 ]; then
+    rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
 fi
 if grep debugssh /proc/cmdline >& /dev/null; then
     exec /opt/confluent/bin/start_root
 else
-    rm -rf /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs /lib/firmware-ramfs /usr/lib64/libcrypto.so* /usr/lib64/systemd/ /kernel/ /usr/bin/ /usr/sbin/ /usr/libexec/
     exec /opt/confluent/bin/start_root -s  # share mount namespace, keep kernel callbacks intact
 fi
