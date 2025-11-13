@@ -45,6 +45,7 @@ memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
 memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
 echo $memtot > /sys/block/zram0/disksize
 mkfs.xfs /dev/zram0 > /dev/null
+TETHERED=0
 if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -o discard /dev/zram0 /sysroot
     echo -en "Decrypting and extracting root filesystem: 0%\r"
@@ -69,6 +70,7 @@ if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     wait
     echo -e "Decrypting and extracting root filesystem: 100%"
 else
+    TETHERED=1
     mount -o discard /dev/zram0 /mnt/overlay
     if [ ! -f /tmp/mountparts.sh ]; then
         mkdir -p /mnt/overlay/upper /mnt/overlay/work
@@ -154,6 +156,17 @@ ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
+if [ $TETHERED -eq 1 ]; then
+    (
+        sleep 86400 &
+        ONBOOTPID=$!
+        mkdir -p /sysroot/run/confluent
+        echo $ONBOOTPID > /sysroot/run/confluent/onboot_sleep.pid
+        wait $ONBOOTPID
+        losetup $loopdev --direct-io=on
+        dd if=/mnt/remoteimg/rootimg.sfs iflag=nocache count=0 >& /dev/null
+    ) &
+fi
 if grep debugssh /proc/cmdline >& /dev/null; then
     exec /opt/confluent/bin/start_root
 else
