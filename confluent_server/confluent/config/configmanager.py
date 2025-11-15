@@ -1208,30 +1208,18 @@ class _ExpressionFormat(string.Formatter):
             return node.value
         elif isinstance(node, ast.Call):
             key = ''
+            baseval = ''
             if isinstance(node.func, ast.Attribute):
                 fun_name = node.func.attr
-                left = node.func.value
-                while isinstance(left, ast.Attribute):
-                    # Loop through, to handle multi dot expressions
-                    # such as 'net.pxe.hwaddr'
-                    key = '.' + left.attr + key
-                    left = left.value
-                if isinstance(left, ast.Name):
-                    key = left.id + key
-                else:
-                    raise ValueError("Invalid AST structure: expected ast.Name at end of attribute chain")
+                baseval = self._handle_ast_node(node.func.value)
             else:
-                raise ValueError(f"Unsupported function in expression")
+                raise ValueError("Invalid function call syntax in expression")
             if fun_name == 'replace':
                 if len(node.args) != 2:
                     raise ValueError("Invalid number of arguments to replace")
                 arg1 = self._handle_ast_node(node.args[0])
                 arg2 = self._handle_ast_node(node.args[1])
-                if key in ('node', 'nodename'):
-                    keyval = self._nodename
-                else:
-                    keyval = self._expand_attribute(key).get('value', '')
-                return keyval.replace(arg1, arg2)
+                return baseval.replace(arg1, arg2)
             else:
                 raise ValueError("Unsupported function in expression")
         else:
