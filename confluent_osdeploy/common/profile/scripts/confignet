@@ -488,6 +488,7 @@ if __name__ == '__main__':
             continue
         myname = s.getsockname()
         s.close()
+        curridx = None
         if len(myname) == 4:
             curridx = myname[-1]
         else:
@@ -496,7 +497,7 @@ if __name__ == '__main__':
             for addr in myaddrs:
                 if myname == addr[1].tobytes():
                     curridx = addr[-1]
-        if curridx in doneidxs:
+        if curridx is not None and curridx in doneidxs:
             continue
         for tries in (1, 2, 3):
             try:
