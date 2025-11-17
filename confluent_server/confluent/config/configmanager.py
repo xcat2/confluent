@@ -2602,7 +2602,7 @@ class ConfigManager(object):
                 else:
                     nidx = get_global('max_node_index')
                     if nidx is None:
-                        nidx = 0
+                        nidx = 1
                     set_global('max_node_index', nidx + 1)
                 self._cfgstore['nodes'][node] = {'id.index': {'value': nidx}}
             cfgobj = self._cfgstore['nodes'][node]
@@ -3241,7 +3241,7 @@ def _init_indexes():
     maxidx = get_global('max_node_index')
     if maxidx is not None:
         return
-    maxidx = 0
+    maxidx = 1
     maincfgstore = _cfgstore['main']
     nodes_without_index = []
     for node in confluent.util.natural_sort(maincfgstore.get('nodes', {})):
