@@ -450,6 +450,9 @@ node = {
 #IBM Flex)''',
 #        'appliesto': ['system'],
 #    },
+    'id.index': {
+        'description': 'Confluent generated numeric index for the node.',
+    },
     'id.model': {
         'description': 'The model number of a node.  In scenarios where there '
                        'is both a name and a model number, it is generally '

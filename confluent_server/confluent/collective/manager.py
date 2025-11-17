@@ -716,6 +716,7 @@ def become_leader(connection):
     if reassimilate is not None:
         reassimilate.kill()
     reassimilate = eventlet.spawn(reassimilate_missing)
+    cfm._init_indexes()
     cfm._ready = True
     if _assimilate_missing(skipaddr):
         schedule_rebalance()
