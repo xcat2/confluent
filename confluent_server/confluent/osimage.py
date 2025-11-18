@@ -1137,6 +1137,8 @@ def generate_stock_profiles(defprofile, distpath, targpath, osname,
         initrds = ['{0}/initramfs/{1}'.format(defprofile, initrd) for initrd in os.listdir('{0}/initramfs'.format(defprofile))]
         if os.path.exists('{0}/initramfs/{1}'.format(defprofile, arch)):
             initrds.extend(['{0}/initramfs/{1}/{2}'.format(defprofile, arch, initrd) for initrd in os.listdir('{0}/initramfs/{1}'.format(defprofile, arch))])
+        elif arch == 'arm64' and os.path.exists('{0}/initramfs/aarch64'.format(defprofile)):
+            initrds.extend(['{0}/initramfs/aarch64/{1}'.format(defprofile, initrd) for initrd in os.listdir('{0}/initramfs/aarch64'.format(defprofile))])
         for fullpath in initrds:
             initrd = os.path.basename(fullpath)
             if os.path.isdir(fullpath):
