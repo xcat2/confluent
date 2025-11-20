@@ -9,6 +9,8 @@ if [ -z "$TARGPROF" ]; then
 	echo "Target profile must be specified"
 	exit 1
 fi
+OLDINSECURE=$(nodeattrib TARGNODE deployment.useinsecureprotocols -b 2> /dev/null |grep -v inherited|awk '{print $3}')
+nodeattrib $TARGNODE deployment.useinsecureprotocols
 nodedefine $TARGNODE deployment.apiarmed=once deployment.profile=$TARGPROF deployment.useinsecureprotocols= deployment.pendingprofile=$TARGPROF
 cat /var/lib/confluent/public/site/ssh/*pubkey | ssh $TARGNODE "mkdir -p /root/.ssh/; cat - >> /root/.ssh/authorized_keys"
 ssh $TARGNODE mkdir -p /etc/confluent /opt/confluent/bin
@@ -20,5 +22,8 @@ scp finalizeadopt.sh $TARGNODE:/tmp/
 ssh $TARGNODE bash /tmp/prepadopt.sh $TARGNODE $TARGPROF
 nodeattrib $TARGNODE deployment.pendingprofile=
 nodeattrib $TARGNODE -c deployment.useinsecureprotocols
+if [ ! -z "$OLDINSECURE" ]; then
+	nodeattrib $TARGNODE $OLDINSECURE
+fi
 nodeapply $TARGNODE -k
 ssh $TARGNODE sh /tmp/finalizeadopt.sh
