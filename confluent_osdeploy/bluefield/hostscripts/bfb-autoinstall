@@ -1,0 +1,74 @@
+#!/usr/bin/python3
+import glob
+import gzip
+import base64
+import os
+import subprocess
+import sys
+import tempfile
+
+def collect_certificates(tmpdir):
+    certdata = ''
+    for cacert in glob.glob(f'{tmpdir}/*.pem'):
+        with open(cacert, 'r') as f:
+            certdata += f.read()
+    return certdata
+
+def embed_certificates(incfg, certdata):
+    if not certdata:
+        raise Exception('No certificates found to embed')
+    incfg = incfg.replace('%CONFLUENTCERTCOLL%', certdata)
+    return incfg
+
+def embed_identity(incfg, identityjson):
+    incfg = incfg.replace('%IDENTJSON%', identityjson)
+    return incfg
+
+def embed_apiclient(incfg, apiclient):
+    with open(apiclient, 'r') as f:
+        apiclientdata = f.read()
+    compressed = gzip.compress(apiclientdata.encode())
+    encoded = base64.b64encode(compressed).decode()
+    incfg = incfg.replace('%APICLIENTZ64%', encoded)
+    return incfg
+
+def embed_data(tmpdir, outfile):
+    templatefile = f'{tmpdir}/bfb.cfg.template'
+    with open(templatefile, 'r') as f:
+        incfg = f.read()
+    
+    certdata = collect_certificates(tmpdir)
+    incfg = embed_certificates(incfg, certdata)
+    
+    with open(f'{tmpdir}/identity.json', 'r') as f:
+        identityjson = f.read()
+    
+    incfg = embed_identity(incfg, identityjson)
+    
+    incfg = embed_apiclient(incfg, f'{tmpdir}/../apiclient')
+    
+    with open(outfile, 'w') as f:
+        f.write(incfg)
+
+def get_identity_json(node):
+    identity_file = f'/var/lib/confluent/private/site/identity_files/{node}.json'
+    try:
+        with open(identity_file, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+if __name__ == '__main__':
+    if len(sys.argv) != 4:
+        print("Usage: bfb-autoinstall <node> <bfbfile> <rshim>")
+        sys.exit(1)
+    
+    node = sys.argv[1]
+    bfbfile = sys.argv[2]
+    rshim = sys.argv[3]
+
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    currdir = os.getcwd()
+    tempdir = tempfile.mkdtemp(prefix=f'bfb-autoinstall-{node}-')
+    embed_data(f'{currdir}/{node}', f'{tempdir}/bfb.cfg')
+    subprocess.check_call(['bfb-install', '-b', bfbfile, '-c', f'{tempdir}/bfb.cfg', '-r', rshim])
