@@ -478,17 +478,17 @@ node = {
                        'the discovery process to decide where to place the mac address of a detected PXE nic.',
     },
     'net.connection_name': {
-        'description': 'Name to use when specifiying a name for connection and/or interface name for a team.  This may be the name of a team interface, '
+        'description': 'Name to use when specifiying a name for connection and/or interface name for a team/bond.  This may be the name of a team/bond interface, '
                        'the connection name in network manager for the interface, or may be installed as an altname '
                        'as supported by the respective OS deployment profiles.  Default is to accept default name for '
-                       'a team consistent with the respective OS, or to use the matching original port name as connection name.'
+                       'a team/bond consistent with the respective OS, or to use the matching original port name as connection name.'
     },
     'net.interface_names': {
         'description': 'Interface name or comma delimited list of names to match for this interface. It is generally recommended '
                        'to leave this blank unless needing to set up interfaces that are not on a common subnet with a confluent server, '
                        'as confluent servers provide autodetection for matching the correct network definition to an interface. '
                        'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
-                       'a team or a single interface for VLAN/PKEY connections.'
+                       'a team/bond or a single interface for VLAN/PKEY connections.'
     },
     'net.mtu': {
             'description': 'MTU to apply to this connection',
@@ -574,7 +574,7 @@ node = {
                        'operating system',
     },
     'net.team_mode': {
-        'description': 'Indicates that this interface should be a team and what mode or runner to use when teamed. '
+        'description': 'Indicates that this interface should be a team/bond and what mode or runner to use when teamed or bonded. '
                        'If this covers a deployment interface, one of the member interfaces may be brought up as '
                        'a standalone interface until deployment is complete, as supported by the OS deployment profile. '
                        'To support this scenario, the switch should be set up to allow independent operation of member ports (e.g. lacp bypass mode or fallback mode).',
