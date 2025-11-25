@@ -894,7 +894,7 @@ def main():
     buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist', default='')
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
-    buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
+    buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, this is not supported, the build system repositories are always used.')
     buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '

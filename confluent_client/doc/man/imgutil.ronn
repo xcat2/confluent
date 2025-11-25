@@ -1,0 +1,139 @@
+# imgutil(1) -- Work with confluent OS cloning and diskless images
+
+## SYNOPSIS
+
+`imgutil` `build` [<options>] <scratchdir>  
+`imgutil` `exec` [<options>] <scratchdir> [<cmd>...]  
+`imgutil` `unpack` <profilename> <scratchdir>  
+`imgutil` `pack` [<options>] <scratchdir> <profilename>  
+`imgutil` `capture` <node> <profilename>
+
+## DESCRIPTION
+
+**imgutil** is a utility for creating, managing, and deploying OS images for diskless boot and system cloning in a Confluent environment. It supports building images from scratch, capturing images from running systems, and packing/unpacking diskless profiles.
+
+## COMMANDS
+
+* `build`:
+  Build a new diskless image from scratch in the specified scratch directory.
+
+* `exec`:
+  Start the specified scratch directory as a container and optionally run a command inside it.
+
+* `unpack`:
+  Unpack a diskless image profile to a scratch directory for modification.
+
+* `pack`:
+  Pack a scratch directory into a diskless profile that can be deployed.
+
+* `capture`:
+  Capture an image for cloning from a running system.
+
+## BUILD OPTIONS
+
+* `-r`, `--addrepos` <repository>:
+  Repositories to add in addition to the main source. May be specified multiple times.
+
+* `-p`, `--packagelist` <file>:
+  Filename of package list to replace default pkglist.
+
+* `-a`, `--addpackagelist` <file>:
+  A list of additional packages to include. May be specified multiple times.
+
+* `-s`, `--source` <directory>:
+  Directory to pull installation from, typically a subdirectory of `/var/lib/confluent/distributions`. By default, the repositories for the build system are used. For Ubuntu, this is not supported; the build system repositories are always used.
+
+* `-y`, `--non-interactive`:
+  Avoid prompting for confirmation.
+
+* `-v`, `--volume` <mount>:
+  Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. Something like `/var/lib/repository:-` will cause it to mount to the identical path inside the image. May be specified multiple times.
+
+* <scratchdir>:
+  Directory to build new diskless root in.
+
+## EXEC OPTIONS
+
+* `-v`, `--volume` <mount>:
+  Directory to make available in the build environment. `-v /` will cause it to be mounted in image as `/run/external/`. `-v /:/run/root` will override the target to be `/run/root`. May be specified multiple times.
+
+* <scratchdir>:
+  Directory of an unpacked diskless root.
+
+* <cmd>:
+  Optional command to run (defaults to a shell).
+
+## UNPACK OPTIONS
+
+* <profilename>:
+  The diskless OS profile to unpack.
+
+* <scratchdir>:
+  Directory to extract diskless root to.
+
+## PACK OPTIONS
+
+* `-b`, `--baseprofile` <profile>:
+  Profile to copy extra info from. For example, to make a new version of an existing profile, reference the previous one as baseprofile.
+
+* `-u`, `--unencrypted`:
+  Pack an unencrypted image rather than encrypting.
+
+* <scratchdir>:
+  Directory containing diskless root.
+
+* <profilename>:
+  The desired diskless OS profile name to pack the root into.
+
+## CAPTURE OPTIONS
+
+* <node>:
+  Node to capture image from.
+
+* <profilename>:
+  Profile name for captured image.
+
+## EXAMPLES
+
+Build a diskless image from a distribution:
+
+    imgutil build -s  alma-9.6-x86_64 /tmp/myimage
+
+Execute a shell in an unpacked image:
+
+    imgutil exec /tmp/myimage
+
+Execute a specific command in an image:
+
+    imgutil exec /tmp/myimage /bin/rpm -qa
+
+Unpack an existing profile for modification:
+
+    imgutil unpack myprofile /tmp/myimage
+
+Pack a modified image into a new profile:
+
+    imgutil pack /tmp/myimage myprofile-v2
+
+Capture an image from a running node:
+
+    imgutil capture node01 production-image
+
+## FILES
+
+* `/var/lib/confluent/public/os/`:
+  Default location for OS profiles.
+
+* `/var/lib/confluent/private/os/`:
+  Location for encrypted image keys and private data.
+
+* `/var/lib/confluent/distributions/`:
+  Default location for installation sources.
+
+## SEE ALSO
+
+osdeploy(8)
+
+## AUTHOR
+
+Written for the Confluent project.
