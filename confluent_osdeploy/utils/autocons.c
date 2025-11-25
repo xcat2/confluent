@@ -107,6 +107,7 @@ serial_port_t search_serial_ports() {
     int fd;
     int status;
     int numfound= 0;
+    int numpossible = 0;
 
     dir = opendir("/dev");
     if (!dir) {
@@ -127,6 +128,11 @@ serial_port_t search_serial_ports() {
         }
         
         if (ioctl(fd, TIOCMGET, &status) == 0) {
+            numpossible++;
+            if (numfound < 1) {
+                strncpy(result.devnode, devpath, sizeof(result.devnode));
+                result.speed = B115200;
+            }
             if (status & TIOCM_CAR) {
                 strncpy(result.devnode, devpath, sizeof(result.devnode));
                 numfound++;
@@ -139,7 +145,7 @@ serial_port_t search_serial_ports() {
     }
     
     closedir(dir);
-    if (numfound == 1) {
+    if (numfound == 1 || numpossible == 1) {
         result.valid = 1;
     }
     return result;
