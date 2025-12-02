@@ -86,7 +86,7 @@ cp -a esxi7 esxi8
 mkdir -p %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
 #cp LICENSE %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/
 mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/common
-cp common/initramfs/opt/confluent/bin/apiclient %{buildroot}/opt/confluent/share/licenses/confluent_osdeploy/common
+cp common/initramfs/opt/confluent/bin/apiclient %{buildroot}/opt/confluent/lib/osdeploy/common
 
 for os in rhvh4 el7 el8 el9 el10 debian debian13 genesis suse15 ubuntu20.04 ubuntu22.04 ubuntu24.04 esxi6 esxi7 esxi8 coreos; do
     mkdir -p %{buildroot}/opt/confluent/lib/osdeploy/$os/initramfs/aarch64/
