@@ -3239,7 +3239,7 @@ def get_globals():
 
 def _init_indexes():
     maxidx = get_global('max_node_index')
-    if maxidx is not None:
+    if maxidx is not None or 'main' not in _cfgstore:
         return
     maxidx = 1
     maincfgstore = _cfgstore['main']
