@@ -25,9 +25,14 @@ END_OF_IDENT
      else
           echo 'ubuntu:!' | chpasswd -e
      fi
-     python3 /opt/confluent/bin/apiclient /confluent-public/os/$PROFILE/scripts/functions > /etc/confluent/functions
+     cntmp=$(mktemp -d)
+     cd "$cntmp" || { echo "Failed to cd to temporary directory $cntmp"; exit 1; }
      touch /etc/confluent/confluent.deploycfg
-     bash /etc/confluent/functions run_remote_python confignet
+     python3 /opt/confluent/bin/apiclient /confluent-public/os/$PROFILE/scripts/confignet > confignet
+     python3 confignet
+     cd -
+     rm -rf "$cntmp"
+     python3 /opt/confluent/bin/apiclient /confluent-public/os/$PROFILE/scripts/functions > /etc/confluent/functions
      bash /etc/confluent/functions run_remote setupssh
      for cert in /etc/ssh/ssh*-cert.pub; do
          if [ -s $cert ]; then
