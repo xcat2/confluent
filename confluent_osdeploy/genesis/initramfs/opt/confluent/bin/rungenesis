@@ -56,7 +56,7 @@ cat /tls/*.pem > /etc/pki/tls/certs/ca-bundle.crt
 TRIES=0
 touch /etc/confluent/confluent.info
 TRIES=5
-echo -n "Waitiing for disks..."
+echo -n "Waiting for disks..."
 while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
     sleep 1
     TRIES=$((TRIES - 1))
