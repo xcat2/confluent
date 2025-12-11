@@ -47,38 +47,112 @@ c_crypt.restype = ctypes.c_char_p
 
 
 def get_my_addresses():
-    nlhdrsz = struct.calcsize('IHHII')
-    ifaddrsz = struct.calcsize('BBBBI')
-    # RTM_GETADDR = 22
-    # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
-    nlhdr = struct.pack('IHHII', nlhdrsz + ifaddrsz, 22, 0x301, 0, 0)
-    # ifaddrmsg struct: u8 family, u8 prefixlen, u8 flags, u8 scope, u32 index
-    ifaddrmsg = struct.pack('BBBBI', 0, 0, 0, 0, 0)
-    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-    s.bind((0, 0))
-    s.sendall(nlhdr + ifaddrmsg)
     addrs = []
-    while True:
-        pdata = s.recv(65536)
-        v = memoryview(pdata)
-        if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
-            break
-        while len(v):
-            length, typ = struct.unpack('IH', v[:6])
-            if typ == 20:
-                fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
-                if scope in (253, 0):
-                    rta = v[nlhdrsz+ifaddrsz:length]
-                    while len(rta):
-                        rtalen, rtatyp = struct.unpack('HH', rta[:4])
-                        if rtalen < 4:
-                            break
-                        if rtatyp == 1:
-                            addrs.append((fam, rta[4:rtalen], plen, ridx))
-                        rta = rta[msg_align(rtalen):]
-            v = v[msg_align(length):]
+    for ifa in get_ifaddrs():
+        if ifa[0] == 'ip':
+            addrs.append((ifa[1], ifa[2], ifa[3]))
     return addrs
 
+def get_mac_addresses():
+    macs = []
+    for ifa in get_ifaddrs():
+        if ifa[0] == 'ETHER':
+            macs.append((ifa[1], ifa[2]))
+    return macs
+
+def get_ifaddrs():
+    class sockaddr(ctypes.Structure):
+        _fields_ = [
+            ('sa_family', ctypes.c_uint16),
+            ('sa_data', ctypes.c_ubyte * 14),
+        ]
+    
+    class sockaddr_in(ctypes.Structure):
+        _fields_ = [
+            ('sin_family', ctypes.c_uint16),
+            ('sin_port', ctypes.c_uint16),
+            ('sin_addr', ctypes.c_ubyte * 4),
+            ('sin_zero', ctypes.c_ubyte * 8),
+        ]
+    
+    class sockaddr_in6(ctypes.Structure):
+        _fields_ = [
+            ('sin6_family', ctypes.c_uint16),
+            ('sin6_port', ctypes.c_uint16),
+            ('sin6_flowinfo', ctypes.c_uint32),
+            ('sin6_addr', ctypes.c_ubyte * 16),
+            ('sin6_scope_id', ctypes.c_uint32),
+        ]
+    
+    class sockaddr_ll(ctypes.Structure):
+        _fields_ = [
+            ('sll_family', ctypes.c_uint16),
+            ('sll_protocol', ctypes.c_uint16),
+            ('sll_ifindex', ctypes.c_int32),
+            ('sll_hatype', ctypes.c_uint16),
+            ('sll_pkttype', ctypes.c_uint8),
+            ('sll_halen', ctypes.c_uint8),
+            ('sll_addr', ctypes.c_ubyte * 8),
+        ]
+    
+    class ifaddrs(ctypes.Structure):
+        pass
+
+    ifaddrs._fields_ = [
+            ('ifa_next', ctypes.POINTER(ifaddrs)),
+            ('ifa_name', ctypes.c_char_p),
+            ('ifa_flags', ctypes.c_uint),
+            ('ifa_addr', ctypes.POINTER(sockaddr)),
+            ('ifa_netmask', ctypes.POINTER(sockaddr)),
+            ('ifa_ifu', ctypes.POINTER(sockaddr)),
+            ('ifa_data', ctypes.c_void_p),
+        ]
+    
+    libc = ctypes.CDLL(ctypes.util.find_library('c'))
+    libc.getifaddrs.argtypes = [ctypes.POINTER(ctypes.POINTER(ifaddrs))]
+    libc.getifaddrs.restype = ctypes.c_int
+    libc.freeifaddrs.argtypes = [ctypes.POINTER(ifaddrs)]
+    libc.freeifaddrs.restype = None
+    ifap = ctypes.POINTER(ifaddrs)()
+    result = libc.getifaddrs(ctypes.pointer(ifap))
+    if result != 0:
+        return []
+    addresses = []
+    ifa = ifap
+    try:
+        while ifa:
+            if ifa.contents.ifa_addr:
+                family = ifa.contents.ifa_addr.contents.sa_family
+                name = ifa.contents.ifa_name.decode('utf-8') if ifa.contents.ifa_name else None
+                if family in (socket.AF_INET, socket.AF_INET6):
+                    # skip loopback and non-multicast interfaces
+                    if ifa.contents.ifa_flags & 8 or not ifa.contents.ifa_flags & 0x1000:
+                        ifa = ifa.contents.ifa_next
+                        continue
+                if family == socket.AF_INET:
+                    addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_in))
+                    addr_bytes = bytes(addr_ptr.contents.sin_addr)
+                    addresses.append(('ip', family, addr_bytes, name))
+                elif family == socket.AF_INET6:
+                    addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_in6))
+                    addr_bytes = bytes(addr_ptr.contents.sin6_addr)
+                    scope_id = addr_ptr.contents.sin6_scope_id
+                    addresses.append(('ip', family, addr_bytes, scope_id))          
+                elif family == socket.AF_PACKET:
+                    addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_ll))
+                    halen = addr_ptr.contents.sll_halen
+                    if addr_ptr.contents.sll_hatype in (1, 32) and halen > 0:  # ARPHRD_ETHER or ARPHRD_INFINIBAND
+                        if addr_ptr.contents.sll_hatype == 1 and addr_ptr.contents.sll_addr[0] & 2:  # skip locally administered MACs
+                            ifa = ifa.contents.ifa_next
+                            continue
+                        mac_bytes = bytes(addr_ptr.contents.sll_addr[:halen])
+                        macaddr = ':'.join('{:02x}'.format(b) for b in mac_bytes)
+                        addresses.append(('ETHER', name, macaddr))                
+            ifa = ifa.contents.ifa_next
+    finally:
+        libc.freeifaddrs(ifap)
+    
+    return addresses
 
 def scan_confluents(confuuid=None):
     srvs = {}
@@ -92,22 +166,24 @@ def scan_confluents(confuuid=None):
     s4.bind(('0.0.0.0', 1900))
     doneidxs = set([])
     msg = 'M-SEARCH * HTTP/1.1\r\nST: urn:xcat.org:service:confluent:'
-    if not confuuid:
+    if not confuuid and os.path.exists('/etc/confluent/confluent.deploycfg'):
         with open('/etc/confluent/confluent.deploycfg') as dcfg:
             for line in dcfg.read().split('\n'):
                 if line.startswith('confluent_uuid:'):
                     confluentuuid = line.split(': ')[1]
                     msg += '/confluentuuid=' + confluentuuid
                     break
+    if not confuuid and os.path.exists('/confluent_uuid'):
+        with open('/confluent_uuid') as cuuidin:
+            confluentuuid = cuuidin.read().strip()
+            msg += '/confluentuuid=' + confluentuuid
     try:
         with open('/sys/devices/virtual/dmi/id/product_uuid') as uuidin:
             msg += '/uuid=' + uuidin.read().strip()
     except Exception:
         pass
-    for addrf in glob.glob('/sys/class/net/*/address'):
-        with open(addrf) as addrin:
-            hwaddr = addrin.read().strip()
-            msg += '/mac=' + hwaddr
+    for iface, hwaddr in get_mac_addresses():
+        msg += '/mac=' + hwaddr
     msg = msg.encode('utf8')
     for addr in get_my_addresses():
         if addr[0] == socket.AF_INET6:
@@ -155,7 +231,8 @@ def scan_confluents(confuuid=None):
             if currip.startswith('fe80::') and '%' not in currip:
                 currip = '{0}%{1}'.format(currip, peer[-1])
             srvs[currip] = current
-            srvlist.append(currip)
+            if currip not in srvlist:
+                srvlist.append(currip)
         r = select.select((s4, s6), (), (), 2)
         if r:
             r = r[0]
