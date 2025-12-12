@@ -132,7 +132,8 @@ def get_ifaddrs():
                 if family == socket.AF_INET:
                     addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_in))
                     addr_bytes = bytes(addr_ptr.contents.sin_addr)
-                    addresses.append(('ip', family, addr_bytes, name))
+                    if_index = socket.if_nametoindex(name) if name else 0
+                    addresses.append(('ip', family, addr_bytes, if_index))
                 elif family == socket.AF_INET6:
                     addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_in6))
                     addr_bytes = bytes(addr_ptr.contents.sin6_addr)
