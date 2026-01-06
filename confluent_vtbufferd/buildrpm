@@ -24,5 +24,10 @@ else
     # Clean up the generated files in this directory
     rm -rf dist 
 fi
+ARCH=$(uname -m)
+if [ ! -z "$1" ]; then
+    cp /root/prmbuild/RPMS/$ARCH/confluent_vtbufferd-*.$ARCH.rpm $1
+fi
+
 
 
