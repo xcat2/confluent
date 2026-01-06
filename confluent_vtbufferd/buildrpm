@@ -13,7 +13,7 @@ cp ../LICENSE NOTICE *.c *.h Makefile dist/confluent_vtbufferd-$VERSION
 cd dist
 tar czf confluent_vtbufferd-$VERSION.tar.gz confluent_vtbufferd-$VERSION
 cd -
-mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPEC
+mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
 cp dist/confluent_vtbufferd-$VERSION.tar.gz ~/rpmbuild/SOURCES
 sed -e 's/#VERSION#/'$VERSION/  confluent_vtbufferd.spec.tmpl > ~/rpmbuild/SPECS/confluent_vtbufferd.spec
 rpmbuild -ba ~/rpmbuild/SPECS/confluent_vtbufferd.spec  2> /dev/null |grep ^Wrote:
