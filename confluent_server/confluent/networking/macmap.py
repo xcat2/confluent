@@ -153,7 +153,7 @@ def _nodelookup(switch, ifname):
     return None
 
 def _fast_map_switch(args):
-    switch, password, user, cfgm = args
+    switch, password, user, cfgm = args[:4]
     macdata = None
     kv = util.TLSCertVerifier(cfgm, switch,
                               'pubkeys.tls_hardwaremanager').verify_cert
