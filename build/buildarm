@@ -1,0 +1,9 @@
+cd ~/confluent
+git pull
+rm ~/rpmbuild/RPMS/noarch/*osdeploy*
+rm ~/rpmbuild/SRPMS/*osdeploy*
+sh confluent_osdeploy/buildrpm-aarch64
+mkdir -p $HOME/el9/
+mkdir -p $HOME/el10/
+podman run --rm -it -v $HOME:/build el9build bash /build/confluent/confluent_vtbufferd/buildrpm /build/el9/
+
