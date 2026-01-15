@@ -824,11 +824,14 @@ def version_sort(iterable):
 
 def get_kern_version(filename):
     with open(filename, 'rb') as kernfile:
-        checkgzip = kernfile.read(2)
-        if checkgzip == b'\x1f\x8b':
-            # gzipped... this would probably be aarch64
+        header = kernfile.read(2)
+        if header == b'\x1f\x8b':
+            # gzipped... we can't process this right now,
             # assume the filename has the version embedded
             return os.path.basename(filename).replace('vmlinuz-', '')
+        if header == b'MZ':
+            # PE format, no easy way to get version, assume filename has it
+            return os.path.basename(filename).replace('vmlinuz-', '')                
         kernfile.seek(0x20e)
         offset = struct.unpack('<H', kernfile.read(2))[0] + 0x200
         kernfile.seek(offset)
