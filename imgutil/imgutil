@@ -386,6 +386,7 @@ def encrypt_image(plainfile, cryptfile, keyfile):
     loopdev = subprocess.check_output(['losetup', '-f']).decode('utf8').strip()
     subprocess.check_call(['losetup', loopdev, cryptfile])
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 8'.format(neededblocks, key, loopdev)])
+    subprocess.check_call(['dmsetup', 'mknodes', dmname])
     with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
         with open(plainfile, 'rb+') as plainin:
             lastoffset = 0
@@ -1295,6 +1296,7 @@ def prep_decrypt(indir):
     tempfile.mktemp()
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {0} crypt {1} {2} 0 {3} 8'.format(
         imglen, cipher, key, loopdev)])
+    subprocess.check_call(['dmsetup', 'mknodes', dmname])
     return '/dev/mapper/{0}'.format(dmname), loopdev
 
 
