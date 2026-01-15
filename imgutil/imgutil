@@ -519,9 +519,18 @@ class OsHandler(object):
             pkglistfile = pkglistfile[:-1]
         with open(pkglistfile, 'r') as pkglist:
             pkgs = ''
+            ignoremode = False
             for line in pkglist.readlines():
                 line = line.split('#', 1)[0].strip()
-                pkgs += line + ' '
+                if line.startswith(r'%onlyarch '):
+                    archs = line[len(r'%onlyarch '):].split()
+                    if self.arch not in archs:
+                        ignoremode = True
+                    else:
+                        ignoremode = False
+                    continue
+                if not ignoremode:
+                    pkgs += line + ' '
             pkgs = pkgs.split()
         retpkgs = []
         for pkg in pkgs:
@@ -764,7 +773,12 @@ class ElHandler(OsHandler):
                 if line.startswith('selinuxfs '):
                     break
             else:
-                self.relabel_targdir()
+                try:
+                    self.relabel_targdir()
+                except subprocess.CalledProcessError:
+                    # Some filesystem contexts can not accommodate the selinux labels, warn that
+                    # this failed, but allow it to proceed in case it can boot anyway
+                    sys.stderr.write('Warning: could not relabel target filesystem for SELinux\n')
 
     def relabel_targdir(self):
         subprocess.check_call(
