@@ -211,7 +211,7 @@ v6cfg=$(grep ^ipv6_method: /etc/confluent/confluent.deploycfg)
 v6cfg=${v6cfg#ipv6_method: }
 v4cfg=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg)
 v4cfg=${v4cfg#ipv4_method: }
-if [ "$v4cfg" = "static" ] || [ "$v4cfg" = "dhcp" ]; then # someone might feed 'manual' in or other such nonsense
+if [ "$v4cfg" = "static" ] || [ "$v4cfg" = "dhcp" ]; then
     mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
     mgr=${mgr#deploy_server: }
 fi
