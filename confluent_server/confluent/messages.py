@@ -18,6 +18,7 @@
 # This module implements client/server messages emitted from plugins.
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
+import base64
 import confluent.exceptions as exc
 import confluent.config.configmanager as cfm
 import confluent.config.conf as cfgfile
@@ -86,7 +87,13 @@ def _htmlify_structure(indict):
 
 
 def msg_deserialize(packed):
-    m = msgpack.unpackb(packed, raw=False)
+    try:
+        m = msgpack.unpackb(packed, raw=False)
+    except UnicodeDecodeError:  # binary data, likely imagedata
+        # strings will be made binary, so binary messages
+        # must tolerate either string or bytes
+        m = msgpack.unpackb(packed)
+        m[0] = m[0].decode()
     cls = globals()[m[0]]
     if issubclass(cls, ConfluentMessage) or issubclass(cls, ConfluentNodeError):
         return cls(*m[1:])
@@ -510,6 +517,10 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
             path[:4] == ['configuration', 'management_controller', 'alerts',
                          'destinations'] and operation != 'retrieve'):
         return InputAlertDestination(path, nodes, inputdata, multinode)
+    elif len(path) == 3 and path[:3] == ['configuration', 'management_controller', 'certificate_authorities'] and operation not in ('retrieve', 'delete'):
+        return InputCertificateAuthority(path, nodes, inputdata)
+    elif len(path) == 4 and path[:4] == ['configuration', 'management_controller', 'certificate', 'sign'] and operation not in ('retrieve', 'delete'):
+        return InputSigningParameters(path, inputdata, nodes, configmanager)
     elif path == ['identify'] and operation != 'retrieve':
         return InputIdentifyMessage(path, nodes, inputdata)
     elif path == ['events', 'hardware', 'decode']:
@@ -567,6 +578,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
     elif '/'.join(path).startswith(
             'configuration/management_controller/licenses') and inputdata:
         return InputLicense(path, nodes, inputdata, configmanager)
+    elif path == ['deployment', 'lock'] and inputdata:
+        return InputDeploymentLock(path, nodes, inputdata)
     elif path == ['deployment', 'ident_image']:
         return InputIdentImage(path, nodes, inputdata)
     elif path == ['console', 'ikvm']:
@@ -715,6 +728,9 @@ class InputConfigChangeSet(InputExpression):
         endattrs = {}
         for attr in attrs:
             origval = attrs[attr]
+            if isinstance(origval, int):
+                endattrs[attr] = origval
+                continue
             if isinstance(origval, bytes) or isinstance(origval, unicode):
                 origval = {'expression': origval}
             if 'expression' not in origval:
@@ -950,14 +966,50 @@ class ConfluentInputMessage(ConfluentMessage):
     def is_valid_key(self, key):
         return key in self.valid_values
 
+class InputSigningParameters(InputConfigChangeSet):
+
+    def get_days(self, node):
+        attribs = self.get_attributes(node)
+        return int(attribs['days'])
+
+    def get_added_names(self, node):
+        attribs = self.get_attributes(node)
+        addnames = []
+        for subj in (attribs.get('added_names') or '').split(','):
+            if subj:
+                addnames.append(subj.strip())
+        return addnames
+
+
+class InputCertificateAuthority(ConfluentInputMessage):
+    keyname = 'pem'
+    # anything is valid, since it is a blob of text
+
+    def get_pem(self, node):
+        return self.inputbynode[node]
+
+    def is_valid_key(self, key):
+        return key.strip().startswith('-----BEGIN') and '-----END' in key
 
 class InputIdentImage(ConfluentInputMessage):
     keyname = 'ident_image'
     valid_values = ['create']
 
+class InputDeploymentLock(ConfluentInputMessage):
+    keyname = 'lock'
+    valid_values = ['autolock', 'unlocked', 'locked']
+
+class DeploymentLock(ConfluentChoiceMessage):
+    valid_values = set([
+        'autolock',
+        'locked',
+        'unlocked',
+    ])
+    keyname = 'lock'
+
 class InputIkvmParams(ConfluentInputMessage):
     keyname = 'method'
-    valid_values = ['unix', 'wss']
+    valid_values = ['unix', 'wss', 'url']
 
 class InputIdentifyMessage(ConfluentInputMessage):
     valid_values = set([
@@ -1065,7 +1117,7 @@ class InputReseatMessage(ConfluentInputMessage):
     keyname = 'reseat'
 
     def is_valid_key(self, key):
-        return key in self.valid_values or isinstance(key, int)
+        return key in self.valid_values or isinstance(key, int) or len(key) < 4
 
 
 class InputBMCReset(ConfluentInputMessage):
@@ -1131,6 +1183,9 @@ class InputNetworkConfiguration(ConfluentInputMessage):
 
         if 'ipv4_gateway' not in inputdata:
             inputdata['ipv4_gateway'] = None
+
+        if 'vlan_id' not in inputdata:
+            inputdata['vlan_id'] = None
 
         if 'ipv4_configuration' in inputdata and inputdata['ipv4_configuration']:
             if inputdata['ipv4_configuration'].lower() not in ['dhcp','static']:
@@ -1325,6 +1380,11 @@ class ReseatResult(ConfluentChoiceMessage):
     ])
     keyname = 'reseat'
 
+
+class CertificateAuthority(ConfluentMessage):
+    def __init__(self, node, pem, subject, san):
+        self.myargs = (node, pem, subject, san)
+        self.kvpairs = {node: {'pem': {'value': pem}, 'subject': {'value': subject}, 'san': {'value': san}}}
 
 class PowerState(ConfluentChoiceMessage):
     valid_values = set([
@@ -1720,8 +1780,8 @@ class NetworkConfiguration(ConfluentMessage):
     desc = 'Network configuration'
 
     def __init__(self, name=None, ipv4addr=None, ipv4gateway=None,
-                 ipv4cfgmethod=None, hwaddr=None, staticv6addrs=(), staticv6gateway=None):
-        self.myargs = (name, ipv4addr, ipv4gateway, ipv4cfgmethod, hwaddr)
+                 ipv4cfgmethod=None, hwaddr=None, staticv6addrs=(), staticv6gateway=None, vlan_id=None):
+        self.myargs = (name, ipv4addr, ipv4gateway, ipv4cfgmethod, hwaddr, staticv6addrs, staticv6gateway, vlan_id)
         self.notnode = name is None
         self.stripped = False
         v6addrs = ','.join(staticv6addrs)
@@ -1732,7 +1792,8 @@ class NetworkConfiguration(ConfluentMessage):
             'ipv4_configuration': {'value': ipv4cfgmethod},
             'hw_addr': {'value': hwaddr},
             'static_v6_addresses': {'value': v6addrs},
-            'static_v6_gateway': {'value': staticv6gateway}
+            'static_v6_gateway': {'value': staticv6gateway},
+            'vlan_id': {'value': vlan_id}
         }
         if self.notnode:
             self.kvpairs = kvpairs
@@ -1886,6 +1947,18 @@ class GraphicalConsole(ConfluentMessage):
             self.kvpairs = {'Launcher': kv}
         else:
             self.kvpairs = {name: {'Launcher': kv}}
+
+class ScreenShot(ConfluentMessage):
+    readonly = True
+
+    def __init__(self, imgdata, node, imgformat=None):
+        if isinstance(node, bytes):
+            node = node.decode()
+        if isinstance(imgformat, bytes):
+            imgformat = imgformat.decode()
+        self.myargs = (imgdata, node, imgformat)
+        self.kvpairs = {node: {'image': {'imgformat': imgformat, 'imgdata': base64.b64encode(imgdata).decode()}}}
+
 
 class CryptedAttributes(Attributes):
     defaulttype = 'password'

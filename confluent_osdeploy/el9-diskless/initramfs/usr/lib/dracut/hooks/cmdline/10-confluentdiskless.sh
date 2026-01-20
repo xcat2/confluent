@@ -42,7 +42,9 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
     autoconsdev=${autocons%,*}
     autocons=${autocons##*/}
-    echo "Automatic console configured for $autocons"
+    if [ ! -z "$autocons" ]; then
+        echo "Automatic console configured for $autocons"
+    fi
 fi
 echo "Initializing confluent diskless environment"
 echo -n "udevd: "
@@ -102,6 +104,14 @@ while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}'
         ip link set $i up
     done
     /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+    echo -n .
+done
+TRIES=0
+while ! grep ^NODENAME: /etc/confluent/confluent.info >& /dev/null && [ "$TRIES" -lt 300 ]; do
+    sleep 0.5
+    echo -n .
+    /opt/confluent/bin/copernicus -t > /etc/confluent/confluent.info
+    TRIES=$((TRIES + 1))
 done
 cd /
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
@@ -292,7 +302,7 @@ if [[ $confluent_websrv == *:* ]] && [[ $confluent_websrv != "["* ]]; then
     confluent_websrv="[$confluent_websrv]"
 fi
 echo -n "Initializing ssh..."
-ssh-keygen -A
+ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -C '' -N ''
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
@@ -302,7 +312,10 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
     fi
     echo HostKey $privfile >> /etc/ssh/sshd_config
 done
-/usr/sbin/sshd
+if grep "debugssh" /proc/cmdline > /dev/null; then
+    /usr/sbin/sshd
+fi
+echo "done"
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 confluent_proto=$(grep ^protocol: /etc/confluent/confluent.deploycfg| awk '{print $2}')
 confluent_urls=""

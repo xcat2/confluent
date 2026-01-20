@@ -122,6 +122,7 @@ def _daemonize():
 
 def _redirectoutput():
     os.umask(63)
+    configmanager.set_global('logdirectory', _get_logdirectory())
     sys.stdout = log.Logger('stdout', buffered=False)
     sys.stderr = log.Logger('stderr', buffered=False)
 
@@ -353,3 +354,6 @@ def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')
     port = conf.get_int_option(session, 'bindport')
     return (host, port)
+
+def _get_logdirectory():
+    return conf.get_option('globals', 'logdirectory')

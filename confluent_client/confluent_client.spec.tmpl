@@ -1,7 +1,7 @@
 %define name confluent_client
 %define version #VERSION#
 %define fversion %{lua:
-sv, _ = string.gsub("#VERSION#", "[~+]", "-")
+sv, _ = string.gsub("#VERSION#", "[~]", "-")
 print(sv)
 }
 %define release 1

@@ -11,6 +11,10 @@ import struct
 import sys
 import subprocess
 import traceback
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 bootuuid = None
 vgname = 'localstorage'
@@ -66,9 +70,9 @@ def get_image_metadata(imgpath):
                 yield md
         else:
             # plausible filesystem structure to apply to a nominally "diskless" image
-            yield {'mount': '/', 'filesystem': 'xfs', 'minsize': 39513563136, 'initsize': 954128662528, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/mapper/root', 'compressed_size': 27022069760}
-            yield {'mount': '/boot', 'filesystem': 'xfs', 'minsize': 232316928, 'initsize': 1006632960, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/nvme1n1p2', 'compressed_size': 171462656}
-            yield {'mount': '/boot/efi', 'filesystem': 'vfat', 'minsize': 7835648, 'initsize': 627900416, 'flags': 'rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro', 'device': '/dev/nvme1n1p1', 'compressed_size': 1576960}
+            yield {'mount': '/', 'filesystem': 'xfs', 'minsize': 4294967296, 'initsize': 954128662528, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/mapper/root', 'compressed_size': 27022069760}
+            yield {'mount': '/boot', 'filesystem': 'xfs', 'minsize': 536870912, 'initsize': 1006632960, 'flags': 'rw,seclabel,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota', 'device': '/dev/nvme1n1p2', 'compressed_size': 171462656}
+            yield {'mount': '/boot/efi', 'filesystem': 'vfat', 'minsize': 33554432, 'initsize': 627900416, 'flags': 'rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro', 'device': '/dev/nvme1n1p1', 'compressed_size': 1576960}
             #raise Exception('Installation from single part image not supported')
 
 class PartedRunner():
@@ -166,6 +170,15 @@ def fixup(rootdir, vols):
     grubsyscfg = os.path.join(rootdir, 'etc/sysconfig/grub')
     if not os.path.exists(grubsyscfg):
         grubsyscfg = os.path.join(rootdir, 'etc/default/grub')
+    currcmdline = []
+    with open('/proc/cmdline') as cmdlinein:
+        cmdline = cmdlinein.read().strip()
+        for arg in cmdline.split():
+            if arg.startswith('console='):
+                currcmdline.append(arg)
+            elif arg == 'quiet':
+                currcmdline.append(arg)
+    currcmdlinestr = ' '.join(currcmdline)
     kcmdline = os.path.join(rootdir, 'etc/kernel/cmdline')
     if os.path.exists(kcmdline):
         with open(kcmdline) as kcmdlinein:
@@ -177,8 +190,10 @@ def fixup(rootdir, vols):
             elif ent.startswith('root='):
                 newkcmdlineent.append('root={}'.format(newrootdev))
             elif ent.startswith('rd.lvm.lv='):
-                ent = convert_lv(ent)
-                if ent:
+                nent = convert_lv(ent)
+                if nent:
+                    newkcmdlineent.append(ent)
+                else:
                     newkcmdlineent.append(ent)
             else:
                 newkcmdlineent.append(ent)
@@ -200,8 +215,10 @@ def fixup(rootdir, vols):
                     elif cfgpart.startswith('resume='):
                         newcfgparts.append('resume={}'.format(newswapdev))
                     elif cfgpart.startswith('rd.lvm.lv='):
-                        cfgpart = convert_lv(cfgpart)
-                        if cfgpart:
+                        ncfgpart = convert_lv(cfgpart)
+                        if ncfgpart:
+                            newcfgparts.append(ncfgpart)
+                        else:
                             newcfgparts.append(cfgpart)
                     else:
                         newcfgparts.append(cfgpart)
@@ -217,13 +234,13 @@ def fixup(rootdir, vols):
         'GRUB_DISABLE_SUBMENU=true',
         'GRUB_TERMINAL=""',
         'GRUB_SERIAL_COMMAND=""',
-        'GRUB_CMDLINE_LINUX="crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"',
+        'GRUB_CMDLINE_LINUX="{}crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=vg/root rd.lvm.lv=vg/swap"'.format(currcmdlinestr),
         'GRUB_DISABLE_RECOVERY="true"',
         'GRUB_ENABLE_BLSCFG=true',
         ]
     if not os.path.exists(os.path.join(rootdir, "etc/kernel/cmdline")):
         with open(os.path.join(rootdir, "etc/kernel/cmdline"), "w") as cmdlineout:
-            cmdlineout.write("root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root")
+            cmdlineout.write("{} root=/dev/mapper/localstorage-root rd.lvm.lv=localstorage/root".format(currcmdlinestr))
     with open(grubsyscfg, 'w') as defgrubout:
         for gline in defgrub:
             gline = gline.split()
@@ -234,11 +251,11 @@ def fixup(rootdir, vols):
                 elif ent.startswith('root='):
                     newline.append('root={}'.format(newrootdev))
                 elif ent.startswith('rd.lvm.lv='):
-                    ent = convert_lv(ent)
-                    if ent:
+                    nent = convert_lv(ent)
+                    if nent:
+                        newline.append(nent)
+                    else:
                         newline.append(ent)
-                    elif '""' in ent:
-                        newline.append('""')
                 else:
                     newline.append(ent)
             defgrubout.write(' '.join(newline) + '\n')
@@ -301,8 +318,8 @@ def fixup(rootdir, vols):
     for vol in vols:
         if vol['mount'] == '/boot/efi':
             targdev = vol['targetdisk']
-            partnum = re.search('(\d+)$', targdev).group(1)
-            targblock = re.search('(.*)\d+$', targdev).group(1)
+            partnum = re.search(r'(\d+)$', targdev).group(1)
+            targblock = re.search(r'(.*)\d+$', targdev).group(1)
     if targblock:
         if targblock.endswith('p') and 'nvme' in targblock:
             targblock = targblock[:-1]
@@ -334,13 +351,16 @@ def had_swap():
 
 newrootdev = None
 newswapdev = None
+vgmap = None
 def install_to_disk(imgpath):
+    global vgmap
     global bootuuid
     global newrootdev
     global newswapdev
     global vgname
     global oldvgname
     lvmvols = {}
+    vgmap = {}
     deftotsize = 0
     mintotsize = 0
     deflvmsize = 0
@@ -365,24 +385,30 @@ def install_to_disk(imgpath):
     mintotsize = swapsize
     for fs in get_image_metadata(imgpath):
         allvols.append(fs)
-        deftotsize += fs['initsize']
-        mintotsize += fs['minsize']
-        if fs['initsize'] > biggestsize:
-            biggestfs = fs
-            biggestsize = fs['initsize']
+
         if fs['device'].startswith('/dev/mapper'):
-            oldvgname = fs['device'].rsplit('/', 1)[-1]
+            odevname = fs['device'].rsplit('/', 1)[-1]
             # if node has - then /dev/mapper will double up the hypen
-            if '_' in oldvgname and '-' in oldvgname.split('_')[-1]:
-                oldvgname = oldvgname.rsplit('-', 1)[0].replace('--', '-')
+            if '_' in odevname and '-' in odevname.split('_', 1)[-1]:
+                oldvgname = odevname.rsplit('-', 1)[0].replace('--', '-')
                 osname = oldvgname.split('_')[0]
                 nodename = socket.gethostname().split('.')[0]
                 vgname = '{}_{}'.format(osname, nodename)
-            lvmvols[fs['device'].replace('/dev/mapper/', '')] = fs
+            elif '-' in odevname: # unique one
+                vgmap[odevname] = odevname.split('-')[0]
+                lvmvols[odevname] = fs
+
+                continue
+            lvmvols[odevname] = fs
             deflvmsize += fs['initsize']
             minlvmsize += fs['minsize']
         else:
-            plainvols[int(re.search('(\d+)$', fs['device'])[0])] = fs
+            plainvols[int(re.search(r'(\d+)$', fs['device'])[0])] = fs
+        if fs['initsize'] > biggestsize:
+            biggestfs = fs
+            biggestsize = fs['initsize']
+        deftotsize += fs['initsize']
+        mintotsize += fs['minsize']
     with open('/tmp/installdisk') as diskin:
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
@@ -440,6 +466,28 @@ def install_to_disk(imgpath):
         lvmpart = get_partname(instdisk, volidx + 1)
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', vgname, lvmpart])
+        vgroupmap = {}
+        if yaml and vgmap:
+            with open('/tmp/volumegroupmap.yml') as mapin:
+                vgroupmap = yaml.safe_load(mapin)
+        donedisks = {}
+        for morevolname in vgmap:
+            morevg = vgmap[morevolname]
+            if morevg not in vgroupmap:
+                raise Exception("No mapping defined to create volume group {}".format(morevg))
+            targdisk = vgroupmap[morevg]
+            if targdisk not in donedisks:
+                moreparted = PartedRunner(targdisk)
+                moreparted.run('mklabel gpt')
+                moreparted.run('mkpart lvm 0% 100%')
+                morelvmpart = get_partname(targdisk, 1)
+                subprocess.check_call(['pvcreate', '-ff', '-y', morelvmpart])
+                subprocess.check_call(['vgcreate', morevg, morelvmpart])
+                donedisks[targdisk] = 1
+            morelvname = morevolname.split('-', 1)[1]
+            subprocess.check_call(['lvcreate', '-L', '{}b'.format(lvmvols[morevolname]['initsize']), '-y', '-n', morelvname, morevg])
+            lvmvols[morevolname]['targetdisk'] = '/dev/{}/{}'.format(morevg, morelvname)
+
         vginfo = subprocess.check_output(['vgdisplay', vgname, '--units', 'b']).decode('utf8')
         vginfo = vginfo.split('\n')
         pesize = 0
@@ -452,6 +500,9 @@ def install_to_disk(imgpath):
                 pes = int(infline[4])
         takeaway = swapsize // pesize
         for volidx in lvmvols:
+            if volidx in vgmap:
+                # was handled previously
+                continue
             vol = lvmvols[volidx]
             if vol is biggestfs:
                 continue
@@ -460,6 +511,10 @@ def install_to_disk(imgpath):
         biggestextents = pes - takeaway
         for volidx in lvmvols:
             vol = lvmvols[volidx]
+            if volidx in vgmap:
+                # was handled previously
+                continue
+
             if vol is biggestfs:
                 extents = biggestextents
             else:
@@ -546,7 +601,13 @@ def install_to_disk(imgpath):
 
 
 
-            subprocess.check_call(['umount', '/run/imginst/targ'])
+            while True:
+                try:
+                    subprocess.check_call(['umount', '/run/imginst/targ'])
+                    break
+                except subprocess.CalledProcessError:
+                    print("Failed to unmount /run/imginst/targ, retrying")
+                    time.sleep(1)
         for vol in allvols:
             subprocess.check_call(['mount', vol['targetdisk'], '/run/imginst/targ/' + vol['mount']])
         fixup('/run/imginst/targ', allvols)

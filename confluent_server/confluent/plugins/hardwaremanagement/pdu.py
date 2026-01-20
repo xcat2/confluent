@@ -42,6 +42,8 @@ def retrieve(nodes, element, configmanager, inputdata):
         inletname = element[-1]
         outlets = get_outlets(nodes, emebs, inletname)
         for node in outlets:
+            if not outlets[node]:
+                yield msg.ConfluentTargetNotFound(node, 'No matching inlets defined for node in "power.*" attributes')
             for pgroup in outlets[node]:
                 pdu = outlets[node][pgroup]['pdu']
                 outlet = outlets[node][pgroup]['outlet']
@@ -53,9 +55,12 @@ def retrieve(nodes, element, configmanager, inputdata):
         for pdu in relpdus:
             gp.spawn(readpdu, pdu, relpdus[pdu], configmanager, rspq)
         while gp.running():
-            nrsp = rspq.get()
-            if not isinstance(nrsp, TaskDone):
-                yield nrsp
+            try:
+                nrsp = rspq.get(timeout=0.1)
+                if nrsp is not None and not isinstance(nrsp, TaskDone):
+                    yield nrsp
+            except queue.Empty:
+                continue
         while not rspq.empty():
             nrsp = rspq.get()
             if not isinstance(nrsp, TaskDone):
@@ -106,6 +111,8 @@ def update(nodes, element, configmanager, inputdata):
     gp = greenpool.GreenPool(64)
     outlets = get_outlets(nodes, emebs, inletname)
     for node in outlets:
+        if not outlets[node]:
+                yield msg.ConfluentTargetNotFound(node, 'No matching inlets defined for node in "power.*" attributes')
         for pgroup in outlets[node]:
             pdu = outlets[node][pgroup]['pdu']
             outlet = outlets[node][pgroup]['outlet']
@@ -115,9 +122,12 @@ def update(nodes, element, configmanager, inputdata):
     for pdu in relpdus:
         gp.spawn(updatepdu, pdu, relpdus[pdu], configmanager, inputdata, rspq)
     while gp.running():
-        nrsp = rspq.get()
-        if not isinstance(nrsp, TaskDone):
-            yield nrsp
+        try:
+            nrsp = rspq.get(timeout=0.1)
+            if nrsp is not None and not isinstance(nrsp, TaskDone):
+                yield nrsp
+        except queue.Empty:
+            continue
     while not rspq.empty():
         nrsp = rspq.get()
         if not isinstance(nrsp, TaskDone):

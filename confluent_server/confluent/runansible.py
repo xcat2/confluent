@@ -48,6 +48,7 @@ class PlayRunner(object):
         return avail
 
     def dump_text(self):
+        stderr = self.stderr
         retinfo = self.dump_dict()
         textout = ''
         for result in retinfo['results']:
@@ -64,9 +65,9 @@ class PlayRunner(object):
                 else:
                     textout += result['state'] + '\n'
             textout += '\n'
-            if self.stderr:
-                textout += "ERRORS **********************************\n"
-                textout += self.stderr
+        if stderr:
+            textout += "ERRORS **********************************\n"
+            textout += stderr
         return textout
 
     def dump_json(self):
@@ -80,32 +81,34 @@ class PlayRunner(object):
 
     def _really_run_playbooks(self):
         global anspypath
-        mypath = anspypath
-        if not mypath:
-            ansloc = shutil.which('ansible')
-            if ansloc:
-                with open(ansloc, 'r') as onsop:
-                    shebang = onsop.readline()
-                    anspypath = shebang.strip().replace('#!', '')
-                    mypath = anspypath
-        if not mypath:
-            mypath = sys.executable    
-        with open(os.devnull, 'w+') as devnull:
-            targnodes = ','.join(self.nodes)
-            for playfilename in self.playfiles:
-                worker = subprocess.Popen(
-                    [mypath, __file__, targnodes, playfilename],
-                    stdin=devnull, stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE)
-                stdout, stder = worker.communicate()
-                self.stderr += stder.decode('utf8')
-                current = memoryview(stdout)
-                while len(current):
-                    sz = struct.unpack('=q', current[:8])[0]
-                    result = msgpack.unpackb(current[8:8+sz], raw=False)
-                    self.results.append(result)
-                    current = current[8+sz:]
-        self.complete = True
+        try:
+            mypath = anspypath
+            if not mypath:
+                ansloc = shutil.which('ansible')
+                if ansloc:
+                    with open(ansloc, 'r') as onsop:
+                        shebang = onsop.readline()
+                        anspypath = shebang.strip().replace('#!', '')
+                        mypath = anspypath
+            if not mypath:
+                mypath = sys.executable
+            with open(os.devnull, 'w+') as devnull:
+                targnodes = ','.join(self.nodes)
+                for playfilename in self.playfiles:
+                    worker = subprocess.Popen(
+                        [mypath, __file__, targnodes, playfilename],
+                        stdin=devnull, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+                    stdout, stder = worker.communicate()
+                    self.stderr += stder.decode('utf8')
+                    current = memoryview(stdout)
+                    while len(current):
+                        sz = struct.unpack('=q', current[:8])[0]
+                        result = msgpack.unpackb(current[8:8+sz], raw=False)
+                        self.results.append(result)
+                        current = current[8+sz:]
+        finally:
+            self.complete = True
 
 
 def run_playbooks(playfiles, nodes):
@@ -143,6 +146,7 @@ if __name__ == '__main__':
     from ansible import context
     from ansible.module_utils.common.collections import ImmutableDict
     from ansible.plugins.callback import CallbackBase
+    import ansible.plugins.loader
     import yaml
 
     class ResultsCollector(CallbackBase):
@@ -161,7 +165,10 @@ if __name__ == '__main__':
         become=None, become_method=None, become_user=None, check=False,
         diff=False, verbosity=0, remote_user='root')
 
-
+    try:
+        ansible.plugins.loader.init_plugin_loader()
+    except AttributeError:
+        pass
     loader = DataLoader()
     invman = None
     if os.path.exists('/etc/ansible/hosts'):

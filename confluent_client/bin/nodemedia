@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2018 Lenovo
@@ -101,22 +101,37 @@ def detach_media(noderange, media):
 
 def upload_media(noderange, media):
     global exitcode
-    if not os.path.exists(media):
-        sys.stderr.write('Unable to locate requested file {0}\n'.format(
-            media))
-        sys.exit(404)
+
     session = client.Command()
     output = sq.ScreenPrinter(noderange, session)
     filename = os.path.abspath(media)
     resource = '/noderange/{0}/media/uploads/'.format(noderange)
+    filename = os.path.abspath(filename)
     upargs = {'filename': filename}
     noderrs = {}
     if session.unixdomain:
-        of = open(filename, 'rb')
-        try:
-            session.add_file(filename, of.fileno(), 'rb')
-        except Exception:
-            pass
+        filesbynode = {}
+        for exp in session.create('/noderange/{0}/attributes/expression'.format(noderange),
+                        {'expression': filename}):
+            if 'error' in exp:
+                sys.stderr.write(exp['error'] + '\n')
+                exitcode |= exp.get('errorcode', 1)
+            ex = exp.get('databynode', ())
+            for node in ex:
+                filesbynode[node] = ex[node]['value']
+                if not isinstance(filesbynode[node], bytes) and not isinstance(filesbynode[node], str):
+                    filesbynode[node] = filesbynode[node].encode('utf-8')
+        for node in filesbynode:
+            endfilename = filesbynode[node]
+            if not os.path.exists(endfilename):
+                sys.stderr.write('Unable to locate requested file {0}\n'.format(
+                    endfilename))
+                sys.exit(404)
+            of = open(endfilename, 'rb')
+            try:
+                session.add_file(endfilename, of.fileno(), 'rb')
+            except Exception:
+                pass
     nodeurls = {}
     for res in session.create(resource, upargs):
         if 'created' not in res:

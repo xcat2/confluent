@@ -25,12 +25,14 @@ async def reseat_bays(encmgr, bays, configmanager, rspq):
                 for rsp in core.handle_path(
                         '/nodes/{0}/_enclosure/reseat_bay'.format(encmgr),
                         'update', configmanager,
-                        inputdata={'reseat': int(encbay)}):
+                        inputdata={'reseat': encbay}):
                     await rspq.put(rsp)
             except pygexc.UnsupportedFunctionality as uf:
                 await rspq.put(msg.ConfluentNodeError(node, str(uf)))
             except exc.TargetEndpointUnreachable as uf:
                 await rspq.put(msg.ConfluentNodeError(node, str(uf)))
+            except Exception as e:
+                await rspq.put(msg.ConfluentNodeError(node, str(e)))
     finally:
         await rspq.put(None)
 
@@ -58,9 +60,12 @@ async def update(nodes, element, configmanager, inputdata):
         currtask = asyncio.create_task(reseat_bays(encmgr, baysbyencmgr[encmgr], configmanager, rspq))
         reseattasks.append(currtask)
     while not all([task.done() for task in reseattasks]):
-        nrsp = await rspq.get()
-        if nrsp is not None:
-            yield nrsp
+        try:
+            nrsp = await rspq.get(timeout=0.1)
+            if nrsp is not None:
+                yield nrsp
+        except queue.Empty:
+            continue
     while not rspq.empty():
         nrsp = await rspq.get()
         if nrsp is not None:

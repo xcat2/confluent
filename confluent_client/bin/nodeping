@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2016-2017 Lenovo
@@ -42,6 +42,8 @@ def run():
         usage="Usage: %prog [options] noderange")
     argparser.add_option('-f', '-c', '--count', type='int', default=168,
                          help='Number of commands to run at a time')
+    argparser.add_option('-o', '--origname', action='store_true',
+                         help='Use original nodename in print out even if substituted')
     argparser.add_option('-s', '--substitutename',
                          help='Use a different name other than the nodename for ping, with {}, it is the entire name evaluated as an expression, otherwise it is used as a suffix')
     # among other things, FD_SETSIZE limits.  Besides, spawning too many
@@ -56,6 +58,7 @@ def run():
 
     currprocs = 0
     all = set([])
+    poller = select.epoll()
     pipedesc = {}
     pendingexecs = deque()
     exitcode = 0
@@ -83,19 +86,29 @@ def run():
             cmdv = ['ping', '-c', '1', '-W', '1', pingnode]
             if currprocs < concurrentprocs:
                 currprocs += 1
-                run_cmdv(pingnode, cmdv, all, pipedesc)
+                if options.origname:
+                    run_cmdv(node, cmdv, all, poller, pipedesc)
+                else:
+                    run_cmdv(pingnode, cmdv, all, poller, pipedesc)
             else:
-                pendingexecs.append((pingnode, cmdv))
+                if options.origname:
+                    pendingexecs.append((node, cmdv))
+                else:
+                    pendingexecs.append((pingnode, cmdv))
     if not all or exitcode:
         sys.exit(exitcode)
-    rdy, _, _ = select.select(all, [], [], 10)
+    rdy = poller.poll(10)
     while all:
         pernodeout = {}
         for r in rdy:
+            r = r[0]
             desc = pipedesc[r]
+            r = desc['file']
             node = desc['node']
             data = True
-            while data and select.select([r], [], [], 0)[0]:
+            singlepoller = select.epoll()
+            singlepoller.register(r, select.EPOLLIN)
+            while data and singlepoller.poll(0):
                 data = r.readline()
                 if not data:
                     pop = desc['popen']
@@ -103,6 +116,7 @@ def run():
                     if ret is not None:
                         exitcode = exitcode | ret
                         all.discard(r)
+                        poller.unregister(r)
                         r.close()
                         if desc['type'] == 'stdout':
                             if ret:
@@ -111,7 +125,8 @@ def run():
                                 print('{0}: ping'.format(node))
                             if pendingexecs:
                                 node, cmdv = pendingexecs.popleft()
-                                run_cmdv(node, cmdv, all, pipedesc)
+                                run_cmdv(node, cmdv, all, poller, pipedesc)
+            singlepoller.close()
         for node in sortutil.natural_sort(pernodeout):
             for line in pernodeout[node]:
                 line = client.stringify(line)
@@ -121,19 +136,21 @@ def run():
                     sys.stdout.write('{0}: {1}'.format(node, line))
         sys.stdout.flush()
         if all:
-            rdy, _, _ = select.select(all, [], [], 10)
+            rdy = poller.poll(10)
     sys.exit(exitcode)
 
 
-def run_cmdv(node, cmdv, all, pipedesc):
+def run_cmdv(node, cmdv, all, poller, pipedesc):
     nopen = subprocess.Popen(
         cmdv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    pipedesc[nopen.stdout] = {'node': node, 'popen': nopen,
-                              'type': 'stdout'}
-    pipedesc[nopen.stderr] = {'node': node, 'popen': nopen,
-                              'type': 'stderr'}
+    pipedesc[nopen.stdout.fileno()] = {'node': node, 'popen': nopen,
+                              'type': 'stdout', 'file': nopen.stdout}
+    pipedesc[nopen.stderr.fileno()] = {'node': node, 'popen': nopen,
+                              'type': 'stderr', 'file': nopen.stderr}
     all.add(nopen.stdout)
+    poller.register(nopen.stdout, select.EPOLLIN)
     all.add(nopen.stderr)
+    poller.register(nopen.stderr, select.EPOLLIN)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,76 @@
+function bfb_modify_os() {
+     echo 'ubuntu:!' | chpasswd -e
+     mkdir -p /mnt/opt/confluent/bin/
+     cat > /mnt/opt/confluent/bin/confluentbootstrap.sh << 'END_OF_EMBED'
+#!/bin/bash
+     cat > /usr/local/share/ca-certificates/confluent.crt << 'END_OF_CERTS'
+%CONFLUENTCERTCOLL%
+END_OF_CERTS
+     update-ca-certificates
+     mkdir -p /opt/confluent/bin /etc/confluent/
+     cp /usr/local/share/ca-certificates/confluent.crt /etc/confluent/ca.pem
+     cat > /opt/confluent/bin/apiclient.gz.b64 << 'END_OF_CLIENT'
+%APICLIENTZ64%
+END_OF_CLIENT
+     base64 -d /opt/confluent/bin/apiclient.gz.b64 | gunzip > /opt/confluent/bin/apiclient
+     cat > /etc/confluent/ident.json << 'END_OF_IDENT'
+%IDENTJSON%
+END_OF_IDENT
+     python3 /opt/confluent/bin/apiclient -i /etc/confluent/ident.json /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+     PROFILE=$(grep ^profile: /etc/confluent/confluent.deploycfg |awk '{print $2}')
+     ROOTPASS=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg | awk '{print $2}'|grep -v null)
+     if [ -n "$ROOTPASS" ]; then
+          echo root:$ROOTPASS | chpasswd -e
+          echo "ubuntu:$ROOTPASS" | chpasswd -e
+     else
+          echo 'ubuntu:!' | chpasswd -e
+     fi
+     cntmp=$(mktemp -d)
+     cd "$cntmp" || { echo "Failed to cd to temporary directory $cntmp"; exit 1; }
+     touch /etc/confluent/confluent.deploycfg
+     python3 /opt/confluent/bin/apiclient /confluent-public/os/$PROFILE/scripts/confignet > confignet
+     python3 confignet
+     cd -
+     rm -rf "$cntmp"
+     python3 /opt/confluent/bin/apiclient /confluent-public/os/$PROFILE/scripts/functions > /etc/confluent/functions
+     bash /etc/confluent/functions run_remote setupssh
+     for cert in /etc/ssh/ssh*-cert.pub; do
+         if [ -s $cert ]; then
+             echo HostCertificate $cert >> /etc/ssh/sshd_config.d/90-confluent.conf
+         fi
+     done
+     mkdir -p /var/log/confluent
+     chmod 700 /var/log/confluent
+     touch /var/log/confluent/confluent-firstboot.log
+     touch /var/log/confluent/confluent-post.log
+     chmod 600 /var/log/confluent/confluent-post.log
+     chmod 600 /var/log/confluent/confluent-firstboot.log
+     exec >> /var/log/confluent/confluent-post.log
+     exec 2>> /var/log/confluent/confluent-post.log
+     bash /etc/confluent/functions run_remote_python syncfileclient
+     bash /etc/confluent/functions run_remote_parts post.d
+     bash /etc/confluent/functions run_remote_config post.d
+     exec >> /var/log/confluent/confluent-firstboot.log
+     exec 2>> /var/log/confluent/confluent-firstboot.log
+     bash /etc/confluent/functions run_remote_parts firstboot.d
+     bash /etc/confluent/functions run_remote_config firstboot.d
+     python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: staged'
+     python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus  -d 'status: complete'
+     systemctl disable confluentbootstrap
+     rm /etc/systemd/system/confluentbootstrap.service
+END_OF_EMBED
+    chmod +x /mnt/opt/confluent/bin/confluentbootstrap.sh
+    cat > /mnt/etc/systemd/system/confluentbootstrap.service << EOS
+[Unit]
+Description=First Boot Process
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/opt/confluent/bin/confluentbootstrap.sh
+
+[Install]
+WantedBy=multi-user.target
+EOS
+    chroot /mnt systemctl enable confluentbootstrap
+}

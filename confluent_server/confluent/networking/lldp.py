@@ -34,6 +34,7 @@ if __name__ == '__main__':
     import sys
     import confluent.config.configmanager as cfm
 import base64
+import confluent.networking.nxapi as nxapi
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -174,11 +175,53 @@ def _init_lldp(data, iname, idx, idxtoportid, switch):
         data[iname] = {'port': iname, 'portid': str(idxtoportid[idx]),
                        'chassisid': _chassisidbyswitch[switch]}
 
-def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata):
+_fastbackends = {}
+def detect_backend(switch, verifier):
+        backend = _fastbackends.get(switch, None)
+        if backend:
+            return backend
+        wc =  webclient.SecureHTTPConnection(
+            switch, 443, verifycallback=verifier, timeout=5)
+        apicheck, retcode = wc.grab_json_response_with_status('/affluent/')
+        if retcode == 401 and apicheck.startswith(b'{}'):
+            _fastbackends[switch] = 'affluent'
+        else:
+            apicheck, retcode = wc.grab_json_response_with_status('/api/')
+            if retcode == 400 and apicheck.startswith(b'{"imdata":['):
+                _fastbackends[switch] = 'nxapi'
+        return _fastbackends.get(switch, None)
+
+def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
     kv = util.TLSCertVerifier(cfm, switch,
                                   'pubkeys.tls_hardwaremanager').verify_cert
+    backend = detect_backend(switch, kv)
+    if not backend:
+        raise Exception("No HTTPS backend identified")
     wc =  webclient.SecureHTTPConnection(
                 switch, 443, verifycallback=kv, timeout=5)
+    if backend == 'affluent':
+        return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
+    elif backend == 'nxapi':
+        return _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc)
+
+
+
+def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
+    cli = nxapi.NxApiClient(switch, user, password, cfm)
+    lldpinfo = cli.get_lldp()
+    for port in lldpinfo:
+        portdata = lldpinfo[port]
+        peerid = '{0}.{1}'.format(
+            portdata.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
+            portdata.get('peerportid', '').replace(':', '-').replace('/', '-'),
+        )
+        portdata['peerid'] = peerid
+        _extract_extended_desc(portdata, portdata['peerdescription'], True)
+        _neighbypeerid[peerid] = portdata
+        lldpdata[port] = portdata
+    _neighdata[switch] = lldpdata
+
+def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     wc.set_basic_credentials(user, password)
     neighdata = wc.grab_json_response('/affluent/lldp/all')
     chassisid = neighdata['chassis']['id']
@@ -204,7 +247,7 @@ def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata):
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
         _neighbypeerid[peerid] = portdata
         lldpdata[localport] = portdata
-    neighdata[switch] = lldpdata
+    _neighdata[switch] = lldpdata
 
 
 def _extract_neighbor_data_b(args):
@@ -212,17 +255,23 @@ def _extract_neighbor_data_b(args):
 
     args are carried as a tuple, because of eventlet convenience
     """
-    switch, password, user, cfm, force = args[:5]
+    # Safely unpack args with defaults to avoid IndexError
+    switch = args[0] if len(args) > 0 else None
+    password = args[1] if len(args) > 1 else None
+    user = args[2] if len(args) > 2 else None
+    cfm = args[3] if len(args) > 3 else None
+    privproto = args[4] if len(args) > 4 else None
+    force = args[5] if len(args) > 5 else False
     vintage = _neighdata.get(switch, {}).get('!!vintage', 0)
     now = util.monotonic_time()
     if vintage > (now - 60) and not force:
         return
     lldpdata = {'!!vintage': now}
     try:
-        return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata)
-    except Exception:
+        return _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
+    except Exception as e:
         pass
-    conn = snmp.Session(switch, password, user)
+    conn = snmp.Session(switch, password, user, privacy_protocol=privproto)
     sid = None
     for sysid in conn.walk('1.3.6.1.2.1.1.2'):
         sid = str(sysid[1][6:])
@@ -321,8 +370,8 @@ def _extract_neighbor_data(args):
             return _extract_neighbor_data_b(args)
     except Exception as e:
         yieldexc = False
-        if len(args) >= 6:
-            yieldexc = args[5]
+        if len(args) >= 7:
+            yieldexc = args[6]
         if yieldexc:
             return e
         else:

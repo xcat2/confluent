@@ -1,5 +1,14 @@
 #!/bin/bash
+mkdir -p /usr/libexec /run/sshd
+if [ ! -x /usr/libexec/platform-python ]; then
+       ln -s /usr/bin/python3 /usr/libexec/platform-python
+fi
 export LANG=en_US.utf8
+
+(while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
+
+
+
 mkdir -p /etc/confluent
 if ! grep console= /proc/cmdline >& /dev/null; then
     autocons=$(/opt/confluent/bin/autocons)
@@ -9,13 +18,9 @@ if ! grep console= /proc/cmdline >& /dev/null; then
     if [ ! -z "$autocons" ]; then
         echo "Using $(cat /tmp/01-autocons.conf)"
         (while :; do TERM=xterm-256color tmux a <> $autocons >&0 2>&1; done) &
-        (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
-    else
-        (while :; do TERM=linux tmux a <> /dev/console >&0 2>&1; done) &
     fi
 else
     (while :; do TERM=xterm-256color tmux a <> /dev/console >&0 2>&1; done) &
-    (while :; do TERM=linux tmux a <> /dev/tty1 >&0 2>&1; done) &
 fi
 (while :; do TERM=linux tmux <> /dev/tty2 >&0 2>&1; done) &
 echo -n "udevd: "
@@ -29,6 +34,13 @@ modprobe ib_umad
 modprobe hfi1
 modprobe mlx5_ib
 echo "done"
+if [ -x /usr/bin/seatd-launch -a -x /usr/bin/sway ]; then
+    export XDG_RUNTIME_DIR=/run/users/0
+    mkdir -p $XDG_RUNTIME_DIR
+    sed -i '/^output /d' /etc/sway/config
+    echo 'exec foot -t xterm -T Terminal tmux a' > /etc/sway/config.d/genesis
+    (while :; do seatd-launch sway <> /dev/tty1 >& /dev/null; done) &
+fi
 cat > /etc/ssh/sshd_config << EOF
 Port 22
 Port 3389
@@ -43,23 +55,48 @@ mkdir -p /etc/pki/tls/certs
 cat /tls/*.pem > /etc/pki/tls/certs/ca-bundle.crt
 TRIES=0
 touch /etc/confluent/confluent.info
+TRIES=5
+echo -n "Waiting for disks..."
+while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
+    sleep 1
+    TRIES=$((TRIES - 1))
+done
+echo "Done"
 if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
     mkdir -p /media/ident
     mount /dev/disk/by-label/CNFLNT_IDNT /media/ident
     if [ -e /media/ident/genesis_bootstrap.sh ]; then
-        exec sh /media/ident/genesis_bootstrap.sh
+        exec bash /media/ident/genesis_bootstrap.sh
     fi
 fi
 if [ -e /dev/disk/by-label/GENESIS-X86 ]; then
     mkdir -p /media/genesis
     mount /dev/disk/by-label/GENESIS-X86 /media/genesis
     if [ -e /media/genesis/genesis_bootstrap.sh ]; then
-        exec sh /media/genesis/genesis_bootstrap.sh
+        exec bash /media/genesis/genesis_bootstrap.sh
     fi
 fi
 cd /sys/class/net
 echo -n "Scanning for network configuration..."
 while ! grep ^EXTMGRINFO: /etc/confluent/confluent.info | awk -F'|' '{print $3}' | grep 1 >& /dev/null && [ "$TRIES" -lt 30 ]; do
+    if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+	echo ""
+	echo "Media bootstrap detected, switching to media based boot"
+        mkdir -p /media/ident
+        mount /dev/disk/by-label/CNFLNT_IDNT /media/ident
+        if [ -e /media/ident/genesis_bootstrap.sh ]; then
+            exec bash /media/ident/genesis_bootstrap.sh
+        fi
+    fi
+    if [ -e /dev/disk/by-label/GENESIS-X86 ]; then
+	echo ""
+	echo "Media bootstrap detected, switching to media based boot"
+        mkdir -p /media/genesis
+        mount /dev/disk/by-label/GENESIS-X86 /media/genesis
+        if [ -e /media/genesis/genesis_bootstrap.sh ]; then
+            exec bash /media/genesis/genesis_bootstrap.sh
+        fi
+    fi
     TRIES=$((TRIES + 1))
     for i in *; do
         ip link set $i up

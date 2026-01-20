@@ -1,0 +1,33 @@
+#!/bin/bash
+TARGNODE=$1
+TARGPROF=$2
+if [ -z "$TARGNODE" ] ; then
+	echo "Target node must be specified"
+	exit 1
+fi
+if [ -z "$TARGPROF" ]; then
+	echo "Target profile must be specified"
+	exit 1
+fi
+OLDINSECURE=$(nodeattrib $TARGNODE deployment.useinsecureprotocols -b 2> /dev/null |grep -v inherited|awk '{print $3}')
+nodedefine $TARGNODE deployment.profile=$TARGPROF deployment.useinsecureprotocols= deployment.pendingprofile=$TARGPROF
+confetty set /nodes/$TARGNODE/deployment/ident_image=create
+REMTMP=$(ssh $TARGNODE $(mktemp -d))
+scp /var/lib/confluent/private/identity_files/$TARGNODE.json $TARGNODE:$REMTMP
+rm /var/lib/confluent/private/identity_files/$TARGNODE.*
+rm /var/lib/confluent/private/identity_images/$TARGNODE.*
+cat /var/lib/confluent/public/site/ssh/*pubkey | ssh $TARGNODE "mkdir -p /root/.ssh/; cat - >> /root/.ssh/authorized_keys"
+ssh $TARGNODE mkdir -p /etc/confluent /opt/confluent/bin
+cat /var/lib/confluent/public/site/tls/*.pem | ssh $TARGNODE "cat - >> /etc/confluent/ca.pem"
+cat /var/lib/confluent/public/site/tls/*.pem | ssh $TARGNODE "cat - >> /etc/pki/ca-trust/source/anchors/confluent.pem"
+nodeattrib $TARGNODE id.uuid=$(ssh $TARGNODE cat /sys/devices/virtual/dmi/id/product_uuid)
+scp prepadopt.sh $TARGNODE:/tmp/
+scp finalizeadopt.sh $TARGNODE:/tmp/
+ssh $TARGNODE bash /tmp/prepadopt.sh $TARGNODE $TARGPROF $REMTMP/$TARGNODE.json
+nodeattrib $TARGNODE deployment.pendingprofile=
+nodeattrib $TARGNODE -c deployment.useinsecureprotocols
+if [ ! -z "$OLDINSECURE" ]; then
+	nodeattrib $TARGNODE $OLDINSECURE
+fi
+nodeapply $TARGNODE -k
+ssh $TARGNODE sh /tmp/finalizeadopt.sh

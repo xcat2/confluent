@@ -1,0 +1,24 @@
+dracut_install /usr/bin/sway /usr/bin/foot
+dracut_install swaynag swaymsg
+cp -a /etc/sway $initdir/etc/sway
+cp -a /usr/share/X11 $initdir/usr/share/X11
+cp -a /usr/share/fonts $initdir/usr/share/fonts
+dracut_install /usr/share/glvnd/egl_vendor.d/50_mesa.json
+dracut_install seatd seatd-launch
+if [ -e /usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0 ]; then
+    dracut_install /usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0
+fi
+if [ -e /usr/lib/sysusers.d/seatd.conf ]; then
+    dracut_install /usr/lib/sysusers.d/seatd.conf
+fi
+if grep Ubuntu /etc/os-release > /dev/null; then
+    dracut_install /usr/share/libinput/* /etc/fonts/fonts.conf /etc/fonts/conf.d/* /usr/bin/libinput /usr/libexec/libinput/* /usr/bin/lsof
+    dracut_install /usr/lib/udev/hwdb.d/60-input-id.hwdb
+    dracut_install /usr/lib/udev/libinput-fuzz-to-zero
+    dracut_install /usr/lib/udev/libinput-fuzz-extract
+    dracut_install /usr/lib/udev/libinput-device-group
+    dracut_install /usr/lib/udev/rules.d/60-input-id.rules
+    dracut_install /usr/lib/udev/rules.d/90-libinput-fuzz-override.rules
+    dracut_install /usr/lib/udev/rules.d/80-libinput-device-groups.rules
+    dracut_install /usr/lib/udev/rules.d/60-persistent-input.rules
+fi

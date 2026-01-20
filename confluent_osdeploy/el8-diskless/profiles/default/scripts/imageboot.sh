@@ -4,10 +4,12 @@ if [[ "$confluent_whost" == *:* ]] && [[ "$confluent_whost" != "["* ]]; then
     confluent_whost="[$confluent_mgr]"
 fi
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
+TETHERED=0
 if [ "untethered" = "$(getarg confluent_imagemethod)" ]; then
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
+    TETHERED=1
     confluent_urls="$confluent_urls https://$confluent_whost/confluent-public/os/$confluent_profile/rootimg.sfs"
     /opt/confluent/bin/urlmount $confluent_urls /mnt/remoteimg
 fi
@@ -130,4 +132,17 @@ ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
 kill $(grep -l ^/usr/lib/systemd/systemd-udevd  /proc/*/cmdline|cut -d/ -f 3)
+if [ $TETHERED -eq 1 ]; then
+    (
+        sleep 86400 &
+        ONBOOTPID=$!
+        mkdir -p /run/confluent
+        echo $ONBOOTPID > /run/confluent/onboot_sleep.pid
+        wait $ONBOOTPID
+        dd if=/mnt/remoteimg/rootimg.sfs iflag=nocache count=0 >& /dev/null
+    ) &
+    while [ ! -f /run/confluent/onboot_sleep.pid ]; do
+        sleep 0.1
+    done
+fi
 exec /opt/confluent/bin/start_root

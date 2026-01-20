@@ -17,6 +17,7 @@ import ast
 import confluent.exceptions as exc
 import confluent.messages as msg
 import confluent.config.attributes as allattributes
+import confluent.config.configmanager as configmod
 import confluent.util as util
 from fnmatch import fnmatch
 
@@ -58,7 +59,7 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata, clearwarnby
                 val['desc'] = 'The noderange this group is expanded ' \
                     'to when used in noderange, exclusive with static ' \
                     'nodes'
-            if attribute.startswith('secret.') or attribute.startswith('crypted.'):
+            if attribute.startswith('secret.') or attribute.startswith('crypted.') or attribute.startswith('custom.nodesecret.'):
                 yield msg.CryptedAttributes(
                     kv={attribute: val},
                     desc=allattributes.node[attribute]['description'])
@@ -108,6 +109,13 @@ def retrieve_nodegroup(nodegroup, element, configmanager, inputdata, clearwarnby
 
 def retrieve_nodes(nodes, element, configmanager, inputdata, clearwarnbynode):
     attributes = configmanager.get_node_attributes(nodes)
+    if element[-1] == 'lock':
+        for node in nodes:
+            lockstate = attributes.get(node, {}).get('deployment.lock', {}).get('value', None)
+            if lockstate not in ('locked', 'autolock'):
+                lockstate = 'unlocked'
+            yield msg.DeploymentLock(node, lockstate)
+        return
     if element[-1] == 'all':
         for node in util.natural_sort(nodes):
             if clearwarnbynode and node in clearwarnbynode:
@@ -120,7 +128,7 @@ def retrieve_nodes(nodes, element, configmanager, inputdata, clearwarnbynode):
                     val = []
                 else:  # no setting, provide a blank
                     val = {'value': None}
-                if attribute.startswith('secret.') or attribute.startswith('crypted.'):
+                if attribute.startswith('secret.') or attribute.startswith('crypted.') or attribute.startswith('custom.nodesecret.'):
                     yield msg.CryptedAttributes(
                         node, {attribute: val},
                         allattributes.node.get(
@@ -208,6 +216,9 @@ def update_nodegroup(group, element, configmanager, inputdata):
 
 
 def _expand_expression(nodes, configmanager, inputdata):
+    if not nodes:
+        raise exc.InvalidArgumentException(
+                'Specified noderange contains no nodes')
     expression = inputdata.get_attributes(list(nodes)[0])
     if type(expression) is dict:
         expression = expression['expression']
@@ -243,12 +254,20 @@ def yield_rename_resources(namemap, isnode):
         else:
             yield msg.RenamedResource(node, namemap[node])
 
+def update_locks(nodes, configmanager, inputdata):
+    for node in nodes:
+        updatestate = inputdata.inputbynode[node]
+        configmanager.set_node_attributes({node: {'deployment.lock': updatestate}})
+        yield msg.DeploymentLock(node, updatestate)
+
 async def update_nodes(nodes, element, configmanager, inputdata):
     updatedict = {}
     if not nodes:
         raise exc.InvalidArgumentException(
             'No action to take, noderange is empty (if trying to define '
             'group attributes, use nodegroupattrib)')
+    if element[-1] == 'lock':
+        return update_locks(nodes, configmanager, inputdata)
     if element[-1] == 'check':
         for node in nodes:
             check = inputdata.get_attributes(node, allattributes.node)
@@ -271,6 +290,15 @@ async def update_nodes(nodes, element, configmanager, inputdata):
     clearwarnbynode = {}
     for node in nodes:
         updatenode = inputdata.get_attributes(node, allattributes.node)
+        if updatenode and 'deployment.lock' in updatenode:
+            raise exc.InvalidArgumentException('Deployment lock must be manipulated by {node}/deployment/lock api')
+        if updatenode and ('deployment.pendingprofile' in updatenode or 'deployment.apiarmed' in updatenode):
+            lockcheck = configmanager.get_node_attributes(node, 'deployment.lock')
+            lockstate = lockcheck.get(node, {}).get('deployment.lock', {}).get('value', None)
+            if lockstate == 'locked':
+                raise exc.InvalidArgumentException('Request to set deployment for a node that has locked deployment')
+    for node in nodes:
+        updatenode = inputdata.get_attributes(node, allattributes.node)
         clearattribs = []
         if updatenode:
             for attrib in list(updatenode):
@@ -284,10 +312,19 @@ async def update_nodes(nodes, element, configmanager, inputdata):
                         clearattribs.append(attrib)
                     else:
                         foundattrib = False
+                        for candattrib in configmod._attraliases:
+                            if fnmatch(candattrib, attrib):
+                                attrib = configmod._attraliases[candattrib]
                         for candattrib in allattributes.node:
                             if fnmatch(candattrib, attrib):
                                 clearattribs.append(candattrib)
                                 foundattrib = True
+                        currnodeattrs = configmanager.get_node_attributes(node, attrib)
+                        for matchattrib in currnodeattrs.get(node, {}):
+                            if matchattrib != attrib:
+                                continue
+                            clearattribs.append(matchattrib)
+                            foundattrib = True
                         if not foundattrib:
                             raise exc.InvalidArgumentException("No attribute matches '" + attrib + "' (try wildcard if trying to clear a group)")
                 elif '*' in attrib:

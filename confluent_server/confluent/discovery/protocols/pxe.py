@@ -23,6 +23,8 @@
 # option 97 = UUID (wireformat)
 
 import asyncio
+import base64
+import confluent.config.conf as inifile
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
@@ -33,7 +35,12 @@ import confluent.util as util
 import confluent.tasks as tasks
 import ctypes
 import ctypes.util
-import netifaces
+try:
+    import psutil
+except ImportError:
+    psutil = None
+    import netifaces
+import os
 import socket
 import struct
 import time
@@ -99,7 +106,12 @@ def idxtoname(idx):
 _idxtobcast = {}
 def get_bcastaddr(idx):
     if idx not in _idxtobcast:
-        bc = netifaces.ifaddresses(idxtoname(idx))[17][0]['broadcast']
+        if psutil:
+            for addr in psutil.net_if_addrs()[idxtoname(idx)]:
+                if addr.family == socket.AF_PACKET:
+                    bc = addr.broadcast
+        else:
+            bc = netifaces.ifaddresses(idxtoname(idx))[17][0]['broadcast']
         bc = bytearray([int(x, 16) for x in bc.split(':')])
         _idxtobcast[idx] = bc
     return _idxtobcast[idx]
@@ -115,6 +127,22 @@ pxearchs = {
     b'\x00\x0b': 'uefi-aarch64',
     b'\x00\x10': 'uefi-httpboot',
 }
+
+
+shorturls = {}
+urlidbyurl = {}
+def register_shorturl(url, can302=True, relurl=None, filename=None):
+    if url in urlidbyurl:
+        return urlidbyurl[url]
+    urlid = base64.urlsafe_b64encode(os.urandom(3))
+    while urlid in shorturls:
+        urlid = base64.urlsafe_b64encode(os.urandom(3))
+    urlid = urlid.decode()
+    shorturls[urlid] = (url, can302, relurl, filename)
+    returl = '/'.join(url.split('/')[:3])
+    returl += '/confluent-api/boot/su/' + urlid + '/' + os.path.basename(url)
+    urlidbyurl[url] = returl
+    return returl
 
 
 uuidmap = {}
@@ -312,12 +340,15 @@ async def proxydhcp(handler, nodeguess):
             elif disco['arch'] == 'uefi-aarch64':
                 bootfile = b'confluent/aarch64/ipxe.efi'
             if len(bootfile) > 127:
-                log.log(
-                    {'info': 'Boot offer cannot be made to {0} as the '
-                    'profile name "{1}" is {2} characters longer than is supported '
-                    'for this boot method.'.format(
-                        node, profile, len(bootfile) - 127)})
-                continue
+                if bootfile.startswith(b'http'):
+                    bootfile = register_shorturl(bootfile.decode('utf8')).encode('utf8')
+                else:
+                    log.log(
+                        {'info': 'Boot offer cannot be made to {0} as the '
+                        'profile name "{1}" is {2} characters longer than is supported '
+                        'for this boot method.'.format(
+                            node, profile, len(bootfile) - 127)})
+                    continue
             rp = bytearray(300)
             rpv = memoryview(rp)
             rqv = memoryview(data)
@@ -335,6 +366,7 @@ async def proxydhcp(handler, nodeguess):
             # tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
             #                event=log.Events.stacktrace)
 
+ignorenics = None
 
 def start_proxydhcp(handler, nodeguess=None):
     tasks.spawn(proxydhcp(handler, nodeguess))
@@ -366,10 +398,16 @@ def new_dhcp6_packet(handler, net6, cfg, nodeguess):
 
 
 async def snoop(handler, protocol=None, nodeguess=None):
+    global ignorenics
     #TODO(jjohnson2): ipv6 socket and multicast for DHCPv6, should that be
     #prominent
     #TODO(jjohnson2): enable unicast replies. This would suggest either
     # injection into the neigh table before OFFER or using SOCK_RAW.
+    ignorenics = inifile.get_option('netboot', 'ignorenics')
+    if ignorenics:
+        if not isinstance(ignorenics, bytes):
+            ignorenics = ignorenics.encode()
+        ignorenics = ignorenics.split(b',')
     start_proxydhcp(handler, nodeguess)
     global tracelog
     tracelog = log.Logger('trace')
@@ -397,6 +435,7 @@ async def snoop(handler, protocol=None, nodeguess=None):
     net6.settimeout(0)
     net4.settimeout(0)
     cloop = asyncio.get_running_loop()
+    # TODO:asyncmerge: honor ignorenics, clean the _recent_txids that have expired
     cloop.add_reader(net4, new_dhcp_packet, handler, nodeguess, cfg, net4)
     cloop.add_reader(net6, new_dhcp6_packet, handler, net6, cfg, nodeguess)
 
@@ -535,6 +574,7 @@ def check_reply(node, info, packet, sock, cfg, reqview, addr, requestor):
         requestor = ('0.0.0.0', None)
     if requestor[0] == '0.0.0.0' and not info.get('uuid', None):
         return  # ignore DHCP from local non-PXE segment
+
     httpboot = info.get('architecture', None) == 'uefi-httpboot'
     cfd = cfg.get_node_attributes(node, ('deployment.*', 'collective.managercandidates'))
     profile, stgprofile = get_deployment_profile(node, cfg, cfd)
@@ -559,7 +599,7 @@ def reply_dhcp6(node, addr, cfg, packet, cfd, profile, sock):
     if not myaddrs:
         log.log({'info': 'Unable to provide IPv6 boot services to {0}, no viable IPv6 configuration on interface index "{1}" to respond through.'.format(node, addr[-1])})
         return
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=addr[-1])
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=addr[-1], onlyfamily=socket.AF_INET6)
     ipv6addr = niccfg.get('ipv6_address', None)
     ipv6prefix = niccfg.get('ipv6_prefix', None)
     ipv6method = niccfg.get('ipv6_method', 'static')
@@ -637,6 +677,7 @@ def get_my_duid():
         _myuuid = uuid.uuid4().bytes
     return _myuuid
 
+_recent_txids = {}
 
 def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=None, requestor=None):
     replen = 275  # default is going to be 286
@@ -671,6 +712,7 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
     repview = repview[28:]
     repview[0:1] = b'\x02'
     repview[1:10] = reqview[1:10] # duplicate txid, hwlen, and others
+    thistxid = bytes(repview[4:8])
     repview[10:11] = b'\x80'  # always set broadcast
     repview[28:44] = reqview[28:44]  # copy chaddr field
     relayip = reqview[24:28].tobytes()
@@ -682,13 +724,13 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         relayipa = socket.inet_ntoa(relayip)
     gateway = None
     netmask = None
-    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip)
+    niccfg = netutil.get_nic_config(cfg, node, ifidx=info['netinfo']['ifidx'], relayipn=relayip, onlyfamily=socket.AF_INET)
     nicerr = niccfg.get('error_msg', False)
     if nicerr:
         log.log({'error': nicerr})
     if niccfg.get('ipv4_broken', False):
         # Received a request over a nic with no ipv4 configured, ignore it
-        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system'.format(node)})
+        log.log({'error': 'Skipping boot reply to {0} due to no viable IPv4 configuration on deployment system on interface index "{}"'.format(node, info['netinfo']['ifidx'])})
         return
     clipn = None
     if niccfg['ipv4_method'] == 'firmwarenone':
@@ -711,28 +753,41 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
     myipn = niccfg['deploy_server']
     if not myipn:
         myipn = info['netinfo']['recvip']
-    if httpboot:
+    if niccfg['ipv4_address'] == myipn:
+        log.log({'error': 'Unable to serve {0} due to duplicated address between node and interface index "{}"'.format(node, info['netinfo']['ifidx'])})
+        return
+    can302 = True
+    if isboot and httpboot:
         proto = 'https' if insecuremode == 'never' else 'http'
         bootfile = '{0}://{1}/confluent-public/os/{2}/boot.img'.format(
             proto, myipn, profile
         )
+        bootshorturl = '/confluent-public/os/{0}/boot.img'.format(profile)
+        bootfilename = '/var/lib/confluent/public/os/{0}/boot.img'.format(profile)
+        can302 = False
         if not isinstance(bootfile, bytes):
             bootfile = bootfile.encode('utf8')
         if len(bootfile) > 127:
-            log.log(
-                {'info': 'Boot offer cannot be made to {0} as the '
-                'profile name "{1}" is {2} characters longer than is supported '
-                'for this boot method.'.format(
-                    node, profile, len(bootfile) - 127)})
-            return
+                if bootfile.startswith(b'http'):
+                    bootfile = register_shorturl(bootfile.decode('utf8'), can302, bootshorturl, bootfilename).encode('utf8')
+                else:
+                    log.log(
+                        {'info': 'Boot offer cannot be made to {0} as the '
+                        'profile name "{1}" is {2} characters longer than is supported '
+                        'for this boot method.'.format(
+                            node, profile, len(bootfile) - 127)})
+                    return
         repview[108:108 + len(bootfile)] = bootfile
-    elif info.get('architecture', None) == 'uefi-aarch64' and packet.get(77, None) == b'iPXE':
-        if not profile:
-            profile, stgprofile = get_deployment_profile(node, cfg)
-        if not profile:
-            log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
-            return
-        bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+    elif isboot and info.get('architecture', None) == 'uefi-aarch64':
+        if packet.get(77, None) == b'iPXE':
+            if not profile:
+                profile, stgprofile = get_deployment_profile(node, cfg)
+            if not profile:
+                log.log({'info': 'No pending profile for {0}, skipping proxyDHCP eply'.format(node)})
+                return
+            bootfile = 'http://{0}/confluent-public/os/{1}/boot.ipxe'.format(myipn, profile).encode('utf8')
+        else:
+            bootfile = b'confluent/aarch64/ipxe.efi'
         repview[108:108 + len(bootfile)] = bootfile
     myip = myipn
     myipn = socket.inet_aton(myipn)
@@ -805,12 +860,26 @@ def reply_dhcp4(node, info, packet, cfg, reqview, httpboot, cfd, profile, sock=N
         boottype = 'HTTP'
     else:
         boottype = 'PXE'
+    deferanswer = None
     if clipn:
+        _recent_txids[thistxid] = time.time() + 1
         ipinfo = 'with static address {0}'.format(niccfg['ipv4_address'])
     else:
+        # use txid to track
+        # defer sending for a second if otherwise unserved...
+        deferanswer = thistxid
         ipinfo = 'without address, served from {0}'.format(myip)
     if relayipa:
         ipinfo += ' (relayed to {} via {})'.format(relayipa, requestor[0])
+    eventlet.spawn(send_rsp, repview, replen, requestor, relayip, reqview, info, deferanswer, isboot, node, boottype, ipinfo, sock)
+
+
+def send_rsp(repview, replen, requestor, relayip, reqview, info, defertxid, isboot, node, boottype, ipinfo, sock):
+    if defertxid:
+        eventlet.sleep(0.5)
+        if defertxid in _recent_txids:
+            log.log({'info': 'Skipping reply for {} over interface {} due to better offer being made over other interface'.format(node, info['netinfo']['ifidx'])})
+            return
     if isboot:
         log.log({
             'info': 'Offering {0} boot {1} to {2}'.format(boottype, ipinfo, node)})

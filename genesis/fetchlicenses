@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+cd $(dirname $0)
+mydir=$(pwd)
+cd - >& /dev/null
+wget https://www.apache.org/licenses/LICENSE-2.0 -O /usr/share/licenses/nss/LICENSE.APACHE
+if [ ! -f /root/rpmbuild/BUILD/openssh-9.9p1/openbsd-compat/blowfish.c ]; then
+	echo "ERROR: openssh source must be extracted"
+	exit 1
+fi
+head -n 37 /root/rpmbuild/BUILD/openssh-9.9p1/openbsd-compat/blowfish.c > /usr/share/licenses/openssh/COPYING.blowfish
+wget https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt -O /usr/share/licenses/bc/COPYING.GPLv2
+cp /root/rpmbuild/BUILD/bind-9.16.23/LICENSE /usr/share/licenses/bind-license/LICENSE || exit 1
+wget https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt -O /usr/share/licenses/procps-ng/COPYING.LIBv2.1
+cp /root/rpmbuild/BUILD/perl-5.32.1/dist/ExtUtils-CBuilder/LICENSE /usr/share/licenses/perl-libs/LICENSE || exit 1
+head -n 31 /root/rpmbuild/BUILD/Linux-PAM-1.5.1/conf/pam_conv1/pam_conv_y.h > /usr/share/licenses/pam/COPYING.bison || exit 1
+mkdir -p  /usr/share/licenses/pcre2
+head -n 25 /root/rpmbuild/BUILD/pcre-8.44/sljit/sljitLir.h > /usr/share/licenses/pcre/LICENSE.BSD2 || exit 1
+head -n 25 /root/rpmbuild/BUILD/pcre2-10.40/src/sljit/sljitLir.h > /usr/share/licenses/pcre2/LICENSE.BSD2
+
+cp -a $mydir/exlicenses/* /usr/share/licenses/
+mkdir -p /usr/share/licenses/perl
+head -n 67 /root/rpmbuild/BUILD/perl-5.32.1/regexec.c | tail -n 25 > /usr/share/licenses/perl/COPYING.regexec
+cp /root/rpmbuild/BUILD/lz4-1.9.3/LICENSE /usr/share/licenses/lz4/LICENSE
+cp /usr/share/doc/lz4-libs/LICENSE /usr/share/licenses/lz4/LICENSE.BSD
+cp /root/rpmbuild/BUILD/libgcrypt-1.10.0/README /usr/share/licenses/libgcrypt/README
+cp /root/rpmbuild/BUILD/libgcrypt-1.10.0/LICENSES /usr/share/licenses/libgcrypt/LICENSES
+mkdir -p /usr/share/licenses/sqlite
+wget https://raw.githubusercontent.com/sqlite/sqlite/master/LICENSE.md -O /usr/share/licenses/sqlite/LICENSE.md
+cd /root/rpmbuild/BUILD/tmux-3.2a
+mkdir -p /usr/share/licenses/tmux
+python3 ~/confluent/genesis/extracttmuxlicenses.py  > /usr/share/licenses/tmux/NOTICE
+cp COPYING README /usr/share/licenses/tmux/
+cd -
+mkdir -p /usr/share/licenses/xfsprogs/
+cp /root/rpmbuild/BUILD/xfsprogs-6.4.0/LICENSES/* /usr/share/licenses/xfsprogs/
+mkdir -p /usr/share/licenses/kernel-extra/
+cp -a /root/rpmbuild/BUILD/kernel-*/linux-*/LICENSES/* /usr/share/licenses/kernel-extra/
+cp /usr/share/licenses/krb5-libs/LICENSE /usr/share/licenses/krb5-libs/NOTICE
+mkdir -p /usr/share/licenses/libdb
+cp /root/rpmbuild/BUILD/db-5.3.28/lang/sql/odbc/debian/copyright /usr/share/licenses/libdb/copyright
+head -n 105 /root/rpmbuild/BUILD/util-linux-2.37.4/sys-utils/hwclock-parse-date.c|tail -n 34 > /usr/share/licenses/util-linux/COPYING.GPLv3
+
+

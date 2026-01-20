@@ -21,7 +21,7 @@ import confluent.collective.manager as collective
 def get_switchcreds(configmanager, switches):
     switchcfg = configmanager.get_node_attributes(
         switches, ('secret.hardwaremanagementuser', 'secret.snmpcommunity',
-                   'secret.hardwaremanagementpassword',
+                   'secret.hardwaremanagementpassword', 'snmp.privacyprotocol',
                    'collective.managercandidates'), decrypt=True)
     switchauth = []
     for switch in switches:
@@ -29,7 +29,10 @@ def get_switchcreds(configmanager, switches):
             continue
         candmgrs = switchcfg.get(switch, {}).get('collective.managercandidates', {}).get('value', None)
         if candmgrs:
-            candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+            try:
+                candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+            except Exception:
+                candmgrs = noderange.NodeRange(candmgrs).nodes
             if collective.get_myname() not in candmgrs:
                 continue
         switchparms = switchcfg.get(switch, {})
@@ -44,7 +47,9 @@ def get_switchcreds(configmanager, switches):
                 'secret.hardwaremanagementuser', {}).get('value', None)
             if not user:
                 user = None
-        switchauth.append((switch, password, user, configmanager))
+            privacy_protocol = switchparms.get(
+                'snmp.privacyprotocol', {}).get('value', None)
+        switchauth.append((switch, password, user, configmanager, privacy_protocol))
     return switchauth
 
 

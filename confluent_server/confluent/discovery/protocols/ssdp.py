@@ -262,7 +262,10 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                     if not isinstance(reply, bytes):
                                         reply = reply.encode('utf8')
                                     s.setblocking(1)
-                                    s.sendto(reply, peer)
+                                        try:
+                                            s.sendto(reply, peer)
+                                        except Exception:
+                                            break
                                 elif query.startswith('uuid='):
                                     curruuid = query.split('=', 1)[1].lower()
                                     node = uuidlookup(curruuid)
@@ -307,7 +310,10 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                     if not isinstance(reply, bytes):
                                         reply = reply.encode('utf8')
                                     s.setblocking(1)
-                                    s.sendto(reply, peer)
+                                    try:
+                                        s.sendto(reply, peer)
+                                    except Exception:
+                                        pass
                                     break
             if deferrednotifies:
                 await asyncio.sleep(2.2)
@@ -317,7 +323,7 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 if not mac:
                     continue
                 _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byehandler, machandlers, handler)
-            for mac in newmacs:
+            for mac in list(newmacs):
                 thehandler = machandlers.get(mac, None)
                 if thehandler:
                     thehandler(peerbymacaddress[mac])

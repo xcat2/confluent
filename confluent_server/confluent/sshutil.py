@@ -6,7 +6,7 @@ import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.util as util
 import glob
-import os
+import eventlet.green.os as os
 import shutil
 import tempfile
 
@@ -51,7 +51,7 @@ async def assure_agent():
                     k = k.decode('utf8')
                     v = v.decode('utf8')
                 if k == 'SSH_AGENT_PID':
-                    agent_pid = v
+                    agent_pid = int(v)
                 os.environ[k] = v
         finally:
             agent_starting = False
@@ -110,9 +110,23 @@ async def initialize_ca():
 adding_key = False
 async def prep_ssh_key(keyname):
     global adding_key
+    global agent_pid
     while adding_key:
         await asyncio.sleep(0.1)
     adding_key = True
+    if agent_pid:
+        if os.path.exists(os.environ['SSH_AUTH_SOCK']):
+            try:
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                sock.connect(os.environ['SSH_AUTH_SOCK'])
+            except Exception:
+                os.unlink(os.environ['SSH_AUTH_SOCK'])
+                os.rmdir(os.path.dirname(os.environ['SSH_AUTH_SOCK']))
+            finally:
+                sock.close()
+        if not os.path.exists(os.environ['SSH_AUTH_SOCK']):
+            agent_pid = None
+            ready_keys.clear()
     if keyname in ready_keys:
         adding_key = False
         return
@@ -133,6 +147,7 @@ async def prep_ssh_key(keyname):
         os.environ['SSH_ASKPASS'] = askpass
         try:
             with open(os.devnull, 'wb') as devnull:
+                #TODO:asyncmerge: capture stderr
                 await util.check_call('ssh-add', keyname)
         finally:
             del os.environ['CONFLUENT_SSH_PASSPHRASE']

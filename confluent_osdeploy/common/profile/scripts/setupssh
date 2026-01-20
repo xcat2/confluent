@@ -7,7 +7,7 @@ for pubkey in /etc/ssh/ssh_host*key.pub; do
         continue
     fi
     certfile=${pubkey/.pub/-cert.pub}
-    rm $certfile
+    echo -n > $certfile
     confluentpython $confapiclient /confluent-api/self/sshcert $pubkey -o $certfile
 done
 if [ -d /etc/ssh/sshd_config.d/ -a ! -e /etc/ssh/sshd_config.d/90-confluent.conf ]; then
@@ -17,6 +17,13 @@ if [ -d /etc/ssh/sshd_config.d/ -a ! -e /etc/ssh/sshd_config.d/90-confluent.conf
 	echo HostbasedAuthentication yes >> /etc/ssh/sshd_config.d/90-confluent.conf
 	echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config.d/90-confluent.conf
 	echo IgnoreRhosts no >> /etc/ssh/sshd_config.d/90-confluent.conf
+elif [ ! -d /etc/ssh/sshd_config.d/ ] && ! grep HostCertificate /etc/ssh/sshd_config > /dev/null; then
+	for cert in /etc/ssh/ssh*-cert.pub; do
+		echo HostCertificate $cert >> /etc/ssh/sshd_config
+	done
+	echo HostbasedAuthentication yes >> /etc/ssh/sshd_config
+	echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config
+	echo IgnoreRhosts no >> /etc/ssh/sshd_config
 fi
 
 TMPDIR=$(mktemp -d)
@@ -25,13 +32,20 @@ confluentpython $confapiclient /confluent-public/site/initramfs.tgz -o initramfs
 tar xf initramfs.tgz
 for ca in ssh/*.ca; do
 	LINE=$(cat $ca)
-	cp -af /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts.new
-	grep -v "$LINE" /etc/ssh/ssh_known_hosts > /etc/ssh/ssh_known_hosts.new
+	if [ -z "$LINE" ]; then continue; fi
+	if [ -f /etc/ssh/ssh_known_hosts ]; then
+		cp -af /etc/ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts.new
+		grep -v "$LINE" /etc/ssh/ssh_known_hosts > /etc/ssh/ssh_known_hosts.new
+	fi
 	echo '@cert-authority *' $LINE >> /etc/ssh/ssh_known_hosts.new
 	mv /etc/ssh/ssh_known_hosts.new /etc/ssh/ssh_known_hosts
 done
+mkdir -p /root/.ssh/
+chmod 700 /root/.ssh/
+touch /root/.ssh/authorized_keys
 for pubkey in ssh/*.*pubkey; do
 	LINE=$(cat $pubkey)
+        if [ -z "$LINE" ]; then continue; fi
 	cp -af /root/.ssh/authorized_keys /root/.ssh/authorized_keys.new
 	grep -v "$LINE" /root/.ssh/authorized_keys > /root/.ssh/authorized_keys.new
 	echo "$LINE" >> /root/.ssh/authorized_keys.new
@@ -41,3 +55,4 @@ confluentpython $confapiclient /confluent-api/self/nodelist | sed -e 's/^- //' >
 cat /etc/ssh/shosts.equiv > /root/.shosts
 cd -
 rm -rf $TMPDIR
+systemctl try-restart sshd

@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2016-2017 Lenovo
@@ -56,7 +56,7 @@ components = ['all']
 
 argparser = optparse.OptionParser(
     usage="Usage: "
-          "%prog <noderange> [list][update [--backup <file>]]|[<components>]")
+          "%prog <noderange> [list][updatestatus][update [--backup <file>]]|[<components>]")
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
 argparser.add_option('-m', '--maxnodes', type='int',
@@ -65,14 +65,18 @@ argparser.add_option('-m', '--maxnodes', type='int',
              
 (options, args) = argparser.parse_args()
 upfile = None
+querystatus = False
 try:
     noderange = args[0]
     if len(args) > 1:
         if args[1] == 'update':
             upfile = args[2]
         else:
+            comps = []
             if args[1] == 'list':
                 comps = args[2:]
+            elif args[1] == 'updatestatus':
+                querystatus = True
             else:
                 comps = args[1:]
             components = []
@@ -110,11 +114,24 @@ def update_firmware(session, filename):
         upargs['bank'] = 'backup'
     noderrs = {}
     if session.unixdomain:
-        of = open(filename, 'rb')
-        try:
-            session.add_file(filename, of.fileno(), 'rb')
-        except Exception:
-            pass
+        filesbynode = {}
+        for exp in session.create('/noderange/{0}/attributes/expression'.format(noderange),
+                        {'expression': filename}):
+            if 'error' in exp:
+                sys.stderr.write(exp['error'] + '\n')
+                exitcode |= exp.get('errorcode', 1)
+            ex = exp.get('databynode', ())
+            for node in ex:
+                filesbynode[node] = ex[node]['value']
+                if not isinstance(filesbynode[node], bytes) and not isinstance(filesbynode[node], str):
+                    filesbynode[node] = filesbynode[node].encode('utf-8')
+        for node in filesbynode:
+            endfilename = filesbynode[node]
+            of = open(endfilename, 'rb')
+            try:
+                session.add_file(endfilename, of.fileno(), 'rb')
+            except Exception:
+                pass
     for res in session.create(resource, upargs):
         if 'created' not in res:
             for nodename in res.get('databynode', ()):
@@ -149,9 +166,13 @@ def show_firmware(session):
     firmware_shown = False
     nodes_matched = False
     for component in components:
+        category = 'all'
+        if component in ('adapters', 'disks', 'misc', 'core'):
+            category = component
+            component = 'all'    
         for res in session.read(
-                '/noderange/{0}/inventory/firmware/all/{1}'.format(
-                    noderange, component)):
+                '/noderange/{0}/inventory/firmware/{2}/{1}'.format(
+                    noderange, component, category)):
             nodes_matched = True
             exitcode |= client.printerror(res)
             if 'databynode' not in res:
@@ -171,7 +192,16 @@ def show_firmware(session):
 
 try:
     session = client.Command()
-    if upfile is None:
+    if querystatus:
+        for res in session.read(
+                '/noderange/{0}/inventory/firmware/updatestatus'.format(noderange)):
+            for node in res.get('databynode', {}):
+                currstat = res['databynode'][node].get('status', None)
+                if currstat:
+                    print('{}: {}'.format(node, currstat))
+                else:
+                    print(repr(res))
+    elif upfile is None:
         show_firmware(session)
     else:
         update_firmware(session, upfile)

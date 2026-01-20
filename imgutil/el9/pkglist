@@ -1,3 +1,4 @@
+system-release
 dnf
 hostname
 irqbalance
@@ -17,4 +18,8 @@ xfsprogs
 e2fsprogs
 fuse-libs
 libnl3
-chrony kernel net-tools nfs-utils openssh-server rsync tar util-linux python3 tar dracut dracut-network ethtool parted openssl dhclient openssh-clients bash vim-minimal rpm iputils lvm2 efibootmgr shim-x64.x86_64 grub2-efi-x64 attr
+chrony kernel net-tools nfs-utils openssh-server rsync tar util-linux python3 tar dracut dracut-network ethtool parted openssl dhclient openssh-clients bash vim-minimal rpm iputils lvm2 efibootmgr attr
+%onlyarch x86_64
+shim-x64.x86_64 grub2-efi-x64
+%onlyarch aarch64
+shim-aa64.aarch64 grub2-efi-aa64

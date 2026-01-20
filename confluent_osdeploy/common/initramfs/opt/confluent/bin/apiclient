@@ -3,6 +3,7 @@ try:
     import http.client as client
 except ImportError:
     import httplib as client
+import base64
 import ctypes
 import ctypes.util
 import glob
@@ -14,6 +15,14 @@ import ssl
 import sys
 import struct
 import time
+import re
+import hashlib
+try:
+    import json
+    import hmac
+except ImportError:
+    json = None
+    hmac = None
 
 class InvalidApiKey(Exception):
     pass
@@ -38,40 +47,115 @@ c_crypt.restype = ctypes.c_char_p
 
 
 def get_my_addresses():
-    nlhdrsz = struct.calcsize('IHHII')
-    ifaddrsz = struct.calcsize('BBBBI')
-    # RTM_GETADDR = 22
-    # nlmsghdr struct: u32 len, u16 type, u16 flags, u32 seq, u32 pid
-    nlhdr = struct.pack('IHHII', nlhdrsz + ifaddrsz, 22, 0x301, 0, 0)
-    # ifaddrmsg struct: u8 family, u8 prefixlen, u8 flags, u8 scope, u32 index
-    ifaddrmsg = struct.pack('BBBBI', 0, 0, 0, 0, 0)
-    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-    s.bind((0, 0))
-    s.sendall(nlhdr + ifaddrmsg)
     addrs = []
-    while True:
-        pdata = s.recv(65536)
-        v = memoryview(pdata)
-        if struct.unpack('H', v[4:6])[0] == 3:  # netlink done message
-            break
-        while len(v):
-            length, typ = struct.unpack('IH', v[:6])
-            if typ == 20:
-                fam, plen, _, scope, ridx = struct.unpack('BBBBI', v[nlhdrsz:nlhdrsz+ifaddrsz])
-                if scope in (253, 0):
-                    rta = v[nlhdrsz+ifaddrsz:length]
-                    while len(rta):
-                        rtalen, rtatyp = struct.unpack('HH', rta[:4])
-                        if rtalen < 4:
-                            break
-                        if rtatyp == 1:
-                            addrs.append((fam, rta[4:rtalen], plen, ridx))
-                        rta = rta[msg_align(rtalen):]
-            v = v[msg_align(length):]
+    for ifa in get_ifaddrs():
+        if ifa[0] == 'ip':
+            addrs.append((ifa[1], ifa[2], ifa[3]))
     return addrs
 
+def get_mac_addresses():
+    macs = []
+    for ifa in get_ifaddrs():
+        if ifa[0] == 'ETHER':
+            macs.append((ifa[1], ifa[2]))
+    return macs
 
-def scan_confluents():
+def get_ifaddrs():
+    class sockaddr(ctypes.Structure):
+        _fields_ = [
+            ('sa_family', ctypes.c_uint16),
+            ('sa_data', ctypes.c_ubyte * 14),
+        ]
+    
+    class sockaddr_in(ctypes.Structure):
+        _fields_ = [
+            ('sin_family', ctypes.c_uint16),
+            ('sin_port', ctypes.c_uint16),
+            ('sin_addr', ctypes.c_ubyte * 4),
+            ('sin_zero', ctypes.c_ubyte * 8),
+        ]
+    
+    class sockaddr_in6(ctypes.Structure):
+        _fields_ = [
+            ('sin6_family', ctypes.c_uint16),
+            ('sin6_port', ctypes.c_uint16),
+            ('sin6_flowinfo', ctypes.c_uint32),
+            ('sin6_addr', ctypes.c_ubyte * 16),
+            ('sin6_scope_id', ctypes.c_uint32),
+        ]
+    
+    class sockaddr_ll(ctypes.Structure):
+        _fields_ = [
+            ('sll_family', ctypes.c_uint16),
+            ('sll_protocol', ctypes.c_uint16),
+            ('sll_ifindex', ctypes.c_int32),
+            ('sll_hatype', ctypes.c_uint16),
+            ('sll_pkttype', ctypes.c_uint8),
+            ('sll_halen', ctypes.c_uint8),
+            ('sll_addr', ctypes.c_ubyte * 8),
+        ]
+    
+    class ifaddrs(ctypes.Structure):
+        pass
+
+    ifaddrs._fields_ = [
+            ('ifa_next', ctypes.POINTER(ifaddrs)),
+            ('ifa_name', ctypes.c_char_p),
+            ('ifa_flags', ctypes.c_uint),
+            ('ifa_addr', ctypes.POINTER(sockaddr)),
+            ('ifa_netmask', ctypes.POINTER(sockaddr)),
+            ('ifa_ifu', ctypes.POINTER(sockaddr)),
+            ('ifa_data', ctypes.c_void_p),
+        ]
+    
+    libc = ctypes.CDLL(ctypes.util.find_library('c'))
+    libc.getifaddrs.argtypes = [ctypes.POINTER(ctypes.POINTER(ifaddrs))]
+    libc.getifaddrs.restype = ctypes.c_int
+    libc.freeifaddrs.argtypes = [ctypes.POINTER(ifaddrs)]
+    libc.freeifaddrs.restype = None
+    ifap = ctypes.POINTER(ifaddrs)()
+    result = libc.getifaddrs(ctypes.pointer(ifap))
+    if result != 0:
+        return []
+    addresses = []
+    ifa = ifap
+    try:
+        while ifa:
+            if ifa.contents.ifa_addr:
+                family = ifa.contents.ifa_addr.contents.sa_family
+                name = ifa.contents.ifa_name.decode('utf-8') if ifa.contents.ifa_name else None
+                if family in (socket.AF_INET, socket.AF_INET6):
+                    # skip loopback and non-multicast interfaces
+                    if ifa.contents.ifa_flags & 8 or not ifa.contents.ifa_flags & 0x1000:
+                        ifa = ifa.contents.ifa_next
+                        continue
+                if family == socket.AF_INET:
+                    addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_in))
+                    addr_bytes = bytes(addr_ptr.contents.sin_addr)
+                    if_index = socket.if_nametoindex(name) if name else 0
+                    addresses.append(('ip', family, addr_bytes, if_index))
+                elif family == socket.AF_INET6:
+                    addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_in6))
+                    addr_bytes = bytes(addr_ptr.contents.sin6_addr)
+                    scope_id = addr_ptr.contents.sin6_scope_id
+                    addresses.append(('ip', family, addr_bytes, scope_id))          
+                elif family == socket.AF_PACKET:
+                    addr_ptr = ctypes.cast(ifa.contents.ifa_addr, ctypes.POINTER(sockaddr_ll))
+                    halen = addr_ptr.contents.sll_halen
+                    if addr_ptr.contents.sll_hatype in (1, 32) and halen > 0:  # ARPHRD_ETHER or ARPHRD_INFINIBAND
+                        if addr_ptr.contents.sll_hatype == 1 and addr_ptr.contents.sll_addr[0] & 2:  # skip locally administered MACs
+                            ifa = ifa.contents.ifa_next
+                            continue
+                        mac_bytes = bytes(addr_ptr.contents.sll_addr[:halen])
+                        macaddr = ':'.join('{:02x}'.format(b) for b in mac_bytes)
+                        addresses.append(('ETHER', name, macaddr))                
+            ifa = ifa.contents.ifa_next
+    finally:
+        libc.freeifaddrs(ifap)
+    
+    return addresses
+
+def scan_confluents(confuuid=None):
     srvs = {}
     s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -83,18 +167,24 @@ def scan_confluents():
     s4.bind(('0.0.0.0', 1900))
     doneidxs = set([])
     msg = 'M-SEARCH * HTTP/1.1\r\nST: urn:xcat.org:service:confluent:'
-    with open('/etc/confluent/confluent.deploycfg') as dcfg:
-        for line in dcfg.read().split('\n'):
-            if line.startswith('confluent_uuid:'):
-                confluentuuid = line.split(': ')[1]
-                msg += '/confluentuuid=' + confluentuuid
-                break
-    with open('/sys/devices/virtual/dmi/id/product_uuid') as uuidin:
-        msg += '/uuid=' + uuidin.read().strip()
-    for addrf in glob.glob('/sys/class/net/*/address'):
-        with open(addrf) as addrin:
-            hwaddr = addrin.read().strip()
-            msg += '/mac=' + hwaddr
+    if not confuuid and os.path.exists('/etc/confluent/confluent.deploycfg'):
+        with open('/etc/confluent/confluent.deploycfg') as dcfg:
+            for line in dcfg.read().split('\n'):
+                if line.startswith('confluent_uuid:'):
+                    confluentuuid = line.split(': ')[1]
+                    msg += '/confluentuuid=' + confluentuuid
+                    break
+    if not confuuid and os.path.exists('/confluent_uuid'):
+        with open('/confluent_uuid') as cuuidin:
+            confluentuuid = cuuidin.read().strip()
+            msg += '/confluentuuid=' + confluentuuid
+    try:
+        with open('/sys/devices/virtual/dmi/id/product_uuid') as uuidin:
+            msg += '/uuid=' + uuidin.read().strip()
+    except Exception:
+        pass
+    for iface, hwaddr in get_mac_addresses():
+        msg += '/mac=' + hwaddr
     msg = msg.encode('utf8')
     for addr in get_my_addresses():
         if addr[0] == socket.AF_INET6:
@@ -122,6 +212,7 @@ def scan_confluents():
     srvlist = []
     if r:
         r = r[0]
+    nodename = None
     while r:
         for s in r:
             (rsp, peer) = s.recvfrom(9000)
@@ -129,6 +220,7 @@ def scan_confluents():
             current = None
             for line in rsp:
                 if line.startswith(b'NODENAME: '):
+                    nodename = line.replace(b'NODENAME: ', b'').strip().decode('utf8')
                     current = {}
                 elif line.startswith(b'DEFAULTNET: 1'):
                     current['isdefault'] = True
@@ -140,20 +232,37 @@ def scan_confluents():
             if currip.startswith('fe80::') and '%' not in currip:
                 currip = '{0}%{1}'.format(currip, peer[-1])
             srvs[currip] = current
-            srvlist.append(currip)
+            if currip not in srvlist:
+                srvlist.append(currip)
         r = select.select((s4, s6), (), (), 2)
         if r:
             r = r[0]
+    if not os.path.exists('/etc/confluent/confluent.info'):
+        with open('/etc/confluent/confluent.info', 'w+') as cinfo:
+            if nodename:
+                cinfo.write('NODENAME: {0}\n'.format(nodename))
+            for srv in srvlist:
+                cinfo.write('MANAGER: {0}\n'.format(srv))
     return srvlist, srvs
 
 
-def get_net_apikey(nodename, mgr):
+def get_net_apikey(nodename, mgr, hmackey=None, confuuid=None):
     alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789./'
     newpass = ''.join([alpha[x >> 2] for x in bytearray(os.urandom(32))])
     salt = '$5$' + ''.join([alpha[x >> 2] for x in bytearray(os.urandom(8))])
     newpass = newpass.encode('utf8')
     salt = salt.encode('utf8')
     crypted = c_crypt(newpass, salt)
+    if hmackey:
+        hmacvalue = hmac.new(hmackey.encode('utf8'), crypted, hashlib.sha256).digest()
+        hmacvalue = base64.b64encode(hmacvalue).decode('utf8')
+        client = HTTPSClient(host=mgr, phmac=hmacvalue, nodename=nodename, confuuid=confuuid)
+        try:
+            status, rsp = client.grab_url_with_status('/confluent-api/self/registerapikey', data=crypted, returnrsp=True)
+            if status == 200:
+                return newpass.decode('utf8')
+        except Exception:
+            pass
     for addrinfo in socket.getaddrinfo(mgr, 13001, 0, socket.SOCK_STREAM):
         try:
             clisock = socket.socket(addrinfo[0], addrinfo[1])
@@ -191,7 +300,7 @@ def get_net_apikey(nodename, mgr):
     return ''
 
 
-def get_apikey(nodename, hosts, errout=None):
+def get_apikey(nodename, hosts, errout=None, hmackey=None, confuuid=None):
     apikey = ""
     if os.path.exists('/etc/confluent/confluent.apikey'):
         apikey = open('/etc/confluent/confluent.apikey').read().strip()
@@ -200,16 +309,16 @@ def get_apikey(nodename, hosts, errout=None):
     while not apikey:
         for host in hosts:
             try:
-                apikey = get_net_apikey(nodename, host)
+                apikey = get_net_apikey(nodename, host, hmackey=hmackey, confuuid=confuuid)
             except OSError:
                 apikey = None
             if apikey:
                 break
         else:
-            srvlist, _ = scan_confluents()
+            srvlist, _ = scan_confluents(confuuid=confuuid)
             for host in srvlist:
                 try:
-                    apikey = get_net_apikey(nodename, host)
+                    apikey = get_net_apikey(nodename, host, hmackey=hmackey, confuuid=confuuid)
                 except OSError:
                     apikey = None
                 if apikey:
@@ -227,34 +336,43 @@ def get_apikey(nodename, hosts, errout=None):
     return apikey
 
 class HTTPSClient(client.HTTPConnection, object):
-    def __init__(self, usejson=False, port=443, host=None, errout=None, phmac=None, checkonly=False):
+    def __init__(self, usejson=False, port=443, host=None, errout=None, phmac=None, checkonly=False, hmackey=None, nodename=None, confuuid=None):
+        self.ignorehosts = set([])
         self.phmac = phmac
+        self.hmackey = hmackey
+        self.confuuid = confuuid
         self.errout = None
+        self.stdheaders = {}
+        if nodename:
+            self.stdheaders['CONFLUENT_NODENAME'] = nodename
         if errout:
             self.errout = open(errout, 'w')
             self.errout.flush()
-        self.stdheaders = {}
         mgtiface = None
         if usejson:
             self.stdheaders['ACCEPT'] = 'application/json'
         if host:
             self.hosts = [host]
-            with open('/etc/confluent/confluent.info') as cinfo:
-                info = cinfo.read().split('\n')
-                for line in info:
-                    if line.startswith('NODENAME:'):
-                        node = line.split(' ')[1]
-                        self.stdheaders['CONFLUENT_NODENAME'] = node
+            if not nodename:
+                with open('/etc/confluent/confluent.info') as cinfo:
+                    info = cinfo.read().split('\n')
+                    for line in info:
+                        if line.startswith('NODENAME:'):
+                            nodename = line.split(' ')[1]
+            self.stdheaders['CONFLUENT_NODENAME'] = nodename
         else:
             self.hosts = []
-            info = open('/etc/confluent/confluent.info').read().split('\n')
+            try:
+                info = open('/etc/confluent/confluent.info').read().split('\n')
+            except Exception:
+                info = []
             havedefault = '0'
             plainhost = ''
             for line in info:
                 host = ''
                 if line.startswith('NODENAME:'):
-                    node = line.split(' ')[1]
-                    self.stdheaders['CONFLUENT_NODENAME'] = node
+                    nodename = line.split(' ')[1]
+                    self.stdheaders['CONFLUENT_NODENAME'] = nodename
                 if line.startswith('MANAGER:') and not host:
                     host = line.split(' ')[1]
                     self.hosts.append(host)
@@ -289,15 +407,14 @@ class HTTPSClient(client.HTTPConnection, object):
             if plainhost and not self.hosts:
                 self.hosts.append(plainhost)
         if self.phmac:
-            with open(phmac, 'r') as hmacin:
-                self.stdheaders['CONFLUENT_CRYPTHMAC'] = hmacin.read()
+            self.stdheaders['CONFLUENT_CRYPTHMAC'] = self.phmac
         elif not checkonly:
-            self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(node, self.hosts, errout=self.errout)
+            self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(nodename, self.hosts, errout=self.errout, hmackey=hmackey, confuuid=self.confuuid)
         if mgtiface:
             self.stdheaders['CONFLUENT_MGTIFACE'] = mgtiface
         self.port = port
         self.host = None
-        self.node = node
+        self.node = nodename
         host = self.check_connections()
         client.HTTPConnection.__init__(self, host, port)
         self.connect()
@@ -315,6 +432,8 @@ class HTTPSClient(client.HTTPConnection, object):
         ctx.check_hostname = True
         for timeo in (0.1, 5):
             for host in hosts:
+                if host in self.ignorehosts:
+                    continue
                 try:
                     addrinf = socket.getaddrinfo(host, self.port)[0]
                     psock = socket.socket(addrinf[0])
@@ -335,7 +454,7 @@ class HTTPSClient(client.HTTPConnection, object):
                 continue
             break
         if not foundsrv:
-            srvlist, srvs = scan_confluents()
+            srvlist, srvs = scan_confluents(self.confuuid)
             hosts = []
             for srv in srvlist:
                 if srvs[srv].get('isdefault', False):
@@ -409,11 +528,101 @@ class HTTPSClient(client.HTTPConnection, object):
                 with open('/etc/confluent/confluent.apikey', 'w+') as akfile:
                     akfile.write('')
                 self.stdheaders['CONFLUENT_APIKEY'] = get_apikey(
-                    self.node, [self.host], errout=self.errout)
+                    self.node, [self.host], errout=self.errout, hmackey=self.hmackey, confuuid=self.confuuid)
+            if rsp.status == 503:  # confluent is down, but the server running confluent is otherwise up
+                authed = False
+                self.ignorehosts.add(self.host)
+                host = self.check_connections()
+                client.HTTPConnection.__init__(self, host, self.port)
+
         raise Exception(rsp.read())
+
+def get_current_vmnic_vswitch():
+    uplinkmatch = re.compile(r'^\s*Uplinks:\s*(.*)')
+    switchmatch = re.compile(r'^\s*Name:\s*(.*)')
+
+    vswinfo = subprocess.check_output(['localcli', 'network', 'vswitch', 'standard', 'list']).decode()
+
+    vmnic = None
+    vswitch_name = None
+
+    for info in vswinfo.split('\n'):
+        name_match = switchmatch.match(info)
+        if name_match:
+            vswitch_name = name_match.group(1).strip()
+
+        upinfo = uplinkmatch.match(info)
+        if upinfo:
+            vmnic = upinfo.group(1).strip()
+            if vmnic and 'vusb0' not in vmnic:
+                return vswitch_name, vmnic
+
+    return vswitch_name, vmnic
+
+def get_available_nics():
+    nicinfo = subprocess.check_output(['localcli', 'network', 'nic', 'list']).decode('utf8').split('\n')
+    available_nics = {}
+
+    # Skip headers and separators
+    parsing_started = False
+    for line in nicinfo:
+        if re.match(r'^-+', line):
+            parsing_started = True
+            continue
+        if not parsing_started or not line.strip():
+            continue
+
+        parts = re.split(r'\s{2,}', line.strip())
+        if len(parts) >= 5:
+            nic_name = parts[0]
+            nic_status = parts[4]  # "Link Status" is the 5th field
+            available_nics[nic_name] = nic_status
+
+    return available_nics
+
+def is_esxi():
+    return os.path.isdir("/etc/vmware")
+
+def fix_vswitch():
+    if is_esxi():
+        start_time = time.time()
+        while True:
+
+            current_vswitch, current_vmnic = get_current_vmnic_vswitch()
+            if current_vswitch is None:
+                raise RuntimeError("Panic: current vswitch is None")
+            if current_vmnic is None:
+                raise RuntimeError("Panic: current vmnic is None")
+
+            available_nics = get_available_nics()
+
+            if current_vmnic and available_nics.get(current_vmnic) == 'Up':
+                break
+
+            new_vmnic = next((nic for nic, status in available_nics.items() if status == 'Up'), None)
+
+            if new_vmnic and new_vmnic != current_vmnic:
+                subprocess.check_call(['localcli', 'network', 'vswitch', 'standard', 'uplink', 'remove',
+                                       '--uplink-name', current_vmnic, '--vswitch-name', current_vswitch])
+                subprocess.check_call(['localcli', 'network', 'vswitch', 'standard', 'uplink', 'add',
+                                       '--uplink-name', new_vmnic, '--vswitch-name', current_vswitch])
+            elif not new_vmnic:
+                if time.time() - start_time > 300:
+                    break
+            time.sleep(5)
+
+        time.sleep(5)
 
 if __name__ == '__main__':
     data = None
+
+    if '-f' in sys.argv:
+        try:
+            fix_vswitch()
+        except Exception as e:
+            print("fix_vswitch() error: {}".format(e))
+        sys.argv.remove('-f')
+        sys.exit(0)
     usejson = False
     if '-j' in sys.argv:
         usejson = True
@@ -448,8 +657,24 @@ if __name__ == '__main__':
         phmac = sys.argv.index('-p')
         sys.argv.pop(phmac)
         phmac = sys.argv.pop(phmac)
+        with open(phmac, 'r') as hmacin:
+            phmac = hmacin.read()
     except ValueError:
         phmac = None
+    try:
+        identfile = sys.argv.index('-i')
+        sys.argv.pop(identfile)
+        identfile = sys.argv.pop(identfile)
+        with open(identfile) as idin:
+            data = idin.read()
+            identinfo = json.loads(data)
+            nodename = identinfo.get('nodename', None)
+            hmackey = identinfo.get('apitoken', None)
+            confuuid = identinfo.get('confluent_uuid', None)
+    except ValueError:
+        hmackey = None
+        nodename = None
+        confuuid = None
     try:
         checkonly = False
         idxit = sys.argv.index('-c')
@@ -461,20 +686,21 @@ if __name__ == '__main__':
         data = open(sys.argv[-1]).read()
     if outbin:
         with open(outbin, 'ab+') as outf:
-            reader = HTTPSClient(usejson=usejson, errout=errout).grab_url(
+            reader = HTTPSClient(usejson=usejson, errout=errout, hmackey=hmackey, nodename=nodename, confuuid=confuuid).grab_url(
                 sys.argv[1], data, returnrsp=True)
             chunk = reader.read(16384)
             while chunk:
                 outf.write(chunk)
                 chunk = reader.read(16384)
         sys.exit(0)
-    client = HTTPSClient(usejson, errout=errout, phmac=phmac, checkonly=checkonly)
+
+    mclient = HTTPSClient(usejson, errout=errout, phmac=phmac, checkonly=checkonly, hmackey=hmackey, nodename=nodename, confuuid=confuuid)
     if waitfor:
         status = 201
         while status != waitfor:
-            status, rsp = client.grab_url_with_status(sys.argv[1], data)
+            status, rsp = mclient.grab_url_with_status(sys.argv[1], data)
             sys.stdout.write(rsp.decode())
     elif checkonly:
-        sys.stdout.write(client.check_connections())
+        sys.stdout.write(mclient.check_connections())
     else:
-        sys.stdout.write(client.grab_url(sys.argv[1], data).decode())
+        sys.stdout.write(mclient.grab_url(sys.argv[1], data).decode())

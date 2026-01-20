@@ -45,7 +45,10 @@ try:
         cfg['ipv4_gateway'] = ncfg['ipv4_gateway']
 except Exception:
     pass
-netline = 'network --hostname={0} --bootproto={1}'.format(nodename, cfg['ipv4_method'])
+if cfg['ipv4_method'] == 'static':
+    netline = 'network --hostname={0} --bootproto={1}'.format(nodename, cfg['ipv4_method'])
+else:
+    netline = 'network --bootproto=dhcp'
 if vmnic:
     netline += ' --device={0}'.format(vmnic)
 if cfg['ipv4_method'] == 'static':

@@ -1,8 +1,8 @@
 pushd $(dirname $0)
 rm -rf licenses
 cp -a 97genesis /usr/lib/dracut/modules.d/
-cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97genesis/install
-chmod +x /usr/lib/dracut/modules.d/97genesis/install /usr/lib/dracut/modules.d/97genesis/installkernel
+#cat /usr/lib/dracut/modules.d/97genesis/install-* > /usr/lib/dracut/modules.d/97genesis/install
+chmod +x /usr/lib/dracut/modules.d/97genesis/install*
 mkdir -p boot/initramfs
 mkdir -p boot/efi/boot
 dracut --no-early-microcode --xz -N -m "genesis base" -f boot/initramfs/distribution $(uname -r)

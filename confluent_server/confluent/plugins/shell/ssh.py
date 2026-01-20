@@ -52,7 +52,10 @@ class SshShell(conapi.Console):
         self.height = height
         if not self.connected:
             return
-        self.shell[0].channel.change_terminal_size(width=width, height=height)
+        try:
+            self.shell[0].channel.change_terminal_size(width=width, height=height)
+        except Exception:
+            pass
 
     async def recvdata(self):
         while self.connected:
@@ -192,6 +195,7 @@ class SshShell(conapi.Console):
             self.shell[0].write(data.decode())
 
     async def close(self):
+        self.connected = False
         if self.ssh is not None:
             self.ssh.close()
         self.datacallback = None

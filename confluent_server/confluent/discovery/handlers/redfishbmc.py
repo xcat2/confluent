@@ -22,6 +22,7 @@ try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
+import eventlet.green.subprocess as subprocess
 
 from socket import getaddrinfo
 
@@ -67,15 +68,20 @@ class NodeHandler(generic.NodeHandler):
                 self._srvroot = srvroot
         return self._srvroot
 
+    def get_manager_url(self, wc):
+        #TODO:asyncmerge: make async
+        mgrs = self.srvroot(wc).get('Managers', {}).get('@odata.id', None)
+        if not mgrs:
+            raise Exception("No Managers resource on BMC")
+        rsp = wc.grab_json_response(mgrs)
+        if len(rsp.get('Members', [])) != 1:
+            raise Exception("Can not handle multiple Managers")
+        mgrurl = rsp['Members'][0]['@odata.id']
+        return mgrurl
+
     async def mgrinfo(self, wc):
         if not self._mgrinfo:
-            svroot = await self.srvroot(wc)
-            mgrs = svroot['Managers']['@odata.id']
-            rsp = await wc.grab_json_response(mgrs)
-            if len(rsp['Members']) != 1:
-                raise Exception("Can not handle multiple Managers")
-            mgrurl = rsp['Members'][0]['@odata.id']
-            self._mgrinfo = await wc.grab_json_response(mgrurl)
+            self._mgrinfo = await wc.grab_json_response(self.get_manager_url(wc))
         return self._mgrinfo
 
 
@@ -280,8 +286,26 @@ class NodeHandler(generic.NodeHandler):
                     continue
                 actualnics.append(candnic)
             if len(actualnics) != 1:
-                raise Exception("Multi-interface BMCs are not supported currently")
-            currnet = await wc.grab_json_response(actualnics[0])
+                compip = self.ipaddr
+                if ':' in compip:
+                    compip = compip.split('%')[0]
+                    ipkey = 'IPv6Addresses'
+                else:
+                    ipkey = 'IPv4Addresses'
+                actualnic = None
+                for curractnic in actualnics:
+                    currnicinfo = await wc.grab_json_response(curractnic)
+                    for targipaddr in currnicinfo.get(ipkey, []):
+                        targipaddr = targipaddr.get('Address', 'Z')
+                        if compip == targipaddr:
+                            actualnic = curractnic
+                            break
+                    if actualnic:
+                        break
+                else:
+                    raise Exception("Unable to detect active NIC of multi-nic bmc")
+                actualnics = [actualnic]
+            currnet = wc.grab_json_response(actualnics[0])
             netconfig = netutil.get_nic_config(self.configmanager, nodename, ip=newip)
             newconfig = {
                 "Address": newip,
@@ -307,6 +331,14 @@ class NodeHandler(generic.NodeHandler):
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
 
+    def autosign_certificate(self):
+        nodename = self.nodename
+        hwmgt_method = self.configmanager.get_node_attributes(
+            nodename, 'hardwaremanagement.method').get(
+                nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
+        if hwmgt_method != 'redfish':
+            return
+        subprocess.check_call(['/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'])
 
 def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(

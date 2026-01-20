@@ -66,6 +66,52 @@ def get_conn_params(node, configdata):
 _configattributes = ('secret.hardwaremanagementuser',
                      'secret.hardwaremanagementpassword',
                      'hardwaremanagement.manager')
+
+class WrappedWebSocket(wso):
+
+    def set_verify_callback(self, callback):
+        self._certverify = callback
+
+    def connect(self, url, **options):
+        add_tls = url.startswith('wss://')
+        if add_tls:
+            hostname, port, resource, _ = websocket._url.parse_url(url)
+            if hostname[0] != '[' and ':' in hostname:
+                hostname = '[{0}]'.format(hostname)
+            if resource[0] != '/':
+                resource = '/{0}'.format(resource)
+            url = 'ws://{0}:443{1}'.format(hostname,resource)
+        else:
+            return super(WrappedWebSocket, self).connect(url, **options)
+        self.sock_opt.timeout = options.get('timeout', self.sock_opt.timeout)
+        self.sock, addrs = websocket._http.connect(url, self.sock_opt, websocket._http.proxy_info(**options),
+                                           options.pop('socket', None))
+        self.sock = ssl.wrap_socket(self.sock, cert_reqs=ssl.CERT_NONE)
+        # The above is supersedeed by the _certverify, which provides
+        # known-hosts style cert validaiton
+        bincert = self.sock.getpeercert(binary_form=True)
+        if not self._certverify(bincert):
+            raise pygexc.UnrecognizedCertificate('Unknown certificate', bincert)
+        try:
+            try:
+                self.handshake_response = websocket._handshake.handshake(self.sock, *addrs, **options)
+            except TypeError:
+                self.handshake_response = websocket._handshake.handshake(self.sock, url, *addrs, **options)
+            if self.handshake_response.status in websocket._handshake.SUPPORTED_REDIRECT_STATUSES:
+                options['redirect_limit'] = options.pop('redirect_limit', 3) - 1
+                if options['redirect_limit'] < 0:
+                     raise Exception('Redirect limit hit')
+                url = self.handshake_response.headers['location']
+                self.sock.close()
+                return self.connect(url, **options)
+            self.connected = True
+        except:
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+            raise
+
+
          
 
 

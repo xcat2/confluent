@@ -805,6 +805,7 @@ async def become_leader(connection):
     if reassimilate is not None:
         reassimilate.cancel()
     reassimilate = tasks.spawn_task(reassimilate_missing())
+    cfm._init_indexes()
     cfm._ready = True
     if await _assimilate_missing(skipaddr):
         schedule_rebalance()

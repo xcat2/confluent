@@ -1,6 +1,6 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
-# Copyright 2016 Lenovo
+# Copyright 2016-2025 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,14 +30,20 @@ async def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
     res = await asyncio.get_event_loop().getaddrinfo(name, 161, type=socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
-        return snmp.Udp6TransportTarget(res[0][4], 2)
+        if asyn:
+            return _run_coro(snmp.Udp6TransportTarget.create(res[0][4], 2))
+        else:
+            return snmp.Udp6TransportTarget(res[0][4], 2)
     else:
-        return snmp.UdpTransportTarget(res[0][4], 2)
+        if asyn:
+            return _run_coro(snmp.UdpTransportTarget.create(res[0][4], 2))
+        else:
+            return snmp.UdpTransportTarget(res[0][4], 2)
 
 
 class Session(object):
 
-    def __init__(self, server, secret, username=None, context=None):
+    def __init__(self, server, secret, username=None, context=None, privacy_protocol=None):
         """Create a new session to interrogate a switch
 
         If username is not given, it is assumed that
@@ -56,9 +62,17 @@ class Session(object):
             # SNMP v2c
             self.authdata = snmp.CommunityData(secret, mpModel=1)
         else:
+            if privacy_protocol == 'aes':
+                privproto = snmp.usmAesCfb128Protocol
+            elif privacy_protocol in ('des', None):
+                privproto = snmp.usmDESPrivProtocol
+            else:
+                raise exc.ConfluentException('Unsupported SNMPv3 privacy protocol '
+                                             '{0}'.format(privacy_protocol))
             self.authdata = snmp.UsmUserData(
                 username, authKey=secret, privKey=secret,
-                authProtocol=snmp.usmHMACSHAAuthProtocol)
+                authProtocol=snmp.usmHMACSHAAuthProtocol,
+                privProtocol=privproto)
         self.eng = snmp.SnmpEngine()
 
     async def walk(self, oid):
@@ -80,12 +94,13 @@ class Session(object):
         if '::' in oid:
             resolvemib = True
             mib, field = oid.split('::')
+            obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(mib, field))
             obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
         else:
-            obj = snmp.ObjectType(snmp.ObjectIdentity(oid))
-        rsps = snmp.bulkWalkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
-                               lexicographicMode=False, lookupMib=resolvemib)
-        async for rsp in rsps:
+            obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(oid))
+        walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+                                   lexicographicMode=False, lookupMib=resolvemib)
+        async for rsp in walking:
             errstr, errnum, erridx, answers = rsp
             if errstr:
                 errstr = str(errstr)

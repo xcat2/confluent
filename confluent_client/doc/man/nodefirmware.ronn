@@ -3,7 +3,7 @@ nodefirmware(8) -- Report firmware information on confluent nodes
 
 ## SYNOPSIS
 
-`nodefirmware <noderange> [list][update [--backup <file>]]|[<components>]`
+`nodefirmware <noderange> [list][updatestatus][update [--backup <file>]]|[<components>]`
 
 ## DESCRIPTION
 
@@ -16,6 +16,9 @@ different capabilities available.  For example, the 'core' distinction may
 not be relevant to redfish.  Additionally, the Lenovo XCC makes certain
 information available over IPMI that is not otherwise available (for example
 the FPGA version where applicable).
+
+The updatestatus argument will describe the state of firmware updates on the
+nodes.
 
 In the update form, it accepts a single file and attempts to update it using
 the out of band facilities.  Firmware updates can end in one of three states:

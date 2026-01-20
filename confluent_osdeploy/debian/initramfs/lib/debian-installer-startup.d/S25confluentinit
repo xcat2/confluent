@@ -14,65 +14,127 @@ setdebopt() {
     echo d-i $1 $3 $2 >> /preseed.cfg
 }
 
-dhuuid=$(reverse_uuid $(cat /sys/devices/virtual/dmi/id/product_uuid))
-dhcpid=$(mktemp)
 mkdir -p /etc/confluent
-cp /tls/* /etc/ssl/certs/
-for nic in $(ip link | grep mtu|grep -v LOOPBACK|cut -d: -f 2|sed -e 's/ //'); do
-     ip link set $nic up
+for i in /sys/class/net/*; do
+    ip link set $(basename $i) up
 done
-for nic in $(ip link | grep mtu|grep -v LOOPBACK|grep LOWER_UP|cut -d: -f 2|sed -e 's/ //'); do
-    if udhcpc -i $nic -p $dhcpid -t 2 -T 2 -n -x 93:0007 -x 97:00$dhuuid -q; then
-         /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
-         if grep ^MANAGER:.*\\. /etc/confluent/confluent.info ; then
-             break
-         fi
+TRIES=5
+while [ ! -e /dev/disk ] && [ $TRIES -gt 0 ]; do
+    sleep 2
+    TRIES=$((TRIES - 1))
+done
+for i in /sys/class/net/*; do
+    ip link set $(basename $i) down
+    udevadm info $i | grep ID_NET_DRIVER=cdc_ether > /dev/null &&  continue
+    ip link set $(basename $i) up
+done
+cp -a /tls/* /etc/ssl/certs/
+mkdir -p /etc/confluent
+if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    tmnt=$(mktemp -d)
+    tcfg=$(mktemp)
+    mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
+    cd $tmnt
+    deploysrvs=$(sed -n '/^deploy_servers:/,/^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+    nodename=$(grep ^nodename: cnflnt.yml|cut -f 2 -d ' ')
+    echo NODENAME: $nodename > /etc/confluent/confluent.info
+    sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
+    autoconfigmethod=$(grep ^ipv4_method: $tcfg)
+    autoconfigmethod=${autoconfigmethod#ipv4_method: }
+    if [ "$autoconfigmethod" = "static" ]; then
+        setdebopt netcfg/disable_dhcp true boolean
+        v4addr=$(grep ^ipv4_address: $tcfg|cut -d: -f 2|sed -e 's/ //')
+        v4gw=$(grep ^ipv4_gateway: $tcfg|cut -d: -f 2| sed -e 's/ //')
+        if [ "$v4gw" = "null" ]; then
+            v4gw=""
+        fi
+        v4nm=$(grep ^ipv4_netmask: $tcfg|cut -d: -f 2|sed -e 's/ //')
+        setdebopt netcfg/get_netmask $v4nm string
+        setdebopt netcfg/get_ipaddress ${v4addr%/*} string
+        setdebopt netcfg/confirm_static true boolean
+        if [ ! -z "$v4gw" ]; then
+            setdebopt netcfg/get_gateway $v4gw string
+        fi
+        NIC=""
+        while [ -z "$NIC" ]; do
+            for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+                ip addr add dev $NICGUESS $v4addr
+                if [ ! -z "$v4gw" ]; then
+                    ip route add default via $v4gw
+                fi
+                for dsrv in $deploysrvs; do
+                    if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
+                        deploysrvs=$dsrv
+                        NIC=$NICGUESS
+                        setdebopt netcfg/choose_interface $NIC select
+                        break
+                    fi
+                done
+                if [ -z "$NIC" ]; then
+                    ip -4 a flush dev $NICGUESS
+                else
+                    break
+                fi
+            done
+        done
+        #TODO: nameservers
+    elif [ "$v4cfgmeth" = "dhcp" ]; then
+        setdebopt netcfg/disable_dhcp false boolean
+        setdebopt netcfg/confirm_static false boolean
+        for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+            udhcpc $NICGUESS
+        done
+        for dsrv in $deploysrvs; do
+            if wget https://$dsrv/confluent-public/ --tries=1 --timeout=1 -O /dev/null > /dev/null 2>&1; then
+                deploysrvs=$dsrv
+            fi
+        done
     fi
-    ip -4 flush dev $nic
-done    
-mgr=$(grep ^MANAGER:.*\\. /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|sed -e 's/ //')
-nodename=$(grep ^NODENAME: /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|sed -e 's/ //')
-/opt/confluent/bin/clortho $nodename $mgr > /etc/confluent/confluent.apikey
+    mgr=$deploysrvs
+    ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
+    hmackeyfile=/tmp/cnflnthmackeytmp
+    passfile=/tmp/cnflnttmppassfile
+    passcrypt=/tmp/cnflntcryptfile
+    hmacfile=/tmp/cnflnthmacfile
+    echo -n $(grep ^apitoken: cnflnt.yml|cut -d ' ' -f 2) > $hmackeyfile
+    /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+    wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_CRYPTHMAC: $(cat $hmacfile)" --post-file=$passcrypt https://$mgr/confluent-api/self/registerapikey -O - --quiet
+    cp $passfile /etc/confluent/confluent.apikey
+    nic=$NIC
+else
+    dhuuid=$(reverse_uuid $(cat /sys/devices/virtual/dmi/id/product_uuid))
+    dhcpid=$(mktemp)
+    mkdir -p /etc/confluent
+    cp /tls/* /etc/ssl/certs/
+    cat /tls/*.pem >> /etc/confluent/ca.pem
+    for nic in $(ip link | grep mtu|grep -v LOOPBACK|cut -d: -f 2|sed -e 's/ //'); do
+        ip link set $nic up
+    done
+    for nic in $(ip link | grep mtu|grep -v LOOPBACK|grep LOWER_UP|cut -d: -f 2|sed -e 's/ //'); do
+        if udhcpc -i $nic -p $dhcpid -t 2 -T 2 -n -x 93:0007 -x 97:00$dhuuid -q; then
+            /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
+            if grep ^MANAGER:.*\\. /etc/confluent/confluent.info ; then
+                break
+            fi
+        fi
+        ip -4 flush dev $nic
+    done
+    mgr=$(grep ^MANAGER:.*\\. /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|sed -e 's/ //')
+    nodename=$(grep ^NODENAME: /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|sed -e 's/ //')
+    /opt/confluent/bin/clortho $nodename $mgr > /etc/confluent/confluent.apikey
+fi
 apikey=$(cat /etc/confluent/confluent.apikey)
 cd /etc/confluent
 wget --header="CONFLUENT_NODENAME: $nodename" --header="CONFLUENT_APIKEY: $apikey" https://$mgr/confluent-api/self/deploycfg
 cd -
 predir=$(mktemp -d)
 cd $predir
+cp /etc/confluent/deploycfg /etc/confluent/confluent.deploycfg
 profile=$(grep ^profile: /etc/confluent/deploycfg|cut -d ' ' -f 2)
-wget https://$mgr/confluent-public/os/$profile/scripts/pre.sh
-chmod u+x pre.sh
-wget https://$mgr/confluent-public/os/$profile/preseed.cfg
-mv preseed.cfg /
-setdebopt auto-install/enable true boolean
-setdebopt partman/early_command  $predir/pre.sh string
-cd -
-ip -4 a flush dev $nic
-setdebopt netcfg/choose_interface $nic select
-setdebopt netcfg/get_hostname $nodename string
-v4cfgmeth=$(grep ipv4_method: /etc/confluent/deploycfg |cut -d: -f 2|sed -e 's/ //')
-if [ "$v4cfgmeth" = "static" ]; then
-    setdebopt netcfg/disable_dhcp true boolean
-    v4addr=$(grep ^ipv4_address: /etc/confluent/deploycfg|cut -d: -f 2|sed -e 's/ //')
-    v4gw=$(grep ^ipv4_gateway: /etc/confluent/deploycfg|cut -d: -f 2| sed -e 's/ //')
-    if [ "$v4gw" = "null" ]; then
-        v4gw=""
-    fi
-    v4nm=$(grep ^ipv4_netmask: /etc/confluent/deploycfg|cut -d: -f 2|sed -e 's/ //')
-    setdebopt netcfg/get_netmask $v4nm string
-    setdebopt netcfg/get_ipaddress $v4addr string
-    setdebopt netcfg/confirm_static true boolean
-    if [ ! -z "$v4gw" ]; then
-        setdebopt netcfg/get_gateway $v4gw string
-    fi
-    namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
-    for namesrv in "$namesrvs"; do
-        setdebopt netcfg/get_nameservers $namesrv string
-    done
-elif [ "$v4cfgmeth" = "dhcp" ]; then
-    setdebopt netcfg/disable_dhcp false boolean
-    setdebopt netcfg/confirm_static false boolean
-fi
+namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
+for namesrv in "$namesrvs"; do
+    setdebopt netcfg/get_nameservers $namesrv string
+done
 rootpass=$(grep ^rootpassword: /etc/confluent/deploycfg|cut -d ' ' -f 2|sed -e 's/ //')
 if [ "$rootpass" = null ] || [ -z "$rootpass" ]; then
     setdebopt passwd/root-login false boolean
@@ -84,9 +146,8 @@ setdebopt time/zone $(grep ^timezone: /etc/confluent/deploycfg|cut -d ' ' -f 2|s
 ntpsrvs=$(sed -n '/^ntpservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
 for ntpsrv in "$ntpsrvs"; do
     setdebopt clock-setup/ntp true boolean
-    setdebopt clock-setup/ntep-server $ntpsrv string
+    setdebopt clock-setup/ntp-server $ntpsrv string
 done
-#setdebopt console-setup/layoutcode $(grep ^keymap: /etc/confluent/deploycfg|cut -d ' ' -f 2) string
 setdebopt debian-installer/locale $(grep ^locale: /etc/confluent/deploycfg|cut -d ' ' -f 2) select
 domainname=$(grep ^dnsdomain: /etc/confluent/deploycfg|cut -d ' ' -f 2)
 if [ ! -z "$domainname" ] && [ "$domainname" != "null" ]; then
@@ -95,3 +156,54 @@ fi
 
 
 
+
+wget https://$mgr/confluent-public/os/$profile/scripts/pre.sh
+chmod u+x pre.sh
+wget https://$mgr/confluent-public/os/$profile/scripts/prechroot.sh
+chmod u+x prechroot.sh
+wget https://$mgr/confluent-public/os/$profile/scripts/post.sh
+chmod u+x post.sh
+wget https://$mgr/confluent-public/os/$profile/preseed.cfg
+cat preseed.cfg >> /preseed.cfg
+echo $mgr > /etc/confluent/deployer
+setdebopt auto-install/enable true boolean
+setdebopt partman/early_command  $predir/pre.sh string
+setdebopt preseed/late_command $predir/prechroot.sh string
+mv $predir/post.sh /tmp/
+cd -
+ip -4 a flush dev $nic
+setdebopt netcfg/choose_interface $nic select
+setdebopt netcfg/get_hostname $nodename string
+setdebopt netcfg/hostname $nodename string
+setdebopt mirror/protocol https string
+setdebopt mirror/country manual string
+setdebopt mirror/https/hostname deb.debian.org string
+setdebopt mirror/https/directory /debian/ string
+setdebopt mirror/protocol https string
+setdebopt mirror/https/proxy "" string
+#setdebopt apt-setup/security_host $mgr string
+if [ ! -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+    v4cfgmeth=$(grep ipv4_method: /etc/confluent/deploycfg |cut -d: -f 2|sed -e 's/ //')
+    if [ "$v4cfgmeth" = "static" ]; then
+        setdebopt netcfg/disable_dhcp true boolean
+        v4addr=$(grep ^ipv4_address: /etc/confluent/deploycfg|cut -d: -f 2|sed -e 's/ //')
+        v4gw=$(grep ^ipv4_gateway: /etc/confluent/deploycfg|cut -d: -f 2| sed -e 's/ //')
+        if [ "$v4gw" = "null" ]; then
+            v4gw=""
+        fi
+        v4nm=$(grep ^ipv4_netmask: /etc/confluent/deploycfg|cut -d: -f 2|sed -e 's/ //')
+        setdebopt netcfg/get_netmask $v4nm string
+        setdebopt netcfg/get_ipaddress $v4addr string
+        setdebopt netcfg/confirm_static true boolean
+        if [ ! -z "$v4gw" ]; then
+            setdebopt netcfg/get_gateway $v4gw string
+        fi
+        namesrvs=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/deploycfg|grep ^- | cut -d ' ' -f 2|sed -e 's/ //')
+        for namesrv in "$namesrvs"; do
+            setdebopt netcfg/get_nameservers $namesrv string
+        done
+    elif [ "$vpcfgmeth" = "dhcp" ]; then
+        setdebopt netcfg/disable_dhcp false boolean
+        setdebopt netcfg/confirm_static false boolean
+    fi
+fi

@@ -21,9 +21,15 @@ console process which will result in the console window closing.
 
 ## OPTIONS
 
+* `-i N`, `--interval`:
+  For screenshot mode, fetch new screenshots and overwrite old screenshots every N seconds.
+  For example, `nodeconsole r3u[21:24] -tsi 3` will tile screenshots of r3u21 through r3u24 and
+  refresh them every 3 seconds.
+
 * `-t`, `--tile`:
-  Use tmux to arrange consoles of the given noderange into a tiled layout on
-  the terminal screen
+  For text consoles, use tmux to arrange consoles of the given noderange into a tiled layout on
+  the terminal screen.  If using 'screenshot' mode, divide the terminal and display the images
+  in a grid. 
 
 * `-l`, `--log`:
   Perform a log reply on the current, local log in /var/log/confluent/consoles.
@@ -34,6 +40,14 @@ console process which will result in the console window closing.
  Dump the log with Timpstamps on the current, local log in /var/log/confluent/consoles.
   If in collective mode, this only makes sense to use on the current collective
   manager at this time.
+
+* `-s`, `--screenshot`:
+  Attempt to grab screenshot(s) and render using a terminal
+  image protocol. The image protocol defaults to kitty, and
+  can be selected by CONFLUENT_IMAGE_PROTOCOL environment variable.
+  Supported protocols are kitty, iterm, and, sixel (sixel only
+  if PySixel is installed).  This only presents screenshots, there
+  is no input supported to graphical consoles from a terminal.
   
 * `-w`, `--windowed`:
   Open terminal windows for each node.  The

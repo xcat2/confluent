@@ -25,6 +25,8 @@ getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 class NodeHandler(redfishbmc.NodeHandler):
     devname = 'SMM3'
+    maxmacs = 18  # support an enclosure, but try to avoid catching daisy chain
+    is_enclosure = True
 
     def scan(self):
         attrs = self.info.get('attributes', {})

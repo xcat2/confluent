@@ -1,7 +1,7 @@
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2014 IBM Corporation
-# Copyright 2015-2019 Lenovo
+# Copyright 2015-2025 Lenovo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -215,6 +215,16 @@ node = {
                         'Using this requires that collective members be '
                         'defined as nodes for noderange expansion')
     },
+    'deployment.client_ip': {
+        'description': ('Client IP used when most recently reporting state.')
+    },
+    'deployment.lock': {
+        'description': ('Indicates whether deployment actions should be impeded. '
+                        'If locked, it indicates that a pending profile should not be applied. '
+                        'If "autolock", then locked will be set when current pending deployment completes. '
+                         ),
+        'validlist':    ('autolock', 'locked')
+    },
     'deployment.pendingprofile': {
         'description': ('An OS profile that is pending deployment.  This indicates to '
                         'the network boot subsystem what should be offered when a potential '
@@ -265,8 +275,7 @@ node = {
     },
     'discovery.policy': {
         'description':  'Policy to use for auto-configuration of discovered '
-                        'and identified nodes. Valid values are "manual", '
-                        '"permissive", or "open". "manual" means nodes are '
+                        'and identified nodes. "manual" means nodes are '
                         'detected, but not autoconfigured until a user '
                         'approves. "permissive" indicates to allow discovery, '
                         'so long as the node has no existing public key. '
@@ -361,9 +370,8 @@ node = {
 #                        'to suppress serial console configuration')
 #    },
     'console.logging': {
-        'description': ('Indicate logging level to apply to console.  Valid '
-                        'values are currently "full", "interactive", "memory", and '
-                        '"none". Defaults to "full".'),
+        'description': ('Indicate logging level to apply to console. '
+                        'Defaults to "full".'),
         'validvalues': ('full', 'memory', 'interactive', 'none'),
     },
     'console.method': {
@@ -371,7 +379,7 @@ node = {
                         'the managed node.  If not specified, then console '
                         'is disabled.  "ipmi" should be specified for most '
                         'systems if console is desired.'),
-        'validvalues': ('ssh', 'ipmi', 'openbmc', 'tsmsol'),
+        'validvalues': ('ssh', 'ipmi', 'openbmc', 'tsmsol', 'vcenter', 'proxmox'),
     },
 #    'virtualization.host': {
 #        'description': ('Hypervisor where this node does/should reside'),
@@ -399,6 +407,12 @@ node = {
                        'is the address of, for example, the Lenovo XCC.  It may optionally '
                        'include /<prefixlen> CIDR suffix to indicate subnet length, which is '
                        'autodetected by default where possible.',
+    },
+    'hardwaremanagement.manager_tls_name': {
+        'description': 'A name to use in lieu of the value in hardwaremanagement.manager for '
+                       'TLS certificate verification purposes. Some strategies involve a non-IP, '
+                       'non-resolvable name, or this can be used to access by IP while using name-based '
+                       'validation',
     },
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
@@ -436,6 +450,9 @@ node = {
 #IBM Flex)''',
 #        'appliesto': ['system'],
 #    },
+    'id.index': {
+        'description': 'Confluent generated numeric index for the node.',
+    },
     'id.model': {
         'description': 'The model number of a node.  In scenarios where there '
                        'is both a name and a model number, it is generally '
@@ -461,17 +478,20 @@ node = {
                        'the discovery process to decide where to place the mac address of a detected PXE nic.',
     },
     'net.connection_name': {
-        'description': 'Name to use when specifiying a name for connection and/or interface name for a team.  This may be the name of a team interface, '
+        'description': 'Name to use when specifiying a name for connection and/or interface name for a team/bond.  This may be the name of a team/bond interface, '
                        'the connection name in network manager for the interface, or may be installed as an altname '
                        'as supported by the respective OS deployment profiles.  Default is to accept default name for '
-                       'a team consistent with the respective OS, or to use the matching original port name as connection name.'
+                       'a team/bond consistent with the respective OS, or to use the matching original port name as connection name.'
     },
     'net.interface_names': {
         'description': 'Interface name or comma delimited list of names to match for this interface. It is generally recommended '
                        'to leave this blank unless needing to set up interfaces that are not on a common subnet with a confluent server, '
                        'as confluent servers provide autodetection for matching the correct network definition to an interface. '
                        'This would be the default name per the deployed OS and can be a comma delimited list to denote members of '
-                       'a team or a single interface for VLAN/PKEY connections.'
+                       'a team/bond or a single interface for VLAN/PKEY connections.'
+    },
+    'net.mtu': {
+            'description': 'MTU to apply to this connection',
     },
     'net.vlan_id': {
         'description': 'Ethernet VLAN or InfiniBand PKEY to use for this connection. '
@@ -554,10 +574,10 @@ node = {
                        'operating system',
     },
     'net.team_mode': {
-        'description': 'Indicates that this interface should be a team and what mode or runner to use when teamed. '
+        'description': 'Indicates that this interface should be a team/bond and what mode or runner to use when teamed or bonded. '
                        'If this covers a deployment interface, one of the member interfaces may be brought up as '
                        'a standalone interface until deployment is complete, as supported by the OS deployment profile. '
-                       'To support this scenario, the switch should be set up to allow independent operation of member ports123654 (e.g. lacp bypass mode or fallback mode).',
+                       'To support this scenario, the switch should be set up to allow independent operation of member ports (e.g. lacp bypass mode or fallback mode).',
         'validvalues': ('lacp', 'loadbalance', 'roundrobin', 'activebackup', 'none')
     },
     'power.pdu': {
@@ -587,6 +607,10 @@ node = {
     'secret.snmpcommunity': {
         'description': ('SNMPv1 community string, it is highly recommended to'
                         'step up to SNMPv3'),
+    },
+    'snmp.privacyprotocol': {
+        'description': 'The privacy protocol to use for SNMPv3',
+        'valid_values': ('aes', 'des'),
     },
 #    'secret.snmplocalizedkey': {
 #        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
@@ -638,6 +662,9 @@ node = {
     'pubkeys.tls_hardwaremanager': {
         'description':  ('Fingerprint of the TLS certificate recognized as'
                          'belonging to the hardware manager of the server'),
+    },
+    'pubkeys.tls': {
+        'description': ('Fingerprint of the TLS certificate for service running on host.'),
     },
     'pubkeys.ssh': {
         'description': ('Fingerprint of the SSH key of the OS running on the '

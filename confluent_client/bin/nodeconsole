@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import optparse
 import os
 import subprocess
@@ -28,8 +29,31 @@ import confluent.client as client
 import confluent.sortutil as sortutil
 import confluent.logreader as logreader
 import time
+import select
+import signal
 import socket
 import re
+import tty
+import termios
+import fcntl
+import confluent.screensqueeze as sq
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    Image = None
+
+try:
+    # sixel is optional, attempt to import but stub out if unavailable
+    import io
+    import sixel
+
+    class DumbWriter(sixel.SixelWriter):
+        def restore_position(self, output):
+            return
+except ImportError:
+    class DumbWriter():
+        def draw(self, imgfile):
+            sys.stderr.write("PySixel not detected, Sixel format display not supported\n")
 
 confettypath = os.path.join(os.path.dirname(sys.argv[0]), 'confetty')
 argparser = optparse.OptionParser(
@@ -46,6 +70,11 @@ argparser.add_option('-l', '--log', action='store_true', default=False,
 argparser.add_option('-T', '--Timestamp', action='store_true', default=False,
                      help= 'Dump log in stdout with timestamps')
 
+argparser.add_option('-s', '--screenshot', action='store_true', default=False,
+                     help='Attempt to grab screenshot and render using kitty image protocol')
+argparser.add_option('-i', '--interval', type='float',
+                     help='Interval in seconds to redraw the screenshot. Currently only '
+                          'works for one node')
 argparser.add_option('-w','--windowed', action='store_true', default=False,
                      help='Open terminal windows for each node.  The '
                           'environment variable NODECONSOLE_WINDOWED_COMMAND '
@@ -68,6 +97,234 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'default.')
 
 (options, args) = argparser.parse_args()
+
+oldtcattr = None
+oldfl = None
+
+def get_coords():
+    sys.stdout.write('\x1b[6n') #
+    sys.stdout.flush()
+    gotreply = select.select([sys.stdin,], [], [], 0.250)[0]
+    if gotreply:
+        response = ''
+        while select.select([sys.stdin,], [], [], 0.1)[0] and 'R' not in response:
+            response += sys.stdin.read()
+        coords = response.replace('R', '').split('[')[1].split(';')
+    #sys.stdout.write('\x1b[{}:{}H'.format(*coords))
+
+def direct_console():
+    global oldtcattr
+    global oldfl
+    oldtcattr = termios.tcgetattr(sys.stdin.fileno())
+    oldfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+    tty.setraw(sys.stdin.fileno())
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, oldfl | os.O_NONBLOCK)
+
+def indirect_console():
+    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, oldfl & ~os.O_NONBLOCK)
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, oldtcattr)
+
+def determine_tile_size(numnodes):
+    # for now, smash everything to a common aspect ratio.  16:11
+    # is pretty much wrong for everything, making 4:3 a bit too wide
+    # and 16:9 significantly too narrow, but it is serviceable
+    # An improvement could come with us owning the scaling
+    # instead of delegating to Kitty, which says if we specify both,
+    # we get stretching.  In theory we should be able to get aspect correct
+    # from kitty by omitting, but:
+    # then we don't know how much to move the cursor left after draw_image
+    # Konsole won't scale at all with only partial scaling specified
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
+    # 16:12 is to roughly account for the 'titles' of the tiles
+    ratio = (pixwidth / 16) / (pixheight / 12)
+    bestdeviation = None
+    bestdims = []
+    for i in range(1, numnodes + 1):
+        number = numnodes
+        while number % i != 0:
+            number += 1
+        columns = i
+        rows = number // i
+        deviation = abs(ratio -  (columns / rows))
+        if bestdeviation is None:
+            bestdeviation = deviation
+            bestdims = [columns, rows]
+        elif deviation < bestdeviation:
+            bestdeviation = deviation
+            bestdims = [columns, rows]
+    # ok, the above algorithm can still pick things like
+    # 1 2 3
+    # 4
+    # So we will let it pick the number of rows, and
+    # then see if we can chop columns and still fit
+    while (bestdims[0] - 1) * bestdims[1] >= numnodes:
+        bestdims[0] = bestdims[0] - 1
+    cellswide = cwidth // bestdims[0]
+    cellshigh = cheight // bestdims[1]
+    tilewidth = cellswide * pixwidth / cwidth
+    tileheight = cellshigh * pixheight / cheight
+    if tilewidth > (tileheight * 16 / 11):
+        tilewidth = tileheight * 16 / 11
+        cellswide = int(tilewidth // (pixwidth / cwidth))
+    if tileheight > (tilewidth * 11 /16):
+        tileheight = tilewidth * 11 / 16
+        cellshigh = int(tileheight // (pixheight / cheight))
+    bestdims = bestdims + [cellswide, cellshigh, cellshigh * bestdims[1]]
+    # incur any scrolling we might get. This allows us to accurately
+    # save/restore cursor or even get coordinates without scrolling fouling
+    # the desired target
+    sys.stdout.write('\n' * bestdims[4])
+    sys.stdout.flush()
+    cursor_up(bestdims[4])
+    return bestdims
+
+cursor_saved = False
+def sticky_cursor():
+    global cursor_saved
+# get cursor restore_position
+    if sys.stdin.isatty() and not cursor_saved:
+        try:
+            direct_console()
+            sys.stdout.write('\x1b7')
+            cursor_saved = True
+        finally:
+            indirect_console()
+    elif cursor_saved:
+        try:
+            direct_console()
+            sys.stdout.write('\x1b8')
+        finally:
+            indirect_console()
+
+def cursor_up(count=1):
+    sys.stdout.write(f'\x1b[{count}A')
+def cursor_down(count=1):
+    sys.stdout.write(f'\x1b[{count}B')
+def cursor_right(count=1):
+    sys.stdout.write(f'\x1b[{count}C')
+def cursor_left(count=1):
+    sys.stdout.write(f'\x1b[{count}D')
+def cursor_save():
+    sys.stdout.write('\x1b7')
+def cursor_restore():
+    sys.stdout.write('\x1b8')
+def cursor_hide():
+    sys.stdout.write('\x1b[?25l')
+def cursor_show():
+    sys.stdout.write('\x1b[?25h')
+
+def get_pix_dimensions(width, height):
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
+    imgwidth = int(pixwidth / cwidth * width)
+    imgheight = int(pixheight / cheight * height)
+    return imgwidth, imgheight
+
+def draw_text(text, width, height):
+    if Image:
+        maxfntsize = 256
+        imgwidth, imgheight = get_pix_dimensions(width, height)
+        nerr = Image.new(mode='RGB', size=(imgwidth, imgheight), color='green')
+        nd = ImageDraw.Draw(nerr)
+        for txtpiece in text.split('\n'):
+            fntsize = 8
+            txtfont = ImageFont.truetype('DejaVuSans.ttf', size=fntsize)
+            while nd.textlength(txtpiece, font=txtfont) < int(imgwidth * 0.90):
+                fntsize += 1
+                txtfont = ImageFont.truetype('DejaVuSans.ttf', size=fntsize)
+            fntsize -= 1
+            if fntsize < maxfntsize:
+                maxfntsize = fntsize
+        hmargin = int(imgwidth * 0.05)
+        vmargin = int(imgheight * 0.10)
+        nd.text((hmargin, vmargin), text, font=txtfont)
+        nd.rectangle((0, 0, nerr.width - 1, nerr.height -1), outline='white')
+        outfile = io.BytesIO()
+        nerr.save(outfile, format='PNG')
+        data = base64.b64encode(outfile.getbuffer())
+        draw_image(data, width, height, doscale=False)
+    else:
+        sys.stdout.write(text)
+        cursor_left(len(text))
+
+def draw_image(data, width, height, doscale=True):
+    imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
+    if doscale and Image and width:
+        bindata = base64.b64decode(data)
+        binfile = io.BytesIO()
+        binfile.write(bindata)
+        binfile.seek(0)
+        try:
+            img = Image.open(binfile)
+        except Exception as e:
+            errstr = 'Error rendering image:\n' + str(e)
+            return draw_text(errstr, width, height)
+        imgwidth, imgheight = get_pix_dimensions(width, height)
+        nimg = Image.new(mode='RGBA', size=(imgwidth, imgheight))
+        imgwidth -= 4
+        imgheight -= 4
+        hscalefact = imgwidth / img.width
+        vscalefact = imgheight / img.height
+        if hscalefact < vscalefact:
+            rzwidth = imgwidth
+            rzheight = int(img.height * hscalefact)
+        else:
+            rzwidth = int(img.width * vscalefact)
+            rzheight = imgheight
+        img = img.resize((rzwidth, rzheight))
+        nd = ImageDraw.Draw(nimg)
+        nd.rectangle((1, 1, rzwidth + 2, rzheight + 2), outline='black')
+        nd.rectangle((0, 0, rzwidth + 3, rzheight + 3), outline='white')
+        nimg.paste(img, box=(2, 2))
+        outfile = io.BytesIO()
+        nimg.save(outfile, format='PNG')
+        data = base64.b64encode(outfile.getbuffer())
+    if imageformat == 'sixel':
+        sixel_draw(data)
+    elif imageformat == 'iterm':
+        iterm_draw(data, width, height)
+    else:
+        kitty_draw(data, width, height)
+
+
+def sixel_draw(data):
+    bindata = base64.b64decode(data)
+    binfile = io.BytesIO()
+    binfile.write(bindata)
+    binfile.seek(0)
+    DumbWriter().draw(binfile)
+
+def iterm_draw(data, width, height):
+    if not height:
+        height = 'auto'
+    if not width:
+        width = 'auto'
+    bindata = base64.b64decode(data)
+    datalen = len(bindata)
+    sys.stdout.write(
+        '\x1b]1337;File=inline=1;width={};height={};size={}:'.format(width,height,datalen))
+    sys.stdout.write(data.decode('utf8'))
+    sys.stdout.write('\a')
+    sys.stdout.flush()
+
+
+def kitty_draw(data, width, height):
+    preamble = '\x1b_Ga=T,f=100'
+    if height:
+        preamble += f',r={height},c={width}'
+    #sys.stdout.write(repr(preamble))
+    #sys.stdout.write('\xb[{}D'.format(len(repr(preamble))))
+    #return
+    first = True
+    while data:
+        chunk, data = data[:4096], data[4096:]
+        m = 1 if data else 0
+        if first:
+            sys.stdout.write('{},m={};'.format(preamble, m))
+        else:
+            sys.stdout.write('\x1b_Gm={};'.format(m))
+        sys.stdout.write(chunk.decode('utf8'))
+        sys.stdout.write('\x1b\\')
+        sys.stdout.flush()
 
 pass_through_args = []
 killcon = False
@@ -106,6 +363,201 @@ if options.Timestamp:
     logreader.dump_to_console(logname)
     sys.exit(0)
 
+def prep_node_tile(node):
+    currcolcell, currrowcell = nodepositions[node]
+    if currcolcell:
+        cursor_right(currcolcell)
+    if currrowcell:
+        cursor_down(currrowcell)
+    sys.stdout.write('▏' + node)
+    cursor_left(len(node) + 1)
+    cursor_down()
+
+def reset_cursor(node):
+    currcolcell, currrowcell = nodepositions[node]
+    if currcolcell:
+        cursor_left(currcolcell)
+    cursor_up(currrowcell + 1)
+
+nodepositions = {}
+numrows = 0
+cwidth = 0
+cheight = 0
+imagedatabynode = {}
+
+def redraw():
+    for node in imagedatabynode:
+        imgdata = imagedatabynode[node]
+        if node in nodepositions:
+            prep_node_tile(node)
+            cursor_save()
+        else:
+            if options.interval is not None:
+                if node != firstnodename:
+                    sys.stderr.write('Multiple nodes not supported for interval')
+                    sys.exit(1)
+                sticky_cursor()
+            sys.stdout.write('{}: '.format(node))
+        # one row is used by our own name, so cheight - 1 for that allowance
+        draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
+        if node in nodepositions:
+            cursor_restore()
+            reset_cursor(node)
+        else:
+            sys.stdout.write('\n')
+        sys.stdout.flush()
+resized = False
+def do_screenshot():
+    global resized
+    global numrows
+    sess = client.Command()
+    if options.tile:
+        imageformat = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
+        if imageformat not in ('kitty', 'iterm'):
+            sys.stderr.write('Tiled screenshots only supported with kitty or iterm protocol')
+            sys.exit(1)
+        allnodes = []
+        numnodes = 0
+        for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
+            allnodes.append(res['item']['href'].replace('/', ''))
+            numnodes += 1
+        resized = False
+        def do_resize(a=None, b=None):
+            global resized
+            if a:
+                resized = True
+                # on a window resize, clear the old stuff
+                # ideally we'd retain the images and redraw them
+                sys.stdout.write('\x1bc')
+            global numrows
+            global cwidth
+            global cheight
+            cols, rows, cwidth, cheight, numrows = determine_tile_size(numnodes)
+            currcol = 1
+            currcolcell = 0
+            currrowcell = 0
+            for node in allnodes:
+                nodepositions[node] = currcolcell, currrowcell
+                if currcol < cols:
+                    currcol += 1
+                    currcolcell += cwidth
+                else:
+                    currcol = 1
+                    currcolcell = 0
+                    currrowcell += cheight
+            if a:
+                redraw()
+        do_resize()
+        signal.signal(signal.SIGWINCH, do_resize)
+    elif options.interval is not None:
+        sys.stdout.write('\x1bc')
+    firstnodename = None
+    dorefresh = True
+    vnconly = set([])
+    while dorefresh:
+        for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
+            for node in res.get('databynode', {}):
+                errorstr = ''
+                if not firstnodename:
+                    firstnodename = node
+                error = res['databynode'][node].get('error')
+                if error and 'vnc available' in error:
+                    vnconly.add(node)
+                    continue
+                elif error:
+                    errorstr = error
+                imgdata = res['databynode'][node].get('image', {}).get('imgdata', None)
+                if imgdata:
+                    if len(imgdata) < 32: # We were subjected to error
+                        errorstr = f'Unable to get screenshot'
+                if errorstr or imgdata:
+                    draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
+        if asyncvnc:
+            urlbynode = {}
+            for node in vnconly:
+                for res in sess.update(f'/nodes/{node}/console/ikvm', {'method': 'unix'}):
+                    url = res.get('item', {}).get('href')
+                    if url:
+                        urlbynode[node] = url
+            draw_vnc_grabs(urlbynode, cwidth, cheight)
+            if resized:
+                do_resize(True)
+                resized = False
+        elif vnconly:
+            sys.stderr.write("Require asyncvnc installed to do VNC screenshotting\n")
+        if options.interval is None:
+            dorefresh = False
+        else:
+            dorefresh = True
+            time.sleep(options.interval)
+    sys.exit(0)
+
+try:
+    import asyncio, asyncvnc
+except ImportError:
+    asyncvnc = None
+
+def draw_vnc_grabs(urlbynode, cwidth, cheight):
+    asyncio.run(grab_vncs(urlbynode, cwidth, cheight))
+async def grab_vncs(urlbynode, cwidth, cheight):
+    tasks = []
+    for node in urlbynode:
+        url = urlbynode[node]
+        tasks.append(asyncio.create_task(do_vnc_screenshot(node, url, cwidth, cheight)))
+    await asyncio.gather(*tasks)
+
+async def my_opener(host, port):
+    # really, host is the unix
+    return await asyncio.open_unix_connection(host)
+
+async def do_vnc_screenshot(node, url, cwidth, cheight):
+    async with asyncvnc.connect(url, opener=my_opener) as client:
+        # Retrieve pixels as a 3D numpy array
+        pixels = await client.screenshot()
+        # Save as PNG using PIL/pillow
+        image = Image.fromarray(pixels)
+        outfile = io.BytesIO()
+        image.save(outfile, format='PNG')
+        imgdata = base64.b64encode(outfile.getbuffer()).decode()
+        if imgdata:
+            draw_node(node, imgdata, '', '', cwidth, cheight)
+
+def draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight):
+    imagedatabynode[node] = imgdata
+    if node in nodepositions:
+        prep_node_tile(node)
+        cursor_save()
+    else:
+        if options.interval is not None:
+            if node != firstnodename:
+                sys.stderr.write('Multiple nodes not supported for interval')
+                sys.exit(1)
+            sticky_cursor()
+        sys.stdout.write('{}: '.format(node))
+    # one row is used by our own name, so cheight - 1 for that allowance
+    if errorstr:
+        draw_text(errorstr, cwidth, cheight -1 if cheight else cheight)
+    else:
+        draw_image(imgdata.encode(), cwidth, cheight - 1 if cheight else cheight)
+    if node in nodepositions:
+        cursor_restore()
+        reset_cursor(node)
+    else:
+        sys.stdout.write('\n')
+    sys.stdout.flush()
+
+if options.screenshot:
+    try:
+        cursor_hide()
+        do_screenshot()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        cursor_show()
+        cursor_down(numrows)
+        sys.stdout.write('\n')
+    sys.exit(0)
+
 def kill(noderange):
     sess = client.Command()
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
@@ -113,29 +565,23 @@ def kill(noderange):
         envstring = 'xterm'
 
     nodes = []
-    for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
+    for res in sess.read('/noderange/{0}/nodes/'.format(noderange)):
         node = res.get('item', {}).get('href', '/').replace('/', '')
         if not node:
             sys.stderr.write(res.get('error', repr(res)) + '\n')
             sys.exit(1)
         nodes.append(node) 
 
-    for node in nodes:
-        s=socket.socket(socket.AF_UNIX)
-        winid=None
+    for node in nodes:    
+        command = "ps auxww | grep {0} | grep console | egrep '\\b{1}\\b' | grep -v grep | awk '{{print $2}}'".format(envstring, node)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
         try:
-            win=subprocess.Popen(['xwininfo', '-tree', '-root'], stdout=subprocess.PIPE)
-            wintr=win.communicate()[0]
-            for line in wintr.decode('utf-8').split('\n'):
-                if 'console: {0}'.format(node) in line or 'confetty' in line:
-                    win_obj = [ele for ele in line.split(' ') if ele.strip()]
-                    winid = win_obj[0]
-        except:
-            print("Error: cannot retrieve window id of node {}".format(node))
-
-        if winid:
-            ps_data=subprocess.Popen(['xkill', '-id', winid ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
+            process_id = stdout.decode('utf-8').split()[0]
+        except IndexError:
+            sys.stderr.write(node + ": console window not found \n")
+            continue
+        subprocess.Popen(["kill", process_id], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     sys.exit(0)
 
 def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):    
@@ -257,7 +703,6 @@ if options.windowed:
         screenheight -= wmyo
         currx = window_width
         curry = 0
-        maxcol = int(screenwidth/window_width)
 
     for node in sortutil.natural_sort(nodes):
         if options.tile and envlist[0] == 'xterm':
@@ -265,7 +710,7 @@ if options.windowed:
             corrected_y = curry
             xgeometry = '{0}+{1}+{2}'.format(sizegeometry, corrected_x, corrected_y)
             currx += window_width
-            if currx >= screenwidth:
+            if currx + window_width >= screenwidth:
                 currx=0
                 curry += window_height
                 if curry > screenheight:

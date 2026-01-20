@@ -19,6 +19,7 @@ import argparse
 import base64
 import csv
 import io
+import os
 import numpy as np
 import sys
 
@@ -72,6 +73,8 @@ def plot(gui, output, plotdata, bins, fmt):
             tdata = io.BytesIO()
         plt.savefig(tdata)
     if not gui and not output:
+        if fmt == 'environment':
+            fmt = os.environ.get('CONFLUENT_IMAGE_PROTOCOL', 'kitty')
         if fmt == 'sixel':
             writer = DumbWriter()
             writer.draw(tdata)
@@ -108,7 +111,7 @@ aparser = argparse.ArgumentParser(description='Quick access to common statistics
 aparser.add_argument('-c', type=int, default=0, help='Column number to analyze (default is last column)')
 aparser.add_argument('-d', default=None, help='Value used to separate columns')
 aparser.add_argument('-x', default=False, action='store_true', help='Output histogram in graphical format')
-aparser.add_argument('-f', default='sixel', help='Format for histogram output (sixel/iterm/kitty)')
+aparser.add_argument('-f', default='environment', help='Format for histogram output (sixel/iterm/kitty)')
 aparser.add_argument('-s', default=0, help='Number of header lines to skip before processing')
 aparser.add_argument('-g', default=False, action='store_true', help='Open histogram in separate graphical window')
 aparser.add_argument('-o', default=None, help='Output histogram to the specified filename in PNG format')

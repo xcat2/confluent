@@ -23,6 +23,7 @@ import confluent.util as util
 import copy
 import errno
 from fnmatch import fnmatch
+import io
 import os
 import pwd
 import aiohmi.constants as pygconstants
@@ -33,6 +34,7 @@ import aiohmi.ipmi.command as ipmicommand
 import socket
 import ssl
 import traceback
+import confluent.vinzmanager as vinzmanager
 
 
 if not hasattr(ssl, 'SSLEOFError'):
@@ -45,10 +47,28 @@ except NameError:
 
 pci_cache = {}
 
+class RetainedIO(io.BytesIO):
+    # Need to retain buffer after close
+    def __init__(self):
+        self.resultbuffer = None
+    def close(self):
+        self.resultbuffer = self.getbuffer()
+        super().close()
+
 def get_dns_txt(qstring):
     return None
     # return support.greendns.resolver.query(
     #    qstring, 'TXT')[0].strings[0].replace('i=', '')
+
+
+def match_aliases(first, second):
+    aliases = {
+        ('bmc', 'xcc')
+        }
+    for alias in aliases:
+        if first in alias and second in alias:
+            return True
+    return False
 
 def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     fqpi = '{0}.{1}.{2}.{3}'.format(subdevice, subvendor, device, vendor)
@@ -160,6 +180,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
     async def create(cls, node, cfm, **kwargs):
         kwargs['keepalive'] = False
         self = await super().create(**kwargs)
+        self.confluentbmcname = kwargs['bmc']
         self.cfm = cfm
         self.node = node
         self.sensormap = {}
@@ -563,6 +584,8 @@ class IpmiHandler:
             await self.handle_configuration()
         elif self.element[:3] == ['inventory', 'firmware', 'updates']:
             self.handle_update()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
+            self.handle_update_status()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
         elif self.element == ['media', 'attach']:
@@ -585,6 +608,12 @@ class IpmiHandler:
             self.handle_servicedata_fetch()
         elif self.element == ['description']:
             await self.handle_description()
+        elif self.element == ['console', 'ikvm_methods']:
+            self.handle_ikvm_methods()
+        elif self.element == ['console', 'ikvm_screenshot']:
+            self.handle_ikvm_screenshot()
+        elif self.element == ['console', 'ikvm']:
+            self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
 
@@ -738,6 +767,7 @@ class IpmiHandler:
                     hwaddr=lancfg['mac_address'],
                     staticv6addrs=v6cfg.get('static_addrs', ''),
                     staticv6gateway=v6cfg.get('static_gateway', ''),
+                    vlan_id=lancfg.get('vlan_id', None)
                 ))
             elif self.op == 'update':
                 config = self.inputdata.netconfig(self.node)
@@ -745,7 +775,8 @@ class IpmiHandler:
                     self.ipmicmd.set_net_configuration(
                         ipv4_address=config['ipv4_address'],
                         ipv4_configuration=config['ipv4_configuration'],
-                        ipv4_gateway=config['ipv4_gateway'])
+                        ipv4_gateway=config['ipv4_gateway'],
+                        vlan_id=config.get('vlan_id', None))
                     v6addrs = config.get('static_v6_addresses', None)
                     if v6addrs is not None:
                         v6addrs = v6addrs.split(',')
@@ -938,14 +969,15 @@ class IpmiHandler:
         for id, data in self.ipmicmd.get_firmware():
             self.output.put(msg.ChildCollection(simplify_name(id)))
 
-    def read_firmware(self, component):
+    def read_firmware(self, component, category):
         items = []
         errorneeded = False
         try:
             complist = () if component == 'all' else (component,)
-            for id, data in self.ipmicmd.get_firmware(complist):
+            for id, data in self.ipmicmd.get_firmware(complist, category):
                 if (component in ('core', 'all') or
-                        component == simplify_name(id)):
+                        component == simplify_name(id) or
+                        match_aliases(component, simplify_name(id))):
                     items.append({id: data})
         except ssl.SSLEOFError:
             errorneeded = msg.ConfluentNodeError(
@@ -965,12 +997,20 @@ class IpmiHandler:
         if errorneeded:
             self.output.put(errorneeded)
 
+    def handle_update_status(self):
+        activeupdates = list(firmwaremanager.list_updates([self.node], None, []))
+        if activeupdates:
+            self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
+        else:
+            status = self.ipmicmd.get_update_status()
+            self.output.put(msg.KeyValueData({'status': status}, self.node))
+
     def handle_inventory(self):
         if self.element[1] == 'firmware':
             if len(self.element) == 3:
                 return self.list_firmware()
             elif len(self.element) == 4:
-                return self.read_firmware(self.element[-1])
+                return self.read_firmware(self.element[-1], self.element[-2])
         elif self.element[1] == 'hardware':
             if len(self.element) == 3:  # list things in inventory
                 return self.list_inventory()
@@ -1605,6 +1645,37 @@ class IpmiHandler:
     async def handle_description(self):
         dsc = await self.ipmicmd.get_description()
         await self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_methods(self):
+        dsc = self.ipmicmd.get_ikvm_methods()
+        dsc = {'ikvm_methods': dsc}
+        self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_screenshot(self):
+        # good background for the webui, and kitty
+        imgdata = RetainedIO()
+        imgformat = self.ipmicmd.get_screenshot(imgdata)
+        imgdata = imgdata.getvalue()
+        if imgdata:
+            self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
+
+    def handle_ikvm(self):
+        methods = self.ipmicmd.get_ikvm_methods()
+        if 'openbmc' in methods:
+            url = vinzmanager.get_url(self.node, self.inputdata)
+            self.output.put(msg.ChildCollection(url))
+            return
+        launchdata = self.ipmicmd.get_ikvm_launchdata()
+        if 'url' in launchdata and not launchdata['url'].startswith('https://'):
+            mybmc = self.ipmicmd.confluentbmcname
+            if mybmc.startswith('fe80::'):  # link local, need to adjust
+                lancfg = self.ipmicmd.get_net_configuration()
+                mybmc = lancfg['ipv4_address'].split('/')[0]
+            if ':' in mybmc and not '[' in mybmc:
+                mybmc = '[{}]'.format(mybmc)
+            launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
+        self.output.put(msg.KeyValueData(launchdata, self.node))
+
 
     def handle_graphical_console(self):
         args = self.ipmicmd.get_graphical_console()

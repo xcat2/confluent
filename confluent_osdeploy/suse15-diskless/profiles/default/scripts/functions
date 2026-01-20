@@ -10,6 +10,13 @@ function test_mgr() {
     return 1
 }
 
+function initconfluentscriptstmp() {
+    if [ -z "$confluentscripttmpdir" ]; then
+        mkdir -p /opt/confluent/tmpexec
+        confluentscripttmpdir=$(mktemp -d /opt/confluent/tmpexec/confluentscripts.XXXXXXXXX)
+    fi
+}
+
 function confluentpython() {
     if [ -x /usr/libexec/platform-python ]; then
         /usr/libexec/platform-python $*
@@ -53,6 +60,7 @@ function set_confluent_vars() {
     if [ -z "$confluent_profile" ]; then
         confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg | sed -e 's/[^ ]*: //')
     fi
+    export confluent_profile confluent_mgr nodename
 }
 
 fetch_remote() {
@@ -71,7 +79,8 @@ fetch_remote() {
 }
 
 source_remote_parts() {
-    confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
+    unset confluentscripttmpdir
+    initconfluentscriptstmp
     apiclient=/opt/confluent/bin/apiclient
     if [ -f /etc/confluent/apiclient ]; then
         apiclient=/etc/confluent/apiclient
@@ -85,7 +94,8 @@ source_remote_parts() {
 }
 
 run_remote_parts() {
-    confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
+    unset confluentscripttmpdir
+    initconfluentscriptstmp
     apiclient=/opt/confluent/bin/apiclient
     if [ -f /etc/confluent/apiclient ]; then
         apiclient=/etc/confluent/apiclient
@@ -104,10 +114,7 @@ source_remote() {
     echo
     echo '---------------------------------------------------------------------------'
     echo Sourcing $1 from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
-    if [ -z "$confluentscripttmpdir" ]; then
-        confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
-        unsettmpdir=1
-    fi
+    initconfluentscriptstmp
     echo Sourcing from $confluentscripttmpdir
     cd $confluentscripttmpdir
     fetch_remote $1
@@ -134,9 +141,9 @@ run_remote() {
     echo '---------------------------------------------------------------------------'
     echo Running $requestedcmd from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
     if [ -z "$confluentscripttmpdir" ]; then
-        confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
         unsettmpdir=1
     fi
+    initconfluentscriptstmp
     echo Executing in $confluentscripttmpdir
     cd $confluentscripttmpdir
     fetch_remote $1
@@ -169,7 +176,8 @@ run_remote_python() {
     fi
     echo '---------------------------------------------------------------------------'
     echo Running python script "'$*'" from https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/
-    confluentscripttmpdir=$(mktemp -d /tmp/confluentscripts.XXXXXXXXX)
+    unset confluentscripttmpdir
+    initconfluentscriptstmp
     echo Executing in $confluentscripttmpdir
     cd $confluentscripttmpdir
     mkdir -p $(dirname $1)

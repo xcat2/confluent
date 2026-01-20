@@ -7,6 +7,11 @@ logging.getLogger('libarchive').addHandler(logging.NullHandler())
 import libarchive
 import hashlib
 import os
+try:
+    from io import BytesIO
+    import pycdlib
+except ImportError:
+    pycdlib = None
 import shutil
 import sys
 import time
@@ -24,13 +29,16 @@ import confluent.util as util
 
 COPY = 1
 EXTRACT = 2
+EXTRACTUDF = 4
 READFILES = set([
     '.disk/info',
     'media.1/products',
     'media.2/products',
     '.DISCINFO',
     '.discinfo',
+    'ISOLINUX.CFG',
     'zipl.prm',
+    'sources/idwbinfo.txt',
 ])
 
 HEADERSUMS = set([b'\x85\xeddW\x86\xc5\xbdhx\xbe\x81\x18X\x1e\xb4O\x14\x9d\x11\xb7C8\x9b\x97R\x0c-\xb8Ht\xcb\xb3'])
@@ -64,7 +72,7 @@ def symlink(src, targ):
             raise
 
 
-async def update_boot(profilename):
+async def update_boot(profilename, initialimport=False):
     if profilename.startswith('/var/lib/confluent/public'):
         profiledir = profilename
     else:
@@ -81,6 +89,21 @@ async def update_boot(profilename):
         await update_boot_linux(profiledir, profile, label)
     elif ostype == 'esxi':
         await update_boot_esxi(profiledir, profile, label)
+    elif ostype == 'windows':
+        await update_boot_windows(profiledir, profile, label, initialimport)
+
+async def update_boot_windows(profiledir, profile, label, initialimport):
+    profname = os.path.basename(profiledir)
+    try:
+        await util.check_call(
+            ['/usr/bin/genisoimage', '-o',
+             '{0}/boot.iso'.format(profiledir), '-udf', '-b', 'dvd/etfsboot.com',
+             '-no-emul-boot', '-eltorito-alt-boot', '-eltorito-boot',
+             'dvd/efisys_noprompt.bin', '{0}/boot'.format(profiledir)], preexec_fn=relax_umask)
+    except Exception:
+        if initialimport:
+            return
+        raise
 
 async def update_boot_esxi(profiledir, profile, label):
     profname = os.path.basename(profiledir)
@@ -187,7 +210,7 @@ async def update_boot_linux(profiledir, profile, label):
                             needefi = True
     lincmd = 'linuxefi' if needefi else 'linux'
     initrdcmd = 'initrdefi' if needefi else 'initrd'
-    grubcfg = "set timeout=5\nmenuentry '"
+    grubcfg = "set timeout=0\nmenuentry '"
     grubcfg += label
     grubcfg += "' {\n    " + lincmd + " /kernel " + kernelargs + "\n"
     initrds = []
@@ -243,8 +266,13 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
         for entry in entries:
             if str(entry).endswith('TRANS.TBL'):
                 continue
-            if extractlist and str(entry).lower() not in extractlist:
-                continue
+            if extractlist:
+                normname = str(entry).lower()
+                for extent in extractlist:
+                    if fnmatch(normname, extent):
+                        break
+                else:
+                    continue
             write_header(write_p, entry._entry_p)
             read_p = entry._archive_p
             while 1:
@@ -267,8 +295,33 @@ def extract_entries(entries, flags=0, callback=None, totalsize=None, extractlist
     return float(sizedone) / float(totalsize)
 
 
-def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extractlist=None):
+def extract_udf(archfile, callback=lambda x: None):
+    """Extracts a UDF archive from a file into the current directory."""
+    dfd = os.dup(archfile.fileno())
+    os.lseek(dfd, 0, 0)
+    fp = os.fdopen(dfd, 'rb')
+    udf = pycdlib.PyCdlib()
+    udf.open_fp(fp)
+    for dirent in udf.walk(udf_path='/'):
+        for filent in dirent[2]:
+            currfile = os.path.join(dirent[0], filent)
+            relfile = currfile
+            if currfile[0] == '/':
+                relfile = currfile[1:]
+            targfile = os.path.join('.', relfile)
+            if os.path.exists(targfile):
+                os.unlink(targfile)
+            os.makedirs(os.path.dirname(targfile), exist_ok=True)
+            udf.get_file_from_iso(targfile, udf_path=currfile)
+    udf.close()
+    fp.close()
+    return True
+
+
+def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extractlist=None, method=EXTRACT):
     """Extracts an archive from a file into the current directory."""
+    if EXTRACTUDF & method:
+        return extract_udf(archfile, callback)
     totalsize = 0
     for img in imginfo:
         if not imginfo[img]:
@@ -286,6 +339,16 @@ def extract_file(archfile, flags=0, callback=lambda x: None, imginfo=(), extract
     return pctdone
 
 
+def check_openeuler(isoinfo):
+    for entry in isoinfo[0]:
+        if 'openEuler-release-24.03' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el9'
+            break
+    else:
+        return None
+    return {'name': 'openeuler-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
 def check_rocky(isoinfo):
     ver = None
     arch = None
@@ -301,6 +364,11 @@ def check_rocky(isoinfo):
             arch = entry.split('.')[-2]
             cat = 'el9'
             break
+        if 'rocky-release-10' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el10'
+            break
     else:
         return None
     if arch == 'noarch' and '.discinfo' in isoinfo[1]:
@@ -310,6 +378,30 @@ def check_rocky(isoinfo):
             arch = arch.decode('utf-8')
     return {'name': 'rocky-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': cat}
 
+fedoracatmap = {
+        '41': 'el10',
+        '42': 'el10',
+}
+def check_fedora(isoinfo):
+    if '.discinfo' not in isoinfo[1]:
+        return None
+    prodinfo = isoinfo[1]['.discinfo']
+    prodlines = prodinfo.split(b'\n')
+    if len(prodlines) < 3:
+        return None
+    if not prodlines[1].split():
+        return None
+    prod = prodlines[1].split()[0]
+    if prod != b'Fedora':
+        return None
+    arch = prodlines[2]
+    ver = prodlines[1].split()[-1]
+    if not isinstance(arch, str):
+        arch = arch.decode('utf-8')
+        ver = ver.decode('utf-8')
+    if ver not in fedoracatmap:
+        return None
+    return {'name': 'fedora-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': fedoracatmap[ver]}
 
 def check_alma(isoinfo):
     ver = None
@@ -326,6 +418,11 @@ def check_alma(isoinfo):
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
             cat = 'el9'
+            break
+        elif 'almalinux-release-10' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            cat = 'el10'
             break
         elif 'almalinux-kitten-release-10' in entry:
             ver = entry.split('-')[3]
@@ -404,12 +501,62 @@ def check_esxi(isoinfo):
             _, version = line.split(b' ', 1)
             if not isinstance(version, str):
                 version = version.decode('utf8')
+    edition = ''
     if isesxi and version:
+        if 'ISOLINUX.CFG' in isoinfo[1]:
+            for line in isoinfo[1]['ISOLINUX.CFG'].split(b'\n'):
+                if line.startswith(b'MENU TITLE'):
+                   words = line.split()
+                   if len(words) > 2:
+                       edition = words[2].decode('utf8')
+                       break
+            if edition:
+                for vnd in ('LNV', 'LVO', 'LVN'):
+                   if edition.startswith(vnd):
+                       edition = '_' + edition.split('-', 1)[1].strip()
+                       break
+                else:
+                   edition = ''
         return {
-            'name': 'esxi-{0}'.format(version),
+            'name': 'esxi-{0}{1}'.format(version, edition),
             'method': EXTRACT,
             'category': 'esxi{0}'.format(version.split('.', 1)[0])
         }
+
+def check_debian(isoinfo):
+    if '.disk/info' not in isoinfo[1]:
+        return None
+    diskinfo = isoinfo[1]['.disk/info']
+    diskbits = diskinfo.split(b' ')
+    if diskbits[0] == b'Debian':
+        if b'mini.iso' not in diskbits:
+            raise Exception("Debian only supports the 'netboot mini.iso' type images")
+        major = diskbits[2].decode()
+        arch = diskbits[4].decode()
+        buildtag = diskbits[-1].decode().strip() # 20230607+deb12u10
+        minor = '0'
+        if '+' in buildtag:
+            _, variant = buildtag.split('+')
+            variant = variant.replace('deb', '')
+            if 'u' in variant:
+                minor = variant.split('u')[1]
+        version = '{0}.{1}'.format(major, minor)
+
+        if arch != 'amd64':
+            raise Exception("Unsupported debian architecture {}".format(arch))
+        arch = 'x86_64'
+        name = 'debian-{0}-{1}'.format(version, arch)
+        major = int(major)
+        if major > 12:
+            category = 'debian13'
+        else:
+            category = 'debian'
+        return {
+            'name': name,
+            'method': EXTRACT,
+            'category': category,
+        }
+
 
 def check_ubuntu(isoinfo):
     if '.disk/info' not in isoinfo[1]:
@@ -442,11 +589,11 @@ def check_ubuntu(isoinfo):
                 'method': EXTRACT,
                 'category': 'ubuntu{0}'.format(major)}
         elif 'efi/boot/bootaa64.efi' in isoinfo[0]:
-            exlist = ['casper/vmlinuz', 'casper/initrd',
+            exlist = ['casper/*vmlinuz', 'casper/*initrd',
                     'efi/boot/bootaa64.efi', 'efi/boot/grubaa64.efi'
                     ]
         else:
-            exlist = ['casper/vmlinuz', 'casper/initrd',
+            exlist = ['casper/*vmlinuz', 'casper/*initrd', 
                     'efi/boot/bootx64.efi', 'efi/boot/grubx64.efi'
                     ]
         return {'name': 'ubuntu-{0}-{1}'.format(ver, arch),
@@ -524,6 +671,33 @@ def fixup_coreos(targpath):
                 bootimg.write(b'\x01')
 
 
+def is_windows_executable(filename):
+    with open(filename, 'rb') as f:
+        header = f.read(2)
+        if header == b'MZ':
+            # seems to be DOS, but let's also make sure it is PE32
+            f.seek(0x3c)
+            pe_offset = f.read(4)
+            offset = int.from_bytes(pe_offset, byteorder='little')
+            f.seek(offset)
+            pe_header = f.read(4)
+            if pe_header == b'PE\x00\x00':
+                return True
+    return False
+
+
+def fixup_windows(targpath):
+    # windows needs the executable file to be executable, which samba
+    # manifests as following the executable bit
+    for root, _, files in os.walk(targpath):
+        for fname in files:
+            for ext in ('.exe', '.dll', '.sys', '.mui', '.efi'):
+                if fname.endswith(ext):
+                    fpath = os.path.join(root, fname)
+                    if is_windows_executable(fpath):
+                        st = os.stat(fpath)
+                        os.chmod(fpath, st.st_mode | 0o111)
+
 def check_coreos(isoinfo):
     arch = 'x86_64'  # TODO: would check magic of vmlinuz to see which arch
     if 'zipl.prm' in isoinfo[1]:
@@ -541,7 +715,28 @@ def check_coreos(isoinfo):
                         'method': EXTRACT, 'category': 'coreos'}
 
 
-
+def check_windows(isoinfo):
+    idwbinfo = isoinfo[1].get('sources/idwbinfo.txt', b'')
+    idwbinfo = idwbinfo.decode()
+    idwbinfo = idwbinfo.split('\n')
+    version = ''
+    for line in idwbinfo:
+        if 'BuildBranch=' in line:
+            branch = line.strip().split('=')[1]
+            if branch == 'rs5_release':
+                version = '2019'
+            elif branch == 'fe_release':
+                version = '2022'
+            elif branch == 'ge_release':
+                version = '2025'
+    category = f'windows{version}'
+    if version:
+        defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(category)
+        if not os.path.exists(defprofile):
+            return None
+        return {'name': 'windows-{0}-x86_64'.format(version), 'method': EXTRACTUDF, 'category': category}
+    return None
+        
 def check_rhel(isoinfo):
     ver = None
     arch = None
@@ -570,6 +765,10 @@ def check_rhel(isoinfo):
             ver = entry.split('-')[2]
             arch = entry.split('.')[-2]
             break
+        elif 'redhat-release-10' in entry:
+            ver = entry.split('-')[2]
+            arch = entry.split('.')[-2]
+            break
     else:
         if '.discinfo' in isoinfo[1]:
             prodinfo = isoinfo[1]['.discinfo']
@@ -590,27 +789,106 @@ def check_rhel(isoinfo):
     major = ver.split('.', 1)[0]
     return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
 
+def fingerprint_initramfs(archive):
+    curroffset = archive.tell()
+    dfd = os.dup(archive.fileno())
+    os.lseek(dfd, curroffset, 0)
+    try:
+        with libarchive.fd_reader(dfd) as reader:
+            for ent in reader:
+                if str(ent) == 'usr/lib/initrd-release':
+                    osrelcontents = b''
+                    for block in ent.get_blocks():
+                        osrelcontents += bytes(block)
+                    osrelease = osrelcontents.decode('utf-8').strip()
+                    osid = ''
+                    osver = ''
+                    for line in osrelease.split('\n'):
+                        if line.startswith('ID='):
+                            osid = line.split('=', 1)[1].strip().strip('"')
+                        if line.startswith('VERSION_ID='):
+                            osver = line.split('=', 1)[1].strip().strip('"')
+                    if osid and osver:
+                        return (osid, osver)
+    finally:
+        os.close(dfd)
+    return None
+
 
 async def scan_iso(archive):
+    scanudf = False
     filesizes = {}
     filecontents = {}
     dfd = os.dup(archive.fileno())
     os.lseek(dfd, 0, 0)
     try:
-        with libarchive.fd_reader(dfd) as reader:
+        with libarchive.fd_reader(dfd, ) as reader:
             for ent in reader:
                 if str(ent).endswith('TRANS.TBL'):
                     continue
                 await asyncio.sleep(0)
                 filesizes[str(ent)] = ent.size
+                if str(ent) == 'README.TXT':
+                    readmecontents = b''
+                    for block in ent.get_blocks():
+                        readmecontents += bytes(block)
+                    if b'ISO-13346' in readmecontents:
+                        scanudf = True
                 if str(ent) in READFILES:
                     filecontents[str(ent)] = b''
                     for block in ent.get_blocks():
                         filecontents[str(ent)] += bytes(block)
+        if scanudf:
+            ndfd = os.dup(archive.fileno())
+            os.lseek(ndfd, 0, 0)
+            return scan_udf(ndfd)
     finally:
         os.close(dfd)
     return filesizes, filecontents
 
+def scan_udf(dfd):
+    fp = os.fdopen(dfd, 'rb')
+    iso = pycdlib.PyCdlib()
+    iso.open_fp(fp)
+    imginfo = {}
+    try:
+        extracted = BytesIO()
+        iso.get_file_from_iso_fp(extracted, udf_path='/sources/idwbinfo.txt')
+        idwbinfo = extracted.getvalue()
+        imginfo = {'sources/idwbinfo.txt': idwbinfo}
+    except Exception:
+        pass
+    finally:
+        iso.close()
+        fp.close()
+    return {}, imginfo
+
+
+def parse_bfb(archive):
+    currtype = 0
+    # we want to find the initramfs image (id 63) and dig around to see the OS version
+    while currtype != 63:
+        currhdr = archive.read(24)
+        if currhdr[:5] != b'Bf\x02\x13!':
+            return None
+        currsize = int.from_bytes(currhdr[8:12], byteorder='little')
+        # currsize needs to be rounded up to nearest 8 byte boundary
+        if currsize % 8:
+            currsize += 8 - (currsize % 8)
+        currtype = currhdr[7]
+        if currtype == 63:
+            ossig = fingerprint_initramfs(archive)
+            if ossig:
+                osinfo = {
+                    'name': f'bluefield_{ossig[0]}-{ossig[1]}-aarch64',
+                    'method': COPY,
+                    'category': f'bluefield_{ossig[0]}{ossig[1]}'
+                }
+                if os.path.exists(f'/opt/confluent/lib/osdeploy/{osinfo["category"]}'):
+                    return osinfo
+        else:
+            archive.seek(currsize, os.SEEK_CUR)
+    return None
 
 async def fingerprint(archive):
     archive.seek(0)
@@ -626,6 +904,12 @@ async def fingerprint(archive):
                 if name:
                     return name, isoinfo[0], fun.replace('check_', '')
         return None
+    elif header[:4] == b'Bf\x02\x13':
+        # BFB payload for Bluefield
+        archive.seek(0)
+        imginfo = parse_bfb(archive)
+        if imginfo:
+            return imginfo, None, 'bluefield'
     else:
         sum = hashlib.sha256(header)
         if sum.digest() in HEADERSUMS:
@@ -669,9 +953,9 @@ async def import_image(filename, callback, backend=False, mfd=None, custtargpath
         print('Importing OS to ' + targpath + ':')
     callback({'progress': 0.0})
     pct = 0.0
-    if EXTRACT & identity['method']:
+    if EXTRACT & identity['method'] or EXTRACTUDF & identity['method']:
         pct = extract_file(archive, callback=callback, imginfo=imginfo,
-                           extractlist=identity.get('extractlist', None))
+                           extractlist=identity.get('extractlist', None), method=identity['method'])
     if COPY & identity['method']:
         basename = identity.get('copyto', os.path.basename(filename))
         targiso = os.path.join(targpath, basename)
@@ -708,10 +992,16 @@ def printit(info):
 
 
 def list_distros():
-    return sorted(os.listdir('/var/lib/confluent/distributions'))
+    try:
+        return sorted(os.listdir('/var/lib/confluent/distributions'))
+    except FileNotFoundError:
+        return []
 
 def list_profiles():
-    return sorted(os.listdir('/var/lib/confluent/public/os/'))
+    try:
+        return sorted(os.listdir('/var/lib/confluent/public/os/'))
+    except FileNotFoundError:
+        return []
 
 def get_profile_label(profile):
     with open('/var/lib/confluent/public/os/{0}/profile.yaml') as metadata:
@@ -849,6 +1139,8 @@ async def generate_stock_profiles(defprofile, distpath, targpath, osname,
         initrds = ['{0}/initramfs/{1}'.format(defprofile, initrd) for initrd in os.listdir('{0}/initramfs'.format(defprofile))]
         if os.path.exists('{0}/initramfs/{1}'.format(defprofile, arch)):
             initrds.extend(['{0}/initramfs/{1}/{2}'.format(defprofile, arch, initrd) for initrd in os.listdir('{0}/initramfs/{1}'.format(defprofile, arch))])
+        elif arch == 'arm64' and os.path.exists('{0}/initramfs/aarch64'.format(defprofile)):
+            initrds.extend(['{0}/initramfs/aarch64/{1}'.format(defprofile, initrd) for initrd in os.listdir('{0}/initramfs/aarch64'.format(defprofile))])
         for fullpath in initrds:
             initrd = os.path.basename(fullpath)
             if os.path.isdir(fullpath):
@@ -864,7 +1156,7 @@ async def generate_stock_profiles(defprofile, distpath, targpath, osname,
         await util.check_call(
             'sh', '{0}/initprofile.sh'.format(dirname),
              targpath, dirname)
-        bootupdates.append(tasks.spawn_task(update_boot(dirname)))
+        bootupdates.append(tasks.spawn_task(update_boot(dirname, True)))
         profilelist.append(profname)
     for upd in bootupdates:
         await upd

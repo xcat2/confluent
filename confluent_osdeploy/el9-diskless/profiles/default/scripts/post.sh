@@ -43,7 +43,8 @@ run_remote_parts post.d
 
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post.d
-
+cd /root/
+fetch_remote confignet
 # rebuild initrd, pick up new drivers if needed
 dracut -f /boot/initramfs-$(uname -r).img $(uname -r)
 

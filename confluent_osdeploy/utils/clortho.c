@@ -246,6 +246,6 @@ int main(int argc, char* argv[]) {
             buffer[0] = 255;
             ret = read(sock, buffer, 2);
         }
-        fprintf(stderr, "Password was not accepted\n");
+        fprintf(stderr, "Confluent API token grant denied by server\n");
         exit(1);
 }

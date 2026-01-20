@@ -67,7 +67,7 @@ import uuid
 import yaml
 import shutil
 
-
+vinz = None
 pluginmap = {}
 dispatch_plugins = (b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos', b'enos', u'enos')
 
@@ -232,6 +232,7 @@ async def handle_deployment(configmanager, inputdata, pathcomponents,
                     with open('/var/lib/confluent/public/os/{}/profile.yaml'.format(profname)) as profyaml:
                         profinfo = yaml.safe_load(profyaml)
                         profinfo['name'] = profname
+                    #check if boot.ipxe is older than profile.yaml
                     yield msg.KeyValueData(profinfo)
                     return
         elif len(pathcomponents) == 3:
@@ -321,6 +322,24 @@ def _init_core():
                         'default': 'ipmi',
                     }),
                 },
+                'certificate': {
+                    'sign': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'generate_csr': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                    'install': PluginRoute({
+                        'pluginattrs': ['hardwaremanagement.method'],
+                        'default': 'ipmi',
+                    }),
+                },
+                'certificate_authorities': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
                 'clear': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
                         'default': 'ipmi',
@@ -456,13 +475,27 @@ def _init_core():
                 'pluginattrs': ['hardwaremanagement.method'],
                 'default': 'ipmi',
             }),
-            'ikvm': PluginRoute({'handler': 'ikvm'}),
+            'ikvm': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'ikvm_methods': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
+            'ikvm_screenshot': PluginRoute({
+                'pluginattrs': ['hardwaremanagement.method'],
+                'default': 'ipmi',
+            }),
         },
         'description': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
             'default': 'ipmi',
         }),
         'deployment': {
+            'lock': PluginRoute({
+                'handler': 'attributes'
+            }),
             'ident_image': PluginRoute({
                 'handler': 'identimage'
             })
@@ -502,6 +535,26 @@ def _init_core():
             },
             'firmware': {
                 'all': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'core': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'adapters': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'disks': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'misc': PluginCollection({
+                    'pluginattrs': ['hardwaremanagement.method'],
+                    'default': 'ipmi',
+                }),
+                'updatestatus': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
                     'default': 'ipmi',
                 }),
@@ -992,6 +1045,7 @@ async def _forward_rsp(connection, res):
 
 async def handle_node_request(configmanager, inputdata, operation,
                         pathcomponents, autostrip=True):
+    global vinz
     if log.logfull:
         raise exc.TargetResourceUnavailable('Filesystem full, free up space and restart confluent service')
     iscollection = False
@@ -1108,6 +1162,10 @@ async def handle_node_request(configmanager, inputdata, operation,
                     plugpath = plugroute['default']
             if plugpath in dispatch_plugins:
                 cfm.check_quorum()
+                if pathcomponents == ['console', 'ikvm']:
+                    if not vinz:
+                        import confluent.vinzmanager as vinz
+                        vinz.assure_vinz()
                 manager = nodeattr[node].get('collective.manager', {}).get(
                     'value', None)
                 if manager:

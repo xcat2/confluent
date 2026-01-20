@@ -45,6 +45,7 @@ import math
 import getpass
 import optparse
 import os
+import re
 import select
 import shlex
 import signal
@@ -663,17 +664,18 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
 def get_session_node(shellargs):
     # straight to node console
     if len(shellargs) == 1 and ' ' not in shellargs[0]:
-        return shellargs[0]
+        targ = "/nodes/%s/console/session" % shellargs[0]
+        return targ, shellargs[0]
     if len(shellargs) == 2 and shellargs[0] == 'start':
         args = [s for s in shellargs[1].split('/') if s]
         if len(args) == 4 and args[0] == 'nodes':
             if args[2] == 'console' and \
                 args[3] == 'session':
-                return args[1]
-            if args[2] == 'shell' and \
+            return shellargs[1], args[1]
+        if len(args) == 5 and args[0] == 'nodes' and args[2] == 'shell' and \
                 args[3] == 'sessions':
-                return args[1]
-    return None
+            return shellargs[1], args[1]
+    return None, None
 
 
 def run_inline_command(path, arg, completion, **kwargs):
@@ -930,10 +932,10 @@ def main():
     doexit = False
     inconsole = False
     pendingcommand = ""
-    session_node = get_session_node(shellargs)
+    targ, session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
-        do_command(shellargs, netserver)
+        do_command("start %s" % targ, netserver)
         doexit = True
     elif shellargs:
         do_command(shellargs, netserver)
@@ -978,8 +980,15 @@ def main():
                     sys.stdout.write('Lost connection to server')
     quitconfetty(fullexit=True)
 
+sgr_re = re.compile(r'(\x1b\[[0-9;]*m)')
+sgr_parameters_re = re.compile(r'\x1b\[([0-9;]*)m')
+fgcolor = None
+bgcolor = None
+fgshifted = False
+pendseq = ''
 def consume_termdata(fh, bufferonly=False):
     global clearpowermessage
+    global fgcolor, bgcolor, fgshifted, pendseq
     try:
         data = tlvdata.recv(fh)
     except Exception:
@@ -988,7 +997,59 @@ def consume_termdata(fh, bufferonly=False):
         updatestatus(data)
         return ''
     if data is not None:
-        data = client.stringify(data)
+        indata = pendseq + client.stringify(data)
+        pendseq = ''
+        data = ''
+        for segment in sgr_re.split(indata):
+            if sgr_re.match(segment):  # it is an sgr, analyze, maybe replace
+                params = []
+                for parameters in sgr_parameters_re.findall(segment):
+                    for param in parameters.split(';'):
+                        params.append(param)
+                        if param == '0':
+                            fgcolor = None
+                            bgcolor = None
+                        try:
+                            ival = int(param)
+                        except ValueError:
+                            continue
+                        if 40 <= ival <= 47 or 100 <= ival <= 107:
+                            bgcolor = ival
+                        if 30 <= ival <= 37 or 90 <= ival <= 97:
+                            fgcolor = ival
+                if bgcolor is not None:
+                    fgindicated = False
+                    for idx, param in enumerate(params):
+                        try:
+                            ival = int(param)
+                        except ValueError:
+                            continue
+                        if 30 <= ival <= 37 and (bgcolor % 10 == ival % 10):
+                            fgindicated = True
+                            fgshifted = True
+                            ival += 60
+                            params[idx] = str(ival)
+                    if not fgindicated and fgcolor is not None:
+                        if bgcolor and (bgcolor % 10) == (fgcolor % 10):
+                            fgshifted = True
+                            params.append(str((fgcolor % 10) + 90))
+                        elif fgshifted:
+                            params.append(str(fgcolor))
+                segment = '\x1b[' + ';'.join(str(p) for p in params) + 'm'
+            data += segment
+        # defer any partial ansi escape sequence for a later pass
+        escidx = segment.rfind('\x1b[')
+        if escidx >= 0:
+            for chr in segment[escidx + 2:]:
+                if 0x40 <= ord(chr) <= 0x7e:
+                    break
+            else:
+                # incomplete escape sequence, don't print it yet
+                data = data[:-len(segment) + escidx]
+                pendseq = segment[escidx:]
+        if not pendseq and segment and segment[-1] == '\x1b':
+            data = data[:-1]
+            pendseq = '\x1b'
         if clearpowermessage:
             sys.stdout.write("\x1b[2J\x1b[;H")
             clearpowermessage = False

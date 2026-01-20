@@ -51,8 +51,11 @@ def listdump(input):
     return retval
 
 
-def get_extra_names(nodename, cfg, myip=None):
-    names = set(['127.0.0.1', '::1', 'localhost', 'localhost.localdomain'])
+def get_extra_names(nodename, cfg, myip=None, preferadjacent=False, addlocalhost=True):
+    if addlocalhost:
+        names = set(['127.0.0.1', '::1', 'localhost', 'localhost.localdomain'])
+    else:
+        names = set([])
     dnsinfo = cfg.get_node_attributes(nodename, ('dns.*', 'net.*hostname'))
     dnsinfo = dnsinfo.get(nodename, {})
     domain = dnsinfo.get('dns.domain', {}).get('value', None)
@@ -73,11 +76,19 @@ def get_extra_names(nodename, cfg, myip=None):
         ncfgs.append(fncfg.get('default', {}))
         for ent in fncfg.get('extranets', []):
             ncfgs.append(fncfg['extranets'][ent])
+        addall = True
+        routedaddrs = set([])
         for ncfg in ncfgs:
             for nip in (ncfg.get('ipv4_address', None), ncfg.get('ipv6_address', None)):
                 if nip:
                     nip = nip.split('/', 1)[0]
-                    names.add(nip)
+                    if not preferadjacent or netutil.address_is_local(nip):
+                        names.add(nip)
+                        addall = False
+                    else:
+                        routedaddrs.add(nip)
+        if addall:
+            names.update(routedaddrs)
     return names
 
 async def handle_request(req, make_response, mimetype):
@@ -134,6 +145,8 @@ async def handle_request(req, make_response, mimetype):
             return
         righthmac = hmac.new(hmackey, cryptkey, hashlib.sha256).digest()
         if righthmac == crypthmac:
+            if not isinstance(cryptkey, str):
+                cryptkey = cryptkey.decode()
             cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': cryptkey}}}
             cfg.set_node_attributes(cfgupdate)
             cfg.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
@@ -245,6 +258,10 @@ async def handle_request(req, make_response, mimetype):
             res['bmcvlan'] = vlan
         bmcaddr = hmattr.get('hardwaremanagement.manager', {}).get('value',
                                                                    None)
+        if not bmcaddr:
+            start_response('500 Internal Server Error', [])
+            yield 'Missing value in hardwaremanagement.manager'
+            return
         bmcaddr = bmcaddr.split('/', 1)[0]
         bmcaddr = await asyncio.get_event_loop().getaddrinfo(bmcaddr, 0)[0]
         bmcaddr = bmcaddr[-1][0]
@@ -257,12 +274,14 @@ async def handle_request(req, make_response, mimetype):
         mrsp = await make_response(mimetype, 200, 'OK')
         await mrsp.write(dumper(res))
     elif reqpath == '/self/myattribs':
-        cfd = cfg.get_node_attributes(nodename, '*').get(nodename, {})
+        cfd = cfg.get_node_attributes(nodename, '*', decrypt=True).get(nodename, {})
         rsp = {}
         for k in cfd:
             if k.startswith('secret') or k.startswith('crypt') or 'value' not in cfd[k] or not cfd[k]['value']:
                 continue
             rsp[k] = cfd[k]['value']
+            if isinstance(rsp[k], bytes):
+                rsp[k] = rsp[k].decode()
         mrsp = await make_response(mimetype, 200, 'OK')
         await mrsp.write(dumper(rsp))
     elif reqpath == '/self/netcfg':
@@ -446,6 +465,9 @@ async def handle_request(req, make_response, mimetype):
         statusstr = update.get('state', None)
         statusdetail = update.get('state_detail', None)
         didstateupdate = False
+        if statusstr or 'status' in update:
+            cfg.set_node_attributes({nodename: {
+                'deployment.client_ip': {'value': clientip}}})
         if statusstr:
             cfg.set_node_attributes({nodename: {'deployment.state': statusstr}})
             didstateupdate = True
@@ -474,6 +496,10 @@ async def handle_request(req, make_response, mimetype):
             updates['deployment.pendingprofile'] = {'value': ''}
             if targattr == 'deployment.profile':
                 updates['deployment.stagedprofile'] = {'value': ''}
+                dls = cfg.get_node_attributes(nodename, 'deployment.lock')
+                dls = dls.get(nodename, {}).get('deployment.lock', {}).get('value', None)
+                if dls == 'autolock':
+                    updates['deployment.lock'] = 'locked'
             currprof = currattr.get(targattr, {}).get('value', '')
             if currprof != pending:
                 updates[targattr] = {'value': pending}
@@ -512,7 +538,9 @@ async def handle_request(req, make_response, mimetype):
             return
     elif reqpath.startswith('/self/remotesyncfiles'):
         if 'POST' == operation:
-            pals = get_extra_names(nodename, cfg, myip)
+            pals = get_extra_names(nodename, cfg, myip, preferadjacent=True, addlocalhost=False)
+            if clientip in pals:
+                pals = [clientip]
             result = syncfiles.start_syncfiles(
                 nodename, cfg, json.loads(reqbody), pals)
             mrsp = await make_response(mimetype, result[0])

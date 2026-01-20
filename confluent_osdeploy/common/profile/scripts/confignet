@@ -164,6 +164,9 @@ class NetplanManager(object):
                 if curraddr not in currips:
                     needcfgwrite = True
                     currips.append(curraddr)
+            if stgs.get('mtu', None):
+                devdict = self.getcfgarrpath([devname])
+                devdict['mtu'] = int(stgs['mtu'])
             gws = []
             gws.append(stgs.get('ipv4_gateway', None))
             gws.append(stgs.get('ipv6_gateway', None))
@@ -301,6 +304,12 @@ class WickedManager(object):
 
 
 class NetworkManager(object):
+    bondtypes = {
+            'lacp': '802.3ad',
+            'loadbalance': 'balance-alb',
+            'roundrobin': 'balance-rr',
+            'activebackup': 'active-backup',
+    }
     def __init__(self, devtypes, deploycfg):
         self.deploycfg = deploycfg
         self.connections = {}
@@ -361,7 +370,7 @@ class NetworkManager(object):
                 args.append(bondcfg[parm])
             subprocess.check_call(['nmcli', 'c', 'm', team] + args)
 
-    def apply_configuration(self, cfg):
+    def apply_configuration(self, cfg, lastchance=False):
         cmdargs = {}
         cmdargs['connection.autoconnect'] = 'yes'
         stgs = cfg['settings']
@@ -375,6 +384,8 @@ class NetworkManager(object):
             cmdargs['ipv4.gateway'] = stgs['ipv4_gateway']
         if stgs.get('ipv6_gateway', None):
             cmdargs['ipv6.gateway'] = stgs['ipv6_gateway']
+        if stgs.get('mtu', None):
+            cmdargs['802-3-ethernet.mtu'] = stgs['mtu']
         dnsips = self.deploycfg.get('nameservers', [])
         if not dnsips:
             dnsips = []
@@ -400,10 +411,10 @@ class NetworkManager(object):
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
-                cargs.append(cmdargs[arg])
-            if stgs['team_mode'] == 'lacp':
-                stgs['team_mode'] = '802.3ad'
-            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'mode={}'.format(stgs['team_mode'])] + cargs)
+                cargs.append('{}'.format(cmdargs[arg]))
+            if stgs['team_mode'] in self.bondtypes:
+                stgs['team_mode'] = self.bondtypes[stgs['team_mode']]
+            subprocess.check_call(['nmcli', 'c', 'add', 'type', 'bond', 'con-name', cname, 'connection.interface-name', cname, 'bond.options', 'miimon=100,mode={}'.format(stgs['team_mode'])] + cargs)
             for iface in cfg['interfaces']:
                 self.add_team_member(cname, iface)
             subprocess.check_call(['nmcli', 'c', 'u', cname])
@@ -412,8 +423,9 @@ class NetworkManager(object):
             iname = list(cfg['interfaces'])[0]
             ctype = self.devtypes.get(iname, None)
             if not ctype:
-                sys.stderr.write("Warning, no device found for interface_name ({0}), skipping setup\n".format(iname))
-                return
+                if lastchance:
+                    sys.stderr.write("Warning, no device found for interface_name ({0}), skipping setup\n".format(iname))
+                return 1
             if stgs.get('vlan_id', None):
                 vlan = stgs['vlan_id']
                 if ctype == 'infiniband':
@@ -434,7 +446,7 @@ class NetworkManager(object):
             cargs = []
             for arg in cmdargs:
                 cargs.append(arg)
-                cargs.append(cmdargs[arg])
+                cargs.append('{}'.format(cmdargs[arg]))
             if u:
                 subprocess.check_call(['nmcli', 'c', 'm', u, 'connection.interface-name', iname] + cargs)
                 subprocess.check_call(['nmcli', 'c', 'u', u])
@@ -448,6 +460,9 @@ class NetworkManager(object):
 
 
 if __name__ == '__main__':
+    checktarg = None
+    if '-c' in sys.argv:
+        checktarg = sys.argv[sys.argv.index('-c') + 1]
     havefirewall = subprocess.call(['systemctl', 'status', 'firewalld'])
     havefirewall = havefirewall == 0
     if havefirewall:
@@ -473,15 +488,16 @@ if __name__ == '__main__':
             continue
         myname = s.getsockname()
         s.close()
+        curridx = None
         if len(myname) == 4:
             curridx = myname[-1]
         else:
             myname = myname[0]
             myname = socket.inet_pton(socket.AF_INET, myname)
             for addr in myaddrs:
-                if myname == addr[1].tobytes():
+                if myname == addr[1]:
                     curridx = addr[-1]
-        if curridx in doneidxs:
+        if curridx is not None and curridx in doneidxs:
             continue
         for tries in (1, 2, 3):
             try:
@@ -533,13 +549,49 @@ if __name__ == '__main__':
     rm_tmp_llas(tmpllas)
     if os.path.exists('/usr/sbin/netplan'):
         nm = NetplanManager(dc)
-    if os.path.exists('/usr/bin/nmcli'):
+    elif os.path.exists('/usr/bin/nmcli'):
         nm = NetworkManager(devtypes, dc)
     elif os.path.exists('/usr/sbin/wicked'):
         nm = WickedManager()
+    retrynics = []
     for netn in netname_to_interfaces:
-        nm.apply_configuration(netname_to_interfaces[netn])
+        redo = nm.apply_configuration(netname_to_interfaces[netn])
+        if redo == 1:
+            retrynics.append(netn)
+    if retrynics:
+        idxmap, devtypes = map_idx_to_name()
+        if os.path.exists('/usr/sbin/netplan'):
+            nm = NetplanManager(dc)
+        if os.path.exists('/usr/bin/nmcli'):
+            nm = NetworkManager(devtypes, dc)
+        elif os.path.exists('/usr/sbin/wicked'):
+            nm = WickedManager()
+        for netn in retrynics:
+            nm.apply_configuration(netname_to_interfaces[netn], lastchance=True)
     if havefirewall:
         subprocess.check_call(['systemctl', 'start', 'firewalld'])
     await_tentative()
+    maxwait = 10
+    while maxwait:
+        try:
+            tclient = apiclient.HTTPSClient(checkonly=True)
+            tclient.check_connections()
+            break
+        except Exception:
+            maxwait -= 1
+            time.sleep(1)
+    maxwait = 10
+    if checktarg:
+        while maxwait:
+            try:
+                addrinf = socket.getaddrinfo(checktarg, 443)[0]
+                psock = socket.socket(addrinf[0], socket.SOCK_STREAM)
+                psock.settimeout(10)
+                psock.connect(addrinf[4])
+                psock.close()
+                break
+            except Exception:
+                maxwait -= 1
+                time.sleep(1)
+
 

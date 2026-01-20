@@ -289,7 +289,7 @@ async def start_term(authname, cfm, connection, params, path, authdata, skipauth
             node=node, configmanager=cfm, username=authname,
             datacallback=ccons.sendall, skipreplay=skipreplay)
     elif len(elems) >= 6 and elems[3:5] == ['shell', 'sessions']:
-        if len(elems) == 7:
+        if len(elems) == 6 and elems[5]:
             sessionid = elems[5]
         else:
             sessionid = None

@@ -4,7 +4,7 @@ import confluent.util as util
 import grp
 import pwd
 import os
-libc = cdll.LoadLibrary(find_library('libc'))
+libc = cdll.LoadLibrary(find_library('c'))
 _getgrouplist = libc.getgrouplist
 _getgrouplist.restype = c_int32
 

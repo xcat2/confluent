@@ -14,13 +14,16 @@
 # limitations under the License.
 
 import asyncio
+import confluent.vinzmanager as vinzmanager
 import confluent.exceptions as exc
 import confluent.firmwaremanager as firmwaremanager
 import confluent.messages as msg
 import confluent.util as util
 import copy
 import errno
+from confluent import certutil
 from fnmatch import fnmatch
+import io
 import os
 import pwd
 import aiohmi.constants as pygconstants
@@ -30,16 +33,34 @@ import aiohmi.redfish.command as ipmicommand
 import socket
 import ssl
 import traceback
+import tempfile
 
 if not hasattr(ssl, 'SSLEOFError'):
     ssl.SSLEOFError = None
 
 pci_cache = {}
 
+class RetainedIO(io.BytesIO):
+    # Need to retain buffer after close
+    def __init__(self):
+        self.resultbuffer = None
+    def close(self):
+        self.resultbuffer = self.getbuffer()
+        super().close()
+
 def get_dns_txt(qstring):
     return None
     # return support.greendns.resolver.query(
     #     qstring, 'TXT')[0].strings[0].replace('i=', '')
+
+def match_aliases(first, second):
+    aliases = {
+        ('bmc', 'xcc')
+        }
+    for alias in aliases:
+        if first in alias and second in alias:
+            return True
+    return False
 
 def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     fqpi = '{0}.{1}.{2}.{3}'.format(subdevice, subvendor, device, vendor)
@@ -128,6 +149,7 @@ def sanitize_invdata(indata):
 class IpmiCommandWrapper(ipmicommand.Command):
     @classmethod
     async def create(cls, node, cfm, **kwargs):
+        self.confluentbmcname = kwargs['bmc']
         kv = util.TLSCertVerifier(
             cfm, node, 'pubkeys.tls_hardwaremanager').verify_cert
         kwargs['verifycallback'] = kv
@@ -140,7 +162,13 @@ class IpmiCommandWrapper(ipmicommand.Command):
             (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 
                       'hardwaremanagement.manager'), self._attribschanged)
-
+        htn = cfm.get_node_attributes(node, 'hardwaremanagement.manager_tls_name')
+        subject = htn.get(node, {}).get('hardwaremanagement.manager_tls_name', {}).get('value', None)
+        if not subject:
+            subject = kwargs['bmc']
+        kv = util.TLSCertVerifier(cfm, node,
+                                  'pubkeys.tls_hardwaremanager', subject).verify_cert
+        kwargs['verifycallback'] = kv
         try:
             pass
         except socket.error as se:
@@ -403,6 +431,8 @@ class IpmiHandler:
             self.handle_configuration()
         elif self.element[:3] == ['inventory', 'firmware', 'updates']:
             self.handle_update()
+        elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
+            self.handle_update_status()
         elif self.element[0] == 'inventory':
             self.handle_inventory()
         elif self.element == ['media', 'attach']:
@@ -423,6 +453,12 @@ class IpmiHandler:
             self.handle_servicedata_fetch()
         elif self.element == ['description']:
             self.handle_description()
+        elif self.element == ['console', 'ikvm_methods']:
+            self.handle_ikvm_methods()
+        elif self.element == ['console', 'ikvm_screenshot']:
+            self.handle_ikvm_screenshot()
+        elif self.element == ['console', 'ikvm']:
+            self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
 
@@ -472,6 +508,10 @@ class IpmiHandler:
     def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
             return self.handle_alerts()
+        elif self.element[1:3] == ['management_controller', 'certificate_authorities']:
+            return self.handle_cert_authorities()
+        elif self.element[1:3] == ['management_controller', 'certificate']:
+            return self.handle_certificate()
         elif self.element[1:3] == ['management_controller', 'users']:
             return self.handle_users()
         elif self.element[1:3] == ['management_controller', 'net_interfaces']:
@@ -512,6 +552,90 @@ class IpmiHandler:
 
     def decode_alert(self):
         raise Exception("Decode Alert not implemented for redfish")
+
+    def handle_certificate(self):
+        self.element = self.element[3:]
+        if len(self.element) != 1:
+            raise Exception('Not implemented')
+        if self.element[0] == 'sign' and self.op == 'update':
+            csr = self.ipmicmd.get_bmc_csr()
+            subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_names(self.node))
+            with tempfile.NamedTemporaryFile() as tmpfile:
+                tmpfile.write(csr.encode())
+                tmpfile.flush()
+                certfile = tempfile.NamedTemporaryFile(delete=False)
+                certname = certfile.name
+                certfile.close()
+                certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
+                                            days=self.inputdata.get_days(self.node))
+            with open(certname, 'rb') as certf:
+                cert = certf.read()
+            os.unlink(certname)
+            self.ipmicmd.install_bmc_certificate(cert)
+
+    def handle_cert_authorities(self):
+        if len(self.element) == 3:
+            if self.op == 'read':
+                for cert in self.ipmicmd.get_trusted_cas():
+                    self.output.put(msg.ChildCollection(cert['id']))
+            elif self.op == 'update':
+                cert = self.inputdata.get_pem(self.node)
+                self.ipmicmd.add_trusted_ca(cert)
+        elif len(self.element) == 4:
+            certid = self.element[-1]
+            if self.op == 'read':
+                for certdata in self.ipmicmd.get_trusted_cas():
+                    if certdata['id'] == certid:
+                        self.output.put(msg.CertificateAuthority(
+                            pem=certdata['pem'],
+                            node=self.node,
+                            subject=certdata['subject'],
+                            san=certdata.get('san', None)))
+            elif self.op == 'delete':
+                self.ipmicmd.del_trusted_ca(certid)
+            return
+
+    def handle_certificate(self):
+        self.element = self.element[3:]
+        if len(self.element) != 1:
+            raise Exception('Not implemented')
+        if self.element[0] == 'sign' and self.op == 'update':
+            csr = self.ipmicmd.get_bmc_csr()
+            subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_names(self.node))
+            with tempfile.NamedTemporaryFile() as tmpfile:
+                tmpfile.write(csr.encode())
+                tmpfile.flush()
+                certfile = tempfile.NamedTemporaryFile(delete=False)
+                certname = certfile.name
+                certfile.close()
+                certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
+                                            days=self.inputdata.get_days(self.node))
+            with open(certname, 'rb') as certf:
+                cert = certf.read()
+            os.unlink(certname)
+            self.ipmicmd.install_bmc_certificate(cert)
+
+    def handle_cert_authorities(self):
+        if len(self.element) == 3:
+            if self.op == 'read':
+                for cert in self.ipmicmd.get_trusted_cas():
+                    self.output.put(msg.ChildCollection(cert['id']))
+            elif self.op == 'update':
+                cert = self.inputdata.get_pem(self.node)
+                self.ipmicmd.add_trusted_ca(cert)
+        elif len(self.element) == 4:
+            certid = self.element[-1]
+            if self.op == 'read':
+                for certdata in self.ipmicmd.get_trusted_cas():
+                    if certdata['id'] == certid:
+                        self.output.put(msg.CertificateAuthority(
+                            pem=certdata['pem'],
+                            node=self.node,
+                            subject=certdata['subject'],
+                            san=certdata.get('san', None)))
+            elif self.op == 'delete':
+                self.ipmicmd.del_trusted_ca(certid)
+            return
 
     def handle_alerts(self):
         if self.element[3] == 'destinations':
@@ -569,7 +693,8 @@ class IpmiHandler:
                     ipv4cfgmethod=lancfg['ipv4_configuration'],
                     hwaddr=lancfg['mac_address'],
                     staticv6addrs=v6cfg['static_addrs'],
-                    staticv6gateway=v6cfg['static_gateway']
+                    staticv6gateway=v6cfg.get('static_gateway', None),
+                    vlan_id=lancfg.get('vlan_id', None)
                 ))
             elif self.op == 'update':
                 config = self.inputdata.netconfig(self.node)
@@ -577,7 +702,8 @@ class IpmiHandler:
                     self.ipmicmd.set_net_configuration(
                         ipv4_address=config['ipv4_address'],
                         ipv4_configuration=config['ipv4_configuration'],
-                        ipv4_gateway=config['ipv4_gateway'])
+                        ipv4_gateway=config['ipv4_gateway'],
+                        vlan_id=config.get('vlan_id', None))
                     v6addrs = config.get('static_v6_addresses', None)
                     if v6addrs is not None:
                         v6addrs = v6addrs.split(',')
@@ -767,14 +893,15 @@ class IpmiHandler:
         for id, data in self.ipmicmd.get_firmware():
             self.output.put(msg.ChildCollection(simplify_name(id)))
 
-    def read_firmware(self, component):
+    def read_firmware(self, component, category):
         items = []
         errorneeded = False
         try:
             complist = () if component == 'all' else (component,)
-            for id, data in self.ipmicmd.get_firmware(complist):
+            for id, data in self.ipmicmd.get_firmware(complist, category):
                 if (component in ('core', 'all') or
-                        component == simplify_name(id)):
+                        component == simplify_name(id) or
+                        match_aliases(component, simplify_name(id))):
                     items.append({id: data})
         except ssl.SSLEOFError:
             errorneeded = msg.ConfluentNodeError(
@@ -794,12 +921,20 @@ class IpmiHandler:
         if errorneeded:
             self.output.put(errorneeded)
 
+    def handle_update_status(self):
+        activeupdates = list(firmwaremanager.list_updates([self.node], None, []))
+        if activeupdates:
+            self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
+        else:
+            status = self.ipmicmd.get_update_status()
+            self.output.put(msg.KeyValueData({'status': status}, self.node))
+
     def handle_inventory(self):
         if self.element[1] == 'firmware':
             if len(self.element) == 3:
                 return self.list_firmware()
             elif len(self.element) == 4:
-                return self.read_firmware(self.element[-1])
+                return self.read_firmware(self.element[-1], self.element[-2])
         elif self.element[1] == 'hardware':
             if len(self.element) == 3:  # list things in inventory
                 return self.list_inventory()
@@ -1151,13 +1286,12 @@ class IpmiHandler:
             health = response['health']
             health = _str_health(health)
             self.output.put(msg.HealthSummary(health, self.node))
-            if 'badreadings' in response:
-                badsensors = []
-                for reading in response['badreadings']:
-                    if hasattr(reading, 'health'):
-                        reading.health = _str_health(reading.health)
-                    badsensors.append(reading)
-                self.output.put(msg.SensorReadings(badsensors, name=self.node))
+            badsensors = []
+            for reading in response.get('badreadings', []):
+                if hasattr(reading, 'health'):
+                    reading.health = _str_health(reading.health)
+                badsensors.append(reading)
+            self.output.put(msg.SensorReadings(badsensors, name=self.node))
         else:
             raise exc.InvalidArgumentException('health is read-only')
 
@@ -1432,6 +1566,36 @@ class IpmiHandler:
     def handle_description(self):
         dsc = self.ipmicmd.get_description()
         self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_methods(self):
+        dsc = self.ipmicmd.get_ikvm_methods()
+        dsc = {'ikvm_methods': dsc}
+        self.output.put(msg.KeyValueData(dsc, self.node))
+
+    def handle_ikvm_screenshot(self):
+        # good background for the webui, and kitty
+        imgdata = RetainedIO()
+        imgformat = self.ipmicmd.get_screenshot(imgdata)
+        imgdata = imgdata.getvalue()
+        if imgdata:
+            self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
+
+    def handle_ikvm(self):
+        methods = self.ipmicmd.get_ikvm_methods()
+        if 'openbmc' in methods:
+            url = vinzmanager.get_url(self.node, self.inputdata)
+            self.output.put(msg.ChildCollection(url))
+            return
+        launchdata = self.ipmicmd.get_ikvm_launchdata()
+        if 'url' in launchdata and not launchdata['url'].startswith('https://'):
+            mybmc = self.ipmicmd.confluentbmcname
+            if mybmc.startswith('fe80::'):  # link local, need to adjust
+                lancfg = self.ipmicmd.get_net_configuration()
+                mybmc = lancfg['ipv4_address'].split('/')[0]
+            if ':' in mybmc and not '[' in mybmc:
+                mybmc = '[{}]'.format(mybmc)
+            launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
+        self.output.put(msg.KeyValueData(launchdata, self.node))
 
 
 def _str_health(health):

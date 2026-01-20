@@ -1,3 +1,4 @@
+cp /tls/* /etc/ssl/certs/
 cd /sys/class/net
 for nic in *; do
     ip link set $nic up
@@ -5,71 +6,102 @@ done
 mkdir -p /custom-installation
 cp -a /opt/confluent /custom-installation
 touch /custom-installation/confluent/confluent.info
-TRIES=5
-while [ ! -e /dev/disk/by-label ] && [ $TRIES -gt 0 ]; do
-    sleep 2
-    TRIES=$((TRIES - 1))
-done
-if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
-    tmnt=/tmp/idntmnt
-    mkdir -p /tmp/identdata/
-    mkdir -p $tmnt
-    tcfg=/tmp/idnttmp
-    mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
-    cp -a $tmnt/* /tmp/identdata/
-    cd $tmnt
-    deploysrvs=$(sed -n '/^deploy_servers:/,/^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
-    sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
-    autoconfigmethod=$(grep ^ipv4_method: $tcfg)
-    autoconfigmethod=${autoconfigmethod#ipv4_method: }
-    . /scripts/functions
-    if [ "$autoconfigmethod" = "static" ]; then
-        MYIP=$(grep ^ipv4_address: $tcfg | awk '{print $2}'|sed -e s'!/.*!!')
-        v4addr=$(grep ^ipv4_address: $tcfg|cut -d: -f 2|sed -e 's/ //')
-        MYGW=$(grep ^ipv4_gateway: $tcfg | awk '{print $2}')
-        if [ "$MYGW" = "null" ]; then
-            MYGW=""
-        fi
-        MYNM=$(grep ^ipv4_netmask: $tcfg | awk '{print $2}')
-        NIC=""
-        while [ -z "$NIC" ]; do
-            for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
-                ip addr add dev $NICGUESS $v4addr
-                if [ ! -z "$MYGW" ]; then
-                    ip route add default via $MYGW
-                fi
-                for dsrv in $deploysrvs; do
-                    if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
-                        deploysrvs=$dsrv
-                        NIC=$NICGUESS
+MGR=""
+while ! grep NODENAME /custom-installation/confluent/confluent.info; do
+    if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
+        tmnt=/tmp/idntmnt
+        mkdir -p /tmp/identdata/
+        mkdir -p $tmnt
+        tcfg=/tmp/idnttmp
+        mount /dev/disk/by-label/CNFLNT_IDNT $tmnt
+        cp -a $tmnt/* /tmp/identdata/
+        cd $tmnt
+        deploysrvs=$(sed -n '/^deploy_servers:/,/^[^-]/p' cnflnt.yml |grep ^-|sed -e 's/^- //'|grep -v :)
+        sed -n '/^net_cfgs:/,/^[^- ]/{/^[^- ]/!p}' cnflnt.yml |sed -n '/^-/,/^-/{/^-/!p}'| sed -e 's/^[- ]*//'> $tcfg
+        autoconfigmethod=$(grep ^ipv4_method: $tcfg)
+        autoconfigmethod=${autoconfigmethod#ipv4_method: }
+        . /scripts/functions
+        if [ "$autoconfigmethod" = "static" ]; then
+            MYIP=$(grep ^ipv4_address: $tcfg | awk '{print $2}'|sed -e s'!/.*!!')
+            v4addr=$(grep ^ipv4_address: $tcfg|cut -d: -f 2|sed -e 's/ //')
+            MYGW=$(grep ^ipv4_gateway: $tcfg | awk '{print $2}')
+            if [ "$MYGW" = "null" ]; then
+                MYGW=""
+            fi
+            MYNM=$(grep ^ipv4_netmask: $tcfg | awk '{print $2}')
+            NIC=""
+            while [ -z "$NIC" ]; do
+                for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK|cut -d ' ' -f 2 | sed -e 's/:$//'); do
+                    ip addr add dev $NICGUESS $v4addr
+                    if [ ! -z "$MYGW" ]; then
+                        ip route add default via $MYGW
+                    fi
+                    for dsrv in $deploysrvs; do
+                        if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
+                            deploysrvs=$dsrv
+                            NIC=$NICGUESS
+                            break
+                        fi
+                    done
+                    if [ -z "$NIC" ]; then
+                        ip -4 a flush dev $NICGUESS
+                    else
                         break
                     fi
                 done
-                if [ -z "$NIC" ]; then
-                    ip -4 a flush dev $NICGUESS
-                else
-                    break
+            done
+            ipconfig -d $MYIP::$MYGW:$MYNM::$NIC
+            echo $NIC > /tmp/autodetectnic
+        else
+	    rmmod cdc_ether 2> /dev/null
+            while [ ! -f /run/confirmednic ]; do
+                ALLNETDEVS=$(ip a|grep LOWER_UP|grep MULTICAST|awk '{print $2}'|sed -e s/://)
+
+                rm -rf /run/net* /run/dhcpcd /var/lib/dhcpcd
+                for dev in $(ip a|grep MULTICAST|awk '{print $2}'|sed -e s/://); do
+                   ip a flush $dev
+                   echo 1 > /proc/sys/net/ipv6/conf/$dev/addr_gen_mode
+                   echo 0 > /proc/sys/net/ipv6/conf/$dev/addr_gen_mode
+                done
+                unset DEVICE DEVICE6 IP IP6 dev
+        		[ -z "$1" ] || DEVICE=$1
+		        shift
+                configure_networking
+                echo $DEVICE > /tmp/autodetectnic
+                for dsrv in $deploysrvs; do
+                    (if openssl s_client -connect $dsrv:443 > /dev/null 2>&1; then
+                        echo $dsrv > /run/confirmednic
+                        break
+                    fi) &
+		            chkpid=$!
+		            ( sleep 10 && kill $chkpid ) &
+		            timeoutpid=$!
+		            wait $chkpid
+		            kill $timeoutpid 2> /dev/null
+		            unset chkpid timeoutpid
+                done
+                if [ ! -f /run/confirmednic ]; then
+                    echo "No connectivity to deployment servers, retrying..."
+		            [ -z "$1" ] && set -- $ALLNETDEVS
                 fi
             done
-        done
-        ipconfig -d $MYIP::$MYGW:$MYNM::$NIC
-        echo $NIC > /tmp/autodetectnic
+            deploysrvs=$(cat /run/confirmednic)
+            rm /run/confirmednic
+        fi
+        MGR=$deploysrvs
+        NODENAME=$(grep ^nodename: /tmp/idntmnt/cnflnt.yml | awk '{print $2}')
+        echo "NODENAME: $NODENAME" >> /custom-installation/confluent/confluent.info
+        echo "MANAGER: $MGR" >> /custom-installation/confluent/confluent.info
+        echo "EXTMGRINFO: $MGR||1" >> /custom-installation/confluent/confluent.info
+        hmackeyfile=/tmp/cnflnthmackeytmp
+        echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
+        cd -
+        umount $tmnt
     else
-        configure_networking
-    fi
-    MGR=$deploysrvs
-    NODENAME=$(grep ^nodename: /tmp/idntmnt/cnflnt.yml | awk '{print $2}')
-    echo "NODENAME: $NODENAME" >> /custom-installation/confluent/confluent.info
-    echo "MANAGER: $MGR" >> /custom-installation/confluent/confluent.info
-    echo "EXTMGRINFO: $MGR||1" >> /custom-installation/confluent/confluent.info
-    hmackeyfile=/tmp/cnflnthmackeytmp
-    echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
-    cd -
-    umount $tmnt
-else
-    while ! grep NODENAME /custom-installation/confluent/confluent.info; do
         /opt/confluent/bin/copernicus -t > /custom-installation/confluent/confluent.info
-    done
+    fi
+done
+if [ -z "$MGR" ]; then
     MGR="[$(grep MANAGER: /custom-installation/confluent/confluent.info | head -n 1 | awk '{print $2}')]"
 fi
 osprofile=$(sed -e 's/.*osprofile=//' -e 's/ .*//' /proc/cmdline)
@@ -85,8 +117,25 @@ echo $osprofile > /custom-installation/confluent/osprofile
 . /etc/os-release
 DIRECTISO=$(blkid -t TYPE=iso9660 |grep -Ei ' LABEL="Ubuntu-Server '$VERSION_ID)
 if [ -z "$DIRECTISO" ]; then
-    echo URL=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
-    fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=http://${MGR}/confluent-public/os/$osprofile/distribution/install.iso"
+    mv /usr/bin/openssl /usr/bin/ossl
+    cat > /usr/bin/openssl << 'EOF'
+#!/bin/sh
+AMENDARGS=0
+nargs=""
+for arg in $*; do
+    if [ "$arg" == "-servername" -o "$arg" == "-verify" ]; then
+        AMENDARGS=1
+    fi
+    if [ "$AMENDARGS" == "1" ]; then
+        arg=$(echo $arg|sed -e 's/:443$//' -e 's/\[//' -e 's/\]//' -e 's/%.*//')
+    fi
+    nargs="$nargs $arg"
+done
+exec /usr/bin/ossl $nargs
+EOF
+    chmod +x /usr/bin/openssl
+    echo URL=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso >> /conf/param.conf
+    fcmdline="$(cat /custom-installation/confluent/cmdline.orig) url=https://${MGR}:443/confluent-public/os/$osprofile/distribution/install.iso"
 fi
 if [ ! -z "$cons" ]; then
     fcmdline="$fcmdline console=${cons#/dev/}"

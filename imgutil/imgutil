@@ -224,7 +224,7 @@ def capture_remote(args):
         sys.exit(1)
     oscat = finfo['oscategory']
     subprocess.check_call(['ssh', '-o', 'LogLevel=QUIET', '-t', targ, 'python3', '/run/imgutil/capenv/imgutil', 'capturelocal'])
-    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')        
+    utillib = __file__.replace('bin/imgutil', 'lib/imgutil')
     if oscat.startswith('ubuntu'):
         utillib = os.path.join(utillib, '{}/initramfs-tools/'.format(oscat))
         if not os.path.exists(utillib):
@@ -386,6 +386,7 @@ def encrypt_image(plainfile, cryptfile, keyfile):
     loopdev = subprocess.check_output(['losetup', '-f']).decode('utf8').strip()
     subprocess.check_call(['losetup', loopdev, cryptfile])
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {} crypt aes-xts-plain64 {} 0 {} 8'.format(neededblocks, key, loopdev)])
+    subprocess.check_call(['dmsetup', 'mknodes', dmname])
     with open('/dev/mapper/{}'.format(dmname), 'wb') as cryptout:
         with open(plainfile, 'rb+') as plainin:
             lastoffset = 0
@@ -519,9 +520,18 @@ class OsHandler(object):
             pkglistfile = pkglistfile[:-1]
         with open(pkglistfile, 'r') as pkglist:
             pkgs = ''
+            ignoremode = False
             for line in pkglist.readlines():
                 line = line.split('#', 1)[0].strip()
-                pkgs += line + ' '
+                if line.startswith(r'%onlyarch '):
+                    archs = line[len(r'%onlyarch '):].split()
+                    if self.arch not in archs:
+                        ignoremode = True
+                    else:
+                        ignoremode = False
+                    continue
+                if not ignoremode:
+                    pkgs += line + ' '
             pkgs = pkgs.split()
         retpkgs = []
         for pkg in pkgs:
@@ -752,16 +762,28 @@ class ElHandler(OsHandler):
             subprocess.check_call(['yum'] + self.yumargs)
         else:
             subprocess.check_call(['yum', '-y'] + self.yumargs)
+        try:
+            with open(os.path.join(self.targpath, 'etc/selinux/config'), 'r') as seconfigin:
+                seconfig = seconfigin.read().replace('SELINUX=enforcing', 'SELINUX=disabled')
+            with open(os.path.join(self.targpath, 'etc/selinux/config'), 'w') as seconfigout:
+                seconfigout.write(seconfig)
+        except Exception:  # this might not exist in all images
+            pass
         with open('/proc/mounts') as mountinfo:
             for line in mountinfo.readlines():
                 if line.startswith('selinuxfs '):
                     break
             else:
-                self.relabel_targdir()
+                try:
+                    self.relabel_targdir()
+                except subprocess.CalledProcessError:
+                    # Some filesystem contexts can not accommodate the selinux labels, warn that
+                    # this failed, but allow it to proceed in case it can boot anyway
+                    sys.stderr.write('Warning: could not relabel target filesystem for SELinux\n')
 
     def relabel_targdir(self):
         subprocess.check_call(
-            ['setfiles', '-r', self.targpath, 
+            ['setfiles', '-r', self.targpath,
              '/etc/selinux/targeted/contexts/files/file_contexts',
              self.targpath])
 
@@ -803,11 +825,14 @@ def version_sort(iterable):
 
 def get_kern_version(filename):
     with open(filename, 'rb') as kernfile:
-        checkgzip = kernfile.read(2)
-        if checkgzip == b'\x1f\x8b':
-            # gzipped... this would probably be aarch64
+        header = kernfile.read(2)
+        if header == b'\x1f\x8b':
+            # gzipped... we can't process this right now,
             # assume the filename has the version embedded
             return os.path.basename(filename).replace('vmlinuz-', '')
+        if header == b'MZ':
+            # PE format, no easy way to get version, assume filename has it
+            return os.path.basename(filename).replace('vmlinuz-', '')                
         kernfile.seek(0x20e)
         offset = struct.unpack('<H', kernfile.read(2))[0] + 0x200
         kernfile.seek(offset)
@@ -887,7 +912,7 @@ def main():
     buildp.add_argument('-p', '--packagelist', help='Filename of package list to replace default pkglist', default='')
     buildp.add_argument('-a', '--addpackagelist', action='append', default=[],
                         help='A list of additional packages to include, may be specified multiple times')
-    buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.')
+    buildp.add_argument('-s', '--source', help='Directory to pull installation from, typically a subdirectory of /var/lib/confluent/distributions. By default, the repositories for the build system are used.  For Ubuntu, this is not supported, the build system repositories are always used.')
     buildp.add_argument('-y', '--non-interactive', help='Avoid prompting for confirmation', action='store_true')
     buildp.add_argument('-v', '--volume',
         help='Directory to make available in the build environment.  -v / will '
@@ -1088,7 +1113,7 @@ def fingerprint_source_suse(files, sourcepath, args):
 
 def fingerprint_source_el(files, sourcepath, args):
     for filen in files:
-        if '-release-8' in filen or '-release-7' in filen or '-release-9' in filen:
+        if '-release-10' in filen or '-release-8' in filen or '-release-7' in filen or '-release-9' in filen:
             parts = filen.split('-')
             osname = '_'.join(parts[:-3])
             if osname == 'centos_linux':
@@ -1121,7 +1146,7 @@ def fingerprint_host_el(args, hostpath='/'):
         ts = rpm.TransactionSet(hostpath)
         rpms = ts.dbMatch('provides', 'system-release')
         for inf in rpms:
-            if 'el8' not in inf.release and 'el7' not in inf.release and 'el9' not in inf.release:
+            if 'el8' not in inf.release and 'el7' not in inf.release and 'el9' not in inf.release and 'el10' not in inf.release:
                 continue
             osname = inf.name
             version = inf.version
@@ -1145,7 +1170,7 @@ def fingerprint_host_el(args, hostpath='/'):
                     version = v
         except (subprocess.SubprocessError, FileNotFoundError):
             return None
-    if 'el8' not in release and 'el7' not in release and 'el9' not in release:
+    if 'el8' not in release and 'el7' not in release and 'el9' not in release and 'el10' not in release:
         return None
     osname = osname.replace('-release', '').replace('-', '_')
     if osname == 'centos_linux':
@@ -1271,6 +1296,7 @@ def prep_decrypt(indir):
     tempfile.mktemp()
     subprocess.check_call(['dmsetup', 'create', dmname, '--table', '0 {0} crypt {1} {2} 0 {3} 8'.format(
         imglen, cipher, key, loopdev)])
+    subprocess.check_call(['dmsetup', 'mknodes', dmname])
     return '/dev/mapper/{0}'.format(dmname), loopdev
 
 

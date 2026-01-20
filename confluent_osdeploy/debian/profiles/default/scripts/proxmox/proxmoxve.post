@@ -1,0 +1,26 @@
+#!/bin/bash
+# This script would run in post.d
+#
+export DEBIAN_FRONTEND=noninteractive
+codename=$(grep ^VERSION_CODENAME /etc/os-release | cut -d= -f2)
+echo "deb [arch=amd64] http://download.proxmox.com/debian/pve $codename pve-no-subscription" > /etc/apt/sources.list.d/pve-install-repo.list
+wget https://enterprise.proxmox.com/debian/proxmox-release-$codename.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-$codename.gpg
+sum=$(sha512sum /etc/apt/trusted.gpg.d/proxmox-release-$codename.gpg)
+if [ $codename == "bookworm" ]; then
+	expectedsum=7da6fe34168adc6e479327ba517796d4702fa2f8b4f0a9833f5ea6e6b48f6507a6da403a274fe201595edc86a84463d50383d07f64bdde2e3658108db7d6dc87
+elif [ $codename == "trixie" ]; then
+	expectedsum=8678f2327c49276615288d7ca11e7d296bc8a2b96946fe565a9c81e533f9b15a5dbbad210a0ad5cd46d361ff1d3c4bac55844bc296beefa4f88b86e44e69fa51
+fi
+if [ "$sum" -ne "$expectedsum" ]; then
+	echo "Mismatch in fingerprint!"
+	rm /etc/apt/trusted.gpg.d/proxmox-release-$codename.gpg
+	exit 1
+fi
+apt-get update && apt-get -y full-upgrade < /dev/null
+
+apt-get -y install proxmox-default-kernel < /dev/null
+apt-get -y remove linux-image-amd64 'linux-image-6.1*' < /dev/null
+update-grub
+apt-get -y remove os-prober < /dev/null
+
+

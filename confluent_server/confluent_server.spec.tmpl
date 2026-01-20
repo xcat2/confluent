@@ -1,7 +1,7 @@
 %define name confluent_server
 %define version #VERSION#
 %define fversion %{lua:
-sv, _ = string.gsub("#VERSION#", "[~+]", "-")
+sv, _ = string.gsub("#VERSION#", "[~]", "-")
 print(sv)
 }
 %define release 1
@@ -27,8 +27,12 @@ Requires: python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-
 %if "%{dist}" == ".el9"
 Requires: python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-webauthn, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
 %else
+%if "%{dist}" == ".el10"
+Requires: python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-webauthn, python3-psutil, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
+%else
 Requires: python3-dbm,python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodome >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dnspython, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-PyYAML openssl iproute
 
+%endif
 %endif
 %endif
 %endif
@@ -79,10 +83,10 @@ chown confluent:confluent /etc/confluent /var/lib/confluent /var/log/confluent /
 sysctl -p /usr/lib/sysctl.d/confluent.conf >& /dev/null
 NEEDCHOWN=0
 NEEDSTART=0
-find /etc/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
-find /var/log/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
-find /var/run/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
-find /var/cache/confluent -uid 0 | egrep '.*' > /dev/null && NEEDCHOWN=1
+find /etc/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
+find /var/log/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
+find /var/run/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
+find /var/cache/confluent -uid 0 | grep -E '.*' > /dev/null && NEEDCHOWN=1
 if [ $NEEDCHOWN = 1 ]; then
     if systemctl is-active confluent > /dev/null; then
         NEEDSTART=1

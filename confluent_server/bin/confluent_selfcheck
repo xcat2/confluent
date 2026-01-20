@@ -24,6 +24,25 @@ import signal
 import confluent.collective.manager as collective
 import confluent.noderange as noderange
 
+def check_sysctl_tuning():
+    with open('/proc/sys/net/ipv4/tcp_sack', 'r') as f:
+        value = f.read().strip()
+        if value == '1':
+            print('OK')
+            return
+        else:
+            emprint('TCP SACK is disabled, network operations to BMCs may be particularly impacted, including firmware updates and virtual media')
+
+
+def check_neigh_overflow():
+    dmesgout = subprocess.check_output(['dmesg'])
+    if b'_cache: neighbor table overflow!' in subprocess.check_output(['dmesg']):
+        return True
+    return False
+    #dmesg snippets
+    #[1203637.865870] neighbour: ndisc_cache: neighbor table overflow!
+    #[1205244.122606] neighbour: arp_cache: neighbor table overflow!
+
 
 def fprint(txt):
     sys.stdout.write(txt)
@@ -197,6 +216,13 @@ async def main():
                     emprint('Failed access, if selinux is enabled, `setsebool -P httpd_can_network_connect=1`, otherwise check web proxy configuration')
         else:
             emprint('Not Running (Example resolution: systemctl enable httpd --now)')
+        fprint('IP neighbor table issue check:')
+        if check_neigh_overflow():
+            emprint('ARP/Neighbor table problem detected, evaluate and increase net.ipv*.neigh.default.gc_thresh*')
+        else:
+            print('OK')
+        fprint('Checking sysctl tunables: ')
+        check_sysctl_tuning()
         fprint('TFTP Status: ')
         if tftp_works():
             print('OK')
@@ -204,23 +230,59 @@ async def main():
             emprint('TFTP failure, PXE will not work, though media and HTTP boot can still work. (Example resolution: osdeploy initialize -p)')
         fprint('SSH root user public key: ')
         if glob.glob('/var/lib/confluent/public/site/ssh/*.rootpubkey'):
-            print('OK')
+            if not glob.glob('/root/.ssh/id_*.pub'):
+                emprint('No SSH keys for root user, passwordless SSH from managers to nodes may not work (Example resolution: osdeploy initialize -u)')
+            for userpub in glob.glob('/root/.ssh/id_*.pub'):
+                with open(userpub) as f:
+                    pubkey = f.read().strip()
+                for sitepubkey in glob.glob('/var/lib/confluent/public/site/ssh/*.rootpubkey'):
+                    with open(sitepubkey) as sf:
+                        spubkey = sf.read().strip()
+                        for keyline in spubkey.split('\n'):
+                            if keyline == pubkey:
+                                print('OK')
+                                break
+                        else:
+                            continue
+                        break
+                else:
+                    continue
+                break
+            else:
+                emprint('No matching public key found for root user (Example resolution: osdeploy initialize -u)')
         else:
             emprint('No trusted ssh keys for root user, passwordless SSH from managers to nodes may not work (Example resolution: osdeploy initialize -u)')
         if sshutil.sshver() > 7.6:
-            fprint('Checking SSH Certificate authority: ')
-            try:
-                sshutil.prep_ssh_key('/etc/confluent/ssh/ca')
-                print('OK')
-            except Exception:
-                emprint('Failed to load SSH authority key, deployed servers will not have host certificates for known_hosts and users may be unable to ssh between nodes without a password (Example resolution: osdeploy initialize -s)')            
-            fprint('Checking confluent SSH automation key: ')
-            try:
-                sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
-                print('OK')
-            except subprocess.CalledProcessError:
-                emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
-            os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+            child = os.fork()
+            if child > 0:
+                pid, extcode = os.waitpid(child, 0)
+            else:
+                sshutil.ready_keys = {}
+                sshutil.agent_pid = None
+                cuser = pwd.getpwnam('confluent')
+                os.setgid(cuser.pw_gid)
+                os.setuid(cuser.pw_uid)
+                fprint('Checking SSH Certificate authority: ')
+                try:
+                    sshutil.prep_ssh_key('/etc/confluent/ssh/ca')
+                    print('OK')
+                except Exception as e:
+                    if type(e).__name__ == 'CalledProcessError' and 'UNPROTECTED' in e.stderr.decode():
+                        emprint('Permissions incorrect on /etc/confluent/ssh/ca (Example resolution: chmod 600 /etc/confluent/ssh/ca)')
+                    else:
+                        emprint('Failed to load SSH authority key, deployed servers will not have host certificates for known_hosts and users may be unable to ssh between nodes without a password (Example resolution: osdeploy initialize -s)')
+                fprint('Checking confluent SSH automation key: ')
+                try:
+                    sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+                    print('OK')
+                except Exception as e:
+                    if type(e).__name__ == 'CalledProcessError' and 'UNPROTECTED' in e.stderr.decode():
+                        emprint('Permissions incorrect on /etc/confluent/ssh/automation (Example resolution: chmod 600 /etc/confluent/ssh/automation)')
+                    else:
+                        emprint('Failed to load confluent automation key, syncfiles and profile ansible plays will not work (Example resolution: osdeploy initialize -a)')
+                if sshutil.agent_pid:
+                    os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+                sys.exit(0)
         fprint('Checking for blocked insecure boot: ')
         if insecure_boot_attempts():
             emprint('Some nodes are attempting network boot using PXE or HTTP boot, but the node is not configured to allow this (Example resolution: nodegroupattrib everything deployment.useinsecureprotocols=firmware)')
@@ -362,7 +424,9 @@ async def main():
                         else:
                             emprint('Unknown error attempting confluent automation ssh:')
                             sys.stderr.buffer.write(srun.stderr)
-                os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+                if sshutil.agent_pid:
+                    os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+                sys.exit(0)
     else:
         print("Skipping node checks, no node specified (Example: confluent_selfcheck -n n1)")
 # possible checks:

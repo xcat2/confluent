@@ -21,6 +21,7 @@
 import confluent.messages as msg
 import confluent.netutil as netutil
 import confluent.util as util
+import confluent.config.configmanager as cfm
 import os
 import shutil
 import tempfile
@@ -51,6 +52,7 @@ async def create_ident_image(node, configmanager):
     # It would be a reasonable enhancement to list all collective server addresses
     # restricted by 'managercandidates'
     ident['deploy_servers'] = []
+    ident['confluent_uuid'] = cfm.get_global('confluent_uuid')
     for myaddr in netutil.get_my_addresses():
         myaddr = socket.inet_ntop(myaddr[0], myaddr[1])
         ident['deploy_servers'].append(myaddr)
@@ -59,6 +61,10 @@ async def create_ident_image(node, configmanager):
         yaml.safe_dump(ident, yamlout, default_flow_style=False)
     with open(os.path.join(tmpd, 'cnflnt.jsn'), 'w') as jsonout:
         json.dump(ident, jsonout)
+    shutil.copytree('/var/lib/confluent/public/site/tls', os.path.join(tmpd, 'tls'))
+    mkdirp('/var/lib/confluent/private/identity_files/')
+    shutil.copy(os.path.join(tmpd, 'cnflnt.yml'), '/var/lib/confluent/private/identity_files/{0}.yml'.format(node))
+    shutil.copy(os.path.join(tmpd, 'cnflnt.jsn'), '/var/lib/confluent/private/identity_files/{0}.json'.format(node))
     mkdirp('/var/lib/confluent/private/identity_images/')
     imgname = '/var/lib/confluent/private/identity_images/{0}.img'.format(node)
     if os.path.exists(imgname):

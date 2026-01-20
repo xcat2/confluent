@@ -43,7 +43,7 @@ if __name__ == '__main__':
     import confluent.snmputil as snmp
 
 import asyncio
-from confluent.networking.lldp import _handle_neighbor_query, get_fingerprint
+from confluent.networking.lldp import detect_backend, _handle_neighbor_query, get_fingerprint
 from confluent.networking.netutil import get_switchcreds, list_switches, get_portnamemap
 
 import socket
@@ -54,6 +54,7 @@ import confluent.log as log
 import confluent.messages as msg
 import confluent.noderange as noderange
 import confluent.tasks as tasks
+import confluent.networking.nxapi as nxapi
 import confluent.util as util
 import fcntl
 import msgpack
@@ -147,19 +148,40 @@ def _nodelookup(switch, ifname):
             return _switchportmap[switch][portdesc]
     return None
 
-
-async def _affluent_map_switch(args):
-    switch, password, user, cfgm = args
+async def _fast_map_switch(args):
+    switch, password, user, cfgm = args[:4]
+    macdata = None
     kv = util.TLSCertVerifier(cfgm, switch,
-                                  'pubkeys.tls_hardwaremanager').verify_cert
-    wc =  webclient.WebConnection(
-                switch, 443, verifycallback=kv, timeout=5)
-    wc.set_basic_credentials(user, password)
-    macs, retcode = wc.grab_json_response_with_status('/affluent/macs/by-port')
-    if retcode != 200:
-        raise Exception("No affluent detected")
-    _macsbyswitch[switch] = macs
+                              'pubkeys.tls_hardwaremanager').verify_cert
+    backend = detect_backend(switch, kv)
+    if backend == 'affluent':
+        return await _affluent_map_switch(switch, password, user, cfgm, macdata)
+    elif backend == 'nxapi':
+        return _nxapi_map_switch(switch, password, user, cfgm)
+    raise Exception("No fast backend match")
 
+async def _nxapi_map_switch(switch, password, user, cfgm):
+        cli = nxapi.NxApiClient(switch, user, password, cfgm)
+        mt = await cli.get_mac_table()
+        _macsbyswitch[switch] = mt
+        _fast_backend_fixup(mt, switch)
+
+
+
+async def _affluent_map_switch(switch, password, user, cfgm, macs):
+    if not macs:
+        kv = util.TLSCertVerifier(cfgm, switch,
+                                    'pubkeys.tls_hardwaremanager').verify_cert
+        wc =  webclient.WebConnection(
+                    switch, 443, verifycallback=kv, timeout=5)
+        wc.set_basic_credentials(user, password)
+        macs, retcode = await wc.grab_json_response_with_status('/affluent/macs/by-port')
+        if retcode != 200:
+            raise Exception("No affluent detected")
+    _macsbyswitch[switch] = macs
+    _fast_backend_fixup(macs, switch)
+
+def _fast_backend_fixup(macs, switch):
     for iface in macs:
         nummacs = len(macs[iface])
         for mac in macs[iface]:
@@ -187,14 +209,14 @@ async def _affluent_map_switch(args):
                 else:
                     _nodesbymac[mac] = (nodename, nummacs)
 
-async def _offload_map_switch(switch, password, user):
+async def _offload_map_switch(switch, password, user, privprotocol=None):
     if _offloader is None:
         await _start_offloader()
     evtid = random.randint(0, 4294967295)
     while evtid in _offloadevts:
         evtid = random.randint(0, 4294967295)
     _offloadevts[evtid] = asyncio.get_event_loop().create_future()
-    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user),
+    _offloader.stdin.write(msgpack.packb((evtid, switch, password, user, privprotocol),
                                                use_bin_type=True))
     #_offloader.stdin.flush()
     await _offloader.stdin.drain()
@@ -255,25 +277,24 @@ async def _map_switch_backend(args):
     #   fallback if ifName is empty
     #
     global _macmap
-    if len(args) == 4:
-        switch, password, user, _ = args  # 4th arg is for affluent only
-        if not user:
-            user = None
-    else:
-        switch, password = args
+    switch = args[0] if len(args) > 0 else None
+    password = args[1] if len(args) > 1 else None
+    user = args[2] if len(args) > 2 else None
+    privprotocol = args[4] if len(args) > 4 else None
+    if not user:  # make '' be treated as None
         user = None
     if switch not in noaffluent:
         try:
-            return await _affluent_map_switch(args)
+            return await _fast_map_switch(args)
         except exc.PubkeyInvalid:
             log.log({'error': 'While trying to gather ethernet mac addresses '
                               'from {0}, the TLS certificate failed validation. '
                               'Clear pubkeys.tls_hardwaremanager if this was '
                               'expected due to reinstall or new certificate'.format(switch)})
-        except Exception:
+        except Exception as e:
             pass
     mactobridge, ifnamemap, bridgetoifmap = await _offload_map_switch(
-        switch, password, user)
+        switch, password, user, privprotocol)
     maccounts = {}
     bridgetoifvalid = False
     for mac in mactobridge:
@@ -342,9 +363,9 @@ async def _map_switch_backend(args):
                 _nodesbymac[mac] = (nodename, maccounts[ifname])
     _macsbyswitch[switch] = newmacs
 
-async def _snmp_map_switch_relay(rqid, switch, password, user):
+async def _snmp_map_switch_relay(rqid, switch, password, user, privprotocol=None):
     try:
-        res = await _snmp_map_switch(switch, password, user)
+        res = await _snmp_map_switch(switch, password, user, privprotocol)
         payload = msgpack.packb((rqid,) + res, use_bin_type=True)
         try:
             sys.stdout.buffer.write(payload)
@@ -367,10 +388,10 @@ async def _snmp_map_switch_relay(rqid, switch, password, user):
     finally:
         sys.stdout.flush()
 
-async def _snmp_map_switch(switch, password, user):
+async def _snmp_map_switch(switch, password, user, privprotocol=None):
     haveqbridge = False
     mactobridge = {}
-    conn = snmp.Session(switch, password, user)
+    conn = snmp.Session(switch, password, user, privacy_protocol=privprotocol)
     ifnamemap = await get_portnamemap(conn)
     async for vb in conn.walk('1.3.6.1.2.1.17.7.1.2.2.1.2'):
         haveqbridge = True
@@ -511,7 +532,10 @@ async def _full_updatemacmap(configmanager):
             if incollective:
                 candmgrs = cfg.get('collective.managercandidates', {}).get('value', None)
                 if candmgrs:
-                    candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+                    try:
+                        candmgrs = noderange.NodeRange(candmgrs, configmanager).nodes
+                    except Exception:
+                        candmgrs = noderange.NodeRange(candmgrs).nodes
                     if mycollectivename not in candmgrs:
                         # do not think about trying to find nodes that we aren't possibly
                         # supposed to be a manager for in a collective

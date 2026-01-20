@@ -6,6 +6,7 @@ except ImportError:
 import importlib.util
 import importlib.machinery
 import sys
+import glob
 modloader = importlib.machinery.SourceFileLoader('apiclient', '/opt/confluent/bin/apiclient')
 modspec = importlib.util.spec_from_file_location('apiclient', '/opt/confluent/bin/apiclient', loader=modloader)
 apiclient = importlib.util.module_from_spec(modspec)
@@ -41,6 +42,7 @@ try:
 except AttributeError:
     f = cStringIO.StringIO(cfgdata)
     c.readfp(f)
+gpgkeys = glob.glob('/etc/pki/rpm-gpg/RPM-GPG-KEY-*')
 for sec in c.sections():
     if sec.startswith('variant-'):
         try:
@@ -56,3 +58,6 @@ for sec in c.sections():
                 repopath = repopath[1:]
             repout.write('baseurl=https://{}/confluent-public/os/{}/distribution/{}\n'.format(server, profile, repopath))
             repout.write('enabled=1\n')
+            if gpgkeys:
+                gpgkeyvals = ['file://{}'.format(x) for x in gpgkeys]
+                repout.write('gpgkey=' + ' '.join(gpgkeyvals) + '\n')

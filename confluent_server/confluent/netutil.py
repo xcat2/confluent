@@ -18,7 +18,11 @@
 
 import confluent.exceptions as exc
 import codecs
-import netifaces
+try:
+    import psutil
+except ImportError:
+    psutil = None
+    import netifaces
 import struct
 import eventlet.green.socket as socket
 import eventlet.support.greendns
@@ -32,9 +36,17 @@ def msg_align(len):
     return (len + 3) & ~3
 
 def mask_to_cidr(mask):
-    maskn = socket.inet_pton(socket.AF_INET, mask)
-    maskn = struct.unpack('!I', maskn)[0]
     cidr = 32
+    fam = socket.AF_INET
+    if ':' in mask:  # ipv6
+        fam = socket.AF_INET6
+        cidr = 128
+    maskn = socket.inet_pton(fam, mask)
+    if len(maskn) == 4:
+        maskn = struct.unpack('!I', maskn)[0]
+    else:
+        first, second = struct.unpack('!QQ', maskn)
+        maskn = first << 64 | second
     while maskn & 0b1 == 0 and cidr > 0:
         cidr -= 1
         maskn >>= 1
@@ -101,16 +113,25 @@ def ipn_is_local(ipn):
 
 
 def address_is_local(address):
-    for iface in netifaces.interfaces():
-        for i4 in netifaces.ifaddresses(iface).get(2, []):
-            cidr = mask_to_cidr(i4['netmask'])
-            if ip_on_same_subnet(i4['addr'], address, cidr):
-                return True
-        for i6 in netifaces.ifaddresses(iface).get(10, []):
-            cidr = int(i6['netmask'].split('/')[1])
-            laddr = i6['addr'].split('%')[0]
-            if ip_on_same_subnet(laddr, address, cidr):
-                return True
+    if psutil:
+        ifas = psutil.net_if_addrs()
+        for iface in ifas:
+            for addr in ifas[iface]:
+                if addr.family in (socket.AF_INET, socket.AF_INET6):
+                    cidr = mask_to_cidr(addr.netmask)
+                    if ip_on_same_subnet(addr.address, address, cidr):
+                        return True
+    else:
+        for iface in netifaces.interfaces():
+            for i4 in netifaces.ifaddresses(iface).get(2, []):
+                cidr = mask_to_cidr(i4['netmask'])
+                if ip_on_same_subnet(i4['addr'], address, cidr):
+                    return True
+            for i6 in netifaces.ifaddresses(iface).get(10, []):
+                cidr = int(i6['netmask'].split('/')[1])
+                laddr = i6['addr'].split('%')[0]
+                if ip_on_same_subnet(laddr, address, cidr):
+                    return True
     return False
 
 
@@ -126,20 +147,35 @@ def _rebuildidxmap():
 
 
 def myiptonets(svrip):
-    fam = netifaces.AF_INET
+    fam = socket.AF_INET
     if ':' in svrip:
-        fam = netifaces.AF_INET6
+        fam = socket.AF_INET6
     relevantnic = None
-    for iface in netifaces.interfaces():
-        for addr in netifaces.ifaddresses(iface).get(fam, []):
-            addr = addr.get('addr', '')
-            addr = addr.split('%')[0]
-            if addresses_match(addr, svrip):
-                relevantnic = iface
-                break
-        else:
-            continue
-        break
+    if psutil:
+        ifas = psutil.net_if_addrs()
+        for iface in ifas:
+            for addr in ifas[iface]:
+                if addr.fam != fam:
+                    continue
+                addr = addr.address
+                addr = addr.split('%')[0]
+                if addresses_match(addr, svrip):
+                    relevantnic = iface
+                    break
+            else:
+                continue
+            break
+    else:
+        for iface in netifaces.interfaces():
+            for addr in netifaces.ifaddresses(iface).get(fam, []):
+                addr = addr.get('addr', '')
+                addr = addr.split('%')[0]
+                if addresses_match(addr, svrip):
+                    relevantnic = iface
+                    break
+            else:
+                continue
+            break
     return inametonets(relevantnic)
 
 
@@ -150,11 +186,22 @@ def _iftonets(ifidx):
     return inametonets(ifidx)
 
 def inametonets(iname):
-    addrs = netifaces.ifaddresses(iname)
-    try:
-        addrs = addrs[netifaces.AF_INET]
-    except KeyError:
-        return
+    addrs = []
+    if psutil:
+        ifaces = psutil.net_if_addrs()
+        if iname not in ifaces:
+            return
+        for iface in ifaces:
+            for addrent in ifaces[iface]:
+                if addrent.family != socket.AF_INET:
+                    continue
+                addrs.append({'addr': addrent.address, 'netmask': addrent.netmask})
+    else:
+        addrs = netifaces.ifaddresses(iname)
+        try:
+            addrs = addrs[netifaces.AF_INET]
+        except KeyError:
+            return
     for addr in addrs:
         ip = struct.unpack('!I', socket.inet_aton(addr['addr']))[0]
         mask = struct.unpack('!I', socket.inet_aton(addr['netmask']))[0]
@@ -196,6 +243,9 @@ class NetManager(object):
         vlanid = attribs.get('vlan_id', None)
         if vlanid:
             myattribs['vlan_id'] = vlanid
+        mtuinfo = attribs.get('mtu', None)
+        if mtuinfo:
+            myattribs['mtu'] = int(mtuinfo)
         teammod = attribs.get('team_mode', None)
         if teammod:
             myattribs['team_mode'] = teammod
@@ -317,6 +367,20 @@ def add_netmask(ncfg):
 def get_full_net_config(configmanager, node, serverip=None):
     cfd = configmanager.get_node_attributes(node, ['net.*'])
     cfd = cfd.get(node, {})
+    bmc = configmanager.get_node_attributes(
+        node, 'hardwaremanagement.manager').get(node, {}).get(
+            'hardwaremanagement.manager', {}).get('value', None)
+    bmc4 = None
+    bmc6 = None
+    if bmc:
+        try:
+            bmc4 = socket.getaddrinfo(bmc, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
+        try:
+            bmc6 = socket.getaddrinfo(bmc, 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
     attribs = {}
     for attrib in cfd:
         val = cfd[attrib].get('value', None)
@@ -346,6 +410,12 @@ def get_full_net_config(configmanager, node, serverip=None):
     for netname in sorted(attribs):
         ppool.spawn(nm.process_attribs, netname, attribs[netname])
     ppool.waitall()
+    for iface in list(nm.myattribs):
+        if bmc4 and nm.myattribs[iface].get('ipv4_address', None) == bmc4:
+            del nm.myattribs[iface]
+            continue
+        if bmc6 and nm.myattribs[iface].get('ipv6_address', None) == bmc6:
+            del nm.myattribs[iface]
     retattrs = {}
     if None in nm.myattribs:
         retattrs['default'] = nm.myattribs[None]
@@ -409,7 +479,7 @@ def noneify(cfgdata):
 # if switch and port available, that should match.
 def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                    serverip=None, relayipn=b'\x00\x00\x00\x00',
-                   clientip=None):
+                   clientip=None, onlyfamily=None):
     """Fetch network configuration parameters for a nic
 
     For a given node and interface, find and retrieve the pertinent network
@@ -430,6 +500,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     #TODO(jjohnson2): ip address, prefix length, mac address,
     # join a bond/bridge, vlan configs, etc.
     # also other nic criteria, physical location, driver and index...
+    if not onlyfamily:
+        onlyfamily = 0
     clientfam = None
     clientipn = None
     serverfam = None
@@ -454,6 +526,21 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
             clientipn = socket.inet_pton(clientfam, clientip)
     nodenetattribs = configmanager.get_node_attributes(
         node, 'net*').get(node, {})
+    bmc = configmanager.get_node_attributes(
+        node, 'hardwaremanagement.manager').get(node, {}).get('hardwaremanagement.manager', {}).get('value', None)
+    bmc4 = None
+    bmc6 = None
+    if bmc:
+        try:
+            if onlyfamily in (0, socket.AF_INET):
+                bmc4 = socket.getaddrinfo(bmc, 0, socket.AF_INET, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
+        try:
+            if onlyfamily in (0, socket.AF_INET6):
+                bmc6 = socket.getaddrinfo(bmc, 0, socket.AF_INET6, socket.SOCK_DGRAM)[0][-1][0]
+        except Exception:
+            pass
     cfgbyname = {}
     for attrib in nodenetattribs:
         segs = attrib.split('.')
@@ -477,7 +564,7 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     myaddrs = []
     if ifidx is not None:
         dhcprequested = False
-        myaddrs = get_my_addresses(ifidx)
+        myaddrs = get_my_addresses(ifidx, family=onlyfamily)
         v4broken = True
         v6broken = True
         for addr in myaddrs:
@@ -509,13 +596,15 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
     ipbynodename = None
     ip6bynodename = None
     try:
-        for addr in socket.getaddrinfo(node, 0, socket.AF_INET, socket.SOCK_DGRAM):
-            ipbynodename = addr[-1][0]
+        if onlyfamily in (socket.AF_INET, 0):
+            for addr in socket.getaddrinfo(node, 0, socket.AF_INET, socket.SOCK_DGRAM):
+                ipbynodename = addr[-1][0]
     except socket.gaierror:
         pass
     try:
-        for addr in socket.getaddrinfo(node, 0, socket.AF_INET6, socket.SOCK_DGRAM):
-                ip6bynodename = addr[-1][0]
+        if onlyfamily in (socket.AF_INET6, 0):
+            for addr in socket.getaddrinfo(node, 0, socket.AF_INET6, socket.SOCK_DGRAM):
+                    ip6bynodename = addr[-1][0]
     except socket.gaierror:
         pass
     if myaddrs:
@@ -540,6 +629,8 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                 cfgdata[srvkey] = socket.inet_ntop(fam, svrip)
             for candidate in cfgbyname:
                 ipmethod = cfgbyname[candidate].get('ipv{}_method'.format(nver), 'static')
+                if not ipmethod:
+                    ipmethod = 'static'
                 if ipmethod == 'dhcp':
                     dhcprequested = True
                     continue
@@ -554,6 +645,10 @@ def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                         continue
                 candgw = cfgbyname[candidate].get('ipv{}_gateway'.format(nver), None)
                 if candip:
+                    if bmc4 and candip == bmc4:
+                        continue
+                    if bmc6 and candip == bmc6:
+                        continue
                     try:
                         for inf in socket.getaddrinfo(candip, 0, fam, socket.SOCK_STREAM):
                             candipn = socket.inet_pton(fam, inf[-1][0])
@@ -665,7 +760,7 @@ def get_addresses_by_serverip(serverip):
     elif ':' in serverip:
         fam = socket.AF_INET6
     else:
-        raise ValueError('"{0}" is not a valid ip argument')
+        raise ValueError('"{0}" is not a valid ip argument'.format(serverip))
     ipbytes = socket.inet_pton(fam, serverip)
     if ipbytes[:8] == b'\xfe\x80\x00\x00\x00\x00\x00\x00':
         myaddrs = get_my_addresses(matchlla=ipbytes)

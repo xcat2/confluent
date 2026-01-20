@@ -102,6 +102,11 @@ try:
 except NameError:
     unicode = str
 
+try:
+    import cryptography.x509.verification as verification
+except ImportError:
+    verification = None
+
 class nesteddict(dict):
 
     def __missing__(self, key):
@@ -311,6 +316,8 @@ def list_matching_nodes(criteria):
     retnodes = []
     for node in known_nodes:
         for mac in known_nodes[node]:
+            if mac not in known_info:
+                continue
             info = known_info[mac]
             if _info_matches(info, criteria):
                 retnodes.append(node)
@@ -524,13 +531,22 @@ async def register_remote_addrs(addresses, configmanager):
         nd = {
             'addresses': [(addr, 443)]
         }
-        sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
-        if not sd:
+        try:
+            sd = await ssdp.check_fish(('/DeviceDescription.json', nd))
+            if not sd:
+                return addr, False
+            if 'macaddress' in sd['attributes']:
+                sd['hwaddr'] = sd['attributes']['macaddress']
+            else:
+                sd['hwaddr'] = sd['attributes']['mac-address']
+            if 'lenovo-xcc3' in sd['services']:
+                nh = xcc3.NodeHandler(sd, configmanager)
+            elif 'lenovo-xcc' in sd['services']:
+                nh = xcc.NodeHandler(sd, configmanager)
+            await nh.scan()
+            await detected(nh.info)
+        except Exception:
             return addr, False
-        sd['hwaddr'] = sd['attributes']['mac-address']
-        nh = xcc.NodeHandler(sd, configmanager)
-        await nh.scan()
-        await detected(nh.info)
         return addr, True
     #rpool = eventlet.greenpool.GreenPool(512)
     for count in iterate_addrs(addresses, True):
@@ -600,7 +616,11 @@ async def handle_api_request(configmanager, inputdata, operation, pathcomponents
         return [msg.AssignedResource(inputdata['node'])]
     elif operation == 'delete':
         mac = _get_mac_from_query(pathcomponents)
-        del known_info[mac]
+        for node in known_nodes:
+            if mac in known_nodes[node]:
+                del known_nodes[node][mac]
+        if mac in known_info:
+            del known_info[mac]
         return [msg.DeletedResource(mac)]
     raise exc.NotImplementedException(
         'Unable to {0} to {1}'.format(operation, '/'.join(pathcomponents)))
@@ -1085,7 +1105,7 @@ async def get_nodename(cfg, handler, info):
         # Ok, see if it is something with a chassis-uuid and discover by
         # chassis
         nodename = get_nodename_from_enclosures(cfg, info)
-    if not nodename and handler.devname == 'SMM':
+    if not nodename and handler.devname in ('SMM', 'SMM3'):
         nodename = get_nodename_from_chained_smms(cfg, handler, info)
     if not nodename:  # as a last resort, search switches for info
         # This is the slowest potential operation, so we hope for the
@@ -1093,7 +1113,7 @@ async def get_nodename(cfg, handler, info):
         nodename, macinfo = await macmap.find_nodeinfo_by_mac(info['hwaddr'], cfg)
         maccount = macinfo['maccount']
         if nodename:
-            if handler.devname == 'SMM':
+            if handler.devname in ('SMM', 'SMM3'):
                 nl = list(cfg.filter_node_attributes(
                             'enclosure.extends=' + nodename))
                 if nl:
@@ -1116,7 +1136,7 @@ async def get_nodename(cfg, handler, info):
                         return None, None
         if (nodename and
                 not handler.discoverable_by_switch(macinfo['maccount'])):
-            if handler.devname == 'SMM':
+            if handler.devname in ('SMM', 'SMM3'):
                 errorstr = 'Attempt to discover SMM by switch, but chained ' \
                            'topology or incorrect net attributes detected, ' \
                            'which is not compatible with switch discovery ' \
@@ -1184,7 +1204,9 @@ def search_smms_by_cert(currsmm, cert, cfg):
         cd = cfg.get_node_attributes(currsmm, ['hardwaremanagement.manager',
                                                'pubkeys.tls_hardwaremanager'])
         smmaddr = cd.get(currsmm, {}).get('hardwaremanagement.manager', {}).get('value', None)
-        wc = webclient.SecureHTTPConnection(currsmm, verifycallback=cv)
+        if not smmaddr:
+            smmaddr = currsmm
+        wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
         neighs = wc.grab_json_response('/scripts/neighdata.json')
     except Exception:
         return None
@@ -1343,7 +1365,8 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
                 errorstr = 'The detected node {0} was detected using switch, ' \
                            'however the relevant port has too many macs learned ' \
                            'for this type of device ({1}) to be discovered by ' \
-                           'switch.'.format(nodename, handler.devname)
+                           'switch.  If this should be an enclosure, make sure there are ' \
+                           'defined nodes for the enclosure'.format(nodename, handler.devname)
                 log.log({'error': errorstr})
                 return
         if not await discover_node(cfg, handler, info, nodename, manual):
@@ -1452,7 +1475,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                         break
             log.log({'info': 'Discovered {0} ({1})'.format(nodename,
                                                           handler.devname)})
-            if nodeconfig:
+            if nodeconfig or handler.current_cert_self_signed():
                 bmcaddr = cfg.get_node_attributes(nodename, 'hardwaremanagement.manager')
                 bmcaddr = bmcaddr.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
                 if not bmcaddr:
@@ -1460,9 +1483,13 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 else:
                     bmcaddr = bmcaddr.split('/', 1)[0]
                     await wait_for_connection(bmcaddr)
-                    await util.check_call('/opt/confluent/bin/nodeconfig', nodename, nodeconfig)
+                    socket.getaddrinfo(bmcaddr, 443)
+            if nodeconfig:
+                    await util.check_call(['/opt/confluent/bin/nodeconfig', nodename] + nodeconfig)
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
+            if verification and handler.current_cert_self_signed():
+                handler.autosign_certificate()
 
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):

@@ -6,6 +6,7 @@ if [ ! -f /var/run/vmware/show-esx-shell-login ]; then
     chvt 2
     /etc/init.d/ESXShell start
 fi
+/opt/confluent/bin/apiclient -f
 uuid=$(vsish -e get /hardware/bios/dmiInfo|grep -A15 UUID|sed -e 's/.*://'|sed -e ':a;N;$!ba;s/\n//g' | sed -e 's/ *0x//g')
 uuid=${uuid:0:8}-${uuid:8:4}-${uuid:12:4}-${uuid:16:4}-${uuid:20:12}
 kargs=$(vsish -e get /system/bootCmdLine|grep "command line:")
@@ -61,8 +62,8 @@ if [ -e /tmp/confluentident/cnflnt.yml ]; then
         fi
         v4nm=$(grep ipv4_netmask: $tcfg)
         v4nm=${v4nm#ipv4_netmask: }
-        localcli network ip interface ipv4 set -i vmk0 -I $v4addr -N $v4nm -g $v4gw -t static
-        localcli network ip route ipv4 add -n default -g $v4gw
+        while ! localcli network ip interface ipv4 set -i vmk0 -I $v4addr -N $v4nm -g $v4gw -t static; do echo "Retrying..."; sleep 5; done
+        while ! localcli network ip route ipv4 add -n default -g $v4gw; do sleep 1; done
     fi
     hmackeyfile=$(mktemp)
     echo -n $(grep ^apitoken: /tmp/confluentident/cnflnt.yml|awk '{print $2}') > $hmackeyfile
@@ -72,6 +73,20 @@ if [ -e /tmp/confluentident/cnflnt.yml ]; then
     hmacfile=$(mktemp)
     ln -s /opt/confluent/bin/clortho /opt/confluent/bin/genpasshmac
     /opt/confluent/bin/genpasshmac $passfile $passcrypt $hmacfile $hmackeyfile
+    echo -n 'Checking connectivity to server: '
+    maxwait=30
+    while ! /opt/confluent/bin/apiclient -c >& /dev/null; do
+        echo -n '.'
+        sleep 1
+        maxwait=$((maxwait - 1))
+        if [ $maxwait -le 0 ]; then
+            echo "Unable to contact deployment server, verify network connectivity"
+            echo "A debug session has been made available on Alt-F1"
+            sleep 30
+            maxwait=30
+	fi
+    done
+    echo
     echo -n 'Registering new API key with deployment server: '
     /opt/confluent/bin/apiclient -p $hmacfile /confluent-api/self/registerapikey $passcrypt
     echo

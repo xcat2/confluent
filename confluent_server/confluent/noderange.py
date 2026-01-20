@@ -57,7 +57,7 @@ def humanify_nodename(nodename):
 
 def unnumber_nodename(nodename):
     # stub out numbers
-    chunked = ["{}" if text.isdigit() else text.lower()
+    chunked = ["{}" if text.isdigit() else text
             for text in re.split(numregex, nodename)]
     return chunked
 

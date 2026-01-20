@@ -16,6 +16,7 @@ import asyncio
 import base64
 import codecs
 import confluent.discovery.handlers.imm as immhandler
+import confluent.discovery.handlers.xcc3 as xcc3handler
 import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
@@ -92,7 +93,10 @@ class NodeHandler(immhandler.NodeHandler):
         await self.get_https_cert()
         c = webclient.WebConnection(ip, port,
             verifycallback=self.validate_cert)
-        i = await c.grab_json_response('/api/providers/logoninfo')
+        try:
+            i = await c.grab_json_response('/api/providers/logoninfo')
+        except Exception:
+            return
         modelname = i.get('items', [{}])[0].get('machine_name', None)
         if modelname:
             self.info['modelname'] = modelname
@@ -454,11 +458,18 @@ class NodeHandler(immhandler.NodeHandler):
                     tmpaccount = None
                     while status != 200:
                         rsp, status = await wc.grab_json_response_with_status(
+                            '/redfish/v1/AccountService/Accounts/{0}'.format(uid))
+                        if status >= 500:
+                            if tries < 0:
+                                raise Exception('Redfish account management failure')
+                            eventlet.sleep(30)
+                            continue
+                        rsp, status = await wc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
                             {'UserName': username}, method='PATCH')
                         if status != 200:
                             rsp = json.loads(rsp)
-                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError'):
+                            if rsp.get('error', {}).get('code', 'Unknown') in ('Base.1.8.GeneralError', 'Base.1.12.GeneralError', 'Base.1.14.GeneralError', 'Base.1.18.GeneralError', 'Base.1.21.GeneralError'):
                                 if tries:
                                     await asyncio.sleep(4)
                                 elif tmpaccount:
@@ -490,7 +501,7 @@ class NodeHandler(immhandler.NodeHandler):
             if userent['users_user_name'] == user:
                 curruser = userent
                 break
-        if curruser.get('users_pass_is_sha256', 0):
+        if curruser and curruser.get('users_pass_is_sha256', 0):
             self._wc = None
             wc = await self.get_wc()
             nwc = wc # .dupe()
@@ -646,8 +657,6 @@ class NodeHandler(immhandler.NodeHandler):
                         statargs[currkey + attribsuffix] = statargs[currkey]
                         del statargs[currkey]
                 netset, status = await wc.grab_json_response_with_status('/api/dataset', statargs)
-                print(repr(netset))
-                print(repr(status))
 
         elif self.ipaddr.startswith('fe80::'):
             await self.configmanager.set_node_attributes(
@@ -670,6 +679,15 @@ class NodeHandler(immhandler.NodeHandler):
             if em:
                 await self.configmanager.set_node_attributes(
                     {em: {'id.uuid': enclosureuuid}})
+    def autosign_certificate(self):
+        nodename = self.nodename
+        hwmgt_method = self.configmanager.get_node_attributes(
+            nodename, 'hardwaremanagement.method').get(
+                nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
+        if hwmgt_method != 'redfish':
+            return
+        subprocess.check_call(['/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'])
+
 
 def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
@@ -682,6 +700,13 @@ def remote_nodecfg(nodename, cfm):
         raise Exception('Cannot remote configure a system without known '
                          'address')
     info = {'addresses': [ipaddr]}
-    nh = NodeHandler(info, cfm)
+    ipaddr = ipaddr[0]
+    wc = webclient.SecureHTTPConnection(
+                ipaddr, 443, verifycallback=lambda x: True)
+    rsp = wc.grab_json_response('/DeviceDescription.json')
+    if isinstance(rsp, list):
+        nh = NodeHandler(info, cfm)
+    else:
+        nh = xcc3handler.NodeHandler(info, cfm)
     nh.config(nodename)
 

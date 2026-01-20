@@ -8,30 +8,35 @@ import os
 import subprocess
 import sys
 
-def create_image(directory, image, label=None):
-    ents = 0
-    datasz = 512
-    for dir in os.walk(sys.argv[1]):
-        ents += 1
-        for filen in dir[2]:
+def create_image(directory, image, label=None, esize=0, totalsize=None):
+
+    if totalsize:
+        datasz = totalsize * 1048576
+    else:
+        ents = 0
+        datasz = 512 + (esize * 1048576)
+        for dir in os.walk(sys.argv[1]):
             ents += 1
-            filename = os.path.join(dir[0], filen)
-            currsz = os.path.getsize(filename)
-            # assuming up to 65k cluster
-            currsz = (currsz // 512 +1) * 512
-            datasz += currsz
-    datasz += ents * 32768
-    datasz = datasz // 16384 + 1
+            for filen in dir[2]:
+                ents += 1
+                filename = os.path.join(dir[0], filen)
+                currsz = os.path.getsize(filename)
+                # assuming up to 65k cluster
+                currsz = (currsz // 512 + 1) * 512
+                datasz += currsz
+        datasz += ents * 32768
+    datasz = datasz // 65536 + 1
     with open(image, 'wb') as imgfile:
-        imgfile.seek(datasz * 16384 - 1)
+        imgfile.seek(datasz * 65536 - 1)
         imgfile.write(b'\x00')
     if label:
+        # 4 heads, 32 sectors, means 65k per track
         subprocess.check_call(['mformat', '-i', image, '-v', label,
                                '-r', '16', '-d', '1', '-t', str(datasz),
-                               '-s', '16','-h', '2', '::'])
+                               '-s', '32','-h', '4', '::'])
     else:
         subprocess.check_call(['mformat', '-i', image, '-r', '16', '-d', '1', '-t',
-                                str(datasz), '-s', '16','-h', '2', '::'])
+                                str(datasz), '-s', '32','-h', '4', '::'])
     # Some clustered filesystems will have the lock from mformat
     # linger after close (mformat doesn't unlock)
     # do a blocking wait for shared lock and then explicitly
@@ -56,6 +61,21 @@ if __name__ == '__main__':
             sys.argv[0]))
         sys.exit(1)
     label = None
-    if len(sys.argv) > 3:
-        label = sys.argv[3]
-    create_image(sys.argv[1], sys.argv[2], label)
+    args = sys.argv
+    esize = 0
+    try:
+        earg = args.index('-e')
+        esize = int(args[earg + 1])
+        args = args[:earg] + args[earg +2:]
+    except ValueError:
+        pass
+    totsize = None
+    try:
+        earg = args.index('-s')
+        totsize = int(args[earg + 1])
+        args = args[:earg] + args[earg +2:]
+    except ValueError:
+        pass
+    if len(args) > 3:
+        label = args[3]
+    create_image(args[1], args[2], label, esize, totsize)

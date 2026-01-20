@@ -1,0 +1,148 @@
+#!/usr/bin/python3
+import subprocess
+import os
+
+class SilentException(Exception):
+    pass
+
+class DiskInfo(object):
+    def __init__(self, devname, devinfo):
+        self.name = devname
+        self.path = '/dev/' + devname
+        self.wwn = None
+        self.model = devinfo.get('model', 'Unknown')
+        self.driver = devinfo.get('adapter_driver', 'Unknown')
+        self.size = devinfo.get('size', 0)  # in MiB
+        if not devinfo.get('is_local', False):
+            raise SilentException("Not local")
+        if devinfo.get('is_removable', False):
+            raise SilentException("Removable")
+        if devinfo.get('is_usb', False):
+            raise SilentException("USB device")
+        if devinfo.get('type', '').lower() in ('cd-rom',):
+            raise SilentException("CD-ROM device")
+        if self.size < 2048:
+            raise SilentException("Too small")
+
+        
+
+
+    @property
+    def priority(self):
+        if self.model.lower() in ('m.2 nvme 2-bay raid kit', 'thinksystem_m.2_vd', 'thinksystem m.2', 'thinksystem_m.2'):
+            return 0
+        if self.driver == 'vmw_ahci':
+            return 2
+        if self.driver == 'nvme_pcie':
+            return 3
+        return 99
+
+    def __repr__(self):
+        return repr({
+            'name': self.name,
+            'path': self.path,
+            'wwn': self.wwn,
+            'driver': self.driver,
+            'size': self.size,
+            'model': self.model,
+        })
+
+def list_disks():
+    current_dev = None
+    disks = {}
+    devlist = subprocess.check_output(['localcli', 'storage', 'core', 'device', 'list'])
+    if not isinstance(devlist, str):
+        devlist = devlist.decode('utf8')
+    devbyadp = {}
+    for line in devlist.split('\n'):
+        if not line.strip():
+            continue
+        if not line.startswith(' '):
+            current_dev = line.rsplit(':', 1)[0]
+            if current_dev not in disks:
+                disks[current_dev] = {}
+        elif current_dev:
+            if '   Model:' in line:
+                disks[current_dev]['model'] = ' '.join(line.split()[1:])
+            elif '   Driver:' in line:
+                disks[current_dev]['driver'] = ' '.join(line.split()[1:])
+            elif '   Is Local:' in line:
+                disks[current_dev]['is_local'] = ' '.join(line.split()[2:]).lower() == 'true'
+            elif '   Is Removable:' in line:
+                disks[current_dev]['is_removable'] = ' '.join(line.split()[2:]).lower() == 'true'
+            elif '   Size:' in line:  # in MiB
+                disks[current_dev]['size'] = int(line.split()[1])
+            elif '   Is SSD:' in line:
+                disks[current_dev]['is_ssd'] = ' '.join(line.split()[2:]).lower() == 'true'
+            elif '   Is USB:' in line:
+                disks[current_dev]['is_usb'] = ' '.join(line.split()[2:]).lower() == 'true'
+            elif '   Is Removable:' in line:
+                disks[current_dev]['is_removable'] = ' '.join(line.split()[2:]).lower() == 'true'
+            elif 'Device Type:' in line:
+                disks[current_dev]['type'] = ' '.join(line.split()[2:])
+    for dev in disks:
+        pathlist = subprocess.check_output(['localcli', 'storage', 'core', 'path', 'list', '--device', dev])
+        if not isinstance(pathlist, str):
+            pathlist = pathlist.decode('utf8')
+        for line in pathlist.split('\n'):
+            if not line.strip():
+                continue
+            if not line.startswith(' '):
+                continue
+            if '   Adapter Identifier:' in line:
+                adpname = ' '.join(line.split()[2:])
+                disks[dev]['adapter_id'] = adpname
+            elif '   Adapter:' in line:
+                adp = ' '.join(line.split()[1:])
+                disks[dev]['adapter'] = adp
+                devbyadp.setdefault(adp, []).append(dev)
+    adapterlist = subprocess.check_output(['localcli', 'storage', 'core', 'adapter', 'list'])
+    if not isinstance(adapterlist, str):
+        adapterlist = adapterlist.decode('utf8')
+    driverbyadp = {}
+    linenum = 0
+    for line in adapterlist.split('\n'):
+        linenum += 1
+        if not line.strip():
+            continue
+        if linenum < 3:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        adp = parts[0]
+        driver = parts[1]
+        driverbyadp[adp] = driver
+    for adp in devbyadp:
+        driver = driverbyadp.get(adp, 'Unknown')
+        for dev in devbyadp[adp]:
+            disks[dev]['adapter_driver'] = driver
+    return disks
+        
+def main():
+    disks = []
+    try:
+        alldisks = list_disks()
+    except Exception as e:
+        print("Error listing disks: {0}".format(str(e)))
+        alldisks = {}
+    for disk in alldisks:
+        try:
+            disks.append(DiskInfo(disk, alldisks[disk]))
+        except SilentException:
+            pass
+        except Exception as e:
+            print("Skipping {0}: {1}".format(disk, str(e)))
+    nd = [x.name for x in sorted(disks, key=lambda x: [x.priority, x.size])]
+    if nd:
+        with open('/tmp/storagecfg', 'w') as sc:
+            sc.write(f'clearpart --all --drives={nd[0]} --overwritevmfs\n')
+            sc.write(f'install --drive={nd[0]} --overwritevmfs\n')
+    else:
+        with open('/tmp/storagecfg', 'w') as sc:
+            sc.write(f'clearpart --firstdisk --overwritevmfs\n')
+            sc.write(f'install --firstdisk --overwritevmfs\n')
+
+
+if __name__ == '__main__':
+    main()

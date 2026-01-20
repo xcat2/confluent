@@ -57,7 +57,7 @@ def stringify(instr):
     # Normalize unicode and bytes to 'str', correcting for
     # current python version
     if isinstance(instr, bytes) and not isinstance(instr, str):
-        return instr.decode('utf-8')
+        return instr.decode('utf-8', errors='replace')
     elif not isinstance(instr, bytes) and not isinstance(instr, str):
         return instr.encode('utf-8')
     return instr
@@ -464,8 +464,8 @@ def printattributes(session, requestargs, showtype, nodetype, noderange, options
 
 def _sort_attrib(k):
     if isinstance(k[1], dict) and k[1].get('sortid', None) is not None:
-        return k[1]['sortid']
-    return k[0]
+        return sortutil.naturalize_string('{}'.format(k[1]['sortid']))
+    return sortutil.naturalize_string(k[0])
 
 def print_attrib_path(path, session, requestargs, options, rename=None, attrprefix=None):
     exitcode = 0

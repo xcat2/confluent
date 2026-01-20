@@ -32,6 +32,7 @@ import confluent.config.attributes as attribs
 import confluent.config.configmanager as configmanager
 import confluent.consoleserver as consoleserver
 import confluent.discovery.core as disco
+import confluent.discovery.protocols.pxe as pxe
 import confluent.forwarder as forwarder
 import confluent.exceptions as exc
 import confluent.log as log
@@ -93,7 +94,7 @@ def group_creation_resources():
     for attr in sorted(attribs.node):
         if attr == 'groups':
             continue
-        if attr.startswith("secret."):
+        if attr.startswith('secret.') or attr.startswith('custom.nodesecret.'):
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -112,7 +113,7 @@ def node_creation_resources():
     yield confluent.messages.Attributes(
         kv={'name': None}, desc="Name of the node").html() + '<br>'
     for attr in sorted(attribs.node):
-        if attr.startswith("secret."):
+        if attr.startswith('secret.') or attr.startswith('custom.nodesecret.'):
             yield confluent.messages.CryptedAttributes(
                 kv={attr: None},
                 desc=attribs.node[attr]['description']).html() + '<br>\n'
@@ -526,7 +527,11 @@ async def wsock_handler(req):
                                     else:
                                         delimit = '/shell/sessions'
                                         shellsession = True
-                                    node = targ.split(delimit, 1)[0]
+                                    nodesess = targ.split(delimit, 1)
+                                    node = nodesess[0]
+                                    sessidx = None
+                                    if len(nodesess) == 2 and len(nodesess[1]) > 1:
+                                        sessidx = nodesess[1][1:]
                                     node = node.rsplit('/', 1)[-1]
                                     auditmsg = {'operation': 'start', 'target': targ,
                                                 'user': util.stringify(username)}
@@ -537,7 +542,7 @@ async def wsock_handler(req):
                                             node=node, configmanager=cfgmgr,
                                             username=username, skipreplay=skipreplay,
                                             datacallback=datacallback,
-                                            width=width, height=height)
+                                            width=width, height=height, sessionid=sessidx)
                                     else:
                                         consession = consoleserver.ConsoleSession(
                                             node=node, configmanager=cfgmgr,
@@ -625,6 +630,8 @@ async def resourcehandler(request):
     # start_response is akin to doing headers
     # and calling 'prepare() on a 'StreamResponse'
     # any 'yield' needs to become a write to the streamresponse
+    #TODO:asyncmerge: Replace /confluent-api with '' in path
+    # Needs testing for confluent header names with golang clients
     async def make_response(mimetype, status=200, reason=None, headers=None, cookies=None):
         rspheaders = {
             'Cache-Control': 'no-store',
@@ -678,6 +685,29 @@ async def resourcehandler_backend(req, make_response):
         request = reqpath.split('/')
         if not request[0]:
             request = request[1:]
+        if request[1] == 'su':  # shorturl
+            #TODO:asyncmerge: update with aiohttp behavior
+            targurl, can302, relurl, bootfilename = pxe.shorturls.get(request[2], (None, None, None, None))
+            if not targurl:
+                start_response('404 Not Found', headers)
+                yield ''
+                return
+            if can302:  # Maximum transparency helps iPXE and whatever else know the most
+                headers.append(('Location', targurl))
+                start_response('302 Found', headers)
+                yield ''
+            else: # The user agent is too dumb, check headers for server side redirects
+                delegatemethod = env.get('HTTP_X_DELEGATE_METHOD', None)
+                if delegatemethod == 'accel':
+                    headers = [('Content-Type', 'application/octet-stream')]
+                    headers.append(('X-Accel-Redirect', relurl))
+                    start_response('200 OK', headers)
+                    yield ''
+                else:
+                    start_response('502 Bad Gateway', headers)
+                    yield 'URL shortening for a limited client without proxy advertised accel support'
+                    log.log({'error': f'Profile name exceeded DHCP limits, and reverse proxy capabilities not detected, switch to the nginx configuration or shorten the profile name: {relurl}'})
+            return
         if len(request) != 4:
             return await make_response(mimetype, 400, 'Bad Request')
         if request[1] == 'by-mac':
@@ -1017,6 +1047,8 @@ async def resourcehandler_backend(req, make_response):
             return rsp
 
 def _assemble_html(responses, resource, querydict, url, extension):
+    yield '<html><body>HTML API Explorer is discontinued, notify developers if you want this back</body></html>'
+    return
     yield '<html><head><meta charset="UTF-8"><title>' \
           'Confluent REST Explorer: ' + url + '</title></head>' \
                                               '<body><form action="' + \
@@ -1138,6 +1170,7 @@ async def serve(bind_host, bind_port):
     sock = None
     while not sock:
         try:
+            #TODO:asyncmerge: unix domain socket as path
             sock = socket.socket(socket.AF_INET6)
             sock.settimeout(0)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -1170,7 +1203,7 @@ async def serve(bind_host, bind_port):
 class HttpApi(object):
     def __init__(self, bind_host=None, bind_port=None):
         self.server = None
-        self.bind_host = bind_host or '::'
+        self.bind_host = bind_host or '127.0.0.1'
         self.bind_port = bind_port or 4005
 
     def start(self):

@@ -18,8 +18,9 @@ import struct
 import termios
 
 def get_screengeom():
-    return struct.unpack('hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ,
-                                           b'....'))
+    # returns height in cells, width in cells, width in pixels, height in pixels
+    return struct.unpack('hhhh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ,
+                                           b'........'))
 class ScreenPrinter(object):
 
     def __init__(self, noderange, client, textlen=4):
@@ -58,7 +59,7 @@ class ScreenPrinter(object):
 
     def drawscreen(self, node=None):
         if self.squeeze:
-            currheight, currwidth = get_screengeom()
+            currheight, currwidth, _, _ = get_screengeom()
             currheight -= 2
             if currheight < 1:
                 currheight = 1
@@ -120,6 +121,7 @@ if __name__ == '__main__':
     c = client.Command()
     p = ScreenPrinter('d1-d12', c)
     p.set_output('d3', 'Upload: 67%')
+    p.set_output('d7', 'Upload: 67%')
 
 
 

@@ -20,8 +20,14 @@ import asyncio
 import base64
 import confluent.exceptions as cexc
 import confluent.log as log
+import glob
 import hashlib
-import netifaces
+import ipaddress
+try:
+    import psutil
+except ImportError:
+    psutil = None
+    import netifaces
 import os
 import re
 import socket
@@ -29,6 +35,12 @@ import ssl
 import struct
 import random
 import subprocess
+import cryptography.x509 as x509
+try:
+    import cryptography.x509.verification as verification
+except ImportError:
+    verification = None
+
 import confluent.tasks as tasks
 
 
@@ -98,14 +110,68 @@ def list_interface_indexes():
         return
 
 
+def get_bmc_subject_san(configmanager, nodename, addnames=()):
+    bmc_san = []
+    subject = ''
+    ipas = set([])
+    dnsnames = set([])
+    for addname in addnames:
+        try:
+            addr = ipaddress.ip_address(addname)
+            ipas.add(addname)
+        except Exception:
+            dnsnames.add(addname)
+    nodecfg = configmanager.get_node_attributes(nodename,
+                                             ('dns.domain', 'hardwaremanagement.manager', 'hardwaremanagement.manager_tls_name'))
+    bmcaddr = nodecfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get('value', '')
+    domain = nodecfg.get(nodename, {}).get('dns.domain', {}).get('value', '')
+    isipv4 = False
+    if bmcaddr:
+        bmcaddr = bmcaddr.split('/', 1)[0]
+        bmcaddr = bmcaddr.split('%', 1)[0]
+        dnsnames.add(bmcaddr)
+        subject = bmcaddr
+        if ':' in bmcaddr:
+            ipas.add(bmcaddr)
+            dnsnames.add('{0}.ipv6-literal.net'.format(bmcaddr.replace(':', '-')))
+        else:
+            try:
+                socket.inet_aton(bmcaddr)
+                isipv4 = True
+                ipas.add(bmcaddr)
+            except socket.error:
+                pass
+            if not isipv4: # neither ipv6 nor ipv4, should be a name
+                if domain and domain not in bmcaddr:
+                    dnsnames.add('{0}.{1}'.format(bmcaddr, domain))
+    bmcname = nodecfg.get(nodename, {}).get('hardwaremanagement.manager_tls_name', {}).get('value', '')
+    if bmcname:
+        subject = bmcname
+        dnsnames.add(bmcname)
+        if domain and domain not in bmcname:
+            dnsnames.add('{0}.{1}'.format(bmcname, domain))
+    for dns in dnsnames:
+        bmc_san.append('DNS:{0}'.format(dns))
+    for ip in ipas:
+        bmc_san.append('IP:{0}'.format(ip))
+    return subject, ','.join(bmc_san)
+
+
 def list_ips():
     # Used for getting addresses to indicate the multicast address
     # as well as getting all the broadcast addresses
-    for iface in netifaces.interfaces():
-        addrs = netifaces.ifaddresses(iface)
-        if netifaces.AF_INET in addrs:
-            for addr in addrs[netifaces.AF_INET]:
-                yield addr
+    if psutil:
+        ifas = psutil.net_if_addrs()
+        for intf in ifas:
+            for addr in ifas[intf]:
+                if addr.family == socket.AF_INET and addr.broadcast:
+                    yield {'broadcast': addr.broadcast, 'addr': addr.address}
+    else:
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface)
+            if netifaces.AF_INET in addrs:
+                for addr in addrs[netifaces.AF_INET]:
+                    yield addr
 
 def randomstring(length=20):
     """Generate a random string of requested length
@@ -189,15 +255,51 @@ def cert_matches(fingerprint, certificate):
     return newfp and fingerprint == newfp
 
 
+_polbuilder = None
+
+
 class TLSCertVerifier(object):
-    def __init__(self, configmanager, node, fieldname):
+    def __init__(self, configmanager, node, fieldname, subject=None):
         self.cfm = configmanager
         self.node = node
         self.fieldname = fieldname
+        self.subject = subject
+
+    def verify_by_ca(self, certificate):
+        global _polbuilder
+        _polbuilder = None
+        if not _polbuilder:
+            certs = []
+            for cert in glob.glob('/var/lib/confluent/public/site/tls/*.pem'):
+                with open(cert, 'rb') as certfile:
+                    certs.extend(x509.load_pem_x509_certificates(certfile.read()))
+            if not certs:
+                return False
+            castore = verification.Store(certs)
+            _polbuilder = verification.PolicyBuilder()
+            eep = verification.ExtensionPolicy.permit_all().require_present(
+                x509.SubjectAlternativeName, verification.Criticality.AGNOSTIC, None).may_be_present(
+                x509.KeyUsage, verification.Criticality.AGNOSTIC, None)
+            cap = verification.ExtensionPolicy.webpki_defaults_ca().require_present(
+                x509.BasicConstraints, verification.Criticality.AGNOSTIC, None).may_be_present(
+                x509.KeyUsage, verification.Criticality.AGNOSTIC, None)
+            _polbuilder = _polbuilder.store(castore).extension_policies(
+                ee_policy=eep, ca_policy=cap)
+        try:
+            addr = ipaddress.ip_address(self.subject)
+            subject = x509.IPAddress(addr)
+        except ValueError:
+            subject = x509.DNSName(self.subject)
+        cert = x509.load_der_x509_certificate(certificate)
+        _polbuilder.build_server_verifier(subject).verify(cert, [])
+        return True
+        
+
 
     def verify_cert(self, certificate):
         storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
                                                    )
+        
         if (self.fieldname not in storedprint[self.node] or
                 storedprint[self.node][self.fieldname]['value'] == ''):
             # no stored value, check policy for next action
@@ -225,6 +327,18 @@ class TLSCertVerifier(object):
                           certificate):
             return True
         fingerprint = get_fingerprint(certificate, 'sha256')
+        # Mismatches, but try more traditional validation using the site CAs
+        if self.subject:
+            try:
+                if verification and self.verify_by_ca(certificate):
+                    auditlog = log.Logger('audit')
+                    auditlog.log({'node': self.node, 'event': 'certautoupdate',
+                                  'fingerprint': fingerprint})
+                    self.cfm.set_node_attributes(
+                        {self.node: {self.fieldname: fingerprint}})
+                    return True
+            except Exception:
+                pass
         raise cexc.PubkeyInvalid(
             'Mismatched certificate detected', certificate, fingerprint,
             self.fieldname, 'mismatch')
