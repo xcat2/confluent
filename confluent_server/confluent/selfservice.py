@@ -259,8 +259,8 @@ async def handle_request(req, make_response, mimetype):
         bmcaddr = hmattr.get('hardwaremanagement.manager', {}).get('value',
                                                                    None)
         if not bmcaddr:
-            start_response('500 Internal Server Error', [])
-            yield 'Missing value in hardwaremanagement.manager'
+            rsp = await make_response(mimetype, 500, 'Internal Server Error')
+            await rsp.write('Missing value in hardwaremanagement.manager')
             return
         bmcaddr = bmcaddr.split('/', 1)[0]
         bmcaddr = await asyncio.get_event_loop().getaddrinfo(bmcaddr, 0)[0]

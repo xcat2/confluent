@@ -689,25 +689,27 @@ async def resourcehandler_backend(req, make_response):
             #TODO:asyncmerge: update with aiohttp behavior
             targurl, can302, relurl, bootfilename = pxe.shorturls.get(request[2], (None, None, None, None))
             if not targurl:
-                start_response('404 Not Found', headers)
-                yield ''
-                return
+                rsp = await make_response(mimetype, 404, 'Not Found')
+                await rsp.write(b'')
+                return rsp
             if can302:  # Maximum transparency helps iPXE and whatever else know the most
                 headers.append(('Location', targurl))
-                start_response('302 Found', headers)
-                yield ''
+                rsp = await make_response(mimetype, 302, 'Found', headers=headers)
+                await rsp.write(b'')
+                return rsp
             else: # The user agent is too dumb, check headers for server side redirects
                 delegatemethod = env.get('HTTP_X_DELEGATE_METHOD', None)
                 if delegatemethod == 'accel':
                     headers = [('Content-Type', 'application/octet-stream')]
                     headers.append(('X-Accel-Redirect', relurl))
-                    start_response('200 OK', headers)
-                    yield ''
+                    rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+                    await rsp.write(b'')
+                    return rsp
                 else:
-                    start_response('502 Bad Gateway', headers)
-                    yield 'URL shortening for a limited client without proxy advertised accel support'
+                    rsp = await make_response(mimetype, 502, 'Bad Gateway', headers=headers)
+                    await rsp.write(b'URL shortening for a limited client without proxy advertised accel support')
                     log.log({'error': f'Profile name exceeded DHCP limits, and reverse proxy capabilities not detected, switch to the nginx configuration or shorten the profile name: {relurl}'})
-            return
+            return rsp
         if len(request) != 4:
             return await make_response(mimetype, 400, 'Bad Request')
         if request[1] == 'by-mac':
@@ -726,8 +728,8 @@ async def resourcehandler_backend(req, make_response):
             return await make_response(mimetype, 404, 'Not Found')
         redir = '/confluent-public/os/{0}/boot.{1}'.format(pprofile, bootfile)
         rsp = await make_response(mimetype, 302, 'Found', {'Location': redir})
-        return
-    if req.content_length and nat '/staging' in reqpath:
+        return rsp
+    if req.content_length and '/staging' not in reqpath:
         reqbody = await req.read()
         reqtype = req.content_type
     operation = opmap.get(req.method, None)
@@ -930,7 +932,6 @@ async def resourcehandler_backend(req, make_response):
             return rsp
         else:  # no keys, but a session, means it's hooking to receive data
             raise Exception("long polling console sessions are discontinued")
-======
     elif (operation == 'create' and ('/firmware/updates/active' in reqpath)):
         if 'application/json' in reqtype:
             if not isinstance(reqbody, str):
@@ -969,7 +970,7 @@ async def resourcehandler_backend(req, make_response):
                 await rsp.write(json.dumps({'data': 'done'}))
                 return       
             else:
-                rsp = await make_response(mimetype, 401 'Unauthorized', headers=headers)
+                rsp = await make_response(mimetype, 401, 'Unauthorized', headers=headers)
                 await rsp.write(json.dumps({'data': 'You do not have permission to write to file'}))
                 return 
         elif len(url.split('/')) == 2:

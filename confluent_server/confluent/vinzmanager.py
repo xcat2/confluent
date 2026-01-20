@@ -121,7 +121,7 @@ async def send_grant(conn, nodename, rqtype):
         # original openbmc dialect
         portnum = 443
         cloop = asyncio.get_event_loop()
-    cfg = configmanager.ConfigManager(None)
+        cfg = configmanager.ConfigManager(None)
         c = cfg.get_node_attributes(
             nodename,
             ['secret.hardwaremanagementuser',

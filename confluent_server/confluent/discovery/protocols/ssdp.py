@@ -262,10 +262,10 @@ async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                                     if not isinstance(reply, bytes):
                                         reply = reply.encode('utf8')
                                     s.setblocking(1)
-                                        try:
-                                            s.sendto(reply, peer)
-                                        except Exception:
-                                            break
+                                    try:
+                                        s.sendto(reply, peer)
+                                    except Exception:
+                                        break
                                 elif query.startswith('uuid='):
                                     curruuid = query.split('=', 1)[1].lower()
                                     node = uuidlookup(curruuid)
