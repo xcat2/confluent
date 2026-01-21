@@ -356,7 +356,7 @@ class NetworkManager(object):
             currteam = deats.get('connection.master', None)
             if currteam == team:
                 return
-            for stg in ('ipv4.dhcp-hostname', 'ipv4.dns', 'ipv6.dns', 'ipv6.dhcp-hostname'):
+            for stg in ('ipv4.dhcp-hostname', 'ipv4.dns', 'ipv6.dns', 'ipv6.dhcp-hostname', 'ipv4.dns-search', 'ipv6.dns-search'):
                 if deats.get(stg, None):
                     bondcfg[stg] = deats[stg]
         if member in self.uuidbyname:
