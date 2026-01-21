@@ -43,7 +43,7 @@ async def main():
 if __name__ == '__main__':
     #multiprocessing.freeze_support()
     #asyncio.get_event_loop().run_until_complete(main())
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
     #gt = spawn_for_awaitable(confluent.main.run(sys.argv))
     #gt.wait()
 #except:
