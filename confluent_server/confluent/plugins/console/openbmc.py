@@ -30,6 +30,13 @@ import aiohmi.redfish.command as rcmd
 import aiohmi.util.webclient as webclient
 import aiohttp
 
+try:
+    raise Exception('TODO: Migrate to aiohttp websocket')
+    websocket = eventlet.import_patched('websocket')
+    wso = websocket.WebSocket
+except Exception:
+    wso = object
+
 class CustomVerifier(aiohttp.Fingerprint):
     def __init__(self, verifycallback):
         self._certverify = verifycallback

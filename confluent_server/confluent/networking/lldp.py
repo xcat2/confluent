@@ -94,7 +94,7 @@ def lenovoname(idx, desc):
     return desc
 
 nameoverrides = [
-    (re.compile('20301\..*'), lenovoname),
+    (re.compile(r'20301\..*'), lenovoname),
 ]
 
 # Lenovo chassis id rule is match only first 5 bytes for a match.....

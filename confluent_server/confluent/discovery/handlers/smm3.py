@@ -16,8 +16,6 @@ import confluent.discovery.handlers.redfishbmc as redfishbmc
 import eventlet.support.greendns
 import confluent.util as util
 
-webclient = eventlet.import_patched('pyghmi.util.webclient')
-
 
 
 getaddrinfo = eventlet.support.greendns.getaddrinfo

@@ -2,7 +2,9 @@
 import confluent.util as util
 import time
 import eventlet
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
+
+
 
 _healthmap = {
     'normal': 'ok',

@@ -1308,7 +1308,7 @@ if __name__ == '__main__':
     os.umask(0o022)
     if len(sys.argv) > 2:
         mfd = os.environ.get('CONFLUENT_MEDIAFD', None)
-        asyncio.get_event_loop().run_until_complete(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd, custtargpath=sys.argv[3], custdistpath=sys.argv[4], custname=sys.argv[5]))
+        asyncio.run(import_image(sys.argv[1], callback=printit, backend=True, mfd=mfd, custtargpath=sys.argv[3], custdistpath=sys.argv[4], custname=sys.argv[5]))
     else:
-        asyncio.get_event_loop().run_until_complete(import_image(sys.argv[1], callback=printit))
+        asyncio.run(import_image(sys.argv[1], callback=printit))
 

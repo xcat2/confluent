@@ -23,8 +23,8 @@ import confluent.exceptions as cexc
 import confluent.interface.console as conapi
 import confluent.log as log
 import confluent.util as util
-import pyghmi.exceptions as pygexc
-import pyghmi.redfish.command as rcmd
+import aiohmi.exceptions as pygexc
+import aiohmi.redfish.command as rcmd
 import eventlet
 import eventlet.green.ssl as ssl
 try:

@@ -14,8 +14,8 @@
 
 import codecs
 import confluent.discovery.handlers.bmc as bmchandler
-import pyghmi.exceptions as pygexc
-import pyghmi.ipmi.private.util as pygutil
+import aiohmi.exceptions as pygexc
+import aiohmi.ipmi.private.util as pygutil
 import confluent.util as util
 import struct
 

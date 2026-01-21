@@ -16,7 +16,9 @@ import codecs
 import confluent.discovery.handlers.bmc as bmchandler
 import confluent.exceptions as exc
 import eventlet
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+
+import aiohmi.util.webclient as webclient
+
 import struct
 try:
     from urllib import urlencode

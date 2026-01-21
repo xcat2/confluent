@@ -19,7 +19,8 @@ try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
+
 
 class NodeHandler(bmchandler.NodeHandler):
     DEFAULT_USER = 'admin'
