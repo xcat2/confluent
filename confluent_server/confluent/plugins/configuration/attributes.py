@@ -169,12 +169,12 @@ async def update(nodes, element, configmanager, inputdata):
     if nodes is not None:
         return await update_nodes(nodes, element, configmanager, inputdata)
     elif element[0] == 'nodegroups':
-        return update_nodegroup(
+        return await update_nodegroup(
             element[1], element[3], configmanager, inputdata)
     raise Exception("This line should never be reached")
 
 
-def update_nodegroup(group, element, configmanager, inputdata):
+async def update_nodegroup(group, element, configmanager, inputdata):
     if element == 'check':
         check = inputdata.attribs
         decrypt = configmanager.decrypt
@@ -192,7 +192,7 @@ def update_nodegroup(group, element, configmanager, inputdata):
     if 'rename' in element:
         namemap = {}
         namemap[group] = inputdata.attribs['rename']
-        configmanager.rename_nodegroups(namemap)
+        await configmanager.rename_nodegroups(namemap)
         return yield_rename_resources(namemap, isnode=False)
     try:
         clearattribs = []
@@ -208,8 +208,8 @@ def update_nodegroup(group, element, configmanager, inputdata):
         for attrib in clearattribs:
             del inputdata.attribs[attrib]
         if clearattribs:
-            configmanager.clear_group_attributes(group, clearattribs)
-        configmanager.set_group_attributes({group: inputdata.attribs})
+            await configmanager.clear_group_attributes(group, clearattribs)
+        await configmanager.set_group_attributes({group: inputdata.attribs})
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     return retrieve_nodegroup(group, element, configmanager, inputdata)
