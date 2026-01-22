@@ -396,16 +396,16 @@ def prep_proxmox_clients(nodes, configmanager):
         clientsbynode[node] = clientsbypmx[currpmx]
     return clientsbynode
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
         currclient = clientsbynode[node]
         if element == ['power', 'state']:
-            yield msg.PowerState(node, currclient.get_vm_power(node))
+            yield msg.PowerState(node, await currclient.get_vm_power(node))
         elif element == ['boot', 'nextdevice']:
-            yield msg.BootDevice(node, currclient.get_vm_bootdev(node))
+            yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
         elif element[:2] == ['inventory', 'hardware'] and len(element) == 4:
-            for rsp in currclient.get_vm_inventory(node):
+            for rsp in await currclient.get_vm_inventory(node):
                 yield rsp
         elif element == ['console', 'ikvm_methods']:
             dsc = {'ikvm_methods': ['vnc']}
