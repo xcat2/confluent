@@ -24,7 +24,7 @@
 
 
 import asyncio
-from confluent_server.confluent import tasks
+from confluent import tasks
 import confluent.exceptions as exc
 import aiohmi.util.webclient as webclient
 import confluent.messages as msg
