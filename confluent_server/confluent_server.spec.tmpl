@@ -17,25 +17,14 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 Prefix: %{_prefix}
 BuildArch: noarch
 Requires: confluent_vtbufferd
-%if "%{dist}" == ".el7"
-
-Requires: python-pyghmi >= 1.5.71, python-eventlet, python-greenlet, python-pycryptodomex >= 3.4.7, confluent_client == %{version}, python-pyparsing, python-paramiko, python-dnspython, python-netifaces, python2-pyasn1 >= 0.2.3, python-pysnmp >= 4.3.4, python-lxml, python-eficompressor, python-setuptools, python-dateutil, python-websocket-client python2-msgpack python-libarchive-c python-yaml python-monotonic
-%else
-%if "%{dist}" == ".el8"
-Requires: python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-enum34, python3-asn1crypto, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
-%else
 %if "%{dist}" == ".el9"
-Requires: python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-webauthn, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
+Requires: python3-asyncssh, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-dns, python3-webauthn, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
 %else
 %if "%{dist}" == ".el10"
-Requires: python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dns, python3-webauthn, python3-psutil, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
-%else
-Requires: python3-dbm,python3-pyghmi >= 1.5.71, python3-eventlet, python3-greenlet, python3-pycryptodome >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-paramiko, python3-dnspython, python3-netifaces, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-PyYAML openssl iproute
+Requires: python3-asyncssh, python3-pycryptodomex >= 3.4.7, confluent_client == %{version}, python3-pyparsing, python3-dns, python3-webauthn, python3-psutil, python3-pyasn1 >= 0.2.3, python3-pysnmp >= 4.3.4, python3-lxml, python3-eficompressor, python3-setuptools, python3-dateutil, python3-cffi, python3-pyOpenSSL, python3-websocket-client python3-msgpack python3-libarchive-c python3-yaml openssl iproute
+%endif
+%endif
 
-%endif
-%endif
-%endif
-%endif
 Vendor: Lenovo
 Url: https://github.com/lenovo/confluent
 
