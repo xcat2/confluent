@@ -177,7 +177,7 @@ def _init_lldp(data, iname, idx, idxtoportid, switch):
                        'chassisid': _chassisidbyswitch[switch]}
 
 _fastbackends = {}
-def detect_backend(switch, verifier):
+async def detect_backend(switch, verifier):
         backend = _fastbackends.get(switch, None)
         if backend:
             return backend

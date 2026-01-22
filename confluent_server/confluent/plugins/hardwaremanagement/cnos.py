@@ -155,7 +155,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
                 nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
         for node in nodes:
             workers.add(tasks.spawn(retrieve_health(configmanager, creds,
-                                       node, results))
+                                       node, results)))
     elif element[:3] == ['inventory', 'hardware', 'all']:
         creds = configmanager.get_node_attributes(
                 nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
