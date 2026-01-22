@@ -208,9 +208,9 @@ class PmxApiClient:
         self.wc = webclient.WebConnection(server, port=8006, verifycallback=cv)
         self.fprint = configmanager.get_node_attributes(server, 'pubkeys.tls').get(server, {}).get('pubkeys.tls', {}).get('value', None)
         self.vmmap = {}
-        self.login()
         self.vmlist = {}
         self.vmbyid = {}
+        self.logged = False
 
     async def login(self):
         loginform = {
@@ -222,12 +222,15 @@ class PmxApiClient:
         self.wc.cookies['PVEAuthCookie'] = rsp[0]['data']['ticket']
         self.pac = rsp[0]['data']['ticket']
         self.wc.set_header('CSRFPreventionToken', rsp[0]['data']['CSRFPreventionToken'])
+        self.logged = True
 
 
     def get_screenshot(self, vm, outfile):
         raise Exception("Not implemented")
 
     async def map_vms(self):
+        if not self.logged:
+            await self.login()
         rsp = await self.wc.grab_json_response('/api2/json/cluster/resources')
         for datum in rsp.get('data', []):
             if datum['type'] == 'qemu':
