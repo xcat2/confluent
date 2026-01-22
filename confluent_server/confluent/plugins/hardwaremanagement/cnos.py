@@ -23,10 +23,10 @@
 #  - One power supply is off.
 
 
-import eventlet
-import eventlet.queue as queue
+import asyncio
+from confluent_server.confluent import tasks
 import confluent.exceptions as exc
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
 import confluent.messages as msg
 import confluent.util as util
 
@@ -38,92 +38,39 @@ class SwitchSensor(object):
         self.health = health
 
 
-def cnos_login(node, configmanager, creds):
-    wc = webclient.SecureHTTPConnection(node, port=443, verifycallback=util.TLSCertVerifier(
+async def cnos_login(node, configmanager, creds):
+    wc = webclient.WebConnection(node, port=443, verifycallback=util.TLSCertVerifier(
         configmanager, node, 'pubkeys.tls_hardwaremanager').verify_cert)
     wc.set_basic_credentials(creds[node]['secret.hardwaremanagementuser']['value'], creds[node]['secret.hardwaremanagementpassword']['value'])
-    wc.request('GET', '/nos/api/login/')
-    rsp = wc.getresponse()
-    body = rsp.read()
-    if rsp.status == 401:  # CNOS gives 401 on first attempt...
-        wc.request('GET', '/nos/api/login/')
-        rsp = wc.getresponse()
-        body = rsp.read()
-    if rsp.status >= 200 and rsp.status < 300:
+    body, status, headers = await wc.grab_response_with_status('/nos/api/login/')
+    if status == 401:  # CNOS gives 401 on first attempt...
+        body, status, headers = await wc.grab_response_with_status('/nos/api/login/')
+    if status >= 200 and status < 300:
         return wc
     raise exc.TargetEndpointBadCredentials('Unable to authenticate')
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         yield msg.ConfluentNodeError(node, 'Not Implemented')
 
-def delete(nodes, element, configmanager, inputdata):
+async def delete(nodes, element, configmanager, inputdata):
     for node in nodes:
         yield msg.ConfluentNodeError(node, 'Not Implemented')
 
-def create(nodes, element, configmanager, inputdata):
+async def create(nodes, element, configmanager, inputdata):
     for node in nodes:
         yield msg.ConfluentNodeError(node, 'Not Implemented')
 
-def retrieve(nodes, element, configmanager, inputdata):
-    results = queue.LightQueue()
-    workers = set([])
-    if element == ['power', 'state']:
-        for node in nodes:
-            yield msg.PowerState(node=node, state='on')
-        return
-    elif element == ['health', 'hardware']:
-        creds = configmanager.get_node_attributes(
-                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
-        for node in nodes:
-            workers.add(eventlet.spawn(retrieve_health, configmanager, creds,
-                                       node, results))
-    elif element[:3] == ['inventory', 'hardware', 'all']:
-        creds = configmanager.get_node_attributes(
-                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
-        for node in nodes:
-            workers.add(eventlet.spawn(retrieve_inventory, configmanager,
-                                       creds, node, results, element))
-    elif element[:3] == ['inventory', 'firmware', 'all']:
-        creds = configmanager.get_node_attributes(
-                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
-        for node in nodes:
-            workers.add(eventlet.spawn(retrieve_firmware, configmanager,
-                                       creds, node, results, element))
-    else:
-        for node in nodes:
-            yield msg.ConfluentNodeError(node, 'Not Implemented')
-        return
-    currtimeout = 10
-    while workers:
-        try:
-            datum = results.get(10)
-            while datum:
-                if datum:
-                    yield datum
-                datum = results.get_nowait()
-        except queue.Empty:
-            pass
-        eventlet.sleep(0.001)
-        for t in list(workers):
-            if t.dead:
-                workers.discard(t)
-    try:
-        while True:
-            datum = results.get_nowait()
-            if datum:
-                yield datum
-    except queue.Empty:
-        pass
 
 
-def retrieve_inventory(configmanager, creds, node, results, element):
+
+async def retrieve_inventory(configmanager, creds, node, results, element):
     if len(element) == 3:
-        results.put(msg.ChildCollection('all'))
-        results.put(msg.ChildCollection('system'))
+        await results.put(msg.ChildCollection('all'))
+        await results.put(msg.ChildCollection('system'))
         return
-    wc = cnos_login(node, configmanager, creds)
-    sysinfo = wc.grab_json_response('/nos/api/sysinfo/inventory')
+    wc = await cnos_login(node, configmanager, creds)
+    sysinfo = await wc.grab_json_response('/nos/api/sysinfo/inventory')
     invinfo = {
         'inventory': [{
             'name': 'System',
@@ -138,39 +85,39 @@ def retrieve_inventory(configmanager, creds, node, results, element):
             }
         }]
     }
-    results.put(msg.KeyValueData(invinfo, node))
+    await results.put(msg.KeyValueData(invinfo, node))
 
 
-def retrieve_firmware(configmanager, creds, node, results, element):
+async def retrieve_firmware(configmanager, creds, node, results, element):
     if len(element) == 3:
-        results.put(msg.ChildCollection('all'))
+        await results.put(msg.ChildCollection('all'))
         return
-    wc = cnos_login(node, configmanager, creds)
-    sysinfo = wc.grab_json_response('/nos/api/sysinfo/inventory')
+    wc = await cnos_login(node, configmanager, creds)
+    sysinfo = await wc.grab_json_response('/nos/api/sysinfo/inventory')
     items = [{
         'Software': {'version': sysinfo['Software Revision']},
         },
         {
         'BIOS': {'version': sysinfo['BIOS Revision']},
         }]
-    results.put(msg.Firmware(items, node))
+    await results.put(msg.Firmware(items, node))
 
-def retrieve_health(configmanager, creds, node, results):
-    wc = cnos_login(node, configmanager, creds)
-    hinfo = wc.grab_json_response('/nos/api/sysinfo/globalhealthstatus')
+async def retrieve_health(configmanager, creds, node, results):
+    wc = await cnos_login(node, configmanager, creds)
+    hinfo = await wc.grab_json_response('/nos/api/sysinfo/globalhealthstatus')
     summary = hinfo['status'].lower()
     if summary == 'noncritical':
         summary = 'warning'
-    results.put(msg.HealthSummary(summary, name=node))
+    await results.put(msg.HealthSummary(summary, name=node))
     state = None
     badreadings = []
     if summary != 'ok':  # temperature or dump or fans or psu
-        wc.grab_json_response('/nos/api/sysinfo/panic_dump')
-        switchinfo = wc.grab_json_response('/nos/api/sysinfo/panic_dump')
+        await wc.grab_json_response('/nos/api/sysinfo/panic_dump')
+        switchinfo = await wc.grab_json_response('/nos/api/sysinfo/panic_dump')
         if switchinfo:
             badreadings.append(
                 SwitchSensor('Panicdump', ['Present'], health='warning'))
-        switchinfo = wc.grab_json_response('/nos/api/sysinfo/temperatures')
+        switchinfo = await wc.grab_json_response('/nos/api/sysinfo/temperatures')
         for temp in switchinfo:
             if temp == 'Temperature threshold':
                 continue
@@ -181,17 +128,68 @@ def retrieve_health(configmanager, creds, node, results):
                 tempval = switchinfo[temp]['Temp']
                 badreadings.append(
                     SwitchSensor(temp, [], value=tempval, health=temphealth))
-        switchinfo = wc.grab_json_response('/nos/api/sysinfo/fans')
+        switchinfo = await wc.grab_json_response('/nos/api/sysinfo/fans')
         for fan in switchinfo:
             if switchinfo[fan]['speed-rpm'] < 100:
                 badreadings.append(
                     SwitchSensor(fan, [], value=switchinfo[fan]['speed-rpm'],
                                  health='critical'))
-        switchinfo = wc.grab_json_response('/nos/api/sysinfo/power')
+        switchinfo = await wc.grab_json_response('/nos/api/sysinfo/power')
         for psu in switchinfo:
             if switchinfo[psu]['State'] != 'Normal ON':
                 psuname = switchinfo[psu]['Name']
                 badreadings.append(
                     SwitchSensor(psuname, states=[switchinfo[psu]['State']],
                                  health='critical'))
-    results.put(msg.SensorReadings(badreadings, name=node))
+    await results.put(msg.SensorReadings(badreadings, name=node))
+
+async def retrieve(nodes, element, configmanager, inputdata):
+    results = asyncio.Queue()
+    workers = set([])
+    if element == ['power', 'state']:
+        for node in nodes:
+            yield msg.PowerState(node=node, state='on')
+        return
+    elif element == ['health', 'hardware']:
+        creds = configmanager.get_node_attributes(
+                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
+        for node in nodes:
+            workers.add(tasks.spawn(retrieve_health(configmanager, creds,
+                                       node, results))
+    elif element[:3] == ['inventory', 'hardware', 'all']:
+        creds = configmanager.get_node_attributes(
+                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
+        for node in nodes:
+            workers.add(tasks.spawn(retrieve_inventory(configmanager,
+                                       creds, node, results, element)))
+    elif element[:3] == ['inventory', 'firmware', 'all']:
+        creds = configmanager.get_node_attributes(
+                nodes, ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
+        for node in nodes:
+            workers.add(tasks.spawn(retrieve_firmware(configmanager,
+                                       creds, node, results, element)))
+    else:
+        for node in nodes:
+            yield msg.ConfluentNodeError(node, 'Not Implemented')
+        return
+    currtimeout = 10
+    while workers:
+        try:
+            datum = await asyncio.wait_for(results.get(), timeout=10)
+            while datum:
+                if datum:
+                    yield datum
+                datum = results.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+        await asyncio.sleep(0.001)
+        for t in list(workers):
+            if t.done():
+                workers.discard(t)
+    try:
+        while True:
+            datum = results.get_nowait()
+            if datum:
+                yield datum
+    except asyncio.QueueEmpty:
+        pass

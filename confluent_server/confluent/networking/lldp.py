@@ -33,6 +33,7 @@
 if __name__ == '__main__':
     import sys
     import confluent.config.configmanager as cfm
+import asyncio
 import base64
 import confluent.networking.nxapi as nxapi
 import confluent.exceptions as exc
@@ -41,11 +42,11 @@ import confluent.messages as msg
 import confluent.snmputil as snmp
 import confluent.networking.netutil as netutil
 import confluent.util as util
-import eventlet
-from eventlet.greenpool import GreenPool
-import eventlet.semaphore
+import confluent.tasks as tasks
 import re
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+
+import aiohmi.util.webclient as webclient
+
 # The interesting OIDs are:
 # lldpLocChassisId - to cross reference (1.0.8802.1.1.2.1.3.2.0)
 # lldpLocPortId - for cross referencing.. (1.0.8802.1.1.2.1.3.7.1.3)
@@ -180,35 +181,35 @@ def detect_backend(switch, verifier):
         backend = _fastbackends.get(switch, None)
         if backend:
             return backend
-        wc =  webclient.SecureHTTPConnection(
+        wc =  webclient.WebConnection(
             switch, 443, verifycallback=verifier, timeout=5)
-        apicheck, retcode = wc.grab_json_response_with_status('/affluent/')
+        apicheck, retcode = await wc.grab_json_response_with_status('/affluent/')
         if retcode == 401 and apicheck.startswith(b'{}'):
             _fastbackends[switch] = 'affluent'
         else:
-            apicheck, retcode = wc.grab_json_response_with_status('/api/')
+            apicheck, retcode = await wc.grab_json_response_with_status('/api/')
             if retcode == 400 and apicheck.startswith(b'{"imdata":['):
                 _fastbackends[switch] = 'nxapi'
         return _fastbackends.get(switch, None)
 
-def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
+async def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
     kv = util.TLSCertVerifier(cfm, switch,
                                   'pubkeys.tls_hardwaremanager').verify_cert
-    backend = detect_backend(switch, kv)
+    backend = await detect_backend(switch, kv)
     if not backend:
         raise Exception("No HTTPS backend identified")
-    wc =  webclient.SecureHTTPConnection(
+    wc =  webclient.WebConnection(
                 switch, 443, verifycallback=kv, timeout=5)
     if backend == 'affluent':
         return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
     elif backend == 'nxapi':
-        return _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc)
+        return await _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc)
 
 
 
-def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
+async def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
     cli = nxapi.NxApiClient(switch, user, password, cfm)
-    lldpinfo = cli.get_lldp()
+    lldpinfo = await cli.get_lldp()
     for port in lldpinfo:
         portdata = lldpinfo[port]
         peerid = '{0}.{1}'.format(
@@ -221,9 +222,9 @@ def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc):
         lldpdata[port] = portdata
     _neighdata[switch] = lldpdata
 
-def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
+async def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     wc.set_basic_credentials(user, password)
-    neighdata = wc.grab_json_response('/affluent/lldp/all')
+    neighdata = await wc.grab_json_response('/affluent/lldp/all')
     chassisid = neighdata['chassis']['id']
     _chassisidbyswitch[switch] = chassisid,
     for record in neighdata['neighbors']:
@@ -250,7 +251,7 @@ def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     _neighdata[switch] = lldpdata
 
 
-def _extract_neighbor_data_b(args):
+async def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
 
     args are carried as a tuple, because of eventlet convenience
@@ -268,7 +269,7 @@ def _extract_neighbor_data_b(args):
         return
     lldpdata = {'!!vintage': now}
     try:
-        return _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
+        return await _extract_neighbor_data_https(switch, user, password, cfm, lldpdata)
     except Exception as e:
         pass
     conn = snmp.Session(switch, password, user, privacy_protocol=privproto)
@@ -327,19 +328,19 @@ def _extract_neighbor_data_b(args):
     _neighdata[switch] = lldpdata
 
 
-def update_switch_data(switch, configmanager, force=False, retexc=False):
+async def update_switch_data(switch, configmanager, force=False, retexc=False):
     switchcreds = netutil.get_switchcreds(configmanager, (switch,))[0]
-    ndr = _extract_neighbor_data(switchcreds + (force, retexc))
+    ndr = await _extract_neighbor_data(switchcreds + (force, retexc))
     if retexc and isinstance(ndr, Exception):
         raise ndr
     return _neighdata.get(switch, {})
 
 
-def update_neighbors(configmanager, force=False, retexc=False):
-    return _update_neighbors_backend(configmanager, force, retexc)
+async def update_neighbors(configmanager, force=False, retexc=False):
+    return await _update_neighbors_backend(configmanager, force, retexc)
 
 
-def _update_neighbors_backend(configmanager, force, retexc):
+async def _update_neighbors_backend(configmanager, force, retexc):
     global _neighdata
     global _neighbypeerid
     vintage = _neighdata.get('!!vintage', 0)
@@ -351,23 +352,22 @@ def _update_neighbors_backend(configmanager, force, retexc):
     switches = netutil.list_switches(configmanager)
     switchcreds = netutil.get_switchcreds(configmanager, switches)
     switchcreds = [ x + (force, retexc) for x in switchcreds]
-    pool = GreenPool(64)
-    for ans in pool.imap(_extract_neighbor_data, switchcreds):
+    async for ans in tasks.task_imap(_extract_neighbor_data, switchcreds, max_concurrent=64):
         yield ans
 
 
-def _extract_neighbor_data(args):
+async def _extract_neighbor_data(args):
     # single switch neighbor data update
     switch = args[0]
     if switch not in _updatelocks:
-        _updatelocks[switch] = eventlet.semaphore.Semaphore()
+        _updatelocks[switch] = asyncio.Semaphore()
     if _updatelocks[switch].locked():
         while _updatelocks[switch].locked():
-            eventlet.sleep(1)
+            await asyncio.sleep(1)
         return
     try:
-        with _updatelocks[switch]:
-            return _extract_neighbor_data_b(args)
+        async with _updatelocks[switch]:
+            return await _extract_neighbor_data_b(args)
     except Exception as e:
         yieldexc = False
         if len(args) >= 7:
@@ -382,6 +382,7 @@ if __name__ == '__main__':
     # (should do three argument form for snmpv3 test
     import sys
     _extract_neighbor_data((sys.argv[1], sys.argv[2], None, True))
+    asyncio.run(_extract_neighbor_data((sys.argv[1], sys.argv[2], None, True)))
     print(repr(_neighdata))
 
 

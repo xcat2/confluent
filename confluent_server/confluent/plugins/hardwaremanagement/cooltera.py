@@ -16,17 +16,9 @@ from xml.etree.ElementTree import fromstring as rfromstring
 import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
-import eventlet.green.time as time
-import eventlet.green.socket as socket
-import eventlet.greenpool as greenpool
-import eventlet
-wc = eventlet.import_patched('pyghmi.util.webclient')
-try:
-    import Cookie
-    httplib = eventlet.import_patched('httplib')
-except ImportError:
-    httplib = eventlet.import_patched('http.client')
-    import http.cookies as Cookie
+import confluent.tasks as tasks
+import aiohmi.util.webclient as wc
+import time
 
 sensorsbymodel = {
     'FS1350': ['alarms', 'dt', 'duty', 'dw', 'mode', 'p3state', 'primflow', 'ps1', 'ps1a', 'ps1b', 'ps2', 'ps3', 'ps4', 'ps5a', 'ps5b', 'ps5c', 'pumpspeed1', 'pumpspeed2', 'pumpspeed3', 'rh', 'sdp', 'secflow', 'setpoint', 't1', 't2', 't2a', 't2b', 't2c', 't3', 't3', 't4', 't5', 'valve', 'valve2'],
@@ -104,81 +96,6 @@ def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-').replace(
         '_-_', '-')
 
-pdupool = greenpool.GreenPool(128)
-
-class WebResponse(httplib.HTTPResponse):
-    def _check_close(self):
-        return True
-
-class WebConnection(wc.SecureHTTPConnection):
-    response_class = WebResponse
-    def __init__(self, host, secure, verifycallback):
-        if secure:
-            port = 443
-        else:
-            port = 80
-        wc.SecureHTTPConnection.__init__(self, host, port, verifycallback=verifycallback)
-        self.secure = secure
-        self.cookies = {}
-
-    def connect(self):
-        if self.secure:
-            return super(WebConnection, self).connect()
-        addrinfo = socket.getaddrinfo(self.host, self.port)[0]
-        # workaround problems of too large mtu, moderately frequent occurance
-        # in this space
-        plainsock = socket.socket(addrinfo[0])
-        plainsock.settimeout(self.mytimeout)
-        try:
-            plainsock.setsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG, 1456)
-        except socket.error:
-            pass
-        plainsock.connect(addrinfo[4])
-        self.sock = plainsock
-    
-    def getresponse(self):
-        try:
-            rsp = super(WebConnection, self).getresponse()
-            try:
-                hdrs = [x.split(':', 1) for x in rsp.msg.headers]
-            except AttributeError:
-                hdrs = rsp.msg.items()
-            for hdr in hdrs:
-                if hdr[0] == 'Set-Cookie':
-                    c = Cookie.BaseCookie(hdr[1])
-                    for k in c:
-                        self.cookies[k] = c[k].value
-        except httplib.BadStatusLine:
-            self.broken = True
-            raise
-        return rsp
-
-    def request(self, method, url, body=None):
-        headers = {}
-        if body:
-            headers['Content-Length'] = len(body)
-        cookies = []
-        for cookie in self.cookies:
-            cookies.append('{0}={1}'.format(cookie, self.cookies[cookie]))
-        headers['Cookie'] = ';'.join(cookies)
-        headers['Host'] = 'pdu.cluster.net'
-        headers['Accept'] = '*/*'
-        headers['Accept-Language'] = 'en-US,en;q=0.9'
-        headers['Connection'] = 'close'
-        headers['Referer'] = 'http://pdu.cluster.net/setting_admin.htm'
-        return super(WebConnection, self).request(method, url, body, headers)
-
-    def grab_response(self, url, body=None, method=None):
-        if method is None:
-            method = 'GET' if body is None else 'POST'
-        if body:
-            self.request(method, url, body)
-        else:
-            self.request(method, url)
-        rsp = self.getresponse()
-        body = rsp.read()
-        return body, rsp.status
-
 class CoolteraClient(object):
     def __init__(self, cdu, configmanager):
         self.node = cdu
@@ -201,7 +118,7 @@ class CoolteraClient(object):
         cv = util.TLSCertVerifier(
             self.configmanager, self.node,
             'pubkeys.tls_hardwaremanager').verify_cert
-        self._wc = WebConnection(target, secure=True, verifycallback=cv)
+        self._wc = wc.WebConnection(target, 443, verifycallback=cv)
         return self._wc
 
     
@@ -231,14 +148,12 @@ def xml2stateinfo(statdata):
 
     
 _sensors_by_node = {}
-def read_sensors(element, node, configmanager):
+async def read_sensors(element, node, configmanager):
     category, name = element[-2:]
-    justnames = False
     if len(element) == 3:
         # just get names
         category = name
         name = 'all'
-        justnames = True
         for sensor in sensors:
             yield msg.ChildCollection(simplify_name(sensors[sensor][0]))
         return     
@@ -247,9 +162,7 @@ def read_sensors(element, node, configmanager):
     sn = _sensors_by_node.get(node, None)
     if not sn or sn[1] < time.time():
         cc = CoolteraClient(node, configmanager)
-        cc.wc.request('GET', '/status.xml')
-        rsp = cc.wc.getresponse()
-        statdata = rsp.read()
+        statdata, status, hdrs = await cc.wc.grab_response_with_status('/status.xml')
         statinfo = xml2stateinfo(statdata)
         _sensors_by_node[node] = (statinfo, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
@@ -257,12 +170,13 @@ def read_sensors(element, node, configmanager):
         yield msg.SensorReadings(sn[0], name=node)
 
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     if element[0] == 'sensors':
-        gp = greenpool.GreenPile(pdupool)
+        taskargs = []
         for node in nodes:
-            gp.spawn(read_sensors, element, node, configmanager)
-        for rsp in gp:
+            taskargs.append((element, node, configmanager))
+        gp = tasks.starmap(read_sensors, taskargs)
+        async for rsp in gp:
             for datum in rsp:
                 yield datum
         return

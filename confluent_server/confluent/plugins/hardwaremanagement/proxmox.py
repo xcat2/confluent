@@ -1,18 +1,12 @@
 
+import asyncio
 import confluent.vinzmanager as vinzmanager
-import codecs
 import confluent.util as util
 import confluent.messages as msg
-import eventlet
-import json
-import struct
-webclient = eventlet.import_patched('pyghmi.util.webclient')
-import eventlet.green.socket as socket
-import eventlet
+import aiohmi.util.webclient as webclient
 import confluent.interface.console as conapi
 import io
 import urllib.parse as urlparse
-import eventlet.green.ssl as ssl
 import eventlet
 
 
@@ -211,20 +205,20 @@ class PmxApiClient:
         except Exception:
             pass
         self.server = server
-        self.wc = webclient.SecureHTTPConnection(server, port=8006, verifycallback=cv)
+        self.wc = webclient.WebConnection(server, port=8006, verifycallback=cv)
         self.fprint = configmanager.get_node_attributes(server, 'pubkeys.tls').get(server, {}).get('pubkeys.tls', {}).get('value', None)
         self.vmmap = {}
         self.login()
         self.vmlist = {}
         self.vmbyid = {}
 
-    def login(self):
+    async def login(self):
         loginform = {
                 'username': self.user,
                 'password': self.password,
             }
         loginbody = urlparse.urlencode(loginform)
-        rsp = self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody)
+        rsp = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody)
         self.wc.cookies['PVEAuthCookie'] = rsp[0]['data']['ticket']
         self.pac = rsp[0]['data']['ticket']
         self.wc.set_header('CSRFPreventionToken', rsp[0]['data']['CSRFPreventionToken'])
@@ -233,23 +227,23 @@ class PmxApiClient:
     def get_screenshot(self, vm, outfile):
         raise Exception("Not implemented")
 
-    def map_vms(self):
-        rsp = self.wc.grab_json_response('/api2/json/cluster/resources')
+    async def map_vms(self):
+        rsp = await self.wc.grab_json_response('/api2/json/cluster/resources')
         for datum in rsp.get('data', []):
             if datum['type'] == 'qemu':
                 self.vmmap[datum['name']] = (datum['node'], datum['id'])
         return self.vmmap
 
 
-    def get_vm(self, vm):
+    async def get_vm(self, vm):
         if vm not in self.vmmap:
-            self.map_vms()
+            await self.map_vms()
         return self.vmmap[vm]
 
 
-    def get_vm_inventory(self, vm):
-        host, guest = self.get_vm(vm)
-        cfg = self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
+    async def get_vm_inventory(self, vm):
+        host, guest = await self.get_vm(vm)
+        cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
         myuuid = None
         sysinfo = {'name': 'System', 'present': True, 'information': {
             'Product name': 'Proxmox qemu virtual machine',
@@ -281,15 +275,15 @@ class PmxApiClient:
         yield msg.KeyValueData({'inventory': invitems}, vm)
 
 
-    def get_vm_ikvm(self, vm):
-        return self.get_vm_consproxy(vm, 'vnc')
+    async def get_vm_ikvm(self, vm):
+        return await self.get_vm_consproxy(vm, 'vnc')
 
-    def get_vm_serial(self, vm):
-        return self.get_vm_consproxy(vm, 'term')
+    async def get_vm_serial(self, vm):
+        return await self.get_vm_consproxy(vm, 'term')
 
-    def get_vm_consproxy(self, vm, constype):
-        host, guest = self.get_vm(vm)
-        rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/{constype}proxy', method='POST')
+    async def get_vm_consproxy(self, vm, constype):
+        host, guest = await self.get_vm(vm)
+        rsp = await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/{constype}proxy', method='POST')
         consdata = rsp[0]['data']
         consdata['server'] = self.server
         consdata['host'] = host
@@ -297,9 +291,9 @@ class PmxApiClient:
         consdata['pac'] = self.pac
         return consdata
 
-    def get_vm_bootdev(self, vm):
-        host, guest = self.get_vm(vm)
-        cfg = self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
+    async def get_vm_bootdev(self, vm):
+        host, guest = await self.get_vm(vm)
+        cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
         for datum in cfg['data']:
             if datum['key'] == 'boot':
                 bootseq = datum.get('pending', datum['value'])
@@ -312,9 +306,9 @@ class PmxApiClient:
         return 'default'
 
 
-    def get_vm_power(self, vm):
-        host, guest = self.get_vm(vm)
-        rsp = self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/status/current')
+    async def get_vm_power(self, vm):
+        host, guest = await self.get_vm(vm)
+        rsp = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/status/current')
         rsp = rsp['data']
         currstatus = rsp["qmpstatus"] # stopped, "running"
         if currstatus == 'running':
@@ -323,15 +317,15 @@ class PmxApiClient:
             return 'off'
         raise Exception("Unknnown response to status query")
 
-    def set_vm_power(self, vm, state):
-        host, guest = self.get_vm(vm)
+    async def set_vm_power(self, vm, state):
+        host, guest = await self.get_vm(vm)
         current = None
         newstate = ''
         targstate = state
         if targstate == 'boot':
             targstate = 'on'
         if state == 'boot':
-            current = self.get_vm_power(vm)
+            current = await self.get_vm_power(vm)
             if current == 'on':
                 state = 'reset'
                 newstate = 'reset'
@@ -342,27 +336,27 @@ class PmxApiClient:
         elif state == 'off':
             state = 'stop'
         if state == 'reset': # check for pending config
-            cfg = self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
+            cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
             for datum in cfg['data']:
                 if datum['key'] == 'boot' and 'pending' in datum:
-                    self.set_vm_power(vm, 'off')
-                    self.set_vm_power(vm, 'on')
+                    await self.set_vm_power(vm, 'off')
+                    await self.set_vm_power(vm, 'on')
                     state = ''
                     newstate = 'reset'
         if state:
-            rsp = self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
+            rsp = await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/status/{state}', method='POST')
         if state and state != 'reset':
-            newstate = self.get_vm_power(vm)
+            newstate = await self.get_vm_power(vm)
             while newstate != targstate:
-                eventlet.sleep(0.1)
-                newstate = self.get_vm_power(vm)
+                await asyncio.sleep(0.1)
+                newstate = await self.get_vm_power(vm)
         return newstate, current
 
-    def set_vm_bootdev(self, vm, bootdev):
-        host, guest = self.get_vm(vm)
+    async def set_vm_bootdev(self, vm, bootdev):
+        host, guest = await self.get_vm(vm)
         if bootdev not in ('net', 'network', 'default'):
             raise Exception('Requested boot device not supported')
-        cfg = self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
+        cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
         nonnetdevs = []
         netdevs = []
         for datum in cfg['data']:
@@ -383,7 +377,7 @@ class PmxApiClient:
                 neworder = 'order=' + ';'.join(newbootdevs)
         self.wc.set_header('Content-Type', 'application/json')
         try:
-            self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/config', {'boot': neworder}, method='PUT')
+            await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/config', {'boot': neworder}, method='PUT')
         finally:
             del self.wc.stdheaders['Content-Type']
 
@@ -420,16 +414,16 @@ def retrieve(nodes, element, configmanager, inputdata):
             # good background for the webui, and kitty
             yield msg.ConfluentNodeError(node, "vnc available, screenshot not available")
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
         currclient = clientsbynode[node]
         if element == ['power', 'state']:
-            newstate, oldstate = currclient.set_vm_power(node, inputdata.powerstate(node))
+            newstate, oldstate = await currclient.set_vm_power(node, inputdata.powerstate(node))
             yield  msg.PowerState(node, newstate, oldstate)
         elif element == ['boot', 'nextdevice']:
-            currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
-            yield msg.BootDevice(node, currclient.get_vm_bootdev(node))
+            await currclient.set_vm_bootdev(node, inputdata.bootdevice(node))
+            yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
         elif element == ['console', 'ikvm']:
             try:
                 currclient = clientsbynode[node]
@@ -441,7 +435,7 @@ def update(nodes, element, configmanager, inputdata):
             return
 
 # assume this is only console for now
-def create(nodes, element, configmanager, inputdata):
+async def create(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
         if element == ['console', 'ikvm']:
@@ -453,7 +447,7 @@ def create(nodes, element, configmanager, inputdata):
                 return
             yield msg.ChildCollection(url)
             return
-        serialdata = clientsbynode[node].get_vm_serial(node)
+        serialdata = await clientsbynode[node].get_vm_serial(node)
         yield PmxConsole(serialdata, node, configmanager, clientsbynode[node])
         return
 

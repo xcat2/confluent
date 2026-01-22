@@ -25,7 +25,6 @@ import re
 import eventlet
 import eventlet.queue as queue
 import confluent.exceptions as exc
-webclient = eventlet.import_patched("pyghmi.util.webclient")
 import confluent.messages as msg
 import confluent.util as util
 import confluent.plugins.shell.ssh as ssh

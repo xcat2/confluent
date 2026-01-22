@@ -44,7 +44,8 @@ import time
 import struct
 import traceback
 
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
+
 mcastv4addr = '224.0.0.251'
 mcastv6addr = 'ff02::fb'
 

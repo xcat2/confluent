@@ -26,6 +26,28 @@ tsks = {}
 tasksitter = None
 logtrace = None
 
+async def task_starmap(coro, iterable, max_concurrent=256):
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def sem_coro(*args):
+        async with semaphore:
+            return await coro(*args)
+
+    tasks = [asyncio.create_task(sem_coro(*item)) for item in iterable]
+    for task in asyncio.as_completed(tasks):
+        yield await task
+
+async def task_imap(coro, iterable, max_concurrent=256):
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def sem_coro(item):
+        async with semaphore:
+            return await coro(item)
+
+    tasks = [asyncio.create_task(sem_coro(item)) for item in iterable]
+    for task in asyncio.as_completed(tasks):
+        yield await task
+
 async def _sit_tasks():
     while True:
         while not tsks:
@@ -60,6 +82,7 @@ def spawn(coro):
     while tskid in tsks:
         tskid = random.random()
     tsks[tskid] = spawn_task(coro)
+    return tsks[tskid]
 
 
 async def _sleep_and_run(sleeptime, func, args):
