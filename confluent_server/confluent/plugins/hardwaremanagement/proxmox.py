@@ -218,9 +218,9 @@ class PmxApiClient:
                 'password': self.password,
             }
         loginbody = urlparse.urlencode(loginform)
-        rsp = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody)
-        self.wc.cookies['PVEAuthCookie'] = rsp[0]['data']['ticket']
+        rsp = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody, headers={'Content-Type': 'application/x-www-form-urlencoded'})
         self.pac = rsp[0]['data']['ticket']
+        self.wc.cookies.update_cookies({'PVEAuthCookie': self.pac})
         self.wc.set_header('CSRFPreventionToken', rsp[0]['data']['CSRFPreventionToken'])
         self.logged = True
 
@@ -408,7 +408,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
         elif element == ['boot', 'nextdevice']:
             yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
         elif element[:2] == ['inventory', 'hardware'] and len(element) == 4:
-            for rsp in await currclient.get_vm_inventory(node):
+            async for rsp in currclient.get_vm_inventory(node):
                 yield rsp
         elif element == ['console', 'ikvm_methods']:
             dsc = {'ikvm_methods': ['vnc']}
