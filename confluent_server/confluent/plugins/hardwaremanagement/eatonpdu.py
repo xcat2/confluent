@@ -18,7 +18,8 @@ import confluent.messages as msg
 import confluent.exceptions as exc
 import eventlet
 import eventlet.green.socket as socket
-wc = eventlet.import_patched('pyghmi.util.webclient')
+
+import aiohmi.util.webclient as wc
 import confluent.util as util
 import re
 import hashlib

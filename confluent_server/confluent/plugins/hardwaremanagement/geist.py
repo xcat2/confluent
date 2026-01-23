@@ -19,7 +19,7 @@ import confluent.exceptions as exc
 import eventlet.green.time as time
 import eventlet
 import eventlet.greenpool as greenpool
-wc = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as wc
 
 
 
@@ -54,10 +54,9 @@ class GeistClient(object):
         self._wc = None
         self.username = None
 
-    @property
-    def token(self):
+    async def token(self):
         if not self._token:
-            self._token = self.login(self.configmanager)
+            self._token = await self.login(self.configmanager)
         return self._token
 
     @property
@@ -75,10 +74,10 @@ class GeistClient(object):
         cv = util.TLSCertVerifier(
             self.configmanager, self.node, 'pubkeys.tls_hardwaremanager'
         ).verify_cert
-        self._wc = wc.SecureHTTPConnection(target, port=443, verifycallback=cv)
+        self._wc = wc.WebConnection(target, port=443, verifycallback=cv)
         return self._wc
 
-    def login(self, configmanager):
+    async def login(self, configmanager):
         credcfg = configmanager.get_node_attributes(
             self.node,
             ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'],
@@ -95,7 +94,7 @@ class GeistClient(object):
         if not username or not passwd:
             raise Exception('Missing username or password')
         self.username = username
-        rsp = self.wc.grab_json_response(
+        rsp = await self.wc.grab_json_response(
             '/api/auth/{0}'.format(username),
             {'cmd': 'login', 'data': {'password': passwd}},
         )
@@ -103,16 +102,16 @@ class GeistClient(object):
         token = rsp['data']['token']
         return token
 
-    def logout(self):
+    async def logout(self):
         if self._token:
-            self.wc.grab_json_response(
+            await self.wc.grab_json_response(
                 '/api/auth/{0}'.format(self.username),
-                {'cmd': 'logout', 'token': self.token},
+                {'cmd': 'logout', 'token': await self.token()},
             )
             self._token = None
 
-    def get_outlet(self, outlet):
-        rsp = self.wc.grab_json_response('/api/dev')
+    async def get_outlet(self, outlet):
+        rsp = await self.wc.grab_json_response('/api/dev')
         rsp = rsp['data']
         dbt = data_by_type(rsp)
 
@@ -126,22 +125,22 @@ class GeistClient(object):
         state = outlet['state'].split('2')[-1]
         return state
 
-    def set_outlet(self, outlet, state):
-        rsp = self.wc.grab_json_response('/api/dev')
+    async def set_outlet(self, outlet, state):
+        rsp = await self.wc.grab_json_response('/api/dev')
         dbt = data_by_type(rsp['data'])
         if 't3hd' in dbt:
             del dbt['t3hd']
         if len(dbt) != 1:
-            self.logout()
+            await self.logout()
             raise Exception('Multiple PDUs per endpoint not supported')
         pdu = dbt[list(dbt)[0]]['keyname']
         outlet = int(outlet) - 1
 
-        rsp = self.wc.grab_json_response(
+        rsp = await self.wc.grab_json_response(
             '/api/dev/{0}/outlet/{1}'.format(pdu, outlet),
             {
                 'cmd': 'control',
-                'token': self.token,
+                'token': await self.token(),
                 'data': {'action': state, 'delay': False},
             },
         )
@@ -210,7 +209,7 @@ def process_measurements(name, category, measurements, enttype, readings):
 _sensors_by_node = {}
 
 
-def read_sensors(element, node, configmanager):
+async def read_sensors(element, node, configmanager):
     category, name = element[-2:]
     justnames = False
     if len(element) == 3:
@@ -223,7 +222,7 @@ def read_sensors(element, node, configmanager):
     sn = _sensors_by_node.get(node, None)
     if not sn or sn[1] < time.time():
         gc = GeistClient(node, configmanager)
-        adev = gc.wc.grab_json_response('/api/dev')
+        adev = await gc.wc.grab_json_response('/api/dev')
         _sensors_by_node[node] = (adev, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
     dbt = data_by_type(sn[0]['data'])
@@ -242,25 +241,25 @@ def read_sensors(element, node, configmanager):
         yield msg.SensorReadings(readings, name=node)
 
 
-def get_outlet(element, node, configmanager):
+async def get_outlet(element, node, configmanager):
     gc = GeistClient(node, configmanager)
-    state = gc.get_outlet(element[-1])
+    state = await gc.get_outlet(element[-1])
 
     return msg.PowerState(node=node, state=state)
 
 
-def read_firmware(node, configmanager):
+async def read_firmware(node, configmanager):
     gc = GeistClient(node, configmanager)
-    adev = gc.wc.grab_json_response('/api/sys')
+    adev = await gc.wc.grab_json_response('/api/sys')
     myversion = adev['data']['version']
     yield msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
 
 
-def read_inventory(element, node, configmanager):
+async def read_inventory(element, node, configmanager):
     _inventory = {}
     inventory = {}
     gc = GeistClient(node, configmanager)
-    adev = gc.wc.grab_json_response('/api/sys')
+    adev = await gc.wc.grab_json_response('/api/sys')
     basedata = adev['data']
     inventory['present'] = True
     inventory['name'] = 'PDU'
@@ -303,7 +302,7 @@ def read_inventory(element, node, configmanager):
     yield msg.KeyValueData({'inventory': [inventory]}, node)
 
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
 
     if 'outlets' in element:
         gp = greenpool.GreenPile(pdupool)
@@ -343,7 +342,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         return
 
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
         yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
         return

@@ -5,7 +5,7 @@ block_cipher = None
 
 a = Analysis(['c:/Python27/Scripts/confluentsrv.py'],
              pathex=[],
-             hiddenimports=['pyghmi.constants', 'pyghmi.exceptions', 'pyghmi.ipmi.console', 'pyghmi.ipmi.private.constants', 'pyghmi.ipmi.private', 'pyghmi.ipmi.private.session', 'pyghmi.ipmi.command', 'pyghmi.ipmi.events', 'pyghmi.ipmi.fru', 'pyghmi.ipmi.private.spd', 'pyghmi.ipmi.oem.lookup', 'pyghmi.ipmi.oem.generic', 'pyghmi.ipmi.oem.lenovo', 'pyghmi.ipmi.private.util', 'pyghmi.ipmi.sdr'],
+             hiddenimports=[], # ['pyghmi.constants', 'pyghmi.exceptions', 'pyghmi.ipmi.console', 'pyghmi.ipmi.private.constants', 'pyghmi.ipmi.private', 'pyghmi.ipmi.private.session', 'pyghmi.ipmi.command', 'pyghmi.ipmi.events', 'pyghmi.ipmi.fru', 'pyghmi.ipmi.private.spd', 'pyghmi.ipmi.oem.lookup', 'pyghmi.ipmi.oem.generic', 'pyghmi.ipmi.oem.lenovo', 'pyghmi.ipmi.private.util', 'pyghmi.ipmi.sdr'],
              hookspath=None,
              runtime_hooks=None,
              excludes=None,

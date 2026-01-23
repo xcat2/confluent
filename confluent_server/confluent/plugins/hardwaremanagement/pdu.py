@@ -13,7 +13,7 @@
 # limitations under the License.
 import confluent.core as core
 import confluent.messages as msg
-import pyghmi.exceptions as pygexc
+import aiohmi.exceptions as pygexc
 import confluent.exceptions as exc
 import eventlet.greenpool as greenpool
 import eventlet.queue as queue

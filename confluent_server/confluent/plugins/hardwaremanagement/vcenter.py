@@ -3,9 +3,9 @@ import codecs
 import confluent.util as util
 import confluent.messages as msg
 import eventlet
-import json
 import struct
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+
+import aiohmi.util.webclient as webclient
 import eventlet.green.socket as socket
 import eventlet.green.ssl as ssl
 import eventlet
@@ -124,8 +124,8 @@ class VmwApiClient:
             self.password = self.password.decode()
         except Exception:
             pass
-        self.wc = webclient.SecureHTTPConnection(vcsa, port=443, verifycallback=cv)
-        self.login()
+        self.wc = webclient.Web(vcsa, port=443, verifycallback=cv)
+        self.logged = False
         self.vmlist = {}
         self.vmbyid = {}
 
@@ -136,8 +136,11 @@ class VmwApiClient:
         body = rsp.read().decode().replace('"', '')
         del self.wc.stdheaders['Authorization']
         self.wc.set_header('vmware-api-session-id', body)
+        self.logged = True
 
-    def get_screenshot(self, vm, outfile):
+    async def get_screenshot(self, vm, outfile):
+        if not self.logged:
+            await self.login()
         vm = self.index_vm(vm)
         url = f'/screen?id={vm}'
         wc = self.wc.dupe()
@@ -146,8 +149,10 @@ class VmwApiClient:
         fd.start()
         fd.join()
 
-    def list_vms(self):
-        rsp = self.wc.grab_json_response('/api/vcenter/vm')
+    async def list_vms(self):
+        if not self.logged:
+            await self.login()
+        rsp = await self.wc.grab_json_response('/api/vcenter/vm')
         self.vmlist = {}
         for vm in rsp:
             name = vm['name']
@@ -156,25 +161,27 @@ class VmwApiClient:
             self.vmbyid[vmid] = name
         return self.vmlist
 
-    def index_vm(self, vm):
+    async def index_vm(self, vm):
+        if not self.logged:
+            await self.login()
         if vm in self.vmlist:
             return self.vmlist[vm]
         if vm in self.vmbyid:
             return vm
-        self.list_vms()
+        await self.list_vms()
         if vm not in self.vmlist:
             if vm in self.vmbyid:
                 return vm
             raise Exception("VM not found")
         return self.vmlist[vm]
 
-    def get_vm(self, vm):
-        vm = self.index_vm(vm)
-        rsp = self.wc.grab_json_response(f'/api/vcenter/vm/{vm}')
+    async def get_vm(self, vm):
+        vm = await self.index_vm(vm)
+        rsp = await self.wc.grab_json_response(f'/api/vcenter/vm/{vm}')
         return rsp
 
-    def get_vm_inventory(self, vm):
-        rawinv = self.get_vm(vm)
+    async def get_vm_inventory(self, vm):
+        rawinv = await self.get_vm(vm)
         hwver = rawinv['hardware']['version']
         uuid = fixuuid(rawinv['identity']['bios_uuid'])
         serial = rawinv['identity']['instance_uuid']
@@ -206,23 +213,23 @@ class VmwApiClient:
 
 
 
-    def get_vm_host(self, vm):
+    async def get_vm_host(self, vm):
         # unfortunately, the REST api doesn't manifest this as a simple attribute,
-        vm = self.index_vm(vm)
-        rsp = self.wc.grab_json_response(f'/api/vcenter/host')
+        vm = await self.index_vm(vm)
+        rsp = await self.wc.grab_json_response(f'/api/vcenter/host')
         for hostinfo in rsp:
             host = hostinfo['host']
-            rsp = self.wc.grab_json_response(f'/api/vcenter/vm?hosts={host}')
+            rsp = await self.wc.grab_json_response(f'/api/vcenter/vm?hosts={host}')
             for guest in rsp:
                 if guest['vm'] == vm:
                     return hostinfo
 
-    def get_vm_serial(self, vm):
-        vm = self.index_vm(vm)
-        rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/serial')
+    async def get_vm_serial(self, vm):
+        vm = await self.index_vm(vm)
+        rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/serial')
         if rsp[1] == 200 and len(rsp[0]) > 0:
             portid = rsp[0][0]['port']
-            rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/serial/{portid}')
+            rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/serial/{portid}')
             if rsp[1] == 200:
                 if rsp[0]['backing']['type'] != 'NETWORK_SERVER':
                     return
@@ -231,7 +238,7 @@ class VmwApiClient:
                 tlsenabled = False
                 if netloc.startswith('telnets'):
                     tlsenabled = True
-                hostinfo = self.get_vm_host(vm)
+                hostinfo = await self.get_vm_host(vm)
                 hostname = hostinfo['name']
                 rsp[0]
                 return {
@@ -240,9 +247,9 @@ class VmwApiClient:
                     'tls': tlsenabled,
                     }
 
-    def get_vm_bootdev(self, vm):
-        vm = self.index_vm(vm)
-        rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot')
+    async def get_vm_bootdev(self, vm):
+        vm = await self.index_vm(vm)
+        rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot')
         if rsp[0]['enter_setup_mode']:
             return 'setup'
         rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot/device')
@@ -253,9 +260,9 @@ class VmwApiClient:
             pass
         return 'default'
 
-    def get_vm_power(self, vm):
-        vm = self.index_vm(vm)
-        rsp = self.wc.grab_json_response(f'/api/vcenter/vm/{vm}/power')
+    async def get_vm_power(self, vm):
+        vm = await self.index_vm(vm)
+        rsp = await self.wc.grab_json_response(f'/api/vcenter/vm/{vm}/power')
         if rsp['state'] == 'POWERED_ON':
             return 'on'
         if rsp['state'] == 'POWERED_OFF':
@@ -264,12 +271,12 @@ class VmwApiClient:
             return 'suspended'
         raise Exception("Unknown response {}".format(repr(rsp)))
 
-    def set_vm_power(self, vm, state):
+    async def set_vm_power(self, vm, state):
         current = None
         targstate = state
-        vm = self.index_vm(vm)
+        vm = await self.index_vm(vm)
         if state == 'boot':
-            current = self.get_vm_power(vm)
+            current = await self.get_vm_power(vm)
             if current == 'on':
                 state = 'reset'
                 targstate = state
@@ -280,12 +287,12 @@ class VmwApiClient:
             state = 'start'
         elif state == 'off':
             state = 'stop'
-        rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/power?action={state}', method='POST')
+        rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/power?action={state}', method='POST')
         return targstate, current
 
 
-    def set_vm_bootdev(self, vm, bootdev):
-        vm = self.index_vm(vm)
+    async def set_vm_bootdev(self, vm, bootdev):
+        vm = await self.index_vm(vm)
         self.wc.set_header('Content-Type', 'application/json')
         try:
             bootdevs = []
@@ -297,18 +304,18 @@ class VmwApiClient:
                 # However, vmware api counter to documentation seems to just ignore
                 # such a request. So instead we just go "disk first"
                 # and rely upon fast fail/retry to take us to a normal place
-                currdisks, rcode = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/disk')
+                currdisks, rcode = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/disk')
                 currdisks = [x['disk'] for x in currdisks]
                 bootdevs.append({'type': 'DISK', 'disks': currdisks})
             elif bootdev in ('net', 'network'):
-                currnics, rcode = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/ethernet')
+                currnics, rcode = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/ethernet')
                 for nic in currnics:
                     bootdevs.append({'type': 'ETHERNET', 'nic': nic['nic']})
             payload = {'devices': bootdevs}
-            rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot/device',
+            rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot/device',
                                                         payload,
                                                         method='PUT')
-            rsp = self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot',
+            rsp = await self.wc.grab_json_response_with_status(f'/api/vcenter/vm/{vm}/hardware/boot',
                                                         {'enter_setup_mode': entersetup},
                                                         method='PATCH')
         finally:
@@ -329,16 +336,16 @@ def prep_vcsa_clients(nodes, configmanager):
         clientsbynode[node] = clientsbyvcsa[currvcsa]
     return clientsbynode
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     clientsbynode = prep_vcsa_clients(nodes, configmanager)
     for node in nodes:
         currclient = clientsbynode[node]
         if element == ['power', 'state']:
-            yield msg.PowerState(node, currclient.get_vm_power(node))
+            yield msg.PowerState(node, await currclient.get_vm_power(node))
         elif element == ['boot', 'nextdevice']:
-            yield msg.BootDevice(node, currclient.get_vm_bootdev(node))
+            yield msg.BootDevice(node, await currclient.get_vm_bootdev(node))
         elif element[:2] == ['inventory', 'hardware'] and len(element) == 4:
-            for rsp in currclient.get_vm_inventory(node):
+            async for rsp in currclient.get_vm_inventory(node):
                 yield rsp
         elif element == ['console', 'ikvm_methods']:
             dsc = {'ikvm_methods': ['screenshot']}

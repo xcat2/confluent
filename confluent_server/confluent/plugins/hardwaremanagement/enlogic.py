@@ -18,7 +18,7 @@ import confluent.exceptions as exc
 import eventlet.green.time as time
 import eventlet
 import eventlet.greenpool as greenpool
-wc = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as wc
 
 
 
@@ -62,7 +62,7 @@ class EnlogicClient(object):
         cv = util.TLSCertVerifier(
             self.configmanager, self.node, 'pubkeys.tls_hardwaremanager'
         ).verify_cert
-        self._wc = wc.SecureHTTPConnection(target, port=443, verifycallback=cv)
+        self._wc = wc.WebConnection(target, port=443, verifycallback=cv)
         return self._wc
 
     def grab_json_response(self, url, body=None):
@@ -76,7 +76,7 @@ class EnlogicClient(object):
             return rsp
         return {}
 
-    def login(self, configmanager):
+    async def login(self, configmanager):
         credcfg = configmanager.get_node_attributes(
             self.node,
             ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'],
@@ -93,25 +93,25 @@ class EnlogicClient(object):
         if not username or not passwd:
             raise Exception('Missing username or password')
         self.username = username
-        rsp = self.wc.grab_json_response(
+        rsp = await self.wc.grab_json_response(
             '/xhrlogin.jsp',
             {'username':  username, 'password': passwd, 'cookie': 0}
         )
-        print(repr(rsp))
+        #print(repr(rsp))
         self.authtoken = rsp['cookie']
         self.wc.set_header('Authorization', self.authtoken)
         return self.authtoken
 
-    def logout(self):
+    async def logout(self):
         if self._token:
-            self.wc.grab_json_response(
+            await self.wc.grab_json_response(
                 '/xhrlogout.jsp',
                 {'timeout': 0, 'cookie': self._token},
             )
             self._token = None
 
-    def get_outlet(self, outlet):
-        rsp = self.grab_json_response(
+    async def get_outlet(self, outlet):
+        rsp = await self.grab_json_response(
             '/xhroutgetgrid.jsp', {
                 'cookie': self.token,
                 'pduid': 1
@@ -122,7 +122,7 @@ class EnlogicClient(object):
                 state = "on" if olet['powstat'] == 1 else "off"
                 return state
 
-    def set_outlet(self, outlet, state):
+    async def set_outlet(self, outlet, state):
         bitflags = 2**(int(outlet) - 1)
         outlet1 = bitflags & (2**24-1)
         outlet2 = bitflags >> 24
@@ -139,13 +139,13 @@ class EnlogicClient(object):
             'pduid': 1,
             'powstat': state
             }
-        rsp = self.grab_json_response('/xhroutpowstatset.jsp', request)
+        rsp = await self.grab_json_response('/xhroutpowstatset.jsp', request)
 
 
 _sensors_by_node = {}
 
 
-def read_sensors(element, node, configmanager):
+async def read_sensors(element, node, configmanager):
     category, name = element[-2:]
     justnames = False
     if len(element) == 3:
@@ -163,7 +163,7 @@ def read_sensors(element, node, configmanager):
     sn = _sensors_by_node.get(node, None)
     if not sn or sn[1] < time.time():
         gc = get_client(node, configmanager)
-        adev = gc.grab_json_response('/energy_get', {'cookie': gc.token, 'end': 1, 'start': 1})
+        adev = await gc.grab_json_response('/energy_get', {'cookie': gc.token, 'end': 1, 'start': 1})
         _sensors_by_node[node] = (adev, time.time() + 1)
         sn = _sensors_by_node.get(node, None)
     if sn:
@@ -196,24 +196,24 @@ def get_client(node, configmanager):
         _pduclients[node] = EnlogicClient(node, configmanager)
     return _pduclients[node]
 
-def get_outlet(element, node, configmanager):
+async def get_outlet(element, node, configmanager):
     gc = get_client(node, configmanager)
-    state = gc.get_outlet(element[-1])
+    state = await gc.get_outlet(element[-1])
     return msg.PowerState(node=node, state=state)
 
 
-def read_firmware(node, configmanager):
+async def read_firmware(node, configmanager):
     gc = get_client(node, configmanager)
-    adev = gc.grab_json_response('/xhrgetuserlist.jsp')
+    adev = await gc.grab_json_response('/xhrgetuserlist.jsp')
     myversion = adev[0]['fwver']
     yield msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
 
 
-def read_inventory(element, node, configmanager):
+async def read_inventory(element, node, configmanager):
     _inventory = {}
     inventory = {}
     gc = get_client(node, configmanager)
-    adev = gc.grab_json_response('/sys_info_get', {
+    adev = await gc.grab_json_response('/sys_info_get', {
         'cookie': gc.token, 'pduid': 1
         })
     inventory['present'] = True
@@ -225,7 +225,7 @@ def read_inventory(element, node, configmanager):
     inventory['information'] = info
     yield msg.KeyValueData({'inventory': [inventory]}, node)
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
 
     if 'outlets' in element:
         gp = greenpool.GreenPile(pdupool)
@@ -265,7 +265,7 @@ def retrieve(nodes, element, configmanager, inputdata):
         return
 
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
         for node in nodes:
             yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
@@ -273,7 +273,7 @@ def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         gc = get_client(node, configmanager)
         newstate = inputdata.powerstate(node)
-        gc.set_outlet(element[-1], newstate)
+        await gc.set_outlet(element[-1], newstate)
     eventlet.sleep(1)
-    for res in retrieve(nodes, element, configmanager, inputdata):
+    async for res in retrieve(nodes, element, configmanager, inputdata):
         yield res
