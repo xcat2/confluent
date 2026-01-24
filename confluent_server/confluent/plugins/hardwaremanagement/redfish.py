@@ -1613,30 +1613,30 @@ def _str_health(health):
 
 
 
-def create(nodes, element, configmanager, inputdata, realop='create'):
+async def create(nodes, element, configmanager, inputdata, realop='create'):
     return perform_requests(
         'update', nodes, element, configmanager, inputdata, realop)
 
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     return create(nodes, element, configmanager, inputdata, 'update')
 
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
-        return firmwaremanager.list_updates(nodes, configmanager.tenant,
+        return await firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element)
     elif '/'.join(element).startswith('media/uploads'):
-        return firmwaremanager.list_updates(nodes, configmanager.tenant,
+        return awaitfirmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'mediaupload')
     elif '/'.join(element).startswith('support/servicedata'):
-        return firmwaremanager.list_updates(nodes, configmanager.tenant,
+        return await firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'ffdc')
     else:
-        return perform_requests('read', nodes, element, configmanager,
+        return await perform_requests('read', nodes, element, configmanager,
                                 inputdata, 'read')
 
-def delete(nodes, element, configmanager, inputdata):
+async def delete(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
         return firmwaremanager.remove_updates(nodes, configmanager.tenant,
                                               element)
