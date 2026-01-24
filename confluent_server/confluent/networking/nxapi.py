@@ -89,40 +89,41 @@ class NxApiClient:
             self.password = self.password.decode()
         except Exception:
             pass
-        self.wc = webclient.SecureHTTPConnection(switch, port=443, verifycallback=cv)
-        self.login()
+        self.wc = webclient.WebConnection(switch, port=443, verifycallback=cv)
+        self.logged = False
 
-    def login(self):
+    async def login(self):
         payload = {'aaaUser':
                        {'attributes':
                             {'name': self.user,
                              'pwd': self.password}}}
-        rsp = self.wc.grab_json_response_with_status('/api/mo/aaaLogin.json', payload)
+        rsp = await self.wc.grab_json_response_with_status('/api/mo/aaaLogin.json', payload)
         if rsp[1] != 200:
             raise Exception("Failed authenticating")
         rsp = rsp[0]
         self.authtoken = rsp['imdata'][0]['aaaLogin']['attributes']['token']
         self.wc.cookies['Apic-Cookie'] = self.authtoken
+        self.logged = True
 
-    def get_firmware(self):
+    async def get_firmware(self):
         firmdata = {}
-        for imdata in self.grab_imdata('/api/mo/sys/showversion.json'):
+        async for imdata in self.grab_imdata('/api/mo/sys/showversion.json'):
             attrs = imdata['sysmgrShowVersion']['attributes']
             firmdata['NX-OS'] = {'version': attrs['nxosVersion'], 'date': attrs['nxosCompileTime']}
             firmdata['BIOS'] = {'version': attrs['biosVersion'], 'date': attrs['biosCompileTime']}
         return firmdata
 
-    def get_sensors(self):
+    async def get_sensors(self):
         sensedata = []
-        for imdata in self.grab_imdata('/api/mo/sys/ch.json?rsp-subtree=full'):
+        async for imdata in self.grab_imdata('/api/mo/sys/ch.json?rsp-subtree=full'):
             hwinfo = imdata['eqptCh']['children']
             for component in hwinfo:
                 add_sensedata(component, sensedata)
         return sensedata
 
-    def get_health(self):
+    async def get_health(self):
         healthdata = {'health': 'ok', 'sensors': []}
-        for sensor in self.get_sensors():
+        async for sensor in self.get_sensors():
             currhealth = sensor.get('health', 'ok')
             if currhealth != 'ok':
                 healthdata['sensors'].append(sensor)
@@ -132,9 +133,9 @@ class NxApiClient:
                     healthdata['health'] = 'warning'
         return healthdata
 
-    def get_inventory(self):
+    async def get_inventory(self):
         invdata = []
-        for imdata in self.grab_imdata('/api/mo/sys/ch.json?rsp-subtree=full'):
+        async for imdata in self.grab_imdata('/api/mo/sys/ch.json?rsp-subtree=full'):
             hwinfo = imdata['eqptCh']
             chattr = hwinfo['attributes']
             invinfo = {'name': 'System', 'present': True}
@@ -162,7 +163,9 @@ class NxApiClient:
                     invdata.append(invinfo)
         return invdata
 
-    def grab(self, url, cache=True, retry=True):
+    async def grab(self, url, cache=True, retry=True):
+        if not self.logged:
+            await self.login()
         if cache is True:
             cache = 1
         if cache:
@@ -178,14 +181,14 @@ class NxApiClient:
         self.cachedurls[url] = rsp[0], time.monotonic()
         return rsp[0]
 
-    def grab_imdata(self, url):
-        response = self.grab(url)
+    async def grab_imdata(self, url):
+        response = await self.grab(url)
         for imdata in response['imdata']:
             yield imdata
 
-    def get_mac_table(self):
+    async def get_mac_table(self):
         macdict = {}
-        for macinfo in self.grab_imdata('/api/mo/sys/mac/table.json?rsp-subtree=full'):
+        async for macinfo in self.grab_imdata('/api/mo/sys/mac/table.json?rsp-subtree=full'):
             mactable = macinfo['l2MacAddressTable']['children']
             for macent in mactable:
                 mace = macent['l2MacAddressEntry']['attributes']
@@ -197,9 +200,9 @@ class NxApiClient:
         return macdict
 
 
-    def get_lldp(self):
+    async def get_lldp(self):
         lldpbyport = {}
-        for lldpimdata in self.grab_imdata('/api/mo/sys/lldp/inst.json?rsp-subtree=full'):
+        async for lldpimdata in self.grab_imdata('/api/mo/sys/lldp/inst.json?rsp-subtree=full'):
             lldpdata = lldpimdata['lldpInst']['children']
             for lldpinfo in lldpdata:
                 if 'lldpIf' not in lldpinfo:

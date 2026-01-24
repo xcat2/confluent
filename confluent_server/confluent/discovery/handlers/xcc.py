@@ -701,7 +701,7 @@ def remote_nodecfg(nodename, cfm):
                          'address')
     info = {'addresses': [ipaddr]}
     ipaddr = ipaddr[0]
-    wc = webclient.SecureHTTPConnection(
+    wc = webclient.WebConnection(
                 ipaddr, 443, verifycallback=lambda x: True)
     rsp = wc.grab_json_response('/DeviceDescription.json')
     if isinstance(rsp, list):

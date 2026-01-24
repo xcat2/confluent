@@ -69,14 +69,14 @@ class WebResponse(httplib.HTTPResponse):
     def _check_close(self):
         return True
 
-class WebConnection(wc.SecureHTTPConnection):
+class WebConnection(wc.WebConnection):
     response_class = WebResponse
     def __init__(self, host, secure, verifycallback):
         if secure:
             port = 443
         else:
             port = 80
-        wc.SecureHTTPConnection.__init__(self, host, port, verifycallback=verifycallback)
+        wc.WebConnection.__init__(self, host, port, verifycallback=verifycallback)
         self.secure = secure
         self.cookies = {}
 

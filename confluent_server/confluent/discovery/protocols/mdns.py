@@ -28,6 +28,7 @@
 # NTS: ssdp:alive
 
 
+import asyncio
 import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.neighutil as neighutil
@@ -43,6 +44,7 @@ import os
 import time
 import struct
 import traceback
+import confluent.tasks as tasks
 
 import aiohmi.util.webclient as webclient
 
@@ -95,14 +97,14 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
         }
         if sdata.get('ttl', 0) == 0:
             if byehandler:
-                eventlet.spawn_n(check_fish_handler, byehandler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
+                tasks.spawn(check_fish_handler(byehandler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer))
             return 1
         if handler:
-            eventlet.spawn_n(check_fish_handler, handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer)
+            tasks.spawn(check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer))
         return 2
         
-def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer):
-    retdata = check_fish(('/redfish/v1/', peerdata))
+async def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress, machandlers, mac, peer):
+    retdata = await check_fish(('/redfish/v1/', peerdata))
     if retdata:
         known_peers.add(peer)
         newmacs.add(mac)
@@ -110,7 +112,7 @@ def check_fish_handler(handler, peerdata, known_peers, newmacs, peerbymacaddress
         machandlers[mac] = handler
 
 
-def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
+async def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     """Watch for unsolicited mDNS answers
 
     The handler shall be called on any service coming online.
@@ -132,7 +134,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
     net6.bind(('', 5353))
     net4.bind(('', 5353))
     try:
-        active_scan(handler, protocol)
+        await active_scan(handler, protocol)
     except Exception as e:
         tracelog.log(traceback.format_exc(), ltype=log.DataTypes.event,
                     event=log.Events.stacktrace)
@@ -181,7 +183,7 @@ def snoop(handler, byehandler=None, protocol=None, uuidlookup=None):
                 if r:
                     r = r[0]
             if deferrednotifies:
-                eventlet.sleep(2.2)
+                await asyncio.sleep(2.2)
             for peerrsp in deferrednotifies:
                 peer, rsp = peerrsp
                 mac = neighutil.get_hwaddr(peer[0])
@@ -213,7 +215,7 @@ def get_sockets():
     net4.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     return net4, net6
         
-def active_scan(handler, protocol=None):
+async def active_scan(handler, protocol=None):
     net4, net6 = get_sockets()
     for idx in util.list_interface_indexes():
         net6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF,
@@ -255,7 +257,7 @@ def active_scan(handler, protocol=None):
             timeout = 0
         r, _, _ = select.select((net4, net6), (), (), timeout)
     if deferparse:
-        eventlet.sleep(2.2)
+        await asyncio.sleep(2.2)
     for dp in deferparse:
         rsp, peer = dp
         _parse_mdns(peer, rsp, peerdata, '_obmc_console._tcp.local')
@@ -276,13 +278,13 @@ def active_scan(handler, protocol=None):
         if pi is not None:
             handler(pi)
 
-def check_fish(urldata, port=443, verifycallback=None):
+async def check_fish(urldata, port=443, verifycallback=None):
     if not verifycallback:
         verifycallback = lambda x: True
     url, data = urldata
     try:
-        wc = webclient.SecureHTTPConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)
-        peerinfo = wc.grab_json_response(url)
+        wc = webclient.WebConnection(_get_svrip(data), port, verifycallback=verifycallback, timeout=1.5)
+        peerinfo = await wc.grab_json_response(url)
     except socket.error:
         return None
     if url == '/DeviceDescription.json':

@@ -35,7 +35,7 @@ class NodeHandler(bmchandler.NodeHandler):
         return util.cert_matches(fprint, certificate)
 
     def get_webclient(self, user, passwd, newuser, newpass):
-        wc = webclient.SecureHTTPConnection(self.ipaddr, 443,
+        wc = webclient.WebConnection(self.ipaddr, 443,
                                             verifycallback=self.validate_cert)
         wc.connect()
         authdata = urlencode({'username': user, 'password': passwd,

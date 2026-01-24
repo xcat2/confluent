@@ -92,6 +92,7 @@ import shlex
 import struct
 import socket
 import socket as nsocket
+import aiohmi.util.webclient as webclient
 
 
 autosensors = set()
@@ -962,7 +963,7 @@ def get_enclosure_chain_head(nodename, cfg):
     return nodename
 
 
-def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
+async def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
     # nodename is the head of the chain, cfg is a configmanager, handler
     # is the handler of the current candidate, nl is optional indication
     # of the next link in the chain, checkswitch can disable the switch
@@ -998,7 +999,7 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
         if pkey:
             cv = util.TLSCertVerifier(
                 cfg, nodename, 'pubkeys.tls_hardwaremanager').verify_cert
-            for fprint in get_smm_neighbor_fingerprints(smmaddr, cv):
+            async for fprint in get_smm_neighbor_fingerprints(smmaddr, cv):
                 if util.cert_matches(fprint, mycert):
                     # a trusted chain member vouched for the cert
                     # so it's validated
@@ -1010,12 +1011,12 @@ def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True):
     return None, False
 
 
-def get_smm_neighbor_fingerprints(smmaddr, cv):
+async def get_smm_neighbor_fingerprints(smmaddr, cv):
     if ':' in smmaddr:
         smmaddr = '[{0}]'.format(smmaddr)
-    wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
+    wc = webclient.WebConnection(smmaddr, verifycallback=cv)
     try:
-        neighs = wc.grab_json_response('/scripts/neighdata.json')
+        neighs = await wc.grab_json_response('/scripts/neighdata.json')
     except Exception:
         log.log({'error': 'Failure getting LLDP information from {}'.format(smmaddr)})
         return
@@ -1196,7 +1197,7 @@ def get_nodename_from_enclosures(cfg, info):
     return nodename
 
 
-def search_smms_by_cert(currsmm, cert, cfg):
+async def search_smms_by_cert(currsmm, cert, cfg):
     neighs = []
     cv = util.TLSCertVerifier(
         cfg, currsmm, 'pubkeys.tls_hardwaremanager').verify_cert
@@ -1206,8 +1207,8 @@ def search_smms_by_cert(currsmm, cert, cfg):
         smmaddr = cd.get(currsmm, {}).get('hardwaremanagement.manager', {}).get('value', None)
         if not smmaddr:
             smmaddr = currsmm
-        wc = webclient.SecureHTTPConnection(smmaddr, verifycallback=cv)
-        neighs = wc.grab_json_response('/scripts/neighdata.json')
+        wc = webclient.WebConnection(smmaddr, verifycallback=cv)
+        neighs = await wc.grab_json_response('/scripts/neighdata.json')
     except Exception:
         return None
     for neigh in neighs:
@@ -1227,7 +1228,7 @@ def search_smms_by_cert(currsmm, cert, cfg):
                 return currsmm, bay, None
     exnl = list(cfg.filter_node_attributes('enclosure.extends=' + currsmm))
     if len(exnl) == 1:
-        return search_smms_by_cert(exnl[0], cert, cfg)
+        return await search_smms_by_cert(exnl[0], cert, cfg)
 
 
 async def eval_node(cfg, handler, info, nodename, manual=False):
@@ -1264,7 +1265,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         # The specified node is an enclosure (has nodes mapped to it), but
         # what we are talking to is *not* an enclosure
         # might be ambiguous, need to match chassis-uuid as well..
-        match = search_smms_by_cert(nodename, handler.https_cert, cfg)
+        match = await search_smms_by_cert(nodename, handler.https_cert, cfg)
         if match:
             info['verfied'] = True
             info['enclosure.bay'] = match[1]

@@ -140,7 +140,7 @@ class NodeHandler(bmchandler.NodeHandler):
 
     def _webconfigcreds(self, username, password):
         ip, port = self.get_web_port_and_ip()
-        wc = webclient.SecureHTTPConnection(ip, port, verifycallback=self._validate_cert)
+        wc = webclient.WebConnection(ip, port, verifycallback=self._validate_cert)
         wc.connect()
         authdata = {  # start by trying factory defaults
             'user': 'USERID',

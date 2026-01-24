@@ -87,14 +87,14 @@ class NodeHandler(generic.NodeHandler):
                         rpasschange = {
                             'Password': self.targpass,
                         }
-                        rwc =  webclient.SecureHTTPConnection(
+                        rwc =  webclient.WebConnection(
                             self.ipaddr, 443,
                             verifycallback=self.validate_cert)
                         rwc.set_basic_credentials(authdata['username'],
                                                      authdata['password'])
                         rwc.set_header('If-Match', '*')
                         rwc.set_header('Content-Type', 'application/json')
-                        rsp, status = rwc.grab_json_response_with_status(
+                        rsp, status = await rwc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/1',
                             rpasschange, method='PATCH')
                         if status >= 200 and status < 300:

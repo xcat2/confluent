@@ -69,7 +69,7 @@ class NodeHandler(object):
         if not self._ipaddr:
             return
         try:
-            wc = webclient.SecureHTTPConnection(self._ipaddr, verifycallback=self._savecert, port=443)
+            wc = webclient.WebConnection(self._ipaddr, verifycallback=self._savecert, port=443)
             wc.connect()
             wc.close()
             if not self._fp:
