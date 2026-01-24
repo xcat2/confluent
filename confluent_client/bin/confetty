@@ -670,8 +670,8 @@ def get_session_node(shellargs):
         args = [s for s in shellargs[1].split('/') if s]
         if len(args) == 4 and args[0] == 'nodes':
             if args[2] == 'console' and \
-                args[3] == 'session':
-            return shellargs[1], args[1]
+                    args[3] == 'session':
+                return shellargs[1], args[1]
         if len(args) == 5 and args[0] == 'nodes' and args[2] == 'shell' and \
                 args[3] == 'sessions':
             return shellargs[1], args[1]
