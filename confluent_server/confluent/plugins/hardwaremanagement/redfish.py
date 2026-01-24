@@ -1633,8 +1633,9 @@ async def retrieve(nodes, element, configmanager, inputdata):
         return await firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'ffdc')
     else:
-        return await perform_requests('read', nodes, element, configmanager,
-                                inputdata, 'read')
+        async for x in perform_requests('read', nodes, element, configmanager,
+                                inputdata, 'read'):
+            yield x
 
 async def delete(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
