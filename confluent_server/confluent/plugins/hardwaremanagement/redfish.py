@@ -1624,14 +1624,17 @@ async def update(nodes, element, configmanager, inputdata):
 
 async def retrieve(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
-        return await firmwaremanager.list_updates(nodes, configmanager.tenant,
-                                            element)
+        async for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
+                                            element):
+            yield x
     elif '/'.join(element).startswith('media/uploads'):
-        return awaitfirmwaremanager.list_updates(nodes, configmanager.tenant,
-                                            element, 'mediaupload')
+        async for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
+                                            element, 'mediaupload'):
+            yield x
     elif '/'.join(element).startswith('support/servicedata'):
-        return await firmwaremanager.list_updates(nodes, configmanager.tenant,
-                                            element, 'ffdc')
+        async for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
+                                            element, 'ffdc'):
+            yield x
     else:
         async for x in perform_requests('read', nodes, element, configmanager,
                                 inputdata, 'read'):
