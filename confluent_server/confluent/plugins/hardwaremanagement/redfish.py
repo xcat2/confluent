@@ -149,11 +149,11 @@ def sanitize_invdata(indata):
 class IpmiCommandWrapper(ipmicommand.Command):
     @classmethod
     async def create(cls, node, cfm, **kwargs):
-        self.confluentbmcname = kwargs['bmc']
         kv = util.TLSCertVerifier(
             cfm, node, 'pubkeys.tls_hardwaremanager').verify_cert
         kwargs['verifycallback'] = kv
         self = await super().create(**kwargs)
+        self.confluentbmcname = kwargs['bmc']
         self.cfm = cfm
         self.node = node
         self._inhealth = False
