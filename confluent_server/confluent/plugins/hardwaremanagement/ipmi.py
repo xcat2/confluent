@@ -593,7 +593,7 @@ class IpmiHandler(object):
         elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
             self.handle_update_status()
         elif self.element[0] == 'inventory':
-            await self.handle_inventory()
+            self.handle_inventory()
         elif self.element == ['media', 'attach']:
             self.handle_attach_media()
         elif self.element == ['media', 'detach']:
@@ -1011,7 +1011,7 @@ class IpmiHandler(object):
             status = self.ipmicmd.get_update_status()
             self.output.put(msg.KeyValueData({'status': status}, self.node))
 
-    async def handle_inventory(self):
+    def handle_inventory(self):
         if self.element[1] == 'firmware':
             if len(self.element) == 3:
                 return self.list_firmware()
@@ -1021,7 +1021,7 @@ class IpmiHandler(object):
             if len(self.element) == 3:  # list things in inventory
                 return self.list_inventory()
             elif len(self.element) == 4:  # actually read inventory data
-                return await self.read_inventory(self.element[-1])
+                return self.read_inventory(self.element[-1])
         raise Exception('Unsupported scenario...')
 
     def list_leds(self):
