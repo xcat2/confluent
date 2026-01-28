@@ -856,15 +856,15 @@ class IpmiHandler:
                 self.ipmicmd.user_delete(uid=user)
                 return
 
-    def do_eventlog(self):
+    async def do_eventlog(self):
         eventout = []
         clear = False
         if self.op == 'delete':
             clear = True
-        for event in self.ipmicmd.get_event_log(clear):
+        async for event in self.ipmicmd.get_event_log(clear):
             self.pyghmi_event_to_confluent(event)
             eventout.append(event)
-        self.output.put(msg.EventCollection(eventout, name=self.node))
+        await self.output.put(msg.EventCollection(eventout, name=self.node))
 
     def pyghmi_event_to_confluent(self, event):
         event['severity'] = _str_health(event.get('severity', 'unknown'))
@@ -887,89 +887,89 @@ class IpmiHandler:
             resourcename = sensor['name']
             self.ipmicmd.sensormap[simplify_name(resourcename)] = resourcename
 
-    def read_normalized(self, sensorname):
+    async def read_normalized(self, sensorname):
         readings = None
         if sensorname == 'average_cpu_temp':
-            cputemp = self.ipmicmd.get_average_processor_temperature()
+            cputemp = await self.ipmicmd.get_average_processor_temperature()
             readings = [cputemp]
         elif sensorname == 'inlet_temp':
-            inltemp = self.ipmicmd.get_inlet_temperature()
+            inltemp = await self.ipmicmd.get_inlet_temperature()
             readings = [inltemp]
         elif sensorname == 'total_power':
             sensor = EmptySensor('Total Power')
             sensor.states = []
             sensor.units = 'W'
-            sensor.value = self.ipmicmd.get_system_power_watts()
+            sensor.value = await self.ipmicmd.get_system_power_watts()
             readings = [sensor]
         if readings:
-            self.output.put(msg.SensorReadings(readings, name=self.node))
+            await self.output.put(msg.SensorReadings(readings, name=self.node))
 
-    def read_sensors(self, sensorname):
+    async def read_sensors(self, sensorname):
         if sensorname == 'all':
-            sensors = self.ipmicmd.get_sensor_descriptions()
+            sensors = await self.ipmicmd.get_sensor_descriptions()
             readings = []
             for sensor in filter(self.match_sensor, sensors):
                 try:
-                    reading = self.ipmicmd.get_sensor_reading(
+                    reading = await self.ipmicmd.get_sensor_reading(
                         sensor['name'])
                 except pygexc.IpmiException as ie:
                     if ie.ipmicode == 203:
-                        self.output.put(msg.SensorReadings([EmptySensor(
+                        await self.output.put(msg.SensorReadings([EmptySensor(
                             sensor['name'])], name=self.node))
                         continue
                     raise
                 if hasattr(reading, 'health'):
                     reading.health = _str_health(reading.health)
                 if hasattr(reading, 'unavailable') and reading.unavailable:
-                    self.output.put(msg.SensorReadings([EmptySensor(
+                    await self.output.put(msg.SensorReadings([EmptySensor(
                         reading.name)], name=self.node))
                     continue
                 readings.append(reading)
-            self.output.put(msg.SensorReadings(readings, name=self.node))
+            await self.output.put(msg.SensorReadings(readings, name=self.node))
         else:
             if sensorname not in self.ipmicmd.sensormap:
-                self.make_sensor_map()
+                await self.make_sensor_map()
             if sensorname not in self.ipmicmd.sensormap:
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentTargetNotFound(self.node,
                                                 'Sensor not found'))
                 return
             try:
-                reading = self.ipmicmd.get_sensor_reading(
+                reading = await self.ipmicmd.get_sensor_reading(
                     self.ipmicmd.sensormap[sensorname])
                 if hasattr(reading, 'health'):
                     reading.health = _str_health(reading.health)
                 if hasattr(reading, 'unavailable') and reading.unavailable:
-                    self.output.put(msg.SensorReadings([EmptySensor(
+                    await self.output.put(msg.SensorReadings([EmptySensor(
                         reading.name)], name=self.node))
                 else:
-                    self.output.put(
+                    await self.output.put(
                         msg.SensorReadings([reading],
                                            name=self.node))
             except pygexc.IpmiException as ie:
                 if ie.ipmicode == 203:
-                    self.output.put(msg.ConfluentResourceUnavailable(
+                    await self.output.put(msg.ConfluentResourceUnavailable(
                         self.node, 'Unavailable'
                     ))
                 else:
-                    self.output.put(msg.ConfluentTargetTimeout(self.node))
+                    await self.output.put(msg.ConfluentTargetTimeout(self.node))
 
-    def list_inventory(self):
+    async def list_inventory(self):
         try:
             components = self.ipmicmd.get_inventory_descriptions()
         except pygexc.IpmiException:
-            self.output.put(msg.ConfluentTargetTimeout(self.node))
+            await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return
-        self.output.put(msg.ChildCollection('all'))
+        await self.output.put(msg.ChildCollection('all'))
         for component in components:
-            self.output.put(msg.ChildCollection(simplify_name(component)))
+            await self.output.put(msg.ChildCollection(simplify_name(component)))
 
-    def list_firmware(self):
-        self.output.put(msg.ChildCollection('all'))
+    async def list_firmware(self):
+        await self.output.put(msg.ChildCollection('all'))
         for id, data in self.ipmicmd.get_firmware():
-            self.output.put(msg.ChildCollection(simplify_name(id)))
+            await self.output.put(msg.ChildCollection(simplify_name(id)))
 
-    def read_firmware(self, component, category):
+    async def read_firmware(self, component, category):
         items = []
         errorneeded = False
         try:
@@ -993,42 +993,42 @@ class IpmiHandler:
         except pygexc.TemporaryError as e:
                 errorneeded = msg.ConfluentNodeError(
                 self.node, str(e))
-        self.output.put(msg.Firmware(items, self.node))
+        await self.output.put(msg.Firmware(items, self.node))
         if errorneeded:
-            self.output.put(errorneeded)
+            await self.output.put(errorneeded)
 
-    def handle_update_status(self):
+    async def handle_update_status(self):
         activeupdates = list(firmwaremanager.list_updates([self.node], None, []))
         if activeupdates:
-            self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
+            await self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
         else:
             status = self.ipmicmd.get_update_status()
-            self.output.put(msg.KeyValueData({'status': status}, self.node))
+            await self.output.put(msg.KeyValueData({'status': status}, self.node))
 
     async def handle_inventory(self):
         if self.element[1] == 'firmware':
             if len(self.element) == 3:
-                return self.list_firmware()
+                return await self.list_firmware()
             elif len(self.element) == 4:
-                return self.read_firmware(self.element[-1], self.element[-2])
+                return await self.read_firmware(self.element[-1], self.element[-2])
         elif self.element[1] == 'hardware':
             if len(self.element) == 3:  # list things in inventory
-                return self.list_inventory()
+                return await self.list_inventory()
             elif len(self.element) == 4:  # actually read inventory data
                 return await self.read_inventory(self.element[-1])
         raise Exception('Unsupported scenario...')
 
-    def list_leds(self):
-        self.output.put(msg.ChildCollection('all'))
+    async def list_leds(self):
+        await self.output.put(msg.ChildCollection('all'))
         for category, info in self.ipmicmd.get_leds():
-            self.output.put(msg.ChildCollection(simplify_name(category)))
+            await self.output.put(msg.ChildCollection(simplify_name(category)))
 
-    def read_leds(self, component):
+    async def read_leds(self, component):
         led_categories = []
         for category, info in self.ipmicmd.get_leds():
             if component == 'all' or component == simplify_name(category):
                 led_categories.append({category: info})
-        self.output.put(msg.LEDStatus(led_categories, self.node))
+        await self.output.put(msg.LEDStatus(led_categories, self.node))
 
     async def read_inventory(self, component):
         errorneeded = False
@@ -1072,9 +1072,9 @@ class IpmiHandler:
                 'target certificate fingerprint and '
                 'pubkeys.tls_hardwaremanager attribute')
         newinvdata = {'inventory': invitems}
-        self.output.put(msg.KeyValueData(newinvdata, self.node))
+        await self.output.put(msg.KeyValueData(newinvdata, self.node))
         if errorneeded:
-            self.output.put(errorneeded)
+            await self.output.put(errorneeded)
 
     def add_invitem(self, invitems, newinf):
         if newinf.get('information', None) and 'name' in newinf['information']:
@@ -1123,13 +1123,13 @@ class IpmiHandler:
                     volsfound = True
                     volumes.append(vol)
         if not volsfound:
-            self.output.put(msg.ConfluentTargetNotFound(
+            await self.output.put(msg.ConfluentTargetNotFound(
                 self.node, "No volume named '{0}' found".format(volname)))
             return
         self.ipmicmd.remove_storage_configuration(toremove)
-        self.output.put(msg.DeletedResource(volname))
+        await self.output.put(msg.DeletedResource(volname))
 
-    def _create_storage(self, storelem):
+    async def _create_storage(self, storelem):
         if 'volumes' not in storelem:
             raise exc.InvalidArgumentException('Can only create volumes')
         vols = []
@@ -1171,22 +1171,22 @@ class IpmiHandler:
                     arrname = '{0}-{1}'.format(*arr.id)
                     for vol in arr.volumes:
                         if vol.name not in currnames:
-                            self.output.put(
+                            await self.output.put(
                                 msg.Volume(self.node, vol.name, vol.size,
                                            vol.status, arrname))
                 return
             else:
-                self._show_storage(storelem[:1] + [vol['name']])
+                await self._show_storage(storelem[:1] + [vol['name']])
 
-    def _update_storage(self, storelem):
+    async def _update_storage(self, storelem):
         if storelem[0] == 'disks':
             if len(storelem) == 1:
                 raise exc.InvalidArgumentException('Must target a disk')
             self.set_disk(storelem[-1],
                           self.inputdata.inputbynode[self.node])
-        self._show_storage(storelem)
+        await self._show_storage(storelem)
 
-    def _show_storage(self, storelem):
+    async def _show_storage(self, storelem):
         if storelem[0] == 'disks':
             if len(storelem) == 1:
                 return self.list_disks()
@@ -1203,23 +1203,23 @@ class IpmiHandler:
             return self._show_all_storage()
 
 
-    def handle_sensors(self):
+    async def handle_sensors(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if len(self.element) < 3:
             return
         self.sensorcategory = self.element[2]
         if self.sensorcategory == 'normalized':
-            return self.read_normalized(self.element[-1])
+            return await self.read_normalized(self.element[-1])
         # list sensors per category
         if len(self.element) == 3 and self.element[-2] == 'hardware':
             if self.sensorcategory == 'leds':
-                return self.list_leds()
-            return self.list_sensors()
+                return await self.list_leds()
+            return await self.list_sensors()
         elif len(self.element) == 4:  # resource requested
             if self.sensorcategory == 'leds':
-                return self.read_leds(self.element[-1])
-            return self.read_sensors(self.element[-1])
+                return await self.read_leds(self.element[-1])
+            return await self.read_sensors(self.element[-1])
 
     def match_sensor(self, sensor):
         if self.sensorcategory == 'all':
@@ -1228,30 +1228,30 @@ class IpmiHandler:
             return True
         return False
 
-    def set_disk(self, name, state):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def set_disk(self, name, state):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for disk in scfg.disks:
             if (name == 'all' or simplify_name(disk.name) == name or
                     disk == name):
                 disk.status = state
-        self.ipmicmd.apply_storage_configuration(
+        await self.ipmicmd.apply_storage_configuration(
             storage.ConfigSpec(disks=scfg.disks))
 
-    def _show_all_storage(self):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def _show_all_storage(self):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for disk in scfg.disks:
-            self.output.put(
+            await self.output.put(
                 msg.Disk(self.node, disk.name, disk.description,
                          disk.id, disk.status, disk.serial,
                          disk.fru))
         for arr in scfg.arrays:
             for disk in arr.disks:
-                self.output.put(
+                await self.output.put(
                     msg.Disk(self.node, disk.name, disk.description,
                              disk.id, disk.status, disk.serial,
                              disk.fru, array='{0}-{1}'.format(*arr.id)))
             for disk in arr.hotspares:
-                self.output.put(
+                await self.output.put(
                     msg.Disk(self.node, disk.name, disk.description,
                              disk.id, disk.status, disk.serial,
                              disk.fru, array='{0}-{1}'.format(*arr.id)))
@@ -1259,11 +1259,11 @@ class IpmiHandler:
             arrname = '{0}-{1}'.format(*arr.id)
             self._detail_array(arr, arrname, True)
 
-    def show_disk(self, name):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def show_disk(self, name):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for disk in scfg.disks:
             if simplify_name(disk.name) == name or disk == name:
-                self.output.put(
+                await self.output.put(
                     msg.Disk(self.node, disk.name, disk.description,
                                          disk.id, disk.status, disk.serial,
                                          disk.fru))
@@ -1272,41 +1272,41 @@ class IpmiHandler:
             for disk in arr.disks:
                 if (name == 'all' or simplify_name(disk.name) == name or
                         disk == name):
-                    self.output.put(
+                    await self.output.put(
                         msg.Disk(self.node, disk.name, disk.description,
                                  disk.id, disk.status, disk.serial,
                                  disk.fru, arrname))
             for disk in arr.hotspares:
                 if (name == 'all' or simplify_name(disk.name) == name or
                         disk == name):
-                    self.output.put(
+                    await self.output.put(
                         msg.Disk(self.node, disk.name, disk.description,
                                  disk.id, disk.status, disk.serial,
                                  disk.fru, arrname))
 
-    def list_disks(self):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def list_disks(self):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for disk in scfg.disks:
-            self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+            await self.output.put(msg.ChildCollection(simplify_name(disk.name)))
         for arr in scfg.arrays:
             for disk in arr.disks:
-                self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+                await self.output.put(msg.ChildCollection(simplify_name(disk.name)))
             for disk in arr.hotspares:
-                self.output.put(msg.ChildCollection(simplify_name(disk.name)))
+                await self.output.put(msg.ChildCollection(simplify_name(disk.name)))
 
-    def list_arrays(self):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def list_arrays(self):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for arr in scfg.arrays:
-            self.output.put(msg.ChildCollection('{0}-{1}'.format(*arr.id)))
+            await self.output.put(msg.ChildCollection('{0}-{1}'.format(*arr.id)))
 
-    def show_array(self, name):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def show_array(self, name):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for arr in scfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
             if arrname == name:
                 self._detail_array(arr, arrname)
 
-    def _detail_array(self, arr, arrname, detailvol=False):
+    async def _detail_array(self, arr, arrname, detailvol=False):
         vols = []
         for vol in arr.volumes:
             vols.append(simplify_name(vol.name))
@@ -1315,45 +1315,45 @@ class IpmiHandler:
             disks.append(simplify_name(disk.name))
         for disk in arr.hotspares:
             disks.append(simplify_name(disk.name))
-        self.output.put(msg.Array(self.node, disks, arr.raid,
+        await self.output.put(msg.Array(self.node, disks, arr.raid,
                                   vols, arrname, arr.capacity,
                                   arr.available_capacity))
         if detailvol:
             for vol in arr.volumes:
-                self.output.put(msg.Volume(self.node, vol.name, vol.size,
+                await self.output.put(msg.Volume(self.node, vol.name, vol.size,
                                            vol.status, arrname))
 
-    def show_volume(self, name):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def show_volume(self, name):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for arr in scfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
             for vol in arr.volumes:
                 if name == simplify_name(vol.name):
-                    self.output.put(msg.Volume(self.node, vol.name, vol.size,
+                    await self.output.put(msg.Volume(self.node, vol.name, vol.size,
                                                vol.status, arrname))
 
-    def list_volumes(self):
-        scfg = self.ipmicmd.get_storage_configuration()
+    async def list_volumes(self):
+        scfg = await self.ipmicmd.get_storage_configuration()
         for arr in scfg.arrays:
             for vol in arr.volumes:
-                self.output.put(msg.ChildCollection(simplify_name(vol.name)))
+                await self.output.put(msg.ChildCollection(simplify_name(vol.name)))
 
-    def list_sensors(self):
+    async def list_sensors(self):
         try:
-            sensors = self.ipmicmd.get_sensor_descriptions()
+            sensors = await self.ipmicmd.get_sensor_descriptions()
         except pygexc.IpmiException:
-            self.output.put(msg.ConfluentTargetTimeout(self.node))
+            await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return
-        self.output.put(msg.ChildCollection('all'))
+        await self.output.put(msg.ChildCollection('all'))
         for sensor in filter(self.match_sensor, sensors):
-            self.output.put(msg.ChildCollection(simplify_name(sensor['name'])))
+            await self.output.put(msg.ChildCollection(simplify_name(sensor['name'])))
 
     async def health(self):
         if 'read' == self.op:
             try:
                 response = await self.ipmicmd.get_health()
             except pygexc.IpmiException:
-                self.output.put(msg.ConfluentTargetTimeout(self.node))
+                await self.output.put(msg.ConfluentTargetTimeout(self.node))
                 return
             health = response['health']
             health = _str_health(health)
@@ -1368,17 +1368,17 @@ class IpmiHandler:
         else:
             raise exc.InvalidArgumentException('health is read-only')
 
-    def reseat_bay(self):
+    async def reseat_bay(self):
         bay = self.inputdata.inputbynode[self.node]
         try:
-            self.ipmicmd.reseat_bay(bay)
-            self.output.put(msg.ReseatResult(self.node, 'success'))
+            await self.ipmicmd.reseat_bay(bay)
+            await self.output.put(msg.ReseatResult(self.node, 'success'))
         except pygexc.UnsupportedFunctionality as uf:
-            self.output.put(uf)
+            await self.output.put(uf)
 
-    def bootdevice(self):
+    async def bootdevice(self):
         if 'read' == self.op:
-            bootdev = self.ipmicmd.get_bootdev()
+            bootdev = await self.ipmicmd.get_bootdev()
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
             bootmode = 'unspecified'
@@ -1390,7 +1390,7 @@ class IpmiHandler:
             persistent = False
             if 'persistent' in bootdev:
                 persistent = bootdev['persistent']
-            self.output.put(msg.BootDevice(node=self.node,
+            await self.output.put(msg.BootDevice(node=self.node,
                                            device=bootdev['bootdev'],
                                            bootmode=bootmode,
                                            persistent=persistent))
@@ -1405,20 +1405,20 @@ class IpmiHandler:
                                                persist=persistent)
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
-            self.output.put(msg.BootDevice(node=self.node,
+            await self.output.put(msg.BootDevice(node=self.node,
                                            device=bootdev['bootdev']))
 
-    def identify(self):
+    async def identify(self):
         if 'update' == self.op:
             identifystate = self.inputdata.inputbynode[self.node] == 'on'
             blinkstate = self.inputdata.inputbynode[self.node] == 'blink'
-            self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
-            self.output.put(msg.IdentifyState(
+            await self.ipmicmd.set_identify(on=identifystate, blink=blinkstate)
+            await self.output.put(msg.IdentifyState(
                 node=self.node, state=self.inputdata.inputbynode[self.node]))
             return
         elif 'read' == self.op:
             # ipmi has identify as read-only for now
-            self.output.put(msg.IdentifyState(node=self.node, state=''))
+            await self.output.put(msg.IdentifyState(node=self.node, state=''))
             return
 
     async def power(self):
@@ -1451,23 +1451,23 @@ class IpmiHandler:
                                oldstate=oldpower))
             return
 
-    def handle_reset(self):
+    async def handle_reset(self):
         if 'read' == self.op:
-            self.output.put(msg.BMCReset(node=self.node,
+            await self.output.put(msg.BMCReset(node=self.node,
                                          state='reset'))
             return
         elif 'update' == self.op:
-            self.ipmicmd.reset_bmc()
+            await self.ipmicmd.reset_bmc()
             return
 
-    def handle_identifier(self):
+    async def handle_identifier(self):
         if 'read' == self.op:
-            mci = self.ipmicmd.get_mci()
-            self.output.put(msg.MCI(self.node, mci))
+            mci = await self.ipmicmd.get_mci()
+            await self.output.put(msg.MCI(self.node, mci))
             return
         elif 'update' == self.op:
             mci = self.inputdata.mci(self.node)
-            self.ipmicmd.set_mci(mci)
+            await self.ipmicmd.set_mci(mci)
             return
 
     async def handle_hostname(self):
@@ -1480,42 +1480,42 @@ class IpmiHandler:
             await self.ipmicmd.set_hostname(hostname)
             return
 
-    def handle_domain_name(self):
+    async def handle_domain_name(self):
         if 'read' == self.op:
-            dn = self.ipmicmd.get_domain_name()
-            self.output.put(msg.DomainName(self.node, dn))
+            dn = await self.ipmicmd.get_domain_name()
+            await self.output.put(msg.DomainName(self.node, dn))
             return
         elif 'update' == self.op:
             dn = self.inputdata.domain_name(self.node)
-            self.ipmicmd.set_domain_name(dn)
+            await self.ipmicmd.set_domain_name(dn)
             return
 
-    def handle_bmcconfigclear(self):
+    async def handle_bmcconfigclear(self):
         if 'read' == self.op:
             raise exc.InvalidArgumentException(
                 'Cannot read the "clear" resource')
-        self.ipmicmd.clear_bmc_configuration()
+        await self.ipmicmd.clear_bmc_configuration()
 
-    def handle_sysconfigclear(self):
+    async def handle_sysconfigclear(self):
         if 'read' == self.op:
             raise exc.InvalidArgumentException(
                 'Cannot read the "clear" resource')
-        self.ipmicmd.clear_system_configuration()
+        await self.ipmicmd.clear_system_configuration()
 
-    def handle_bmcconfig(self, advanced=False, extended=False):
+    async def handle_bmcconfig(self, advanced=False, extended=False):
         if 'read' == self.op:
             try:
                 if extended:
-                    bmccfg = self.ipmicmd.get_extended_bmc_configuration(
+                    bmccfg = await self.ipmicmd.get_extended_bmc_configuration(
                         hideadvanced=(not advanced))
                 else:
-                    bmccfg = self.ipmicmd.get_bmc_configuration()
-                self.output.put(msg.ConfigSet(self.node, bmccfg))
+                    bmccfg = await self.ipmicmd.get_bmc_configuration()
+                await self.output.put(msg.ConfigSet(self.node, bmccfg))
             except Exception as e:
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
         elif 'update' == self.op:
-            self.ipmicmd.set_bmc_configuration(
+            await self.ipmicmd.set_bmc_configuration(
                 self.inputdata.get_attributes(self.node))
 
     async def handle_sysconfig(self, advanced=False):
@@ -1529,38 +1529,38 @@ class IpmiHandler:
                 await self.output.put(
                     msg.ConfluentNodeError(self.node, str(e)))
         elif 'update' == self.op:
-            self.ipmicmd.set_system_configuration(
+            await self.ipmicmd.set_system_configuration(
                 self.inputdata.get_attributes(self.node))
 
-    def handle_ntp(self):
+    async def handle_ntp(self):
         if self.element[3] == 'enabled':
             if 'read' == self.op:
-                enabled = self.ipmicmd.get_ntp_enabled()
-                self.output.put(msg.NTPEnabled(self.node, enabled))
+                enabled = await self.ipmicmd.get_ntp_enabled()
+                await self.output.put(msg.NTPEnabled(self.node, enabled))
                 return
             elif 'update' == self.op:
                 enabled = self.inputdata.ntp_enabled(self.node)
-                self.ipmicmd.set_ntp_enabled(enabled == 'True')
+                await self.ipmicmd.set_ntp_enabled(enabled == 'True')
                 return
         elif self.element[3] == 'servers':
             if len(self.element) == 4:
-                self.output.put(msg.ChildCollection('all'))
-                size = len(self.ipmicmd.get_ntp_servers())
+                await self.output.put(msg.ChildCollection('all'))
+                size = len(await self.ipmicmd.get_ntp_servers())
                 for idx in range(1, size + 1):
-                    self.output.put(msg.ChildCollection(idx))
+                    await self.output.put(msg.ChildCollection(idx))
             else:
                 if 'read' == self.op:
                     if self.element[-1] == 'all':
-                        servers = self.ipmicmd.get_ntp_servers()
-                        self.output.put(msg.NTPServers(self.node, servers))
+                        servers = await self.ipmicmd.get_ntp_servers()
+                        await self.output.put(msg.NTPServers(self.node, servers))
                         return
                     else:
                         idx = int(self.element[-1]) - 1
-                        servers = self.ipmicmd.get_ntp_servers()
+                        servers = await self.ipmicmd.get_ntp_servers()
                         if len(servers) > idx:
-                            self.output.put(msg.NTPServer(self.node, servers[idx]))
+                            await self.output.put(msg.NTPServer(self.node, servers[idx]))
                         else:
-                            self.output.put(
+                            await self.output.put(
                                 msg.ConfluentTargetNotFound(
                                     self.node, 'Requested NTP configuration not found'))
                         return
@@ -1568,21 +1568,21 @@ class IpmiHandler:
                     if self.element[-1] == 'all':
                         servers = self.inputdata.ntp_servers(self.node)
                         for idx in servers:
-                            self.ipmicmd.set_ntp_server(servers[idx],
+                            await self.ipmicmd.set_ntp_server(servers[idx],
                                                         int(idx[-1])-1)
                         return
                     else:
                         idx = int(self.element[-1]) - 1
                         server = self.inputdata.ntp_server(self.node)
-                        self.ipmicmd.set_ntp_server(server, idx)
+                        await self.ipmicmd.set_ntp_server(server, idx)
                         return
 
-    def handle_license(self):
-        available = self.ipmicmd.get_remote_kvm_available()
-        self.output.put(msg.License(self.node, available))
+    async def handle_license(self):
+        available = await self.ipmicmd.get_remote_kvm_available()
+        await self.output.put(msg.License(self.node, available))
         return
 
-    def save_licenses(self):
+    async def save_licenses(self):
         directory = self.inputdata.nodefile(self.node)
         checkdir = directory
         if not os.access(directory, os.W_OK):
@@ -1590,16 +1590,16 @@ class IpmiHandler:
                 'The confluent system user/group is unable to write to '
                 'directory {0}, check ownership and permissions'.format(
                     checkdir))
-        for saved in self.ipmicmd.save_licenses(directory):
+        async for saved in self.ipmicmd.save_licenses(directory):
             if self.current_user:
                 try:
                     pwent = pwd.getpwnam(self.current_user)
                     os.chown(saved, pwent.pw_uid, pwent.pw_gid)
                 except KeyError:
                     pass
-            self.output.put(msg.SavedFile(self.node, saved))
+            await self.output.put(msg.SavedFile(self.node, saved))
 
-    def handle_licenses(self):
+    async def handle_licenses(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if self.op in ('create', 'update'):
@@ -1613,7 +1613,7 @@ class IpmiHandler:
                            '(ensure confluent user or group can access file '
                            'and parent directories)').format(
                                filename, socket.gethostname())
-                self.output.put(msg.ConfluentNodeError(self.node, errstr))
+                await self.output.put(msg.ConfluentNodeError(self.node, errstr))
                 return
             try:
                 self.ipmicmd.apply_license(filename, data=datfile)
@@ -1621,10 +1621,10 @@ class IpmiHandler:
                 if datfile is not None:
                     datfile.close()
         if len(self.element) == 3:
-            self.output.put(msg.ChildCollection('all'))
+            await self.output.put(msg.ChildCollection('all'))
             i = 1
             for lic in self.ipmicmd.get_licenses():
-                self.output.put(msg.ChildCollection(str(i)))
+                await self.output.put(msg.ChildCollection(str(i)))
                 i += 1
             return
         licname = self.element[3]
@@ -1633,54 +1633,54 @@ class IpmiHandler:
                 if self.op == 'delete':
                     self.ipmicmd.delete_license(lic['name'])
                 else:
-                    self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
+                    await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
         else:
             index = int(licname)
             lic = list(self.ipmicmd.get_licenses())[index - 1]
             if self.op == 'delete':
                 self.ipmicmd.delete_license(lic['name'])
             else:
-                self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
+                await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
 
     async def handle_description(self):
         dsc = await self.ipmicmd.get_description()
         await self.output.put(msg.KeyValueData(dsc, self.node))
 
-    def handle_ikvm_methods(self):
-        dsc = self.ipmicmd.get_ikvm_methods()
+    async def handle_ikvm_methods(self):
+        dsc = await self.ipmicmd.get_ikvm_methods()
         dsc = {'ikvm_methods': dsc}
-        self.output.put(msg.KeyValueData(dsc, self.node))
-
-    def handle_ikvm_screenshot(self):
+        await self.output.put(msg.KeyValueData(dsc, self.node))
+    
+    async def handle_ikvm_screenshot(self):
         # good background for the webui, and kitty
         imgdata = RetainedIO()
-        imgformat = self.ipmicmd.get_screenshot(imgdata)
+        imgformat = await self.ipmicmd.get_screenshot(imgdata)
         imgdata = imgdata.getvalue()
         if imgdata:
-            self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
+            await self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
 
-    def handle_ikvm(self):
-        methods = self.ipmicmd.get_ikvm_methods()
+    async def handle_ikvm(self):
+        methods = await self.ipmicmd.get_ikvm_methods()
         if 'openbmc' in methods:
             url = vinzmanager.get_url(self.node, self.inputdata)
-            self.output.put(msg.ChildCollection(url))
+            await self.output.put(msg.ChildCollection(url))
             return
-        launchdata = self.ipmicmd.get_ikvm_launchdata()
+        launchdata = await self.ipmicmd.get_ikvm_launchdata()
         if 'url' in launchdata and not launchdata['url'].startswith('https://'):
             mybmc = self.ipmicmd.confluentbmcname
             if mybmc.startswith('fe80::'):  # link local, need to adjust
-                lancfg = self.ipmicmd.get_net_configuration()
+                lancfg = await self.ipmicmd.get_net_configuration()
                 mybmc = lancfg['ipv4_address'].split('/')[0]
             if ':' in mybmc and not '[' in mybmc:
                 mybmc = '[{}]'.format(mybmc)
             launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
-        self.output.put(msg.KeyValueData(launchdata, self.node))
+        await self.output.put(msg.KeyValueData(launchdata, self.node))
 
 
-    def handle_graphical_console(self):
-        args = self.ipmicmd.get_graphical_console()
+    async def handle_graphical_console(self):
+        args = await self.ipmicmd.get_graphical_console()
         m = msg.GraphicalConsole(self.node, *args)
-        self.output.put(m)
+        await self.output.put(m)
         return
 
 
