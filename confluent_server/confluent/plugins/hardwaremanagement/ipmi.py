@@ -243,6 +243,8 @@ async def _ipmi_evtloop():
             while _ipmiwaiters:
                 waiter = _ipmiwaiters.pop()
                 waiter.send()
+        except asyncio.CancelledError:
+            break
         except:  # TODO(jbjohnso): log the trace into the log
 
             traceback.print_exc()
