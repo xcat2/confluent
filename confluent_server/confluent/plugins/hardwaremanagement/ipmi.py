@@ -875,14 +875,14 @@ class IpmiHandler:
             event['id'] = '{0}.{1}'.format(event['event_id'],
                                            event['component_type_id'])
 
-    def make_inventory_map(self):
-        invnames = self.ipmicmd.get_inventory_descriptions()
+    async def make_inventory_map(self):
+        invnames = await self.ipmicmd.get_inventory_descriptions()
         for name in invnames:
             self.invmap[simplify_name(name)] = name
 
-    def make_sensor_map(self, sensors=None):
+    async def make_sensor_map(self, sensors=None):
         if sensors is None:
-            sensors = self.ipmicmd.get_sensor_descriptions()
+            sensors = await self.ipmicmd.get_sensor_descriptions()
         for sensor in sensors:
             resourcename = sensor['name']
             self.ipmicmd.sensormap[simplify_name(resourcename)] = resourcename
@@ -1030,12 +1030,12 @@ class IpmiHandler:
                 led_categories.append({category: info})
         self.output.put(msg.LEDStatus(led_categories, self.node))
 
-    def read_inventory(self, component):
+    async def read_inventory(self, component):
         errorneeded = False
         try:
             invitems = []
             if component == 'all':
-                for invdata in self.ipmicmd.get_inventory():
+                async for invdata in self.ipmicmd.get_inventory():
                     if invdata[1] is None:
                         newinf = {'present': False, 'information': None,
                                   'name': invdata[0]}
@@ -1046,12 +1046,12 @@ class IpmiHandler:
                         newinf['name'] = invdata[1].get('name', invdata[0])
                     self.add_invitem(invitems, newinf)
             else:
-                self.make_inventory_map()
+                await self.make_inventory_map()
                 compname = self.invmap.get(component, None)
                 if compname is None:
                     self.output.put(msg.ConfluentTargetNotFound())
                     return
-                invdata = self.ipmicmd.get_inventory_of_component(compname)
+                invdata = await self.ipmicmd.get_inventory_of_component(compname)
                 if invdata is None:
                     newinf = {'present': False, 'information': None,
                               'name': compname}
