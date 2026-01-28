@@ -1094,20 +1094,20 @@ class IpmiHandler:
                 newinf['name'] = dstr
         invitems.append(newinf)
 
-    def handle_storage(self):
+    async def handle_storage(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         storelem = self.element[2:]
         if 'read' == self.op:
-            return self._show_storage(storelem)
+            return await self._show_storage(storelem)
         elif 'update' == self.realop:
-            return self._update_storage(storelem)
+            return await self._update_storage(storelem)
         elif 'delete' == self.op:
-            return self._delete_storage(storelem)
+            return await self._delete_storage(storelem)
         elif 'create' == self.realop:
-            return self._create_storage(storelem)
+            return await self._create_storage(storelem)
 
-    def _delete_storage(self, storelem):
+    async def _delete_storage(self, storelem):
         if len(storelem) < 2:
             storelem.append('')
         if len(storelem) < 2 or storelem[0] != 'volumes':
@@ -1163,10 +1163,10 @@ class IpmiHandler:
             vols.append(storage.Volume(name=vol['name'], size=vol['size'], stripsize=vol['stripsize']))
         newcfg = storage.ConfigSpec(
             arrays=(storage.Array(raid=raidlvl, disks=disks, volumes=vols),))
-        self.ipmicmd.apply_storage_configuration(newcfg)
+        await self.ipmicmd.apply_storage_configuration(newcfg)
         for vol in self.inputdata.inputbynode[self.node]:
             if vol['name'] is None:
-                newcfg = self.ipmicmd.get_storage_configuration()
+                newcfg = await self.ipmicmd.get_storage_configuration()
                 for arr in newcfg.arrays:
                     arrname = '{0}-{1}'.format(*arr.id)
                     for vol in arr.volumes:
@@ -1182,25 +1182,25 @@ class IpmiHandler:
         if storelem[0] == 'disks':
             if len(storelem) == 1:
                 raise exc.InvalidArgumentException('Must target a disk')
-            self.set_disk(storelem[-1],
+            await self.set_disk(storelem[-1],
                           self.inputdata.inputbynode[self.node])
         await self._show_storage(storelem)
 
     async def _show_storage(self, storelem):
         if storelem[0] == 'disks':
             if len(storelem) == 1:
-                return self.list_disks()
-            return self.show_disk(storelem[1])
+                return await self.list_disks()
+            return await self.show_disk(storelem[1])
         elif storelem[0] == 'arrays':
             if len(storelem) == 1:
-                return self.list_arrays()
-            return self.show_array(storelem[1])
+                return await self.list_arrays()
+            return await self.show_array(storelem[1])
         elif storelem[0] == 'volumes':
             if len(storelem) == 1:
-                return self.list_volumes()
-            return self.show_volume(storelem[1])
+                return await self.list_volumes()
+            return await self.show_volume(storelem[1])
         elif storelem[0] == 'all':
-            return self._show_all_storage()
+            return await self._show_all_storage()
 
 
     async def handle_sensors(self):
