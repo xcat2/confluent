@@ -603,7 +603,7 @@ class IpmiHandler:
         elif self.element == ['events', 'hardware', 'decode']:
             self.decode_alert()
         elif self.element == ['console', 'license']:
-            self.handle_license()
+            await self.handle_license()
         elif self.element == ['console', 'graphical']:
             self.handle_graphical_console()
         elif self.element == ['support', 'servicedata']:
@@ -695,7 +695,7 @@ class IpmiHandler:
         elif self.element[1:3] == ['management_controller', 'clear']:
             return self.handle_bmcconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
-            return self.handle_licenses()
+            return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
             return self.save_licenses()
         raise Exception('Not implemented')
@@ -1625,13 +1625,13 @@ class IpmiHandler:
         if len(self.element) == 3:
             await self.output.put(msg.ChildCollection('all'))
             i = 1
-            for lic in self.ipmicmd.get_licenses():
+            async for lic in self.ipmicmd.get_licenses():
                 await self.output.put(msg.ChildCollection(str(i)))
                 i += 1
             return
         licname = self.element[3]
         if licname == 'all':
-            for lic in self.ipmicmd.get_licenses():
+            async for lic in self.ipmicmd.get_licenses():
                 if self.op == 'delete':
                     self.ipmicmd.delete_license(lic['name'])
                 else:
