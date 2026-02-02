@@ -491,7 +491,7 @@ def check_fish(urldata, port=443, verifycallback=None):
             data['services'] = ['lenovo-xcc'] if 'xcc-variant' not in peerinfo else ['lenovo-xcc' + peerinfo['xcc-variant']]
             return data
         except (IndexError, KeyError):
-            if 'type' in peerinfo and peerinfo['type'].lower() == 'lenovo-smm3':
+            if 'type' in peerinfo and peerinfo['type'].lower() in ('lenovo-smm3', 'smm3'):
                 del peerinfo['xcc-variant']
                 data['uuid'] = peerinfo['enclosure-uuid']
                 data['services'] = ['lenovo-smm3']
