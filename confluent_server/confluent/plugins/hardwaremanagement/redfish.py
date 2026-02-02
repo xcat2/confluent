@@ -545,9 +545,9 @@ class IpmiHandler:
         elif self.element[1:3] == ['management_controller', 'clear']:
             return self.handle_bmcconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
-            return self.handle_licenses()
+            return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
-            return self.save_licenses()
+            return await self.save_licenses()
         raise Exception('Not implemented')
 
     def decode_alert(self):
@@ -1504,23 +1504,23 @@ class IpmiHandler:
         self.output.put(msg.License(self.node, available))
         return
 
-    def save_licenses(self):
+    async def save_licenses(self):
         directory = self.inputdata.nodefile(self.node)
         if not os.access(directory, os.W_OK):
             raise exc.InvalidArgumentException(
                 'The confluent system user/group is unable to write to '
                 'directory {0}, check ownership and permissions'.format(
                     directory))
-        for saved in self.ipmicmd.save_licenses(directory):
+        async for saved in self.ipmicmd.save_licenses(directory):
             if self.current_user:
                 try:
                     pwent = pwd.getpwnam(self.current_user)
                     os.chown(saved, pwent.pw_uid, pwent.pw_gid)
                 except KeyError:
                     pass
-            self.output.put(msg.SavedFile(self.node, saved))
+            await self.output.put(msg.SavedFile(self.node, saved))
 
-    def handle_licenses(self):
+    async def handle_licenses(self):
         if self.element[-1] == '':
             self.element = self.element[:-1]
         if self.op in ('create', 'update'):
@@ -1544,24 +1544,27 @@ class IpmiHandler:
         if len(self.element) == 3:
             self.output.put(msg.ChildCollection('all'))
             i = 1
-            for lic in self.ipmicmd.get_licenses():
-                self.output.put(msg.ChildCollection(str(i)))
+            async for lic in self.ipmicmd.get_licenses():
+                await self.output.put(msg.ChildCollection(str(i)))
                 i += 1
             return
         licname = self.element[3]
         if licname == 'all':
-            for lic in self.ipmicmd.get_licenses():
+            async for lic in self.ipmicmd.get_licenses():
                 if self.op == 'delete':
-                    self.ipmicmd.delete_license(lic['name'])
+                    await self.ipmicmd.delete_license(lic['name'])
                 else:
-                    self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
+                    await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
         else:
             index = int(licname)
-            lic = list(self.ipmicmd.get_licenses())[index - 1]
+            async for lic in self.ipmicmd.get_licenses():
+                index -= 1
+                if index <= 0:
+                    break
             if self.op == 'delete':
-                self.ipmicmd.delete_license(lic['name'])
+                await self.ipmicmd.delete_license(lic['name'])
             else:
-                self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
+                await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
 
     def handle_description(self):
         dsc = self.ipmicmd.get_description()

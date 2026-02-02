@@ -697,7 +697,7 @@ class IpmiHandler:
         elif self.element[1:3] == ['management_controller', 'licenses']:
             return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
-            return self.save_licenses()
+            return await self.save_licenses()
         raise Exception('Not implemented')
 
     def decode_alert(self):
