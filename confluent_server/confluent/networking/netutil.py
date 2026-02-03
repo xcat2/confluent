@@ -39,6 +39,7 @@ def get_switchcreds(configmanager, switches):
         user = None
         password = switchparms.get(
             'secret.snmpcommunity', {}).get('value', None)
+        privacy_protocol = None
         if not password:
             password = switchparms.get(
                 'secret.hardwaremanagementpassword', {}).get('value',
