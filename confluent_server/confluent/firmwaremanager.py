@@ -21,7 +21,7 @@
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
-import eventlet
+import confluent.tasks as tasks
 import io
 import os
 import pwd
@@ -31,12 +31,12 @@ import traceback
 updatesbytarget = {}
 uploadsbytarget = {}
 downloadsbytarget = {}
-updatepool = eventlet.greenpool.GreenPool(256)
 _tracelog = None
 sharedfiles = {}
+updatepool = tasks.TaskPool(max_concurrent=256)
 
 
-def execupdate(handler, filename, updateobj, type, owner, node, datfile):
+async def execupdate(handler, filename, updateobj, type, owner, node, datfile):
     global _tracelog
     try:
         if type != 'ffdc' and not datfile:
@@ -66,10 +66,10 @@ def execupdate(handler, filename, updateobj, type, owner, node, datfile):
                 return
         try:
             if type == 'firmware':
-                completion = handler(filename, progress=updateobj.handle_progress,
+                completion = await handler(filename, progress=updateobj.handle_progress,
                                     data=datfile, bank=updateobj.bank)
             else:
-                completion = handler(filename, progress=updateobj.handle_progress,
+                completion = await handler(filename, progress=updateobj.handle_progress,
                                     data=datfile)
             if type == 'ffdc' and completion:
                 filename = completion
@@ -122,7 +122,7 @@ class Updater(object):
         else:
             datfile = None
         self.datfile = datfile
-        self.updateproc = updatepool.spawn(execupdate, handler, filename,
+        self.updateproc = updatepool.schedule(execupdate, handler, filename,
                                            self, type, owner, node, datfile)
         if type == 'firmware':
             myparty = updatesbytarget
@@ -145,7 +145,7 @@ class Updater(object):
         self.detail = progress.get('detail', '')
 
     def cancel(self):
-        self.updateproc.kill()
+        self.updateproc.cancel()
         if self.datfile:
             self.datfile.close()
 

@@ -450,7 +450,7 @@ class IpmiHandler:
         elif self.element == ['console', 'license']:
             self.handle_license()
         elif self.element == ['support', 'servicedata']:
-            self.handle_servicedata_fetch()
+            await self.handle_servicedata_fetch()
         elif self.element == ['description']:
             self.handle_description()
         elif self.element == ['console', 'ikvm_methods']:
@@ -483,12 +483,12 @@ class IpmiHandler:
         return self.ipmicmd.get_diagnostic_data(
             savefile, progress=progress, autosuffix=True)
 
-    def handle_servicedata_fetch(self):
+    async def handle_servicedata_fetch(self):
         u = firmwaremanager.Updater(
             self.node, self.get_diags,
             self.inputdata.nodefile(self.node), self.tenant, type='ffdc',
             owner=self.current_user)
-        self.output.put(msg.CreatedResource(
+        await self.output.put(msg.CreatedResource(
             'nodes/{0}/support/servicedata/{1}'.format(self.node, u.name)))
 
     async def handle_attach_media(self):

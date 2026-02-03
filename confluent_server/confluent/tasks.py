@@ -22,6 +22,58 @@ import random
 
 tsks = {}
 
+class TaskHolder:
+    def __init__(self, coro, args):
+        self._coro = coro
+        self._args = args
+        self._cancelled = False
+        self._task = None
+    
+    def cancel(self):
+        self._cancelled = True
+        if self._task:
+            self._task.cancel()
+    
+    def cancelled(self):
+        return self._cancelled
+    
+    async def run(self):
+        return await self._coro(*self._args)
+    
+    def assign_task(self, task):
+        self._task = task
+    
+
+
+class TaskPool:
+    def __init__(self, max_concurrent):
+        self.max_concurrent = max_concurrent
+        self._tasks = set()
+        self._pending = []
+
+    
+    def _done_callback(self, task):
+        self._tasks.discard(task)
+        while self._pending and len(self._tasks) < self.max_concurrent:
+            tholder = self._pending.pop(0)
+            if tholder.cancelled():
+                continue
+            currtask = spawn_task(tholder.run())
+            tholder.assign_task(currtask)
+            self._tasks.add(currtask)
+            currtask.add_done_callback(self._done_callback)
+
+
+    def schedule(self, coro_func, *args):
+        tholder = TaskHolder(coro_func, args)
+        if len(self._tasks) >= self.max_concurrent:
+            self._pending.append(tholder)
+            return tholder
+        currtask = spawn_task(tholder.run())
+        tholder.assign_task(currtask)
+        self._tasks.add(currtask)
+        currtask.add_done_callback(self._done_callback)
+        return tholder
 
 tasksitter = None
 logtrace = None
