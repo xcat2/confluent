@@ -1727,15 +1727,15 @@ def update(nodes, element, configmanager, inputdata):
 async def retrieve(nodes, element, configmanager, inputdata):
     initthread()
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
-        async for ret in firmwaremanager.list_updates(nodes, configmanager.tenant,
+        for ret in firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element):
             yield ret
     elif '/'.join(element).startswith('media/uploads'):
-        async for ret in firmwaremanager.list_updates(nodes, configmanager.tenant,
+        for ret in firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'mediaupload'):
             yield ret
     elif '/'.join(element).startswith('support/servicedata'):
-        async for ret in firmwaremanager.list_updates(nodes, configmanager.tenant,
+        for ret in firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'ffdc'):
             yield ret
     else:

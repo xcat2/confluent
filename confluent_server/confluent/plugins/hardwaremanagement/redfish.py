@@ -922,7 +922,7 @@ class IpmiHandler:
             await self.output.put(errorneeded)
 
     async def handle_update_status(self):
-        activeupdates = list(await firmwaremanager.list_updates([self.node], None, []))
+        activeupdates = list(firmwaremanager.list_updates([self.node], None, []))
         if activeupdates:
             await self.output.put(msg.KeyValueData({'status': 'active'}, self.node))
         else:
@@ -1627,15 +1627,15 @@ async def update(nodes, element, configmanager, inputdata):
 
 async def retrieve(nodes, element, configmanager, inputdata):
     if '/'.join(element).startswith('inventory/firmware/updates/active'):
-        async for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
+        for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element):
             yield x
     elif '/'.join(element).startswith('media/uploads'):
-        async for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
+        for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'mediaupload'):
             yield x
     elif '/'.join(element).startswith('support/servicedata'):
-        async for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
+        for x in firmwaremanager.list_updates(nodes, configmanager.tenant,
                                             element, 'ffdc'):
             yield x
     else:
