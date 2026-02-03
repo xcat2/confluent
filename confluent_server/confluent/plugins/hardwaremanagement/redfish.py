@@ -307,22 +307,22 @@ async def perform_request(operator, node, element,
         return await ih.handle_request()
     except socket.error as se:
         if hasattr(se, 'strerror'):
-            results.put(msg.ConfluentTargetTimeout(node, se.strerror))
+            await results.put(msg.ConfluentTargetTimeout(node, se.strerror))
         else:
-            results.put(msg.ConfluentTargetTimeout(node, str(se)))
+            await results.put(msg.ConfluentTargetTimeout(node, str(se)))
     except pygexc.IpmiException as ipmiexc:
         excmsg = str(ipmiexc)
         if excmsg in ('Session no longer connected', 'timeout'):
-            results.put(msg.ConfluentTargetTimeout(node))
+            await results.put(msg.ConfluentTargetTimeout(node))
         else:
-            results.put(msg.ConfluentNodeError(node, excmsg))
+            await results.put(msg.ConfluentNodeError(node, excmsg))
             raise
     except exc.TargetEndpointUnreachable as tu:
-        results.put(msg.ConfluentTargetTimeout(node, str(tu)))
+        await results.put(msg.ConfluentTargetTimeout(node, str(tu)))
     except exc.TargetEndpointBadCredentials:
-        results.put(msg.ConfluentTargetInvalidCredentials(node))
+        await results.put(msg.ConfluentTargetInvalidCredentials(node))
     except ssl.SSLEOFError:
-        results.put(msg.ConfluentNodeError(
+        await results.put(msg.ConfluentNodeError(
             node, 'Unable to communicate with the https server on '
                     'the target BMC'))
     except exc.PubkeyInvalid:
@@ -331,7 +331,7 @@ async def perform_request(operator, node, element,
             'Mismatch detected between target certificate fingerprint '
             'and pubkeys.tls_hardwaremanager attribute'))
     except (pygexc.InvalidParameterValue, pygexc.RedfishError) as e:
-        results.put(msg.ConfluentNodeError(node, str(e)))
+        await results.put(msg.ConfluentNodeError(node, str(e)))
     except Exception as e:
         await results.put(msg.ConfluentNodeError(node, 'Unexpected Error: {0}'.format(str(e))))
         traceback.print_exc()
