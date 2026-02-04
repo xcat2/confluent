@@ -1171,12 +1171,27 @@ async def serve(bind_host, bind_port):
     sock = None
     while not sock:
         try:
-            #TODO:asyncmerge: unix domain socket as path
-            sock = socket.socket(socket.AF_INET6)
+            bind_arg = None
+            if '/' in bind_host:
+                try:
+                    os.remove(bind_host)
+                except OSError:
+                    pass
+                sock = socket.socket(socket.AF_UNIX)
+                os.chmod(bind_host, 0o660)
+                bind_arg = bind_host
+            else:
+                bindinfo = socket.getaddrinfo(
+                    bind_host, bind_port, 0, socket.SOCK_STREAM)
+                if bindinfo[0][0] == socket.AF_INET:
+                    sock = socket.socket(socket.AF_INET)
+                elif bindinfo[0][0] == socket.AF_INET6:
+                    sock = socket.socket(socket.AF_INET6)
+                bind_arg = bindinfo[0][4]
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             sock.settimeout(0)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            sock.bind((bind_host, bind_port, 0, 0))
+            sock.bind(bind_arg)
             sock.listen(128)
         except socket.error as e:
             if e.errno != 98:
