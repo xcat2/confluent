@@ -133,7 +133,7 @@ def _recvmsg(loop, fut, sock, msglen, maxfds, rfd):
             msglen, socket.CMSG_LEN(maxfds * fds.itemsize))
     except (BlockingIOError, InterruptedError):
         fd = sock.fileno()
-        loop.add_reader(fd, _recvmsg, loop, fut, sock, fd)
+        loop.add_reader(fd, _recvmsg, loop, fut, sock, msglen, maxfds, fd)
     except Exception as exc:
         fut.set_exception(exc)
     else:
@@ -144,7 +144,7 @@ def _recvmsg(loop, fut, sock, msglen, maxfds, rfd):
                 fds.frombytes(
                     cmsg_data[
                         :len(cmsg_data) - (len(cmsg_data) % fds.itemsize)])
-        fut.set_result(msglen, list(fds))
+        fut.set_result((msg, list(fds)))
 
 
 def recv_fds(sock, msglen, maxfds):
