@@ -436,15 +436,15 @@ class IpmiHandler:
         elif self.element[0] == 'inventory':
             await self.handle_inventory()
         elif self.element == ['media', 'attach']:
-            self.handle_attach_media()
+            await self.handle_attach_media()
         elif self.element == ['media', 'detach']:
-            self.handle_detach_media()
+            await self.handle_detach_media()
         elif self.element == ['media', 'uploads']:
-            self.handle_media_upload()
+            await self.handle_media_upload()
         elif self.element == ['media', 'current']:
-            self.handle_list_media()
+            await self.handle_list_media()
         elif self.element == ['events', 'hardware', 'log']:
-            self.do_eventlog()
+            await self.do_eventlog()
         elif self.element == ['events', 'hardware', 'decode']:
             self.decode_alert()
         elif self.element == ['console', 'license']:
@@ -462,21 +462,21 @@ class IpmiHandler:
         else:
             raise Exception('Not Implemented')
 
-    def handle_update(self):
+    async def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
                                     self.inputdata.nodefile(self.node), self.tenant,
                                     bank=self.inputdata.bank,
                                     configmanager=self.cfm)
-        self.output.put(
+        await self.output.put(
             msg.CreatedResource(
                 'nodes/{0}/inventory/firmware/updates/active/{1}'.format(
                     self.node, u.name)))
 
-    def handle_media_upload(self):
+    async def handle_media_upload(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.upload_media,
                                      self.inputdata.nodefile(self.node), self.tenant,
                                      type='mediaupload', configmanager=self.cfm)
-        self.output.put(msg.CreatedResource(
+        await self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
     async def get_diags(self, savefile, progress, data=None):
@@ -496,14 +496,14 @@ class IpmiHandler:
             await self.ipmicmd.attach_remote_media(self.inputdata.nodefile(
                 self.node))
         except pygexc.UnsupportedFunctionality as uf:
-            self.output.put(msg.ConfluentNodeError(self.node, str(uf)))
+            await self.output.put(msg.ConfluentNodeError(self.node, str(uf)))
 
     async def handle_detach_media(self):
         await self.ipmicmd.detach_remote_media()
 
     async def handle_list_media(self):
         for media in self.ipmicmd.list_media():
-            self.output.put(msg.Media(self.node, media))
+            await self.output.put(msg.Media(self.node, media))
 
     async def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
