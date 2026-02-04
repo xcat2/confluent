@@ -479,8 +479,8 @@ class IpmiHandler:
         self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
-    def get_diags(self, savefile, progress, data=None):
-        return self.ipmicmd.get_diagnostic_data(
+    async def get_diags(self, savefile, progress, data=None):
+        return await self.ipmicmd.get_diagnostic_data(
             savefile, progress=progress, autosuffix=True)
 
     async def handle_servicedata_fetch(self):
