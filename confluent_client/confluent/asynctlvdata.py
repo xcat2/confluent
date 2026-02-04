@@ -306,7 +306,6 @@ async def recv(handle):
         msg.msg_control = ctypes.addressof(cmsg)
         msg.msg_controllen = ctypes.sizeof(cmsg)
         i = await recv_fds(handle, 2048, 4)
-        print(repr(i))
         data = i[0]
         filehandles = i[1]
         data = json.loads(bytes(data))

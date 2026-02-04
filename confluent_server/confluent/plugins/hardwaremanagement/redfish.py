@@ -502,7 +502,7 @@ class IpmiHandler:
         await self.ipmicmd.detach_remote_media()
 
     async def handle_list_media(self):
-        for media in self.ipmicmd.list_media():
+        async for media in self.ipmicmd.list_media():
             await self.output.put(msg.Media(self.node, media))
 
     async def handle_configuration(self):
