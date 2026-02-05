@@ -464,7 +464,7 @@ async def _find_service(service, target):
             continue
         else:
             for targurl in peerdata[nid]['urls']:
-                if '/eth' in targurl and targurl.endswith('.xml'):
+                if targurl and targurl.endswith('.xml'):
                     pooltargs.append(('/redfish/v1/', peerdata[nid], 'megarac-bmc'))
         # For now, don't interrogate generic redfish bmcs
         # This is due to a need to deduplicate from some supported SLP
