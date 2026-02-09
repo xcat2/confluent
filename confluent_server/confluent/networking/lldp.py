@@ -218,6 +218,7 @@ async def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc
         )
         portdata['peerid'] = peerid
         _extract_extended_desc(portdata, portdata['peerdescription'], True)
+        portdata['switch'] = switch
         _neighbypeerid[peerid] = portdata
         lldpdata[port] = portdata
     _neighdata[switch] = lldpdata
