@@ -1063,8 +1063,12 @@ def get_nodename_sysdisco(cfg, handler, info):
         return currnode
     else:
         baynum = info['bay']
-        nl = cfg.filter_node_attributes('enclosure.manager=' + currnode)
-        nl = list(cfg.filter_node_attributes('enclosure.bay={0}'.format(baynum), nl))
+        alphabaynum = '{}{}'.format((int(baynum) + 1) // 2, 'ab'[(int(baynum) - 1) % 2])
+        onl = cfg.filter_node_attributes('enclosure.manager=' + currnode)
+        nl = list(cfg.filter_node_attributes('enclosure.bay={}'.format(baynum), onl))
+        if len(nl) == 1:
+            return nl[0]
+        nl = list(cfg.filter_node_attributes('enclosure.bay={}'.format(alphabaynum), onl))
         if len(nl) == 1:
             return nl[0]
 
@@ -1186,14 +1190,21 @@ def get_nodename_from_enclosures(cfg, info):
         encl = nodes_by_uuid[cuuid]
         bay = info.get('enclosure.bay', None)
         if bay:
-            tnl = cfg.filter_node_attributes('enclosure.manager=' + encl)
+            otnl = cfg.filter_node_attributes('enclosure.manager=' + encl)
             tnl = list(
-                cfg.filter_node_attributes('enclosure.bay={0}'.format(bay),
-                                           tnl))
+                cfg.filter_node_attributes('enclosure.bay={}'.format(bay), otnl))
             if len(tnl) == 1:
                 # This is not a secure assurance, because it's by
                 # uuid instead of a key
                 nodename = tnl[0]
+            else:
+                alphabay = '{}{}'.format((int(bay) + 1) // 2, 'ab'[(int(bay) - 1) % 2])
+                tnl = list(
+                    cfg.filter_node_attributes('enclosure.bay={}'.format(alphabay), otnl))
+                if len(tnl) == 1:
+                    # Fallback alpha-bay mapping resolved to a single node
+                    nodename = tnl[0]
+
     return nodename
 
 
@@ -1219,10 +1230,15 @@ async def search_smms_by_cert(currsmm, cert, cfg):
             port = neigh.get('port', None)
             if port is not None:
                 bay = port + 1
-                nl = list(
+                onl = list(
                     cfg.filter_node_attributes('enclosure.manager=' + currsmm))
                 nl = list(
-                    cfg.filter_node_attributes('enclosure.bay={}'.format(bay), nl))
+                    cfg.filter_node_attributes('enclosure.bay={}'.format(bay), onl))
+                if len(nl) == 1:
+                    return currsmm, bay, nl[0]
+                alphabay = '{}{}'.format((bay + 1) // 2, 'ab'[(bay - 1) % 2])
+                nl = list(
+                    cfg.filter_node_attributes('enclosure.bay={}'.format(alphabay), onl))
                 if len(nl) == 1:
                     return currsmm, bay, nl[0]
                 return currsmm, bay, None
@@ -1315,8 +1331,15 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
                 return
         # search for nodes fitting our description using filters
         # lead with the most specific to have a small second pass
-        nl = list(cfg.filter_node_attributes(
-            'enclosure.bay={0}'.format(info['enclosure.bay']), nl))
+        baynum = info.get('enclosure.bay', None)
+        if baynum:
+            nnl = list(cfg.filter_node_attributes(
+                'enclosure.bay={}'.format(baynum), nl))
+            if len(nnl) == 0:
+                alphabaynum = '{}{}'.format((int(baynum) + 1) // 2, 'ab'[(int(baynum) - 1) % 2])
+                nnl = list(cfg.filter_node_attributes(
+                    'enclosure.bay={}'.format(alphabaynum), nl))
+            nl = nnl
         if len(nl) != 1:
             info['discofailure'] = 'ambigconfig'
             if len(nl):
@@ -1327,7 +1350,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
                 errorstr = 'The {0} in enclosure {1} bay {2} does not ' \
                            'seem to be a defined node ({3})'.format(
                                         handler.devname, nodename,
-                                        info['enclosure.bay'],
+                                        baynum,
                                         handler.ipaddr,
                                     )
             if manual:
