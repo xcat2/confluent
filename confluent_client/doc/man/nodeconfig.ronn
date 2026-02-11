@@ -49,8 +49,7 @@ actually be in effect until a reboot.
 
 * `-r COMPONENT`, `--restoredefault=COMPONENT`:
   Request that the specified component of the targeted nodes will have its
-  configuration reset to default.  Currently the only component implemented
-  is uefi.
+  configuration reset to default.  The component may be "uefi" or "bmc".
 
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
   Specify a maximum number of nodes to configure, prompting if over 

@@ -73,7 +73,7 @@ argparser.add_option('-r', '--restoredefault', default=False,
                      dest='restoredefault', metavar="COMPONENT",
                      help='Restore the configuration of the node '
                           'to factory default for given component. '
-                          'Currently only uefi is supported')
+                          'Currently "uefi" and "bmc" are supported components')
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='Specify a maximum number of '
                           'nodes to configure, '
