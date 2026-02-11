@@ -32,6 +32,13 @@ BMCs map a virtual USB device to that url.  Content is loaded on demand, and
 as such that URL is referenced potentially once for every IO operation that
 the host platform attempts.
 
+## NOTES
+
+When doing an attach of an https:// url, you may hit an error if you have not enrolled your certificate authority.
+In a general confluent environment, you can usually address it by:
+  `# for cert in /var/lib/confluent/public/site/tls/*.pem; do nodecertutil s1-s4 installbmccacert $cert; done`  
+  
+
 ## OPTIONS
 
 * `-h`, `--help`:
