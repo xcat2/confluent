@@ -84,13 +84,13 @@ def main():
                 healthexplanations[node] = []
                 for sensor in health[node]['sensors']:
                     explanation = sensor['name'] + ':'
-                    if sensor['value'] is not None:
+                    if sensor.get('value', None) is not None:
                         explanation += str(sensor['value'])
-                        if sensor['units'] is not None:
+                        if sensor.get('units', None) is not None:
                             explanation += sensor['units']
-                        if sensor['states']:
+                        if sensor.get('states', None):
                             explanation += ','
-                    if sensor['states']:
+                    if sensor.get('states', None):
                         explanation += ','.join(sensor['states'])
                     healthexplanations[node].append(explanation)
             if node in healthbynode and node in healthexplanations:

@@ -123,7 +123,7 @@ def sensorpass(showout=True, appendtime=False):
                 if 'sensors' not in reading[node]:
                     continue
                 for sensedata in reading[node]['sensors']:
-                    if sensedata['value'] is None and options.skipnumberless:
+                    if sensedata.get('value', None) is None and options.skipnumberless:
                         continue
                     for redundant_state in ('Non-Critical', 'Critical'):
                         try:
@@ -134,17 +134,17 @@ def sensorpass(showout=True, appendtime=False):
                     resultdata[node][sensedata['name']] = sensedata
                     sensorname = sensedata['name']
                     sensorheaders[sensorname] = sensorname
-                    if sensedata['units'] not in (None, u''):
+                    if sensedata.get('units', None) not in (None, u''):
                         sensorheaders[sensorname] += u' ({0})'.format(
                             sensedata['units'])
                     if showout:
-                        if sensedata['value'] is None:
+                        if sensedata.get('value', None) is None:
                             showval = ''
                         elif isinstance(sensedata['value'], float):
                             showval = u' {0} '.format(floatformat(sensedata['value']))
                         else:
-                            showval = u' {0} '.format(sensedata['value'])
-                        if sensedata['units'] not in (None, u''):
+                            showval = u' {0} '.format(sensedata.get('value', ''))
+                        if sensedata.get('units', None) not in (None, u''):
                             showval += sensedata['units']
                         if sensedata.get('health', 'ok') != 'ok':
                             datadescription = [sensedata['health']]
