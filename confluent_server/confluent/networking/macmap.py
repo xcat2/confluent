@@ -55,6 +55,7 @@ import confluent.log as log
 import confluent.messages as msg
 import confluent.noderange as noderange
 import confluent.networking.nxapi as nxapi
+import confluent.networking.srlinux as srlinux
 import confluent.util as util
 from eventlet.greenpool import GreenPool
 import eventlet.green.subprocess as subprocess
@@ -162,7 +163,15 @@ def _fast_map_switch(args):
         return _affluent_map_switch(switch, password, user, cfgm, macdata)
     elif backend == 'nxapi':
         return _nxapi_map_switch(switch, password, user, cfgm)
+    elif backend == 'srlinux':
+        return _srlinux_map_switch(switch, password, user, cfgm)
     raise Exception("No fast backend match")
+
+def _srlinux_map_switch(switch, password, user, cfgm):
+    cli = srlinux.SRLinuxClient(switch, user, password, cfgm)
+    mt = cli.get_mac_table()
+    _macsbyswitch[switch] = mt
+    _fast_backend_fixup(mt, switch)
 
 def _nxapi_map_switch(switch, password, user, cfgm):
         cli = nxapi.NxApiClient(switch, user, password, cfgm)
