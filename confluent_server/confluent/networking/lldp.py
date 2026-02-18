@@ -36,6 +36,7 @@ if __name__ == '__main__':
 import asyncio
 import base64
 import confluent.networking.nxapi as nxapi
+import confluent.networking.srlinux as srlinux
 import confluent.exceptions as exc
 import confluent.log as log
 import confluent.messages as msg
@@ -190,6 +191,10 @@ async def detect_backend(switch, verifier):
             apicheck, retcode = await wc.grab_json_response_with_status('/api/')
             if retcode == 400 and apicheck.startswith(b'{"imdata":['):
                 _fastbackends[switch] = 'nxapi'
+            else:
+                rsp = wc.grab_json_response_with_status('/jsonrpc', {'dummy': 'data'}, returnheaders=True)
+                if rsp[1] == 401 and rsp[2].get('WWW-Authenticate', '').startswith('Basic realm="SRLinux"'):
+                    _fastbackends[switch] = 'srlinux'
         return _fastbackends.get(switch, None)
 
 async def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
@@ -204,6 +209,8 @@ async def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
         return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
     elif backend == 'nxapi':
         return await _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc)
+    elif backend == 'srlinux':
+        return _extract_neighbor_data_srlinux(switch, user, password, cfm, lldpdata, wc)
 
 
 
@@ -223,7 +230,24 @@ async def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc
         lldpdata[port] = portdata
     _neighdata[switch] = lldpdata
 
-async def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
+async def _extract_neighbor_data_srlinux(switch, user, password, cfm, lldpdata, wc):
+    cli = srlinux.SRLinuxClient(switch, user, password, cfm)
+    lldpinfo = cli.get_lldp()
+    for port in lldpinfo:
+        portdata = lldpinfo[port]
+        peerid = '{0}.{1}'.format(
+            portdata.get('peerchassisid', '').replace(':', '-').replace('/', '-'),
+            portdata.get('peerportid', '').replace(':', '-').replace('/', '-'),
+        )
+        portdata['peerid'] = peerid
+        _extract_extended_desc(portdata, portdata['peerdescription'], True)
+        portdata['switch'] = switch
+        _neighbypeerid[peerid] = portdata
+        lldpdata[port] = portdata
+    _neighdata[switch] = lldpdata
+
+
+def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     wc.set_basic_credentials(user, password)
     neighdata = await wc.grab_json_response('/affluent/lldp/all')
     chassisid = neighdata['chassis']['id']

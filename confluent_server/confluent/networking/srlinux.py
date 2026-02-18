@@ -191,14 +191,19 @@ class SRLinuxClient:
 
     def get_mac_table(self):
         macdict = {}
-        response = self._get_state('/network-instance')
+        response = self._get_state('/network-instance/bridge-table/mac-table/mac')
         for datum in response:
             for niname in datum:
                 for nin in datum[niname]:
-                    if nin.get('type', '').endswith('mac-vrf'):
-                        mactable = nin.get('bridge-table', {}).get('mac-table', {})
-                        #TODO: process mac table
-
+                    btable = nin.get('bridge-table', {})
+                    for btab in btable:
+                        macs = btable[btab].get('mac', [])
+                        for macent in macs:
+                            macaddr = macent.get('address', None)
+                            if macaddr:
+                                macport = macent.get('destination', None)
+                                if macport:
+                                    macdict.setdefault(macport, []).append(macaddr)
         return macdict
 
     def get_lldp(self):
@@ -207,7 +212,24 @@ class SRLinuxClient:
         response = self._get_state('/system/lldp/interface')
         for datum in response:
             for intfname in datum:
-                #TODO: actually process LLDP data
+                lldpallinfo = datum[intfname]
+                for lldpdatum in lldpallinfo:
+                    myportname = lldpdatum.get('name', None)
+                    for neighinfo in lldpdatum.get('neighbor', []):
+                        peerdesc = neighinfo.get('system-description', 'Unknown')
+                        peername = neighinfo.get('system-name', 'Unknown')
+                        peerchassisid = neighinfo.get('chassis-id', 'Unknown')
+                        peerportid = neighinfo.get('port-id', 'Unknown')
+                        lldpinfo = {
+                            'verified': True, # Data provided with authentication over TLS
+                            'peerdescription': peerdesc,
+                            'peername': peername,
+                            'peerchassisid': peerchassisid,
+                            'peerportid': peerportid,
+                            'portid': myportname,
+                            'port': myportname,
+                        }
+                        lldpbyport[myportname] = lldpinfo
         return lldpbyport
 
 
