@@ -206,11 +206,11 @@ async def _extract_neighbor_data_https(switch, user, password, cfm, lldpdata):
     wc =  webclient.WebConnection(
                 switch, 443, verifycallback=kv, timeout=5)
     if backend == 'affluent':
-        return _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
+        return await _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc)
     elif backend == 'nxapi':
         return await _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc)
     elif backend == 'srlinux':
-        return _extract_neighbor_data_srlinux(switch, user, password, cfm, lldpdata, wc)
+        return await _extract_neighbor_data_srlinux(switch, user, password, cfm, lldpdata, wc)
 
 
 
@@ -232,7 +232,8 @@ async def _extract_neighbor_data_nxapi(switch, user, password, cfm, lldpdata, wc
 
 async def _extract_neighbor_data_srlinux(switch, user, password, cfm, lldpdata, wc):
     cli = srlinux.SRLinuxClient(switch, user, password, cfm)
-    lldpinfo = cli.get_lldp()
+    await cli.login()
+    lldpinfo = await cli.get_lldp()
     for port in lldpinfo:
         portdata = lldpinfo[port]
         peerid = '{0}.{1}'.format(

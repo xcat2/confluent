@@ -160,17 +160,19 @@ async def _fast_map_switch(args):
     elif backend == 'nxapi':
         return await _nxapi_map_switch(switch, password, user, cfgm)
     elif backend == 'srlinux':
-        return _srlinux_map_switch(switch, password, user, cfgm)
+        return await _srlinux_map_switch(switch, password, user, cfgm)
     raise Exception("No fast backend match")
 
 async def _srlinux_map_switch(switch, password, user, cfgm):
     cli = srlinux.SRLinuxClient(switch, user, password, cfgm)
+    await cli.login()
     mt = await cli.get_mac_table()
     _macsbyswitch[switch] = mt
     _fast_backend_fixup(mt, switch)
 
 async def _nxapi_map_switch(switch, password, user, cfgm):
         cli = nxapi.NxApiClient(switch, user, password, cfgm)
+        await cli.login()
         mt = await cli.get_mac_table()
         _macsbyswitch[switch] = mt
         _fast_backend_fixup(mt, switch)
@@ -738,20 +740,21 @@ async def rescan(cfg):
     async for _ in update_macmap(cfg):
         pass
 
-async def get_stdin_reader(cloop):
+async def get_stdin_reader():
+    cloop = asyncio.get_event_loop()
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)
     await cloop.connect_read_pipe(lambda: protocol, sys.stdin)
     return reader
 
-async def offloader_main(cloop):
+async def offloader_main():
     try:
         upacker = msgpack.Unpacker(encoding='utf8')
     except TypeError:
         upacker = msgpack.Unpacker(raw=False, strict_map_key=False)
     #currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     #fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
-    sreader = await get_stdin_reader(cloop)
+    sreader = await get_stdin_reader()
     while True:
         data = await sreader.read(512)
         upacker.feed(data)
@@ -759,7 +762,7 @@ async def offloader_main(cloop):
             tasks.spawn(_snmp_map_switch_relay(*cmd))
     sys.exit(0)
 
-async def test_main(cloop):
+async def test_main():
     cg = cfm.ConfigManager(None)
     async for res in update_macmap(cg):
         print("map has updated")
@@ -775,8 +778,7 @@ async def test_main(cloop):
         print(repr(_macsbyswitch))
 
 if __name__ == '__main__':
-    cloop = asyncio.get_event_loop()
     if len(sys.argv) > 1 and sys.argv[1] == '-o':
-        cloop.run_until_complete(offloader_main(cloop))
+        asyncio.run(offloader_main())
         sys.exit(0)
-    cloop.run_until_complete(test_main(cloop))
+    asyncio.run(test_main())

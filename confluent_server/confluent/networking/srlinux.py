@@ -1,3 +1,4 @@
+import asyncio
 import confluent.util as util
 import aiohmi.util.webclient as webclient
 
@@ -23,16 +24,15 @@ class SRLinuxClient:
         self.wc = webclient.SecureHTTPConnection(switch, port=443, verifycallback=cv)
         self.wc.set_basic_credentials(self.user, self.password)
         self.rpc_id = 1
-        self.login()
 
-    def login(self):
+    async def login(self):
         # Just a quick query to validate that credentials are correct and device is reachable and TLS works out however it is supposed to
-        self._get_state('/system/information')
+        await self._get_state('/system/information')
 
         
         
 
-    def _rpc_call(self, method, params=None):
+    async def _rpc_call(self, method, params=None):
         """Make a JSON-RPC call to SR-Linux"""
         payload = {
             'jsonrpc': '2.0',
@@ -44,7 +44,7 @@ class SRLinuxClient:
         
         self.rpc_id += 1
         
-        rsp = self.wc.grab_json_response_with_status('/jsonrpc', payload)
+        rsp = await self.wc.grab_json_response_with_status('/jsonrpc', payload)
         if rsp[1] != 200:
             raise Exception(f"Failed RPC call: {method}, status: {rsp[1]}")
         
@@ -54,7 +54,7 @@ class SRLinuxClient:
         
         return result.get('result', {})
 
-    def _get_state(self, path, datastore='state'):
+    async def _get_state(self, path, datastore='state'):
         """Get state data from SR-Linux using JSON-RPC get method"""
         params = {
             'commands': [
@@ -64,13 +64,13 @@ class SRLinuxClient:
                 }
             ]
         }
-        result = self._rpc_call('get', params)
+        result = await self._rpc_call('get', params)
         return result
 
-    def get_firmware(self):
+    async def get_firmware(self):
         """Get firmware/software version information"""
         firmdata = {}
-        result = self._get_state('/system/information')
+        result = await self._get_state('/system/information')
         for item in result:
             if 'version' in item:
                 firmdata['SR-Linux'] = {'version': item['version']}
@@ -79,10 +79,10 @@ class SRLinuxClient:
                         firmdata['SR-Linux']['date'] = item['build-date']
         return firmdata
 
-    def get_sensors(self):
+    async def get_sensors(self):
         """Get sensor readings from the device"""
         sensedata = []
-        result = self._get_state('/platform/control/temperature')
+        result = await self._get_state('/platform/control/temperature')
         for item in result:
             for pcc in item:
                 currreading = {}
@@ -100,7 +100,7 @@ class SRLinuxClient:
                     currreading['units'] = '°C'
                     sensedata.append(currreading)
 
-        result = self._get_state('/platform/fan-tray')
+        result = await self._get_state('/platform/fan-tray')
         for item in result:
             for pft in item:
                 currreading = {}
@@ -118,7 +118,7 @@ class SRLinuxClient:
                     currreading['units'] = '%'
                     sensedata.append(currreading)
 
-        result = self._get_state('/platform/power-supply')
+        result = await self._get_state('/platform/power-supply')
         for item in result:
             for pps in item:
                 for reading in item[pps]:
@@ -153,9 +153,9 @@ class SRLinuxClient:
 
 
 
-    def get_health(self):
+    async def get_health(self):
         healthdata = {'health': 'ok', 'sensors': []}
-        sensors = self.get_sensors()
+        sensors = await self.get_sensors()
         
         for sensor in sensors:
             currhealth = sensor.get('health', 'ok')
@@ -168,9 +168,9 @@ class SRLinuxClient:
         
         return healthdata
 
-    def get_inventory(self):
+    async def get_inventory(self):
         invdata = []        
-        results = self._get_state('/platform/chassis')
+        results = await self._get_state('/platform/chassis')
         for result in results:
             invinfo = {'name': 'System', 'present': True}
             invinfo['information'] = {'Manufacturer': 'Nokia'}
@@ -188,9 +188,9 @@ class SRLinuxClient:
                 invdata.append(invinfo)
         return invdata
 
-    def get_mac_table(self):
+    async def get_mac_table(self):
         macdict = {}
-        response = self._get_state('/network-instance/bridge-table/mac-table/mac')
+        response = await self._get_state('/network-instance/bridge-table/mac-table/mac')
         for datum in response:
             for niname in datum:
                 for nin in datum[niname]:
@@ -205,10 +205,10 @@ class SRLinuxClient:
                                     macdict.setdefault(macport, []).append(macaddr)
         return macdict
 
-    def get_lldp(self):
+    async def get_lldp(self):
         lldpbyport = {}
         
-        response = self._get_state('/system/lldp/interface')
+        response = await self._get_state('/system/lldp/interface')
         for datum in response:
             for intfname in datum:
                 lldpallinfo = datum[intfname]
@@ -232,7 +232,7 @@ class SRLinuxClient:
         return lldpbyport
 
 
-if __name__ == '__main__':
+async def main():
     import sys
     import os
     from pprint import pprint
@@ -243,9 +243,13 @@ if __name__ == '__main__':
         sys.exit(1)
     
     srl = SRLinuxClient(sys.argv[1], myuser, mypass, None)
-    pprint(srl.get_firmware())
-    pprint(srl.get_inventory())
-    pprint(srl.get_sensors())
-    pprint(srl.get_health())
-    pprint(srl.get_lldp())
-    pprint(srl.get_mac_table())
+    await srl.login()
+    pprint(await srl.get_firmware())
+    pprint(await srl.get_inventory())
+    pprint(await srl.get_sensors())
+    pprint(await srl.get_health())
+    pprint(await srl.get_lldp())
+    pprint(await srl.get_mac_table())
+
+if __name__ == '__main__':
+    asyncio.run(main())
