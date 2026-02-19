@@ -21,7 +21,7 @@ class SRLinuxClient:
             self.password = self.password.decode()
         except Exception:
             pass
-        self.wc = webclient.SecureHTTPConnection(switch, port=443, verifycallback=cv)
+        self.wc = webclient.WebConnection(switch, port=443, verifycallback=cv)
         self.wc.set_basic_credentials(self.user, self.password)
         self.rpc_id = 1
 

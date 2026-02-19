@@ -73,7 +73,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
         if not user or not pwd:
             yield msg.ConfluentTargetInvalidCredentials(node)
             continue
-        workers.add(tasks.spawn(retrieve_node, node, element, user, pwd, configmanager, inputdata, results))
+        workers.add(tasks.spawn(retrieve_node(node, element, user, pwd, configmanager, inputdata, results)))
     while workers:
         try:
             datum = await asyncio.wait_for(results.get(), timeout=10.0)
