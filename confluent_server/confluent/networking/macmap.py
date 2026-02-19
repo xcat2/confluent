@@ -158,18 +158,18 @@ async def _fast_map_switch(args):
     if backend == 'affluent':
         return await _affluent_map_switch(switch, password, user, cfgm, macdata)
     elif backend == 'nxapi':
-        return _nxapi_map_switch(switch, password, user, cfgm)
+        return await _nxapi_map_switch(switch, password, user, cfgm)
     elif backend == 'srlinux':
         return _srlinux_map_switch(switch, password, user, cfgm)
     raise Exception("No fast backend match")
 
 async def _srlinux_map_switch(switch, password, user, cfgm):
     cli = srlinux.SRLinuxClient(switch, user, password, cfgm)
-    mt = cli.get_mac_table()
+    mt = await cli.get_mac_table()
     _macsbyswitch[switch] = mt
     _fast_backend_fixup(mt, switch)
 
-def _nxapi_map_switch(switch, password, user, cfgm):
+async def _nxapi_map_switch(switch, password, user, cfgm):
         cli = nxapi.NxApiClient(switch, user, password, cfgm)
         mt = await cli.get_mac_table()
         _macsbyswitch[switch] = mt

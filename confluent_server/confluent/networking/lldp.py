@@ -247,7 +247,7 @@ async def _extract_neighbor_data_srlinux(switch, user, password, cfm, lldpdata, 
     _neighdata[switch] = lldpdata
 
 
-def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
+async def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata, wc):
     wc.set_basic_credentials(user, password)
     neighdata = await wc.grab_json_response('/affluent/lldp/all')
     chassisid = neighdata['chassis']['id']
