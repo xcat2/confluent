@@ -22,36 +22,36 @@ async def retrieve_node_backend(node, element, user, pwd, configmanager, inputda
     cli = srlinux.SRLinuxClient(node, user, pwd, configmanager)
     await cli.login()
     if element == ['power', 'state']:  # client initted successfully, must be on
-        results.put(msg.PowerState(node, 'on'))
+        await results.put(msg.PowerState(node, 'on'))
     elif element == ['health', 'hardware']:
         hinfo = await cli.get_health()
-        results.put(msg.HealthSummary(hinfo.get('health', 'unknown'), name=node))
-        results.put(msg.SensorReadings(hinfo.get('sensors', []), name=node))
+        await results.put(msg.HealthSummary(hinfo.get('health', 'unknown'), name=node))
+        await results.put(msg.SensorReadings(hinfo.get('sensors', []), name=node))
     elif element[:3] == ['inventory', 'hardware', 'all']:
         if len(element) == 3:
-            results.put(msg.ChildCollection('all'))
+            await results.put(msg.ChildCollection('all'))
             return
         invinfo = await cli.get_inventory()
         if invinfo:
-            results.put(msg.KeyValueData({'inventory': invinfo}, node))
+            await results.put(msg.KeyValueData({'inventory': invinfo}, node))
     elif element[:3] == ['inventory', 'firmware', 'all']:
         if len(element) == 3:
-            results.put(msg.ChildCollection('all'))
+            await results.put(msg.ChildCollection('all'))
             return
         fwinfo = []
         for fwnam, fwdat in (await cli.get_firmware()).items():
             fwinfo.append({fwnam: fwdat})
         if fwinfo:
-            results.put(msg.Firmware(fwinfo, node))
+            await results.put(msg.Firmware(fwinfo, node))
     elif element == ['sensors', 'hardware', 'all']:
         sensors = await cli.get_sensors()
         for sensor in sensors:
-            results.put(msg.ChildCollection(simplify_name(sensor['name'])))
+            await results.put(msg.ChildCollection(simplify_name(sensor['name'])))
     elif element[:3] == ['sensors', 'hardware', 'all']:
         sensors = await cli.get_sensors()
         for sensor in sensors:
             if element[-1] == 'all' or simplify_name(sensor['name']) == element[-1]:
-                results.put(msg.SensorReadings([sensor], node))
+                await results.put(msg.SensorReadings([sensor], node))
     else:
         print(repr(element))
 
