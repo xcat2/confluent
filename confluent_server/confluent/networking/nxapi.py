@@ -1,7 +1,6 @@
 
 import confluent.util as util
 import time
-import eventlet
 import aiohmi.util.webclient as webclient
 
 

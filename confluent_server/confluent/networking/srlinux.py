@@ -1,6 +1,5 @@
 import confluent.util as util
-import eventlet
-webclient = eventlet.import_patched('pyghmi.util.webclient')
+import aiohmi.util.webclient as webclient
 
 
 
