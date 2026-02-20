@@ -363,7 +363,8 @@ async def update_switch_data(switch, configmanager, force=False, retexc=False):
 
 
 async def update_neighbors(configmanager, force=False, retexc=False):
-    return await _update_neighbors_backend(configmanager, force, retexc)
+    async for ans in _update_neighbors_backend(configmanager, force, retexc):
+        yield ans
 
 
 async def _update_neighbors_backend(configmanager, force, retexc):
@@ -463,14 +464,14 @@ def list_info(parms, requestedparameter):
                     results.add(_api_sanitize_string(candidate))
     return [msg.ChildCollection(x + suffix) for x in util.natural_sort(results)]
 
-def _handle_neighbor_query(pathcomponents, configmanager):
+async def _handle_neighbor_query(pathcomponents, configmanager):
     choices, parms, listrequested, childcoll = _parameterize_path(
         pathcomponents)
     if not childcoll:  # this means it's a single entry with by-peerid
         # guaranteed
         if (parms['by-peerid'] not in _neighbypeerid and
                 _neighbypeerid.get('!!vintage', 0) < util.monotonic_time() - 60):
-            for x in update_neighbors(configmanager, retexc=True):
+            async for x in update_neighbors(configmanager, retexc=True):
                 if isinstance(x, Exception):
                     raise x
         if parms['by-peerid'] not in _neighbypeerid:
@@ -481,9 +482,9 @@ def _handle_neighbor_query(pathcomponents, configmanager):
     if listrequested not in multi_selectors | single_selectors:
         raise exc.NotFoundException('{0} is not found'.format(listrequested))
     if 'by-switch' in parms:
-        update_switch_data(parms['by-switch'], configmanager, retexc=True)
+        await update_switch_data(parms['by-switch'], configmanager, retexc=True)
     else:
-        for x in update_neighbors(configmanager, retexc=True):
+        async for x in update_neighbors(configmanager, retexc=True):
             if isinstance(x, Exception):
                 raise x
     return list_info(parms, listrequested)

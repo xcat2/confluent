@@ -640,7 +640,7 @@ def get_node_fingerprints(nodename, configmanager):
                                        _namesmatch)
 
 
-def handle_read_api_request(pathcomponents, configmanager):
+async def handle_read_api_request(pathcomponents, configmanager):
     # TODO(jjohnson2): discovery core.py api handler design, apply it here
     # to make this a less tangled mess as it gets extended
     if len(pathcomponents) == 1:
@@ -651,7 +651,7 @@ def handle_read_api_request(pathcomponents, configmanager):
             return [msg.ChildCollection(x + '/')
                     for x in list_switches(configmanager)]
         else:
-            return _handle_neighbor_query(pathcomponents[2:], configmanager)
+            return await _handle_neighbor_query(pathcomponents[2:], configmanager)
     elif len(pathcomponents) == 2:
         if pathcomponents[-1] == 'macs':
             return [msg.ChildCollection(x) for x in (# 'by-node/',

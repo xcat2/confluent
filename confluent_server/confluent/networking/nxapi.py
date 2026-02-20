@@ -101,7 +101,7 @@ class NxApiClient:
             raise Exception("Failed authenticating")
         rsp = rsp[0]
         self.authtoken = rsp['imdata'][0]['aaaLogin']['attributes']['token']
-        self.wc.cookies['Apic-Cookie'] = self.authtoken
+        self.wc.cookies.update_cookies({'APIC-cookie': self.authtoken})
         self.logged = True
 
     async def get_firmware(self):
@@ -118,7 +118,8 @@ class NxApiClient:
             hwinfo = imdata['eqptCh']['children']
             for component in hwinfo:
                 add_sensedata(component, sensedata)
-        return sensedata
+        for sd in sensedata:
+            yield sd
 
     async def get_health(self):
         healthdata = {'health': 'ok', 'sensors': []}
@@ -171,10 +172,10 @@ class NxApiClient:
             if url in self.cachedurls:
                 if self.cachedurls[url][1] > time.monotonic() - cache:
                     return self.cachedurls[url][0]
-        rsp = self.wc.grab_json_response_with_status(url)
+        rsp = await self.wc.grab_json_response_with_status(url)
         if rsp[1] == 403 and retry:
-            self.login()
-            return self.grab(url, cache, False)
+            await self.login()
+            return await self.grab(url, cache, False)
         if rsp[1] != 200:
             raise Exception("Error making request")
         self.cachedurls[url] = rsp[0], time.monotonic()

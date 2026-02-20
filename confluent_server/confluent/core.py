@@ -1482,7 +1482,7 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
         return await disco.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'networking':
-        return macmap.handle_api_request(
+        return await macmap.handle_api_request(
             configmanager, inputdata, operation, pathcomponents)
     elif pathcomponents[0] == 'version':
         return (msg.Attributes(kv={'version': confluent.__version__}),)
