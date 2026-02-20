@@ -25,20 +25,15 @@ import asyncio
 import confluent.exceptions as exc
 import socket
 import pysnmp.hlapi.asyncio as snmp
+import pysnmp.smi.rfc1902 as rfc1902
 
 async def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
     res = await asyncio.get_event_loop().getaddrinfo(name, 161, type=socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
-        if asyn:
-            return _run_coro(snmp.Udp6TransportTarget.create(res[0][4], 2))
-        else:
-            return snmp.Udp6TransportTarget(res[0][4], 2)
+        return await snmp.Udp6TransportTarget.create(res[0][4], 2)
     else:
-        if asyn:
-            return _run_coro(snmp.UdpTransportTarget.create(res[0][4], 2))
-        else:
-            return snmp.UdpTransportTarget(res[0][4], 2)
+        return await snmp.UdpTransportTarget.create(res[0][4], 2)
 
 
 class Session(object):
@@ -98,7 +93,7 @@ class Session(object):
             obj = snmp.ObjectType(snmp.ObjectIdentity(mib, field))
         else:
             obj = rfc1902.ObjectType(rfc1902.ObjectIdentity(oid))
-        walking = snmp.bulkCmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
+        walking = snmp.bulk_walk_cmd(self.eng, self.authdata, tp, ctx, 0, 10, obj,
                                    lexicographicMode=False, lookupMib=resolvemib)
         async for rsp in walking:
             errstr, errnum, erridx, answers = rsp

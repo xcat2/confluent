@@ -192,7 +192,7 @@ async def detect_backend(switch, verifier):
             if retcode == 400 and apicheck.startswith(b'{"imdata":['):
                 _fastbackends[switch] = 'nxapi'
             else:
-                rsp = wc.grab_json_response_with_status('/jsonrpc', {'dummy': 'data'}, returnheaders=True)
+                rsp = await wc.grab_response_with_status('/jsonrpc', {'dummy': 'data'}, expect_type='json')
                 if rsp[1] == 401 and rsp[2].get('WWW-Authenticate', '').startswith('Basic realm="SRLinux"'):
                     _fastbackends[switch] = 'srlinux'
         return _fastbackends.get(switch, None)
@@ -300,41 +300,44 @@ async def _extract_neighbor_data_b(args):
         pass
     conn = snmp.Session(switch, password, user, privacy_protocol=privproto)
     sid = None
-    for sysid in conn.walk('1.3.6.1.2.1.1.2'):
+    async for sysid in conn.walk('1.3.6.1.2.1.1.2'):
         sid = str(sysid[1][6:])
     _noaffluent.add(switch)
     idxtoifname = {}
     idxtoportid = {}
-    _chassisidbyswitch[switch] = sanitize(list(
-        conn.walk('1.0.8802.1.1.2.1.3.2'))[0][1])
-    for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.3'):
+    async for cid in conn.walk('1.0.8802.1.1.2.1.3.2'):
+         _chassisidbyswitch[switch] = sanitize(cid[1])
+         break
+    #_chassisidbyswitch[switch] = sanitize(list(
+    #    conn.walk('1.0.8802.1.1.2.1.3.2'))[0][1])
+    async for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.3'):
         idx = oidindex[0][-1]
         idxtoportid[idx] = sanitize(oidindex[1])
-    for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.4'):
+    async for oidindex in conn.walk('1.0.8802.1.1.2.1.3.7.1.4'):
         idx = oidindex[0][-1]
         idxtoifname[idx] = _lldpdesc_to_ifname(sid, idx, str(oidindex[1]))
-    for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
+    async for remotedesc in conn.walk('1.0.8802.1.1.2.1.4.1.1.10'):
         iname = idxtoifname.get(remotedesc[0][-2],
                                 idxtoportid.get(remotedesc[0][-2], None))
         if iname is None:
             continue
         _init_lldp(lldpdata, iname, remotedesc[0][-2], idxtoportid, switch)
         _extract_extended_desc(lldpdata[iname], remotedesc[1], user)
-    for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
+    async for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.9'):
         iname = idxtoifname.get(remotename[0][-2],
                                 idxtoportid.get(remotename[0][-2], None))
         if iname is None:
             continue
         _init_lldp(lldpdata, iname, remotename[0][-2], idxtoportid, switch)
         lldpdata[iname]['peername'] = str(remotename[1])
-    for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.7'):
+    async for remotename in conn.walk('1.0.8802.1.1.2.1.4.1.1.7'):
         iname = idxtoifname.get(remotename[0][-2],
                                 idxtoportid.get(remotename[0][-2], None))
         if iname is None:
             continue
         _init_lldp(lldpdata, iname, remotename[0][-2], idxtoportid, switch)
         lldpdata[iname]['peerportid'] = sanitize(remotename[1])
-    for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
+    async for remoteid in conn.walk('1.0.8802.1.1.2.1.4.1.1.5'):
         iname = idxtoifname.get(remoteid[0][-2],
                                 idxtoportid.get(remoteid[0][-2], None))
         if iname is None:
