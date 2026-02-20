@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import codecs
 import confluent.discovery.handlers.bmc as bmchandler
 import confluent.exceptions as exc
-import eventlet
-
 import aiohmi.util.webclient as webclient
 
 import struct
@@ -24,10 +23,8 @@ try:
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlencode
-import eventlet.support.greendns
 import confluent.netutil as netutil
 import confluent.util as util
-getaddrinfo = eventlet.support.greendns.getaddrinfo
 
 from xml.etree.ElementTree import fromstring as rfromstring
 
@@ -93,7 +90,7 @@ class NodeHandler(bmchandler.NodeHandler):
             wc.request('POST', '/data', apirequest)
             wc.getresponse().read()
 
-    def _webconfignet(self, wc, nodename):
+    async def _webconfignet(self, wc, nodename):
         cfg = self.configmanager
         if 'service:lenovo-smm2' in self.info.get('services', []):
             # need to enable ipmi for now..
@@ -109,7 +106,7 @@ class NodeHandler(bmchandler.NodeHandler):
         if smmip:
             smmip = smmip.split('/', 1)[0]
         if smmip and ':' not in smmip:
-            smmip = getaddrinfo(smmip, 0)[0]
+            smmip = await asyncio.get_event_loop().getaddrinfo(smmip, 0)[0]
             smmip = smmip[-1][0]
             if smmip and ':' in smmip:
                 raise exc.NotImplementedException('IPv6 not supported')
@@ -219,7 +216,7 @@ class NodeHandler(bmchandler.NodeHandler):
             wc.set_header('ST2', st2)
             return wc
 
-    def config(self, nodename):
+    async def config(self, nodename):
         # SMM for now has to reset to assure configuration applies
         cd = self.configmanager.get_node_attributes(
             nodename, ['secret.hardwaremanagementuser',
@@ -257,7 +254,7 @@ class NodeHandler(bmchandler.NodeHandler):
             # Switch to full web based configuration, to mitigate risks with the SMM
             wc = self._webconfigcreds(username, passwd)
             self._webconfigrules(wc)
-            self._webconfignet(wc, nodename)
+            await self._webconfignet(wc, nodename)
 
 
 # notes for smm:

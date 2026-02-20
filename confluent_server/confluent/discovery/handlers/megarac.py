@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 import confluent.discovery.handlers.redfishbmc as redfishbmc
-import eventlet.support.greendns
-
-
-getaddrinfo = eventlet.support.greendns.getaddrinfo
-
 
 class NodeHandler(redfishbmc.NodeHandler):
 
@@ -25,19 +22,19 @@ class NodeHandler(redfishbmc.NodeHandler):
         return ('admin', 'admin')
 
 
-def remote_nodecfg(nodename, cfm):
+async def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
             nodename, 'hardwaremanagement.manager')
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = getaddrinfo(ipaddr, 0)[0][-1]
+    ipaddr = (await asyncio.get_event_loop().getaddrinfo(ipaddr, 0))[0][-1]
     if not ipaddr:
         raise Exception('Cannot remote configure a system without known '
                         'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)
-    nh.config(nodename)
+    await nh.config(nodename)
 
 
 if __name__ == '__main__':

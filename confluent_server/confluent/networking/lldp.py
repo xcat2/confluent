@@ -17,7 +17,7 @@
 # This provides the implementation of locating MAC addresses on ethernet
 # switches.  It is, essentially, a port of 'MacMap.pm' to confluent.
 # However, there are enhancements.
-# For one, each switch interrogation is handled in an eventlet 'thread'
+# For one, each switch interrogation is handled in an async coroutine
 # For another, MAC addresses are checked in the dictionary on every
 # switch return, rather than waiting for all switches to check in
 # (which makes it more responsive when there is a missing or bad switch)
@@ -280,7 +280,7 @@ async def _extract_neighbor_data_affluent(switch, user, password, cfm, lldpdata,
 async def _extract_neighbor_data_b(args):
     """Build LLDP data about elements connected to switch
 
-    args are carried as a tuple, because of eventlet convenience
+    args are carried as a tuple
     """
     # Safely unpack args with defaults to avoid IndexError
     switch = args[0] if len(args) > 0 else None

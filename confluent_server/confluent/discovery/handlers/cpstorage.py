@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import confluent.discovery.handlers.bmc as bmchandler
-import eventlet
 import confluent.util as util
 try:
     from urllib import urlencode
@@ -34,13 +33,13 @@ class NodeHandler(bmchandler.NodeHandler):
         fprint = util.get_fingerprint(self.https_cert)
         return util.cert_matches(fprint, certificate)
 
-    def get_webclient(self, user, passwd, newuser, newpass):
+    async def get_webclient(self, user, passwd, newuser, newpass):
         wc = webclient.WebConnection(self.ipaddr, 443,
                                             verifycallback=self.validate_cert)
-        wc.connect()
+        await wc.connect()
         authdata = urlencode({'username': user, 'password': passwd,
                               'weblogsign': 1})
-        res = wc.grab_json_response_with_status('/api/session', authdata)
+        res = await wc.grab_json_response_with_status('/api/session', authdata)
         if res[1] == 200:
             if res[0].get('force_password', 1) == 0:
                 # Need to handle password change
@@ -52,12 +51,12 @@ class NodeHandler(bmchandler.NodeHandler):
                     'privilege': 4,
                 }
                 passchange = urlencode(passchange)
-                rsp = wc.grab_json_response_with_status('/api/reset-pass',
+                rsp = await wc.grab_json_response_with_status('/api/reset-pass',
                                                         passchange)
-                rsp = wc.grab_json_response_with_status('/api/session',
+                rsp = await wc.grab_json_response_with_status('/api/session',
                                                         method='DELETE')
 
-    def config(self, nodename, reset=False):
+    async def config(self, nodename, reset=False):
         self.nodename = nodename
         creds = self.configmanager.get_node_attributes(
             self.nodename, ['secret.hardwaremanagementuser',
@@ -66,6 +65,6 @@ class NodeHandler(bmchandler.NodeHandler):
         user, passwd, isdefault = self.get_node_credentials(
                 nodename, creds, 'admin', 'admin')
         if not isdefault:
-            self.get_webclient(self.DEFAULT_USER, self.DEFAULT_PASS, user,
+            await self.get_webclient(self.DEFAULT_USER, self.DEFAULT_PASS, user,
                                passwd)
-        self._bmcconfig(nodename, False)
+        await self._bmcconfig(nodename, False)

@@ -18,11 +18,7 @@ import confluent.exceptions as exc
 import confluent.netutil as netutil
 import confluent.util as util
 import json
-try:
-    from urllib import urlencode
-except ImportError:
-    from urllib.parse import urlencode
-import eventlet.green.subprocess as subprocess
+
 
 from socket import getaddrinfo
 
@@ -68,12 +64,11 @@ class NodeHandler(generic.NodeHandler):
                 self._srvroot = srvroot
         return self._srvroot
 
-    def get_manager_url(self, wc):
-        #TODO:asyncmerge: make async
-        mgrs = self.srvroot(wc).get('Managers', {}).get('@odata.id', None)
+    async def get_manager_url(self, wc):
+        mgrs = (await self.srvroot(wc)).get('Managers', {}).get('@odata.id', None)
         if not mgrs:
             raise Exception("No Managers resource on BMC")
-        rsp = wc.grab_json_response(mgrs)
+        rsp = await wc.grab_json_response(mgrs)
         if len(rsp.get('Members', [])) != 1:
             raise Exception("Can not handle multiple Managers")
         mgrurl = rsp['Members'][0]['@odata.id']
@@ -81,7 +76,7 @@ class NodeHandler(generic.NodeHandler):
 
     async def mgrinfo(self, wc):
         if not self._mgrinfo:
-            self._mgrinfo = await wc.grab_json_response(self.get_manager_url(wc))
+            self._mgrinfo = await wc.grab_json_response(await self.get_manager_url(wc))
         return self._mgrinfo
 
 
@@ -331,16 +326,19 @@ class NodeHandler(generic.NodeHandler):
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
 
-    def autosign_certificate(self):
+    async def autosign_certificate(self):
         nodename = self.nodename
         hwmgt_method = self.configmanager.get_node_attributes(
             nodename, 'hardwaremanagement.method').get(
                 nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
         if hwmgt_method != 'redfish':
             return
-        subprocess.check_call(['/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'])
+        proc = await asyncio.create_subprocess_exec(
+            '/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'
+        )
+        await proc.wait()
 
-def remote_nodecfg(nodename, cfm):
+async def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
             nodename, 'hardwaremanagement.manager')
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
@@ -352,7 +350,7 @@ def remote_nodecfg(nodename, cfm):
                          'address')
     info = {'addresses': [ipaddr]}
     nh = NodeHandler(info, cfm)
-    nh.config(nodename)
+    await nh.config(nodename)
 
 if __name__ == '__main__':
     import confluent.config.configmanager as cfm

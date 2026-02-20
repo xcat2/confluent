@@ -462,7 +462,7 @@ class NodeHandler(immhandler.NodeHandler):
                         if status >= 500:
                             if tries < 0:
                                 raise Exception('Redfish account management failure')
-                            eventlet.sleep(30)
+                            await asyncio.sleep(30)
                             continue
                         rsp, status = await wc.grab_json_response_with_status(
                             '/redfish/v1/AccountService/Accounts/{0}'.format(uid),
