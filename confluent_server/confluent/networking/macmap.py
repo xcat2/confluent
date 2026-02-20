@@ -154,7 +154,7 @@ async def _fast_map_switch(args):
     macdata = None
     kv = util.TLSCertVerifier(cfgm, switch,
                               'pubkeys.tls_hardwaremanager').verify_cert
-    backend = detect_backend(switch, kv)
+    backend = await detect_backend(switch, kv)
     if backend == 'affluent':
         return await _affluent_map_switch(switch, password, user, cfgm, macdata)
     elif backend == 'nxapi':
@@ -615,9 +615,9 @@ def _dump_locations(info, macaddr, nodename=None):
     yield msg.KeyValueData(retdata)
 
 
-def handle_api_request(configmanager, inputdata, operation, pathcomponents):
+async def handle_api_request(configmanager, inputdata, operation, pathcomponents):
     if operation == 'retrieve':
-        return handle_read_api_request(pathcomponents, configmanager)
+        return await handle_read_api_request(pathcomponents, configmanager)
     if (operation in ('update', 'create') and
             pathcomponents == ['networking', 'macs', 'rescan']):
         if inputdata != {'rescan': 'start'}:
