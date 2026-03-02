@@ -249,9 +249,9 @@ async def process_request(
         else:
             hdlr = pluginapi.handle_path(path, operation, cfm, params)
     except exc.NotFoundException as e:
-        send_data(connection, {"errorcode": 404,
-                               "error": "Target not found - " + str(e)})
-        send_data(connection, {"_requestdone": 1})
+        await send_data(connection, {"errorcode": 404,
+                                     "error": "Target not found - " + str(e)})
+        await send_data(connection, {"_requestdone": 1})
     except exc.InvalidArgumentException as e:
         await send_data(connection, {"errorcode": 400,
                                "error": "Bad Request - " + str(e)})
