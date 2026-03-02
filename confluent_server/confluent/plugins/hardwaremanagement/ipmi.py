@@ -878,14 +878,14 @@ class IpmiHandler:
                                            event['component_type_id'])
 
     async def make_inventory_map(self):
-        invnames = await self.ipmicmd.get_inventory_descriptions()
-        for name in invnames:
+        invnames = self.ipmicmd.get_inventory_descriptions()
+        async for name in invnames:
             self.invmap[simplify_name(name)] = name
 
     async def make_sensor_map(self, sensors=None):
         if sensors is None:
-            sensors = await self.ipmicmd.get_sensor_descriptions()
-        for sensor in sensors:
+            sensors = self.ipmicmd.get_sensor_descriptions()
+        async for sensor in sensors:
             resourcename = sensor['name']
             self.ipmicmd.sensormap[simplify_name(resourcename)] = resourcename
 
@@ -957,8 +957,10 @@ class IpmiHandler:
                     await self.output.put(msg.ConfluentTargetTimeout(self.node))
 
     async def list_inventory(self):
+        components = []
         try:
-            components = self.ipmicmd.get_inventory_descriptions()
+            async for component in self.ipmicmd.get_inventory_descriptions():
+                components.append(component)
         except pygexc.IpmiException:
             await self.output.put(msg.ConfluentTargetTimeout(self.node))
             return
