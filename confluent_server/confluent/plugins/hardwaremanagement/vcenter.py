@@ -349,6 +349,8 @@ def prep_vcsa_clients(nodes, configmanager):
     clientsbynode = {}
     for node in nodes:
         cfg = cfginfo[node]
+        if 'hardwaremanagement.manager' not in cfg or 'value' not in cfg['hardwaremanagement.manager']:
+            raise Exception("Missing hardwaremanagement.manager for node {}".format(node))
         currvcsa = cfg['hardwaremanagement.manager']['value']
         if currvcsa not in clientsbyvcsa:
              user = cfg.get('secret.hardwaremanagementuser', {}).get('value', None)

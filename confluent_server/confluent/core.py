@@ -719,7 +719,7 @@ def show_user(name, configmanager):
 
 
 async def stripnode(iterablersp, node):
-    async for i in iterablersp:
+    async for i in iterate_responses(iterablersp):
         if i is None:
             raise exc.NotImplementedException("Not Implemented")
         if isinstance(i, console.Console):
