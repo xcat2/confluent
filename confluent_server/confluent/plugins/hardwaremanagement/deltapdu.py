@@ -13,6 +13,8 @@
 # limitations under the License.
 
 #TODO: ASYNC asyncio conversion
+import asyncio
+
 import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
@@ -159,8 +161,8 @@ class PDUClient(object):
     def logout(self):
         self.wc.grab_response('/logout_wait.htm')
 
-    def get_outlet(self, outlet):
-        rsp = self.wc.grab_response('/setting_admin4.xml')
+    async def get_outlet(self, outlet):
+        rsp = await self.wc.grab_response('/setting_admin4.xml')
         xd = fromstring(rsp[0])
         for ch in xd:
             if 'relay' not in ch.tag:
@@ -169,14 +171,14 @@ class PDUClient(object):
             if outnum == outlet:
                 return ch.text.lower()
 
-    def set_outlet(self, outlet, state):
+    async def set_outlet(self, outlet, state):
         state = 0 if state == 'off' else 1
         outlet = int(outlet)
         ident = self.map_outlets[outlet]
         sitem = '/SetParm?item={}?content={}'.format(ident, state)
-        self.wc.grab_response(sitem)
+        await self.wc.grab_response(sitem)
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
         for node in nodes:
             yield  msg.ConfluentResourceUnavailable(node, 'Not implemented')
@@ -184,14 +186,14 @@ def retrieve(nodes, element, configmanager, inputdata):
     for node in nodes:
         try:
             gc = PDUClient(node, configmanager)
-            state = gc.get_outlet(element[-1])
+            state = await gc.get_outlet(element[-1])
         except exc.TargetEndpointBadCredentials:
             yield msg.ConfluentTargetInvalidCredentials(node)
             continue
         yield msg.PowerState(node=node, state=state)
-        gc.logout()
+        await gc.logout()
 
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     if 'outlets' not in element:
         yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
         return
@@ -199,8 +201,8 @@ def update(nodes, element, configmanager, inputdata):
     for node in nodes:
         gc = PDUClient(node, configmanager)
         newstate = inputdata.powerstate(node)
-        gc.set_outlet(element[-1], newstate)
-        gc.logout()
-    eventlet.sleep(timeout)
-    for res in retrieve(nodes, element, configmanager, inputdata):
+        await gc.set_outlet(element[-1], newstate)
+        await gc.logout()
+    await asyncio.sleep(timeout)
+    async for res in retrieve(nodes, element, configmanager, inputdata):
         yield res
