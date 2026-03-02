@@ -799,15 +799,15 @@ class IpmiHandler:
             event['id'] = '{0}.{1}'.format(event['event_id'],
                                            event['component_type_id'])
 
-    def make_inventory_map(self):
+    async def make_inventory_map(self):
         invnames = self.ipmicmd.get_inventory_descriptions()
-        for name in invnames:
+        async for name in invnames:
             self.invmap[simplify_name(name)] = name
 
     async def make_sensor_map(self, sensors=None):
         if sensors is None:
             sensors = await self.ipmicmd.get_sensor_descriptions()
-        for sensor in sensors:
+        async for sensor in sensors:
             resourcename = sensor['name']
             self.sensormap[simplify_name(resourcename)] = resourcename
 
