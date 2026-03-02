@@ -776,6 +776,7 @@ async def get_my_addresses(idx=0, family=0, matchlla=None):
     ifaddrmsg = struct.pack('BBBBI', family, 0, 0, 0, idx)
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
     s.bind((0, 0))
+    s.setblocking(False)
     await asyncio.get_event_loop().sock_sendall(s, nlhdr + ifaddrmsg)
     addrs = []
     while True:
