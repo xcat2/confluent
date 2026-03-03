@@ -663,13 +663,13 @@ class IpmiHandler:
 
     async def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
-            return self.handle_alerts()
+            return await self.handle_alerts()
         elif self.element[1:3] == ['management_controller', 'users']:
-            return self.handle_users()
+            return await self.handle_users()
         elif self.element[1:3] == ['management_controller', 'net_interfaces']:
-            return self.handle_nets()
+            return await self.handle_nets()
         elif self.element[1:3] == ['management_controller', 'reset']:
-            return self.handle_reset()
+            return await self.handle_reset()
         elif self.element[1:3] == ['management_controller', 'identifier']:
             return self.handle_identifier()
         elif self.element[1:3] == ['management_controller', 'hostname']:
@@ -751,18 +751,18 @@ class IpmiHandler:
                     return
         raise Exception('Not implemented')
 
-    def handle_nets(self):
+    async def handle_nets(self):
         if len(self.element) == 3:
             if self.op != 'read':
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentNodeError(self.node, 'Unsupported operation'))
                 return
-            self.output.put(msg.ChildCollection('management'))
+            await self.output.put(msg.ChildCollection('management'))
         elif len(self.element) == 4 and self.element[-1] == 'management':
             if self.op == 'read':
-                lancfg = self.ipmicmd.get_net_configuration()
-                v6cfg = self.ipmicmd.get_net6_configuration()
-                self.output.put(msg.NetworkConfiguration(
+                lancfg = await self.ipmicmd.get_net_configuration()
+                v6cfg = await self.ipmicmd.get_net6_configuration()
+                await self.output.put(msg.NetworkConfiguration(
                     self.node, ipv4addr=lancfg['ipv4_address'],
                     ipv4gateway=lancfg['ipv4_gateway'],
                     ipv4cfgmethod=lancfg['ipv4_configuration'],
@@ -774,7 +774,7 @@ class IpmiHandler:
             elif self.op == 'update':
                 config = self.inputdata.netconfig(self.node)
                 try:
-                    self.ipmicmd.set_net_configuration(
+                    await self.ipmicmd.set_net_configuration(
                         ipv4_address=config['ipv4_address'],
                         ipv4_configuration=config['ipv4_configuration'],
                         ipv4_gateway=config['ipv4_gateway'],
@@ -783,48 +783,48 @@ class IpmiHandler:
                     if v6addrs is not None:
                         v6addrs = v6addrs.split(',')
                     v6gw = config.get('static_v6_gateway', None)
-                    self.ipmicmd.set_net6_configuration(static_addresses=v6addrs, static_gateway=v6gw)
+                    await self.ipmicmd.set_net6_configuration(static_addresses=v6addrs, static_gateway=v6gw)
                 except socket.error as se:
-                    self.output.put(msg.ConfluentNodeError(self.node,
+                    await self.output.put(msg.ConfluentNodeError(self.node,
                                                            se.message))
                 except ValueError as e:
                     if e.message == 'negative shift count':
-                        self.output.put(msg.ConfluentNodeError(
+                        await self.output.put(msg.ConfluentNodeError(
                             self.node, 'Invalid prefix length given'))
                     else:
                         raise
         elif len(self.element) == 4 and self.element[-1] != 'management':
-            self.output.put(
+            await self.output.put(
                     msg.ConfluentTargetNotFound(self.node,
                                                 'Interface not found'))
 
-    def handle_users(self):
+    async def handle_users(self):
         # Create user
         if len(self.element) == 3:
             if self.op == 'update':
                 user = self.inputdata.credentials[self.node]
-                self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
+                await self.ipmicmd.create_user(uid=user['uid'], name=user['username'],
                                     password=user['password'],
                                     callback=True,link_auth=True, ipmi_msg=True,
                                     privilege_level=user['privilege_level'])
             # A list of users
-            self.output.put(msg.ChildCollection('all'))
+            await self.output.put(msg.ChildCollection('all'))
             for user in self.ipmicmd.get_users():
-                self.output.put(msg.ChildCollection(user, candelete=True))
+                await self.output.put(msg.ChildCollection(user, candelete=True))
             return
         # List all users
         elif len(self.element) == 4 and self.element[-1] == 'all':
             users = []
             for user in self.ipmicmd.get_users():
                 users.append(self.ipmicmd.get_user(uid=user))
-            self.output.put(msg.UserCollection(users=users, name=self.node))
+            await self.output.put(msg.UserCollection(users=users, name=self.node))
             return
         # Update user
         elif len(self.element) == 4:
             user = int(self.element[-1])
             if self.op == 'read':
-                data = self.ipmicmd.get_user(uid=user)
-                self.output.put(msg.User(
+                data = await self.ipmicmd.get_user(uid=user)
+                await self.output.put(msg.User(
                     uid=data['uid'],
                     username=data['name'],
                     privilege_level=data['access']['privilege_level'],
@@ -835,16 +835,16 @@ class IpmiHandler:
                 user = self.inputdata.credentials[self.node]
 
                 if 'username' in user:
-                    self.ipmicmd.set_user_name(uid=user['uid'],
+                    await self.ipmicmd.set_user_name(uid=user['uid'],
                                                name=user['username'])
 
                 if 'password' in user:
-                    self.ipmicmd.set_user_password(uid=user['uid'],
+                    await self.ipmicmd.set_user_password(uid=user['uid'],
                                                    password=user['password'])
-                    self.ipmicmd.set_user_password(uid=user['uid'],
+                    await self.ipmicmd.set_user_password(uid=user['uid'],
                                     mode='enable', password=user['password'])
                 if 'privilege_level' in user:
-                    self.ipmicmd.set_user_access(uid=user['uid'],
+                    await self.ipmicmd.set_user_access(uid=user['uid'],
                                                     privilege_level=user[
                                                         'privilege_level'])
                 if 'enabled' in user:
@@ -852,10 +852,10 @@ class IpmiHandler:
                         mode = 'enable'
                     else:
                         mode = 'disable'
-                    self.ipmicmd.disable_user(user['uid'], mode)
+                    await self.ipmicmd.disable_user(user['uid'], mode)
                 return
             elif self.op == 'delete':
-                self.ipmicmd.user_delete(uid=user)
+                await self.ipmicmd.user_delete(uid=user)
                 return
 
     async def do_eventlog(self):
