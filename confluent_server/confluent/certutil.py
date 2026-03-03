@@ -330,7 +330,9 @@ async def create_certificate(keyout=None, certout=None, csrfile=None, subj=None,
                 for pname in nc.permitted_subtrees:
                     permitdomains.append(pname.value)
     if not san:
-        ipaddrs = list(get_ip_addresses())
+        ipaddrs = []
+        async for ip in get_ip_addresses():
+            ipaddrs.append(ip)
         if not permitdomains:
             san = ['IP:{0}'.format(x) for x in ipaddrs]
             # It is incorrect to put IP addresses as DNS type.  However
