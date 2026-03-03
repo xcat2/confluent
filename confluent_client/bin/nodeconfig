@@ -223,7 +223,7 @@ def parse_config_line(arguments, single=False):
                 queryparms[path][attrib] = param
 
 async def main():
-    printsys = []
+    global printsys
     if options.batch:
         printsys = []
         argfile = open(options.batch, 'r')
