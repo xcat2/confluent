@@ -31,7 +31,7 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 
-import confluent.client as client
+import confluent.asynclient as client
 
 class NullOpt(object):
     blame = None
@@ -223,6 +223,7 @@ def parse_config_line(arguments, single=False):
                 queryparms[path][attrib] = param
 
 async def main():
+    printsys = []
     if options.batch:
         printsys = []
         argfile = open(options.batch, 'r')
