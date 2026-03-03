@@ -577,7 +577,7 @@ class IpmiHandler:
         elif self.element == ['health', 'hardware']:
             await self.health()
         elif self.element == ['identify']:
-            self.identify()
+            await self.identify()
         elif self.element[0] == 'sensors':
             await self.handle_sensors()
         elif self.element[:2] == ['configuration', 'storage']:
@@ -619,47 +619,47 @@ class IpmiHandler:
         else:
             raise Exception('Not Implemented')
 
-    def handle_update(self):
+    async def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
                                     self.inputdata.nodefile(self.node), self.tenant,
                                     bank=self.inputdata.bank, configmanager=self.cfm)
-        self.output.put(
+        await self.output.put(
             msg.CreatedResource(
                 'nodes/{0}/inventory/firmware/updates/active/{1}'.format(
                     self.node, u.name)))
 
-    def handle_media_upload(self):
+    async def handle_media_upload(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.upload_media,
                                      self.inputdata.nodefile(self.node), self.tenant,
                                      type='mediaupload', configmanager=self.cfm)
-        self.output.put(msg.CreatedResource(
+        await self.output.put(msg.CreatedResource(
             'nodes/{0}/media/uploads/{1}'.format(self.node, u.name)))
 
     def get_diags(self, savefile, progress, data=None):
         return self.ipmicmd.get_diagnostic_data(
             savefile, progress=progress, autosuffix=True)
 
-    def handle_servicedata_fetch(self):
+    async def handle_servicedata_fetch(self):
         u = firmwaremanager.Updater(
             self.node, self.get_diags,
             self.inputdata.nodefile(self.node), self.tenant, type='ffdc',
             owner=self.current_user)
-        self.output.put(msg.CreatedResource(
+        await self.output.put(msg.CreatedResource(
             'nodes/{0}/support/servicedata/{1}'.format(self.node, u.name)))
 
-    def handle_attach_media(self):
+    async def handle_attach_media(self):
         try:
-            self.ipmicmd.attach_remote_media(self.inputdata.nodefile(
+            await self.ipmicmd.attach_remote_media(self.inputdata.nodefile(
                 self.node))
         except pygexc.UnsupportedFunctionality as uf:
-            self.output.put(msg.ConfluentNodeError(self.node, str(uf)))
+            await self.output.put(msg.ConfluentNodeError(self.node, str(uf)))
 
-    def handle_detach_media(self):
-        self.ipmicmd.detach_remote_media()
+    async def handle_detach_media(self):
+        await self.ipmicmd.detach_remote_media()
 
-    def handle_list_media(self):
-        for media in self.ipmicmd.list_media():
-            self.output.put(msg.Media(self.node, media))
+    async def handle_list_media(self):
+        async for media in self.ipmicmd.list_media():
+            await self.output.put(msg.Media(self.node, media))
 
     async def handle_configuration(self):
         if self.element[1:3] == ['management_controller', 'alerts']:
@@ -671,7 +671,7 @@ class IpmiHandler:
         elif self.element[1:3] == ['management_controller', 'reset']:
             return await self.handle_reset()
         elif self.element[1:3] == ['management_controller', 'identifier']:
-            return self.handle_identifier()
+            return await self.handle_identifier()
         elif self.element[1:3] == ['management_controller', 'hostname']:
             return await self.handle_hostname()
         elif self.element[1:3] == ['management_controller', 'domain_name']:
@@ -710,21 +710,21 @@ class IpmiHandler:
         varbinddata = hex2bin(varbinddata)
         event = self.ipmicmd.decode_pet(specifictrap, varbinddata)
         self.pyghmi_event_to_confluent(event)
-        self.output.put(msg.EventCollection((event,), name=self.node))
+        await self.output.put(msg.EventCollection((event,), name=self.node))
 
-    def handle_alerts(self):
+    async def handle_alerts(self):
         if self.element[3] == 'destinations':
             if len(self.element) == 4:
                 # A list of destinations
-                maxdest = self.ipmicmd.get_alert_destination_count()
+                maxdest = await self.ipmicmd.get_alert_destination_count()
                 for alertidx in range(0, maxdest + 1):
-                    self.output.put(msg.ChildCollection(alertidx))
+                    await self.output.put(msg.ChildCollection(alertidx))
                 return
             elif len(self.element) == 5:
                 alertidx = int(self.element[-1])
                 if self.op == 'read':
-                    destdata = self.ipmicmd.get_alert_destination(alertidx)
-                    self.output.put(msg.AlertDestination(
+                    destdata = await self.ipmicmd.get_alert_destination(alertidx)
+                    await self.output.put(msg.AlertDestination(
                         ip=destdata['address'],
                         acknowledge=destdata['acknowledge_required'],
                         acknowledge_timeout=destdata.get('acknowledge_timeout', None),
@@ -743,11 +743,11 @@ class IpmiHandler:
                         alertargs['ip'] = alertparms['ip']
                     if 'retries' in alertparms:
                         alertargs['retries'] = alertparms['retries']
-                    self.ipmicmd.set_alert_destination(destination=alertidx,
+                    await self.ipmicmd.set_alert_destination(destination=alertidx,
                                                        **alertargs)
                     return
                 elif self.op == 'delete':
-                    self.ipmicmd.clear_alert_destination(alertidx)
+                    await self.ipmicmd.clear_alert_destination(alertidx)
                     return
         raise Exception('Not implemented')
 
