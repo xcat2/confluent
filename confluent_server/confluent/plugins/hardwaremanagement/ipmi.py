@@ -571,51 +571,51 @@ class IpmiHandler:
         if self.element == ['power', 'state']:
             await self.power()
         elif self.element == ['_enclosure', 'reseat_bay']:
-            self.reseat_bay()
+            await self.reseat_bay()
         elif self.element == ['boot', 'nextdevice']:
-            self.bootdevice()
+            await self.bootdevice()
         elif self.element == ['health', 'hardware']:
             await self.health()
         elif self.element == ['identify']:
             self.identify()
         elif self.element[0] == 'sensors':
-            self.handle_sensors()
+            await self.handle_sensors()
         elif self.element[:2] == ['configuration', 'storage']:
-            self.handle_storage()
+            await self.handle_storage()
         elif self.element[0] == 'configuration':
             await self.handle_configuration()
         elif self.element[:3] == ['inventory', 'firmware', 'updates']:
-            self.handle_update()
+            await self.handle_update()
         elif self.element[:3] == ['inventory', 'firmware', 'updatestatus']:
-            self.handle_update_status()
+            await self.handle_update_status()
         elif self.element[0] == 'inventory':
             await self.handle_inventory()
         elif self.element == ['media', 'attach']:
-            self.handle_attach_media()
+            await self.handle_attach_media()
         elif self.element == ['media', 'detach']:
-            self.handle_detach_media()
+            await self.handle_detach_media()
         elif self.element == ['media', 'uploads']:
-            self.handle_media_upload()
+            await self.handle_media_upload()
         elif self.element == ['media', 'current']:
-            self.handle_list_media()
+            await self.handle_list_media()
         elif self.element == ['events', 'hardware', 'log']:
-            self.do_eventlog()
+            await self.do_eventlog()
         elif self.element == ['events', 'hardware', 'decode']:
-            self.decode_alert()
+            await self.decode_alert()
         elif self.element == ['console', 'license']:
             await self.handle_license()
         elif self.element == ['console', 'graphical']:
-            self.handle_graphical_console()
+            await self.handle_graphical_console()
         elif self.element == ['support', 'servicedata']:
-            self.handle_servicedata_fetch()
+            await self.handle_servicedata_fetch()
         elif self.element == ['description']:
             await self.handle_description()
         elif self.element == ['console', 'ikvm_methods']:
-            self.handle_ikvm_methods()
+            await self.handle_ikvm_methods()
         elif self.element == ['console', 'ikvm_screenshot']:
-            self.handle_ikvm_screenshot()
+            await self.handle_ikvm_screenshot()
         elif self.element == ['console', 'ikvm']:
-            self.handle_ikvm()
+            await self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
 
