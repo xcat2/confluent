@@ -510,7 +510,7 @@ async def rebase(profilename):
             sys.exit(rsp['errorcode'])
         else:
             print(repr(rsp))
-/opt/confluent/bin/confluent
+
 def oslist():
     c = client.Command()
     print("Distributions:")
@@ -598,4 +598,4 @@ async def osimport(imagefile, checkonly=False, custname=None):
                 pass
 
 if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main(sys.argv))
+    asyncio.run(main(sys.argv))

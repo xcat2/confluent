@@ -317,8 +317,8 @@ async def create_certificate(keyout=None, certout=None, csrfile=None, subj=None,
         subj = '/CN={0}'.format(subj)
     if not csrfile:
         await util.check_call(
-            ['openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
-             keyout])
+            'openssl', 'ecparam', '-name', 'secp384r1', '-genkey', '-out',
+             keyout)
     permitdomains = []
     if x509:
         # check if this CA has name constraints, and avoid violating them

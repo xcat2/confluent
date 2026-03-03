@@ -619,7 +619,7 @@ async def start_console_sessions():
     await configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
-async def connect_node(node, configmanager, username=None, direct=True, width=80,
+def connect_node(node, configmanager, username=None, direct=True, width=80,
                  height=24):
     attrval = configmanager.get_node_attributes(node, 'collective.manager')
     myc = attrval.get(node, {}).get('collective.manager', {}).get(
