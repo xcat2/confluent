@@ -700,7 +700,7 @@ class IpmiHandler:
             return await self.save_licenses()
         raise Exception('Not implemented')
 
-    def decode_alert(self):
+    async def decode_alert(self):
         inputdata = self.inputdata.get_alert(self.node)
         specifictrap = int(inputdata['.1.3.6.1.6.3.1.1.4.1.0'].rpartition(
             '.')[-1])
