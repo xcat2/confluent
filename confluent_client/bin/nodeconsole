@@ -134,7 +134,9 @@ def determine_tile_size(numnodes):
     # from kitty by omitting, but:
     # then we don't know how much to move the cursor left after draw_image
     # Konsole won't scale at all with only partial scaling specified
-    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
+    direct_console()
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom(escfallback=True)
+    indirect_console()
     # 16:12 is to roughly account for the 'titles' of the tiles
     ratio = (pixwidth / 16) / (pixheight / 12)
     bestdeviation = None
@@ -214,7 +216,9 @@ def cursor_show():
     sys.stdout.write('\x1b[?25h')
 
 def get_pix_dimensions(width, height):
-    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom()
+    direct_console()
+    cheight, cwidth, pixwidth, pixheight = sq.get_screengeom(escfallback=True)
+    indirect_console()
     imgwidth = int(pixwidth / cwidth * width)
     imgheight = int(pixheight / cheight * height)
     return imgwidth, imgheight

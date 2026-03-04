@@ -16,11 +16,55 @@ import fcntl
 import sys
 import struct
 import termios
+import select
 
-def get_screengeom():
+def get_screengeom(escfallback=False):
     # returns height in cells, width in cells, width in pixels, height in pixels
-    return struct.unpack('hhhh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ,
-                                           b'........'))
+    geom = list(struct.unpack('hhhh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ,
+                                           b'........')))
+    if escfallback and (geom[0] == 0 or geom[1] == 0):
+        cellgeom = get_cell_geometry_using_esc_18t()
+        geom[0], geom[1] = cellgeom
+    if escfallback and (geom[2] == 0 or geom[3] == 0):
+        pixgeom = get_pixel_geometry_using_esc_14t()
+        geom[2], geom[3] = pixgeom
+    return geom
+
+def get_pixel_geometry_using_esc_14t():
+    sys.stdout.write('\x1b[14t')
+    sys.stdout.flush()
+    rlist, _, _ = select.select([sys.stdin], [], [], 1)
+    if not rlist:
+        return 0, 0
+    response = ''
+    while True:
+        c = sys.stdin.read(1)
+        if c == 't':
+            break
+        response += c
+    if not response.startswith('\x1b[4;'):
+        return 0, 0
+    pixgeom = response[4:].split(';')
+    return int(pixgeom[0]), int(pixgeom[1])
+
+def get_cell_geometry_using_esc_18t():
+    sys.stdout.write('\x1b[18t')
+    sys.stdout.flush()
+    rlist, _, _ = select.select([sys.stdin], [], [], 1)
+    if not rlist:
+        return 0, 0
+    response = ''
+    while True:
+        c = sys.stdin.read(1)
+        if c == 't':
+            break
+        response += c
+    if not response.startswith('\x1b[8;'):
+        return 0, 0
+    cellgeom = response[4:].split(';')
+    return int(cellgeom[0]), int(cellgeom[1])
+        
+        
 class ScreenPrinter(object):
 
     def __init__(self, noderange, client, textlen=4):
