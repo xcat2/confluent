@@ -45,7 +45,7 @@ def get_pixel_geometry_using_esc_14t():
     if not response.startswith('\x1b[4;'):
         return 0, 0
     pixgeom = response[4:].split(';')
-    return int(pixgeom[0]), int(pixgeom[1])
+    return int(pixgeom[1]), int(pixgeom[0])
 
 def get_cell_geometry_using_esc_18t():
     sys.stdout.write('\x1b[18t')
