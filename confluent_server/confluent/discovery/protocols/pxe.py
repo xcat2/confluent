@@ -383,7 +383,7 @@ def new_dhcp_packet(handler, nodeguess, cfg, net4):
             recv = ipfromint(recv)
         rqv = memoryview(data)
         if rqv[0] == 1:
-            process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client)
+            tasks.spawn(process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client))
 
 
 def new_dhcp6_packet(handler, net6, cfg, nodeguess):
@@ -466,9 +466,9 @@ async def process_dhcp6req(handler, rqv, addr, net, cfg, nodeguess):
     if ignoredisco.get(mac, 0) + 90 < time.time():
         ignoredisco[mac] = time.time()
         handler(info)
-    consider_discover(info, req, net, cfg, None, nodeguess, addr)
+    await consider_discover(info, req, net, cfg, None, nodeguess, addr)
 
-def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client):
+async def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client):
     rq = bytearray(rqv)
     addrlen = rq[2]
     if addrlen > 16 or addrlen == 0:
@@ -511,7 +511,7 @@ def process_dhcp4req(handler, nodeguess, cfg, net4, idx, recv, rqv, client):
                             and time.time() > ignoredisco.get(netaddr, 0) + 90):
         ignoredisco[netaddr] = time.time()
         handler(info)
-    consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess, requestor=client)
+    await consider_discover(info, rqinfo, net4, cfg, rqv, nodeguess, requestor=client)
 
 
 
@@ -942,13 +942,13 @@ def ack_request(pkt, rq, info, sock=None, requestor=None):
     else:
         send_raw_packet(repview, len(rply), rq, info)
 
-def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None, requestor=None):
+async def consider_discover(info, packet, sock, cfg, reqview, nodeguess, addr=None, requestor=None):
     if packet.get(53, None) == b'\x03':
         ack_request(packet, reqview, info, sock, requestor)
     elif info.get('hwaddr', None) in macmap: #  and info.get('uuid', None):
-        check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr, requestor)
+        await check_reply(macmap[info['hwaddr']], info, packet, sock, cfg, reqview, addr, requestor)
     elif info.get('uuid', None) in uuidmap:
-        check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr, requestor)
+        await check_reply(uuidmap[info['uuid']], info, packet, sock, cfg, reqview, addr, requestor)
     elif packet.get(53, None) == b'\x03':
         ack_request(packet, reqview, info, sock, requestor)
     elif info.get('uuid', None) and info.get('hwaddr', None):

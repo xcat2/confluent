@@ -391,7 +391,7 @@ async def initialize(cmdset):
             sys.exit(rc)
     if not didsomething and (cmdset.k or cmdset.l or cmdset.g or cmdset.p):
         if cmdset.g:
-            updateboot('genesis-x86_64')
+            await updateboot('genesis-x86_64')
         sys.exit(0)
     if not didsomething:
         sys.stderr.write('Nothing was done, use initialize -i for '

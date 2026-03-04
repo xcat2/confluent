@@ -61,7 +61,7 @@ class TaskPile:
                 yield task
 
 class TaskPool:
-    def __init__(self, max_concurrent):
+    def __init__(self, max_concurrent=128):
         self.max_concurrent = max_concurrent
         self._tasks = set()
         self._pending = []

@@ -313,20 +313,20 @@ def start_syncfiles(nodename, cfg, suffixes, principals=[]):
         raise Exception('Cannot perform syncfiles without profile assigned')
     synclist = '/var/lib/confluent/public/os/{}/syncfiles'.format(profile)
     if not os.path.exists(synclist):
-        return '200 OK', 'No synclist'  # not running
+        return 200, 'OK', 'No synclist'  # not running
     sl = SyncList(synclist, nodename, cfg)
     if not (sl.appendmap or sl.mergemap or sl.replacemap or sl.appendoncemap):
-        return '200 OK', 'Empty synclist'  # the synclist has no actual entries
+        return 200, 'OK', 'Empty synclist'  # the synclist has no actual entries
     if nodename in syncrunners:
         if syncrunners[nodename].dead:
             syncrunners[nodename].wait()
         else:
-            return '503 Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
+            return 503, 'Synchronization already in progress', 'Synchronization already in progress for {}'.format(nodename)
     syncrunners[nodename] = tasks.spawn(
         sync_list_to_node(sl, nodename, suffixes, peerip))
     if not cleaner:
         cleaner = tasks.spawn(cleanit())
-    return '202 Queued', 'Background synchronization initiated'  # backgrounded
+    return 202,'Queued', 'Background synchronization initiated'  # backgrounded
 
 
 async def cleanit():
@@ -351,9 +351,9 @@ async def cleanit():
 
 def get_syncresult(nodename):
     if nodename not in syncrunners:
-        return ('204 Not Running', '')
+        return 204, 'Not Running', ''
     if not syncrunners[nodename].dead:
-        return ('200 OK', '')
+        return 200, 'OK', ''
     result = syncrunners[nodename].wait()
     del syncrunners[nodename]
-    return ('200 OK', result)
+    return 200, 'OK', result

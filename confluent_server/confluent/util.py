@@ -63,13 +63,15 @@ async def check_call(*cmd, **kwargs):
 
 
 async def check_output(*cmd):
+    if len(cmd) == 1 and isinstance(cmd[0], (list, tuple)):
+        cmd = cmd[0]
     process = await asyncio.create_subprocess_exec(
         *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await process.communicate()
     retcode = process.returncode
     if retcode:
         raise subprocess.CalledProcessError(
-            retcode, process.args,
+            retcode, cmd,
             output=stdout, stderr=stderr)
     return stdout, stderr
 

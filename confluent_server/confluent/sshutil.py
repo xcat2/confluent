@@ -6,7 +6,9 @@ import confluent.config.configmanager as cfm
 import confluent.collective.manager as collective
 import confluent.util as util
 import glob
+import os
 import shutil
+import subprocess
 import tempfile
 
 agent_pid = None
@@ -38,7 +40,7 @@ async def assure_agent():
     if agent_pid is None:
         try:
             agent_starting = True
-            sai = await util.check_output(['ssh-agent'])[0]
+            sai = (await util.check_output(['ssh-agent']))[0]
             for line in sai.split(b'\n'):
                 if b';' not in line:
                     continue
@@ -115,6 +117,7 @@ async def prep_ssh_key(keyname):
     adding_key = True
     if agent_pid:
         if os.path.exists(os.environ['SSH_AUTH_SOCK']):
+            sock = None
             try:
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 sock.connect(os.environ['SSH_AUTH_SOCK'])
@@ -122,7 +125,8 @@ async def prep_ssh_key(keyname):
                 os.unlink(os.environ['SSH_AUTH_SOCK'])
                 os.rmdir(os.path.dirname(os.environ['SSH_AUTH_SOCK']))
             finally:
-                sock.close()
+                if sock:
+                    sock.close()
         if not os.path.exists(os.environ['SSH_AUTH_SOCK']):
             agent_pid = None
             ready_keys.clear()
@@ -145,9 +149,7 @@ async def prep_ssh_key(keyname):
         os.environ['DISPLAY'] = 'NONE'
         os.environ['SSH_ASKPASS'] = askpass
         try:
-            with open(os.devnull, 'wb') as devnull:
-                #TODO:asyncmerge: capture stderr
-                await util.check_call('ssh-add', keyname)
+            await util.check_call('ssh-add', keyname, stdin=subprocess.DEVNULL)
         finally:
             del os.environ['CONFLUENT_SSH_PASSPHRASE']
             del os.environ['DISPLAY']

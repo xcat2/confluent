@@ -632,7 +632,7 @@ async def resourcehandler(request):
     # any 'yield' needs to become a write to the streamresponse
     #TODO:asyncmerge: Replace /confluent-api with '' in path
     # Needs testing for confluent header names with golang clients
-    async def make_response(mimetype, status=200, reason=None, headers=None, cookies=None):
+    async def make_response(mimetype, status=200, reason=None, headers=None, cookies=None, body=None):
         rspheaders = {
             'Cache-Control': 'no-store',
             'Pragma': 'no-cache',
@@ -650,6 +650,10 @@ async def resourcehandler(request):
             rsp.cookies.update(cookies)
         rsp.content_type = mimetype
         await rsp.prepare(request)
+        if body:
+            if isinstance(body, str):
+                body = body.encode('utf8')
+            await rsp.write(body)
         return rsp
     try:
         if 'Sec-WebSocket-Version' in request.headers:

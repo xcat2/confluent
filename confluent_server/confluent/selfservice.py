@@ -48,7 +48,7 @@ def listdump(input):
     retval = ''
     for entry in input:
         retval += '- ' + entry + '\n'
-    return retval
+    return retval.encode()
 
 
 async def get_extra_names(nodename, cfg, myip=None, preferadjacent=False, addlocalhost=True):
@@ -105,34 +105,30 @@ async def handle_request(req, make_response, mimetype):
         clientids = env.get('HTTP_CONFLUENT_IDS', None)
         if not clientids:
             rsp = await make_response(mimetype, 400, 'Bad Request')
-            await rsp.write( 'Bad Request')
-            return
+            await rsp.write(b'Bad Request')
+            return rsp
         for ids in clientids.split('/'):
             _, v = ids.split('=', 1)
             repname = disco.get_node_by_uuid_or_mac(v)
             if repname:
                 rsp = await make_response(mimetype, 200, 'OK')
-                await rsp.write(repname)
-                return
+                await rsp.write(repname.encode())
+                return rsp
         rsp = await make_response(mimetype, 404, 'Unknown')
-        return
+        return rsp
     if reqpath == '/self/registerapikey':
         crypthmac = env.get('HTTP_CONFLUENT_CRYPTHMAC', None)
         if int(env.get('CONTENT_LENGTH', 65)) > 64:
             rsp = await make_response(mimetype, 400, 'Bad Request')
             await rsp.write('Bad Request')
-            return
+            return rsp
         cryptkey = await req.read()
         if not (crypthmac and cryptkey):
-            rsp = make_response(mimetype, 401, 'Unauthorized')
-            await rsp.write('Unauthorized')
-            return
+            return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
         hmackey = cfg.get_node_attributes(nodename, ['secret.selfapiarmtoken'], decrypt=True)
         hmackey = hmackey.get(nodename, {}).get('secret.selfapiarmtoken', {}).get('value', None)
         if not hmackey:
-            rsp = await make_response(mimetype, 401, 'Unauthorized')
-            await rsp.write('Unauthorized')
-            return
+            return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
         if not isinstance(hmackey, bytes):
             hmackey = hmackey.encode('utf8')
         if not isinstance(cryptkey, bytes):
@@ -140,47 +136,34 @@ async def handle_request(req, make_response, mimetype):
         try:
             crypthmac = base64.b64decode(crypthmac)
         except Exception:
-            rsp = await make_response(mimetype, 400, 'Bad Request')
-            await rsp.write('Bad Request')
-            return
+            return await make_response(mimetype, 400, 'Bad Request', body='Bad Request')
         righthmac = hmac.new(hmackey, cryptkey, hashlib.sha256).digest()
         if righthmac == crypthmac:
             if not isinstance(cryptkey, str):
                 cryptkey = cryptkey.decode()
             cfgupdate = {nodename: {'crypted.selfapikey': {'hashvalue': cryptkey}}}
-            cfg.set_node_attributes(cfgupdate)
-            cfg.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
-            rsp = await make_response(mimetype, 200, 'OK')
-            await rsp.write('Accepted')
-            return
-        rsp = await make_response(mimetype, 401, 'Unauthorized')
-        await rsp.write('Unauthorized')
-        return
+            await cfg.set_node_attributes(cfgupdate)
+            await cfg.clear_node_attributes([nodename], ['secret.selfapiarmtoken'])
+            return await make_response(mimetype, 200, 'OK', body='Accepted')
+        return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
     apikey = req.headers.get('CONFLUENT_APIKEY', None)
     if not (nodename and apikey):
-        rsp = await make_response(mimetype, 401, 'Unauthorized')
-        await rsp.write('Unauthorized')
-        return
+        return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
     if len(apikey) > 48:
-        rsp = await make_response(mimetype, 401, 'Unauthorized')
-        await rsp.write('Unauthorized')
-        return
+        return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
+        return rsp
     ea = cfg.get_node_attributes(nodename, ['crypted.selfapikey', 'deployment.apiarmed'])
     eak = ea.get(
         nodename, {}).get('crypted.selfapikey', {}).get('hashvalue', None)
     if not eak:
-        rsp = await make_response(mimetype, 401, 'Unauthorized')
-        await rsp.write(b'Unauthorized')
-        return rsp
+        return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
     if not isinstance(eak, str):
         eak = eak.decode('utf8')
     salt = '$'.join(eak.split('$', 3)[:-1]) + '$'
     if crypt.crypt(apikey, salt) != eak:
-        rsp = await make_response(mimetype, 401, 'Unauthorized')
-        await rsp.write(b'Unauthorized')
-        return
+        return await make_response(mimetype, 401, 'Unauthorized', body='Unauthorized')
     if ea.get(nodename, {}).get('deployment.apiarmed', {}).get('value', None) == 'once':
-        cfg.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
+        await cfg.set_node_attributes({nodename: {'deployment.apiarmed': ''}})
     myip = req.headers.get('X-Forwarded-Host', None)
     if myip and ']' in myip:
         myip = myip.split(']', 1)[0]
@@ -198,18 +181,14 @@ async def handle_request(req, make_response, mimetype):
     elif retype == 'application/json':
         dumper = json.dumps
     else:
-        rsp = await make_response(mimetype, 406, 'Not supported')
-        await rsp.write(b'Unsupported content type in ACCEPT: ' + retype.encode())
-        return
+        return await make_response(mimetype, 406, 'Not supported', body='Unsupported content type in ACCEPT: ' + retype)
     operation = req.method
     if operation not in ('HEAD', 'GET') and req.content_length > 0:
         reqbody = await req.read()
     if reqpath == '/self/register_discovered':
         rb = json.loads(reqbody)
         if not rb.get('path', None):
-            rsp = await make_response(mimetype, 400, 'Bad Requst')
-            await rsp.write('Missing Path')
-            return
+            return await make_response(mimetype, 400, 'Bad Request', body='Missing Path')
         targurl = '/affluent/systems/by-port/{0}/webaccess'.format(rb['path'])
         tlsverifier = util.TLSCertVerifier(cfg, nodename, 'pubkeys.tls_hardwaremanager')
         wc = webclient.WebConnection(nodename, 443, verifycallback=tlsverifier.verify_cert)
@@ -239,13 +218,9 @@ async def handle_request(req, make_response, mimetype):
             elif rb['type'] == 'lenovo-smm2':
                 rb['services'] = ['service:lenovo-smm2']
             else:
-                rsp = await make_response(mimetype, 400, 'Unsupported Device')
-                await rsp.write('Unsupported device for remote discovery registration')
-                return
+                return await make_response(mimetype, 400, 'Unsupported Device', body='Unsupported device for remote discovery registration')
         await disco.detected(rb)
-        rsp = await make_response(mimetype, 200, 'OK')
-        await rsp.write('Registered')
-        return
+        return await make_response(mimetype, 200, 'OK', body='Registered')
     if reqpath == '/self/bmcconfig':
         hmattr = cfg.get_node_attributes(nodename, 'hardwaremanagement.*')
         hmattr = hmattr.get(nodename, {})
@@ -259,9 +234,7 @@ async def handle_request(req, make_response, mimetype):
         bmcaddr = hmattr.get('hardwaremanagement.manager', {}).get('value',
                                                                    None)
         if not bmcaddr:
-            rsp = await make_response(mimetype, 500, 'Internal Server Error')
-            await rsp.write('Missing value in hardwaremanagement.manager')
-            return
+            return await make_response(mimetype, 500, 'Internal Server Error', body='Missing value in hardwaremanagement.manager')
         bmcaddr = bmcaddr.split('/', 1)[0]
         bmcaddr = await asyncio.get_event_loop().getaddrinfo(bmcaddr, 0)[0]
         bmcaddr = bmcaddr[-1][0]
@@ -271,8 +244,7 @@ async def handle_request(req, make_response, mimetype):
             res['prefixv4'] = netconfig['prefix']
             res['bmcgw'] = netconfig.get('ipv4_gateway', None)
         # credential security results in user/password having to be deferred
-        mrsp = await make_response(mimetype, 200, 'OK')
-        await mrsp.write(dumper(res))
+        return await make_response(mimetype, 200, 'OK', body=dumper(res))
     elif reqpath == '/self/myattribs':
         cfd = cfg.get_node_attributes(nodename, '*', decrypt=True).get(nodename, {})
         rsp = {}
@@ -282,12 +254,10 @@ async def handle_request(req, make_response, mimetype):
             rsp[k] = cfd[k]['value']
             if isinstance(rsp[k], bytes):
                 rsp[k] = rsp[k].decode()
-        mrsp = await make_response(mimetype, 200, 'OK')
-        await mrsp.write(dumper(rsp))
+        return await make_response(mimetype, 200, 'OK', body=dumper(rsp))
     elif reqpath == '/self/netcfg':
         ncfg = await netutil.get_full_net_config(cfg, nodename, myip)
-        mrsp = await make_response(mimetype, 200, 'OK')
-        await mrsp.write(dumper(ncfg))
+        return await make_response(mimetype, 200, 'OK', body=dumper(ncfg))
     elif reqpath in ('/self/deploycfg', '/self/deploycfg2'):
         if 'CONFLUENT_MGTIFACE' in req.headers:
             nicname = req.headers['CONFLUENT_MGTIFACE']
@@ -421,30 +391,26 @@ async def handle_request(req, make_response, mimetype):
                 ncfg['ntpservers'].append(ntpsrv)
         dnsdomain = deployinfo.get('dns.domain', {}).get('value', None)
         ncfg['dnsdomain'] = dnsdomain
-        mrsp = await make_response(mimetype, 200, 'OK')
-        await mrsp.write(dumper(ncfg).encode())
-        return mrsp
+        return await make_response(mimetype, 200, 'OK', body=dumper(ncfg))
     elif reqpath == '/self/sshcert' and reqbody:
         if not sshutil.ca_exists():
-            mrsp = await make_response(mimetype, 500, 'Unconfigured')
-            await msrp.write(b'CA is not configured on this system (run ...)')
-            return mrsp
+            return await make_response(mimetype, 500, 'Unconfigured', body='CA is not configured on this system (run ...)')
         pals = await get_extra_names(nodename, cfg, myip)
-        cert = sshutil.sign_host_key(reqbody, nodename, pals)
-        mrsp = await make_response('text/plain', 200, 'OK')
-        await mrsp.write(cert)
+        cert = await sshutil.sign_host_key(reqbody, nodename, pals)
+        return await make_response('text/plain', 200, 'OK', body=cert.encode())
     elif reqpath == '/self/nodelist':
         nodes, _ = await get_cluster_list(nodename, cfg)
         if isgeneric:
             mrsp = await make_response('text/plain', 200, 'OK')
             for node in util.natural_sort(nodes):
-                await mrsp.write(node + '\n')
+                await mrsp.write(f'{node}\n'.encode('utf-8'))
         else:
             mrsp = await make_response(retype, 200, 'OK')
             if retype == 'application/yaml':
                 await mrsp.write(listdump(list(util.natural_sort(nodes))))
             else:
                 await mrsp.write(dumper(list(util.natural_sort(nodes))))
+        return mrsp
     elif reqpath == '/self/remoteconfigbmc' and reqbody:
         try:
             reqbody = yamlload(reqbody)
@@ -456,27 +422,25 @@ async def handle_request(req, make_response, mimetype):
         elif cfgmod == 'tsm':
             tsm.remote_nodecfg(nodename, cfg)
         else:
-            mrsp = await make_response(mimetype, 500, 'unsupported configmod')
-            await mrsp.write('Unsupported configmod "{}"'.format(cfgmod))
-        mrsp = await make_response(mimetype, 200, 'Ok')
-        await mrsp.write('complete')
+            return await make_response(mimetype, 500, 'unsupported configmod', body='Unsupported configmod "{}"'.format(cfgmod))
+        return await make_response(mimetype, 200, 'Ok', body='complete')
     elif reqpath == '/self/updatestatus' and reqbody:
         update = yamlload(reqbody)
         statusstr = update.get('state', None)
         statusdetail = update.get('state_detail', None)
         didstateupdate = False
         if statusstr or 'status' in update:
-            cfg.set_node_attributes({nodename: {
+            await cfg.set_node_attributes({nodename: {
                 'deployment.client_ip': {'value': clientip}}})
         if statusstr:
-            cfg.set_node_attributes({nodename: {'deployment.state': statusstr}})
+            await cfg.set_node_attributes({nodename: {'deployment.state': statusstr}})
             didstateupdate = True
         if statusdetail:
-            cfg.set_node_attributes({nodename: {'deployment.state_detail': statusdetail}})
+            await cfg.set_node_attributes({nodename: {'deployment.state_detail': statusdetail}})
             didstateupdate = True
         if 'status' not in update and didstateupdate:
             mrsp = await make_response(mimetype, 200, 'Ok')
-            await mrsp.write('Accepted')
+            await mrsp.write(b'Accepted')
             return
         if update['status'] == 'staged':
             targattr = 'deployment.stagedprofile'
@@ -503,18 +467,16 @@ async def handle_request(req, make_response, mimetype):
             currprof = currattr.get(targattr, {}).get('value', '')
             if currprof != pending:
                 updates[targattr] = {'value': pending}
-            cfg.set_node_attributes({nodename: updates})
-            mrsp = await make_response('text/plain', 200, 'OK')
-            await mrsp.write('OK')
+            await cfg.set_node_attributes({nodename: updates})
+            return await make_response('text/plain', 200, 'OK', body='OK')
         else:
-            mrsp = await make_response('text/plain', 500, 'Error')
-            await mrsp.write('No pending profile detected, unable to accept status update')
+            return await make_response('text/plain', 500, 'Error', body='No pending profile detected, unable to accept status update')
     elif reqpath == '/self/saveapikey' and reqbody:
         if not isinstance(reqbody, str):
             reqbody = reqbody.decode('utf8')
-        cfg.set_node_attributes({
+        await cfg.set_node_attributes({
             nodename: {'deployment.sealedapikey': {'value': reqbody}}})
-        mrsp = await make_response(mimetype, 200, 'OK')
+        return await make_response(mimetype, 200, 'OK', body='OK')
     elif reqpath.startswith('/self/remoteconfig/') and 'POST' == operation:
         scriptcat = reqpath.replace('/self/remoteconfig/', '')
         playlist = []
@@ -532,10 +494,9 @@ async def handle_request(req, make_response, mimetype):
                     playlist.append(os.path.join(dirname, filename))
         if playlist:
             runansible.run_playbooks(playlist, [nodename])
-            mrsp = await make_response(mimetype, 202, 'Queued')
+            return await make_response(mimetype, 202, 'Queued', body='Queued')
         else:
-            mrsp = await make_response(mimetype, 200, 'OK')
-            return
+            return await make_response(mimetype, 200, 'OK', body='OK')
     elif reqpath.startswith('/self/remotesyncfiles'):
         if 'POST' == operation:
             pals = await get_extra_names(nodename, cfg, myip, preferadjacent=True, addlocalhost=False)
@@ -543,25 +504,20 @@ async def handle_request(req, make_response, mimetype):
                 pals = [clientip]
             result = syncfiles.start_syncfiles(
                 nodename, cfg, json.loads(reqbody), pals)
-            mrsp = await make_response(mimetype, result[0])
-            await mrsp.write(result[1])
-            return
+            return await make_response(mimetype, result[0], result[1], body=result[2])
         if 'GET' == operation:
-            status, output = syncfiles.get_syncresult(nodename)
+            statcode, status, output = syncfiles.get_syncresult(nodename)
             output = json.dumps(output)
-            mrsp = await make_response('application/json', status)
-            await mrsp.write(output)
-            return
+            return await make_response('application/json', statcode, status, body=output)
     elif reqpath.startswith('/self/remoteconfig/status'):
         rst = runansible.running_status.get(nodename, None)
         if not rst:
-            mrsp = await make_response(mimetype, 204, 'Not Running')
-            return
+            return await make_response(mimetype, 204, 'Not Running')
         mrsp = await make_response(mimetype, 200, 'OK')
         if rst.complete:
             del runansible.running_status[nodename]
         await mrsp.write(rst.dump_text())
-        return
+        return mrsp
     elif reqpath.startswith('/self/scriptlist/'):
         scriptcat = reqpath.replace('/self/scriptlist/', '')
         slist, _ = get_scriptlist(
@@ -572,6 +528,7 @@ async def handle_request(req, make_response, mimetype):
             await mrsp.write(yamldump(util.natural_sort(slist)))
         else:
             mrsp = await make_response(mimetype, 200, 'OK')
+        return mrsp
     elif reqpath.startswith('/self/profileprivate/pending/'):
         fname = reqpath.replace('/self/profileprivate/', '')
         deployinfo = cfg.get_node_attributes(
@@ -580,22 +537,15 @@ async def handle_request(req, make_response, mimetype):
         profile = deployinfo.get(
             'deployment.pendingprofile', {}).get('value', '')
         if not profile:
-            mrsp = await make_response(mimetype, 400, 'No pending profile')
-            await mrsp.write('No profile')
-            return
+            return await make_response(mimetype, 400, 'No pending profile', body='No profile')
         fname = '/var/lib/confluent/private/os/{}/{}'.format(profile, fname)
         try:
             with open(fname, 'rb') as privdata:
-                mrsp = await make_response(200, 'OK')
-                await mrsp.write(privdata.read())
-                return
+                return await make_response(mimetype, 200, 'OK', body=privdata.read())
         except IOError:
-            mrsp = await make_response(mimetype, 404, 'Not Found')
-            await mrsp.write('Not found')
-            return
+            return await make_response(mimetype, 404, 'Not Found', body='Not found')
     else:
-        mrsp = await make_response(mimetype, 404, 'Not Found')
-        await mrsp.write('Not found')
+        return await make_response(mimetype, 404, 'Not Found', body='Not found')
 
 def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
     if '..' in scriptcat:
