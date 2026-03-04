@@ -63,8 +63,8 @@ class KvmConnHandler:
         self.pmxclient = pmxclient
         self.node = node
 
-    def connect(self):
-        consdata = self.pmxclient.get_vm_ikvm(self.node)
+    async def connect(self):
+        consdata = await self.pmxclient.get_vm_ikvm(self.node)
         consdata['fprint'] = self.pmxclient.fprint
         return KvmConnection(consdata)
 
@@ -404,7 +404,7 @@ async def update(nodes, element, configmanager, inputdata):
         elif element == ['console', 'ikvm']:
             try:
                 currclient = clientsbynode[node]
-                url = vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
+                url = await vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
             except Exception as e:
                 print(repr(e))
                 return
@@ -418,7 +418,7 @@ async def create(nodes, element, configmanager, inputdata):
         if element == ['console', 'ikvm']:
             try:
                 currclient = clientsbynode[node]
-                url = vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
+                url = await vinzmanager.get_url(node, inputdata, nodeparmcallback=KvmConnHandler(currclient, node).connect)
             except Exception as e:
                 print(repr(e))
                 return
