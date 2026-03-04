@@ -44,8 +44,11 @@ class RetainedIO(io.BytesIO):
     # Need to retain buffer after close
     def __init__(self):
         self.resultbuffer = None
+
     def close(self):
-        self.resultbuffer = self.getbuffer()
+        buf = self.getbuffer()
+        self.resultbuffer = bytes(buf)
+        del buf
         super().close()
 
 def get_dns_txt(qstring):
@@ -452,13 +455,13 @@ class IpmiHandler:
         elif self.element == ['support', 'servicedata']:
             await self.handle_servicedata_fetch()
         elif self.element == ['description']:
-            self.handle_description()
+            await self.handle_description()
         elif self.element == ['console', 'ikvm_methods']:
-            self.handle_ikvm_methods()
+            await self.handle_ikvm_methods()
         elif self.element == ['console', 'ikvm_screenshot']:
-            self.handle_ikvm_screenshot()
+            await self.handle_ikvm_screenshot()
         elif self.element == ['console', 'ikvm']:
-            self.handle_ikvm()
+            await self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
 
@@ -1566,39 +1569,39 @@ class IpmiHandler:
             else:
                 await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
 
-    def handle_description(self):
-        dsc = self.ipmicmd.get_description()
-        self.output.put(msg.KeyValueData(dsc, self.node))
+    async def handle_description(self):
+        dsc = await self.ipmicmd.get_description()
+        await self.output.put(msg.KeyValueData(dsc, self.node))
 
-    def handle_ikvm_methods(self):
-        dsc = self.ipmicmd.get_ikvm_methods()
+    async def handle_ikvm_methods(self):
+        dsc = await self.ipmicmd.get_ikvm_methods()
         dsc = {'ikvm_methods': dsc}
-        self.output.put(msg.KeyValueData(dsc, self.node))
+        await self.output.put(msg.KeyValueData(dsc, self.node))
 
-    def handle_ikvm_screenshot(self):
+    async def handle_ikvm_screenshot(self):
         # good background for the webui, and kitty
         imgdata = RetainedIO()
-        imgformat = self.ipmicmd.get_screenshot(imgdata)
-        imgdata = imgdata.getvalue()
+        imgformat = await self.ipmicmd.get_screenshot(imgdata)
+        imgdata = imgdata.resultbuffer
         if imgdata:
-            self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
+            await self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
 
-    def handle_ikvm(self):
-        methods = self.ipmicmd.get_ikvm_methods()
+    async def handle_ikvm(self):
+        methods = await self.ipmicmd.get_ikvm_methods()
         if 'openbmc' in methods:
-            url = vinzmanager.get_url(self.node, self.inputdata)
-            self.output.put(msg.ChildCollection(url))
+            url = await vinzmanager.get_url(self.node, self.inputdata)
+            await self.output.put(msg.ChildCollection(url))
             return
-        launchdata = self.ipmicmd.get_ikvm_launchdata()
+        launchdata = await self.ipmicmd.get_ikvm_launchdata()
         if 'url' in launchdata and not launchdata['url'].startswith('https://'):
             mybmc = self.ipmicmd.confluentbmcname
             if mybmc.startswith('fe80::'):  # link local, need to adjust
-                lancfg = self.ipmicmd.get_net_configuration()
+                lancfg = await self.ipmicmd.get_net_configuration()
                 mybmc = lancfg['ipv4_address'].split('/')[0]
             if ':' in mybmc and not '[' in mybmc:
                 mybmc = '[{}]'.format(mybmc)
             launchdata['url'] = 'https://{}{}'.format(mybmc, launchdata['url'])
-        self.output.put(msg.KeyValueData(launchdata, self.node))
+        await self.output.put(msg.KeyValueData(launchdata, self.node))
 
 
 def _str_health(health):

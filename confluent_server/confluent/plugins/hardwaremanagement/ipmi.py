@@ -52,7 +52,9 @@ class RetainedIO(io.BytesIO):
     def __init__(self):
         self.resultbuffer = None
     def close(self):
-        self.resultbuffer = self.getbuffer()
+        buf = self.getbuffer()
+        self.resultbuffer = bytes(buf)
+        del buf
         super().close()
 
 def get_dns_txt(qstring):
@@ -1659,7 +1661,7 @@ class IpmiHandler:
         # good background for the webui, and kitty
         imgdata = RetainedIO()
         imgformat = await self.ipmicmd.get_screenshot(imgdata)
-        imgdata = imgdata.getvalue()
+        imgdata = imgdata.resultbuffer
         if imgdata:
             await self.output.put(msg.ScreenShot(imgdata, self.node, imgformat=imgformat))
 
