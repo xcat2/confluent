@@ -580,6 +580,8 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         return InputLicense(path, nodes, inputdata, configmanager)
     elif path == ['deployment', 'lock'] and inputdata:
         return InputDeploymentLock(path, nodes, inputdata)
+    elif path == ['deployment', 'remote_config', 'run'] and inputdata:
+        return InputRemoteConfig(path, nodes, inputdata)
     elif path == ['deployment', 'ident_image']:
         return InputIdentImage(path, nodes, inputdata)
     elif path == ['console', 'ikvm']:
@@ -993,6 +995,10 @@ class InputIdentImage(ConfluentInputMessage):
 class InputDeploymentLock(ConfluentInputMessage):
     keyname = 'lock'
     valid_values = ['autolock', 'unlocked', 'locked']
+
+class InputRemoteConfig(ConfluentInputMessage):
+    keyname = 'category'
+    valid_values = ['post.d', 'firstboot.d', 'onboot.d']
 
 class DeploymentLock(ConfluentChoiceMessage):
     valid_values = set([

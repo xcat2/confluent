@@ -519,19 +519,7 @@ def handle_request(env, start_response):
         yield ''
     elif env['PATH_INFO'].startswith('/self/remoteconfig/') and 'POST' == operation:
         scriptcat = env['PATH_INFO'].replace('/self/remoteconfig/', '')
-        playlist = []
-        for privacy in ('public', 'private'):
-            slist, profile = get_scriptlist(
-                scriptcat, cfg, nodename,
-                '/var/lib/confluent/{0}/os/{{0}}/ansible/{{1}}'.format(privacy))
-            dirname = '/var/lib/confluent/{2}/os/{0}/ansible/{1}/'.format(
-                profile, scriptcat, privacy)
-            if not os.path.isdir(dirname):
-                dirname = '/var/lib/confluent/{2}/os/{0}/ansible/{1}.d/'.format(
-                    profile, scriptcat, privacy)
-            for filename in slist:
-                if filename.endswith('.yaml') or filename.endswith('.yml'):
-                    playlist.append(os.path.join(dirname, filename))
+        playlist = list_ansible_scripts(cfg, nodename, scriptcat)
         if playlist:
             runansible.run_playbooks(playlist, [nodename])
             start_response('202 Queued', ())
@@ -602,6 +590,22 @@ def handle_request(env, start_response):
     else:
         start_response('404 Not Found', ())
         yield 'Not found'
+
+def list_ansible_scripts(cfg, nodename, scriptcat):
+    playlist = []
+    for privacy in ('public', 'private'):
+        slist, profile = get_scriptlist(
+                scriptcat, cfg, nodename,
+                '/var/lib/confluent/{0}/os/{{0}}/ansible/{{1}}'.format(privacy))
+        dirname = '/var/lib/confluent/{2}/os/{0}/ansible/{1}/'.format(
+                profile, scriptcat, privacy)
+        if not os.path.isdir(dirname):
+            dirname = '/var/lib/confluent/{2}/os/{0}/ansible/{1}.d/'.format(
+                    profile, scriptcat, privacy)
+        for filename in slist:
+            if filename.endswith('.yaml') or filename.endswith('.yml'):
+                playlist.append(os.path.join(dirname, filename))
+    return playlist
 
 def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
     if '..' in scriptcat:

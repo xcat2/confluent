@@ -36,6 +36,36 @@ import confluent.client as client
 import confluent.sortutil as sortutil
 devnull = None
 
+def run_automation(noderange, category, c):
+    automationbynode = {}
+    for res in c.update('/noderange/{0}/deployment/remote_config/run'.format(noderange), {
+            'category': category,
+        }):
+            if 'error' in res:
+                sys.stderr.write(res['error'] + '\n')
+                exitcode |= res.get('errorcode', 1)
+            if 'created' in res:
+                nodename = res['created'].split('/')[2]
+                automationbynode[nodename] = res['created']
+    while automationbynode:
+        for node in list(automationbynode):
+            for res in c.read(automationbynode[node]):
+                if 'error' in res:
+                    sys.stderr.write(res['error'] + '\n')
+                    exitcode |= res.get('errorcode', 1)
+                for result in res.get('results', []):
+                    sys.stdout.write('{0}: Task [{1}] {2}\n'.format(
+                        node, result['task_name'], result['state']))
+                    for warning in result.get('warnings', []):
+                        sys.stderr.write('{0}: [WARNING] {1}\n'.format(node, warning))
+                    if 'errorinfo' in result:
+                        for errorline in result['errorinfo'].splitlines():
+                            sys.stderr.write('{0}: [ERROR] {1}\n'.format(node, errorline))                
+                if res.get('complete', False):
+                    del automationbynode[node]
+                    sys.stdout.write('{0}: Automation complete\n'.format(node))
+                    
+
 def run():
     global devnull
     devnull = open(os.devnull, 'rb')
@@ -51,6 +81,8 @@ def run():
                          help='Run the syncfiles associated with the currently completed OS profile on the noderange')
     argparser.add_option('-P', '--scripts',
                          help='Re-run specified scripts, with full path under scripts, e.g. post.d/first,firstboot.d/second')
+    argparser.add_option('-A', '--automation',
+                         help='Run the automation scripts associated with the current OS profile on the noderange, specifying category (onboot.d/firstboot.d/post.d)')
     argparser.add_option('-m', '--maxnodes', type='int',
                     help='Specify a maximum number of '
                         'nodes to run remote ssh command to, '
@@ -74,16 +106,13 @@ def run():
     exitcode = 0
 
     c.stop_if_noderange_over(args[0], options.maxnodes)
+    if options.automation:
+        run_automation(args[0], options.automation, c)
+        
     nodemap = {}
     cmdparms = []
     nodes = []
-    for res in c.read('/noderange/{0}/nodes/'.format(args[0])):
-        if 'error' in res:
-            sys.stderr.write(res['error'] + '\n')
-            exitcode |= res.get('errorcode', 1)
-            break
-        node = res['item']['href'][:-1]
-        nodes.append(node)
+
     
     cmdstorun = []
     if options.security:
@@ -94,8 +123,17 @@ def run():
         for script in options.scripts.split(','):
             cmdstorun.append(['run_remote', script])
     if not cmdstorun:
+        if options.automation:
+            sys.exit(0)
         argparser.print_help()
         sys.exit(1)
+    for res in c.read('/noderange/{0}/nodes/'.format(args[0])):
+        if 'error' in res:
+            sys.stderr.write(res['error'] + '\n')
+            exitcode |= res.get('errorcode', 1)
+            break
+        node = res['item']['href'][:-1]
+        nodes.append(node)
     idxbynode = {}
     cmdvbase = ['bash', '/etc/confluent/functions']
     for sshnode in nodes:
