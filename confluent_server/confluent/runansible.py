@@ -21,12 +21,15 @@ try:
 except ImportError:
     pass
 import asyncio
+import base64
 import shutil
 import json
+import socket
 import msgpack
 import os
 import struct
 import sys
+import tempfile
 
 anspypath = None
 running_status = {}
@@ -38,6 +41,7 @@ class PlayRunner(object):
         self.worker = None
         self.results = []
         self.complete = False
+        self.stdout = ''
 
     def _start_playbooks(self):
         self.worker = tasks.spawn(self._really_run_playbooks())
@@ -49,6 +53,7 @@ class PlayRunner(object):
 
     def dump_text(self):
         stderr = self.stderr
+        stdout = self.stdout
         retinfo = self.dump_dict()
         textout = ''
         for result in retinfo['results']:
@@ -65,6 +70,9 @@ class PlayRunner(object):
                 else:
                     textout += result['state'] + '\n'
             textout += '\n'
+        if stdout:
+            textout += "OUTPUT **********************************\n"
+            textout += stdout
         if stderr:
             textout += "ERRORS **********************************\n"
             textout += stderr
@@ -119,7 +127,7 @@ def run_playbooks(playfiles, nodes):
     runner._start_playbooks()
 
 
-def print_result(result, state, collector=None):
+def print_result(result, state, collector=None, callbacksock=None):
     output = {
         'task_name': result.task_name,
         'changed': result._result.get('changed', ''),
@@ -130,12 +138,12 @@ def print_result(result, state, collector=None):
         del result._result['warnings']
     except KeyError:
         pass
-    if collector:
+    if state != 'ok' and collector and hasattr(collector, '_dump_results'):
         output['errorinfo'] = collector._dump_results(result._result)
     msg = msgpack.packb(output, use_bin_type=True)
     msglen = len(msg)
-    sys.stdout.buffer.write(struct.pack('=q', msglen))
-    sys.stdout.buffer.write(msg)
+    callbacksock.sendall(struct.pack('=q', msglen))
+    callbacksock.sendall(msg)
 
 if __name__ == '__main__':
     from ansible.inventory.manager import InventoryManager
@@ -149,16 +157,25 @@ if __name__ == '__main__':
     import ansible.plugins.loader
     import yaml
 
+    sockpath = os.environ.get('FEEDBACK_SOCK')
+    if not sockpath:
+        sys.stderr.write('No feedback socket specified\n')
+        sys.exit(1)
+
+    callbacksock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    callbacksock.connect(sockpath)
+
+
     class ResultsCollector(CallbackBase):
 
         def v2_runner_on_unreachable(self, result):
-            print_result(result, 'UNREACHABLE', self)
+            print_result(result, 'UNREACHABLE', self, callbacksock)
 
         def v2_runner_on_ok(self, result, *args, **kwargs):
-            print_result(result, 'ok')
+            print_result(result, 'ok', self, callbacksock)
 
         def v2_runner_on_failed(self, result, *args, **kwargs):
-            print_result(result, 'FAILED', self)
+            print_result(result, 'FAILED', self, callbacksock)
 
     context.CLIARGS = ImmutableDict(
         connection='smart', module_path=['/usr/share/ansible'], forks=10,

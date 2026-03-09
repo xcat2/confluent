@@ -547,6 +547,23 @@ async def handle_request(req, make_response, mimetype):
     else:
         return await make_response(mimetype, 404, 'Not Found', body='Not found')
 
+
+def list_ansible_scripts(cfg, nodename, scriptcat):
+    playlist = []
+    for privacy in ('public', 'private'):
+        slist, profile = get_scriptlist(
+                scriptcat, cfg, nodename,
+                '/var/lib/confluent/{0}/os/{{0}}/ansible/{{1}}'.format(privacy))
+        dirname = '/var/lib/confluent/{2}/os/{0}/ansible/{1}/'.format(
+                profile, scriptcat, privacy)
+        if not os.path.isdir(dirname):
+            dirname = '/var/lib/confluent/{2}/os/{0}/ansible/{1}.d/'.format(
+                    profile, scriptcat, privacy)
+        for filename in slist:
+            if filename.endswith('.yaml') or filename.endswith('.yml'):
+                playlist.append(os.path.join(dirname, filename))
+    return playlist
+
 def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
     if '..' in scriptcat:
         return None, None
