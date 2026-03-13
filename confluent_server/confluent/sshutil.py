@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import socket
 
 agent_pid = None
 ready_keys = {}
