@@ -97,7 +97,7 @@ class PlayRunner(object):
                 if ansloc:
                     with open(ansloc, 'r') as onsop:
                         shebang = onsop.readline()
-                        anspypath = shebang.strip().replace('#!', '')
+                        anspypath = shebang.strip().replace('#!', '').strip()
                         mypath = anspypath
             if not mypath:
                 mypath = sys.executable
