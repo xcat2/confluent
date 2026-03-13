@@ -7,7 +7,7 @@ def update(nodes, element, configmanager, inputdata):
     if element[-1] != 'run':
         raise ValueError('Invalid element for remoteconfig plugin')
     for node in nodes:
-        category = inputdata.inputbynode[node]['category']
+        category = inputdata.inputbynode[node]
         playlist = selfservice.list_ansible_scripts(configmanager, node, category)
         if playlist:
             _user_initiated_runs[node] = True
