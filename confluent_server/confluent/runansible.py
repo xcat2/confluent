@@ -96,7 +96,7 @@ class PlayRunner(object):
                 if ansloc:
                     with open(ansloc, 'r') as onsop:
                         shebang = onsop.readline()
-                        anspypath = shebang.strip().replace('#!', '')
+                        anspypath = shebang.strip().replace('#!', '').strip()
                         mypath = anspypath
             if not mypath:
                 mypath = sys.executable
@@ -119,8 +119,8 @@ class PlayRunner(object):
             self.complete = True
 
 
-def run_playbooks(playfiles, nodes):
-    sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+async def run_playbooks(playfiles, nodes):
+    await sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
     runner = PlayRunner(playfiles, nodes)
     for node in nodes:
         running_status[node] = runner

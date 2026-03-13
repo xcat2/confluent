@@ -3,7 +3,7 @@ import confluent.messages as msg
 import confluent.runansible as runansible
 
 _user_initiated_runs = {}
-def update(nodes, element, configmanager, inputdata):
+async def update(nodes, element, configmanager, inputdata):
     if element[-1] != 'run':
         raise ValueError('Invalid element for remoteconfig plugin')
     for node in nodes:
@@ -11,13 +11,13 @@ def update(nodes, element, configmanager, inputdata):
         playlist = selfservice.list_ansible_scripts(configmanager, node, category)
         if playlist:
             _user_initiated_runs[node] = True
-            runansible.run_playbooks(playlist, [node])
+            await runansible.run_playbooks(playlist, [node])
             yield msg.CreatedResource(
                     '/nodes/{0}/deployment/remote_config/active/{0}'.format(node))
         else:
             yield msg.ConfluentNodeError('No remote configuration for category "{0}"', node)
 
-def retrieve(nodes, element, configmanager, inputdata):
+async def retrieve(nodes, element, configmanager, inputdata):
     for node in nodes:
         if element[-1] == 'active':
             rst = runansible.running_status.get(node, None)

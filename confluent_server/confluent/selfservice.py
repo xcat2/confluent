@@ -493,7 +493,7 @@ async def handle_request(req, make_response, mimetype):
                 if filename.endswith('.yaml') or filename.endswith('.yml'):
                     playlist.append(os.path.join(dirname, filename))
         if playlist:
-            runansible.run_playbooks(playlist, [nodename])
+            await runansible.run_playbooks(playlist, [nodename])
             return await make_response(mimetype, 202, 'Queued', body='Queued')
         else:
             return await make_response(mimetype, 200, 'OK', body='OK')
@@ -516,7 +516,7 @@ async def handle_request(req, make_response, mimetype):
         mrsp = await make_response(mimetype, 200, 'OK')
         if rst.complete:
             del runansible.running_status[nodename]
-        await mrsp.write(rst.dump_text())
+        await mrsp.write(rst.dump_text().encode('utf8'))
         return mrsp
     elif reqpath.startswith('/self/scriptlist/'):
         scriptcat = reqpath.replace('/self/scriptlist/', '')
