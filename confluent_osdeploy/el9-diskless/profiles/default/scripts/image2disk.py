@@ -467,7 +467,7 @@ def install_to_disk(imgpath):
         subprocess.check_call(['pvcreate', '-ff', '-y', lvmpart])
         subprocess.check_call(['vgcreate', vgname, lvmpart])
         vgroupmap = {}
-        if yaml and vgmap:
+        if yaml and vgmap and os.path.exists('/tmp/volumegroupmap.yml'):
             with open('/tmp/volumegroupmap.yml') as mapin:
                 vgroupmap = yaml.safe_load(mapin)
         donedisks = {}
