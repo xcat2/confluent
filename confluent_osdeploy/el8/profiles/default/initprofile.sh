@@ -3,7 +3,7 @@ sed -i 's/centos/CentOS/; s/rhel/Red Hat Enterprise Linux/; s/oraclelinux/Oracle
 if grep Fedora $2/profile.yaml > /dev/null; then
 	sed -i 's/@^minimal-environment/#/' $2/packagelist
 fi
-if grep ^label: $2/profile.yaml | grep 10 > /dev/null; then
+if grep ^label: $2/profile.yaml | grep ' 10' > /dev/null; then
 	echo 'echo openssh-keysign >> /tmp/addonpackages' > $2/scripts/pre.d/enablekeysign
 	chmod 644 $2/scripts/pre.d/enablekeysign
 fi
