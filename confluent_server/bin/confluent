@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import asyncio
 import sys
 import os
 
@@ -35,12 +34,12 @@ import confluent.main
 #try:
 import multiprocessing
 
-async def main():
-    await confluent.main.run(sys.argv)
+def main():
+    confluent.main.run(sys.argv)
 if __name__ == '__main__':
     #multiprocessing.freeze_support()
     #asyncio.get_event_loop().run_until_complete(main())
-    asyncio.run(main())
+    main()
     #gt = spawn_for_awaitable(confluent.main.run(sys.argv))
     #gt.wait()
 #except:

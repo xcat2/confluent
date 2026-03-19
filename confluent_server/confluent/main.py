@@ -276,8 +276,7 @@ def migrate_db():
     configmanager.init()
 
 
-async def run(args):
-    asyncio.get_event_loop().set_debug(True)
+def run(args):
     setlimits()
     try:
         configmanager.ConfigManager(None)
@@ -314,6 +313,10 @@ async def run(args):
         _redirectoutput()
     if havefcntl:
         _updatepidfile()
+    asyncio.run(asyncrun())
+
+async def asyncrun():
+    asyncio.get_event_loop().set_debug(True)
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
     atexit.register(doexit)
