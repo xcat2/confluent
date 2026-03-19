@@ -62,7 +62,7 @@ argparser.add_option('-e', '--extra', dest='extra',
                            'to be extra configuration')
 argparser.add_option('-x', '--exclude', dest='exclude',
                      action='store_true', default=False,
-                     help='Treat positional arguments as items to not '
+                     help='Treat named settings as items to not '
                           'examine, compare, or restore default')
 argparser.add_option('-a', '--advanced', dest='advanced',
                      action='store_true', default=False,
