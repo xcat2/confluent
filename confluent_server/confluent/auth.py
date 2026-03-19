@@ -345,7 +345,7 @@ def pam_check(pwe, user, passphrase):
         # get unix_chkpwd helper to enable checking /etc/shadow
         getprompt, sendprompt = os.pipe()
         getprompt, sendprompt = os.fdopen(getprompt, 'rb', 0), os.fdopen(sendprompt, 'wb', 0)
-        pid = os.fork()
+        pid = os.fork()  # we are forking with asyncio, but we are not using async in the child so it should be fine.
         if not pid:
             usergood = False
             try:
