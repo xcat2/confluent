@@ -1733,6 +1733,7 @@ class Disk(ConfluentMessage):
     state_aliases = {
         'unconfigured bad': 'fault',
         'unconfigured good': 'unconfigured',
+        'unconfiguredgood': 'unconfigured',
         'global hot spare': 'hotspare',
         'dedicated hot spare': 'hotspare',
     }
