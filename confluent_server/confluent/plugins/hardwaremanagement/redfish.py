@@ -682,15 +682,15 @@ class IpmiHandler:
     async def handle_nets(self):
         if len(self.element) == 3:
             if self.op != 'read':
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentNodeError(self.node, 'Unsupported operation'))
                 return
-            self.output.put(msg.ChildCollection('management'))
+            await self.output.put(msg.ChildCollection('management'))
         elif len(self.element) == 4 and self.element[-1] == 'management':
             if self.op == 'read':
                 lancfg = await self.ipmicmd.get_net_configuration()
                 v6cfg = await self.ipmicmd.get_net6_configuration()
-                self.output.put(msg.NetworkConfiguration(
+                await self.output.put(msg.NetworkConfiguration(
                     self.node, ipv4addr=lancfg['ipv4_address'],
                     ipv4gateway=lancfg['ipv4_gateway'],
                     ipv4cfgmethod=lancfg['ipv4_configuration'],
@@ -713,16 +713,16 @@ class IpmiHandler:
                     v6gw = config.get('static_v6_gateway', None)
                     await self.ipmicmd.set_net6_configuration(static_addresses=v6addrs, static_gateway=v6gw)
                 except socket.error as se:
-                    self.output.put(msg.ConfluentNodeError(self.node,
+                    await self.output.put(msg.ConfluentNodeError(self.node,
                                                            se.message))
                 except ValueError as e:
                     if e.message == 'negative shift count':
-                        self.output.put(msg.ConfluentNodeError(
+                        await self.output.put(msg.ConfluentNodeError(
                             self.node, 'Invalid prefix length given'))
                     else:
                         raise
         elif len(self.element) == 4 and self.element[-1] != 'management':
-            self.output.put(
+            await self.output.put(
                     msg.ConfluentTargetNotFound(self.node,
                                                 'Interface not found'))
 
