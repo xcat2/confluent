@@ -277,6 +277,9 @@ def migrate_db():
 
 
 def run(args):
+    asyncio.run(asyncrun())
+
+async def asyncrun():
     setlimits()
     try:
         configmanager.ConfigManager(None)
@@ -308,14 +311,15 @@ def run(args):
         print(repr(e))
         sys.exit(1)
     if '-f' not in args:
-        _daemonize()
+        sys.stderr.write("-f is now required")
+        # the fork wreaks havoc with asyncio thread executor
+        # If someone comes along with a non-systemd demand, will just have to have a daemonize wrapper
+        sys.exit(1)
+        #_daemonize()
     if '-o' not in args:
         _redirectoutput()
     if havefcntl:
         _updatepidfile()
-    asyncio.run(asyncrun())
-
-async def asyncrun():
     asyncio.get_event_loop().set_debug(True)
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
@@ -350,8 +354,21 @@ async def asyncrun():
     disco.start_detection()
     await asyncio.sleep(1)
     await consoleserver.start_console_sessions()
+    notifysock = os.environ.get('NOTIFY_SOCKET', None)
+    if notifysock:
+        if notifysock.startswith('@'):
+            notifysock = '\0' + notifysock[1:]
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.connect(notifysock)
+        sock.send(b'READY=1')
+    watchdogsecs = int(os.environ.get('WATCHDOG_USEC', 0)) / 1000000
+    if not watchdogsecs:
+        watchdogsecs = 200
+    watchdogsecs = watchdogsecs / 2
     while 1:
-        await asyncio.sleep(100)
+        await asyncio.sleep(watchdogsecs)
+        if notifysock:
+            sock.send(b'WATCHDOG=1')
 
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')
