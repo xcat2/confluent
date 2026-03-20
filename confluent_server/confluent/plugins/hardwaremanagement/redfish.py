@@ -512,25 +512,25 @@ class IpmiHandler:
         if self.element[1:3] == ['management_controller', 'alerts']:
             return await self.handle_alerts()
         elif self.element[1:3] == ['management_controller', 'certificate_authorities']:
-            return self.handle_cert_authorities()
+            return await self.handle_cert_authorities()
         elif self.element[1:3] == ['management_controller', 'certificate']:
-            return self.handle_certificate()
+            return await self.handle_certificate()
         elif self.element[1:3] == ['management_controller', 'users']:
-            return self.handle_users()
+            return await self.handle_users()
         elif self.element[1:3] == ['management_controller', 'net_interfaces']:
-            return self.handle_nets()
+            return await self.handle_nets()
         elif self.element[1:3] == ['management_controller', 'reset']:
-            return self.handle_reset()
+            return await self.handle_reset()
         elif self.element[1:3] == ['management_controller', 'identifier']:
-            return self.handle_identifier()
+            return await self.handle_identifier()
         elif self.element[1:3] == ['management_controller', 'hostname']:
-            return self.handle_hostname()
+            return await self.handle_hostname()
         elif self.element[1:3] == ['management_controller', 'domain_name']:
-            return self.handle_domain_name()
+            return await self.handle_domain_name()
         elif self.element[1:3] == ['management_controller', 'location']:
-            return self.handle_location_config()
+            return await self.handle_location_config()
         elif self.element[1:3] == ['management_controller', 'ntp']:
-            return self.handle_ntp()
+            return await self.handle_ntp()
         elif self.element[1:4] == ['management_controller', 'extended', 'all']:
             return await self.handle_bmcconfig()
         elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
