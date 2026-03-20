@@ -277,9 +277,9 @@ def migrate_db():
 
 
 def run(args):
-    asyncio.run(asyncrun())
+    asyncio.run(asyncrun(args))
 
-async def asyncrun():
+async def asyncrun(args):
     setlimits()
     try:
         configmanager.ConfigManager(None)
