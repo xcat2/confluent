@@ -191,7 +191,7 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
             for ent in sl.appendoncemap:
                 stage_ent(sl.appendoncemap, ent,
                           os.path.join(targdir, suffixes['appendonce']), True)
-        sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
+        await sshutil.prep_ssh_key('/etc/confluent/ssh/automation')
         targip = node
         if peerip:
             targip = peerip

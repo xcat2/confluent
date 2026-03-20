@@ -81,9 +81,10 @@ except NameError:
 
 async def iterate_responses(responses):
     # normalize plugin behaviors
-    # some might have an async Generator
-    # some might be a traditional generator
-    # others might return an awaitable generator
+    # First, take care of whatever potentially nested levels of awaitables
+    # Then handle async generators, generators, then just general iterable types
+    while inspect.isawaitable(responses):
+        responses = await responses
     if inspect.isasyncgen(responses):
         async for rsp in responses:
             yield rsp
@@ -92,14 +93,6 @@ async def iterate_responses(responses):
         for rsp in responses:
             yield rsp
         return
-    elif inspect.isawaitable(responses):
-        responses = await responses
-    if inspect.isasyncgen(responses):
-        async for rsp in responses:
-            yield rsp
-        return
-    if inspect.isawaitable(responses):
-        responses = await responses
     for rsp in responses:
         yield rsp
 

@@ -532,21 +532,21 @@ class IpmiHandler:
         elif self.element[1:3] == ['management_controller', 'ntp']:
             return self.handle_ntp()
         elif self.element[1:4] == ['management_controller', 'extended', 'all']:
-            return self.handle_bmcconfig()
+            return await self.handle_bmcconfig()
         elif self.element[1:4] == ['management_controller', 'extended', 'advanced']:
-            return self.handle_bmcconfig(True)
+            return await self.handle_bmcconfig(True)
         elif self.element[1:4] == ['management_controller', 'extended', 'extra']:
-            return self.handle_bmcconfig(advanced=False, extended=True)
+            return await self.handle_bmcconfig(advanced=False, extended=True)
         elif self.element[1:4] == ['management_controller', 'extended', 'extra_advanced']:
-            return self.handle_bmcconfig(advanced=True, extended=True)
+            return await self.handle_bmcconfig(advanced=True, extended=True)
         elif self.element[1:3] == ['system', 'all']:
-            return self.handle_sysconfig()
+            return await self.handle_sysconfig()
         elif self.element[1:3] == ['system', 'advanced']:
-            return self.handle_sysconfig(True)
+            return await self.handle_sysconfig(True)
         elif self.element[1:3] == ['system', 'clear']:
-            return self.handle_sysconfigclear()
+            return await self.handle_sysconfigclear()
         elif self.element[1:3] == ['management_controller', 'clear']:
-            return self.handle_bmcconfigclear()
+            return await self.handle_bmcconfigclear()
         elif self.element[1:3] == ['management_controller', 'licenses']:
             return await self.handle_licenses()
         elif self.element[1:3] == ['management_controller', 'save_licenses']:
