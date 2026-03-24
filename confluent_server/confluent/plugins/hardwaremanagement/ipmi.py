@@ -910,7 +910,7 @@ class IpmiHandler:
 
     async def read_sensors(self, sensorname):
         if sensorname == 'all':
-            sensors = await self.ipmicmd.get_sensor_descriptions()
+            sensors = [x async for x in self.ipmicmd.get_sensor_descriptions()]
             readings = []
             for sensor in filter(self.match_sensor, sensors):
                 try:
