@@ -728,7 +728,7 @@ async def get_nic_config(configmanager, node, ip=None, mac=None, ifidx=None,
                     cfgdata['ipv{}_gateway'.format(nver)] = socket.inet_ntop(fam, candgwn)
         return noneify(cfgdata)
     if ip is not None:
-        for prefixinfo in await get_prefix_len_for_ip(ip):
+        async for prefixinfo in get_prefix_len_for_ip(ip):
             fam, prefix = prefixinfo
             ip = ip.split('/', 1)[0]
             if fam == socket.AF_INET:
