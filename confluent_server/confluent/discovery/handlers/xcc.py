@@ -662,9 +662,7 @@ class NodeHandler(immhandler.NodeHandler):
                     for currkey in list(statargs):
                         statargs[currkey + attribsuffix] = statargs[currkey]
                         del statargs[currkey]
-                print(repr(statargs))
                 netset, status = await wc.grab_json_response_with_status('/api/dataset', statargs)
-                print(repr(netset))
 
         elif myipaddr.startswith('fe80::'):
             await self.configmanager.set_node_attributes(

@@ -242,17 +242,17 @@ async def main():
     session = client.Command()
     rcode = 0
     if options.restoredefault:
-        session.stop_if_noderange_over(noderange, options.maxnodes)
+        await session.stop_if_noderange_over(noderange, options.maxnodes)
         if options.restoredefault.lower() in (
             'sys', 'system', 'uefi', 'bios'):
-            for fr in session.update(
+            async for fr in session.update(
                     '/noderange/{0}/configuration/system/clear'.format(noderange),
                     {'clear': True}):
                 rcode |= client.printerror(fr)
             sys.exit(rcode)
         elif options.restoredefault.lower() in (
             'bmc', 'imm', 'xcc'):
-            for fr in session.update(
+            async for fr in session.update(
                     '/noderange/{0}/configuration/management_controller/clear'.format(noderange),
                     {'clear': True}):
                 rcode |= client.printerror(fr)

@@ -972,7 +972,7 @@ class IpmiHandler:
 
     async def list_firmware(self):
         await self.output.put(msg.ChildCollection('all'))
-        for id, data in self.ipmicmd.get_firmware():
+        async for id, data in self.ipmicmd.get_firmware():
             await self.output.put(msg.ChildCollection(simplify_name(id)))
 
     async def read_firmware(self, component, category):
@@ -980,7 +980,7 @@ class IpmiHandler:
         errorneeded = False
         try:
             complist = () if component == 'all' else (component,)
-            for id, data in self.ipmicmd.get_firmware(complist, category):
+            async for id, data in self.ipmicmd.get_firmware(complist, category):
                 if (component in ('core', 'all') or
                         component == simplify_name(id) or
                         match_aliases(component, simplify_name(id))):
