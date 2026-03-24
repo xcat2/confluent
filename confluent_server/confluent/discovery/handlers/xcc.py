@@ -200,7 +200,7 @@ class NodeHandler(immhandler.NodeHandler):
         return util.cert_matches(fprint, certificate)
 
     async def get_webclient(self, username, password, newpassword):
-        wc = self._wc  # .dupe()
+        wc = self._wc.dupe()
         pwdchanged = False
         adata = {'username': util.stringify(username),
                  'password': util.stringify(password)}
@@ -233,8 +233,9 @@ class NodeHandler(immhandler.NodeHandler):
                 pwdchanged = True
                 password = newpassword
                 wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
-                if '_csrf_token' in wc.cookies:
-                    wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+                for cookie in wc.cookies:
+                    if cookie.key.lower() == '_csrf_token':
+                        wc.set_header('X-XSRF-TOKEN', cookie.value)
                 await wc.grab_json_response_with_status('/api/providers/logout')
             else:
                 if rspdata.get('locktime', 0) > 0:
@@ -246,8 +247,9 @@ class NodeHandler(immhandler.NodeHandler):
             wc.set_basic_credentials(username, password)
             wc.set_header('Content-Type', 'application/json')
             wc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
-            if '_csrf_token' in wc.cookies:
-                wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            for cookie in wc.cookies:
+                if cookie.key.lower() == '_csrf_token':
+                    wc.set_header('X-XSRF-TOKEN', cookie.value)
             if rspdata.get('pwchg_required', None) == 'true':
                 if newpassword is None:
                     # a normal login hit expired condition
@@ -272,8 +274,9 @@ class NodeHandler(immhandler.NodeHandler):
                 self._currcreds = (username, newpassword)
                 wc.set_basic_credentials(username, newpassword)
                 pwdchanged = True
-            if '_csrf_token' in wc.cookies:
-                wc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+            for cookie in wc.cookies:
+                if cookie.key.lower() == '_csrf_token':
+                    wc.set_header('X-XSRF-TOKEN', cookie.value)
             if pwdchanged:
                 # Remove the minimum change interval, to allow sane 
                 # password changes after provisional changes
@@ -482,7 +485,7 @@ class NodeHandler(immhandler.NodeHandler):
                                 break
                     if tmpaccount:
                         wc.set_basic_credentials(username, passwd)
-                        wc.grab_json_response_with_status(tmpaccount, method='DELETE')
+                        await wc.grab_json_response_with_status(tmpaccount, method='DELETE')
                     self.tmppasswd = None
                     self._currcreds = (username, passwd)
                     return
@@ -504,7 +507,7 @@ class NodeHandler(immhandler.NodeHandler):
         if curruser and curruser.get('users_pass_is_sha256', 0):
             self._wc = None
             wc = await self.get_wc()
-            nwc = wc # .dupe()
+            nwc = wc.dupe()
             # Have to convert it for being useful with most Lenovo automation tools
             # This requires deleting the account entirely and trying again
             tmpuid = await self._get_next_userid(wc)
@@ -527,8 +530,9 @@ class NodeHandler(immhandler.NodeHandler):
                     rspdata = rsp
                     nwc.set_header('Content-Type', 'application/json')
                     nwc.set_header('Authorization', 'Bearer ' + rspdata['access_token'])
-                    if '_csrf_token' in wc.cookies:
-                        nwc.set_header('X-XSRF-TOKEN', wc.cookies['_csrf_token'])
+                    for cookie in wc.cookies:
+                        if cookie.key.lower() == '_csrf_token':
+                            nwc.set_header('X-XSRF-TOKEN', cookie.value)
                     if rspdata.get('reason', False):
                         newpass = base64.b64encode(os.urandom(9)) + 'q4J$'
                         await nwc.grab_json_response(
@@ -590,7 +594,7 @@ class NodeHandler(immhandler.NodeHandler):
         await self._convert_sha256account(user, passwd, wc)
         if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
                 or cd.get('console.method', {}).get('value', None) == 'ipmi'):
-            nwc = wc # wc.dupe()
+            nwc = wc.dupe()
             nwc.set_basic_credentials(self._currcreds[0], self._currcreds[1])
             rsp = await nwc.grab_json_response('/redfish/v1/Managers/1/NetworkProtocol')
             if not rsp.get('IPMI', {}).get('ProtocolEnabled', True):
@@ -658,7 +662,9 @@ class NodeHandler(immhandler.NodeHandler):
                     for currkey in list(statargs):
                         statargs[currkey + attribsuffix] = statargs[currkey]
                         del statargs[currkey]
+                print(repr(statargs))
                 netset, status = await wc.grab_json_response_with_status('/api/dataset', statargs)
+                print(repr(netset))
 
         elif myipaddr.startswith('fe80::'):
             await self.configmanager.set_node_attributes(
