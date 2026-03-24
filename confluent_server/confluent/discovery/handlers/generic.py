@@ -93,7 +93,7 @@ class NodeHandler(object):
             pass
         return False
     
-    def autosign_certificate(self):
+    async def autosign_certificate(self):
         # A no-op by default
         return
 

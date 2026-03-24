@@ -57,19 +57,19 @@ class NodeHandler(immhandler.NodeHandler):
         self._currcreds = (None, None)
         super(NodeHandler, self).__init__(info, configmanager)
 
-    @property
-    def ipaddr(self):
+    async def get_ipaddr(self):
         if not self._ipaddr:
+            cloop = asyncio.get_running_loop()
             lla = self.info.get('linklocal', '')
             tmplla = None
             if lla:
                 for idx in util.list_interface_indexes():
                     tmplla = '{0}%{1}'.format(lla, idx)
-                    addr = socket.getaddrinfo(tmplla, 443, 0, socket.SOCK_STREAM)[0][4]
+                    addr = (await cloop.getaddrinfo(tmplla, 443, 0, socket.SOCK_STREAM))[0][4]
                     try:
                         tsock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-                        tsock.settimeout(1)
-                        tsock.connect(addr)
+                        tsock.setblocking(0)
+                        await asyncio.wait_for(cloop.sock_connect(tsock, addr), timeout=1)
                         tsock.close()
                         break
                     except Exception:
@@ -563,7 +563,8 @@ class NodeHandler(immhandler.NodeHandler):
                        True)
         cd = cd.get(nodename, {})
         targbmc = cd.get('hardwaremanagement.manager', {}).get('value', '')
-        if not self.ipaddr.startswith('fe80::') and (targbmc.startswith('fe80::') or not targbmc):
+        myipaddr = await self.get_ipaddr()
+        if not myipaddr.startswith('fe80::') and (targbmc.startswith('fe80::') or not targbmc):
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
         # TODO(jjohnson2): set ip parameters, user/pass, alert cfg maybe
@@ -615,8 +616,9 @@ class NodeHandler(immhandler.NodeHandler):
         if targbmc and not targbmc.startswith('fe80::'):
             attribsuffix = ''
             newip = targbmc.split('/', 1)[0]
-            newipinfo = socket.getaddrinfo(newip, 0)[0]
-            newip = newipinfo[-1][0]
+            cloop = asyncio.get_running_loop()
+            newipinfo = await cloop.getaddrinfo(newip, 0)
+            newip = newipinfo[0][-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
             netconfig = await netutil.get_nic_config(self.configmanager, nodename, ip=targbmc)
@@ -625,19 +627,19 @@ class NodeHandler(immhandler.NodeHandler):
             currip = currinfo.get('items', [{}])[0].get('ipv4_address', '')
             curreth1 = await wc.grab_json_response('/api/dataset/imm_ethernet')
             if curreth1:
-                if self.ipaddr.startswith('fe80::'):
+                if myipaddr.startswith('fe80::'):
                     ipkey = 'ipv6_link_local_address'
-                elif '.' in self.ipaddr:
+                elif '.' in myipaddr:
                     ipkey = 'ipv4_address'
                 else:
                     raise Exception('Non-Link-Local IPv6 TODO')
                 nic1ip = curreth1.get('items', [{}])[0].get(ipkey, None)
-                if nic1ip != self.ipaddr:
+                if nic1ip != myipaddr:
                     # check second nic instead
                     curreth2 = await wc.grab_json_response('/api/dataset/imm_ethernet_2')
                     if curreth2 and curreth2.get('items', [{}])[0].get('if_second_port_exist', 0):
                         nic2ip = curreth2.get('items', [{}])[0].get(ipkey + '_2', None)
-                        if nic2ip != self.ipaddr:
+                        if nic2ip != myipaddr:
                             raise Exception("Unable to determine which NIC is active")
                         # ok, second nic is active, target it
                         currip = curreth2.get('items', [{}])[0].get("ipv4_address", None)
@@ -658,9 +660,9 @@ class NodeHandler(immhandler.NodeHandler):
                         del statargs[currkey]
                 netset, status = await wc.grab_json_response_with_status('/api/dataset', statargs)
 
-        elif self.ipaddr.startswith('fe80::'):
+        elif myipaddr.startswith('fe80::'):
             await self.configmanager.set_node_attributes(
-                {nodename: {'hardwaremanagement.manager': self.ipaddr}})
+                {nodename: {'hardwaremanagement.manager': myipaddr}})
         else:
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
@@ -679,23 +681,25 @@ class NodeHandler(immhandler.NodeHandler):
             if em:
                 await self.configmanager.set_node_attributes(
                     {em: {'id.uuid': enclosureuuid}})
-    def autosign_certificate(self):
+    async def autosign_certificate(self):
         nodename = self.nodename
         hwmgt_method = self.configmanager.get_node_attributes(
             nodename, 'hardwaremanagement.method').get(
                 nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
         if hwmgt_method != 'redfish':
             return
-        subprocess.check_call(['/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'])
+        await util.check_call('/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47')
 
 
-def remote_nodecfg(nodename, cfm):
+async def remote_nodecfg(nodename, cfm):
     cfg = cfm.get_node_attributes(
             nodename, 'hardwaremanagement.manager')
     ipaddr = cfg.get(nodename, {}).get('hardwaremanagement.manager', {}).get(
         'value', None)
     ipaddr = ipaddr.split('/', 1)[0]
-    ipaddr = socket.getaddrinfo(ipaddr, 0)[0][-1]
+    cloop = asyncio.get_running_loop()
+    newipinfo = await cloop.getaddrinfo(ipaddr, 0)
+    ipaddr = newipinfo[0][-1][0]
     if not ipaddr:
         raise Exception('Cannot remote configure a system without known '
                          'address')
@@ -703,10 +707,10 @@ def remote_nodecfg(nodename, cfm):
     ipaddr = ipaddr[0]
     wc = webclient.WebConnection(
                 ipaddr, 443, verifycallback=lambda x: True)
-    rsp = wc.grab_json_response('/DeviceDescription.json')
+    rsp = await wc.grab_json_response('/DeviceDescription.json')
     if isinstance(rsp, list):
         nh = NodeHandler(info, cfm)
     else:
         nh = xcc3handler.NodeHandler(info, cfm)
-    nh.config(nodename)
+    await nh.config(nodename)
 

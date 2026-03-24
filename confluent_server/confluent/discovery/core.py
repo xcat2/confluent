@@ -1511,7 +1511,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                     log.log({'info': 'Configured {0} ({1})'.format(nodename,
                                                           handler.devname)})
             if verification and handler.current_cert_self_signed():
-                handler.autosign_certificate()
+                await handler.autosign_certificate()
 
         info['discostatus'] = 'discovered'
         for i in pending_by_uuid.get(curruuid, []):

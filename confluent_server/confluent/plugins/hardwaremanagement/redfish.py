@@ -762,14 +762,14 @@ class IpmiHandler:
                 user = self.inputdata.credentials[self.node]
 
                 if 'username' in user:
-                    self.ipmicmd.set_user_name(uid=user['uid'],
+                    await self.ipmicmd.set_user_name(uid=user['uid'],
                                                name=user['username'])
 
                 if 'password' in user:
-                    self.ipmicmd.set_user_password(uid=user['uid'],
+                    await self.ipmicmd.set_user_password(uid=user['uid'],
                                                    password=user['password'])
                 if 'privilege_level' in user:
-                    self.ipmicmd.set_user_access(uid=user['uid'],
+                    await self.ipmicmd.set_user_access(uid=user['uid'],
                                                  privilege_level=user[
                                                      'privilege_level'])
                 if 'enabled' in user:
@@ -833,11 +833,11 @@ class IpmiHandler:
 
     async def read_sensors(self, sensorname):
         if sensorname == 'all':
-            sensors = await self.ipmicmd.get_sensor_descriptions()
+            sensors = [x async for x in self.ipmicmd.get_sensor_descriptions()]
             readings = []
             for sensor in filter(self.match_sensor, sensors):
                 try:
-                    reading = self.ipmicmd.get_sensor_reading(
+                    reading = await self.ipmicmd.get_sensor_reading(
                         sensor['name'])
                     if reading.unavailable:
                         await self.output.put(msg.SensorReadings([EmptySensor(
@@ -861,7 +861,7 @@ class IpmiHandler:
                                                 'Sensor not found'))
                 return
             try:
-                reading = self.ipmicmd.get_sensor_reading(
+                reading = await self.ipmicmd.get_sensor_reading(
                     self.sensormap[sensorname])
                 if reading.unavailable:
                     await self.output.put(msg.ConfluentResourceUnavailable(
