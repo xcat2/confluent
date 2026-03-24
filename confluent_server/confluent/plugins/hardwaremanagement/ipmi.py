@@ -1637,14 +1637,14 @@ class IpmiHandler:
         if licname == 'all':
             async for lic in self.ipmicmd.get_licenses():
                 if self.op == 'delete':
-                    self.ipmicmd.delete_license(lic['name'])
+                    await self.ipmicmd.delete_license(lic['name'])
                 else:
                     await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
         else:
             index = int(licname)
-            lic = list(self.ipmicmd.get_licenses())[index - 1]
+            lic = list([x async for x in self.ipmicmd.get_licenses()])[index - 1]
             if self.op == 'delete':
-                self.ipmicmd.delete_license(lic['name'])
+                await self.ipmicmd.delete_license(lic['name'])
             else:
                 await self.output.put(msg.License(self.node, feature=lic['name'], state=lic.get('state', 'Active')))
 
