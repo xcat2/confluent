@@ -1622,7 +1622,7 @@ class IpmiHandler:
                 await self.output.put(msg.ConfluentNodeError(self.node, errstr))
                 return
             try:
-                self.ipmicmd.apply_license(filename, data=datfile)
+                await self.ipmicmd.apply_license(filename, data=datfile)
             finally:
                 if datfile is not None:
                     datfile.close()
