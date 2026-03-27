@@ -1407,7 +1407,7 @@ class IpmiHandler:
             if self.inputdata.bootmode(self.node) == 'uefi':
                 douefi = True
             persistent = self.inputdata.persistent(self.node)
-            bootdev = self.ipmicmd.set_bootdev(bootdev, uefiboot=douefi,
+            bootdev = await self.ipmicmd.set_bootdev(bootdev, uefiboot=douefi,
                                                persist=persistent)
             if bootdev['bootdev'] in self.bootdevices:
                 bootdev['bootdev'] = self.bootdevices[bootdev['bootdev']]
