@@ -53,12 +53,16 @@ class TaskPile:
         self._tasks.add(task)
         return task
     
-    def __iter__(self):
-        while self._tasks:
-            done, _ = yield from asyncio.wait(self._tasks, return_when=asyncio.FIRST_COMPLETED)
-            for task in done:
-                self._tasks.discard(task)
-                yield task
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self._tasks:
+            raise StopAsyncIteration
+        done, _ = await asyncio.wait(self._tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            self._tasks.discard(task)
+            return task
 
 class TaskPool:
     def __init__(self, max_concurrent=128):

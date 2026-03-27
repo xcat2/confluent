@@ -186,8 +186,7 @@ async def read_sensors(element, node, configmanager):
             'type': 'Power',
         },
     ]
-    yield msg.SensorReadings(readings, name=node)
-    return
+    return msg.SensorReadings(readings, name=node)
 
 def get_client(node, configmanager):
     if node not in _pduclients:
@@ -204,7 +203,7 @@ async def read_firmware(node, configmanager):
     gc = get_client(node, configmanager)
     adev = await gc.grab_json_response('/xhrgetuserlist.jsp')
     myversion = adev[0]['fwver']
-    yield msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
+    return msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
 
 
 async def read_inventory(element, node, configmanager):
@@ -221,7 +220,7 @@ async def read_inventory(element, node, configmanager):
     info['Product Name'] = adev['pdu'][0]['model']
     info['Model'] = adev['pdu'][0]['part_number']
     inventory['information'] = info
-    yield msg.KeyValueData({'inventory': [inventory]}, node)
+    return msg.KeyValueData({'inventory': [inventory]}, node)
 
 async def retrieve(nodes, element, configmanager, inputdata):
 
@@ -230,7 +229,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
 
             gp.spawn(get_outlet, element, node, configmanager)
-        for res in gp:
+        async for res in gp:
             yield res
 
         return
@@ -238,25 +237,22 @@ async def retrieve(nodes, element, configmanager, inputdata):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(read_sensors, element, node, configmanager)
-        for rsp in gp:
-            for datum in rsp:
-                yield datum
+        async for rsp in gp:
+            yield rsp
         return
     elif '/'.join(element).startswith('inventory/firmware/all'):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(read_firmware, node, configmanager)
-        for rsp in gp:
-            for datum in rsp:
-                yield datum
+        async for rsp in gp:
+            yield rsp
 
     elif '/'.join(element).startswith('inventory/hardware/all'):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(read_inventory, element, node, configmanager)
-        for rsp in gp:
-            for datum in rsp:
-                yield datum
+        async for rsp in gp:
+            yield rsp
     else:
         for node in nodes:
             yield msg.ConfluentResourceUnavailable(node, 'Not implemented')

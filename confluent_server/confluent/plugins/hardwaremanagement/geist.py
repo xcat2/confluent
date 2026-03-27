@@ -234,9 +234,9 @@ async def read_sensors(element, node, configmanager):
             process_measurements(name, category, datum['outlet'], 'outlet', readings)
     if justnames:
         for reading in readings:
-            yield msg.ChildCollection(simplify_name(reading['name']))
+            return msg.ChildCollection(simplify_name(reading['name']))
     else:
-        yield msg.SensorReadings(readings, name=node)
+        return msg.SensorReadings(readings, name=node)
 
 
 async def get_outlet(element, node, configmanager):
@@ -250,7 +250,7 @@ async def read_firmware(node, configmanager):
     gc = GeistClient(node, configmanager)
     adev = await gc.wc.grab_json_response('/api/sys')
     myversion = adev['data']['version']
-    yield msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
+    return msg.Firmware([{'PDU Firmware': {'version': myversion}}], node)
 
 
 async def read_inventory(element, node, configmanager):
@@ -306,7 +306,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(get_outlet, element, node, configmanager)
-        for res in gp:
+        async for res in gp:
             yield res
 
         return
@@ -314,23 +314,20 @@ async def retrieve(nodes, element, configmanager, inputdata):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(read_sensors, element, node, configmanager)
-        for rsp in gp:
-            for datum in rsp:
-                yield datum
+        async for rsp in gp:
+            yield rsp
         return
     elif '/'.join(element).startswith('inventory/firmware/all'):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(read_firmware, node, configmanager)
-        for rsp in gp:
-            for datum in rsp:
-                yield datum
-
+        async for rsp in gp:
+            yield rsp
     elif '/'.join(element).startswith('inventory/hardware/all'):
         gp = tasks.TaskPile(pdupool)
         for node in nodes:
             gp.spawn(read_inventory, element, node, configmanager)
-        for rsp in gp:
+        async for rsp in gp:
             for datum in rsp:
                 yield datum
     else:
