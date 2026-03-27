@@ -297,7 +297,7 @@ async def read_inventory(element, node, configmanager):
 
     inventory['information'] = _inventory
 
-    yield msg.KeyValueData({'inventory': [inventory]}, node)
+    return msg.KeyValueData({'inventory': [inventory]}, node)
 
 
 async def retrieve(nodes, element, configmanager, inputdata):
@@ -328,8 +328,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
             gp.spawn(read_inventory, element, node, configmanager)
         async for rsp in gp:
-            for datum in rsp:
-                yield datum
+            yield rsp
     else:
         for node in nodes:
             yield msg.ConfluentResourceUnavailable(node, 'Not implemented')
