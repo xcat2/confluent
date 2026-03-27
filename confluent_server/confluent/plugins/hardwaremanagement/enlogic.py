@@ -146,6 +146,7 @@ _sensors_by_node = {}
 async def read_sensors(element, node, configmanager):
     category, name = element[-2:]
     justnames = False
+    msgs = []
     if len(element) == 3:
         # just get names
         category = name
@@ -154,10 +155,10 @@ async def read_sensors(element, node, configmanager):
     if category in ('leds, fans', 'temperature'):
         return
     if justnames:
-        yield msg.ChildCollection('total_energy')
-        yield msg.ChildCollection('total_apparent_power')
-        yield msg.ChildCollection('total_real_power')
-        return
+        msgs.append(msg.ChildCollection('total_energy'))
+        msgs.append(msg.ChildCollection('total_apparent_power'))
+        msgs.append(msg.ChildCollection('total_real_power'))
+        return msgs
     sn = _sensors_by_node.get(node, None)
     if not sn or sn[1] < time.time():
         gc = get_client(node, configmanager)
@@ -186,7 +187,7 @@ async def read_sensors(element, node, configmanager):
             'type': 'Power',
         },
     ]
-    return msg.SensorReadings(readings, name=node)
+    return [msg.SensorReadings(readings, name=node)]
 
 def get_client(node, configmanager):
     if node not in _pduclients:
@@ -238,7 +239,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
         for node in nodes:
             gp.spawn(read_sensors, element, node, configmanager)
         async for rsp in gp:
-            yield rsp
+            for msg in rsp:
+                yield msg
         return
     elif '/'.join(element).startswith('inventory/firmware/all'):
         gp = tasks.TaskPile(pdupool)
