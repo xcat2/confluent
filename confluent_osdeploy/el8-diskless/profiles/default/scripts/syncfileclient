@@ -277,7 +277,10 @@ def synchronize():
                             try:
                                 uid = pwd.getpwnam(opts[fname][opt]['name']).pw_uid
                             except KeyError:
-                                uid = opts[fname][opt]['id']
+                                try:
+                                    uid = opts[fname][opt]['id']
+                                except KeyError:
+                                    raise Exception(f"Unable to map owner of {fname}") 
                         elif opt == 'group':
                             try:
                                 gid = grp.getgrnam(opts[fname][opt]['name']).gr_gid
