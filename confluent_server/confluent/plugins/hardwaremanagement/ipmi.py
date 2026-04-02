@@ -217,7 +217,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
 
     def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:
-            self.ipmi_session._mark_broken()
+            await self.ipmi_session._mark_broken()
         except AttributeError:
             # if ipmi_session doesn't already exist,
             # then do nothing
@@ -1264,7 +1264,7 @@ class IpmiHandler:
                              disk.fru, array='{0}-{1}'.format(*arr.id)))
         for arr in scfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
-            self._detail_array(arr, arrname, True)
+            await self._detail_array(arr, arrname, True)
 
     async def show_disk(self, name):
         scfg = await self.ipmicmd.get_storage_configuration()
@@ -1311,7 +1311,7 @@ class IpmiHandler:
         for arr in scfg.arrays:
             arrname = '{0}-{1}'.format(*arr.id)
             if arrname == name:
-                self._detail_array(arr, arrname)
+                await self._detail_array(arr, arrname)
 
     async def _detail_array(self, arr, arrname, detailvol=False):
         vols = []
