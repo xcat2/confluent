@@ -183,7 +183,7 @@ def run():
                                 run_cmdv(node, cmdv, all, poller, pipedesc)
                             elif pendingexecs:
                                 node, cmdv = pendingexecs.popleft()
-                                run_cmdv(node, cmdv, all, poller. pipedesc)
+                                run_cmdv(node, cmdv, all, poller, pipedesc)
             singlepoller.close()
         for node in sortutil.natural_sort(pernodeout):
             for line in pernodeout[node]:
