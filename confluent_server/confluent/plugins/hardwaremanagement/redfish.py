@@ -736,13 +736,15 @@ class IpmiHandler:
                                     privilege_level=user['privilege_level'])
             # A list of users
             await self.output.put(msg.ChildCollection('all'))
-            async for user in self.ipmicmd.get_users():
+            usersfrombmc = await self.ipmicmd.get_users()
+            for user in usersfrombmc:
                 await self.output.put(msg.ChildCollection(user, candelete=True))
             return
         # List all users
         elif len(self.element) == 4 and self.element[-1] == 'all':
             users = []
-            async for user in self.ipmicmd.get_users():
+            usersfrombmc = await self.ipmicmd.get_users()
+            for user in usersfrombmc:
                 users.append(await self.ipmicmd.get_user(uid=user))
             await self.output.put(msg.UserCollection(users=users, name=self.node))
             return

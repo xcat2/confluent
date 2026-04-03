@@ -215,7 +215,7 @@ class IpmiCommandWrapper(ipmicommand.Command):
             self.cfm.remove_watcher(self._attribwatcher)
             self._attribwatcher = None
 
-    def _attribschanged(self, nodeattribs, configmanager, **kwargs):
+    async def _attribschanged(self, nodeattribs, configmanager, **kwargs):
         try:
             await self.ipmi_session._mark_broken()
         except AttributeError:
