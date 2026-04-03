@@ -69,7 +69,7 @@ import shutil
 
 vinz = None
 pluginmap = {}
-dispatch_plugins = (b'remoteconfig', b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'affluent', u'affluent', b'cnos', u'cnos', b'enos', u'enos')
+dispatch_plugins = (b'remoteconfig', b'ipmi', u'ipmi', b'redfish', u'redfish', b'tsmsol', u'tsmsol', b'geist', u'geist', b'deltapdu', u'deltapdu', b'eatonpdu', u'eatonpdu', b'raritan', u'raritan', b'affluent', u'affluent', b'cnos', u'cnos', b'enos', u'enos')
 
 PluginCollection = plugin.PluginCollection
 
