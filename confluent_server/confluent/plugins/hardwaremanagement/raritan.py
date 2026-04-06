@@ -60,7 +60,16 @@ _sensor_type_map = {
 
 
 class RaritanClient(object):
+    def __new__(cls, pdu, configmanager):
+        # Ensure only one client instance per node to allow session reuse
+        if pdu in _sessions_by_node and time.time() - _sessions_by_node[pdu]._authvintage < 90:
+            return _sessions_by_node[pdu]
+        return super(RaritanClient, cls).__new__(cls)
+
     def __init__(self, pdu, configmanager):
+        if hasattr(self, 'node'):
+            # Already initialized by a previous instance, skip reinitialization
+            return
         self.node = pdu
         self.configmanager = configmanager
         self._wc = None
@@ -72,19 +81,15 @@ class RaritanClient(object):
         self._password = None
         self._authtoken = None
         self._authvintage = None
+        self._deviceslots = None
+        self._sensorinfobyrid = {}
+        self._sensorstoread = []
 
     def _next_id(self):
         self._jsonrpc_id += 1
         return self._jsonrpc_id
 
     async def get_wc_with_session(self):
-        if self.node in _sessions_by_node:
-            wc, token, vintage = _sessions_by_node[self.node]
-            if time.time() - vintage < 90:
-                self._wc = wc
-                self._authtoken = token
-                self._authvintage = vintage
-                return wc
         if self._authtoken and self._authvintage and time.time() - self._authvintage < 90:
             return self._wc
         wc = self.wc
@@ -114,7 +119,7 @@ class RaritanClient(object):
         self._authvintage = time.time()
         self.wc.set_header('Authorization', 'Basic')
         self.wc.set_header('X-Sessiontoken', token)
-        _sessions_by_node[self.node] = (self._wc, self._authtoken, self._authvintage)
+        _sessions_by_node[self.node] = self
         return self._wc
 
     @property
@@ -246,10 +251,12 @@ class RaritanClient(object):
         return result.get('_ret_', {})
 
     async def get_peripheral_slots(self):
-        result = await self.jsonrpc(
-            '/model/peripheraldevicemanager', 'getDeviceSlots'
-        )
-        return result.get('_ret_', [])
+        if self._deviceslots is None:
+            result = await self.jsonrpc(
+                '/model/peripheraldevicemanager', 'getDeviceSlots'
+            )
+            self._deviceslots = result.get('_ret_', [])
+        return self._deviceslots
 
 
 _sensors_by_node = {}
@@ -258,9 +265,25 @@ _sensors_by_node = {}
 async def _collect_sensor_readings(rc, name, category):
     readings = []
     # Inlet sensors
-    inlet_sensors = await rc.get_inlet_sensors()
     read_requests = []
     infobyrid = {}
+    if rc._sensorstoread:
+        read_requests.extend(rc._sensorstoread)
+        infobyrid.update(rc._sensorinfobyrid)
+        rsps = await rc.bulk_jsonrpc(read_requests)
+        for sensor_rid, result in rsps.items():
+            reading = result.get('_ret_', {})
+            myname, units, readtype = infobyrid.get(sensor_rid, ('Unknown', '', ''))
+            readings.append({
+                'name': myname,
+                'value': float(reading.get('value', 0)),
+                'units': units,
+                'type': readtype.split()[-1] if readtype.split() else '',
+            })
+        return readings
+    rc._sensorstoread = read_requests
+    rc._sensorinfobyrid = infobyrid
+    inlet_sensors = await rc.get_inlet_sensors()
     for stype, sref in inlet_sensors.items():
         if sref is None:
             continue
