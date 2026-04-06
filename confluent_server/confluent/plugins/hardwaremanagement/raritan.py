@@ -240,6 +240,8 @@ async def _collect_sensor_readings(rc, name, category):
     readings = []
     # Inlet sensors
     inlet_sensors = await rc.get_inlet_sensors()
+    read_requests = []
+    infobyrid = {}
     for stype, sref in inlet_sensors.items():
         if sref is None:
             continue
@@ -255,17 +257,8 @@ async def _collect_sensor_readings(rc, name, category):
         sensor_rid = sref.get('rid', None) if isinstance(sref, dict) else None
         if not sensor_rid:
             continue
-        try:
-            result = await rc.jsonrpc(sensor_rid, 'getReading')
-            reading = result.get('_ret_', {})
-            readings.append({
-                'name': myname,
-                'value': float(reading.get('value', 0)),
-                'units': units,
-                'type': readtype.split()[-1],
-            })
-        except Exception:
-            pass
+        infobyrid[sensor_rid] = (myname, units, readtype)
+        read_requests.append((sensor_rid, 'getReading', None))
     # Outlet sensors
     num_outlets = await rc.get_num_outlets()
     outlet_by_url = {}
@@ -275,8 +268,6 @@ async def _collect_sensor_readings(rc, name, category):
         bulkreqs.append(('/model/pdu/0/outlet/{0}'.format(idx), 'getSensors', None))
     rsps = await rc.bulk_jsonrpc(bulkreqs)
     bulkreqs = []
-    read_requests = []
-    infobyrid = {}
     for url in rsps:
         idx = outlet_by_url.get(url, None)
         if idx is not None:
