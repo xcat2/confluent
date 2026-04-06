@@ -41,6 +41,8 @@ _str_to_state = {
     'on': 1,
 }
 
+_sessions_by_node = {}
+
 # Raritan sensor type IDs to human-readable names and categories
 _sensor_type_map = {
     'rmsCurrent': ('Current', 'A', 'all'),
@@ -66,10 +68,54 @@ class RaritanClient(object):
         self._jsonrpc_id = 0
         self._pdu_metadata = None
         self._num_outlets = None
+        self._username = None
+        self._password = None
+        self._authtoken = None
+        self._authvintage = None
 
     def _next_id(self):
         self._jsonrpc_id += 1
         return self._jsonrpc_id
+
+    async def get_wc_with_session(self):
+        if self.node in _sessions_by_node:
+            wc, token, vintage = _sessions_by_node[self.node]
+            if time.time() - vintage < 90:
+                self._wc = wc
+                self._authtoken = token
+                self._authvintage = vintage
+                return wc
+        if self._authtoken and self._authvintage and time.time() - self._authvintage < 90:
+            return self._wc
+        wc = self.wc
+        if not self._username or not self._password:
+            credcfg = self.configmanager.get_node_attributes(
+                self.node,
+                ['secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'],
+                decrypt=True,
+            )
+            credcfg = credcfg.get(self.node, {})
+            self._username = credcfg.get('secret.hardwaremanagementuser', {}).get('value', None)
+            self._password = credcfg.get('secret.hardwaremanagementpassword', {}).get('value', None)
+            if not self._username or not self._password:
+                raise Exception('Missing username or password')
+            if not isinstance(self._username, str):
+                self._username = self._username.decode('utf8')
+            if not isinstance(self._password, str):        
+                self._password = self._password.decode('utf8')
+        rpcauthorization = 'Basic ' + base64.b64encode(
+            '{0}:{1}'.format(self._username, self._password).encode('utf8')
+        ).decode('utf8')
+        res = await self.jsonrpc('/session', 'newSession', None, custheaders={'Rpcauthorization': rpcauthorization})
+        token = res.get('token', None)
+        if not token:
+            raise Exception('Failed to obtain session token')
+        self._authtoken = token
+        self._authvintage = time.time()
+        self.wc.set_header('Authorization', 'Basic')
+        self.wc.set_header('X-Sessiontoken', token)
+        _sessions_by_node[self.node] = (self._wc, self._authtoken, self._authvintage)
+        return self._wc
 
     @property
     def wc(self):
@@ -90,37 +136,6 @@ class RaritanClient(object):
         ).verify_cert
         self._wc = wc.WebConnection(target, port=443, verifycallback=cv)
         return self._wc
-
-    @property
-    def authheader(self):
-        if self._authheader:
-            return self._authheader
-        credcfg = self.configmanager.get_node_attributes(
-            self.node,
-            [
-                'secret.hardwaremanagementuser',
-                'secret.hardwaremanagementpassword',
-            ],
-            decrypt=True,
-        )
-        credcfg = credcfg.get(self.node, {})
-        username = credcfg.get('secret.hardwaremanagementuser', {}).get(
-            'value', None
-        )
-        passwd = credcfg.get('secret.hardwaremanagementpassword', {}).get(
-            'value', None
-        )
-        if not username or not passwd:
-            raise Exception('Missing username or password')
-        if not isinstance(username, str):
-            username = username.decode('utf8')
-        if not isinstance(passwd, str):
-            passwd = passwd.decode('utf8')
-        cred = base64.b64encode(
-            '{0}:{1}'.format(username, passwd).encode('utf8')
-        ).decode('utf8')
-        self._authheader = {'Authorization': 'Basic ' + cred}
-        return self._authheader
 
     async def bulk_jsonrpc(self, ump):
         requests = []
@@ -153,7 +168,7 @@ class RaritanClient(object):
         return result_by_uri
 
 
-    async def jsonrpc(self, uri, method, params=None):
+    async def jsonrpc(self, uri, method, params=None, custheaders=None):
         reqdata = {
             'jsonrpc': '2.0',
             'method': method,
@@ -161,9 +176,13 @@ class RaritanClient(object):
         }
         if params is not None:
             reqdata['params'] = params
-        rsp = await self.wc.grab_json_response(
-            uri, reqdata, headers=self.authheader
-        )
+        if custheaders:
+            rsp = await self.wc.grab_json_response(
+                uri, reqdata, headers=custheaders
+            )
+        else:
+            webclient = await self.get_wc_with_session()
+            rsp = await webclient.grab_json_response(uri, reqdata)
         if 'error' in rsp and rsp['error']:
             raise Exception(
                 'Raritan JSON-RPC error: {}'.format(rsp['error'])
