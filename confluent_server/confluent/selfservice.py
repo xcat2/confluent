@@ -539,6 +539,11 @@ async def handle_request(req, make_response, mimetype):
         if not profile:
             return await make_response(mimetype, 400, 'No pending profile', body='No profile')
         fname = '/var/lib/confluent/private/os/{}/{}'.format(profile, fname)
+        fullpath = os.path.abspath(fname)
+        if not fullpath.startswith('/var/lib/confluent/private/os/{}/'.format(profile)):
+            start_response('400 Bad Request', ())
+            yield 'Bad Request'
+            return
         try:
             with open(fname, 'rb') as privdata:
                 return await make_response(mimetype, 200, 'OK', body=privdata.read())
@@ -580,6 +585,11 @@ def get_scriptlist(scriptcat, cfg, nodename, pathtemplate):
         'deployment.profile', {}).get('value', '')
     slist = []
     target = pathtemplate.format(profile, scriptcat)
+    target = os.path.abspath(target)
+    allowedbase = os.path.abspath(pathtemplate.format(profile, '').rstrip('/'))
+    allowedbaseprefix = os.path.join(allowedbase, '')
+    if not target.startswith(allowedbaseprefix):
+        return None, None
     if not os.path.isdir(target) and os.path.isdir(target + '.d'):
         target = target + '.d'
     try:
