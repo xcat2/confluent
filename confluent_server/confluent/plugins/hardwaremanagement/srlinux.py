@@ -3,12 +3,14 @@ import confluent.networking.srlinux as srlinux
 import eventlet
 import eventlet.queue as queue
 import confluent.messages as msg
-import traceback
 
 
 def retrieve_node(node, element, user, pwd, configmanager, inputdata, results):
     try:
         retrieve_node_backend(node, element, user, pwd, configmanager, inputdata, results)
+    except exc.PubkeyInvalid as e:
+        results.put(msg.ConfluentNodeError(node, 'Mismatch detected between target certificate fingerprint '
+                'and pubkeys.tls_hardwaremanager attribute'))
     except Exception as e:
         results.put(e)
 
