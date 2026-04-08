@@ -1,3 +1,4 @@
+import confluent.exceptions as exc
 import confluent.networking.srlinux as srlinux
 import eventlet
 import eventlet.queue as queue
@@ -9,8 +10,7 @@ def retrieve_node(node, element, user, pwd, configmanager, inputdata, results):
     try:
         retrieve_node_backend(node, element, user, pwd, configmanager, inputdata, results)
     except Exception as e:
-        print(traceback.format_exc())
-        print(repr(e))
+        results.put(e)
 
 
 def simplify_name(name):
@@ -52,7 +52,7 @@ def retrieve_node_backend(node, element, user, pwd, configmanager, inputdata, re
             if element[-1] == 'all' or simplify_name(sensor['name']) == element[-1]:
                 results.put(msg.SensorReadings([sensor], node))
     else:
-        print(repr(element))
+        results.put(msg.ConfluentNodeError(node, 'Not supported'))
 
 
 def retrieve(nodes, element, configmanager, inputdata):
@@ -77,6 +77,8 @@ def retrieve(nodes, element, configmanager, inputdata):
         try:
             datum = results.get(block=True, timeout=10)
             while datum:
+                if isinstance(datum, Exception):
+                    raise datum
                 if datum:
                     yield datum
                 datum = results.get_nowait()
