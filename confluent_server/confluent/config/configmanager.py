@@ -1026,12 +1026,9 @@ async def del_collective_member(name):
     _true_del_collective_member(name)
     if cfgstreams:
         _hasquorum = has_quorum()
-        pushes = eventlet.GreenPool()
         payload = msgpack.packb({'quorum': _hasquorum}, use_bin_type=False)
-        for _ in pushes.starmap(
-                _push_rpc,
-                [(cfgstreams[s]['stream'], payload) for s in cfgstreams]):
-            pass
+        # Check health of collective prior to attempting
+        await asyncio.gather(*[_push_rpc(cfgstreams[s]['stream'], payload) for s in cfgstreams])
 
 def _true_del_collective_member(name, sync=True):
     global cfgleader

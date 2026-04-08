@@ -541,9 +541,7 @@ async def handle_request(req, make_response, mimetype):
         fname = '/var/lib/confluent/private/os/{}/{}'.format(profile, fname)
         fullpath = os.path.abspath(fname)
         if not fullpath.startswith('/var/lib/confluent/private/os/{}/'.format(profile)):
-            start_response('400 Bad Request', ())
-            yield 'Bad Request'
-            return
+            return await make_response(mimetype, 400, 'Bad Request', body='Bad Request')
         try:
             with open(fname, 'rb') as privdata:
                 return await make_response(mimetype, 200, 'OK', body=privdata.read())
