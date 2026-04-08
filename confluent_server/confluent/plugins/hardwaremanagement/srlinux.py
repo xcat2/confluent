@@ -1,16 +1,18 @@
 import asyncio
+import confluent.exceptions as exc
 import confluent.networking.srlinux as srlinux
 import confluent.messages as msg
-import traceback
 import confluent.tasks as tasks
 
 
 async def retrieve_node(node, element, user, pwd, configmanager, inputdata, results):
     try:
         await retrieve_node_backend(node, element, user, pwd, configmanager, inputdata, results)
+    except exc.PubkeyInvalid as e:
+        await results.put(msg.ConfluentNodeError(node, 'Mismatch detected between target certificate fingerprint '
+                'and pubkeys.tls_hardwaremanager attribute'))
     except Exception as e:
-        print(traceback.format_exc())
-        print(repr(e))
+        await results.put(e)
 
 
 def simplify_name(name):
@@ -53,7 +55,7 @@ async def retrieve_node_backend(node, element, user, pwd, configmanager, inputda
             if element[-1] == 'all' or simplify_name(sensor['name']) == element[-1]:
                 await results.put(msg.SensorReadings([sensor], node))
     else:
-        print(repr(element))
+        results.put(msg.ConfluentNodeError(node, 'Not supported'))
 
 
 async def retrieve(nodes, element, configmanager, inputdata):
@@ -78,6 +80,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
         try:
             datum = await asyncio.wait_for(results.get(), timeout=10.0)
             while datum:
+                if isinstance(datum, Exception):
+                    raise datum
                 if datum:
                     yield datum
                 datum = results.get_nowait()
