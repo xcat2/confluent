@@ -556,26 +556,6 @@ class IpmiHandler:
     def decode_alert(self):
         raise Exception("Decode Alert not implemented for redfish")
 
-    async def handle_certificate(self):
-        self.element = self.element[3:]
-        if len(self.element) != 1:
-            raise Exception('Not implemented')
-        if self.element[0] == 'sign' and self.op == 'update':
-            csr = await self.ipmicmd.get_bmc_csr()
-            subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_names(self.node))
-            with tempfile.NamedTemporaryFile() as tmpfile:
-                tmpfile.write(csr.encode())
-                tmpfile.flush()
-                certfile = tempfile.NamedTemporaryFile(delete=False)
-                certname = certfile.name
-                certfile.close()
-                await certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
-                                            days=self.inputdata.get_days(self.node))
-            with open(certname, 'rb') as certf:
-                cert = certf.read()
-            os.unlink(certname)
-            await self.ipmicmd.install_bmc_certificate(cert)
-
     async def handle_cert_authorities(self):
         if len(self.element) == 3:
             if self.op == 'read':
@@ -611,7 +591,7 @@ class IpmiHandler:
                 certfile = tempfile.NamedTemporaryFile(delete=False)
                 certname = certfile.name
                 certfile.close()
-                certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
+                await certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
                                             days=self.inputdata.get_days(self.node))
             with open(certname, 'rb') as certf:
                 cert = certf.read()
