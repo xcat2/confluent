@@ -402,16 +402,16 @@ class IpmiHandler:
             if (self.error == 'timeout' or
                     'Insufficient resources' in self.error):
                 self.error = self.error.replace(' reported in RAKP4', '')
-                self.output.put(msg.ConfluentTargetTimeout(
+                await self.output.put(msg.ConfluentTargetTimeout(
                     self.node, self.error))
                 return
             elif 'Invalid Session ID' in self.error:
-                self.output.put(msg.ConfluentTargetTimeout(
+                await self.output.put(msg.ConfluentTargetTimeout(
                     self.node, 'Temporary Login Error'))
                 return
             elif ('Unauthorized' in self.error or
                     'Incorrect password' in self.error):
-                self.output.put(
+                await self.output.put(
                     msg.ConfluentTargetInvalidCredentials(self.node))
                 return
             else:
