@@ -621,7 +621,7 @@ class IpmiHandler:
     async def handle_cert_authorities(self):
         if len(self.element) == 3:
             if self.op == 'read':
-                for cert in self.ipmicmd.get_trusted_cas():
+                async for cert in self.ipmicmd.get_trusted_cas():
                     self.output.put(msg.ChildCollection(cert['id']))
             elif self.op == 'update':
                 cert = self.inputdata.get_pem(self.node)
