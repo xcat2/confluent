@@ -579,17 +579,17 @@ class IpmiHandler:
     async def handle_cert_authorities(self):
         if len(self.element) == 3:
             if self.op == 'read':
-                for cert in self.ipmicmd.get_trusted_cas():
-                    self.output.put(msg.ChildCollection(cert['id']))
+                async for cert in self.ipmicmd.get_trusted_cas():
+                    await self.output.put(msg.ChildCollection(cert['id']))
             elif self.op == 'update':
                 cert = self.inputdata.get_pem(self.node)
                 await self.ipmicmd.add_trusted_ca(cert)
         elif len(self.element) == 4:
             certid = self.element[-1]
             if self.op == 'read':
-                for certdata in self.ipmicmd.get_trusted_cas():
+                async for certdata in self.ipmicmd.get_trusted_cas():
                     if certdata['id'] == certid:
-                        self.output.put(msg.CertificateAuthority(
+                        await self.output.put(msg.CertificateAuthority(
                             pem=certdata['pem'],
                             node=self.node,
                             subject=certdata['subject'],
@@ -622,16 +622,16 @@ class IpmiHandler:
         if len(self.element) == 3:
             if self.op == 'read':
                 async for cert in self.ipmicmd.get_trusted_cas():
-                    self.output.put(msg.ChildCollection(cert['id']))
+                    await self.output.put(msg.ChildCollection(cert['id']))
             elif self.op == 'update':
                 cert = self.inputdata.get_pem(self.node)
                 await self.ipmicmd.add_trusted_ca(cert)
         elif len(self.element) == 4:
             certid = self.element[-1]
             if self.op == 'read':
-                for certdata in self.ipmicmd.get_trusted_cas():
+                async for certdata in self.ipmicmd.get_trusted_cas():
                     if certdata['id'] == certid:
-                        self.output.put(msg.CertificateAuthority(
+                        await self.output.put(msg.CertificateAuthority(
                             pem=certdata['pem'],
                             node=self.node,
                             subject=certdata['subject'],
@@ -644,15 +644,15 @@ class IpmiHandler:
         if self.element[3] == 'destinations':
             if len(self.element) == 4:
                 # A list of destinations
-                maxdest = self.ipmicmd.get_alert_destination_count()
+                maxdest = await self.ipmicmd.get_alert_destination_count()
                 for alertidx in range(0, maxdest + 1):
-                    self.output.put(msg.ChildCollection(alertidx))
+                    await self.output.put(msg.ChildCollection(alertidx))
                 return
             elif len(self.element) == 5:
                 alertidx = int(self.element[-1])
                 if self.op == 'read':
                     destdata = await self.ipmicmd.get_alert_destination(alertidx)
-                    self.output.put(msg.AlertDestination(
+                    await self.output.put(msg.AlertDestination(
                         ip=destdata['address'],
                         acknowledge=destdata['acknowledge_required'],
                         acknowledge_timeout=destdata.get('acknowledge_timeout', None),
