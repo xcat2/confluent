@@ -569,7 +569,7 @@ class IpmiHandler:
                 certfile = tempfile.NamedTemporaryFile(delete=False)
                 certname = certfile.name
                 certfile.close()
-                certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
+                await certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
                                             days=self.inputdata.get_days(self.node))
             with open(certname, 'rb') as certf:
                 cert = certf.read()
