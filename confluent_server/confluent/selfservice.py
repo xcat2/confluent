@@ -363,7 +363,7 @@ async def handle_request(req, make_response, mimetype):
             try:
                 tdcout, tdcerr = await util.check_output('timedatectl')
                 tdc = tdcout.split(b'\n')
-            except subprocess.CalledProcessError:
+            except (subprocess.CalledProcessError, FileNotFoundError):
                 tdc = []
                 currtzvintage = time.time()
                 ncfg['timezone'] = currtz
