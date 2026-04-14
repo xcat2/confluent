@@ -340,7 +340,7 @@ async def update_nodes(nodes, element, configmanager, inputdata):
                         raise exc.InvalidArgumentException('Syntax error in attribute name: "{0}"'.format(markup))
             if len(clearattribs) > 0:
                 clearwarnbynode[node] = []
-                configmanager.clear_node_attributes([node], clearattribs, warnings=clearwarnbynode[node])
+                await configmanager.clear_node_attributes([node], clearattribs, warnings=clearwarnbynode[node])
             updatedict[node] = updatenode
     try:
         await configmanager.set_node_attributes(updatedict)
