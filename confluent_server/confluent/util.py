@@ -328,8 +328,8 @@ class TLSCertVerifier(object):
                     auditlog = log.Logger('audit')
                     auditlog.log({'node': self.node, 'event': 'certautoupdate',
                                   'fingerprint': fingerprint})
-                    self.cfm.set_node_attributes(
-                        {self.node: {self.fieldname: fingerprint}})
+                    tasks.spawn(self.cfm.set_node_attributes(
+                        {self.node: {self.fieldname: fingerprint}}))
                     return True
             except Exception:
                 pass
