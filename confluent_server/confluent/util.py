@@ -279,17 +279,6 @@ class TLSCertVerifier(object):
                 return False
             castore = verification.Store(certs)
             _polbuilder = verification.PolicyBuilder().store(castore)
-            try:
-                eep = verification.ExtensionPolicy.permit_all().require_present(
-                    x509.SubjectAlternativeName, verification.Criticality.AGNOSTIC, None).may_be_present(
-                    x509.KeyUsage, verification.Criticality.AGNOSTIC, None)
-                cap = verification.ExtensionPolicy.webpki_defaults_ca().require_present(
-                    x509.BasicConstraints, verification.Criticality.AGNOSTIC, None).may_be_present(
-                    x509.KeyUsage, verification.Criticality.AGNOSTIC, None)
-                _polbuilder = _polbuilder.extension_policies(
-                    ee_policy=eep, ca_policy=cap)
-            except AttributeError:
-                pass
         try:
             addr = ipaddress.ip_address(self.subject)
             subject = x509.IPAddress(addr)
