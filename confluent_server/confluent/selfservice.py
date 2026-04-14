@@ -395,7 +395,7 @@ def handle_request(env, start_response):
                         keymap = ckeymap
             try:
                 tdc = util.run(['timedatectl'])[0].split(b'\n')
-            except subprocess.CalledProcessError:
+            except (subprocess.CalledProcessError, FileNotFoundError):
                 tdc = []
                 currtzvintage = time.time()
                 ncfg['timezone'] = currtz
