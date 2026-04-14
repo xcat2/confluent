@@ -152,8 +152,12 @@ def sanitize_invdata(indata):
 class IpmiCommandWrapper(ipmicommand.Command):
     @classmethod
     async def create(cls, node, cfm, **kwargs):
-        kv = util.TLSCertVerifier(
-            cfm, node, 'pubkeys.tls_hardwaremanager').verify_cert
+        htn = cfm.get_node_attributes(node, 'hardwaremanagement.manager_tls_name')
+        subject = htn.get(node, {}).get('hardwaremanagement.manager_tls_name', {}).get('value', None)
+        if not subject:
+            subject = kwargs['bmc']
+        kv = util.TLSCertVerifier(cfm, node,
+                                  'pubkeys.tls_hardwaremanager', subject).verify_cert
         kwargs['verifycallback'] = kv
         self = await super().create(**kwargs)
         self.confluentbmcname = kwargs['bmc']
@@ -165,13 +169,6 @@ class IpmiCommandWrapper(ipmicommand.Command):
             (node,), ('secret.hardwaremanagementuser', 'collective.manager',
                       'secret.hardwaremanagementpassword', 
                       'hardwaremanagement.manager'), self._attribschanged)
-        htn = cfm.get_node_attributes(node, 'hardwaremanagement.manager_tls_name')
-        subject = htn.get(node, {}).get('hardwaremanagement.manager_tls_name', {}).get('value', None)
-        if not subject:
-            subject = kwargs['bmc']
-        kv = util.TLSCertVerifier(cfm, node,
-                                  'pubkeys.tls_hardwaremanager', subject).verify_cert
-        kwargs['verifycallback'] = kv
         try:
             pass
         except socket.error as se:
