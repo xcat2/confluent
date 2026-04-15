@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # vim: tabstop=4 shiftwidth=4 softtabstop=4
 
 # Copyright 2017 Lenovo
@@ -50,8 +50,8 @@ async def main():
     client.check_globbing(noderange)
     session = client.Command()
     exitcode = 0
-    await session.stop_if_noderange_over(noderange, options.maxnodes)
-    async for r in session.delete('/noderange/{0}'.format(noderange)):
+    session.stop_if_noderange_over(noderange, options.maxnodes)
+    for r in session.delete('/noderange/{0}'.format(noderange)):
         if 'error' in r:
             sys.stderr.write(r['error'] + '\n')
             exitcode |= 1
@@ -61,4 +61,4 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
