@@ -1012,7 +1012,7 @@ async def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True
 async def get_smm_neighbor_fingerprints(smmaddr, cv):
     if ':' in smmaddr:
         smmaddr = '[{0}]'.format(smmaddr)
-    wc = webclient.WebConnection(smmaddr, verifycallback=cv)
+    wc = webclient.WebConnection(smmaddr, 443, verifycallback=cv)
     try:
         neighs = await wc.grab_json_response('/scripts/neighdata.json')
     except Exception:
@@ -1216,7 +1216,7 @@ async def search_smms_by_cert(currsmm, cert, cfg):
         smmaddr = cd.get(currsmm, {}).get('hardwaremanagement.manager', {}).get('value', None)
         if not smmaddr:
             smmaddr = currsmm
-        wc = webclient.WebConnection(smmaddr, verifycallback=cv)
+        wc = webclient.WebConnection(smmaddr, 443, verifycallback=cv)
         neighs = await wc.grab_json_response('/scripts/neighdata.json')
     except Exception:
         return None
