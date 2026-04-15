@@ -40,7 +40,6 @@ class NodeHandler(object):
         self.relay_server = None
         self.web_ip = None
         self.web_port = None
-        self.https_cert = None
         # if this is a remote registered component, prefer to use the agent forwarder
         if info.get('forwarder_url', False):
             self.relay_url = info['forwarder_url']
@@ -171,7 +170,6 @@ class NodeHandler(object):
         except Exception:
             self._certfailreason = 2
             return None
-        self.https_cert = self._fp
         return self._fp
 
     async def get_web_port_and_ip(self):

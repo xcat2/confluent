@@ -733,7 +733,7 @@ async def _recheck_single_unknown_info(configmanager, info):
         #log.log({'info': 'Missing address information in ' + repr(info)})
         return
     handler = info['handler'].NodeHandler(info, configmanager)
-    if handler.https_supported and not handler.https_cert:
+    if handler.https_supported and not await handler.get_https_cert():
         if handler.cert_fail_reason == 'unreachable':
             log.log(
                 {
@@ -767,7 +767,7 @@ async def _recheck_single_unknown_info(configmanager, info):
                                          ('pubkeys.tls_hardwaremanager',))
             lastfp = dp.get(nodename, {}).get('pubkeys.tls_hardwaremanager',
                                               {}).get('value', None)
-            if util.cert_matches(lastfp, handler.https_cert):
+            if util.cert_matches(lastfp, await handler.get_https_cert()):
                 info['nodename'] = nodename
                 known_nodes[nodename][info['hwaddr']] = info
                 info['discostatus'] = 'discovered'
@@ -870,7 +870,7 @@ async def detected(info):
         info['otheraddresses'].add(i4addr)
     for i4addr in info.get('attributes', {}).get('ipv4-addresses', []):
         info['otheraddresses'].add(i4addr)
-    if handler and handler.https_supported and not handler.https_cert:
+    if handler and handler.https_supported and not await handler.get_https_cert():
         if handler.cert_fail_reason == 'unreachable':
             log.log(
                 {
@@ -902,7 +902,7 @@ async def detected(info):
         dp = dp.get(nodename, {})
         lastfp = dp.get('pubkeys.tls_hardwaremanager',
                                           {}).get('value', None)
-        if util.cert_matches(lastfp, handler.https_cert):
+        if util.cert_matches(lastfp, await handler.get_https_cert()):
             info['nodename'] = nodename
             known_nodes[nodename][info['hwaddr']] = info
             info['discostatus'] = 'discovered'
@@ -968,7 +968,7 @@ async def get_chained_smm_name(nodename, cfg, handler, nl=None, checkswitch=True
     # search if not indicated by current situation
     # returns the new name and whether it has been securely validated or not
     # first we check to see if directly connected
-    mycert = handler.https_cert
+    mycert = await handler.get_https_cert()
     if checkswitch:
         fprints = macmap.get_node_fingerprints(nodename, cfg)
         for fprint in fprints:
@@ -1078,7 +1078,7 @@ async def get_nodename(cfg, handler, info):
     if not handler:
         return None, None
     if handler.https_supported:
-        currcert = handler.https_cert
+        currcert = await handler.get_https_cert()
         if not currcert:
             info['discofailure'] = 'nohttps'
             return None, None
@@ -1279,7 +1279,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
         # The specified node is an enclosure (has nodes mapped to it), but
         # what we are talking to is *not* an enclosure
         # might be ambiguous, need to match chassis-uuid as well..
-        match = await search_smms_by_cert(nodename, handler.https_cert, cfg)
+        match = await search_smms_by_cert(nodename, await handler.get_https_cert(), cfg)
         if match:
             info['verfied'] = True
             info['enclosure.bay'] = match[1]
@@ -1377,7 +1377,7 @@ async def eval_node(cfg, handler, info, nodename, manual=False):
                     # validate the smm certificate by the switch
                     fprints = macmap.get_node_fingerprints(nodename, cfg)
                     for fprint in fprints:
-                        if util.cert_matches(fprint[0], handler.https_cert):
+                        if util.cert_matches(fprint[0], await handler.get_https_cert()):
                             if not await discover_node(cfg, handler, info,
                                                  nodename, manual):
                                 pending_nodes[nodename] = info
@@ -1402,7 +1402,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 '{0} is not a defined node, must be defined before an '
                 'endpoint may be assigned to it'.format(nodename))
         if handler.https_supported:
-            currcert = handler.https_cert
+            currcert = await handler.get_https_cert()
             if currcert:
                 currprint = util.get_fingerprint(currcert, 'sha256')
                 prevnode = nodes_by_fprint.get(currprint, None)
@@ -1432,7 +1432,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
     if 'pxe' in policies and info['handler'] == pxeh:
         return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
     elif ('permissive' in policies and handler.https_supported and lastfp and
-            not util.cert_matches(lastfp, handler.https_cert) and not manual):
+            not util.cert_matches(lastfp, await handler.get_https_cert()) and not manual):
         info['discofailure'] = 'fingerprint'
         log.log({'info': 'Detected replacement of {0} with existing '
                          'fingerprint and permissive discovery policy, not '
@@ -1442,7 +1442,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
         return False  # With a permissive policy, do not discover new
     elif policies & set(('open', 'permissive', 'verified')) or manual:
         if 'verified' in policies:
-            if not handler.https_supported or not util.cert_matches(info['fingerprint'], handler.https_cert):
+            if not handler.https_supported or not util.cert_matches(info['fingerprint'], await handler.get_https_cert()):
                 log.log({'info': 'Detected replacement of {0} without verified '
                          'fingerprint and discovery policy is set to verified, not '
                          'doing discovery unless discovery.policy=open or '
@@ -1452,7 +1452,7 @@ async def discover_node(cfg, handler, info, nodename, manual):
         info['nodename'] = nodename
         if info['handler'] == pxeh:
             return do_pxe_discovery(cfg, handler, info, manual, nodename, policies)
-        elif manual or not util.cert_matches(lastfp, handler.https_cert):
+        elif manual or not util.cert_matches(lastfp, await handler.get_https_cert()):
             # only 'discover' if it is not the same as last time
             try:
                 await handler.config(nodename)
@@ -1485,9 +1485,9 @@ async def discover_node(cfg, handler, info, nodename, manual):
                 newnodeattribs['id.serial'] = info['serialnumber']
             if 'modelnumber' in info:
                 newnodeattribs['id.model'] = info['modelnumber']
-            if handler.https_cert:
+            if await handler.get_https_cert():
                 newnodeattribs['pubkeys.tls_hardwaremanager'] = \
-                    util.get_fingerprint(handler.https_cert, 'sha256')
+                    util.get_fingerprint(await handler.get_https_cert(), 'sha256')
             if newnodeattribs:
                 currattrs = cfg.get_node_attributes(nodename, newnodeattribs)
                 for checkattr in newnodeattribs:
