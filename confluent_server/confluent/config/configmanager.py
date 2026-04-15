@@ -1655,7 +1655,7 @@ class ConfigManager(object):
         :param attributemap: The mapping of keys to values to set
         """
         if cfgleader:
-            return exec_on_leader('_rpc_master_set_usergroup', self.tenant,
+            return await exec_on_leader('_rpc_master_set_usergroup', self.tenant,
                                   groupname, attributemap)
         if cfgstreams:
             await exec_on_followers('_rpc_set_usergroup', self.tenant, groupname,
@@ -1686,7 +1686,7 @@ class ConfigManager(object):
                      "Administrator"
         """
         if cfgleader:
-            return exec_on_leader('_rpc_master_create_usergroup', self.tenant,
+            return await exec_on_leader('_rpc_master_create_usergroup', self.tenant,
                                   groupname, role)
         if cfgstreams:
             await exec_on_followers('_rpc_create_usergroup', self.tenant, groupname,
@@ -1715,7 +1715,7 @@ class ConfigManager(object):
 
     async def del_usergroup(self, name):
         if cfgleader:
-            return exec_on_leader('_rpc_master_del_usergroup', self.tenant, name)
+            return await exec_on_leader('_rpc_master_del_usergroup', self.tenant, name)
         if cfgstreams:
             await exec_on_followers('_rpc_del_usergroup', self.tenant, name)
         self._true_del_usergroup(name)
@@ -1733,7 +1733,7 @@ class ConfigManager(object):
         :param attributemap: A dict of key values to set
         """
         if cfgleader:
-            return exec_on_leader('_rpc_master_set_user', self.tenant, name,
+            return await exec_on_leader('_rpc_master_set_user', self.tenant, name,
                                   attributemap)
         if cfgstreams:
             await exec_on_followers('_rpc_set_user', self.tenant, name, attributemap)
@@ -1766,7 +1766,7 @@ class ConfigManager(object):
 
     async def del_user(self, name):
         if cfgleader:
-            return exec_on_leader('_rpc_master_del_user', self.tenant, name)
+            return await exec_on_leader('_rpc_master_del_user', self.tenant, name)
         if cfgstreams:
             await exec_on_followers('_rpc_del_user', self.tenant, name)
         self._true_del_user(name)
@@ -2004,8 +2004,8 @@ class ConfigManager(object):
                 continue  # next node, this node already in
             self._node_added_to_group(node, group, changeset)
 
-    def add_group_attributes(self, attribmap):
-        self.set_group_attributes(attribmap, autocreate=True)
+    async def add_group_attributes(self, attribmap):
+        await self.set_group_attributes(attribmap, autocreate=True)
 
     async def set_group_attributes(self, attribmap, autocreate=False, merge="replace", keydata=None, skipped=None):
         for group in attribmap:
@@ -2025,8 +2025,8 @@ class ConfigManager(object):
                 if 'expression' in curr[attrib]:
                     ExpressionChecker().format(curr[attrib]['expression'])
         if cfgleader:  # currently config slave to another
-            return exec_on_leader('_rpc_master_set_group_attributes',
-                                  self.tenant, attribmap, autocreate)
+            return await exec_on_leader('_rpc_master_set_group_attributes',
+                                        self.tenant, attribmap, autocreate)
         if cfgstreams:
             await exec_on_followers('_rpc_set_group_attributes', self.tenant,
                               attribmap, autocreate)
@@ -2155,7 +2155,7 @@ class ConfigManager(object):
 
     async def clear_group_attributes(self, groups, attributes):
         if cfgleader:
-            return exec_on_leader('_rpc_master_clear_group_attributes',
+            return await exec_on_leader('_rpc_master_clear_group_attributes',
                                   self.tenant, groups, attributes)
         if cfgstreams:
             await exec_on_followers('_rpc_clear_group_attributes', self.tenant,
@@ -2330,7 +2330,7 @@ class ConfigManager(object):
 
     async def del_groups(self, groups):
         if cfgleader:
-            return exec_on_leader('_rpc_master_del_groups', self.tenant,
+            return await exec_on_leader('_rpc_master_del_groups', self.tenant,
                                   groups)
         if cfgstreams:
             await exec_on_followers('_rpc_del_groups', self.tenant, groups)
@@ -2349,7 +2349,7 @@ class ConfigManager(object):
 
     async def clear_node_attributes(self, nodes, attributes, warnings=None):
         if cfgleader:
-            mywarnings = exec_on_leader('_rpc_master_clear_node_attributes',
+            mywarnings = await exec_on_leader('_rpc_master_clear_node_attributes',
                                   self.tenant, nodes, attributes)
             if mywarnings and warnings is not None:
                 warnings.extend(mywarnings)
@@ -2456,7 +2456,7 @@ class ConfigManager(object):
 
     async def rename_nodegroups(self, renamemap):
         if cfgleader:
-            return exec_on_leader('_rpc_master_rename_nodegroups', self.tenant, renamemap)
+            return await exec_on_leader('_rpc_master_rename_nodegroups', self.tenant, renamemap)
         if cfgstreams:
             await exec_on_followers('_rpc_rename_nodegroups', self.tenant, renamemap)
         self._true_rename_groups(renamemap)

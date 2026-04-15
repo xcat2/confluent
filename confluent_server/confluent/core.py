@@ -748,19 +748,19 @@ async def iterate_resources(fancydict):
         yield msg.ChildCollection(resource)
 
 
-def delete_user(user, configmanager):
-    configmanager.del_user(user)
+async def delete_user(user, configmanager):
+    await configmanager.del_user(user)
     yield msg.DeletedResource(user)
 
-def delete_usergroup(usergroup, configmanager):
-    configmanager.del_usergroup(usergroup)
+async def delete_usergroup(usergroup, configmanager):
+    await configmanager.del_usergroup(usergroup)
     yield msg.DeletedResource(usergroup)
 
 
-def delete_nodegroup_collection(collectionpath, configmanager):
+async def delete_nodegroup_collection(collectionpath, configmanager):
     if len(collectionpath) == 2:  # just the nodegroup
         group = collectionpath[-1]
-        configmanager.del_groups([group])
+        await configmanager.del_groups([group])
         yield msg.DeletedResource(group)
     else:
         raise Exception("Not implemented")
@@ -808,7 +808,7 @@ def enumerate_node_collection(collectionpath, configmanager):
     return iterate_resources(collection)
 
 
-def create_group(inputdata, configmanager):
+async def create_group(inputdata, configmanager):
     try:
         groupname = inputdata['name']
         del inputdata['name']
@@ -816,7 +816,7 @@ def create_group(inputdata, configmanager):
     except KeyError:
         raise exc.InvalidArgumentException()
     try:
-        configmanager.add_group_attributes(attribmap)
+        await configmanager.add_group_attributes(attribmap)
     except ValueError as e:
         raise exc.InvalidArgumentException(str(e))
     yield msg.CreatedResource(groupname)
@@ -861,7 +861,7 @@ async def enumerate_collections(collections):
         yield msg.ChildCollection(collection)
 
 
-def handle_nodegroup_request(configmanager, inputdata,
+async def handle_nodegroup_request(configmanager, inputdata,
                              pathcomponents, operation):
     iscollection = False
     routespec = None
@@ -1464,16 +1464,16 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
     if not pathcomponents:  # root collection list
         return enumerate_collections(rootcollections)
     elif pathcomponents[0] == 'noderange':
-        return await  handle_node_request(configmanager, inputdata, operation,
+        return await handle_node_request(configmanager, inputdata, operation,
                                    pathcomponents, autostrip)
     elif pathcomponents[0] == 'deployment':
-        return handle_deployment(configmanager, inputdata, pathcomponents,
+        return await handle_deployment(configmanager, inputdata, pathcomponents,
                                  operation)
     elif pathcomponents[0] == 'storage':
-        return handle_storage(configmanager, inputdata, pathcomponents,
+        return await handle_storage(configmanager, inputdata, pathcomponents,
                               operation)
     elif pathcomponents[0] == 'nodegroups':
-        return handle_nodegroup_request(configmanager, inputdata,
+        return await handle_nodegroup_request(configmanager, inputdata,
                                         pathcomponents,
                                         operation)
     elif pathcomponents[0] == 'nodes':
@@ -1542,7 +1542,7 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
             inputdata = msg.get_input_message(
                 pathcomponents, operation, inputdata,
                 configmanager=configmanager)
-            update_user(user, inputdata.attribs, configmanager)
+            await update_user(user, inputdata.attribs, configmanager)
             return show_user(user, configmanager)
     elif pathcomponents[0] == 'events':
         try:
