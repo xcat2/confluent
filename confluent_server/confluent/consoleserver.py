@@ -455,7 +455,7 @@ class ConsoleHandler(object):
             self._console.close()
             self._console = None
         if self.connectionthread:
-            self.connectionthread.kill()
+            self.connectionthread.cancel()
             self.connectionthread = None
         if self._attribwatcher:
             self.cfgmgr.remove_watcher(self._attribwatcher)
@@ -619,7 +619,7 @@ async def start_console_sessions():
     await configmodule.hook_new_configmanagers(_start_tenant_sessions)
 
 
-def connect_node(node, configmanager, username=None, direct=True, width=80,
+async def connect_node(node, configmanager, username=None, direct=True, width=80,
                  height=24):
     attrval = configmanager.get_node_attributes(node, 'collective.manager')
     myc = attrval.get(node, {}).get('collective.manager', {}).get(
@@ -778,7 +778,7 @@ class ConsoleSession(object):
                               # relay
         self.width = width
         self.height = height
-        self.connect_session()
+        tasks.spawn(self.connect_session())
         self.registered = True
         self._evt = None
         self.node = node
@@ -801,14 +801,14 @@ class ConsoleSession(object):
         await self.conshdl.attachsession(self)
 
 
-    def connect_session(self):
+    async def connect_session(self):
         """Connect to the appropriate backend handler
 
         This is not intended to be called by your usual consumer,
         it is a hook for confluent to abstract the concept of a terminal
         between console and shell.
         """
-        self.conshdl = connect_node(self.node, self.configmanager,
+        self.conshdl = await connect_node(self.node, self.configmanager,
                                     self.username, self.direct, self.width,
                                     self.height)
     def send_break(self):
@@ -853,7 +853,7 @@ class ConsoleSession(object):
         """
         await self.conshdl.detachsession(self)
         if reattach:
-            self.connect_session()
+            await self.connect_session()
             await self.conshdl.attachsession(self)
             self.write = self.conshdl.write
 
