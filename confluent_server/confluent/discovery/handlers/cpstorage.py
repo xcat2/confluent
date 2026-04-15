@@ -27,12 +27,6 @@ class NodeHandler(bmchandler.NodeHandler):
     devname = 'BMC'
     maxmacs = 2
 
-    def validate_cert(self, certificate):
-        # broadly speaking, merely checks consistency moment to moment,
-        # but if https_cert gets stricter, this check means something
-        fprint = util.get_fingerprint(self.https_cert)
-        return util.cert_matches(fprint, certificate)
-
     async def get_webclient(self, user, passwd, newuser, newpass):
         wc = webclient.WebConnection(self.ipaddr, 443,
                                             verifycallback=self.validate_cert)

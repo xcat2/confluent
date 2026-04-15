@@ -61,14 +61,6 @@ class NodeHandler(bmchandler.NodeHandler):
             uuid = fixuuid(uuid[0])
             self.info['uuid'] = uuid
 
-    def _validate_cert(self, certificate):
-        # Assumption is by the time we call config, that discovery core has
-        # vetted self._fp.  Our job here then is just to make sure that
-        # the currect connection matches the previously saved cert
-        if not self._fp:  # circumstances are that we haven't validated yet
-            self._fp = certificate
-        return certificate == self._fp
-
     def _webconfigrules(self, wc):
         rules = []
         for rule in self.ruleset.split(','):
@@ -137,7 +129,7 @@ class NodeHandler(bmchandler.NodeHandler):
 
     def _webconfigcreds(self, username, password):
         ip, port = self.get_web_port_and_ip()
-        wc = webclient.WebConnection(ip, port, verifycallback=self._validate_cert)
+        wc = webclient.WebConnection(ip, port, verifycallback=self.validate_cert)
         wc.connect()
         authdata = {  # start by trying factory defaults
             'user': 'USERID',

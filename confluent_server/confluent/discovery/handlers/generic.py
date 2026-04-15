@@ -31,7 +31,7 @@ class NodeHandler(object):
 
     def __init__(self, info, configmanager):
         self._certfailreason = None
-        self._fp = None
+        self._savedcert = None
         self.info = info
         self.configmanager = configmanager
         targsa = [None]
@@ -71,10 +71,10 @@ class NodeHandler(object):
             wc = webclient.WebConnection(self._ipaddr, verifycallback=self._savecert, port=443)
             wc.connect()
             wc.close()
-            if not self._fp:
+            if not self._savedcert:
                 return False
             # Check if certificate is self-signed by comparing issuer and subject
-            cert = self._fp
+            cert = self._savedcert
             certobj = x509.load_der_x509_certificate(cert)
             skid = None
             akid = None
@@ -116,7 +116,7 @@ class NodeHandler(object):
         return macs <= self.maxmacs
 
     def _savecert(self, certificate):
-        self._fp = certificate
+        self._savedcert = certificate
         return True
 
     def get_node_credentials(self, nodename, creds, defuser, defpass):
@@ -152,8 +152,8 @@ class NodeHandler(object):
             return 'unreachable'
 
     async def get_https_cert(self):
-        if self._fp:
-            return self._fp
+        if self._savedcert:
+            return self._savedcert
         ip, port = await self.get_web_port_and_ip()
         wc = webclient.WebConnection(ip, verifycallback=self._savecert, port=port)
         try:
@@ -170,7 +170,14 @@ class NodeHandler(object):
         except Exception:
             self._certfailreason = 2
             return None
-        return self._fp
+        return self._savedcert
+    
+    def validate_cert(self, certificate):
+        if not self._savedcert:
+            self._savedcert = certificate
+            return True
+        fprint = util.get_fingerprint(self._savedcert)
+        return util.cert_matches(fprint, certificate)
 
     async def get_web_port_and_ip(self):
         if self.web_ip:

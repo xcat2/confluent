@@ -72,9 +72,7 @@ class NodeHandler(redfishbmc.NodeHandler):
             if slot != 0:
                 self.info['enclosure.bay'] = slot
 
-    def validate_cert(self, certificate):
-        fprint = util.get_fingerprint(self.https_cert)
-        return util.cert_matches(fprint, certificate)
+
 
 
 def remote_nodecfg(nodename, cfm):

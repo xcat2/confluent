@@ -1109,7 +1109,7 @@ async def get_nodename(cfg, handler, info):
         # chassis
         nodename = get_nodename_from_enclosures(cfg, info)
     if not nodename and handler.devname in ('SMM', 'SMM3'):
-        nodename = get_nodename_from_chained_smms(cfg, handler, info)
+        nodename = await get_nodename_from_chained_smms(cfg, handler, info)
     if not nodename:  # as a last resort, search switches for info
         # This is the slowest potential operation, so we hope for the
         # best to occur prior to this
@@ -1123,8 +1123,8 @@ async def get_nodename(cfg, handler, info):
                     # We found an SMM, and it's in a chain per configuration
                     # we need to ask the switch for the fingerprint to see
                     # if we have a match or not
-                    newnodename, v = get_chained_smm_name(nodename, cfg,
-                                                          handler, nl)
+                    newnodename, v = await get_chained_smm_name(nodename, cfg,
+                                                                handler, nl)
                     if newnodename:
                         # while this started by switch, it was disambiguated
                         info['verified'] = v
@@ -1150,16 +1150,16 @@ async def get_nodename(cfg, handler, info):
     return nodename, maccount
 
 
-def get_nodename_from_chained_smms(cfg, handler, info):
+async def get_nodename_from_chained_smms(cfg, handler, info):
     nodename = None
-    for fprint in get_smm_neighbor_fingerprints(
+    async for fprint in get_smm_neighbor_fingerprints(
             handler.ipaddr, lambda x: True):
         if fprint in nodes_by_fprint:
             # need to chase the whole chain
             # to support either direction
             chead = get_enclosure_chain_head(nodes_by_fprint[fprint],
                                              cfg)
-            newnodename, v = get_chained_smm_name(
+            newnodename, v = await get_chained_smm_name(
                 chead, cfg, handler, checkswitch=False)
             if newnodename:
                 info['verified'] = v
