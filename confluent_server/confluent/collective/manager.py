@@ -134,7 +134,7 @@ async def connect_to_leader(cert=None, name=None, leader=None, remote=None, isre
                         {'info': 'Prospective leader {0} has redirected this '
                                  'member to {1}'.format(leader, keydata['leader']),
                          'subsystem': 'collective'})
-                    ldrc = cfm.get_collective_member_by_address(
+                    ldrc = await cfm.get_collective_member_by_address(
                         keydata['leader'])
                     if ldrc and ldrc['name'] == name:
                         raise Exception("Redirected to self")
@@ -276,7 +276,7 @@ async def connect_to_collective(cert, member, remote=None):
     if cert:
         fprint = cert
     else:
-        collent = cfm.get_collective_member_by_address(member)
+        collent = await cfm.get_collective_member_by_address(member)
         fprint = collent['fingerprint']
     cnn = remote[1].transport.get_extra_info('ssl_object')
     if not util.cert_matches(fprint, cnn.getpeercert(binary_form=True)):
@@ -320,7 +320,7 @@ async def handle_connection(connection, cert, request, local=False):
                                                       'system'}})
                 return
             if follower is not None:
-                linfo = cfm.get_collective_member_by_address(currentleader)
+                linfo = await cfm.get_collective_member_by_address(currentleader)
                 try:
                     _, remote = await create_connection(currentleader)
                     if isinstance(remote, Exception):
@@ -504,8 +504,8 @@ async def handle_connection(connection, cert, request, local=False):
             await cfm.add_collective_member(request['name'],
                                     connection[1].transport.get_extra_info('socket').getpeername()[0], fprint, role)
             myleader = await get_leader(connection)
-            ldrfprint = cfm.get_collective_member_by_address(
-                myleader)['fingerprint']
+            ldrfprint = (await cfm.get_collective_member_by_address(
+                myleader))['fingerprint']
             await tlvdata.send(connection,
                         {'collective': {'approval': myrsp,
                                         'fingerprint': ldrfprint,
