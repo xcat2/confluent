@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import confluent.core as core
 import confluent.messages as msg
 import aiohmi.exceptions as pygexc
@@ -22,7 +23,7 @@ async def reseat_bays(encmgr, bays, configmanager, rspq):
         for encbay in bays:
             node = bays[encbay]
             try:
-                for rsp in core.handle_path(
+                async for rsp in await core.handle_path(
                         '/nodes/{0}/_enclosure/reseat_bay'.format(encmgr),
                         'update', configmanager,
                         inputdata={'reseat': encbay}):
@@ -61,10 +62,13 @@ async def update(nodes, element, configmanager, inputdata):
         reseattasks.append(currtask)
     while not all([task.done() for task in reseattasks]):
         try:
-            nrsp = await rspq.get(timeout=0.1)
+            try:
+                nrsp = await asyncio.wait_for(rspq.get(), timeout=0.1)
+            except asyncio.TimeoutError:
+                continue
             if nrsp is not None:
                 yield nrsp
-        except queue.Empty:
+        except asyncio.QueueEmpty:
             continue
     while not rspq.empty():
         nrsp = await rspq.get()
