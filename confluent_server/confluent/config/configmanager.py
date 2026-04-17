@@ -373,7 +373,7 @@ def _rpc_rename_nodes(tenant, renamemap):
 
 
 def _rpc_rename_nodegroups(tenant, renamemap):
-    ConfigManager(tenant)._true_rename_nodegroups(renamemap)
+    ConfigManager(tenant)._true_rename_groups(renamemap)
 
 
 def _rpc_set_group_attributes(tenant, attribmap, autocreate):
