@@ -391,8 +391,13 @@ class Command(object):
             cacert = None
             certreqs = ssl.CERT_NONE
             knownhosts = True
-        self.connection = ssl.wrap_socket(self.connection, ca_certs=cacert,
-                                          cert_reqs=certreqs)
+        tlsctx = ssl.create_default_context()
+        if certreqs == ssl.CERT_NONE:
+            tlsctx.check_hostname = False
+        tlsctx.verify_mode = certreqs
+        if cacert:
+            tlsctx.load_verify_locations(cacert)
+        self.connection = tlsctx.wrap_socket(self.connection, server_hostname=server)
         if knownhosts:
             certdata = self.connection.getpeercert(binary_form=True)
             fingerprint = 'sha512$' + hashlib.sha512(certdata).hexdigest()
