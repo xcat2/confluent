@@ -285,7 +285,7 @@ async def update_nodes(nodes, element, configmanager, inputdata):
         for node in nodes:
             rename = inputdata.get_attributes(node)
             namemap[node] = rename['rename']
-        configmanager.rename_nodes(namemap)
+        await configmanager.rename_nodes(namemap)
         return yield_rename_resources(namemap, isnode=True)
     clearwarnbynode = {}
     for node in nodes:
