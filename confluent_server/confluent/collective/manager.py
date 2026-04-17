@@ -671,12 +671,15 @@ async def handle_connection(connection, cert, request, local=False):
                 else:
                     connection.write(cfgdata)
                     await connection.drain()
-            finally:
+            except Exception as e:
+                log.log({'error': 'Error sending initial configuration data: {0}'.format(e),
+                          'subsystem': 'collective'}) 
                 try:
                     await tlvdata.close(connection)
                 except Exception as e:
                     log.log({'info': 'Ignoring non-fatal error while closing collective connection: {0}'.format(e),
                              'subsystem': 'collective'})
+                raise
         #tlvdata.send(connection, {'tenants': 0}) # skip the tenants for now,
         # so far unused anyway
         #connection.settimeout(90)
