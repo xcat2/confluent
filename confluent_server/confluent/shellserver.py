@@ -121,16 +121,17 @@ class ShellSession(consoleserver.ConsoleSession):
                       customize the name of a new session.
     """
 
-    def __init__(self, node, configmanager, username, datacallback=None,
+    @classmethod
+    async def create(cls, node, configmanager, username, datacallback=None,
                  skipreplay=False, sessionid=None, width=80, height=24):
-        self.sessionid = sessionid
-        self.configmanager = configmanager
-        self.node = node
-        super(ShellSession, self).__init__(node, configmanager, username,
+        self = await super().__init__(node, configmanager, username,
                                            datacallback, skipreplay,
                                            width=width, height=height)
+        self.sessionid = sessionid
+        return self
 
-    def connect_session(self):
+
+    async def connect_session(self):
         global activesessions
         tenant = self.configmanager.tenant
         if (self.configmanager.tenant, self.node, self.username) not in activesessions:
