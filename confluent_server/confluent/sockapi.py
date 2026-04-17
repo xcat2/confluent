@@ -193,12 +193,7 @@ async def sessionhdl(connection, authname, skipauth=False, cert=None):
         if cfm:
             cfm.close_client_files()
         try:
-            if isinstance(connection, tuple):
-                connection[1].close()
-                await connection[1].wait_closed()
-                connection = connection[1].get_extra_info('socket')
-            else:
-                connection.close()
+            await tlvdata.close(connection)
         except Exception as e:
             print(repr(e))
             pass
