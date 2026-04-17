@@ -167,24 +167,24 @@ class NodeHandler(generic.NodeHandler):
         if user != self.curruser:
             authupdate = True
             if not curruserinfo:
-                curruserinfo = wc.grab_json_response('/api/settings/users')
+                curruserinfo = await wc.grab_json_response('/api/settings/users')
                 authchg = curruserinfo[1]
             authchg['name'] = user
         if passwd != self.currpass:
             authupdate = True
             if not curruserinfo:
-                curruserinfo = wc.grab_json_response('/api/settings/users')
+                curruserinfo = await wc.grab_json_response('/api/settings/users')
                 authchg = curruserinfo[1]
             authchg['changepassword'] = 0
             authchg['password_size'] = 'bytes_20'
             authchg['password'] = passwd
             authchg['confirm_password'] = passwd
         if authupdate:
-            rsp, status = wc.grab_json_response_with_status('/api/settings/users/2', authchg, method='PUT')
+            rsp, status = await wc.grab_json_response_with_status('/api/settings/users/2', authchg, method='PUT')
         if (cd.get('hardwaremanagement.method', {}).get('value', 'ipmi') != 'redfish'
                 or cd.get('console.method', {}).get('value', None) == 'ipmi'):
             # IPMI must be enabled per user config
-            wc.grab_json_response('/api/settings/ipmilanconfig', {
+            await wc.grab_json_response('/api/settings/ipmilanconfig', {
                 'ipv4_enable': 1, 'ipv6_enable': 1,
                 'uncheckedipv4lanEnable': 0, 'uncheckedipv6lanEnable': 0,
                 'checkedipv4lanEnable': 1, 'checkedipv6lanEnable': 1})
@@ -198,7 +198,7 @@ class NodeHandler(generic.NodeHandler):
             newip = newipinfo[-1][0]
             if ':' in newip:
                 raise exc.NotImplementedException('IPv6 remote config TODO')
-            currnet = wc.grab_json_response('/api/settings/network')
+            currnet = await wc.grab_json_response('/api/settings/network')
             for net in currnet:
                 if net['channel_number'] == self.channel and net['lan_enable'] == 0:
                     # ignore false indication and switch to 8 (dedicated)
@@ -213,16 +213,16 @@ class NodeHandler(generic.NodeHandler):
                         if netconfig['ipv4_gateway']:
                             net['ipv4_gateway'] = netconfig['ipv4_gateway']
                         net['ipv4_dhcp_enable'] = 0
-                        rsp, status = wc.grab_json_response_with_status(
+                        rsp, status = await wc.grab_json_response_with_status(
                             '/api/settings/network/{0}'.format(net['id']), net, method='PUT')
                     break
         elif self.ipaddr.startswith('fe80::'):
-            self.configmanager.set_node_attributes(
+            await self.configmanager.set_node_attributes(
                 {nodename: {'hardwaremanagement.manager': self.ipaddr}})
         else:
             raise exc.TargetEndpointUnreachable(
                 'hardwaremanagement.manager must be set to desired address (No IPv6 Link Local detected)')
-        rsp, status = wc.grab_json_response_with_status('/api/session', method='DELETE')
+        rsp, status = await wc.grab_json_response_with_status('/api/session', method='DELETE')
 
 
 def remote_nodecfg(nodename, cfm):
