@@ -266,8 +266,8 @@ async def _do_notifier(cfg, watcher, callback):
 
 
 
-def _rpc_master_del_usergroup(tenant, name):
-    ConfigManager(tenant).del_usergroup(name)
+async def _rpc_master_del_usergroup(tenant, name):
+    await ConfigManager(tenant).del_usergroup(name)
 
 
 def _rpc_del_usergroup(tenant, name):
@@ -275,16 +275,16 @@ def _rpc_del_usergroup(tenant, name):
 
 
 
-def _rpc_master_set_usergroup(tenant, name, attributemap):
-    ConfigManager(tenant).set_usergroup(name, attributemap)
+async def _rpc_master_set_usergroup(tenant, name, attributemap):
+    await ConfigManager(tenant).set_usergroup(name, attributemap)
 
 
 def _rpc_set_usergroup(tenant, name, attributemap):
     ConfigManager(tenant)._true_set_usergroup(name, attributemap)
 
 
-def _rpc_master_set_user(tenant, name, attributemap):
-    ConfigManager(tenant).set_user(name, attributemap)
+async def _rpc_master_set_user(tenant, name, attributemap):
+    await ConfigManager(tenant).set_user(name, attributemap)
 
 
 def _rpc_set_user(tenant, name, attributemap):
@@ -295,17 +295,17 @@ async def _rpc_master_set_node_attributes(tenant, attribmap, autocreate):
     await ConfigManager(tenant).set_node_attributes(attribmap, autocreate)
 
 
-def _rpc_master_rename_nodes(tenant, renamemap):
-    ConfigManager(tenant).rename_nodes(renamemap)
+async def _rpc_master_rename_nodes(tenant, renamemap):
+    await ConfigManager(tenant).rename_nodes(renamemap)
 
 
-def _rpc_master_rename_nodegroups(tenant, renamemap):
-    ConfigManager(tenant).rename_nodegroups(renamemap)
+async def _rpc_master_rename_nodegroups(tenant, renamemap):
+    await ConfigManager(tenant).rename_nodegroups(renamemap)
 
 
-def _rpc_master_clear_node_attributes(tenant, nodes, attributes):
+async def _rpc_master_clear_node_attributes(tenant, nodes, attributes):
     warnings = []
-    ConfigManager(tenant).clear_node_attributes(nodes, attributes, warnings)
+    await ConfigManager(tenant).clear_node_attributes(nodes, attributes, warnings)
     return warnings
 
 
@@ -313,20 +313,20 @@ def _rpc_clear_node_attributes(tenant, nodes, attributes):  # master has to do t
     ConfigManager(tenant)._true_clear_node_attributes(nodes, attributes)
 
 
-def _rpc_master_set_group_attributes(tenant, attribmap, autocreate):
-    ConfigManager(tenant).set_group_attributes(attribmap, autocreate)
+async def _rpc_master_set_group_attributes(tenant, attribmap, autocreate):
+    await ConfigManager(tenant).set_group_attributes(attribmap, autocreate)
 
 
-def _rpc_master_clear_group_attributes(tenant, groups, attributes):
-    ConfigManager(tenant).clear_group_attributes(groups, attributes)
+async def _rpc_master_clear_group_attributes(tenant, groups, attributes):
+    await ConfigManager(tenant).clear_group_attributes(groups, attributes)
 
 
 def _rpc_clear_group_attributes(tenant, groups, attributes):
     ConfigManager(tenant)._true_clear_group_attributes(groups, attributes)
 
 
-def _rpc_master_del_user(tenant, name):
-    ConfigManager(tenant).del_user(name)
+async def _rpc_master_del_user(tenant, name):
+    await ConfigManager(tenant).del_user(name)
 
 
 def _rpc_del_user(tenant, name):
@@ -349,8 +349,8 @@ def _rpc_create_usergroup(tenant, *args):
     ConfigManager(tenant)._true_create_usergroup(*args)
 
 
-def _rpc_master_del_groups(tenant, groups):
-    ConfigManager(tenant).del_groups(groups)
+async def _rpc_master_del_groups(tenant, groups):
+    await ConfigManager(tenant).del_groups(groups)
 
 def _rpc_del_groups(tenant, groups):
     ConfigManager(tenant)._true_del_groups(groups)
