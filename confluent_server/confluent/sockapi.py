@@ -262,7 +262,7 @@ async def start_proxy_term(connection, cert, request):
         return
     cfm = configmanager.ConfigManager(request['tenant'])
     ccons = ClientConsole(connection)
-    consession = consoleserver.ConsoleSession(
+    consession = await consoleserver.ConsoleSession.create(
         node=request['node'], configmanager=cfm, username=request['user'],
         datacallback=ccons.sendall, skipreplay=request['skipreplay'],
         direct=False, width=request.get('width', 80), height=request.get(
@@ -280,7 +280,7 @@ async def start_term(authname, cfm, connection, params, path, authdata, skipauth
     if params and 'skipreplay' in params and params['skipreplay']:
         skipreplay = True
     if elems[3] == "console":
-        consession = consoleserver.ConsoleSession(
+        consession = await consoleserver.ConsoleSession.create(
             node=node, configmanager=cfm, username=authname,
             datacallback=ccons.sendall, skipreplay=skipreplay)
     elif len(elems) >= 6 and elems[3:5] == ['shell', 'sessions']:

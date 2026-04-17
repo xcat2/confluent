@@ -544,7 +544,7 @@ async def wsock_handler(req):
                                             datacallback=datacallback,
                                             width=width, height=height, sessionid=sessidx)
                                     else:
-                                        consession = consoleserver.ConsoleSession(
+                                        consession = await consoleserver.ConsoleSession.create(
                                             node=node, configmanager=cfgmgr,
                                             username=username, skipreplay=skipreplay,
                                             datacallback=datacallback,
@@ -597,7 +597,7 @@ async def wsock_handler(req):
                     datacallback=datacallback, width=width, height=height
                 )
             else:
-                consession = consoleserver.ConsoleSession(
+                consession = await consoleserver.ConsoleSession.create(
                     node=nodename, configmanager=cfgmgr,
                     username=username, skipreplay=skipreplay,
                     datacallback=datacallback, width=width, height=height
@@ -884,7 +884,7 @@ async def resourcehandler_backend(req, make_response):
                         datacallback=datacallback, width=width, height=height
                     )
                 else:
-                    consession = consoleserver.ConsoleSession(
+                    consession = await consoleserver.ConsoleSession.create(
                         node=nodename, configmanager=cfgmgr,
                         username=authorized['username'], skipreplay=skipreplay,
                         datacallback=datacallback, width=width, height=height

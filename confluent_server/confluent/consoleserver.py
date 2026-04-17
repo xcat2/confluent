@@ -765,8 +765,10 @@ class ConsoleSession(object):
     :param skipreplay: If true, will skip the attempt to redraw the screen
     """
 
-    def __init__(self, node, configmanager, username, datacallback=None,
+    @classmethod
+    async def create(cls, node, configmanager, username, datacallback=None,
                  skipreplay=False, direct=True, width=80, height=24):
+        self = cls()
         self.registered = False
         self.tenant = configmanager.tenant
         if not configmanager.is_node(node):
@@ -778,12 +780,13 @@ class ConsoleSession(object):
                               # relay
         self.width = width
         self.height = height
-        tasks.spawn(self.connect_session())
+        await self.connect_session()
         self.registered = True
         self._evt = None
         self.node = node
         self.write = self.conshdl.write
         tasks.spawn(self.delayinit(datacallback, skipreplay))
+        return self
 
     async def delayinit(self, datacallback, skipreplay):
         if datacallback is None:
