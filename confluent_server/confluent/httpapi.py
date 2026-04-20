@@ -843,8 +843,8 @@ async def resourcehandler_backend(req, make_response):
         elif ':' in host:
             host = host.rsplit(':', 1)[0]
         url = 'https://{0}:{1}/'.format(host, funport)
-        start_response('302', [('Location', url)])
-        rsp.write(b'Our princess is in another castle!')
+        rsp = await make_response('text/plain', 302, headers={'Location': url})
+        await rsp.write(b'Our princess is in another castle!')
         return rsp
     elif (operation == 'create' and ('/console/session' in reqpath or
             '/shell/sessions/' in reqpath)):
@@ -906,18 +906,18 @@ async def resourcehandler_backend(req, make_response):
             myinput = querydict['bytes']
             sessid = querydict['session']
             if sessid not in consolesessions:
-                start_response('400 Expired Session', headers)
+                rsp = await make_response('text/plain', 400, 'Expired Session', headers=headers)
                 return rsp
             consolesessions[sessid]['expiry'] = time.time() + 90
             consolesessions[sessid]['session'].write(myinput)
-            start_response('200 OK', headers)
-            rsp.write(json.dumps({'session': querydict['session']}))
+            rsp = await make_response('application/json', 200, headers=headers)
+            await rsp.write(json.dumps({'session': querydict['session']}))
             return rsp # client has requests to send or receive, not both...
         elif 'closesession' in querydict:
             consolesessions[querydict['session']]['session'].destroy()
             del consolesessions[querydict['session']]
-            start_response('200 OK', headers)
-            rsp.write(b'{"sessionclosed": true}')
+            rsp = await make_response('application/json', 200, headers=headers)
+            await rsp.write(b'{"sessionclosed": true}')
             return rsp
         elif 'action' in querydict:
             if querydict['action'] == 'break':
@@ -928,11 +928,11 @@ async def resourcehandler_backend(req, make_response):
             elif querydict['action'] == 'reopen':
                 consolesessions[querydict['session']]['session'].reopen()
             else:
-                start_response('400 Bad Request')
-                rsp.write(b'Unrecognized action ' + querydict['action'])
+                rsp = await make_response('text/plain', 400, 'Bad Request', headers=headers)
+                await rsp.write(b'Unrecognized action ' + querydict['action'])
                 return rsp
-            start_response('200 OK', headers)
-            rsp.write(json.dumps({'session': querydict['session']}))
+            rsp = await make_response('application/json', 200, headers=headers)
+            await rsp.write(json.dumps({'session': querydict['session']}))
             return rsp
         else:  # no keys, but a session, means it's hooking to receive data
             raise Exception("long polling console sessions are discontinued")
@@ -1013,7 +1013,7 @@ async def resourcehandler_backend(req, make_response):
             return rsp
         elif url.startswith('/sessions/current/webauthn/'):
             if not webauthn:
-                start_response('501 Not Implemented', headers)
+                rsp = await make_response('text/plain', 501, 'Not Implemented', headers=headers)
                 return rsp
             for rspd in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody, authorized):
                 rsp.write(rspd)
