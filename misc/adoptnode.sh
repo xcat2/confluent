@@ -12,7 +12,7 @@ fi
 OLDINSECURE=$(nodeattrib $TARGNODE deployment.useinsecureprotocols -b 2> /dev/null |grep -v inherited|awk '{print $3}')
 nodedefine $TARGNODE deployment.profile=$TARGPROF deployment.useinsecureprotocols= deployment.pendingprofile=$TARGPROF
 confetty set /nodes/$TARGNODE/deployment/ident_image=create
-REMTMP=$(ssh $TARGNODE $(mktemp -d))
+REMTMP=$(ssh $TARGNODE mktemp -d)
 scp /var/lib/confluent/private/identity_files/$TARGNODE.json $TARGNODE:$REMTMP
 rm /var/lib/confluent/private/identity_files/$TARGNODE.*
 rm /var/lib/confluent/private/identity_images/$TARGNODE.*
