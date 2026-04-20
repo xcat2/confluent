@@ -487,7 +487,7 @@ async def wsock_handler(req):
         asess = None
         try:
             for asess in confluent.asynchttp.handle_async(
-                    {}, {}, currsess['inflight'], asyncwscallback):
+                    {}, asyncwscallback):
                 await rsp.send_str(u' ASYNCID: {0}'.format(asess.asyncid))
                 clientmsg = True
                 while clientmsg:
@@ -569,7 +569,6 @@ async def wsock_handler(req):
                 myconsoles[cons].destroy()
             if asess:
                 asess.destroy()
-            currsess['inflight'].discard(mythreadid)
         return
     if '/console/session' in ws.path or '/shell/sessions/' in ws.path:
         def datacallback(data):
@@ -604,7 +603,6 @@ async def wsock_handler(req):
                 )
         except exc.NotFoundException:
             return
-        currsess['inflight'].add(mythreadid)
         clientmsg = ws.wait()
         try:
             while clientmsg is not None:
@@ -622,7 +620,6 @@ async def wsock_handler(req):
                     ws.send(u'?')
                 clientmsg = ws.wait()
         finally:
-            currsess['inflight'].discard(mythreadid)
             consession.destroy()
 
 

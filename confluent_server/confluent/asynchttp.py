@@ -117,7 +117,7 @@ def get_async(env, querydict):
     return _asyncsessions[env['HTTP_CONFLUENTASYNCID']]['asyncsession']
 
 
-def handle_async(env, querydict, threadset, wshandler=None):
+def handle_async(querydict, wshandler=None):
     # This may be one of two things, a request for a new async stream
     # or a request for next data from async stream
     # httpapi otherwise handles requests an injecting them to queue
