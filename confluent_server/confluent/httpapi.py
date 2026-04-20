@@ -697,20 +697,20 @@ async def resourcehandler_backend(req, make_response):
                 await rsp.write(b'')
                 return rsp
             if can302:  # Maximum transparency helps iPXE and whatever else know the most
-                headers.append(('Location', targurl))
+                headers = {'Location': targurl}
                 rsp = await make_response(mimetype, 302, 'Found', headers=headers)
                 await rsp.write(b'')
                 return rsp
             else: # The user agent is too dumb, check headers for server side redirects
                 delegatemethod = env.get('HTTP_X_DELEGATE_METHOD', None)
                 if delegatemethod == 'accel':
-                    headers = [('Content-Type', 'application/octet-stream')]
-                    headers.append(('X-Accel-Redirect', relurl))
+                    headers = {'Content-Type': 'application/octet-stream'}
+                    headers['X-Accel-Redirect'] = relurl
                     rsp = await make_response(mimetype, 200, 'OK', headers=headers)
                     await rsp.write(b'')
                     return rsp
                 else:
-                    rsp = await make_response(mimetype, 502, 'Bad Gateway', headers=headers)
+                    rsp = await make_response(mimetype, 502, 'Bad Gateway')
                     await rsp.write(b'URL shortening for a limited client without proxy advertised accel support')
                     log.log({'error': f'Profile name exceeded DHCP limits, and reverse proxy capabilities not detected, switch to the nginx configuration or shorten the profile name: {relurl}'})
             return rsp
@@ -906,17 +906,17 @@ async def resourcehandler_backend(req, make_response):
             myinput = querydict['bytes']
             sessid = querydict['session']
             if sessid not in consolesessions:
-                rsp = await make_response('text/plain', 400, 'Expired Session', headers=headers)
+                rsp = await make_response('text/plain', 400, 'Expired Session')
                 return rsp
             consolesessions[sessid]['expiry'] = time.time() + 90
             consolesessions[sessid]['session'].write(myinput)
-            rsp = await make_response('application/json', 200, headers=headers)
+            rsp = await make_response('application/json', 200)
             await rsp.write(json.dumps({'session': querydict['session']}))
             return rsp # client has requests to send or receive, not both...
         elif 'closesession' in querydict:
             consolesessions[querydict['session']]['session'].destroy()
             del consolesessions[querydict['session']]
-            rsp = await make_response('application/json', 200, headers=headers)
+            rsp = await make_response('application/json', 200)
             await rsp.write(b'{"sessionclosed": true}')
             return rsp
         elif 'action' in querydict:
@@ -928,10 +928,10 @@ async def resourcehandler_backend(req, make_response):
             elif querydict['action'] == 'reopen':
                 consolesessions[querydict['session']]['session'].reopen()
             else:
-                rsp = await make_response('text/plain', 400, 'Bad Request', headers=headers)
+                rsp = await make_response('text/plain', 400, 'Bad Request')
                 await rsp.write(b'Unrecognized action ' + querydict['action'])
                 return rsp
-            rsp = await make_response('application/json', 200, headers=headers)
+            rsp = await make_response('application/json', 200)
             await rsp.write(json.dumps({'session': querydict['session']}))
             return rsp
         else:  # no keys, but a session, means it's hooking to receive data
@@ -954,7 +954,7 @@ async def resourcehandler_backend(req, make_response):
                     currnode = watchurl.split('/')[1]
                     nodeurls[currnode] = '/' + watchurl
 
-            rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+            rsp = await make_response(mimetype, 200, 'OK')
             await rsp.write(json.dumps({'data': nodeurls}))
             return
     elif (operation == 'create' and ('/staging' in reqpath)):
@@ -970,11 +970,11 @@ async def resourcehandler_backend(req, make_response):
                     if isinstance(resp, confluent.messages.FileUploadProgress):
                         if resp.kvpairs['progress']['value'] == 100:
                             progress = resp.kvpairs['progress']['value']
-                rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+                rsp = await make_response(mimetype, 200, 'OK')
                 await rsp.write(json.dumps({'data': 'done'}))
                 return       
             else:
-                rsp = await make_response(mimetype, 401, 'Unauthorized', headers=headers)
+                rsp = await make_response(mimetype, 401, 'Unauthorized')
                 await rsp.write(json.dumps({'data': 'You do not have permission to write to file'}))
                 return 
         elif len(url.split('/')) == 2:
@@ -993,7 +993,7 @@ async def resourcehandler_backend(req, make_response):
             for res in hdlr:
                 if isinstance(res, confluent.messages.CreatedResource):
                     stageurl = res.kvpairs['created']
-            rsp = await make_response(mimetype, 200, 'OK', headers=headers)
+            rsp = await make_response(mimetype, 200, 'OK')
             await rsp.write(json.dumps({'data': stageurl}))
             return
     else:
@@ -1013,7 +1013,7 @@ async def resourcehandler_backend(req, make_response):
             return rsp
         elif url.startswith('/sessions/current/webauthn/'):
             if not webauthn:
-                rsp = await make_response('text/plain', 501, 'Not Implemented', headers=headers)
+                rsp = await make_response('text/plain', 501, 'Not Implemented')
                 return rsp
             for rspd in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody, authorized):
                 rsp.write(rspd)
