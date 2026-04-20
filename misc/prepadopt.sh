@@ -19,7 +19,7 @@ if [ "$FWACTIVE" == 1 ]; then systemctl stop firewalld; fi
 opt/confluent/bin/copernicus  > /etc/confluent/confluent.info
 #opt/confluent/bin/clortho $TARGNODE $DEPLOYSRV > /etc/confluent/confluent.apikey
 . /etc/confluent/functions
-confluentpython opt/confluent/bin/apiclient -i $TAGRIDENT /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
+confluentpython opt/confluent/bin/apiclient -i $TARGIDENT /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
 if [ "$FWACTIVE" == 1 ]; then systemctl start firewalld; fi
 cp opt/confluent/bin/apiclient /opt/confluent/bin
 #curl -sg -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -H "CONFLUENT_NODENAME: $TARGNODE" https://$UDEPLOYSRV/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg
