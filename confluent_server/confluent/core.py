@@ -1166,7 +1166,7 @@ async def handle_node_request(configmanager, inputdata, operation,
                 if pathcomponents == ['console', 'ikvm']:
                     if not vinz:
                         import confluent.vinzmanager as vinz
-                        vinz.assure_vinz()
+                        await vinz.assure_vinz()
                 manager = nodeattr[node].get('collective.manager', {}).get(
                     'value', None)
                 if manager:

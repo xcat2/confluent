@@ -142,19 +142,20 @@ async def send_grant(conn, nodename, rqtype):
                 bmcuser = bmcuser.decode()
             if not isinstance(bmcpass, str):
                 bmcpass = bmcpass.decode()
-            rsp = wc.grab_json_response_with_status(
+            rsp = await wc.grab_json_response_with_status(
                 '/login', {'data': [bmcuser, bmcpass]},
                 headers={'Content-Type': 'application/json',
                         'Accept': 'application/json'})
-            cookies['SESSION'] = wc.cookies['SESSION']
-            cookies['XSRF-TOKEN'] = wc.cookies['XSRF-TOKEN']
+            for cky in wc.cookies:
+                if cky.key == 'SESSION' or cky.key == 'XSRF-TOKEN':
+                    cookies[cky.key] = cky.value
             if rqtype == 1:
                 # unfortunately, the original protocol failed to
                 # provide a means for separate tracking bmc side
                 # and confluent side
                 # chances are pretty good still
-                sessionid = wc.cookies['SESSION']
-            sessiontok = wc.cookies['XSRF-TOKEN']
+                sessionid = cookies['SESSION']
+            sessiontok = cookies['XSRF-TOKEN']
             protos.append(sessiontok)
             _usersessions[sessionid] = {
                 'webclient': wc,
