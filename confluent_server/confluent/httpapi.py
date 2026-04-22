@@ -1012,13 +1012,8 @@ async def resourcehandler_backend(req, make_response):
             if not webauthn:
                 rsp = await make_response('text/plain', 501, 'Not Implemented')
                 return rsp
-            try:
-                wauthbody = webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
-                rsp = await make_response()
-                await rsp.write(wauthbody.encode('utf8'))
-            except Exception as e:
-                rsp = await make_response('text/plain', 408)
-            return rsp
+            wauthbody = webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
+            return await make_response(body=wauthbody)
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
         try:

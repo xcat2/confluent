@@ -19,7 +19,7 @@ from webauthn import verify_registration_response
 from webauthn import verify_authentication_response
 
 
-challenges = {}
+challenges = set([])
 
 CONFIG_MANAGER = None
 
@@ -67,13 +67,6 @@ class User():
             credid = base64.b64encode(self.credentials.id).decode()
             pubkey = base64.b64encode(self.credentials.credential_public_key).decode()
             return {"id": credid, "signature_count": self.credentials.signature_count, "credential_public_key": pubkey}
-
-
-    def __parse_challenges(self):
-        if self.challenges:
-            request = base64.b64encode(self.challenges.request).decode()
-            return {"id": self.challenges.id, 'request': request}
-
 
     @staticmethod
     def seek_credential_by_id(credential_id):
@@ -155,7 +148,8 @@ class User():
     def save(self):
         authenticators = CONFIG_MANAGER.get_user(self.username).get('authenticators', {})
         authenticators = _load_authenticators(authenticators)
-        authenticators['challenges'] = self.__parse_challenges()  # Looks like the bigger the array we encounter problems changing to just save one challenge
+        # Let's not retain the transient challenges
+        #authenticators['challenges'] = self.__parse_challenges()  # Looks like the bigger the array we encounter problems changing to just save one challenge
         authenticators['credentials'] = self.__parse_credentials()
         
         CONFIG_MANAGER.set_user(self.username, {'authenticators': authenticators})
@@ -226,9 +220,18 @@ def registration_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
 
 
 def authentication_request(username, APP_RELYING_PARTY):
-    user_model = User.get(username)
-    if not user_model:
-        raise Exception("Invalid Username")
+    if username:  # WebUI has supplied username and hit enter, only suggest webauthn if we have webauthn registered
+        user_model = User.get(username)
+        if not user_model:
+            raise Exception("Invalid Username")
+        credential_model = User.get_credential(credential_id=None, username=username)
+        if not credential_model:
+            raise Exception("No credential for user")
+    else:
+        raise Exception("TODO:  Authenticator driven identification")  # in theory, we want to support click to authentication without even a username
+        # but have to sort out matching challenges between requests
+
+        
 
     options = generate_authentication_options(
         rp_id=APP_RELYING_PARTY.id,
@@ -292,7 +295,8 @@ def handle_api_request(url, req, username, cfm, reqbody, authorized):
             cfm.create_user(username, role='Stub')
             userinfo = cfm.get_user(username)
         authid = userinfo.get('webauthid', None)
-        if not authid:
+        if not authid:  # TODO: index users by authid as well as name
+            # this would entail checking authid for uniqueness as a key once that key structure starts being built
             authid = secrets.token_bytes(64)
             b64authid = base64.b64encode(authid).decode()
             cfm.set_user(username, {'webauthid': b64authid})
