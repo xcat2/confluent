@@ -629,7 +629,7 @@ async def resourcehandler(request):
     # any 'yield' needs to become a write to the streamresponse
     #TODO:asyncmerge: Replace /confluent-api with '' in path
     # Needs testing for confluent header names with golang clients
-    async def make_response(mimetype, status=200, reason=None, headers=None, cookies=None, body=None):
+    async def make_response(mimetype='application/json', status=200, reason=None, headers=None, cookies=None, body=None):
         rspheaders = {
             'Cache-Control': 'no-store',
             'Pragma': 'no-cache',
@@ -1012,8 +1012,9 @@ async def resourcehandler_backend(req, make_response):
             if not webauthn:
                 rsp = await make_response('text/plain', 501, 'Not Implemented')
                 return rsp
-            for rspd in webauthn.handle_api_request(url, env, start_response, authorized['username'], cfgmgr, headers, reqbody, authorized):
-                rsp.write(rspd)
+            try:
+                wauthbody = webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
+                await rsp.write(wauthbody.encode('utf8'))
             return rsp
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
