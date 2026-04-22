@@ -1467,10 +1467,10 @@ async def handle_path(path, operation, configmanager, inputdata=None, autostrip=
         return await handle_node_request(configmanager, inputdata, operation,
                                    pathcomponents, autostrip)
     elif pathcomponents[0] == 'deployment':
-        return await handle_deployment(configmanager, inputdata, pathcomponents,
+        return handle_deployment(configmanager, inputdata, pathcomponents,
                                  operation)
     elif pathcomponents[0] == 'storage':
-        return await handle_storage(configmanager, inputdata, pathcomponents,
+        return handle_storage(configmanager, inputdata, pathcomponents,
                               operation)
     elif pathcomponents[0] == 'nodegroups':
         return await handle_nodegroup_request(configmanager, inputdata,
