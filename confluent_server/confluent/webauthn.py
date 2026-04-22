@@ -272,7 +272,7 @@ class RpEntity(object):
         self.name = name
         self.id = id 
 
-def handle_api_request(url, env, start_response, username, cfm, headers, reqbody, authorized):
+def handle_api_request(url, req, username, cfm, reqbody, authorized):
     """
         For now webauth is going to be limited to just one passkey per user 
         If you try to register a new passkey this will just clear the old one and register the new passkey
@@ -280,11 +280,10 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
     global CONFIG_MANAGER
     CONFIG_MANAGER = cfm
 
-    APP_ORIGIN = 'https://' + env['HTTP_X_FORWARDED_HOST']
-    HOST = env['HTTP_X_FORWARDED_HOST']
+    APP_ORIGIN = 'https://' + req.headers['X-Forwarded-Host']
+    HOST = req.headers['X-Forwarded-Host']
     APP_RELYING_PARTY = RpEntity(name='Confluent Web UI', id=HOST)
-
-    if env['REQUEST_METHOD'] != 'POST':
+    if req.method != 'POST':
         raise Exception('Only POST supported for webauthn operations')
     url = url.replace('/sessions/current/webauthn', '')
     if url == '/registration_options':
@@ -298,16 +297,14 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             b64authid = base64.b64encode(authid).decode()
             cfm.set_user(username, {'webauthid': b64authid})
         opts = registration_request(username, cfm, APP_RELYING_PARTY)
-        start_response('200 OK', headers)
-        yield opts
+        return opts
     elif url.startswith('/registered_credentials/'):
         username = url.rsplit('/', 1)[-1]
         userinfo = cfm.get_user(username)
         if not isinstance(username, bytes):
             username = username.encode('utf8')
         opts = authentication_request(username, APP_RELYING_PARTY)
-        start_response('200 OK', headers)
-        yield opts
+        return opts
     elif url.startswith('/validate/'):
         username = url.rsplit('/', 1)[-1]
         userinfo = cfm.get_user(username)
@@ -316,18 +313,17 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
         req = json.loads(reqbody)
         rsp = authentication_response(req, username, APP_RELYING_PARTY, APP_ORIGIN)
         if rsp == 'Timeout':
-            start_response('408 Timeout', headers)
-        elif rsp['verified'] and start_response:
-            start_response('200 OK', headers)
+            raise Exception('Authentication timed out')
+        elif rsp['verified']:
             sessinfo = {'username': username}
             if 'authtoken' in authorized:
                 sessinfo['authtoken'] = authorized['authtoken']
             if 'sessionid' in authorized:
                 sessinfo['sessionid'] = authorized['sessionid']
             tlvdata.unicode_dictvalues(sessinfo)
-            yield json.dumps(sessinfo)
+            return json.dumps(sessinfo)
         else:
-            yield rsp
+            return rsp
     elif url == '/register_credential':
         req = json.loads(reqbody)
         userinfo = cfm.get_user(username)
@@ -335,7 +331,6 @@ def handle_api_request(url, env, start_response, username, cfm, headers, reqbody
             username = username.encode('utf8')
         rsp = registration_response(req, username, APP_RELYING_PARTY, APP_ORIGIN)
         if rsp.get('verified', False):
-            start_response('200 OK', headers)
-            yield json.dumps({'status': 'Success'})
+            return json.dumps({'status': 'Success'})
 
 

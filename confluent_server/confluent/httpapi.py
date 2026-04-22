@@ -1014,7 +1014,10 @@ async def resourcehandler_backend(req, make_response):
                 return rsp
             try:
                 wauthbody = webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
+                rsp = await make_response()
                 await rsp.write(wauthbody.encode('utf8'))
+            except Exception as e:
+                rsp = await make_response('text/plain', 408)
             return rsp
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
