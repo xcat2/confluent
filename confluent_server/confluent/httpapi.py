@@ -351,10 +351,11 @@ async def _authorize_request(req, operation, reqbody):
         sessid = _establish_http_session(req, authdata, name, cookie)
     if authdata and element and element.startswith('/sessions/current/webauthn/validate/'):
         if webauthn:
-            for rsp in webauthn.handle_api_request(element, env, None, authdata[2], authdata[1], None, reqbody, None):
-                if rsp['verified']:
-                    sessid = _establish_http_session(env, authdata, name, cookie)
-                    break
+            rsp = await webauthn.handle_api_request(element, req, authdata[2], authdata[1], reqbody, None)
+            if rsp['verified']:
+                sessid = _establish_http_session(req, authdata, name, cookie)
+            else:
+                return {'code': 403}
     skiplog = _should_skip_authlog(req)
     if authdata:
         auditmsg = {
@@ -1012,7 +1013,7 @@ async def resourcehandler_backend(req, make_response):
             if not webauthn:
                 rsp = await make_response('text/plain', 501, 'Not Implemented')
                 return rsp
-            wauthbody = webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
+            wauthbody = await webauthn.handle_api_request(url, req, authorized['username'], cfgmgr, reqbody, authorized)
             return await make_response(body=wauthbody)
         resource = '.' + url[url.rindex('/'):]
         lquerydict = copy.deepcopy(querydict)
