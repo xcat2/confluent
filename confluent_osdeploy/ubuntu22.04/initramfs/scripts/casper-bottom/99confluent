@@ -37,10 +37,20 @@ else
         chroot . custom-installation/confluent/bin/clortho $NODENAME $MGR > /root/custom-installation/confluent/confluent.apikey
         APIKEY=$(cat /root/custom-installation/confluent/confluent.apikey)
     done
-    MGR=[$MGR]
-    nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
-    nic=$(ip link |grep ^$nic:|awk '{print $2}')
-    DEVICE=${nic%:}
+    if echo "$MGR" | grep -q ':'; then
+        # IPv6 manager: wrap address in brackets and resolve interface from scoped manager entry.
+        MGR=[$MGR]
+        nic=$(grep ^MANAGER /custom-installation/confluent/confluent.info|grep fe80::|sed -e s/.*%//|head -n 1)
+        nic=$(ip link |grep ^$nic:|awk '{print $2}')
+        DEVICE=${nic%:}
+    else
+        # IPv4 routed deployment: use previously detected NIC, fallback to route lookup.
+        if [ -f /tmp/autodetectnic ]; then
+            DEVICE=$(cat /tmp/autodetectnic)
+        else
+            DEVICE=$(ip route get ${MGR} 2>/dev/null | head -1 | sed -n 's/.*dev \([^ ]*\).*/\1/p')
+        fi
+    fi
     IP=done
 fi
 if [ -z "$MGTIFACE" ]; then
