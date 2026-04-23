@@ -999,7 +999,7 @@ async def resourcehandler_backend(req, make_response):
         url = reqpath
         url = url.replace('.json', '')
         url = url.replace('.html', '')
-        if url == '/sessions/current/info':
+        if url == '/sessions/current/info' or url.startswith('/sessions/current/webauthn/validate/'):
             rsp = await make_response('application/json', 200, cookies=cookies)
             sessinfo = {'username': authorized['username']}
             if 'authtoken' in authorized:

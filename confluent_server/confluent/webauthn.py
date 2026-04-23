@@ -172,10 +172,14 @@ def b64decode(data: str) -> bytes:
     data += '=' * (-len(data) % 4)  # Pad with '='s
     return base64.urlsafe_b64decode(data)
 
-async def registration_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
-    cdj = request['response']['clientDataJSON']
+def get_challenge_from_response(rsp):
+    cdj = rsp['response']['clientDataJSON']
     cdata = json.loads(b64decode(cdj))
     challenge = b64decode(cdata['challenge'])
+    return challenge
+
+async def registration_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
+    challenge = get_challenge_from_response(request)
     if challenge not in challenges:
         raise Exception("Could not find challenge")
     chausername = challenges.pop(challenge, None)
@@ -227,15 +231,18 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
     user_model = User.get(username)
     if not user_model:
         raise Exception("Invalid Username")
+    challenge = get_challenge_from_response(request)
+    expected_username = challenges.pop(challenge, None)
+    if expected_username is None:
+        raise Exception("No matching challenge")
     print(repr(request))
-    raise Exception("Nope")
     credential_model = User.get_credential(credential_id=None, username=username)
     if not credential_model:
         raise Exception("No credential for user")
     
     verification = verify_authentication_response(
         credential=request,
-        expected_challenge=challenge_model.request,
+        expected_challenge=challenge,
         expected_rp_id=APP_RELYING_PARTY.id,
         expected_origin=APP_ORIGIN,
         credential_public_key = credential_model.credential_public_key,
@@ -243,7 +250,6 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
         require_user_verification = True
 
     )
-
     return {"verified": True}
     
 class RpEntity(object):
@@ -294,7 +300,7 @@ async def handle_api_request(url, req, username, cfm, reqbody, authorized):
         rsp = authentication_response(req, username, APP_RELYING_PARTY, APP_ORIGIN)
         if rsp == 'Timeout':
             raise Exception('Authentication timed out')
-        elif rsp['verified']:
+        elif rsp['verified'] and authorized is not None:
             sessinfo = {'username': username}
             if 'authtoken' in authorized:
                 sessinfo['authtoken'] = authorized['authtoken']
