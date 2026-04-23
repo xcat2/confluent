@@ -97,6 +97,62 @@ while ! grep NODENAME /custom-installation/confluent/confluent.info; do
         echo -n $(grep ^apitoken: cnflnt.yml|awk '{print $2}') > $hmackeyfile
         cd -
         umount $tmnt
+    elif confluentsrv=$(sed -n 's/.*confluent=\([^ ]*\).*/\1/p' /proc/cmdline); [ ! -z "$confluentsrv" ]; then
+        echo "confluent= kernel arg found: $confluentsrv" > /dev/console 2>&1
+        . /scripts/functions
+
+        rmmod cdc_ether 2> /dev/null
+        rm -rf /run/net* /run/dhcpcd /var/lib/dhcpcd
+        for dev in $(ip a|grep MULTICAST|awk '{print $2}'|sed -e s/://); do
+            ip a flush $dev
+            echo 1 > /proc/sys/net/ipv6/conf/$dev/addr_gen_mode 2>/dev/null
+            echo 0 > /proc/sys/net/ipv6/conf/$dev/addr_gen_mode 2>/dev/null
+        done
+        unset DEVICE DEVICE6 IP IP6 dev
+
+        echo "Starting DHCP configure_networking..." > /dev/console 2>&1
+        configure_networking
+        echo "DHCP done, DEVICE=$DEVICE" > /dev/console 2>&1
+        echo $DEVICE > /tmp/autodetectnic
+
+        RETRIES=0
+        while [ $RETRIES -lt 5 ]; do
+            if openssl s_client -connect $confluentsrv:443 </dev/null > /dev/null 2>&1; then
+                echo "TLS connectivity to $confluentsrv OK" > /dev/console 2>&1
+                break
+            fi
+            RETRIES=$((RETRIES + 1))
+            echo "Cannot reach $confluentsrv:443, retry $RETRIES/5..." > /dev/console 2>&1
+            sleep 3
+        done
+
+        if [ $RETRIES -ge 5 ]; then
+            echo "Failed to reach $confluentsrv after 5 retries, falling back to copernicus" > /dev/console 2>&1
+            /opt/confluent/bin/copernicus -t > /custom-installation/confluent/confluent.info
+            continue
+        fi
+
+        myids="uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)"
+        for mac in $(ip link | grep 'link/ether' | awk '{print $2}'); do
+            myids="$myids/mac=$mac"
+        done
+        echo "Calling whoami with IDs: $myids" > /dev/console 2>&1
+
+        myname=$( (printf "GET /confluent-api/self/whoami HTTP/1.0\r\nHost: $confluentsrv\r\nCONFLUENT_IDS: $myids\r\n\r\n"; sleep 3) \
+            | openssl s_client -connect $confluentsrv:443 -quiet 2>/dev/null \
+            | tail -1 | tr -d '\r\n')
+
+        echo "whoami returned: '$myname'" > /dev/console 2>&1
+
+        if [ ! -z "$myname" ]; then
+            MGR=$confluentsrv
+            echo "NODENAME: $myname" > /custom-installation/confluent/confluent.info
+            echo "MANAGER: $confluentsrv" >> /custom-installation/confluent/confluent.info
+            echo "EXTMGRINFO: $confluentsrv||1" >> /custom-installation/confluent/confluent.info
+        else
+            echo "whoami returned empty, retrying in 10s..." > /dev/console 2>&1
+            sleep 10
+        fi
     else
         /opt/confluent/bin/copernicus -t > /custom-installation/confluent/confluent.info
     fi
