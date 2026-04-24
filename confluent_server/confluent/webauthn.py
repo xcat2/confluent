@@ -23,14 +23,6 @@ class Credential():
         self.id = id
         self.credential_public_key = public_key 
 
-class Challenge():
-    def __init__(self, request, id=None) -> None:
-        if id is None:
-            self.id = util.randomstring(16)
-        else:
-            self.id = id
-        self.request = request
-
 def _load_credentials(creds):
     if creds is None:
         return None
@@ -66,6 +58,7 @@ class User():
         """
         There certainly is a better way to do this but for now lets try the wrong way that works 
         """
+        credential_id = b64decode(credential_id)
         for username in CONFIG_MANAGER.list_users():
             authenticators = CONFIG_MANAGER.get_user(username).get('authenticators', {})
             authenticators = _load_authenticators(authenticators)
@@ -203,18 +196,16 @@ def authentication_request(username, APP_RELYING_PARTY):
         credential_model = User.get_credential(credential_id=None, username=username)
         if not credential_model:
             raise Exception("No credential for user")
-    else:
-        raise Exception("TODO:  Authenticator driven identification")  # in theory, we want to support click to authentication without even a username
-        # but have to sort out matching challenges between requests
-
-        
-
     options = generate_authentication_options(rp_id=APP_RELYING_PARTY.id)
     challenges[options.challenge] = username
     opts = options_to_json(options)
     return opts
 
 def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
+    if not username:
+        credential_model, username = User.seek_credential_by_id(request['id'])
+    else:
+        credential_model = User.get_credential(credential_id=None, username=username)
     user_model = User.get(username)
     if not user_model:
         raise Exception("Invalid Username")
@@ -222,8 +213,6 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
     expected_username = challenges.pop(challenge, None)
     if expected_username is None:
         raise Exception("No matching challenge")
-    print(repr(request))
-    credential_model = User.get_credential(credential_id=None, username=username)
     if not credential_model:
         raise Exception("No credential for user")
     
@@ -235,7 +224,7 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
         credential_public_key = credential_model.credential_public_key,
         credential_current_sign_count = 0,
     )
-    return {"verified": True}
+    return {"verified": True, "username": username}
     
 class RpEntity(object):
     def __init__(self, name, id):
@@ -291,6 +280,8 @@ async def handle_api_request(url, req, username, cfm, reqbody, authorized):
                 sessinfo['authtoken'] = authorized['authtoken']
             if 'sessionid' in authorized:
                 sessinfo['sessionid'] = authorized['sessionid']
+            if 'username' in rsp and rsp['username']:
+                sessinfo['username'] = rsp['username']
             tlvdata.unicode_dictvalues(sessinfo)
             return json.dumps(sessinfo)
         else:

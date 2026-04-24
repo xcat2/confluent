@@ -353,6 +353,9 @@ async def _authorize_request(req, operation, reqbody):
         if webauthn:
             rsp = await webauthn.handle_api_request(element, req, authdata[2], authdata[1], reqbody, None)
             if rsp['verified']:
+                if rsp.get('username', None):
+                    name = rsp['username']
+                    authdata = (authdata[0], authdata[1], name, authdata[3], authdata[4])
                 sessid = _establish_http_session(req, authdata, name, cookie)
             else:
                 return {'code': 403}
