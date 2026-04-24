@@ -33,7 +33,7 @@ cp -a debian debian13
 mkdir -p debian13/initramfs/usr
 mv debian13/initramfs/lib debian13/initramfs/usr/
 mv el10/initramfs/usr el10/initramfs/var
-for os in rhvh4 el7 genesis el8 suse15 debian debian13 ubuntu18.04 ubuntu20.04 ubuntu22.04 ubuntu24.04 ubuntu 26.04 coreos el9 el10; do
+for os in rhvh4 el7 genesis el8 suse15 debian debian13 ubuntu18.04 ubuntu20.04 ubuntu22.04 ubuntu24.04 ubuntu26.04 coreos el9 el10; do
     mkdir ${os}out
     cd ${os}out
     if [ -d ../${os}bin ]; then 
