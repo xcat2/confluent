@@ -10,11 +10,6 @@ from webauthn import (
     options_to_json, 
     generate_authentication_options,
     )
-from webauthn.helpers.structs import (
-    AuthenticatorSelectionCriteria,
-    UserVerificationRequirement,
-)
-
 from webauthn import verify_registration_response
 from webauthn import verify_authentication_response
 
@@ -152,11 +147,7 @@ def registration_request(username, cfg, APP_RELYING_PARTY):
         rp_name=APP_RELYING_PARTY.name,
         rp_id=APP_RELYING_PARTY.id,
         user_id=user_model.user_handle,
-        user_name=username,
-        authenticator_selection=AuthenticatorSelectionCriteria(
-            user_verification=UserVerificationRequirement.REQUIRED,
-        ),
-    )
+        user_name=username)
 
     challenges[options.challenge] = username
     options_json = options_to_json(options)
@@ -194,7 +185,6 @@ async def registration_response(request, username, APP_RELYING_PARTY, APP_ORIGIN
         expected_challenge=challenge,
         expected_rp_id=APP_RELYING_PARTY.id,
         expected_origin=APP_ORIGIN,
-        require_user_verification=True,
         )
     except Exception as err:
         raise Exception("Could not handle credential attestation")
@@ -219,10 +209,7 @@ def authentication_request(username, APP_RELYING_PARTY):
 
         
 
-    options = generate_authentication_options(
-        rp_id=APP_RELYING_PARTY.id,
-        user_verification=UserVerificationRequirement.REQUIRED,
-    )
+    options = generate_authentication_options(rp_id=APP_RELYING_PARTY.id)
     challenges[options.challenge] = username
     opts = options_to_json(options)
     return opts
@@ -247,8 +234,6 @@ def authentication_response(request, username, APP_RELYING_PARTY, APP_ORIGIN):
         expected_origin=APP_ORIGIN,
         credential_public_key = credential_model.credential_public_key,
         credential_current_sign_count = 0,
-        require_user_verification = True
-
     )
     return {"verified": True}
     
