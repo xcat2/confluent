@@ -198,7 +198,7 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
             targip = peerip
         output, stderr = await util.check_output(
             'rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip))
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
         unreadablefiles = []
         for root, dirnames, filenames in os.walk(targdir):
             for filename in filenames:
