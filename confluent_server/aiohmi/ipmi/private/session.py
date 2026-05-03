@@ -56,9 +56,8 @@ except AttributeError:
 # session.  This will be randomized to stagger out retries
 # in case of congestion
 initialtimeout = 0.5
-# the thread in which all IO will be performed
-# This thread tucks away the threading situation such that
-# calling code doesn't have to do any gymnastics.
+# the thread in which all IO will be performed, so that
+# calling code doesn't have to manage threading directly
 iothread = None
 # whether io thread is yet ready to work
 iothreadready = False
