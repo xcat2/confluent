@@ -98,9 +98,6 @@ def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     return vendorstr, devstr
 
 
-# Since we are single-threaded via asyncio, the operations being protected
-# by RLocks are not actually dangerously multiplexed, so we can replace
-# with a null context manager
 class NullLock(object):
 
     def donothing(self, *args, **kwargs):

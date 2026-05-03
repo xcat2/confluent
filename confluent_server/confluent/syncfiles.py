@@ -199,8 +199,8 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
             'rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip))
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
-            # CalledProcessError can't be caught normally in some contexts,
-            # so check via repr as a workaround
+            # CalledProcessError can't be caught normally through
+            # asyncio subprocess, so check via repr as a workaround
             raise
         unreadablefiles = []
         for root, dirnames, filenames in os.walk(targdir):
