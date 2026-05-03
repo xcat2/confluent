@@ -847,7 +847,7 @@ class Session(object):
         # within a process.  In this way, synchronous usage of the interface
         # plays well with asynchronous use.  In fact, this produces the
         # behavior of only the constructor needing a callback.  From then on,
-        # synchronous usage of the class acts in a greenthread style governed
+        # synchronous usage of the class acts in a coroutine style governed
         # by order of data on the network
         await self.awaitresponse(retry, netfn + 1, command)
         lastresponse = self.lastresponse

@@ -98,13 +98,9 @@ def get_pci_text_from_ids(subdevice, subvendor, device, vendor):
     return vendorstr, devstr
 
 
-# There is something not right with the RLocks used in pyghmi when
-# greenthreads comes into play.  It seems like sometimes on acquire,
-# it calls _get_ident and it isn't the id(greenlet) and so
-# a thread deadlocks itself due to identity crisis?
-# However, since we are not really threaded, the operations being protected
-# are not actually dangerously multiplexed...  so we can replace with
-# a null context manager for now
+# Since we are single-threaded via asyncio, the operations being protected
+# by RLocks are not actually dangerously multiplexed, so we can replace
+# with a null context manager
 class NullLock(object):
 
     def donothing(self, *args, **kwargs):

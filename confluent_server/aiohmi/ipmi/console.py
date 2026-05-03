@@ -421,7 +421,7 @@ class Console(object):
         If a caller is a simple little utility, provide a function to
         eternally run the event loop.  More complicated usage would be expected
         to provide their own event loop behavior, though this could be used
-        within the greenthread implementation of caller's choice if desired.
+        within the async implementation of caller's choice if desired.
         """
         # wait_for_rsp promises to return a false value when no sessions are
         # alive anymore
