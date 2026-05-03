@@ -17,6 +17,7 @@
 import asyncio
 import glob
 import os
+import subprocess
 import shutil
 import tempfile
 import confluent.sshutil as sshutil
@@ -197,11 +198,7 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
             targip = peerip
         output, stderr = await util.check_output(
             'rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip))
-    except Exception as e:
-        if 'CalledProcessError' not in repr(e):
-            # CalledProcessError can't be caught normally through
-            # asyncio subprocess, so check via repr as a workaround
-            raise
+    except subprocess.CalledProcessError:
         unreadablefiles = []
         for root, dirnames, filenames in os.walk(targdir):
             for filename in filenames:
