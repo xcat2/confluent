@@ -57,12 +57,8 @@ except AttributeError:
 # in case of congestion
 initialtimeout = 0.5
 # the thread in which all IO will be performed
-# While the model as-is works fine for it's own coroutine
-# structure, when combined with threading or something like
-# eventlet, it becomes difficult for the calling code to cope
-# This thread will tuck away the threading situation such that
-# calling code doesn't have to do any gymnastics to cope with
-# the nature of things.
+# This thread tucks away the threading situation such that
+# calling code doesn't have to do any gymnastics.
 iothread = None
 # whether io thread is yet ready to work
 iothreadready = False
@@ -186,24 +182,13 @@ async def _io_wait(timeout, myaddr=None, evq=None):
         evq.append(evt)
     deadline = timeout + _monotonic_time()
     ioqueue.append((deadline, evt, myaddr))
-    # Unfortunately, at least with eventlet patched threading, the wait()
-    # is a somewhat busy wait if given a deadline.  Workaround by having
-    # it piggy back on the select() in the io thread, which is a truly
-    # lazy wait even with eventlet involvement
     if deadline < selectdeadline:
-        intsock = iosockets[0]
-        if hasattr(intsock, 'fd'):
-            # if in eventlet, go for the true sendto, which is less glitchy
-            intsock = intsock.fd
-        intsock.sendto(b'\x01', (myself, iosockets[0].getsockname()[1]))
+        iosockets[0].sendto(b'\x01', (myself, iosockets[0].getsockname()[1]))
     await evt.wait()
 
 
 def _io_sendto(mysocket, packet, sockaddr):
-    # Want sendto to act reasonably sane..
     mysocket.setblocking(1)
-    if hasattr(mysocket, 'fd'):
-        mysocket = mysocket.fd
     try:
         mysocket.sendto(packet, sockaddr)
     except Exception:

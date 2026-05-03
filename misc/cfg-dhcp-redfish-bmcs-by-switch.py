@@ -32,17 +32,16 @@
 
 import sys
 sys.path.append('/opt/confluent/lib/python')
+import concurrent.futures
 import confluent.client as cli
-import eventlet.greenpool
 import gzip
 import io
 import json
 import os
 import struct
 import subprocess
+import pyghmi.util.webclient as webclient
 import time
-
-webclient = eventlet.import_patched('pyghmi.util.webclient')
 
 
 bmcsbyuuid = {}
@@ -57,10 +56,10 @@ def checkfish(addr, mac):
     try:
         body = json.loads(body)
     except json.decoder.JSONDecodeError:
-        return
+        return None
     uuid = body.get('UUID', None)
     if not uuid:
-        return
+        return None
     #This part is needed if a bmc sticks 'wire format' uuid in the json body
     #Should be skipped for bmcs that present it sanely
     uuidparts = uuid.split('-')
@@ -68,14 +67,10 @@ def checkfish(addr, mac):
     uuidparts[1] = '{:04x}'.format(struct.unpack('!H', struct.pack('<H', int(uuidparts[1], 16)))[0])
     uuidparts[2] = '{:04x}'.format(struct.unpack('!H', struct.pack('<H', int(uuidparts[2], 16)))[0])
     uuid = '-'.join(uuidparts)
-    if uuid in bmcsbyuuid:
-        bmcsbyuuid[uuid]['bmcs'][mac] = addr
-    else:
-        bmcsbyuuid[uuid] = {'bmcs': {mac: addr}}
+    return (uuid, mac, addr)
 
 
 if __name__ == '__main__':
-    gpool = eventlet.greenpool.GreenPool()
     with open('/var/lib/dhcpd/dhcpd.leases', 'r') as leasefile:
         leases = leasefile.read()
     inlease = False
@@ -115,9 +110,25 @@ if __name__ == '__main__':
         for inf in macinfo:
             if inf.get('possiblenode', None):
                 mactonode[mac] = inf['possiblenode']
-    for mac in sorted(mactonode):
-        gpool.spawn(checkfish, mactoips[mac], mac)
-    gpool.waitall()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = {}
+        for mac in sorted(mactonode):
+            futures[executor.submit(checkfish, mactoips[mac], mac)] = mac
+        for future in concurrent.futures.as_completed(futures):
+            mac = futures[future]
+            try:
+                result = future.result()
+            except Exception as e:
+                sys.stderr.write('Failed to probe {}: {}\n'.format(
+                    mactoips[mac], e))
+                continue
+            if result is None:
+                continue
+            uuid, mac, addr = result
+            if uuid in bmcsbyuuid:
+                bmcsbyuuid[uuid]['bmcs'][mac] = addr
+            else:
+                bmcsbyuuid[uuid] = {'bmcs': {mac: addr}}
     for uuid in sorted(bmcsbyuuid):
         macd = bmcsbyuuid[uuid]['bmcs']
         macs = sorted(macd)

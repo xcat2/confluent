@@ -199,9 +199,8 @@ async def sync_list_to_node(sl, node, suffixes, peerip=None):
             'rsync', '-rvLD', targdir + '/', 'root@[{}]:/'.format(targip))
     except Exception as e:
         if 'CalledProcessError' not in repr(e):
-            # https://github.com/eventlet/eventlet/issues/413
-            # for some reason, can't catch the calledprocesserror normally
-            # for this exception, implement a hack workaround
+            # CalledProcessError can't be caught normally in some contexts,
+            # so check via repr as a workaround
             raise
         unreadablefiles = []
         for root, dirnames, filenames in os.walk(targdir):
