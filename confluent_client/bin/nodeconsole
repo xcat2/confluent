@@ -16,7 +16,6 @@
 # limitations under the License.
 
 
-#TODO: clean exit
 import asyncio
 import base64
 import optparse
@@ -280,7 +279,8 @@ class InputHandler:
             await relay_keypresses(self.buffer[3:], modifiers=[SpecialKeys.ALT, SpecialKeys.SYSRQ])
             self.reset_input_context()
         elif self.buffer == '\x05c.':  # Ctrl-E, then .
-            sys.exit(0)
+            asyncio.get_running_loop().call_soon(sys.exit, 0)
+            return
         elif self.buffer == '\x05cfa':  # toggle focus ...
             toggle_focus_all()
         elif self.buffer == '\x05c?':  # Ctrl-E, then ?
