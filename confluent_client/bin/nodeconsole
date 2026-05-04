@@ -572,7 +572,7 @@ def iterm_draw(bindata, width, height):
 
 def kitty_draw(bindata, width, height):
     data = base64.b64encode(bindata)
-    preamble = '\x1b_Ga=T,f=100'
+    preamble = '\x1b_Ga=T,f=100,q=2'
     if height:
         preamble += f',r={height},c={width}'
     #sys.stdout.write(repr(preamble))
@@ -639,10 +639,10 @@ def prep_node_tile(node):
             sys.stdout.write('\x1b[43m')
         else:
             sys.stdout.write('\x1b[44m')    
-    sys.stdout.write('▏' + node)
+    sys.stdout.write(f'▏{node:^{cwidth - 2}}▕')
     if node in focused_nodes:
         sys.stdout.write('\x1b[0m')
-    cursor_left(len(node) + 1)
+    cursor_left(cwidth)
     cursor_down()
 
 def reset_cursor(node):
@@ -703,7 +703,6 @@ async def do_screenshot():
             if a:
                 resized = True
                 # on a window resize, clear the old stuff
-                # ideally we'd retain the images and redraw them
                 sys.stdout.write('\x1bc')
             global numrows
             global cwidth
