@@ -283,11 +283,13 @@ class InputHandler:
             return
         elif self.buffer == '\x05cfa':  # toggle focus ...
             toggle_focus_all()
-        elif self.buffer == '\x05c?':  # Ctrl-E, then ?
-            sys.stdout.write('Command sequences:\n')
-            sys.stdout.write('Ctrl-E, then c: Send SysRq\n')
-            sys.stdout.write('Ctrl-E, then .: Exit console\n')
-            sys.stdout.write('Ctrl-E, then ?: This help message\n')
+        elif self.buffer == '\x05c?':  # Ctrl-E, then c?
+            msg = ''
+            msg.append('Command sequences:\n')
+            msg.append('Ctrl-E, then cb: Send SysRq\n')
+            msg.append('Ctrl-E, then c.: Exit console\n')
+            msg.append('Ctrl-E, then c?: This help message\n')
+
             self.reset_input_context()
         elif self.buffer in ('\x05c\x1b[A', '\x05c\x1b[B', '\x05c\x1b[C', '\x05c\x1b[D'):  # Ctrl-E, then cursor keys
             arrowkey_map = {'A': 'Up', 'B': 'Down', 'C': 'Right', 'D': 'Left'}
@@ -627,7 +629,7 @@ if options.Timestamp:
         sys.exit(1)
     logreader.dump_to_console(logname)
     sys.exit(0)
-
+extratext = ''
 def prep_node_tile(node):
     currcolcell, currrowcell = nodepositions[node]
     if currcolcell:
@@ -639,7 +641,10 @@ def prep_node_tile(node):
             sys.stdout.write('\x1b[43m')
         else:
             sys.stdout.write('\x1b[44m')    
-    sys.stdout.write(f'▏{node:^{cwidth - 2}}▕')
+    titletext = node
+    if extratext:
+        titletext += ' - ' + extratext
+    sys.stdout.write(f'▏{titletext:<{cwidth - 1}}')
     if node in focused_nodes:
         sys.stdout.write('\x1b[0m')
     cursor_left(cwidth)
