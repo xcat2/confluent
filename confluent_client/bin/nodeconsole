@@ -15,6 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+#TODO: clean exit
+import asyncio
 import base64
 import optparse
 import os
@@ -160,24 +163,25 @@ class InputHandler:
     }
 
     csikeys = {
-        'H': SpecialKeys.HOME,
-        'F': SpecialKeys.END,
-        '2~': SpecialKeys.INSERT,
-        '3~': SpecialKeys.DELETE,
-        '5~': SpecialKeys.PAGE_UP,
-        '6~': SpecialKeys.PAGE_DOWN,
-        '11~': SpecialKeys.F1,
-        '12~': SpecialKeys.F2,
-        '13~': SpecialKeys.F3,
-        '14~': SpecialKeys.F4,
-        '15~': SpecialKeys.F5,
-        '17~': SpecialKeys.F6,
-        '18~': SpecialKeys.F7,
-        '19~': SpecialKeys.F8,
-        '20~': SpecialKeys.F9,
-        '21~': SpecialKeys.F10,
-        '23~': SpecialKeys.F11,
-        '24~': SpecialKeys.F12,
+        '[H': SpecialKeys.HOME,
+        '[F': SpecialKeys.END,
+        '[1;3': False, # Stub to detect alt-arrow
+        '[2~': SpecialKeys.INSERT,
+        '[3~': SpecialKeys.DELETE,
+        '[5~': SpecialKeys.PAGE_UP,
+        '[6~': SpecialKeys.PAGE_DOWN,
+        '[11~': SpecialKeys.F1,
+        '[12~': SpecialKeys.F2,
+        '[13~': SpecialKeys.F3,
+        '[14~': SpecialKeys.F4,
+        '[15~': SpecialKeys.F5,
+        '[17~': SpecialKeys.F6,
+        '[18~': SpecialKeys.F7,
+        '[19~': SpecialKeys.F8,
+        '[20~': SpecialKeys.F9,
+        '[21~': SpecialKeys.F10,
+        '[23~': SpecialKeys.F11,
+        '[24~': SpecialKeys.F12,
         '[A': SpecialKeys.UP,
         '[B': SpecialKeys.DOWN,
         '[C': SpecialKeys.RIGHT,
@@ -188,6 +192,7 @@ class InputHandler:
     async def create(cls):
         self = cls()
         self.buffer = ''
+        self.modkeys = None
         self.inputcontext = None
         currloop = asyncio.get_running_loop()
         self.fd = sys.stdin.fileno()
@@ -210,6 +215,7 @@ class InputHandler:
     def reset_input_context(self):
         self.inputcontext = None
         self.buffer = ''
+        self.modkeys = None
         global focus_pending
         if focus_pending:
             focus_pending = False
@@ -302,8 +308,14 @@ class InputHandler:
             self.seqtimeout.cancel()
         self.buffer += data.decode('utf-8', errors='ignore')
         if len(self.buffer) >= 2 and self.buffer.startswith('\x1b['):  #CSI
+            if self.buffer.endswith(';3~'):
+                self.buffer = self.buffer.replace(';3~', '~')
+                self.modkeys = [SpecialKeys.ALT]
+            if '1;3' in self.buffer:
+                self.buffer = self.buffer.replace('1;3', '')
+                self.modkeys = [SpecialKeys.ALT]
             if self.buffer[1:] in self.csikeys:
-                await relay_keypresses(self.csikeys[self.buffer[1:]])
+                await relay_keypresses(self.csikeys[self.buffer[1:]], modifiers=self.modkeys)
                 self.reset_input_context()
                 return
             for cand in self.csikeys:
@@ -767,8 +779,6 @@ async def do_screenshot():
             dorefresh = True
             time.sleep(options.interval)
     sys.exit(0)
-
-import asyncio
 
 async def grab_vncs(urlbynode):
     global streaming
