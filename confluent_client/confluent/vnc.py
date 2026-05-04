@@ -71,6 +71,30 @@ class VNCClient:
         await self._do_vnc_handshake()
         return self
     
+    async def send_keypresses(self, keys, modifierkeys=None):
+        payload = ByteStream()
+        for modkey in (modifierkeys or []):
+            payload.add_number(4, 1)  # Key event
+            payload.add_number(1, 1)  # Down
+            payload.add_number(0, 2)  # Padding
+            payload.add_number(modkey.value, 4)
+        for key in keys:
+            keynumber = key.value if hasattr(key, 'value') else key
+            payload.add_number(4, 1)  # Key event
+            payload.add_number(1, 1)  # Down
+            payload.add_number(0, 2)  # Padding
+            payload.add_number(keynumber, 4)
+            payload.add_number(4, 1)  # Key event
+            payload.add_number(0, 1)  # Up
+            payload.add_number(0, 2)  # Padding
+            payload.add_number(keynumber, 4)
+        for modkey in (modifierkeys or []):
+            payload.add_number(4, 1)  # Key event
+            payload.add_number(0, 1)  # Up
+            payload.add_number(0, 2)  # Padding
+            payload.add_number(modkey.value, 4)
+        payload.flush(self.writer)
+
     async def _read_number(self, num_bytes):
         data = await self.reader.readexactly(num_bytes)
         return int.from_bytes(data, byteorder='big', signed=True)
