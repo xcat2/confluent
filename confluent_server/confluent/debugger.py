@@ -5,6 +5,8 @@ import socket
 import sys
 import confluent.tasks as tasks
 
+#this will ultimately fill the role of the 'backdoor' of eventlet
+
 # since we have to asyncio up the input and output, we use InteractiveInterpreter and handle the
 # input ourselves, since code is not asyncio friendly in and of itself
 #code.InteractiveConsole().interact()
