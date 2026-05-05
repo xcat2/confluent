@@ -294,11 +294,10 @@ class TLSCertVerifier(object):
         storedprint = self.cfm.get_node_attributes(self.node, (self.fieldname,)
                                                    )
         storedprint = storedprint.get(self.node, {}).get(self.fieldname, {}).get('value', '')
+        newpolicy = self.cfm.get_node_attributes(self.node, ('pubkeys.addpolicy',))
+        newpolicy = newpolicy.get(self.node, {}).get('pubkeys.addpolicy', {}).get('value', '')
         if (not storedprint):
             # no stored value, check policy for next action
-            newpolicy = self.cfm.get_node_attributes(self.node,
-                                                     ('pubkeys.addpolicy',))
-            newpolicy = newpolicy.get(self.node, {}).get('pubkeys.addpolicy', {}).get('value', '')
             if newpolicy == 'manual':
                 # manual policy means always raise unless a match is set
                 # manually
