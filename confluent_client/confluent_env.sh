@@ -19,6 +19,7 @@ alias nodebmcreset='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export
 alias nodeboot='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeboot'
 alias nodeconfig='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeconfig'
 alias nodeconsole='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeconsole'
+alias nodecertutil='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodecertutil'
 alias nodedeploy='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodedeploy'
 alias nodedefine='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodedefine'
 alias nodeeventlog='CURRENT_CMDLINE=$(HISTTIMEFORMAT= builtin history 1); export CURRENT_CMDLINE; nodeeventlog'
@@ -293,6 +294,30 @@ _confluent_nodegroupattrib_completion()
     COMP_CANDIDATES=$(nodegroupattrib 'everything' all | awk '{print $2}'|sed -e 's/://')
     _confluent_generic_ng_completion
 }
+
+_confluent_nodecertutil_completion()
+{
+    _confluent_get_args
+    if [ $NUMARGS -lt 3 ]; then
+        _confluent_nr_completion
+        return
+    fi
+    if [ $NUMARGS == 3 ]; then
+        COMPREPLY=($(compgen -W "installbmccacert removebmccacert listbmccacerts signbmccert" -- ${COMP_WORDS[COMP_CWORD]}))
+        return
+    fi
+    if [ ${CMPARGS[2]} == 'installbmccacert' ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+    if [ ${CMPARGS[2]} == 'signbmccert' ]; then
+        COMP_CANDIDATES=("--days --added-names")
+        _confluent_get_args
+        COMPREPLY=($(compgen -W "$GENNED" -- ${COMP_WORDS[COMP_CWORD]}))
+    fi
+}
+
 _confluent_nn_completion()
 {
     _confluent_get_args
@@ -375,6 +400,7 @@ complete -F _confluent_ng_completion nodegroupremove
 complete -F _confluent_nr_completion nodehealth
 complete -F _confluent_nodeidentify_completion nodeidentify
 complete -F _confluent_nr_completion nodeinventory
+complete -F _confluent_nodecertutil_completion nodecertutil
 complete -F _confluent_nodeattrib_completion nodelist
 complete -F _confluent_nodemedia_completion nodemedia
 complete -F _confluent_nodepower_completion nodepower
