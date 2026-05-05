@@ -306,7 +306,7 @@ class TLSCertVerifier(object):
                 self.cfm.set_node_attributes(
                     {self.node: {self.fieldname: fingerprint}})
                 return True
-        elif cert_matches(storedprint, certificate):
+        elif cert_matches(storedprint, certificate) and newpolicy != 'ca-only':
             return True
         fingerprint = get_fingerprint(certificate, 'sha256')
         # No pinned certificate match, try to validate by CA if possible
@@ -320,7 +320,8 @@ class TLSCertVerifier(object):
                         {self.node: {self.fieldname: fingerprint}})
                     return True
             except Exception:
-                pass
+                if newpolicy == 'ca-only':
+                    raise
         raise cexc.PubkeyInvalid(
             'Mismatched certificate detected', certificate, fingerprint,
             self.fieldname, 'mismatch')
