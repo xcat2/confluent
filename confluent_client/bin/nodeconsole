@@ -148,6 +148,7 @@ class SpecialKeys(enum.Enum):
     ESC = 0xff1b
 
 extratextbynode = {}
+focustext = ''
 async def do_power_action(action, setboot=None):
     targnodes = list(focused_nodes)
     if not targnodes:
@@ -181,12 +182,20 @@ async def do_power_action(action, setboot=None):
             extratextbynode[node] = ''
         redraw()
 
-
+def set_extra_text(text):
+    global focustext
+    focustext = text
+    redraw()
 
 async def watch_input():
+    global focustext
+    focustext = 'Hit Ctrl-E for command mode'
     handler = await InputHandler.create()
     while True:
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
+        if focustext == 'Hit Ctrl-E for command mode':
+            focustext = ''
+            redraw()
 
 class InputHandler:
 
@@ -244,21 +253,28 @@ class InputHandler:
     async def timeout_sequence(self, timeout=3, flushbuffer=False):
         await asyncio.sleep(timeout)
         if flushbuffer:
-            await relay_keypresses(self.buffer)
+            if self.buffer == '\x05':
+                await relay_keypresses('e', modifiers=[SpecialKeys.CTRL])
+            else:
+                await relay_keypresses(self.buffer)
         self.reset_input_context()
         
-    def reset_input_context(self):
+    def reset_input_context(self, escmode=False):
         self.inputcontext = None
         self.buffer = ''
         self.modkeys = None
+        if not escmode:
+            set_extra_text('')
         global focus_pending
         if focus_pending:
             focus_pending = False
+        if focus_pending or escmode:
             redraw()
 
     async def process_input(self, data):
         if self.inputcontext is None:  # no escape or command sequence
             if data == b'\x05':  # Ctrl-E
+                set_extra_text('Ctrl-E pressed, release Ctrl and hit "c" to enter command mode, Ctrl-E again to send Ctrl-E')  # clear any previous command sequence text
                 if self.seqtimeout:
                     self.seqtimeout.cancel()
                 self.seqtimeout = asyncio.create_task(self.timeout_sequence(flushbuffer=True))
@@ -297,9 +313,12 @@ class InputHandler:
                       '\x05cpbs', # boot system to setup
                       '\x05cpbn', # boot system to network
                       '\x05c.', # exit console
+                      '\x05cq', # exit console alias
                       '\x05c?', # help
                       '\x05cfa', # toggle focus all
                       '\x05c\x1b[A', '\x05c\x1b[B', '\x05c\x1b[C', '\x05c\x1b[D', # move focus with arrow keys
+                      '\x05cf\x1b[A', '\x05cf\x1b[B', '\x05cf\x1b[C', '\x05cf\x1b[D', # move focus with arrow keys
+
                       )
 
     def starts_valid_command(self):
@@ -312,23 +331,50 @@ class InputHandler:
         if self.seqtimeout:
             self.seqtimeout.cancel()
         self.buffer += data.decode('utf-8', errors='ignore')
+        if '\x1b' == self.buffer[-1:]:
+            # user hit escape, or arrow key..
+            # give it a short timeout for arrows..
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
+            return
+        if '\x03' == self.buffer[-1:]:  # Ctrl-C, abort command sequence immediately
+            self.reset_input_context()
+            return
+        if self.buffer == '\x05\x05': # double ctrl-e, send a single ctrl-e to the console
+            await relay_keypresses('e', modifiers=[SpecialKeys.CTRL])
+            self.reset_input_context()
+            return
         if len(self.buffer) < 2:
             raise Exception('Command sequence buffer should have at least 2 characters')
         if not self.buffer.startswith('\x05c'):  # not a command
             await relay_keypresses('e', modifiers=[SpecialKeys.CTRL])
             await relay_keypresses(self.buffer[1:])
             self.reset_input_context()
+        if self.buffer == '\x05c':
+            set_extra_text('Commands: q:exit, p:power, f:input focus, b:sysrq, ^c:abort') 
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))  # extend timeout to navigate options
+            return
         if '\x05cb' == self.buffer: # send break
             # but we need to know more, so wait for the next key
+            set_extra_text('Enter sysrq command key (or <ESC> to abort)')
             self.seqtimeout = asyncio.create_task(self.timeout_sequence())
         elif len(self.buffer) == 4 and self.buffer.startswith('\x05cb'):  # Ctrl-E, then c, then b
             await relay_keypresses(self.buffer[3:], modifiers=[SpecialKeys.ALT, SpecialKeys.SYSRQ])
             self.reset_input_context()
-        elif self.buffer == '\x05c.':  # Ctrl-E, then .
+        elif self.buffer == '\x05c.' or self.buffer == '\x05cq':  # Ctrl-E, then . or q
             asyncio.get_running_loop().call_soon(sys.exit, 0)
             return
+        elif self.buffer == '\x05cf':  # Ctrl-E, then c, then f
+            set_extra_text('Focus commands: ⇅⇄:move focus, a:toggle focus all')
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))
         elif self.buffer == '\x05cfa':  # toggle focus ...
             toggle_focus_all()
+            self.reset_input_context()
+        elif self.buffer == '\x05cp':
+            set_extra_text('Power commands: o:power off, s:shutdown, b:boot')
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))
+        elif self.buffer == '\x05cpb':
+            set_extra_text('Boot options: <enter>: normal boot, s:boot to setup, n:boot to network, ^c to abort')
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))
         elif self.buffer == '\x05cpo':  # Ctrl-E, then power off
             await do_power_action('off')
             return self.reset_input_context()
@@ -345,14 +391,11 @@ class InputHandler:
             await do_power_action('boot', 'network')
             return self.reset_input_context()
         elif self.buffer == '\x05c?':  # Ctrl-E, then c?
-            msg = ''
-            msg.append('Command sequences:\n')
-            msg.append('Ctrl-E, then cb: Send SysRq\n')
-            msg.append('Ctrl-E, then c.: Exit console\n')
-            msg.append('Ctrl-E, then c?: This help message\n')
-
-            self.reset_input_context()
-        elif self.buffer in ('\x05c\x1b[A', '\x05c\x1b[B', '\x05c\x1b[C', '\x05c\x1b[D'):  # Ctrl-E, then cursor keys
+            set_extra_text('q:exit,⇅⇄:focus,po:power off,ps:shutdown,pb<enter>:reboot,pbs:boot setup,pbn:boot network,fa:(un)focus all,bX:sysrq, then X')
+            self.buffer = '\x05c' # go back to let the user enter stuff based on text
+            self.seqtimeout = asyncio.create_task(self.timeout_sequence(10))
+            return
+        elif self.buffer[-3:] in ('\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D'):  # Ctrl-E, then cursor keys
             arrowkey_map = {'A': 'Up', 'B': 'Down', 'C': 'Right', 'D': 'Left'}
             arrowkey = arrowkey_map.get(self.buffer[-1], self.buffer[-1])
             global focus_pending
@@ -379,7 +422,7 @@ class InputHandler:
                 self.modkeys = [SpecialKeys.ALT]
             if self.buffer[1:] in self.csikeys:
                 await relay_keypresses(self.csikeys[self.buffer[1:]], modifiers=self.modkeys)
-                self.reset_input_context()
+                self.reset_input_context(escmode=True)
                 return
             for cand in self.csikeys:
                 if cand.startswith(self.buffer[1:]):
@@ -387,16 +430,16 @@ class InputHandler:
                     self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
                     break
             else:
-                self.reset_input_context()
+                self.reset_input_context(escmode=True)
         elif len(self.buffer) >= 2 and self.buffer.startswith('\x1bO'): #SS3
             if len(self.buffer) == 3:
                 if self.buffer[2:] in self.ss3keys:
                     await relay_keypresses(self.ss3keys[self.buffer[2:]])
-                    self.reset_input_context()
+                    self.reset_input_context(escmode=True)
                     return
         elif len(self.buffer) >= 2:  # ESC-key is a way to do alt
             await relay_keypresses(self.buffer[1:], modifiers=[SpecialKeys.ALT])
-            self.reset_input_context()
+            self.reset_input_context(escmode=True)
                   
 
 vncclientsbynode = {}
@@ -697,18 +740,24 @@ def prep_node_tile(node):
         cursor_right(currcolcell)
     if currrowcell:
         cursor_down(currrowcell)
+    titletext = node
+    if extratextbynode.get(node, None):
+        titletext += ' ' + extratextbynode[node]
     if node in focused_nodes:
+        if focustext and not extratextbynode.get(node, None):
+            titletext += ' ' + focustext
         if focus_pending:
             sys.stdout.write('\x1b[43m')
         else:
-            sys.stdout.write('\x1b[44m')    
-    titletext = node
-    if extratextbynode.get(node):
-        titletext += ' - ' + extratextbynode[node]
-    sys.stdout.write(f'▏{titletext:<{cwidth - 1}}')
+            sys.stdout.write('\x1b[44m')
+
+    titlebar = f'▏{titletext:<{cwidth - 1}}'
+    if len(titlebar) > cwidth:
+        titlebar = titlebar[:cwidth - 1] + '…'
+    sys.stdout.write(titlebar)
     if node in focused_nodes:
         sys.stdout.write('\x1b[0m')
-    cursor_left(cwidth)
+    cursor_left(len(titlebar))
     cursor_down()
 
 def reset_cursor(node):
