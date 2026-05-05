@@ -27,7 +27,8 @@ path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
 if path.startswith('/opt'):
     sys.path.append(path)
 
-import confluent.client as client
+import confluent.asynclient as client
+import confluent.client as synclient
 import confluent.sortutil as sortutil
 import confluent.logreader as logreader
 import confluent.vnc as vnc
@@ -146,6 +147,41 @@ class SpecialKeys(enum.Enum):
     END = 0xff57
     ESC = 0xff1b
 
+extratextbynode = {}
+async def do_power_action(action, setboot=None):
+    targnodes = list(focused_nodes)
+    if not targnodes:
+        return
+    for node in targnodes:
+        extratextbynode[node] = 'Power action: '
+    redraw()
+    try:
+        paclient = client.Command()
+        if setboot:
+            noderange = ','.join(targnodes)
+            async for res in paclient.update(f'/noderange/{noderange}/boot/nextdevice', {'nextdevice': setboot, 'mode': 'uefi'}):
+                if 'error' in res:
+                    for node in targnodes:
+                        extratextbynode[node] += 'Failed to set boot device: {0}'.format(res['error'])
+                    return
+                for node in res.get('databynode', {}):
+                    extratextbynode[node] += 'set boot device to: ' + res['databynode'][node].get('nextdevice', {}).get('value', 'Unknown') + ', '
+        noderange = ','.join(targnodes)
+        async for res in paclient.update(f'/noderange/{noderange}/power/state', {'state': action}):
+            if 'error' in res:
+                for node in targnodes:
+                    extratextbynode[node] += 'Failed to power ' + action + ': {0}'.format(res['error'])
+                return
+            for node in res.get('databynode', {}):
+                extratextbynode[node] += res['databynode'][node].get('state', {}).get('value', 'Unknown')
+    finally:
+        redraw()
+        await asyncio.sleep(5)
+        for node in targnodes:
+            extratextbynode[node] = ''
+        redraw()
+
+
 
 async def watch_input():
     handler = await InputHandler.create()
@@ -254,7 +290,17 @@ class InputHandler:
         elif self.inputcontext == 'command_sequence':
             await self.handle_command_sequence(data)
 
-    valid_commands = ('\x05cb', '\x05c.', '\x05c?', '\x05cfa', '\x05c\x1b[A', '\x05c\x1b[B', '\x05c\x1b[C', '\x05c\x1b[D')
+    valid_commands = ('\x05cb',  # send sysrq
+                      '\x05cpo', # power off system
+                      '\x05cps', # shutdown system gracefully
+                      '\x05cpb\r', # reboot system
+                      '\x05cpbs', # boot system to setup
+                      '\x05cpbn', # boot system to network
+                      '\x05c.', # exit console
+                      '\x05c?', # help
+                      '\x05cfa', # toggle focus all
+                      '\x05c\x1b[A', '\x05c\x1b[B', '\x05c\x1b[C', '\x05c\x1b[D', # move focus with arrow keys
+                      )
 
     def starts_valid_command(self):
         for cmd in self.valid_commands:
@@ -283,6 +329,21 @@ class InputHandler:
             return
         elif self.buffer == '\x05cfa':  # toggle focus ...
             toggle_focus_all()
+        elif self.buffer == '\x05cpo':  # Ctrl-E, then power off
+            await do_power_action('off')
+            return self.reset_input_context()
+        elif self.buffer == '\x05cps':  # Ctrl-E, then shutdown
+            await do_power_action('shutdown')
+            return self.reset_input_context()
+        elif self.buffer == '\x05cpb\r':  # Ctrl-E, then reboot
+            await do_power_action('boot')
+            return self.reset_input_context()
+        elif self.buffer == '\x05cpbs':  # Ctrl-E, then boot to setup
+            await do_power_action('boot', 'setup')
+            return self.reset_input_context()
+        elif self.buffer == '\x05cpbn':  # Ctrl-E, then boot to network
+            await do_power_action('boot', 'network')
+            return self.reset_input_context()
         elif self.buffer == '\x05c?':  # Ctrl-E, then c?
             msg = ''
             msg.append('Command sequences:\n')
@@ -629,7 +690,7 @@ if options.Timestamp:
         sys.exit(1)
     logreader.dump_to_console(logname)
     sys.exit(0)
-extratext = ''
+
 def prep_node_tile(node):
     currcolcell, currrowcell = nodepositions[node]
     if currcolcell:
@@ -642,8 +703,8 @@ def prep_node_tile(node):
         else:
             sys.stdout.write('\x1b[44m')    
     titletext = node
-    if extratext:
-        titletext += ' - ' + extratext
+    if extratextbynode.get(node):
+        titletext += ' - ' + extratextbynode[node]
     sys.stdout.write(f'▏{titletext:<{cwidth - 1}}')
     if node in focused_nodes:
         sys.stdout.write('\x1b[0m')
@@ -699,7 +760,7 @@ async def do_screenshot():
             sys.exit(1)
         allnodes = []
         numnodes = 0
-        for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
+        async for res in sess.read('/noderange/{}/nodes/'.format(args[0])):
             allnodes.append(res['item']['href'].replace('/', ''))
             numnodes += 1
         resized = False
@@ -738,7 +799,7 @@ async def do_screenshot():
     vnconly = set([])
     if streaming:
         doexit = 0
-        for res in sess.read('/noderange/{}/console/ikvm_methods'.format(args[0])):
+        async for res in sess.read('/noderange/{}/console/ikvm_methods'.format(args[0])):
             for node in res.get('databynode', {}):
                 methods = res['databynode'][node].get('ikvm_methods', [])
                 if 'vnc' not in methods and 'openbmc' not in methods:
@@ -749,7 +810,7 @@ async def do_screenshot():
             sys.exit(1)
     while dorefresh:
         if not streaming:
-            for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
+            async for res in sess.read('/noderange/{}/console/ikvm_screenshot'.format(args[0])):
                 for node in res.get('databynode', {}):
                     errorstr = ''
                     if not firstnodename:
@@ -769,7 +830,7 @@ async def do_screenshot():
                         draw_node(node, imgdata, errorstr, firstnodename, cwidth, cheight)
         urlbynode = {}
         for node in vnconly:
-            for res in sess.update(f'/nodes/{node}/console/ikvm', {'method': 'unix'}):
+            async for res in sess.update(f'/nodes/{node}/console/ikvm', {'method': 'unix'}):
                 url = res.get('item', {}).get('href')
                 if url:
                     urlbynode[node] = url
@@ -956,14 +1017,14 @@ if options.screenshot or options.video:
         sys.stdout.write('\n')
     sys.exit(0)
 
-def kill(noderange):
+async def kill(noderange):
     sess = client.Command()
     envstring=os.environ.get('NODECONSOLE_WINDOWED_COMMAND')
     if not envstring:
         envstring = 'xterm'
 
     nodes = []
-    for res in sess.read('/noderange/{0}/nodes/'.format(noderange)):
+    async for res in sess.read('/noderange/{0}/nodes/'.format(noderange)):
         node = res.get('item', {}).get('href', '/').replace('/', '')
         if not node:
             sys.stderr.write(res.get('error', repr(res)) + '\n')
@@ -1002,7 +1063,7 @@ def handle_geometry(envlist, sizegeometry, side_pad=0, top_pad=0, first=False):
 
 # add funcltionality to close/kill all open consoles
 if killcon:
-    kill(noderange)
+    asyncio.run(kill(noderange))
     
 #added functionality for wcons
 if options.windowed:
@@ -1039,7 +1100,7 @@ if options.windowed:
                 g_index = 1
             
     nodes = []
-    sess = client.Command()
+    sess = synclient.Command()
     for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
         node = res.get('item', {}).get('href', '/').replace('/', '')
         if not node:
@@ -1131,7 +1192,7 @@ if options.windowed:
 if options.tile:
     null = open('/dev/null', 'w')
     nodes = []
-    sess = client.Command()
+    sess = synclient.Command()
     for res in sess.read('/noderange/{0}/nodes/'.format(args[0])):
         node = res.get('item', {}).get('href', '/').replace('/', '')
         if not node:
