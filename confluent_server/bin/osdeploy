@@ -49,6 +49,7 @@ def main(args):
     wiz.add_argument('-p', help='Copy in TFTP contents required for PXE support', action='store_true')
     wiz.add_argument('-i', help='Interactively prompt for behaviors', action='store_true')
     wiz.add_argument('-l', help='Set up local management node to allow login from managed nodes', action='store_true')
+    wiz.add_argument('-r', help='Repack site contents if present', action='store_true')
     osip = sp.add_parser('importcheck', help='Check import of an OS image from an ISO image')
     osip.add_argument('imagefile', help='File to use for source of importing')
     osip = sp.add_parser('import', help='Import an OS image from an ISO image')
@@ -367,6 +368,8 @@ def initialize(cmdset):
         rc = initialize_genesis()
         if rc != 0:
             sys.exit(rc)
+    if cmdset.r:
+        didsomething = True
     if not didsomething and (cmdset.k or cmdset.l or cmdset.g or cmdset.p):
         if cmdset.g:
             updateboot('genesis-x86_64')
