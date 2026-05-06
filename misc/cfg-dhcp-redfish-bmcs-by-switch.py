@@ -30,32 +30,23 @@
 # recommend, but hopefully can be useful reference material
 
 
+import asyncio
 import sys
 sys.path.append('/opt/confluent/lib/python')
-import concurrent.futures
+import aiohmi.util.webclient as webclient
 import confluent.client as cli
-import gzip
-import io
 import json
 import os
 import struct
 import subprocess
-import pyghmi.util.webclient as webclient
 import time
 
 
 bmcsbyuuid = {}
-def checkfish(addr, mac):
-    wc = webclient.SecureHTTPConnection(addr, 443, verifycallback=lambda x: True)
-    wc.connect()
-    wc.request('GET', '/redfish/v1')
-    rsp = wc.getresponse()
-    body = rsp.read()
-    if body[:2] == b'\x1f\x8b':
-        body = gzip.GzipFile(fileobj=io.BytesIO(body)).read()
-    try:
-        body = json.loads(body)
-    except json.decoder.JSONDecodeError:
+async def checkfish(addr, mac):
+    wc = webclient.WebConnection(addr, 443, verifycallback=lambda x: True)
+    body = await wc.grab_json_response('/redfish/v1')
+    if not body:
         return None
     uuid = body.get('UUID', None)
     if not uuid:
@@ -68,6 +59,27 @@ def checkfish(addr, mac):
     uuidparts[2] = '{:04x}'.format(struct.unpack('!H', struct.pack('<H', int(uuidparts[2], 16)))[0])
     uuid = '-'.join(uuidparts)
     return (uuid, mac, addr)
+
+
+async def probe_bmcs(mactonode, mactoips):
+    tasks = []
+    macs = []
+    for mac in sorted(mactonode):
+        tasks.append(checkfish(mactoips[mac], mac))
+        macs.append(mac)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for mac, result in zip(macs, results):
+        if isinstance(result, Exception):
+            sys.stderr.write('Failed to probe {}: {}\n'.format(
+                mactoips[mac], result))
+            continue
+        if result is None:
+            continue
+        uuid, mac, addr = result
+        if uuid in bmcsbyuuid:
+            bmcsbyuuid[uuid]['bmcs'][mac] = addr
+        else:
+            bmcsbyuuid[uuid] = {'bmcs': {mac: addr}}
 
 
 if __name__ == '__main__':
@@ -90,7 +102,7 @@ if __name__ == '__main__':
             currip = None
             inlease = False
     # warm up arp tables and fdb
-    pings = {} 
+    pings = {}
     for mac in mactoips:
         pings[mac] = subprocess.Popen(['ping', '-c', '1', mactoips[mac]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for mac in pings:
@@ -110,25 +122,7 @@ if __name__ == '__main__':
         for inf in macinfo:
             if inf.get('possiblenode', None):
                 mactonode[mac] = inf['possiblenode']
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = {}
-        for mac in sorted(mactonode):
-            futures[executor.submit(checkfish, mactoips[mac], mac)] = mac
-        for future in concurrent.futures.as_completed(futures):
-            mac = futures[future]
-            try:
-                result = future.result()
-            except Exception as e:
-                sys.stderr.write('Failed to probe {}: {}\n'.format(
-                    mactoips[mac], e))
-                continue
-            if result is None:
-                continue
-            uuid, mac, addr = result
-            if uuid in bmcsbyuuid:
-                bmcsbyuuid[uuid]['bmcs'][mac] = addr
-            else:
-                bmcsbyuuid[uuid] = {'bmcs': {mac: addr}}
+    asyncio.run(probe_bmcs(mactonode, mactoips))
     for uuid in sorted(bmcsbyuuid):
         macd = bmcsbyuuid[uuid]['bmcs']
         macs = sorted(macd)
