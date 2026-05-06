@@ -23,8 +23,8 @@ chmod +x ./makesetup.deb
 VERSION=`cat VERSION`
 cat > setup.cfg << EOF
 [install]
-install-purelib=/opt/confluent/lib/python
-install-scripts=/opt/confluent/bin
+install_purelib=/opt/confluent/lib/python
+install_scripts=/opt/confluent/bin
 
 [sdist_dsc]
 package=$DPKGNAME
