@@ -334,14 +334,14 @@ async def asyncrun(args):
     auth.check_for_yaml()
     collective.startup()
     await consoleserver.initialize()
-    http_bind_host, http_bind_port = _get_connector_config('http')
-    sock_bind_host, sock_bind_port = _get_connector_config('socket')
+    http_bind_host, http_bind_port, http_bind_group, http_bind_perms = _get_connector_config('http')
+    sock_bind_host, sock_bind_port, sock_bind_group, sock_bind_perms = _get_connector_config('socket')
     try:
-        sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
+        sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port, sock_bind_group, sock_bind_perms)
         asyncio.get_event_loop().create_task(sockservice.start())
     except NameError:
         pass
-    webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
+    webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)
     webservice.start()
     while len(list(configmanager.list_collective())) >= 2:
         # If in a collective, stall automatic startup activity
@@ -373,7 +373,23 @@ async def asyncrun(args):
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')
     port = conf.get_int_option(session, 'bindport')
-    return (host, port)
+    group = conf.get_option(session, 'bindgroup')
+    perms = conf.get_option(session, 'bindperms')
+    if perms:
+        if perms.startswith('0'):
+            perms = int(perms, 8)
+        else:
+            # Parse rw-rw-rw- format (user, group, other)
+            perms_value = 0
+            perm_map = {'r': 4, 'w': 2, 'x': 1}
+            for i, section in enumerate([perms[0:3], perms[3:6], perms[6:9]]):
+                for char in section:
+                    if char in perm_map:
+                        perms_value += perm_map[char] * (8 ** (2 - i))
+            perms = perms_value
+    else:
+        perms = None
+    return (host, port, group, perms)
 
 def _get_logdirectory():
     return conf.get_option('globals', 'logdirectory')

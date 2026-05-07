@@ -27,6 +27,7 @@ import ctypes.util
 import errno
 import os
 import pwd
+import shutil
 import stat
 import struct
 import sys
@@ -444,8 +445,10 @@ def removesocket():
     except OSError:
         pass
 
-async def _unixdomainhandler():
+async def _unixdomainhandler(bind_group=None, bind_perms=None):
     aloop = asyncio.get_event_loop()
+    if not bind_perms:
+        bind_perms = 0o666
     unixsocket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     unixsocket.settimeout(0)
     try:
@@ -454,10 +457,12 @@ async def _unixdomainhandler():
         pass
     if not os.path.isdir("/var/run/confluent"):
         os.makedirs('/var/run/confluent', 0o755)
+    oldumask = os.umask(0o777 - bind_perms)
     unixsocket.bind("/var/run/confluent/api.sock")
-    os.chmod("/var/run/confluent/api.sock",
-             stat.S_IWOTH | stat.S_IROTH | stat.S_IWGRP |
-             stat.S_IRGRP | stat.S_IWUSR | stat.S_IRUSR)
+    os.chmod("/var/run/confluent/api.sock", bind_perms)
+    if bind_group:
+        shutil.chown("/var/run/confluent/api.sock", group=bind_group)
+    os.umask(oldumask)
     atexit.register(removesocket)
     unixsocket.listen(5)
     while True:
@@ -487,11 +492,13 @@ async def _unixdomainhandler():
 
 
 class SockApi(object):
-    def __init__(self, bindhost=None, bindport=None):
+    def __init__(self, bindhost=None, bindport=None, bindgroup=None, bindperms=None):
         self.tlsserver = None
         self.unixdomainserver = None
         self.bind_host = bindhost or '::'
         self.bind_port = bindport or 13001
+        self.bind_group = bindgroup
+        self.bind_perms = bindperms
 
     async def start(self):
         global auditlog
@@ -504,7 +511,7 @@ class SockApi(object):
         else:
             cloop = asyncio.get_event_loop()
             tasks.spawn(self.watch_for_cert())
-        self.unixdomainserver = tasks.spawn_task(_unixdomainhandler())
+        self.unixdomainserver = tasks.spawn_task(_unixdomainhandler(self.bind_group, self.bind_perms))
 
     async def watch_for_cert(self):
         watcher = libc.inotify_init1(os.O_NONBLOCK)

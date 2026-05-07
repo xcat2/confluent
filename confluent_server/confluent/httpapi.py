@@ -17,6 +17,7 @@
 # This SCGI server provides a http wrap to confluent api
 # It additionally manages httprequest console sessions
 import base64
+import shutil
 
 import aiohttp
 try:
@@ -1166,13 +1167,15 @@ async def _assemble_json(responses, resource=None, url=None, extension=None):
         rspdata, sort_keys=True, indent=4, ensure_ascii=False).encode('utf-8'))
 
 
-async def serve(bind_host, bind_port):
+async def serve(bind_host, bind_port, bind_group, bind_perms):
     # TODO(jbjohnso): move to unix socket and explore
     # either making apache deal with it
     # or just supporting nginx or lighthttpd
     # for now, http port access
     # todo remains unix domain socket for even http
     sock = None
+    if not bind_perms:
+        bind_perms = 0o666
     while not sock:
         try:
             bind_arg = None
@@ -1181,16 +1184,21 @@ async def serve(bind_host, bind_port):
                     os.remove(bind_host)
                 except OSError:
                     pass
-                sock = socket.socket(socket.AF_UNIX)
-                os.chmod(bind_host, 0o660)
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                oldumask = os.umask(0o777 - bind_perms)
+                sock.bind(bind_host)
+                os.chmod(bind_host, bind_perms)
+                if bind_group:
+                    shutil.chown(bind_host, group=bind_group)
+                os.umask(oldumask)
                 bind_arg = bind_host
             else:
                 bindinfo = socket.getaddrinfo(
                     bind_host, bind_port, 0, socket.SOCK_STREAM)
                 if bindinfo[0][0] == socket.AF_INET:
-                    sock = socket.socket(socket.AF_INET)
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 elif bindinfo[0][0] == socket.AF_INET6:
-                    sock = socket.socket(socket.AF_INET6)
+                    sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
                 bind_arg = bindinfo[0][4]
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -1221,10 +1229,12 @@ async def serve(bind_host, bind_port):
 
 
 class HttpApi(object):
-    def __init__(self, bind_host=None, bind_port=None):
+    def __init__(self, bind_host=None, bind_port=None, bind_group=None, bind_perms=None):
         self.server = None
         self.bind_host = bind_host or '127.0.0.1'
         self.bind_port = bind_port or 4005
+        self.bind_group = bind_group
+        self.bind_perms = bind_perms
 
     def start(self):
         global _cleaner
@@ -1236,4 +1246,4 @@ class HttpApi(object):
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
         self.server = asyncio.get_event_loop().create_task(
-            serve(self.bind_host, self.bind_port))
+            serve(self.bind_host, self.bind_port, self.bind_group, self.bind_perms))
