@@ -203,7 +203,8 @@ class InputHandler:
         'P': SpecialKeys.F1,
         'Q': SpecialKeys.F2,
         'R': SpecialKeys.F3,
-        'S': SpecialKeys.F4
+        'S': SpecialKeys.F4,
+        'M': SpecialKeys.ENTER,
     }
 
     csikeys = {
@@ -255,6 +256,8 @@ class InputHandler:
         if flushbuffer:
             if self.buffer == '\x05':
                 await relay_keypresses('e', modifiers=[SpecialKeys.CTRL])
+            elif self.buffer == '\x1bO':
+                await relay_keypresses('O', modifiers=[SpecialKeys.ALT, SpecialKeys.SHIFT])
             else:
                 await relay_keypresses(self.buffer)
         self.reset_input_context()
@@ -413,6 +416,7 @@ class InputHandler:
         if self.seqtimeout:
             self.seqtimeout.cancel()
         self.buffer += data.decode('utf-8', errors='ignore')
+        # Shift-enter
         if len(self.buffer) >= 2 and self.buffer.startswith('\x1b['):  #CSI
             if self.buffer.endswith(';3~'):
                 self.buffer = self.buffer.replace(';3~', '~')
@@ -435,8 +439,11 @@ class InputHandler:
             if len(self.buffer) == 3:
                 if self.buffer[2:] in self.ss3keys:
                     await relay_keypresses(self.ss3keys[self.buffer[2:]])
-                    self.reset_input_context(escmode=True)
-                    return
+                self.reset_input_context(escmode=True)
+                return
+            if len(self.buffer) == 2:
+                self.seqtimeout = asyncio.create_task(self.timeout_sequence(0.2))
+                return
         elif len(self.buffer) >= 2:  # ESC-key is a way to do alt
             await relay_keypresses(self.buffer[1:], modifiers=[SpecialKeys.ALT])
             self.reset_input_context(escmode=True)
