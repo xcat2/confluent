@@ -1,0 +1,34 @@
+diff -urN t/usr/lib/python3/dist-packages/stdeb/cli_runner.py t.patch/usr/lib/python3/dist-packages/stdeb/cli_runner.py
+--- t/usr/lib/python3/dist-packages/stdeb/cli_runner.py 2024-06-11 18:30:13.930328999 +0000
++++ t.patch/usr/lib/python3/dist-packages/stdeb/cli_runner.py   2024-06-11 18:32:05.392731405 +0000
+@@ -8,7 +8,7 @@
+     from ConfigParser import SafeConfigParser  # noqa: F401
+ except ImportError:
+     # python 3.x
+-    from configparser import SafeConfigParser  # noqa: F401
++    from configparser import ConfigParser  # noqa: F401
+ from distutils.util import strtobool
+ from distutils.fancy_getopt import FancyGetopt, translate_longopt
+ from stdeb.util import stdeb_cmdline_opts, stdeb_cmd_bool_opts
+diff -urN t/usr/lib/python3/dist-packages/stdeb/util.py t.patch/usr/lib/python3/dist-packages/stdeb/util.py
+--- t/usr/lib/python3/dist-packages/stdeb/util.py       2024-06-11 18:32:53.864776149 +0000
++++ t.patch/usr/lib/python3/dist-packages/stdeb/util.py 2024-06-11 18:33:02.063952870 +0000
+@@ -730,7 +730,7 @@
+     example.
+     """
+ 
+-    cfg = ConfigParser.SafeConfigParser()
++    cfg = ConfigParser.ConfigParser()
+     cfg.read(cfg_files)
+     if cfg.has_section(module_name):
+         section_items = cfg.items(module_name)
+@@ -801,7 +801,7 @@
+         if len(cfg_files):
+             check_cfg_files(cfg_files, module_name)
+ 
+-        cfg = ConfigParser.SafeConfigParser(cfg_defaults)
++        cfg = ConfigParser.ConfigParser(cfg_defaults)
+         for cfg_file in cfg_files:
+             with codecs.open(cfg_file, mode='r', encoding='utf-8') as fd:
+                 cfg.readfp(fd)
+
