@@ -342,6 +342,21 @@ def _get_connector_config(session):
     port = conf.get_int_option(session, 'bindport')
     group = conf.get_option(session, 'bindgroup')
     perms = conf.get_option(session, 'bindperms')
+    if perms:
+        if perms.startswith('0'):
+            perms = int(perms, 8)
+        else:
+            # Parse rw-rw-rw- format (user, group, other)
+            perms_value = 0
+            perm_map = {'r': 4, 'w': 2, 'x': 1}
+            for i, section in enumerate([perms[0:3], perms[3:6], perms[6:9]]):
+                for char in section:
+                    if char in perm_map:
+                        perms_value += perm_map[char] * (8 ** (2 - i))
+            perms = perms_value
+    else:
+        perms = None
+
     return (host, port, group, perms)
 
 def _get_logdirectory():
