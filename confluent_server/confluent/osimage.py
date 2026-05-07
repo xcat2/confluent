@@ -641,6 +641,9 @@ def check_sles(isoinfo):
         elif '.2' in medianame:
             disk = '2'
     if disk and distro:
+        category = 'suse{0}'.format(major)
+        if not os.path.exists('/opt/confluent/lib/osdeploy/{0}'.format(category)):
+            return None
         return {'name': '{0}-{1}-{2}'.format(distro, ver, arch),
                 'method': EXTRACT, 'subname': disk,
                 'category': 'suse{0}'.format(major)}
@@ -790,7 +793,11 @@ def check_rhel(isoinfo):
                         'method': EXTRACT, 'category': cat}
         return None
     major = ver.split('.', 1)[0]
-    return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': 'el{0}'.format(major)}
+    category = 'el{0}'.format(major)
+    defprofile = '/opt/confluent/lib/osdeploy/{0}'.format(category)
+    if not os.path.exists(defprofile):
+        return None
+    return {'name': 'rhel-{0}-{1}'.format(ver, arch), 'method': EXTRACT, 'category': category}
 
 def fingerprint_initramfs(archive):
     curroffset = archive.tell()
