@@ -17,6 +17,7 @@
 # This SCGI server provides a http wrap to confluent api
 # It additionally manages httprequest console sessions
 import base64
+import shutil
 try:
     import Cookie
 except ModuleNotFoundError:
@@ -1217,7 +1218,7 @@ def _assemble_json(responses, resource=None, url=None, extension=None):
         rspdata, sort_keys=True, indent=4, ensure_ascii=False).encode('utf-8'))
 
 
-def serve(bind_host, bind_port):
+def serve(bind_host, bind_port, bind_group=None, bind_perms=None):
     # TODO(jbjohnso): move to unix socket and explore
     # either making apache deal with it
     # or just supporting nginx or lighthttpd
@@ -1232,13 +1233,17 @@ def serve(bind_host, bind_port):
     while not sock:
         try:
             if '/' in bind_host:
+                oldumask = os.umask(0o777 - bind_perms)
                 try:
                     os.remove(bind_host)
                 except Exception:
                     pass
                 sock = eventlet.listen(
                     bind_host, family=socket.AF_UNIX)
-                os.chmod(bind_host, 0o666)
+                os.umask(oldumask)
+                os.chmod(bind_host, bind_perms)
+                if bind_group:
+                    shutil.chown(bind_host, group=bind_group)
             else:
                 addrinfo = socket.getaddrinfo(bind_host, bind_port)[0]
                 sock = eventlet.listen(
@@ -1264,17 +1269,22 @@ def serve(bind_host, bind_port):
 
 
 class HttpApi(object):
-    def __init__(self, bind_host=None, bind_port=None):
+    def __init__(self, bind_host=None, bind_port=None, bind_group=None, bind_perms=None):
         self.server = None
         self.bind_host = bind_host or '127.0.0.1'
         self.bind_port = bind_port or 4005
+        # Ultimately, a unix socket is being used in lieu of a TCP socket,
+        # so open permissions make sense as the security is not based solely on socket access
+        # however, steering it to webserver group can be done for extra confidence
+        self.bind_group = bind_group
+        self.bind_perms = bind_perms or 0o666
 
     def start(self):
         global auditlog
         global tracelog
         tracelog = log.Logger('trace')
         auditlog = log.Logger('audit')
-        self.server = eventlet.spawn(serve, self.bind_host, self.bind_port)
+        self.server = eventlet.spawn(serve, self.bind_host, self.bind_port, self.bind_group, self.bind_perms)
 
 
 _cleaner = eventlet.spawn(_sessioncleaner)

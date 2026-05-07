@@ -314,14 +314,14 @@ def run(args):
     auth.check_for_yaml()
     collective.startup()
     consoleserver.initialize()
-    http_bind_host, http_bind_port = _get_connector_config('http')
-    sock_bind_host, sock_bind_port = _get_connector_config('socket')
+    http_bind_host, http_bind_port, http_bind_group, http_bind_perms = _get_connector_config('http')
+    sock_bind_host, sock_bind_port, sock_bind_group, sock_bind_perms = _get_connector_config('socket')
     try:
-        sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port)
+        sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port, sock_bind_group, sock_bind_perms)
         sockservice.start()
     except NameError:
         pass
-    webservice = httpapi.HttpApi(http_bind_host, http_bind_port)
+    webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)
     webservice.start()
     while len(list(configmanager.list_collective())) >= 2:
         # If in a collective, stall automatic startup activity
@@ -340,7 +340,9 @@ def run(args):
 def _get_connector_config(session):
     host = conf.get_option(session, 'bindhost')
     port = conf.get_int_option(session, 'bindport')
-    return (host, port)
+    group = conf.get_option(session, 'bindgroup')
+    perms = conf.get_option(session, 'bindperms')
+    return (host, port, group, perms)
 
 def _get_logdirectory():
     return conf.get_option('globals', 'logdirectory')
