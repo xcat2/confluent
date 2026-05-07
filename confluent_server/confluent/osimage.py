@@ -596,6 +596,9 @@ def check_ubuntu(isoinfo):
             exlist = ['casper/*vmlinuz', 'casper/*initrd', 
                     'efi/boot/bootx64.efi', 'efi/boot/grubx64.efi'
                     ]
+        defprofile = '/opt/confluent/lib/osdeploy/ubuntu{0}'.format(major)
+        if not os.path.exists(defprofile):
+            return None
         return {'name': 'ubuntu-{0}-{1}'.format(ver, arch),
                 'method': EXTRACT|COPY,
                 'extractlist': exlist,
