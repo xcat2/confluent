@@ -280,6 +280,8 @@ class WebConnection:
         self.verifycallback = verifycallback
         if isinstance(timeout, (int, float)):
             self.timeout = aiohttp.ClientTimeout(total=timeout)
+        elif timeout is None:
+            self.timeout = aiohttp.DEFAULT_TIMEOUT
         else:
             self.timeout = timeout 
         self.stdheaders = {}
