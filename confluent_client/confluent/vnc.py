@@ -68,32 +68,47 @@ class VNCClient:
         self.copytext = None
         self._updating = True
         self.decompressor = zlib.decompressobj()
+        self._input_queue = asyncio.Queue()
+        self._input_task = asyncio.create_task(self._input_worker())
         await self._do_vnc_handshake()
         return self
     
+    async def _input_worker(self):
+        while True:
+            keys, modifierkeys = await self._input_queue.get()
+            payload = ByteStream()
+            for modkey in (modifierkeys or []):
+                payload.add_number(4, 1)  # Key event
+                payload.add_number(1, 1)  # Down
+                payload.add_number(0, 2)  # Padding
+                payload.add_number(modkey.value, 4)
+                payload.flush(self.writer)
+                await self.writer.drain()
+            for key in keys:
+                keynumber = key.value if hasattr(key, 'value') else key
+                payload.add_number(4, 1)  # Key event
+                payload.add_number(1, 1)  # Down
+                payload.add_number(0, 2)  # Padding
+                payload.add_number(keynumber, 4)
+                payload.add_number(4, 1)  # Key event
+                payload.add_number(0, 1)  # Up
+                payload.add_number(0, 2)  # Padding
+                payload.add_number(keynumber, 4)
+                payload.flush(self.writer)
+                await self.writer.drain()
+            for modkey in (modifierkeys or []):
+                payload.add_number(4, 1)  # Key event
+                payload.add_number(0, 1)  # Up
+                payload.add_number(0, 2)  # Padding
+                payload.add_number(modkey.value, 4)
+                payload.flush(self.writer)
+                await self.writer.drain()
+            await asyncio.sleep(0.01)  # Have to slow down keypresses for some servers
+            # Still shouldn't be noticable interactively, but does slow down paste to a fast typist...
+            self._input_queue.task_done()
+    
     async def send_keypresses(self, keys, modifierkeys=None):
-        payload = ByteStream()
-        for modkey in (modifierkeys or []):
-            payload.add_number(4, 1)  # Key event
-            payload.add_number(1, 1)  # Down
-            payload.add_number(0, 2)  # Padding
-            payload.add_number(modkey.value, 4)
-        for key in keys:
-            keynumber = key.value if hasattr(key, 'value') else key
-            payload.add_number(4, 1)  # Key event
-            payload.add_number(1, 1)  # Down
-            payload.add_number(0, 2)  # Padding
-            payload.add_number(keynumber, 4)
-            payload.add_number(4, 1)  # Key event
-            payload.add_number(0, 1)  # Up
-            payload.add_number(0, 2)  # Padding
-            payload.add_number(keynumber, 4)
-        for modkey in (modifierkeys or []):
-            payload.add_number(4, 1)  # Key event
-            payload.add_number(0, 1)  # Up
-            payload.add_number(0, 2)  # Padding
-            payload.add_number(modkey.value, 4)
-        payload.flush(self.writer)
+        await self._input_queue.put((keys, modifierkeys))
 
     async def _read_number(self, num_bytes):
         data = await self.reader.readexactly(num_bytes)
