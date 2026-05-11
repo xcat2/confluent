@@ -30,37 +30,27 @@
 # recommend, but hopefully can be useful reference material
 
 
+import asyncio
 import sys
 sys.path.append('/opt/confluent/lib/python')
+import aiohmi.util.webclient as webclient
 import confluent.client as cli
-import eventlet.greenpool
-import gzip
-import io
 import json
 import os
 import struct
 import subprocess
 import time
 
-webclient = eventlet.import_patched('pyghmi.util.webclient')
-
 
 bmcsbyuuid = {}
-def checkfish(addr, mac):
-    wc = webclient.SecureHTTPConnection(addr, 443, verifycallback=lambda x: True)
-    wc.connect()
-    wc.request('GET', '/redfish/v1')
-    rsp = wc.getresponse()
-    body = rsp.read()
-    if body[:2] == b'\x1f\x8b':
-        body = gzip.GzipFile(fileobj=io.BytesIO(body)).read()
-    try:
-        body = json.loads(body)
-    except json.decoder.JSONDecodeError:
-        return
+async def checkfish(addr, mac):
+    wc = webclient.WebConnection(addr, 443, verifycallback=lambda x: True)
+    body = await wc.grab_json_response('/redfish/v1')
+    if not body:
+        return None
     uuid = body.get('UUID', None)
     if not uuid:
-        return
+        return None
     #This part is needed if a bmc sticks 'wire format' uuid in the json body
     #Should be skipped for bmcs that present it sanely
     uuidparts = uuid.split('-')
@@ -68,14 +58,31 @@ def checkfish(addr, mac):
     uuidparts[1] = '{:04x}'.format(struct.unpack('!H', struct.pack('<H', int(uuidparts[1], 16)))[0])
     uuidparts[2] = '{:04x}'.format(struct.unpack('!H', struct.pack('<H', int(uuidparts[2], 16)))[0])
     uuid = '-'.join(uuidparts)
-    if uuid in bmcsbyuuid:
-        bmcsbyuuid[uuid]['bmcs'][mac] = addr
-    else:
-        bmcsbyuuid[uuid] = {'bmcs': {mac: addr}}
+    return (uuid, mac, addr)
+
+
+async def probe_bmcs(mactonode, mactoips):
+    tasks = []
+    macs = []
+    for mac in sorted(mactonode):
+        tasks.append(checkfish(mactoips[mac], mac))
+        macs.append(mac)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for mac, result in zip(macs, results):
+        if isinstance(result, Exception):
+            sys.stderr.write('Failed to probe {}: {}\n'.format(
+                mactoips[mac], result))
+            continue
+        if result is None:
+            continue
+        uuid, mac, addr = result
+        if uuid in bmcsbyuuid:
+            bmcsbyuuid[uuid]['bmcs'][mac] = addr
+        else:
+            bmcsbyuuid[uuid] = {'bmcs': {mac: addr}}
 
 
 if __name__ == '__main__':
-    gpool = eventlet.greenpool.GreenPool()
     with open('/var/lib/dhcpd/dhcpd.leases', 'r') as leasefile:
         leases = leasefile.read()
     inlease = False
@@ -95,7 +102,7 @@ if __name__ == '__main__':
             currip = None
             inlease = False
     # warm up arp tables and fdb
-    pings = {} 
+    pings = {}
     for mac in mactoips:
         pings[mac] = subprocess.Popen(['ping', '-c', '1', mactoips[mac]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for mac in pings:
@@ -115,9 +122,7 @@ if __name__ == '__main__':
         for inf in macinfo:
             if inf.get('possiblenode', None):
                 mactonode[mac] = inf['possiblenode']
-    for mac in sorted(mactonode):
-        gpool.spawn(checkfish, mactoips[mac], mac)
-    gpool.waitall()
+    asyncio.run(probe_bmcs(mactonode, mactoips))
     for uuid in sorted(bmcsbyuuid):
         macd = bmcsbyuuid[uuid]['bmcs']
         macs = sorted(macd)
