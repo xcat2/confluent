@@ -857,7 +857,7 @@ automation_map = {
     '<tab>': '\t',
 }
 
-def parse_automation_script(script):
+def parse_automation_script(script, session_node):
     global current_automation_directive
     for line in script.splitlines():
         line = line.strip()
@@ -886,6 +886,14 @@ def parse_automation_script(script):
             for key, value in automation_map.items():
                 arg = arg.replace(key, value)
             arg = re.sub(r'<env:(\w+)>', lambda m: os.environ[m.group(1)], arg)
+        if '{' in arg:  # support confluent expressions
+            for res in session.create('/nodes/{0}/attributes/expression'.format(session_node),
+                            {'expression': arg}):
+                if 'error' in res:
+                    sys.stderr.write(res['error'] + '\n')
+                    sys.exit(1)
+                if 'value' in res:
+                    arg = res['value']
         automation_directives.append((directive, arg))
     if automation_directives:
         current_automation_directive = automation_directives.pop(0)
@@ -906,9 +914,7 @@ parser.add_option(
          'terminal from closing quickly on error)')
 opts, shellargs = parser.parse_args()
 
-if opts.automation:
-    with open(opts.automation) as f:
-        parse_automation_script(f.read())
+
 
 
 username = None
@@ -963,6 +969,7 @@ def main():
     # sys.stdout.write('\x1b[H\x1b[J')
     # sys.stdout.flush()
     global powerstate, powertime, clearpowermessage
+    
 
 
     if sys.stdout.isatty():
@@ -979,6 +986,9 @@ def main():
     targ, session_node = get_session_node(shellargs)
     if session_node is not None:
         consoleonly = True
+        if opts.automation:
+            with open(opts.automation) as f:
+                parse_automation_script(f.read(), session_node)
         do_command("start %s" % targ, netserver)
         doexit = True
     elif shellargs:
