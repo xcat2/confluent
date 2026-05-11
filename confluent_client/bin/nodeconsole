@@ -20,6 +20,7 @@ import asyncio
 import base64
 import optparse
 import os
+import shlex
 import subprocess
 import sys
 path = os.path.dirname(os.path.realpath(__file__))
@@ -67,6 +68,8 @@ argparser = optparse.OptionParser(
            "ctrl-'e', then release ctrl, then 'c', then '?' for a full list. "
            "For example, ctrl-'e', then 'c', then '.' will exit the current "
            "console")
+argparser.add_option('-a', '--automation', type='string', default=None,
+                     help='Specify an automation script')
 argparser.add_option('-t', '--tile', action='store_true', default=False,
                      help='Tile console windows in the terminal')
 argparser.add_option('-l', '--log', action='store_true', default=False,
@@ -104,6 +107,10 @@ argparser.add_option('-w','--windowed', action='store_true', default=False,
                           'default.')
 
 (options, args) = argparser.parse_args()
+
+automation_args = []
+if options.automation:
+    automation_args = ['-a', options.automation]
 
 oldtcattr = None
 oldfl = None
@@ -1170,7 +1177,7 @@ if options.windowed:
     firstnode=nodes[0]
     nodes.pop(0)
     with open(os.devnull, 'wb') as devnull:
-        xopen=subprocess.Popen(envlist + [confettypath, '-c', '/tmp/controlpath-{0}'.format(firstnode), '-m', '5', 'start', '/nodes/{0}/console/session'.format(firstnode) ] , stdin=devnull)
+        xopen=subprocess.Popen(envlist + [confettypath, '-c', '/tmp/controlpath-{0}'.format(firstnode)] + automation_args + ['-m', '5', 'start', '/nodes/{0}/console/session'.format(firstnode)] , stdin=devnull)
         time.sleep(2)
         s=socket.socket(socket.AF_UNIX)
         winid=''
@@ -1242,7 +1249,7 @@ if options.windowed:
         else:
             pass 
         with open(os.devnull, 'wb') as devnull:
-            xopen=subprocess.Popen(envlist + [confettypath, '-c', '/tmp/controlpath-{0}'.format(node), '-m', '5', 'start', '/nodes/{0}/console/session'.format(node)] , stdin=devnull)
+            xopen=subprocess.Popen(envlist + [confettypath, '-c', '/tmp/controlpath-{0}'.format(node)] + automation_args + ['-m', '5', 'start', '/nodes/{0}/console/session'.format(node)] , stdin=devnull)
     sys.exit(0)
 #end of wcons
 if options.tile:
@@ -1267,18 +1274,18 @@ if options.tile:
         panename = '{0}:{1}'.format(sessname, pane)
         if initial:
             initial = False
+            confetty_cmd = [confettypath] + automation_args + ['-m', '5', 'start', '/nodes/{0}/console/session'.format(node)]
             subprocess.call(
                 ['tmux', 'new-session', '-d', '-s',
                  sessname, '-x', '800', '-y',
-                 '800', '{0} -m 5 start /nodes/{1}/console/session'.format(
-                    confettypath, node)])
+                 '800', ' '.join(shlex.quote(arg) for arg in confetty_cmd)])
         else:
             subprocess.call(['tmux', 'select-pane', '-t', sessname])
             subprocess.call(['tmux', 'set-option', '-t', panename, 'pane-border-status', 'top'], stderr=null)
+            confetty_cmd = [confettypath] + automation_args + ['-m', '5', 'start', '/nodes/{0}/console/session'.format(node)]
             subprocess.call(
                     ['tmux', 'split', '-h', '-t', sessname,
-                 '{0} -m 5 start /nodes/{1}/console/session'.format(
-                     confettypath, node)])
+                 ' '.join(shlex.quote(arg) for arg in confetty_cmd)])
             subprocess.call(['tmux', 'select-layout', '-t', sessname, 'tiled'], stdout=null)
             pane += 1
     subprocess.call(['tmux', 'select-pane', '-t', sessname])
@@ -1286,5 +1293,6 @@ if options.tile:
     if not in_tmux:
         os.execlp('tmux', 'tmux', 'attach', '-t', sessname)
 else:
-    os.execl(confettypath, confettypath, 'start',
-             '/nodes/{0}/console/session'.format(args[0]))
+    execl_args = [confettypath] + automation_args + ['start',
+             '/nodes/{0}/console/session'.format(args[0])]
+    os.execl(confettypath, *execl_args)

@@ -637,6 +637,7 @@ def startconsole(nodename):
     currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
     inconsole = True
+    check_automation('')  # give any leading 'sends' a chance
 
 
 def quitconfetty(code=0, fullexit=False, fixterm=True):
@@ -854,6 +855,52 @@ def check_escape_seq(currinput, filehandle):
         currinput += filehandle.read()
     return currinput
 
+automation_directives = []
+current_automation_directive = None
+automation_map = {
+    '<up>': '\x1b[A',
+    '<down>': '\x1b[B',
+    '<right>': '\x1b[C',
+    '<left>': '\x1b[D',
+    '<enter>': '\r',
+    '<esc>': '\x1b',
+    '<tab>': '\t',
+}
+
+def parse_automation_script(script):
+    global current_automation_directive
+    for line in script.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('exit'):
+            automation_directives.append(('exit', None))
+            continue
+        if ' ' not in line:
+            sys.stderr.write("Invalid line in automation script: %s\n" % line)
+            continue
+        directive, arg = line.split(' ', 1)
+        directive = directive.strip().lower()
+        if directive not in ('expect', 'send', 'forget'):
+            sys.stderr.write("Unknown directive in automation script: %s\n" % directive)
+            continue
+        arg = arg.strip()
+        if arg[0] not in ('"', "'"):
+            arg = '"' + arg + '"'
+        if arg[0] == "'" and arg[-1] == "'":
+            # do not process '<>' sequences in single quotes
+            arg = arg[1:-1]
+            arg = bytes(arg, "utf-8").decode("unicode_escape")
+        elif arg[0] == '"' and arg[-1] == '"':
+            arg = bytes(arg[1:-1], "utf-8").decode("unicode_escape")
+            for key, value in automation_map.items():
+                arg = arg.replace(key, value)
+            arg = re.sub(r'<env:(\w+)>', lambda m: os.environ[m.group(1)], arg)
+        automation_directives.append((directive, arg))
+    if automation_directives:
+        current_automation_directive = automation_directives.pop(0)
+
+
 parser = optparse.OptionParser()
 parser.add_option("-s", "--server", dest="netserver",
                   help="Confluent instance to connect to",
@@ -861,11 +908,18 @@ parser.add_option("-s", "--server", dest="netserver",
 parser.add_option("-c", "--control", dest="controlpath",
                   help="Path to offer terminal control",
                   metavar="PATH")
+parser.add_option('-a', '--automation', type='string', default=None,
+                  help='Specify an automation script to run', metavar='SCRIPT')
 parser.add_option(
     '-m', '--mintime', default=0,
     help='Minimum time to run or else pause for input (used to keep a '
          'terminal from closing quickly on error)')
 opts, shellargs = parser.parse_args()
+
+if opts.automation:
+    with open(opts.automation) as f:
+        parse_automation_script(f.read())
+
 
 username = None
 passphrase = None
@@ -986,6 +1040,49 @@ fgcolor = None
 bgcolor = None
 fgshifted = False
 pendseq = ''
+automation_check = ''
+
+def check_automation(data):
+    global automation_check
+    global current_automation_directive
+    if type(data) != str:
+        data = data.decode('utf-8', errors='ignore')
+    while current_automation_directive:
+        if current_automation_directive[0] == 'forget' and data:
+            current_automation_directive = None
+            automation_check = ''
+            if automation_directives:
+                current_automation_directive = automation_directives.pop(0)
+            return
+        if current_automation_directive[0] == 'expect':
+            expected = current_automation_directive[1]
+            combined = automation_check + data
+            if expected and expected in combined:
+                data = data[combined.rindex(expected) + len(expected):]
+                current_automation_directive = None
+                automation_check = ''
+                if automation_directives:
+                    current_automation_directive = automation_directives.pop(0)
+            else:
+                # Check if there's potential start of expected data in the incoming data
+                combined = automation_check + data
+                automation_check = ''
+                for i in range(1, min(len(expected), len(combined)) + 1):
+                    if expected.startswith(combined[-i:]):
+                        automation_check = combined[-i:]
+                return # wait for next check
+        elif current_automation_directive[0] == 'send':
+            data = ''
+            automation_check = ''
+            if current_automation_directive[1]:
+                tlvdata.send(session.connection, current_automation_directive[1])
+            current_automation_directive = None
+            if automation_directives:
+                current_automation_directive = automation_directives.pop(0)
+        elif current_automation_directive[0] == 'exit':
+            return True
+    return False
+
 def consume_termdata(fh, bufferonly=False):
     global clearpowermessage
     global fgcolor, bgcolor, fgshifted, pendseq
@@ -997,6 +1094,7 @@ def consume_termdata(fh, bufferonly=False):
         updatestatus(data)
         return ''
     if data is not None:
+        shouldexit = check_automation(data)
         indata = pendseq + client.stringify(data)
         pendseq = ''
         data = ''
@@ -1083,6 +1181,8 @@ def consume_termdata(fh, bufferonly=False):
             # this scenario comfortable that it
             # will come out soon enough
             pass
+        if shouldexit:
+            quitconfetty(fullexit=True)
     else:
         deadline = 5
         connected = False
