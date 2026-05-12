@@ -142,6 +142,8 @@ def writeout(data):
 
 def updatestatus(stateinfo={}):
     global powerstate, powertime, clearpowermessage
+    if opts.headless:
+        return
     status = consolename
     info = []
     for statekey in stateinfo:
@@ -464,8 +466,10 @@ def do_command(command, server):
         currconsole = targpath
         startrequest = {'operation': 'start', 'path': targpath,
                         'parameters': {}}
-        height, width = struct.unpack(
-            'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
+        height, width = 31, 100
+        if not opts.headless:
+            height, width = struct.unpack(
+                'hh', fcntl.ioctl(sys.stdout, termios.TIOCGWINSZ, b'....'))[:2]
         startrequest['parameters']['width'] = width
         startrequest['parameters']['height'] = height
         for param in argv[2:]:
@@ -633,9 +637,10 @@ def startconsole(nodename):
     signal.signal(signal.SIGWINCH, do_resize)
     didconsole = True
     consolename = nodename
-    tty.setraw(sys.stdin.fileno())
-    currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
-    fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
+    if not opts.headless:
+        tty.setraw(sys.stdin.fileno())
+        currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl | os.O_NONBLOCK)
     inconsole = True
     check_automation('')  # give any leading 'sends' a chance
 
@@ -644,7 +649,7 @@ def quitconfetty(code=0, fullexit=False, fixterm=True):
     global inconsole
     global currconsole
     global didconsole
-    if fixterm or didconsole:
+    if (fixterm or didconsole) and not opts.headless:
         currfl = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFL)
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, currfl & ~os.O_NONBLOCK)
         if oldtcattr is not None:
@@ -867,6 +872,26 @@ automation_map = {
     '<tab>': '\t',
 }
 
+
+
+parser = optparse.OptionParser()
+parser.add_option("-s", "--server", dest="netserver",
+                  help="Confluent instance to connect to",
+                  metavar="SERVER:PORT")
+parser.add_option("-c", "--control", dest="controlpath",
+                  help="Path to offer terminal control",
+                  metavar="PATH")
+parser.add_option('-a', '--automation', type='string', default=None,
+                  help='Specify an automation script to run', metavar='SCRIPT')
+parser.add_option('-e', '--headless', action='store_true', default=False,
+                  help='Run in headless mode, which is designed for use with '
+                       'automation scripts and disables interactive features')
+parser.add_option(
+    '-m', '--mintime', default=0,
+    help='Minimum time to run or else pause for input (used to keep a '
+         'terminal from closing quickly on error)')
+opts, shellargs = parser.parse_args()
+
 def parse_automation_script(script, session_node):
     global current_automation_directive
     for line in script.splitlines():
@@ -885,6 +910,7 @@ def parse_automation_script(script, session_node):
             sys.stderr.write("Unknown directive in automation script: %s\n" % directive)
             continue
         arg = arg.strip()
+        origarg = arg
         if arg[0] not in ('"', "'"):
             arg = '"' + arg + '"'
         if arg[0] == "'" and arg[-1] == "'":
@@ -904,26 +930,12 @@ def parse_automation_script(script, session_node):
                     sys.exit(1)
                 if 'value' in res:
                     arg = res['value']
-        automation_directives.append((directive, arg))
+        automation_directives.append((directive, arg, origarg))
     if automation_directives:
         current_automation_directive = automation_directives.pop(0)
-
-
-parser = optparse.OptionParser()
-parser.add_option("-s", "--server", dest="netserver",
-                  help="Confluent instance to connect to",
-                  metavar="SERVER:PORT")
-parser.add_option("-c", "--control", dest="controlpath",
-                  help="Path to offer terminal control",
-                  metavar="PATH")
-parser.add_option('-a', '--automation', type='string', default=None,
-                  help='Specify an automation script to run', metavar='SCRIPT')
-parser.add_option(
-    '-m', '--mintime', default=0,
-    help='Minimum time to run or else pause for input (used to keep a '
-         'terminal from closing quickly on error)')
-opts, shellargs = parser.parse_args()
-
+        if opts.headless and current_automation_directive[0] == 'expect':
+            sys.stdout.write(f'Expecting {repr(current_automation_directive[2])}\r\n')
+            sys.stdout.flush()
 
 
 
@@ -1010,9 +1022,13 @@ def main():
 
     while inconsole or not doexit:
         if inconsole:
+            if opts.headless:
+                handles = [session.connection]
+            else:
+                handles = (sys.stdin, session.connection)
             try:
                 rdylist, _, _ = select.select(
-                    (sys.stdin, session.connection), (), (), 10)
+                    handles, (), (), 10)
             except select.error:
                 rdylist = ()
             for fh in rdylist:
@@ -1063,16 +1079,26 @@ def check_automation(data):
             automation_check = ''
             if automation_directives:
                 current_automation_directive = automation_directives.pop(0)
+                if opts.headless and current_automation_directive[0] == 'expect':
+                    sys.stdout.write(f'Expecting {repr(current_automation_directive[2])}\n')
+                    sys.stdout.flush()
             return
         if current_automation_directive[0] == 'expect':
             expected = current_automation_directive[1]
             combined = automation_check + data
             if expected and expected in combined:
                 data = data[combined.rindex(expected) + len(expected):]
+
+                if opts.headless:
+                    sys.stdout.write(f'Detected {repr(current_automation_directive[2])}\r\n')
+                    sys.stdout.flush()
                 current_automation_directive = None
                 automation_check = ''
                 if automation_directives:
                     current_automation_directive = automation_directives.pop(0)
+                    if opts.headless and current_automation_directive[0] == 'expect':
+                        sys.stdout.write(f'Expecting {repr(current_automation_directive[2])}\r\n')
+                        sys.stdout.flush()
             else:
                 # Check if there's potential start of expected data in the incoming data
                 combined = automation_check + data
@@ -1084,12 +1110,25 @@ def check_automation(data):
         elif current_automation_directive[0] == 'send':
             data = ''
             automation_check = ''
+            if opts.headless:
+                sys.stdout.write(f'Sending {repr(current_automation_directive[2])}\r\n')
+                sys.stdout.flush()
             if current_automation_directive[1]:
                 tlvdata.send(session.connection, current_automation_directive[1])
             current_automation_directive = None
             if automation_directives:
                 current_automation_directive = automation_directives.pop(0)
+                if opts.headless and current_automation_directive[0] == 'expect':
+                    sys.stdout.write(f'Expecting {repr(current_automation_directive[2])}\r\n')
+                    sys.stdout.flush()
         elif current_automation_directive[0] == 'exit':
+            if opts.headless:
+                sys.stdout.write('Automation completed\r\n')
+                sys.stdout.flush()
+            return True
+        if opts.headless and not current_automation_directive:
+            sys.stdout.write('Automation completed\r\n')
+            sys.stdout.flush()
             return True
     return False
 
@@ -1105,6 +1144,10 @@ def consume_termdata(fh, bufferonly=False):
         return ''
     if data is not None:
         shouldexit = check_automation(data)
+        if opts.headless:
+            if shouldexit:
+                quitconfetty(fullexit=True)
+            return ''
         indata = pendseq + client.stringify(data)
         pendseq = ''
         data = ''
