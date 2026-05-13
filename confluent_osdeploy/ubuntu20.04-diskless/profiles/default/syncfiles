@@ -1,0 +1,29 @@
+# It is advised to avoid /var/lib/confluent/public as a source for syncing.  /var/lib/confluent/public
+# is served without authentication and thus any sensitive content would be a risk. If wanting to host
+# syncfiles on a common share, it is suggested to have /var/lib/confluent be the share and use some other
+# subdirectory other than public.
+#
+# Syncing is performed as the 'confluent' user, so all source files must be accessible by the confluent user.
+#
+# This file lists files to synchronize or merge to the deployed systems from the deployment server
+# To specify taking /some/path/hosts on the deployment server and duplicating it to /etc/hosts:
+# Note particularly the use of '->' to delineate source from target.
+# /some/path/hosts -> /etc/hosts
+
+# If wanting to simply use the same path for source and destinaiton, the -> may be skipped:
+# /etc/hosts
+
+# More function is available, for example to limit the entry to run only on n1 through n8, and to set
+# owner, group, and permissions in octal notation:
+# /example/source -> n1-n8:/etc/target (owner=root,group=root,permissions=600)
+
+# Entries under APPENDONCE: will be added to specified target, only if the target does not already
+# contain the data in the source already in its entirety. This allows append in a fashion that
+# is friendly to being run repeatedly
+
+# Entries under MERGE: will attempt to be intelligently merged. This supports /etc/group and /etc/passwd
+# Any supporting entries in /etc/shadow or /etc/gshadow are added automatically, with password disabled
+# It also will not inject 'system' ids (under 1,000 usually) as those tend to be local and rpm managed.
+MERGE:
+# /etc/passwd
+# /etc/group
