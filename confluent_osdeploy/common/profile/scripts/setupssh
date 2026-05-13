@@ -55,4 +55,9 @@ confluentpython $confapiclient /confluent-api/self/nodelist | sed -e 's/^- //' >
 cat /etc/ssh/shosts.equiv > /root/.shosts
 cd -
 rm -rf $TMPDIR
-systemctl try-restart sshd
+# ssh may be sshd or ssh, depending
+if systemctl list-unit-files | grep -q '^sshd\.service'; then
+    systemctl try-restart sshd
+elif systemctl list-unit-files | grep -q '^ssh\.service'; then
+    systemctl try-restart ssh
+fi

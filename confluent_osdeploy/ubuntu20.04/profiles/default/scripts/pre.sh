@@ -33,7 +33,7 @@ done
 echo HostbasedAuthentication yes >> /etc/ssh/sshd_config.d/confluent.conf
 echo HostbasedUsesNameFromPacketOnly yes >> /etc/ssh/sshd_config.d/confluent.conf
 echo IgnoreRhosts no >> /etc/ssh/sshd_config.d/confluent.conf
-systemctl restart sshd
+systemctl restart ssh
 mkdir -p /etc/confluent
 export nodename confluent_profile confluent_mgr
 curl -f https://$confluent_mgr/confluent-public/os/$confluent_profile/scripts/functions > /etc/confluent/functions

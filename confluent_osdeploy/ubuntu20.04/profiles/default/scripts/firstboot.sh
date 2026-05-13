@@ -7,7 +7,7 @@ exec >> /target/var/log/confluent/confluent-firstboot.log
 exec 2>> /target/var/log/confluent/confluent-firstboot.log
 chmod 600 /target/var/log/confluent/confluent-firstboot.log
 cp -a /etc/confluent/ssh/* /etc/ssh/
-systemctl restart sshd
+systemctl restart ssh
 rootpw=$(grep ^rootpassword: /etc/confluent/confluent.deploycfg |awk '{print $2}')
 if [ ! -z "$rootpw" -a "$rootpw" != "null" ]; then
 	echo root:$rootpw | chpasswd -e
