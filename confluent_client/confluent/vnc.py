@@ -13,7 +13,7 @@ MYPIXFORMAT = bytearray([
     0, 255,  # red max
     0, 255,  # green max
     0, 255,  # blue max
-    16, 8, 0,     # red shift, green shift, blue shift
+    0, 8, 16,     # red shift, green shift, blue shift
     0, 0, 0       # padding
 ])
 
