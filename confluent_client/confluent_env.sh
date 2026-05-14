@@ -333,6 +333,22 @@ _confluent_nn_completion()
 
     COMPREPLY=($(compgen -W "$(nodelist | sed -e s/^/$PREFIX/)" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
+
+_confluent_nodeconsole_completion()
+{
+    _confluent_get_args
+    if [ ${CMPARGS[-2]} == '-a' ] || [ ${CMPARGS[-2]} == '--automation' ]; then
+        compopt -o default
+        COMPREPLY=()
+        return
+    fi
+    if [[ ${COMP_WORDS[COMP_CWORD]} == -* ]]; then
+        COMPREPLY=($(compgen -W "-a --automation -e --headless -t --tile -l --log -T --Timestamp -s --screenshot -i --interval -v --video -w --windowed" -- "${COMP_WORDS[COMP_CWORD]}"))
+        return
+    fi
+    _confluent_nn_completion
+}
+
 _confluent_nr_completion()
 {
     CMPARGS=($COMP_LINE)
@@ -387,7 +403,7 @@ complete -F _confluent_nodeattrib_completion nodeattrib
 complete -F _confluent_nr_completion nodebmcreset
 complete -F _confluent_nodesetboot_completion nodeboot
 complete -F _confluent_nr_completion nodeconfig
-complete -F _confluent_nn_completion nodeconsole
+complete -F _confluent_nodeconsole_completion nodeconsole
 complete -F _confluent_define_completion nodedefine
 complete -F _confluent_define_completion nodegroupdefine
 complete -F _confluent_nr_completion nodeeventlog
