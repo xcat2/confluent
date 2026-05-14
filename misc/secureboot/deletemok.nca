@@ -1,0 +1,13 @@
+expect Press any key to perform MOK management
+send a
+expect Delete MOK
+send <down><enter>
+expect Continue
+send <down><enter>
+expect Yes
+send <down><enter>
+expect Password:
+send <env:MOKPASS><enter>
+expect Reboot
+send <enter>
+exit
