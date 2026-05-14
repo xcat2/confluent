@@ -825,6 +825,8 @@ class Session(object):
                     timeout=None,
                     callback=None,
                     rslun=0):
+        if self.logging and not self.logged and self.logoutexpiry = None:
+            self.logoutexpiry = _monotonic_time() + self._getmaxtimeout()
         while (self.logging and not self.logged
                 and _monotonic_time() < self.logoutexpiry):
             await self.pause(1)
