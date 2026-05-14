@@ -1488,9 +1488,17 @@ def gather_bootloader(outdir, rootpath='/'):
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib64/efi/shim.efi')
     if not os.path.exists(shimlocation):
+        shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed.latest')
+    if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed')
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
+    for maybemokmanager in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*/mmx64.efi')):
+        shutil.copyfile(maybemokmanager, os.path.join(outdir, 'boot/efi/boot/mmx64.efi'))
+        break
+    else:
+        if os.path.exists(os.path.join(rootpath, 'usr/lib/shim/mmx64.efi')):
+            shutil.copyfile(os.path.join(rootpath, 'usr/lib/shim/mmx64.efi'), os.path.join(outdir, 'boot/efi/boot/mmx64.efi'))
     grubbin = None
     for candidate in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*')):
         if 'BOOT' not in candidate:
