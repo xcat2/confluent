@@ -1,6 +1,5 @@
 linux-generic
 shim-signed
-grub-efi-amd64-bin
 busybox-initramfs
 busybox-static
 curl
@@ -43,3 +42,7 @@ libmaxminddb0
 libuv1
 dbus-user-session
 tpm2-tools
+%onlyarch x86_64
+grub-efi-amd64-bin
+%onlyarch aarch64
+grub-efi-arm64-bin
