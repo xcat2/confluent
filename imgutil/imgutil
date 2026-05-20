@@ -1491,6 +1491,8 @@ def gather_bootloader(outdir, rootpath='/'):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed.latest')
     if not os.path.exists(shimlocation):
         shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimx64.efi.signed')
+    if not os.path.exists(shimlocation):
+        shimlocation = os.path.join(rootpath, 'usr/lib/shim/shimaa64.efi.signed.latest')
     mkdirp(os.path.join(outdir, 'boot/efi/boot'))
     shutil.copyfile(shimlocation, os.path.join(outdir, 'boot/efi/boot/BOOTX64.EFI'))
     for maybemokmanager in glob.glob(os.path.join(rootpath, 'boot/efi/EFI/*/mmx64.efi')):
@@ -1512,6 +1514,8 @@ def gather_bootloader(outdir, rootpath='/'):
         grubbin = os.path.join(rootpath, 'usr/lib64/efi/grub.efi')
     if not os.path.exists(grubbin):
         grubbin = os.path.join(rootpath, 'usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed')
+    if not os.path.exists(grubbin):
+        grubbin = os.path.join(rootpath, 'usr/lib/grub/arm64-efi/monolithic/grubaa64.efi')
     if not os.path.exists(grubbin):
         grubs = os.path.join(rootpath, 'boot/efi/EFI/*/grubx64.efi')
         grubs = glob.glob(grubs)
