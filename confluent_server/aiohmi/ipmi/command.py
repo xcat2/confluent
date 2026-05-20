@@ -138,8 +138,7 @@ class Command(object):
     :param bmc: hostname or ip address of the BMC (default is local)
     :param userid: username to use to connect (default to no user)
     :param password: password to connect to the BMC (defaults to no password)
-    :param onlogon: function to run when logon completes in an asynchronous
-                    fashion.  This will result in a greenthread behavior.
+    :param onlogon: function to run when logon completes asynchronously.
     :param kg: Optional parameter to use if BMC has a particular Kg configured
     :param verifycallback: For OEM extensions that use HTTPS, this function
                            will be used to evaluate the certificate.

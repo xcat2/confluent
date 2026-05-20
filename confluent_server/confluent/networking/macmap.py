@@ -587,7 +587,6 @@ async def _full_updatemacmap(configmanager):
             if switch not in switches:
                 del _macsbyswitch[switch]
         switchauth = get_switchcreds(configmanager, switches)
-        #pool = GreenPool(64)
         tsks = []
         for sa in switchauth:
             tsks.append(_map_switch(sa))

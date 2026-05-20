@@ -462,8 +462,6 @@ class ConsoleHandler(object):
             self._attribwatcher = None
 
     async def get_console_output(self, data):
-        # Spawn as a greenthread, return control as soon as possible
-        # to the console object
         await self._handle_console_output(data)
 
     async def attachsession(self, session):
