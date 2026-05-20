@@ -174,6 +174,7 @@ pxearchs = {
     b'\x00\x09': 'uefi-x64',
     b'\x00\x0b': 'uefi-aarch64',
     b'\x00\x10': 'uefi-httpboot',
+    b'\x00\x13': 'uefi-httpboot',  # arm httpboot
 }
 
 
