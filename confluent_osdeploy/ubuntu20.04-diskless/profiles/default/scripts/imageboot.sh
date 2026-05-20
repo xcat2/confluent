@@ -8,7 +8,9 @@ for addr in $(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}'|sed 
     fi
 done
 mkdir -p /mnt/remoteimg /mnt/remote /mnt/overlay
-if grep confluent_imagemethod=untethered /proc/cmdline > /dev/null; then
+TETHERED=1
+if grep -q confluent_imagemethod=untethered /proc/cmdline || grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+    TETHERED=0
     mount -t tmpfs untethered /mnt/remoteimg
     curl https://$confluent_mgr/confluent-public/os/$confluent_profile/rootimg.sfs -o /mnt/remoteimg/rootimg.sfs
 else
@@ -44,15 +46,46 @@ fi
 
 
 #mount -t tmpfs overlay /mnt/overlay
-modprobe zram
-memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
-memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
-echo $memtot > /sys/block/zram0/disksize
-modprobe xfs
 mkdir /sysroot
-mkfs.xfs /dev/zram0 > /dev/null
-mount -o discard /dev/zram0 /mnt/overlay
-if [ ! -f /tmp/mountparts.sh ]; then
+if ! grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+    modprobe zram
+    memtot=$(grep ^MemTotal: /proc/meminfo|awk '{print $2}')
+    memtot=$((memtot/2))$(grep ^MemTotal: /proc/meminfo | awk '{print $3'})
+    echo $memtot > /sys/block/zram0/disksize
+    modprobe xfs
+    mkfs.xfs /dev/zram0 > /dev/null
+    if [ "$TETHERED" = 1 ]; then
+         mount -o discard /dev/zram0 /mnt/overlay
+    else
+         mount -o discard /dev/zram0 /sysroot
+    fi
+    mount -o discard /dev/zram0 /mnt/overlay
+elif grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
+    mount -t tmpfs disklessroot /sysroot
+fi
+if [ "$TETHERED" = 0 ]; then
+    echo -en "Decrypting and extracting root filesystem: 0%\r"
+        srcsz=$(du -sk /mnt/remote | awk '{print $1}')
+        while [ -f /mnt/remoteimg/rootimg.sfs ]; do
+        dstsz=$(du -sk /sysroot | awk '{print $1}')
+        pct=$((dstsz * 100 / srcsz))
+        if [ $pct -gt 99 ]; then
+            pct=99
+        fi
+        echo -en "Decrypting and extracting root filesystem: $pct%\r"
+        sleep 0.25
+    done &
+    cp -a /mnt/remote/* /sysroot/
+    umount /mnt/remote
+    if [ -e /dev/mapper/cryptimg ]; then
+        dmsetup remove cryptimg
+    fi
+    losetup -d $loopdev
+    rm /mnt/remoteimg/rootimg.sfs
+    umount /mnt/remoteimg
+    wait
+    echo -e "Decrypting and extracting root filesystem: 100%"
+elif [ ! -f /tmp/mountparts.sh ]; then
     mkdir -p /mnt/overlay/upper /mnt/overlay/work
     mount -t overlay -o upperdir=/mnt/overlay/upper,workdir=/mnt/overlay/work,lowerdir=/mnt/remote disklessroot /sysroot
 else
@@ -68,6 +101,7 @@ cp /root/.ssh/* /sysroot/root/.ssh
 chmod 700 /sysroot/root/.ssh
 cp /etc/confluent/* /sysroot/etc/confluent/
 cp /etc/ssh/*key* /sysroot/etc/ssh/
+cp /tls/* /sysroot/etc/ssl/certs
 for pubkey in /etc/ssh/ssh_host*key.pub; do
     certfile=${pubkey/.pub/-cert.pub}
     privfile=${pubkey%.pub}
