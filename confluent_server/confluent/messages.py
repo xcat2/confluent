@@ -1729,10 +1729,13 @@ class Disk(ConfluentMessage):
         'rebuilding',
         'online',
         'offline',
+        'failed',
+        'foreign',
     ])
     state_aliases = {
         'unconfigured bad': 'fault',
         'unconfigured good': 'unconfigured',
+        '(foreign) unconfigured good': 'foreign',
         'unconfiguredgood': 'unconfigured',
         'global hot spare': 'hotspare',
         'dedicated hot spare': 'hotspare',
