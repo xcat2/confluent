@@ -757,13 +757,13 @@ class OEMHandler(object):
             }}
             if uefiboot is not None:
                 uefiboot = 'UEFI' if uefiboot else 'Legacy'
-                payload['BootSourceOverrideMode'] = uefiboot
+                payload['Boot']['BootSourceOverrideMode'] = uefiboot
                 try:
-                    await fishclient._do_web_request(self.sysurl, payload,
-                                               method='PATCH')
+                    await fishclient._do_web_request(fishclient.sysurl, payload,
+                                               method='PATCH', etag='*')
                     return {'bootdev': reqbootdev}
                 except Exception:
-                    del payload['BootSourceOverrideMode']
+                    del payload['Boot']['BootSourceOverrideMode']
         #thetag = fishclient.sysinfo.get('@odata.etag', None)
         await fishclient._do_web_request(fishclient.sysurl, payload, method='PATCH',
                                    etag='*') # thetag)
