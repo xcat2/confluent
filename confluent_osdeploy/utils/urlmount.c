@@ -132,8 +132,8 @@ static int http_read(const char *path, char *buf, size_t size, off_t offset,
 
     if (strcmp(path, filename) != 0) return -ENOENT;
     memset(headbuffer, 0, 512);
-    if (offset >= filesize) return 0;
-    if (offset + size - 1 >= filesize) size = filesize - offset - 1;
+    if (offset >= filesize || size == 0) return 0;
+    if (offset + size > filesize) size = filesize - offset;
     snprintf(headbuffer, 512, "%ld-%ld", offset, offset + size - 1);
     if (curl_easy_setopt(curl, CURLOPT_RANGE, headbuffer) != CURLE_OK) {
         fprintf(stderr, "Error setting range\n");
