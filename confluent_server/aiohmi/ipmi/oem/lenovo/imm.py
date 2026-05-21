@@ -893,7 +893,7 @@ class IMMClient(object):
             try:
                 fpga = await self.ipmicmd.raw_command(netfn=0x3a, command=0x6b,
                                                  data=(0,))
-                fpga = '{0}.{1}.{2}'.format(*bytearray(fpga['data']))
+                fpga = '{0:x}.{1:x}.{2:x}'.format(*bytearray(fpga['data']))
                 yield ('FPGA', {'version': fpga})
             except pygexc.IpmiException as ie:
                 if ie.ipmicode != 193:
@@ -1938,7 +1938,7 @@ class XCCClient(IMMClient):
             try:
                 fpga = await self.ipmicmd.raw_command(netfn=0x3a, command=0x6b,
                                                       data=(0,))
-                fpga = '{0}.{1}.{2}'.format(
+                fpga = '{0:x}.{1:x}.{2:x}'.format(
                     *struct.unpack('BBB', fpga['data']))
                 yield 'FPGA', {'version': fpga}
             except pygexc.IpmiException as ie:

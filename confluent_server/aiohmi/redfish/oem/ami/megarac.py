@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import aiohmi.redfish.oem.generic as generic
+import aiohmi.util.webclient as webclient
+from urllib.parse import urlencode
 
 
 class OEMHandler(generic.OEMHandler):
@@ -28,4 +30,29 @@ class OEMHandler(generic.OEMHandler):
                         sysurl = system['@odata.id']
                         break
             self._varsysurl = sysurl
+        self._wc = None
+        self.bmc = webclient.thehost
+        self._certverify = webclient.verifycallback
         return self
+    
+
+    async def get_wc(self):
+        self.fwid = None
+        if self._wc:
+            rsp, status = await self._wc.grab_json_response_with_status('/api/chassis-status')
+            if status == 200:
+                return self._wc
+        authdata = {
+            'username': self.username,
+            'password': self.password
+        }
+        wc = webclient.WebConnection(self.bmc, 443, verifycallback=self._certverify)
+        wc.set_header('Content-Type', 'application/x-www-form-urlencoded')
+        rsp, status = await wc.grab_json_response_with_status('/api/session', method='POST', data=urlencode(authdata))
+        if status < 200 or status >= 300:
+            raise Exception('Failed to authenticate to BMC')
+        if 'CSRFToken' in rsp:
+            self.csrftok = rsp['CSRFToken']
+            wc.set_header('X-CSRF-Token', rsp['CSRFToken'])
+        self._wc = wc
+        return wc

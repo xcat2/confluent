@@ -1117,7 +1117,7 @@ class Command(object):
         cidr = _mask_to_cidr(currip['SubnetMask'])
         retval['ipv4_address'] = '{0}/{1}'.format(currip['Address'], cidr)
         retval['mac_address'] = netcfg['MACAddress']
-        hasgateway = _mask_to_cidr(currip['Gateway'])
+        hasgateway = _mask_to_cidr(currip['Gateway']) if currip.get('Gateway', None) else None
         retval['ipv4_gateway'] = currip['Gateway'] if hasgateway else None
         retval['ipv4_configuration'] = currip['AddressOrigin']
         tagged = netcfg.get('VLAN', {}).get('VLANEnable', False)
