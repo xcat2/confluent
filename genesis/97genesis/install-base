@@ -58,4 +58,5 @@ if [ -e /etc/crypto-policies/back-ends/opensslcnf.config ]; then
     dracut_install /etc/crypto-policies/back-ends/opensslcnf.config
 fi
 
+dracut_install mokutil
 #dracut_install mstflint This would have mlx update support, but it incurs gigantic dependencies, libicudata
