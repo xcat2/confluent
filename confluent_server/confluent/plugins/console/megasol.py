@@ -152,6 +152,7 @@ class TsmConsole(conapi.Console):
         if self.ws:
             self.ws.close()
         self.connected = False
+        self.datacallback = None
 
 def create(nodes, element, configmanager, inputdata):
     if len(nodes) == 1:
