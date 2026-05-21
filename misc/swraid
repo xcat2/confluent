@@ -10,7 +10,7 @@ for dev in $DEVICES; do
    wipefs -a -f $dev
 done
 # must use older metadata format to leave disks looking normal for uefi
-mdadm -C /dev/md/raid $DEVICES -n $NUMDEVS -e 1.0 -l $RAIDLEVEL
+mdadm -C /dev/md/raid $DEVICES -n $NUMDEVS -e 1.0 -l $RAIDLEVEL -b internal
 # shut and restart array to prime things for anaconda
 mdadm -S -s
 mdadm --assemble --scan
