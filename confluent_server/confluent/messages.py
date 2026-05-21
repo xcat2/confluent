@@ -1733,7 +1733,9 @@ class Disk(ConfluentMessage):
         '(foreign) unconfigured good': 'foreign',
         'unconfiguredgood': 'unconfigured',
         'global hot spare': 'hotspare',
+        'globalhotspare': 'hotspare',
         'dedicated hot spare': 'hotspare',
+        'dedicatedhotspare': 'hotspare',
     }
 
     def _normalize_state(self, instate):
