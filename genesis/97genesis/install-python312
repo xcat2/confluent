@@ -179,4 +179,5 @@ dracut_install /usr/lib64/python3.12/lib-dynload/_json.cpython-312-x86_64-linux-
 dracut_install /usr/lib64/python3.12/encodings/idna.py /usr/lib64/python3.12/stringprep.py
 dracut_install /usr/lib64/python3.12/lib-dynload/binascii.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/lib-dynload/_struct.cpython-312-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.12/lib-dynload/math.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/lib-dynload/_random.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/lib-dynload/_hashlib.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/hashlib.py /usr/lib64/python3.12/lib-dynload/_blake2.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/lib-dynload/_socket.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/lib-dynload/select.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/lib-dynload/array.cpython-312-x86_64-linux-gnu.so /usr/lib64/python3.12/_pydatetime.py /usr/lib64/python3.12/lib-dynload/_posixsubprocess.cpython-312-x86_64-linux-gnu.so
+dracut_install /usr/lib64/python3.12/encodings/idna.py
 
