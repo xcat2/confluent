@@ -113,6 +113,8 @@ def initialize_genesis():
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/BOOTX64.EFI')
         symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/grubx64.efi',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/grubx64.efi')
+        symlinkp('/opt/confluent/genesis/x86_64/boot/efi/boot/mmx64.efi',
+                '/var/lib/confluent/public/os/genesis-x86_64/boot/efi/boot/mmx64.efi')
         symlinkp('/opt/confluent/genesis/x86_64/boot/initramfs/distribution',
                 '/var/lib/confluent/public/os/genesis-x86_64/boot/initramfs/distribution')
         symlinkp('/var/lib/confluent/public/site/initramfs.cpio',
