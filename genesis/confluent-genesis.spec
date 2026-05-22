@@ -31,5 +31,6 @@ find . -type f -exec chmod -x {} +
 /opt/confluent/genesis/%{arch}/rpmlist
 /opt/confluent/genesis/%{arch}/boot/efi/boot/BOOTX64.EFI
 /opt/confluent/genesis/%{arch}/boot/efi/boot/grubx64.efi
+/opt/confluent/genesis/%{arch}/boot/efi/boot/mmx64.efi
 /opt/confluent/genesis/%{arch}/boot/initramfs/distribution
 /opt/confluent/genesis/%{arch}/boot/kernel

@@ -57,6 +57,7 @@ echo /opt/confluent/genesis/%{arch}/licenses/libbpf >> confluent-genesis-out.spe
 cp -f /boot/vmlinuz-$(uname -r) boot/kernel
 cp /boot/efi/EFI/BOOT/BOOTX64.EFI boot/efi/boot
 find /boot/efi -name grubx64.efi -exec cp {} boot/efi/boot/grubx64.efi \;
+find /boot/efi -name mmx64.efi -exec cp {} boot/efi/boot/mmx64.efi \;
 mkdir -p ~/rpmbuild/SOURCES/
 tar cf ~/rpmbuild/SOURCES/confluent-genesis.tar boot rpmlist licenses
 rpmbuild -bb confluent-genesis-out.spec
