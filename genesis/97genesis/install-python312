@@ -177,4 +177,5 @@ dracut_install /usr/lib64/python3.12/json/scanner.py
 dracut_install /usr/lib64/python3.12/json/tool.py
 dracut_install /usr/lib64/python3.12/lib-dynload/_json.cpython-312-x86_64-linux-gnu.so
 dracut_install /usr/lib64/python3.12/encodings/idna.py /usr/lib64/python3.12/stringprep.py
+dracut_install /usr/lib64/python3.12/lib-dynload/binascii.cpython-312-x86_64-linux-gnu.so
 
