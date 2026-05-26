@@ -114,8 +114,10 @@ def get_interface_name(iname, settings):
 class NetplanManager(object):
     def __init__(self, deploycfg):
         self.cfgbydev = {}
+        self.cfgbybond = {}
         self.read_connections()
         self.deploycfg = deploycfg
+        self.teamidx = 0
 
     def read_connections(self):
         for plan in glob.glob('/etc/netplan/*.y*ml'):
@@ -124,29 +126,61 @@ class NetplanManager(object):
                 if not planinfo:
                     continue
             nicinfo = planinfo.get('network', {}).get('ethernets', {})
-            for devname in nicinfo:
-                if devname == 'lo':
-                    continue
-                if 'gateway4' in nicinfo[devname]:
-                    # normalize deprecated syntax on read in
-                    gw4 = nicinfo[devname]['gateway4']
-                    del nicinfo[devname]['gateway4']
-                    routeinfo = nicinfo[devname].get('routes', [])
-                    for ri in routeinfo:
-                        if ri.get('via', None) == gw4 and ri.get('to', None) in ('default', '0.0.0.0/0', '0/0'):
-                            break
-                    else:
-                        routeinfo.append({
-                            'to': 'default',
-                            'via': gw4
-                        })
-                    nicinfo[devname]['routes'] = routeinfo
-                self.cfgbydev[devname] = nicinfo[devname]
+            bondinfo = planinfo.get('network', {}).get('bonds', {})
+            for currinfo in (nicinfo, bondinfo):
+                currcfg = self.cfgbydev if currinfo is nicinfo else self.cfgbybond
+                for devname in currinfo:
+                    if devname == 'lo':
+                        continue
+                    if 'gateway4' in currinfo[devname]:
+                        # normalize deprecated syntax on read in
+                        gw4 = currinfo[devname]['gateway4']
+                        del currinfo[devname]['gateway4']
+                        routeinfo = currinfo[devname].get('routes', [])
+                        for ri in routeinfo:
+                            if ri.get('via', None) == gw4 and ri.get('to', None) in ('default', '0.0.0.0/0', '0/0'):
+                                break
+                        else:
+                            routeinfo.append({
+                                'to': 'default',
+                                'via': gw4
+                            })
+                        currinfo[devname]['routes'] = routeinfo
+                    currcfg[devname] = currinfo[devname]
     
     def apply_configuration(self, cfg):
         devnames = cfg['interfaces']
-        if len(devnames) != 1:
-            raise Exception('Multi-nic team/bonds not yet supported')
+        if len(devnames) > 1:
+            teammode = cfg['settings'].get('team_mode', None)
+            if not teammode:
+                sys.stderr.write("Warning, multiple interfaces ({0}) without a team_mode, skipping setup\n".format(','.join(devnames)))
+                return
+            if teammode == 'lacp':
+                teammode = '802.3ad'
+            elif teammode == 'activebackup':
+                teammode = 'active-backup'
+            for currdev in self.cfgbybond:
+                for iface in self.cfgbybond[currdev].get('interfaces', []):
+                    if iface in devnames:
+                        break
+                    else:
+                        continue
+                else:
+                    continue
+                # this bond is identified as matching
+                self.cfgbybond[currdev]['interfaces'] = list(devnames)
+                self.cfgbybond[currdev]['parameters']['mode'] = teammode
+                devnames = [currdev]
+                break
+            # no current bond, make a new one
+            connname = cfg['settings'].get('connection_name', None)
+            if not connname:
+                connname = 'bond{0}'.format(self.teamidx)
+                while connname in self.cfgbybond:
+                    self.teamidx += 1
+                    connname = 'bond{0}'.format(self.teamidx)
+            self.cfgbybond[connname] = {'interfaces': list(devnames), 'parameters': {'mode': teammode, 'mii-monitor-interval': 100}}
+            devnames = [connname]
         stgs = cfg['settings']
         needcfgapply = False
         for devname in devnames:
@@ -194,8 +228,14 @@ class NetplanManager(object):
                     currdnsdomain.append(dnsdomain)
             if needcfgwrite:
                 needcfgapply = True
-                newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
                 oumask = os.umask(0o77)
+                if devname in self.cfgbydev:
+                    newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
+                elif devname in self.cfgbybond:
+                    newcfg = {'network': {'version': 2, 'bonds': {devname: self.cfgbybond[devname]}}}
+                    for iface in newcfg['network']['bonds'][devname]['interfaces']:
+                        with open('/etc/netplan/{0}-confluentcfg.yaml'.format(iface), 'w') as planout:
+                            planout.write(yaml.dump({'network': {'version': 2, 'ethernets': {iface: {'dhcp4': False}}}}))
                 with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
                     planout.write(yaml.dump(newcfg))
                 os.umask(oumask)
@@ -203,7 +243,7 @@ class NetplanManager(object):
             subprocess.call(['netplan', 'apply'])
 
     def getcfgarrpath(self, devpath):
-        currptr = self.cfgbydev
+        currptr = self.cfgbydev if devpath[0] in self.cfgbydev else self.cfgbybond
         for k in devpath[:-1]:
             if k not in currptr:
                 currptr[k] = {}
