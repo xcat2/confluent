@@ -45,7 +45,7 @@ dracut_install /usr/lib/udev/rules.d/*-dm.rules /usr/sbin/dmsetup /usr/lib/udev/
 #dracut_install opainfo
 #dracut_install /usr/lib/opa-fm/bin/opafmd
 #dracut_install /usr/sbin/opensm /usr/libexec/opensm-launch
-dracut_install /usr/$IMPLIBDIR/libibverbs/libhfi1verbs-rdmav57.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/$IMPLIBDIR/libibverbs/libmlx4-rdmav57.so /usr/$IMPLIBDIR/libibverbs/libmlx5-rdmav57.so
+dracut_install /usr/$IMPLIBDIR/libibverbs/libhfi1verbs-rdmav59.so /etc/libibverbs.d/hfi1verbs.driver /etc/libibverbs.d/mlx4.driver /etc/libibverbs.d/mlx5.driver /usr/$IMPLIBDIR/libibverbs/libmlx4-rdmav59.so /usr/$IMPLIBDIR/libibverbs/libmlx5-rdmav59.so
 if [ -x /usr/libexec/openssh/sshd-session ]; then
     dracut_install /usr/libexec/openssh/sshd-session
 fi
