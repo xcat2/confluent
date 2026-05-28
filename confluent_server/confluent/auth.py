@@ -21,10 +21,7 @@
 
 import asyncio
 import confluent.config.configmanager as configmanager
-try:
-    import Cryptodome.Protocol.KDF as KDF
-except ImportError:
-    import Crypto.Protocol.KDF as KDF
+
 from concurrent.futures import ProcessPoolExecutor
 from fnmatch import fnmatch
 import hashlib
@@ -379,8 +376,9 @@ def pam_check(pwe, user, passphrase):
     return usergood
 
 def _apply_pbkdf(passphrase, salt):
-    return KDF.PBKDF2(passphrase, salt, 32, 10000,
-                      lambda p, s: hmac.new(p, s, hashlib.sha256).digest())
+    if not isinstance(passphrase, bytes):
+        passphrase = passphrase.encode('utf-8')
+    return hashlib.pbkdf2_hmac('sha256', passphrase, salt, 10000, dklen=32)
 
 
 def _clean_authworkers():

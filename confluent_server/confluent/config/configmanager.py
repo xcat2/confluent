@@ -42,16 +42,8 @@
 # by passphrase and optionally TPM
 
 #TODO:asyncmerge: compare and resolve more carefully
-try:
-    import Cryptodome.Protocol.KDF as KDF
-    from Cryptodome.Cipher import AES
-    from Cryptodome.Hash import HMAC
-    from Cryptodome.Hash import SHA256
-except ImportError:
-    import Crypto.Protocol.KDF as KDF
-    from Crypto.Cipher import AES
-    from Crypto.Hash import HMAC
-    from Crypto.Hash import SHA256
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 try:
     import anydbm as dbm
 except ModuleNotFoundError:
@@ -86,6 +78,7 @@ import errno
 import socket
 import fnmatch
 import hashlib
+import hmac as hmac_mod
 import json
 import msgpack
 import operator
@@ -205,10 +198,10 @@ def _derive_keys(password, salt):
     #implement our specific combination of pbkdf2 transforms to get at
     #key.  We bump the iterations up because we can afford to
     #TODO: WORKERPOOL PBKDF2 is expensive
-    tmpkey = KDF.PBKDF2(password, salt, 32, 50000,
-                        lambda p, s: HMAC.new(p, s, SHA256).digest())
-    finalkey = KDF.PBKDF2(tmpkey, salt, 32, 50000,
-                          lambda p, s: HMAC.new(p, s, SHA256).digest())
+    if not isinstance(password, bytes):
+        password = password.encode('utf-8')
+    tmpkey = hashlib.pbkdf2_hmac('sha256', password, salt, 50000, dklen=32)
+    finalkey = hashlib.pbkdf2_hmac('sha256', tmpkey, salt, 50000, dklen=32)
     return finalkey[:16], finalkey[16:]
 
 
@@ -503,13 +496,13 @@ def decrypt_value(cryptvalue,
         key = _masterkey
         integritykey = _masterintegritykey
     if len(cryptvalue) == 3:
-        check_hmac = HMAC.new(integritykey, cipherdata, SHA256).digest()
+        check_hmac = hmac_mod.new(integritykey, cipherdata, hashlib.sha256).digest()
         if hmac != check_hmac:
-            check_hmac = HMAC.new(integritykey, cipherdata + iv, SHA256).digest()
+            check_hmac = hmac_mod.new(integritykey, cipherdata + iv, hashlib.sha256).digest()
         if hmac != check_hmac:
             raise Exception("bad HMAC value on crypted value")
-        decrypter = AES.new(key, AES.MODE_CBC, iv)
-        value = decrypter.decrypt(cipherdata)
+        decrypter = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend()).decryptor()
+        value = decrypter.update(cipherdata) + decrypter.finalize()
         padsize = bytearray(value)[-1]
         pad = value[-padsize:]
         # Note that I cannot grasp what could be done with a subliminal
@@ -519,9 +512,8 @@ def decrypt_value(cryptvalue,
                 raise Exception("bad padding in encrypted value")
         return value[0:-padsize]
     else:
-        decrypter = AES.new(key, AES.MODE_GCM, nonce=iv)
-        value = decrypter.decrypt(cipherdata)
-        decrypter.verify(hmac)
+        decrypter = Cipher(algorithms.AES(key), modes.GCM(iv, hmac), backend=default_backend()).decryptor()
+        value = decrypter.update(cipherdata) + decrypter.finalize()
         return value
 
 
@@ -604,10 +596,11 @@ def crypt_value(value,
             init_masterkey()
         key = _masterkey
     iv = os.urandom(12)
-    crypter = AES.new(key, AES.MODE_GCM, nonce=iv)
+    crypter = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend()).encryptor()
     if not isinstance(value, bytes):
         value = value.encode('utf-8')
-    cryptval, hmac = crypter.encrypt_and_digest(value)
+    cryptval = crypter.update(value) + crypter.finalize()
+    hmac = crypter.tag
     return iv, cryptval, hmac, b'\x02'
 
 
@@ -1754,10 +1747,10 @@ class ConfigManager(object):
             if attribute == 'password':
                 salt = os.urandom(8)
                 #TODO: WORKERPOOL, offload password set to a worker
-                crypted = KDF.PBKDF2(
-                    attributemap[attribute], salt, 32, 10000,
-                    lambda p, s: HMAC.new(p, s, SHA256).digest()
-                )
+                pw = attributemap[attribute]
+                if not isinstance(pw, bytes):
+                    pw = pw.encode('utf-8')
+                crypted = hashlib.pbkdf2_hmac('sha256', pw, salt, 10000, dklen=32)
                 user['cryptpass'] = (salt, crypted)
             else:
                 user[attribute] = attributemap[attribute]
