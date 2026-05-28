@@ -254,8 +254,8 @@ def fixup(rootdir, vols):
     for vol in vols:
         if vol['mount'] == '/boot/efi':
             targdev = vol['targetdisk']
-            partnum = re.search('(\d+)$', targdev).group(1)
-            targblock = re.search('(.*)\d+$', targdev).group(1)
+            partnum = re.search(r'(\d+)$', targdev).group(1)
+            targblock = re.search(r'(.*)\d+$', targdev).group(1)
     if targblock:
         if 'nvme' in targblock and targblock[-1] == 'p':
             targblock = targblock[:-1]
@@ -321,7 +321,7 @@ def install_to_disk(imgpath):
             deflvmsize += fs['initsize']
             minlvmsize += fs['minsize']
         else:
-            plainvols[int(re.search('(\d+)$', fs['device'])[0])] = fs
+            plainvols[int(re.search(r'(\d+)$', fs['device'])[0])] = fs
     with open('/tmp/installdisk') as diskin:
         instdisk = diskin.read()
     instdisk = '/dev/' + instdisk
