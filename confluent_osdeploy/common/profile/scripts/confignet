@@ -226,20 +226,39 @@ class NetplanManager(object):
                 if dnsdomain not in currdnsdomain:
                     needcfgwrite = True
                     currdnsdomain.append(dnsdomain)
+            prune_from_cloudinit = []
             if needcfgwrite:
                 needcfgapply = True
                 oumask = os.umask(0o77)
                 if devname in self.cfgbydev:
+                    prune_from_cloudinit.append(devname)
                     newcfg = {'network': {'version': 2, 'ethernets': {devname: self.cfgbydev[devname]}}}
+                    cfgfile = '/etc/netplan/10-{0}-confluentcfg.yaml'.format(devname)
                 elif devname in self.cfgbybond:
                     newcfg = {'network': {'version': 2, 'bonds': {devname: self.cfgbybond[devname]}}}
                     for iface in newcfg['network']['bonds'][devname]['interfaces']:
-                        with open('/etc/netplan/{0}-confluentcfg.yaml'.format(iface), 'w') as planout:
+                        prune_from_cloudinit.append(iface)
+                        with open('/etc/netplan/10-{0}-confluentcfg.yaml'.format(iface), 'w') as planout:
                             planout.write(yaml.dump({'network': {'version': 2, 'ethernets': {iface: {'dhcp4': False}}}}))
-                with open('/etc/netplan/{0}-confluentcfg.yaml'.format(devname), 'w') as planout:
+                    cfgfile = '/etc/netplan/30-{0}-confluentcfg.yaml'.format(devname)
+                with open(cfgfile, 'w') as planout:
                     planout.write(yaml.dump(newcfg))
                 os.umask(oumask)
+        if prune_from_cloudinit:
+            with open('/etc/netplan/50-cloud-init.yaml', 'r') as cloudinit:
+                cloudinfo = yaml.safe_load(cloudinit)
+                for clouddev in cloudinfo.get('network', {}).get('ethernets', {}):
+                    if clouddev in prune_from_cloudinit:
+                        del cloudinfo['network']['ethernets'][clouddev]
+                if not cloudinfo['network'].get('ethernets', {}):
+                    os.remove('/etc/netplan/50-cloud-init.yaml')
+                else:
+                    oumask = os.umask(0o77)
+                    with open('/etc/netplan/50-cloud-init.yaml', 'w') as cloudinit:
+                        cloudinit.write(yaml.dump(cloudinfo))
+                    os.umask(oumask)
         if needcfgapply:
+            subprocess.check_call(['netplan', 'generate'])
             subprocess.call(['netplan', 'apply'])
 
     def getcfgarrpath(self, devpath):
