@@ -245,18 +245,31 @@ class NetplanManager(object):
                     planout.write(yaml.dump(newcfg))
                 os.umask(oumask)
         if prune_from_cloudinit:
-            with open('/etc/netplan/50-cloud-init.yaml', 'r') as cloudinit:
-                cloudinfo = yaml.safe_load(cloudinit)
-                for clouddev in list(cloudinfo.get('network', {}).get('ethernets', {})):
-                    if clouddev in prune_from_cloudinit:
-                        del cloudinfo['network']['ethernets'][clouddev]
-                if not cloudinfo['network'].get('ethernets', {}):
-                    os.remove('/etc/netplan/50-cloud-init.yaml')
-                else:
-                    oumask = os.umask(0o77)
-                    with open('/etc/netplan/50-cloud-init.yaml', 'w') as cloudinit:
-                        cloudinit.write(yaml.dump(cloudinfo))
-                    os.umask(oumask)
+            prunecfgs = ['/etc/netplan/00-installer-config.yaml',
+                         '/etc/netplan/50-cloud-init.yaml.dist-subiquity',
+                         '/etc/netplan/50-cloud-init.yaml']
+            prunecfgs.extend(glob.glob('/etc/cloud/cloud.cfg.d/*.cfg'))
+            for defcfg in prunecfgs:
+                if not os.path.exists(defcfg):
+                    continue
+                with open(defcfg, 'r') as cloudinit:
+                    cloudinfo = yaml.safe_load(cloudinit)
+                    if 'network' not in cloudinfo:
+                        continue
+                    for clouddev in list(cloudinfo.get('network', {}).get('ethernets', {})):
+                        if clouddev in prune_from_cloudinit:
+                            del cloudinfo['network']['ethernets'][clouddev]
+                    if not cloudinfo['network'].get('ethernets', {}):
+                        os.remove(defcfg)
+                        if '/etc/cloud/cloud.cfg.d/' in defcfg:
+                            # need to also change datasource, probably
+                            if os.path.exists('/var/lib/cloud/instances/iid-datasource-none/network-config.json'):
+                                os.remove('/var/lib/cloud/instances/iid-datasource-none/network-config.json')
+                    else:
+                        oumask = os.umask(0o77)
+                        with open(defcfg, 'w') as cloudinit:
+                            cloudinit.write(yaml.dump(cloudinfo))
+                        os.umask(oumask)
         if needcfgapply:
             subprocess.check_call(['netplan', 'generate'])
             subprocess.call(['netplan', 'apply'])
