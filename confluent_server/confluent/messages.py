@@ -595,6 +595,7 @@ class InputFirmwareUpdate(ConfluentMessage):
     def __init__(self, path, nodes, inputdata, configmanager):
         self._filename = inputdata.get('filename', inputdata.get('url', inputdata.get('dirname', None)))
         self.bank = inputdata.get('bank', None)
+        self.parameterdata = inputdata.get('parameterdata', None)
         self.nodes = nodes
         self.filebynode = {}
         self._complexname = False

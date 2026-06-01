@@ -35,7 +35,10 @@ the out of band facilities.  Firmware updates can end in one of three states:
 * `-m MAXNODES`, `--maxnodes=MAXNODES`:
   When updating, prompt if more than the specified number of servers will 
   be affected  
-  
+
+* `-p PARAMETERFILE`, `--paramaterfile=PARAMETERFILE`:
+  For updating, a parameter file to provife along with the update payload
+
 * `-h`, `--help`:
   Show help message and exit    
 
