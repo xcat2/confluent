@@ -80,14 +80,18 @@ def await_tentative():
         time.sleep(1)
 
 def map_idx_to_name():
-    map = {}
+    map_dict = {}
     devtype = {}
     prevdev = None
+
     for line in subprocess.check_output(['ip', 'l']).decode('utf8').splitlines():
-        if line.startswith(' ') and 'link/' in line:
-            typ = line.split()[0].split('/')[1]
-            devtype[prevdev] = typ if typ != 'ether' else 'ethernet'
         if line.startswith(' '):
+            if 'link/' in line and prevdev and prevdev not in devtype:
+                for word in line.split():
+                    if word.startswith('link/'):
+                        typ = word.split('/')[1]
+                        devtype[prevdev] = typ if typ != 'ether' else 'ethernet'
+                        break # Stop detection after the first type hit
             continue
         idx, iface, rst = line.split(':', 2)
         prevdev = iface.strip()
@@ -99,9 +103,8 @@ def map_idx_to_name():
             pass
         idx = int(idx)
         iface = iface.strip()
-        map[idx] = iface
-    return map, devtype
-
+        map_dict[idx] = iface
+    return map_dict, devtype
 
 def get_interface_name(iname, settings):
     explicitname = settings.get('interface_names', None)
