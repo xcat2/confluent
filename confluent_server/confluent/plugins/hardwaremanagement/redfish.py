@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 import confluent.vinzmanager as vinzmanager
 import confluent.exceptions as exc
 import confluent.firmwaremanager as firmwaremanager
@@ -485,6 +487,14 @@ class IpmiHandler(object):
             self.handle_ikvm()
         else:
             raise Exception('Not Implemented')
+
+    def update_firmware(self, filename, progress, data, bank):
+        params=()
+        if self.inputdata.parameterdata:
+            params = self.inputdata.parameterdata
+        if params and isinstance(params, str):
+            params = json.loads(params)
+        return self.ipmicmd.update_firmware(filename, progress=progress, data=data, bank=bank, otherfields=params)
 
     def handle_update(self):
         u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,

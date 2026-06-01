@@ -59,6 +59,8 @@ argparser = optparse.OptionParser(
           "%prog <noderange> [list][updatestatus][update [--backup <file>]]|[<components>]")
 argparser.add_option('-b', '--backup', action='store_true',
                      help='Target a backup bank rather than primary')
+argparser.add_option('-p', '--parameterfile', type='string',
+                     help='When updating, use the specified parameter file')
 argparser.add_option('-m', '--maxnodes', type='int',
                      help='When updating, prompt if more than the specified '
                           'number of servers will be affected')
@@ -112,6 +114,10 @@ def update_firmware(session, filename):
     upargs = {'filename': filename}
     if options.backup:
         upargs['bank'] = 'backup'
+    if options.parameterfile:
+        with open(options.parameterfile, 'rb') as pf:
+            pfdata = pf.read()
+        upargs['parameterdata'] = pfdata
     noderrs = {}
     if session.unixdomain:
         filesbynode = {}
