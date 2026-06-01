@@ -1537,7 +1537,7 @@ class Command(object):
         oem = await self.oem()
         return await oem.get_update_status()   
 
-    async def update_firmware(self, file, data=None, progress=None, bank=None):
+    async def update_firmware(self, file, data=None, progress=None, bank=None, otherfields=()):
         """Send file to BMC to perform firmware update
 
          :param filename:  The filename to upload to the target BMC
@@ -1550,7 +1550,7 @@ class Command(object):
         if progress is None:
             progress = lambda x: True
         oem = await self.oem()
-        return await oem.update_firmware(file, data, progress, bank)
+        return await oem.update_firmware(file, data, progress, bank, otherfields)
 
     async def get_diagnostic_data(self, savefile, progress=None, autosuffix=False):
         if os.path.exists(savefile) and not os.path.isdir(savefile):

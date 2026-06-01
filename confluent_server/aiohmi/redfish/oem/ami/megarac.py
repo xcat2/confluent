@@ -15,6 +15,7 @@
 import aiohmi.redfish.oem.generic as generic
 import aiohmi.util.webclient as webclient
 from urllib.parse import urlencode
+import aiohmi.exceptions as pygexc
 
 
 class OEMHandler(generic.OEMHandler):
@@ -34,7 +35,49 @@ class OEMHandler(generic.OEMHandler):
         self.bmc = webclient.thehost
         self._certverify = webclient.verifycallback
         return self
-    
+
+    async def reseat_bay(self, bay):
+        if bay != -1:
+            raise pygexc.UnsupportedFunctionality(
+                'This is not an enclosure manager')
+        
+        await self._do_web_request('/redfish/v1/Chassis/Chassis_0/Actions/Oem/NvidiaChassis.AuxPowerReset', {
+            "ResetType": "AuxPowerCycle"
+        })
+
+    def format_messages(self, response):
+        msgs = response.get('Messages', [])
+        msgents = []
+        for msg in msgs:
+            msgents.append(self.format_message(msg))
+        for msg in response.get('Oem', {}).get('Ami', {}).get('HMCMessages', []):
+            msgents.append(self.format_messages(msg))
+        return ';'.join(msgents)
+
+    async def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
+        await self._do_web_request('/redfish/v1/UpdateService', {
+            "Oem": {
+                "AMIUpdateService": {
+                "@odata.type": "#AMIUpdateService.v1_0_0.AMIUpdateService",
+                "PreserveConfiguration": {
+                    "Syslog": True,
+                    "NTP": True,
+                    "Network": True,
+                    "Authentication": True,
+                    "EXTLOG": True,
+                    "FRU": True,
+                    "IPMI": True,
+                    "KVM": True,
+                    "REDFISH": True,
+                    "SDR": False,
+                    "SEL": True,
+                    "SNMP": True,
+                    "SSH": True,
+                    "WEB": True
+            }
+            }}}, method='PATCH', etag='*')
+        return await super().update_firmware(filename, data, progress, bank, otherfields)
+
 
     async def get_wc(self):
         self.fwid = None

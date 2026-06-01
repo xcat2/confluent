@@ -652,7 +652,7 @@ class OEMHandler(object):
                 'Status', {})
             procsumstatus = procsumstatus.get('HealthRollup',
                                               procsumstatus.get('Health',
-                                                                None))
+                                                                'OK'))
             if procsumstatus != 'OK':
                 procfound = False
                 procurl = sysinfo.get('Processors', {}).get('@odata.id',
@@ -764,6 +764,8 @@ class OEMHandler(object):
                     return {'bootdev': reqbootdev}
                 except Exception:
                     del payload['Boot']['BootSourceOverrideMode']
+            else:
+                payload['Boot']['BootSourceOverrideMode'] = 'UEFI'
         #thetag = fishclient.sysinfo.get('@odata.etag', None)
         await fishclient._do_web_request(fishclient.sysurl, payload, method='PATCH',
                                    etag='*') # thetag)
@@ -1404,13 +1406,22 @@ class OEMHandler(object):
             return 'ready'       
         return 'unavailable'
 
+    def format_message(self, msg):
+        try:
+            return '{}: {}'.format(msg.get('MessageSeverity', msg['Severity']), msg['Message'])
+        except Exception:
+            return repr(msg)
+
+    def format_messages(self, response):
+        msgs = response.get('Messages', [])
+        return ';'.join(self.format_message(x) for x in msgs)
 
     async def update_firmware(self, filename, data=None, progress=None, bank=None, otherfields=()):
         # disable cache to make sure we trigger the token renewal logic if needed
         usd, upurl, ismultipart = await self.retrieve_firmware_upload_url()
         try:
             uploadthread = await webclient.make_uploader(
-                self.webclient, upurl, filename, data, formwrap=ismultipart,
+                self.webclient, upurl, filename, data, formname='UpdateFile', formwrap=ismultipart,
                 otherfields=otherfields)
             wc = self.webclient
             while not uploadthread.completed():
@@ -1471,11 +1482,9 @@ class OEMHandler(object):
                 if state in ('Cancelled', 'Exception', 'Interrupted',
                              'Suspended'):
                     raise Exception(
-                        json.dumps(json.dumps(pgress['Messages'])))
+                        self.format_messages(pgress))
                 if 'PercentComplete' in pgress:
                     pct = float(pgress['PercentComplete'])
-                else:
-                    print(repr(pgress))
                 complete = state == 'Completed'
                 progress({'phase': phase, 'progress': pct})
                 if complete:
