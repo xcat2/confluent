@@ -497,7 +497,7 @@ class IpmiHandler(object):
         return self.ipmicmd.update_firmware(filename, progress=progress, data=data, bank=bank, otherfields=params)
 
     def handle_update(self):
-        u = firmwaremanager.Updater(self.node, self.ipmicmd.update_firmware,
+        u = firmwaremanager.Updater(self.node, self.update_firmware,
                                     self.inputdata.nodefile(self.node), self.tenant,
                                     bank=self.inputdata.bank,
                                     configmanager=self.cfm)
