@@ -247,7 +247,7 @@ class NetplanManager(object):
         if prune_from_cloudinit:
             with open('/etc/netplan/50-cloud-init.yaml', 'r') as cloudinit:
                 cloudinfo = yaml.safe_load(cloudinit)
-                for clouddev in cloudinfo.get('network', {}).get('ethernets', {}):
+                for clouddev in list(cloudinfo.get('network', {}).get('ethernets', {})):
                     if clouddev in prune_from_cloudinit:
                         del cloudinfo['network']['ethernets'][clouddev]
                 if not cloudinfo['network'].get('ethernets', {}):
