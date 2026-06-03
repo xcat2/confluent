@@ -1283,6 +1283,7 @@ class BootDevice(ConfluentChoiceMessage):
         'cd',
         'floppy',
         'usb',
+        'http',
     ])
 
     valid_bootmodes = set([
