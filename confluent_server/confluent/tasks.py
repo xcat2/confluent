@@ -156,7 +156,7 @@ def spawn_task(coro):
     try:
         return asyncio.create_task(coro)
     except AttributeError:
-        return asyncio.get_event_loop().create_task(coro)
+        return asyncio.get_running_loop().create_task(coro)
 
 
 def spawn(coro):

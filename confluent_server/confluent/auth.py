@@ -327,7 +327,7 @@ async def check_user_passphrase(name, passphrase, operation=None, element=None, 
             #pam won't work if the user doesn't exist, don't go further
             await asyncio.sleep(0.05)  # stall even on test for existence of a username
             return None
-        usergood = await asyncio.get_event_loop().run_in_executor(authworkers, pam_check, pwe, user, passphrase)
+        usergood = await asyncio.get_running_loop().run_in_executor(authworkers, pam_check, pwe, user, passphrase)
         if usergood:
             if bpassphrase:
                 _passcache[(user, tenant)] = hashlib.sha256(bpassphrase).digest()
@@ -393,5 +393,5 @@ async def _do_pbkdf(passphrase, salt):
     # compute.  However, we do want to wait for result, so we have
     # one of the exceedingly rare sort of circumstances where 'apply'
     # actually makes sense
-    res = await asyncio.get_event_loop().run_in_executor(authworkers, _apply_pbkdf, passphrase, salt)
+    res = await asyncio.get_running_loop().run_in_executor(authworkers, _apply_pbkdf, passphrase, salt)
     return res

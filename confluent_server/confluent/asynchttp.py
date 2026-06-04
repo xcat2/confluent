@@ -108,7 +108,7 @@ async def run_handler(hdlr, req):
     except KeyError:
         raise exc.InvalidArgumentException(
                 'Invalid Session ID or missing request id')
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     cloop.create_task(asyncsession.run_handler(hdlr, requestid))
     return requestid
 

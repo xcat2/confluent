@@ -376,7 +376,7 @@ async def _tlshandler(bind_host, bind_port):
     plainsocket.setsockopt(socket.SOL_TCP, 23, 5)
     plainsocket.listen(5)
     cs = credserver.CredServer()
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     while (1):  # TODO: exithook
         cnn, addr = await cloop.sock_accept(plainsocket)
         if addr[1] < 1000:
@@ -407,7 +407,7 @@ class PySSLContext(ctypes.Structure):
 
 async def _tlsstartup(cnn):
     authname = None
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     cert = None
     conf.init_config()
     configfile = conf.get_config()
@@ -446,7 +446,7 @@ def removesocket():
         pass
 
 async def _unixdomainhandler(bind_group=None, bind_perms=None):
-    aloop = asyncio.get_event_loop()
+    aloop = asyncio.get_running_loop()
     if not bind_perms:
         bind_perms = 0o666
     unixsocket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -509,7 +509,7 @@ class SockApi(object):
         if self.should_run_remoteapi():
             self.start_remoteapi()
         else:
-            cloop = asyncio.get_event_loop()
+            cloop = asyncio.get_running_loop()
             tasks.spawn(self.watch_for_cert())
         self.unixdomainserver = tasks.spawn_task(_unixdomainhandler(self.bind_group, self.bind_perms))
 
@@ -518,10 +518,10 @@ class SockApi(object):
         if libc.inotify_add_watch(watcher, b'/etc/confluent/', 0x100) > -1:
             while True:
                 currfut = asyncio.Future()
-                asyncio.get_event_loop().add_reader(
+                asyncio.get_running_loop().add_reader(
                     watcher, currfut.set_result, None)
                 currfut.add_done_callback(
-                    lambda x: asyncio.get_event_loop().remove_reader(watcher))
+                    lambda x: asyncio.get_running_loop().remove_reader(watcher))
                 done, _ = await asyncio.wait([currfut], return_when=asyncio.FIRST_COMPLETED)
                 for currfut in done:
                     await currfut

@@ -80,7 +80,7 @@ class WebConnection(wc.WebConnection):
     async def connect(self):
         if self.secure:
             return super(WebConnection, self).connect()
-        addrinfo = (await asyncio.get_event_loop().getaddrinfo(self.host, self.port))[0]
+        addrinfo = (await asyncio.get_running_loop().getaddrinfo(self.host, self.port))[0]
         # workaround problems of too large mtu, moderately frequent occurance
         # in this space
         plainsock = socket.socket(addrinfo[0])

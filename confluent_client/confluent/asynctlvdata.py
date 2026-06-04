@@ -118,7 +118,7 @@ def _sendmsg(loop, fut, sock, msg, fds, rfd):
 
 
 def send_fds(sock, msg, fds):
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     fut = cloop.create_future()
     _sendmsg(cloop, fut, sock, msg, fds, None)
     return fut
@@ -148,7 +148,7 @@ def _recvmsg(loop, fut, sock, msglen, maxfds, rfd):
 
 
 def recv_fds(sock, msglen, maxfds):
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     fut = cloop.create_future()
     _recvmsg(cloop, fut, sock, msglen, maxfds, None)
     return fut
@@ -195,7 +195,7 @@ async def sendall(handle, data):
         handle[1].write(data)
         return await handle[1].drain()
     else:
-        cloop = asyncio.get_event_loop()
+        cloop = asyncio.get_running_loop()
         return await cloop.sock_sendall(handle, data)
 
 def get_socket(handle):
@@ -212,7 +212,7 @@ async def close(handle):
         handle.close()
 
 async def send(handle, data, filehandle=None):
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     if isinstance(data, unicode):
         try:
             data = data.encode('utf-8')
@@ -256,7 +256,7 @@ async def _grabhdl(handle, size):
     if isinstance(handle, tuple):
         return await handle[0].read(size)
     else:
-        cloop = asyncio.get_event_loop()
+        cloop = asyncio.get_running_loop()
         return await cloop.sock_recv(handle, size)
 
 

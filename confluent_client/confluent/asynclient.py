@@ -440,7 +440,7 @@ class Command(object):
         libssl.SSL_CTX_set_cert_verify_callback(ssl_ctx, verify_stub, 0)
         sreader = asyncio.StreamReader()
         sreaderprot = asyncio.StreamReaderProtocol(sreader)
-        cloop = asyncio.get_event_loop()
+        cloop = asyncio.get_running_loop()
         tport, _ = await cloop.create_connection(
             lambda: sreaderprot, sock=self.connection, ssl=ctx, server_hostname='x')
         swriter = asyncio.StreamWriter(tport, sreaderprot, sreader, cloop)

@@ -46,7 +46,7 @@ async def node_by_manager(manager):
     """
 
     manageraddresses = []
-    for tmpaddr in await asyncio.get_event_loop().getaddrinfo(manager, None):
+    for tmpaddr in await asyncio.get_running_loop().getaddrinfo(manager, None):
         manageraddresses.append(tmpaddr[4][0])
     cfm = configmanager.ConfigManager(None)
     if manager in manager_to_nodemap:
@@ -68,7 +68,7 @@ async def node_by_manager(manager):
         if currhm in manageraddresses:
             manager_to_nodemap[manager] = node
             return node
-        for curraddr in await asyncio.get_event_loop().getaddrinfo(currhm, None):
+        for curraddr in await asyncio.get_running_loop().getaddrinfo(currhm, None):
             curraddr = curraddr[4][0]
             if curraddr in manageraddresses:
                 manager_to_nodemap[manager] = node

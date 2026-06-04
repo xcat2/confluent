@@ -65,7 +65,7 @@ class CredServer(object):
             apiarmed = None
             hmackey = None
             hmacval = None
-            cloop = asyncio.get_event_loop()
+            cloop = asyncio.get_running_loop()
             await cloop.sock_sendall(client, b'\xc2\xd1-\xa8\x80\xd8j\xba')
             tlv = bytearray(await cloop.sock_recv(client, 2))
             if tlv[0] != 1:
@@ -150,4 +150,4 @@ async def main():
     while True:
         await asyncio.sleep(86400)
 if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())

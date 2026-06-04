@@ -37,7 +37,7 @@ running_status = {}
 async def recv_exact(conn, size):
     data = b''
     while len(data) < size:
-        chunk = await asyncio.get_event_loop().sock_recv(conn, size - len(data))
+        chunk = await asyncio.get_running_loop().sock_recv(conn, size - len(data))
         if not chunk:
             return None
         data += chunk
@@ -138,7 +138,7 @@ class PlayRunner(object):
                             stdout=asyncio.subprocess.PIPE,
                             stderr=asyncio.subprocess.PIPE,
                             env=localenv)
-                        conn, _ = await asyncio.get_event_loop().sock_accept(feedback)
+                        conn, _ = await asyncio.get_running_loop().sock_accept(feedback)
                         conn.setblocking(False)
                         try:
                             result = True
@@ -153,7 +153,7 @@ class PlayRunner(object):
                                 if result is not None:
                                     self.results.append(result)
                         finally:
-                            await asyncio.get_event_loopy().sock_close(conn)
+                            await asyncio.get_running_loop().sock_close(conn)
                         stdout, stder = await worker.communicate()
                         self.stderr += stder.decode('utf8')
                         self.stdout += stdout.decode('utf8')

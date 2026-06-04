@@ -236,7 +236,7 @@ async def handle_request(req, make_response, mimetype):
         if not bmcaddr:
             return await make_response(mimetype, 500, 'Internal Server Error', body='Missing value in hardwaremanagement.manager')
         bmcaddr = bmcaddr.split('/', 1)[0]
-        bmcaddr = await asyncio.get_event_loop().getaddrinfo(bmcaddr, 0)[0]
+        bmcaddr = await asyncio.get_running_loop().getaddrinfo(bmcaddr, 0)[0]
         bmcaddr = bmcaddr[-1][0]
         if '.' in bmcaddr:  # ipv4 is allowed
             netconfig = await netutil.get_nic_config(cfg, nodename, ip=bmcaddr)

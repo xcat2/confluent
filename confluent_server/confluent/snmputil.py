@@ -29,7 +29,7 @@ import pysnmp.smi.rfc1902 as rfc1902
 
 async def _get_transport(name):
     # Annoyingly, pysnmp does not automatically determine ipv6 v ipv4
-    res = await asyncio.get_event_loop().getaddrinfo(name, 161, type=socket.SOCK_DGRAM)
+    res = await asyncio.get_running_loop().getaddrinfo(name, 161, type=socket.SOCK_DGRAM)
     if res[0][0] == socket.AF_INET6:
         return await snmp.Udp6TransportTarget.create(res[0][4], 2)
     else:

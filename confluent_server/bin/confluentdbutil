@@ -86,7 +86,7 @@ if args[0] in ('restore', 'merge'):
             skipped=skipped,
             format=format)
             
-        asyncio.get_event_loop().run_until_complete(dp)
+        asyncio.run(dp)
         if skipped['nodes']:
             skippedn = ','.join(skipped['nodes'])
             print('The following nodes were skipped during merge: '
@@ -129,6 +129,6 @@ elif args[0] == 'dump':
     format = 'yaml' if options.yaml else 'json'
     dp = cfm.dump_db_to_directory(dumpdir, password, options.redact,
                                   options.skipkeys, format=format)
-    asyncio.get_event_loop().run_until_complete(dp)
+    asyncio.run(dp)
 
 

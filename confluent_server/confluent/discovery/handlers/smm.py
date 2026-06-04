@@ -98,7 +98,7 @@ class NodeHandler(bmchandler.NodeHandler):
         if smmip:
             smmip = smmip.split('/', 1)[0]
         if smmip and ':' not in smmip:
-            smmip = await asyncio.get_event_loop().getaddrinfo(smmip, 0)[0]
+            smmip = await asyncio.get_running_loop().getaddrinfo(smmip, 0)[0]
             smmip = smmip[-1][0]
             if smmip and ':' in smmip:
                 raise exc.NotImplementedException('IPv6 not supported')

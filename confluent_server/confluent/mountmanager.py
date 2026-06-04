@@ -51,7 +51,7 @@ async def handle_request(configmanager, inputdata, pathcomponents, operation):
 
 async def requestmount(subdir, filename):
     await assure_browserfs()
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     a = socket.socket(socket.AF_UNIX)
     a.settimeout(0)
     await cloop.sock_connect(a, '/var/run/confluent/browserfs/control')

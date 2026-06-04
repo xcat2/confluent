@@ -55,7 +55,7 @@ async def interact(cloop, cnn):
 
 
 async def srv_debug(sock):
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     while True:
         cnn, addr = await cloop.sock_accept(sock)
         tasks.spawn(interact(cloop, cnn))

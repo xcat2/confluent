@@ -226,7 +226,7 @@ async def _offload_map_switch(switch, password, user, privprotocol=None):
     evtid = random.randint(0, 4294967295)
     while evtid in _offloadevts:
         evtid = random.randint(0, 4294967295)
-    _offloadevts[evtid] = asyncio.get_event_loop().create_future()
+    _offloadevts[evtid] = asyncio.get_running_loop().create_future()
     _offloader.stdin.write(msgpack.packb((evtid, switch, password, user, privprotocol),
                                                use_bin_type=True))
     #_offloader.stdin.flush()
@@ -251,7 +251,7 @@ async def _start_offloader():
     #fl = fcntl.fcntl(_offloader.stdout.fileno(), fcntl.F_GETFL)
     #fcntl.fcntl(_offloader.stdout.fileno(),
     #            fcntl.F_SETFL, fl | os.O_NONBLOCK)
-    asyncio.get_event_loop().create_task(_recv_offload())
+    asyncio.get_running_loop().create_task(_recv_offload())
 
 
 async def _recv_offload():
@@ -740,7 +740,7 @@ async def rescan(cfg):
         pass
 
 async def get_stdin_reader():
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     reader = asyncio.StreamReader()
     protocol = asyncio.StreamReaderProtocol(reader)
     await cloop.connect_read_pipe(lambda: protocol, sys.stdin)

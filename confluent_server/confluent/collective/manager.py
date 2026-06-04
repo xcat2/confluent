@@ -233,7 +233,7 @@ async def follow_leader(remote, leader):
                 random.random(), start_collective)
 
 async def _create_tls_connection(host, port):
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     ainfo = await cloop.getaddrinfo(
                     host, port, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM)
     for res in ainfo:
@@ -408,7 +408,7 @@ async def handle_connection(connection, cert, request, local=False):
                 return
             host = request['server']
             try:
-                cloop = asyncio.get_event_loop()
+                cloop = asyncio.get_running_loop()
                 ainfo = await cloop.getaddrinfo(
                     host, 13001, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM)
                 for res in ainfo:

@@ -94,7 +94,7 @@ async def close_session(sessionid):
 
 
 async def send_grant(conn, nodename, rqtype):
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     parmcallback = _nodeparms.get(nodename, None)
     cookies = {}
     protos = []
@@ -121,7 +121,7 @@ async def send_grant(conn, nodename, rqtype):
     else:
         # original openbmc dialect
         portnum = 443
-        cloop = asyncio.get_event_loop()
+        cloop = asyncio.get_running_loop()
         cfg = configmanager.ConfigManager(None)
         c = cfg.get_node_attributes(
             nodename,
@@ -204,7 +204,7 @@ async def send_grant(conn, nodename, rqtype):
 
 async def recv_exact(conn, n):
     #TODO:asyncmerge: review recv_exact usage
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     retdata = b''
     while len(retdata) < n:
         currdata = await cloop.sock_recv(conn, n - len(retdata))
@@ -216,7 +216,7 @@ async def recv_exact(conn, n):
 async def evaluate_request(conn):
     allow = False
     authname = None
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     try:
         creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED,
                                 struct.calcsize('iII'))
@@ -275,7 +275,7 @@ async def evaluate_request(conn):
         conn.close()
 
 async def monitor_requests():
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     a = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         os.remove('/var/run/confluent/vinz/approval')
@@ -291,7 +291,7 @@ async def monitor_requests():
 
 async def request_session(nodename):
     await assure_vinz()
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     a = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     a.setblocking(0)
     await cloop.sock_connect(a, '/var/run/confluent/vinz/control')

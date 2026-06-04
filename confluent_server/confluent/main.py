@@ -320,7 +320,7 @@ async def asyncrun(args):
         _redirectoutput()
     if havefcntl:
         _updatepidfile()
-    asyncio.get_event_loop().set_debug(True)
+    asyncio.get_running_loop().set_debug(True)
     signal.signal(signal.SIGINT, terminate)
     signal.signal(signal.SIGTERM, terminate)
     atexit.register(doexit)
@@ -338,7 +338,7 @@ async def asyncrun(args):
     sock_bind_host, sock_bind_port, sock_bind_group, sock_bind_perms = _get_connector_config('socket')
     try:
         sockservice = sockapi.SockApi(sock_bind_host, sock_bind_port, sock_bind_group, sock_bind_perms)
-        asyncio.get_event_loop().create_task(sockservice.start())
+        asyncio.get_running_loop().create_task(sockservice.start())
     except NameError:
         pass
     webservice = httpapi.HttpApi(http_bind_host, http_bind_port, http_bind_group, http_bind_perms)

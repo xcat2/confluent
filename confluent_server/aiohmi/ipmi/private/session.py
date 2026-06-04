@@ -117,7 +117,7 @@ async def watchsockets():
         currfutures = []
         for currsock in iosockets:
             currfut = asyncio.Future()
-            asyncio.get_event_loop().add_reader(currsock, sock_completion, asyncio.get_event_loop(), currsock, currfut)
+            asyncio.get_running_loop().add_reader(currsock, sock_completion, asyncio.get_running_loop(), currsock, currfut)
             currfutures.append(currfut)
         #select.select(iosockets, (), (), timeout)
         done, futures = await asyncio.wait(currfutures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
@@ -397,7 +397,7 @@ class Session(object):
         if iothread is None:
             initevt = asyncio.Event()
             iothreadwaiters.append(initevt)
-            iothread = asyncio.get_event_loop().create_task(watchsockets())
+            iothread = asyncio.get_running_loop().create_task(watchsockets())
             await initevt.wait()
         elif not iothreadready:
             initevt = asyncio.Event()

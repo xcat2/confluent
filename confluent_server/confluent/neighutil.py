@@ -47,7 +47,7 @@ async def _update_neigh():
     nlhdr = b'\x1c\x00\x00\x00\x1e\x00\x01\x03\x00\x00\x00\x00\x00\x00\x00\x00'
     # ndmsg struct u8 family u8 pad, u16 pad, s32 ifidx, u16 state, u8 flags, u8 type
     ndmsg=  b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     await cloop.sock_sendall(s, nlhdr + ndmsg)
     #s.sendall(nlhdr + ndmsg)
     neightable = {}

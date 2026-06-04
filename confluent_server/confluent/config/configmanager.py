@@ -389,7 +389,7 @@ async def exec_on_leader(function, *args):
     xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
     while xid in _pendingchangesets:
         xid = confluent.util.stringify(base64.b64encode(os.urandom(8)))
-    cloop = asyncio.get_event_loop()
+    cloop = asyncio.get_running_loop()
     _pendingchangesets[xid] = cloop.create_future()  # future instead of event
     rpcpayload = msgpack.packb({'function': function, 'args': args,
                                 'xid': xid}, use_bin_type=False)

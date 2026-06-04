@@ -55,7 +55,7 @@ async def handle_connection(incoming, outgoing):
 
 
 async def forward_port(sock, target, clientip, sessionid):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     sock.setblocking(False)
     while True:
         conn, cli = await loop.sock_accept(sock)
@@ -79,7 +79,7 @@ async def forward_video():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(('::', 3900, 0, 0))
     sock.listen(50)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     sock.setblocking(False)
     while True:
         conn, cli = await loop.sock_accept(sock)
