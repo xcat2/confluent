@@ -36,7 +36,10 @@ currtzvintage = None
 
 
 def yamldump(input):
-    return yaml.dump_all([input], Dumper=SafeDumper, default_flow_style=False)
+    return yaml.dump_all([input], Dumper=SafeDumper, default_flow_style=False).encode()
+
+def jsondump(input):
+    return json.dumps(input).encode()
 
 def yamlload(input):
     return yaml.load(input, Loader=SafeLoader)
@@ -179,7 +182,7 @@ async def handle_request(req, make_response, mimetype):
     if retype == 'application/yaml':
         dumper = yamldump
     elif retype == 'application/json':
-        dumper = json.dumps
+        dumper = jsondump
     else:
         return await make_response(mimetype, 406, 'Not supported', body='Unsupported content type in ACCEPT: ' + retype)
     operation = req.method
@@ -507,7 +510,7 @@ async def handle_request(req, make_response, mimetype):
             return await make_response(mimetype, result[0], result[1], body=result[2])
         if 'GET' == operation:
             statcode, status, output = syncfiles.get_syncresult(nodename)
-            output = json.dumps(output)
+            output = jsondump(output)
             return await make_response('application/json', statcode, status, body=output)
     elif reqpath.startswith('/self/remoteconfig/status'):
         rst = runansible.running_status.get(nodename, None)
