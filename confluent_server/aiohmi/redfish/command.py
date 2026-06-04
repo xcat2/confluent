@@ -61,6 +61,7 @@ boot_devices_read = {
     'Pxe': 'network',
     'Usb': 'usb',
     'SDCard': 'sdcard',
+    'UefiHttp': 'http',
 }
 
 

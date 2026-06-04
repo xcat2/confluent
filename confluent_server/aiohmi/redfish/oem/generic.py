@@ -118,6 +118,7 @@ boot_devices_write = {
     'setup': 'BiosSetup',
     'bios': 'BiosSetup',
     'f1': 'BiosSetup',
+    'http': 'UefiHttp',
 }
 
 boot_devices_read = {
@@ -129,6 +130,7 @@ boot_devices_read = {
     'Pxe': 'network',
     'Usb': 'usb',
     'SDCard': 'sdcard',
+    'UefiHttp': 'http',
 }
 
 
@@ -747,6 +749,11 @@ class OEMHandler(object):
             raise exc.InvalidParameterValue('Unsupported device %s'
                                             % repr(bootdev))
         bootdev = boot_devices_write.get(bootdev, bootdev)
+        if bootdev == 'UefiHttp':  # not universally supported, remap to Pxe
+            sysinfo = await self.sysinfo()
+            allowed = sysinfo.get('Boot', {}).get('BootSourceOverrideTarget@Redfish.AllowableValues', [])
+            if 'UefiHttp' not in allowed:
+                bootdev = 'Pxe'
         if bootdev == 'None':
             payload = {'Boot': {'BootSourceOverrideEnabled': 'Disabled'}}
         else:
@@ -985,7 +992,8 @@ class OEMHandler(object):
         return None
 
     async def get_description(self):
-        for chassis in fishclient.sysinfo.get('Links', {}).get('Chassis', []):
+        sysinfo = await self.sysinfo()
+        for chassis in sysinfo.get('Links', {}).get('Chassis', []):
             chassisurl = chassis['@odata.id']
             chassisinfo = await self._do_web_request(chassisurl)
             hmm = chassisinfo.get('HeightMm', None)
