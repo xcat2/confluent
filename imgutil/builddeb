@@ -1,4 +1,6 @@
 #!/bin/bash
+export DEBFULLNAME="Lenovo HPC"
+export DEBEMAIL="hpchelp@lenovo.com"
 VERSION=`git describe|cut -d- -f 1`
 NUMCOMMITS=`git describe|cut -d- -f 2`
 if [ "$NUMCOMMITS" != "$VERSION"  ]; then

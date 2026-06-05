@@ -1,5 +1,7 @@
 #!/bin/bash
 cd `dirname $0`
+export DEBFULLNAME="Lenovo HPC"
+export DEBEMAIL="hpchelp@lenovo.com"
 PKGNAME=$(basename $(pwd))
 DPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
 OPKGNAME=$(basename $(pwd) | sed -e s/_/-/)
