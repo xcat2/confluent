@@ -549,7 +549,7 @@ class Session(object):
             self.socketchecking.release()
         await self.login()
         if not self.async_:
-            while self.logging:
+            while self.logging and not self.broken:
                 await Session.wait_for_rsp()
         if self.broken:
             raise exc.IpmiException(self.errormsg)
@@ -792,9 +792,9 @@ class Session(object):
                         self.waiting_sessions.pop(self, None)
                         if not self.lastpayload and not self.logging:
                             return
-                        await self._timedout()
                 finally:
                     WAITING_SESSIONS.release()
+                await self._timedout()
         finally:
             self.awaitingresponse = False
 
@@ -1668,7 +1668,7 @@ class Session(object):
             if data[1] == 2 and self.logontries:  # if we retried RAKP3 because
                 # RAKP4 got dropped, BMC can consider it done and we must
                 # restart
-                self._relog()
+                await self._relog()
                 return
             # ignore 15 value if we are retrying.
             # xCAT did but I can't recall why exactly
@@ -1804,7 +1804,7 @@ class Session(object):
         self.nowait = True
         self.timeout += 1
         if self.timeout > self.maxtimeout:
-            if not self.logontries:
+            if self.logontries <= 0:
                 response = {'error': 'timeout', 'code': 0xffff}
                 if self.ipmicallback:
                     await self.ipmicallback(response)
@@ -1834,8 +1834,20 @@ class Session(object):
               or self.sessioncontext == 'EXPECTINGRAKP4'):
             # If we can't be sure which RAKP was dropped or if RAKP3/4 was just
             # delayed, the most reliable thing to do is rewind and start over
-            # bmcs do not take kindly to receiving RAKP1 or RAKP3 twice
-            await self._relog()
+            # bmcs do not take kindly to receiving RAKP1 or RAKP3 twice.
+            # Only do this while we still have login attempts budgeted;
+            # otherwise each lost RAKP would spawn a fresh RAKP1 forever
+            # (_relog resets self.timeout, so the timeout budget above never
+            # trips during the RAKP phase).
+            if self.logontries > 0:
+                await self._relog()
+            else:
+                response = {'error': 'timeout', 'code': 0xffff}
+                if self.ipmicallback:
+                    await self.ipmicallback(response)
+                self.nowait = False
+                await self._mark_broken()
+                return
         else:  # in IPMI case, the only recourse is to act as if the packet is
             # idempotent.  SOL has more sophisticated retry handling
             # the biggest risks are reset sp which is often fruitless to retry
