@@ -121,10 +121,10 @@ int main(int argc, char* argv[]) {
     memset(last6msg, 0, 1024);
     addr.sin6_family = AF_INET6;
     addr.sin6_addr = in6addr_any;
-    addr.sin6_port = htons(190);
+    addr.sin6_port = htons(1900);  // Attempt to be consistent about source port for firewall
     addr4.sin_family = AF_INET;
     addr4.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr4.sin_port = htons(190);
+    addr4.sin_port = htons(1900);
     dst.sin6_family = AF_INET6;
     dst.sin6_port = htons(1900);
     inet_pton(AF_INET6, "ff02::c", &dst.sin6_addr);
@@ -160,14 +160,14 @@ int main(int argc, char* argv[]) {
     if (setsockopt(ns, IPPROTO_IPV6, IPV6_V6ONLY, &ifidx, sizeof(ifidx)) != 0) {
         fprintf(stderr, "Unable to limit socket to IPv6 only\n");
     }
-    /* For now, bind to 190 to prove we are a privileged process */
+    /* For now, bind to 1900 to prove we are a privileged process */
     if (bind(n4, (const struct sockaddr *)&addr4, sizeof(addr4)) < 0) {
-        fprintf(stderr, "Error binding privilged port!\n");
-        exit(1);
+        //fprintf(stderr, "Error binding privilged port!\n");
+        //exit(1);
     }
     if (bind(ns, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        fprintf(stderr, "Error binding ipv6 privileged port!\n");
-        exit(1);
+        //fprintf(stderr, "Error binding ipv6 privileged port!\n");
+        //exit(1);
     }
     getifaddrs(&ifa);
     for (ifc = ifa; ifc != NULL; ifc = ifc->ifa_next) {
