@@ -1179,8 +1179,8 @@ class _ExpressionFormat(string.Formatter):
         return formatted
 
     def _handle_ast_node(self, node):
-        if isinstance(node, ast.Num):
-            return node.n
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return node.value
         elif isinstance(node, ast.Attribute):
             #ok, we have something with a dot
             left = node

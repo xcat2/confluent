@@ -107,8 +107,8 @@ class _ExpEngine(object):
             elif isinstance(parsed.ops[0], ast.Eq):
                 return self.process(parsed.left) == self.process(
                     parsed.comparators[0])
-        if isinstance(parsed, ast.Num):
-            return parsed.n
+        if isinstance(parsed, ast.Constant) and isinstance(parsed.value, (int, float)):
+            return parsed.value
         if isinstance(parsed, ast.Attribute):
             category = parsed.value.id
             setting = parsed.attr
