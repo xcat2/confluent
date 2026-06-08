@@ -197,8 +197,7 @@ async def check_ssh_to_node(targsships):
             else:
                 emprint('Unknown error attempting confluent automation ssh:')
                 sys.stderr.buffer.write(srun.stderr)
-    if sshutil.agent_pid:
-        os.kill(int(sshutil.agent_pid), signal.SIGTERM)
+    sshutil.cleanup()
     sys.exit(0)
 
 async def check_confluent_ssh():

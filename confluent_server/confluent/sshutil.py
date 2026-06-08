@@ -33,15 +33,20 @@ def normalize_uid():
     return curruid
 
 agent_starting = False
+agent_tmpdir = None
 async def assure_agent():
     global agent_starting
     global agent_pid
+    global agent_tmpdir
     while agent_starting:
         await asyncio.sleep(0.1)
     if agent_pid is None:
         try:
             agent_starting = True
-            sai = (await util.check_output(['ssh-agent']))[0]
+            agent_tmpdir = tempfile.mkdtemp()
+            os.chmod(agent_tmpdir, 0o700)
+            sockpath = os.path.join(agent_tmpdir, 'agent.sock')
+            sai = (await util.check_output(['ssh-agent', '-a', sockpath]))[0]
             for line in sai.split(b'\n'):
                 if b';' not in line:
                     continue
@@ -108,6 +113,11 @@ async def initialize_ca():
         os.seteuid(ouid)
     #    newent = '@cert-authority * ' + capub.read()
 
+def cleanup():
+    if agent_pid:
+        os.kill(int(agent_pid), signal.SIGTERM)
+    if agent_tmpdir:
+        shutil.rmtree(agent_tmpdir)
 
 adding_key = False
 async def prep_ssh_key(keyname):
