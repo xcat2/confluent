@@ -631,7 +631,7 @@ def draw_text(text, width, height):
         nd.rectangle((0, 0, nerr.width - 1, nerr.height -1), outline='white')
         outfile = io.BytesIO()
         nerr.save(outfile, format='PNG')
-        draw_image(outfile.getbuffer(), width, height, doscale=False)
+        draw_image(outfile.getvalue(), width, height, doscale=False)
     else:
         sys.stdout.write(text)
         cursor_left(len(text))
@@ -666,7 +666,7 @@ def draw_image(bindata, width, height, doscale=True):
         nimg.paste(img, box=(2, 2))
         outfile = io.BytesIO()
         nimg.save(outfile, format='PNG')
-        bindata = outfile.getbuffer()
+        bindata = outfile.getvalue()
     if imageformat == 'sixel':
         sixel_draw(bindata)
     elif imageformat == 'iterm':
@@ -1033,7 +1033,7 @@ async def do_vnc(node, url):
                     # Save as PNG using PIL/pillow
                     outfile = io.BytesIO()
                     image.save(outfile, format='PNG')
-                    imgdata = outfile.getbuffer()
+                    imgdata = outfile.getvalue()
                     if imgdata:
                         draw_node(node, imgdata, '', '', cwidth, cheight)
                     else:

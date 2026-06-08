@@ -256,9 +256,10 @@ class VNCClient:
                 raise NotImplementedError(f'tight encoding with comptype {comptype} not implemented')
             compressed_data_length = await self._read_tight_length()
             compressed_data = await self.reader.readexactly(compressed_data_length)
-            jpgimg = io.BytesIO(compressed_data)
-            img = Image.open(jpgimg)
-            self.framebuffer.paste(img, (x, y))
+            with io.BytesIO(compressed_data) as jpgimg:
+                img = Image.open(jpgimg)
+                img.load()
+                self.framebuffer.paste(img, (x, y))
         else:
             raise Exception(f'Unsupported encoding type: {encoding_type}')
     
