@@ -23,7 +23,7 @@ async def _notimplemented(nodes, element, configmanager, inputdata):
     if not nodes:
         nodes = [None]
     for node in nodes:
-        yield msg.NotImplemented(node)
+        yield msg.NotImplemented(node, "No working hardwaremanagement.method is defined, define a valid method (formerly this defaulted to ipmi)")
 
 
 retrieve = _notimplemented
