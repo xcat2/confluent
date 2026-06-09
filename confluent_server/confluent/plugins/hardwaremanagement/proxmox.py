@@ -390,6 +390,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
         elif element == ['console', 'ikvm_screenshot']:
             # good background for the webui, and kitty
             yield msg.ConfluentNodeError(node, "vnc available, screenshot not available")
+        elif element == ['health', 'hardware']:
+            yield msg.HealthSummary('unknown', node)
 
 async def update(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)
