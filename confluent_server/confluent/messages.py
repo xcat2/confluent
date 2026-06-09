@@ -262,6 +262,13 @@ class ConfluentNodeError(object):
         raise Exception('{0}: {1}'.format(self.node, self.error))
 
 
+class NotImplemented(ConfluentNodeError):
+    apicode = 501
+
+    def __init__(self, node, errorstr='Not implemented'):
+        self.node = node
+        self.error = errorstr
+
 class Generic(ConfluentMessage):
 
     def __init__(self, data):

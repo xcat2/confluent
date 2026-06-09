@@ -304,7 +304,7 @@ def _init_core():
         'boot': {
             'nextdevice': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
         },
         'configuration': {
@@ -312,126 +312,126 @@ def _init_core():
                 'alerts': {
                     'destinations': PluginCollection({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                 },
                 'certificate': {
                     'sign': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'generate_csr': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'install': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                 },
                 'certificate_authorities': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'clear': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                 }),
                 'users': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'licenses': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'save_licenses': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'net_interfaces': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'reset': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'hostname': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'identifier': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'domain_name': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'location': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'ntp': {
                     'enabled': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'servers': PluginCollection({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                 },
                 'extended': {
                     'all': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'extra': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'advanced': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'extra_advanced': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                 },
             },
             'storage': {
                 'all': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'arrays': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'disks': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'volumes': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 })
             },
             'system': {
                 'all': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'advanced': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'clear': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 })
             },
         },
@@ -449,7 +449,7 @@ def _init_core():
         '_enclosure': {
             'reseat_bay': PluginRoute(
                 {'pluginattrs': ['hardwaremanagement.method'],
-                 'default': 'ipmi'}),
+                 'default': 'null'}),
         },
         'shell': {
             # another special case similar to console
@@ -462,28 +462,28 @@ def _init_core():
             'session': None,
             'license': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'graphical': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'ikvm': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'ikvm_methods': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'ikvm_screenshot': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
         },
         'description': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
+            'default': 'null',
         }),
         'deployment': {
             'lock': PluginRoute({
@@ -505,11 +505,11 @@ def _init_core():
             'hardware': {
                 'log': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'decode': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
             },
         },
@@ -520,49 +520,49 @@ def _init_core():
         'health': {
             'hardware': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
         },
         'identify': PluginRoute({
             'pluginattrs': ['hardwaremanagement.method'],
-            'default': 'ipmi',
+            'default': 'null',
         }),
         'inventory': {
             'hardware': {
                 'all': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
             },
             'firmware': {
                 'all': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'core': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'adapters': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'disks': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'misc': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'updatestatus': PluginRoute({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'updates': {
                     'active': PluginCollection({
                             'pluginattrs': ['hardwaremanagement.method'],
-                            'default': 'ipmi',
+                            'default': 'null',
                     }),
                 },
             },
@@ -571,26 +571,26 @@ def _init_core():
         'media': {
             'uploads': PluginCollection({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'attach': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'detach': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'current': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
 
         },
         'power': {
             'state': PluginRoute({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
             'inlets': PluginCollection({'handler': 'pdu'}),
             'outlets': PluginCollection({'pluginattrs': ['hardwaremanagement.method']}),
@@ -600,41 +600,41 @@ def _init_core():
             'hardware': {
                 'all': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'normalized': {
                     'inlet_temp': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'average_cpu_temp': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                     'total_power': PluginRoute({
                         'pluginattrs': ['hardwaremanagement.method'],
-                        'default': 'ipmi',
+                        'default': 'null',
                     }),
                 },
                 'energy': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'temperature': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'power': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'fans': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
                 'leds': PluginCollection({
                     'pluginattrs': ['hardwaremanagement.method'],
-                    'default': 'ipmi',
+                    'default': 'null',
                 }),
             },
 
@@ -642,7 +642,7 @@ def _init_core():
         'support': {
             'servicedata': PluginCollection({
                 'pluginattrs': ['hardwaremanagement.method'],
-                'default': 'ipmi',
+                'default': 'null',
             }),
         },
     }
