@@ -392,6 +392,7 @@ async def retrieve(nodes, element, configmanager, inputdata):
             yield msg.ConfluentNodeError(node, "vnc available, screenshot not available")
         elif element == ['health', 'hardware']:
             yield msg.HealthSummary('unknown', node)
+            yield msg.SensorReadings([], node)
 
 async def update(nodes, element, configmanager, inputdata):
     clientsbynode = prep_proxmox_clients(nodes, configmanager)

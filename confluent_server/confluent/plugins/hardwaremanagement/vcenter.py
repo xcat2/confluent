@@ -382,6 +382,8 @@ async def retrieve(nodes, element, configmanager, inputdata):
                 yield msg.ScreenShot(imgdata, node, imgformat=imgformat)
         elif element == ['health', 'hardware']:
             yield msg.HealthSummary('unknown', node)
+            yield msg.SensorReadings([], node)
+
 
 
 
