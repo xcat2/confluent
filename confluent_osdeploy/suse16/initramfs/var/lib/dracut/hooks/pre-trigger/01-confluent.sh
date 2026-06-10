@@ -18,17 +18,7 @@ modprobe ib_ipoib
 modprobe ib_umad
 modprobe hfi1
 modprobe mlx5_ib
-function confluentpython() {
-    if [ -x /usr/libexec/platform-python ]; then
-        /usr/libexec/platform-python $*
-    elif [ -x /usr/bin/python3 ]; then
-        /usr/bin/python3 $*
-    elif [ -x /usr/bin/python ]; then
-        /usr/bin/python $*
-    elif [ -x /usr/bin/python2 ]; then
-        /usr/bin/python2 $*
-    fi
-}
+
 vlaninfo=$(getarg vlan)
 if [ ! -z "$vlaninfo" ]; then
         vldev=${vlaninfo#*:}
@@ -185,7 +175,18 @@ errout=""
 if [ ! -z "$autocons" ]; then
     errout="-e $autocons"
 fi
-while ! confluentpython /opt/confluent/bin/apiclient $errout /confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
+confluentmgr=$(grep ^EXTMGRINFO: /etc/confluent/confluent.info |awk '{print $2}'| awk -F'|' '{print $1" "$2" "$3}' | grep '1$'| awk '{print $1}')
+confluentmgr=$(echo $confluentmgr|awk '{print $1}')
+if [ -z "$confluentmgr" ]; then
+    confluentmgr=$(grep ^MANAGER: /etc/confluent/confluent.info|awk '{print $2}')
+    confluentmgr=$(echo $confluentmgr|awk '{print $1}')
+fi
+if [ -z "$confluent_apikey" ]; then
+    /opt/confluent/bin/clortho $nodename $confluentmgr > /etc/confluent/confluent.apikey
+    confluent_apikey=$(cat /etc/confluent/confluent.apikey)
+fi
+
+while ! curl -sgf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://[$confluentmgr]/confluent-api/self/deploycfg2 > /etc/confluent/confluent.deploycfg; do
         sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
