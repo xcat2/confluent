@@ -42,6 +42,8 @@ libmaxminddb0
 libuv1
 dbus-user-session
 tpm2-tools
+%onlyversions 26.04
+libfuse2t64
 %onlyarch x86_64
 grub-efi-amd64-bin
 %onlyarch aarch64

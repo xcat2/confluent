@@ -531,6 +531,13 @@ class OsHandler(object):
                     else:
                         ignoremode = False
                     continue
+                if line.startswith(r'%onlyversions '):
+                    vers = line[len(r'%onlyversions '):].split()
+                    if self.version not in vers:
+                        ignoremode = True
+                    else:
+                        ignoremode = False
+                    continue
                 if not ignoremode:
                     pkgs += line + ' '
             pkgs = pkgs.split()
