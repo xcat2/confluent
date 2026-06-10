@@ -680,14 +680,37 @@ class DebHandler(OsHandler):
         cmd = ['debootstrap', self.codename, self.targpath]
         subprocess.check_call(cmd)
 
+    def _apt(self, args, cmd):
+        args.cmd = ['env', 'DEBIAN_FRONTEND=noninteractive'] + cmd
+        rc = run_constrainedx(fancy_chroot, (args, self.targpath))
+        if rc:
+            sys.stderr.write('{0} failed with exit code {1}\n'.format(
+                ' '.join(cmd), rc))
+            raise SystemExit(rc)
+
     def prep_root(self, args):
+        mkdirp(os.path.join(self.targpath, 'etc/apt'))
+        for aptdir in ('sources.list.d', 'trusted.gpg.d', 'keyrings'):
+            mkdirp(os.path.join(self.targpath, 'etc/apt', aptdir))
         shutil.copy('/etc/apt/sources.list', os.path.join(self.targpath, 'etc/apt/sources.list'))
         for listfile in glob.glob('/etc/apt/sources.list.d/*'):
             shutil.copy(listfile, os.path.join(self.targpath, listfile[1:]))
-        args.cmd = ['apt-get', 'update']
-        run_constrainedx(fancy_chroot, (args, self.targpath))
-        args.cmd = ['apt-get', '-y', 'install'] + self.includepkgs
-        run_constrainedx(fancy_chroot, (args, self.targpath))
+        for keydir in ('/etc/apt/trusted.gpg.d', '/etc/apt/keyrings'):
+            for keyfile in glob.glob(os.path.join(keydir, '*')):
+                if not os.path.isfile(keyfile):
+                    continue
+                tkeyfile = os.path.join(
+                    self.targpath, os.path.relpath(keyfile, '/'))
+                mkdirp(os.path.dirname(tkeyfile))
+                shutil.copy(keyfile, tkeyfile)
+        if os.path.exists('/etc/apt/trusted.gpg'):
+            trustedgpg = os.path.join(self.targpath, 'etc/apt/trusted.gpg')
+            mkdirp(os.path.dirname(trustedgpg))
+            shutil.copy(
+                '/etc/apt/trusted.gpg', trustedgpg)
+        self._apt(args, ['apt-get', 'update'])
+        if self.includepkgs:
+            self._apt(args, ['apt-get', '-y', 'install'] + self.includepkgs)
         servicefile = os.path.join(
             self.targpath, 'usr/lib/systemd/system/ssh.service')
         if os.path.exists(servicefile):
@@ -852,20 +875,26 @@ def mkdirp(path):
             raise
 
 
+def _exitcode_from_status(status):
+    if os.WIFEXITED(status):
+        return os.WEXITSTATUS(status)
+    if os.WIFSIGNALED(status):
+        return 128 + os.WTERMSIG(status)
+    return 1
+
 def run_constrainedx(function, args):
     # first fork to avoid changing namespace of unconstrained environment
     pid = os.fork()
     if pid:
-        os.waitpid(pid, 0)
-        return
+        _, status = os.waitpid(pid, 0)
+        return _exitcode_from_status(status)
     libc.unshare(CLONE_NEWNS|CLONE_NEWPID)
     # must fork again due to CLONE_NEWPID, or else lose the ability to make
     # subprocesses
     pid = os.fork()
     if pid:
-        os.waitpid(pid, 0)
-        os._exit(0)
-        return
+        _, status = os.waitpid(pid, 0)
+        os._exit(_exitcode_from_status(status))
     # we are pid 1 now
     _mount('none', '/', flags=MS_REC|MS_PRIVATE)
     _mount('proc', '/proc', fstype='proc')
@@ -876,16 +905,15 @@ def run_constrained(function, args):
     # first fork to avoid changing namespace of unconstrained environment
     pid = os.fork()
     if pid:
-        os.waitpid(pid, 0)
-        return
+        _, status = os.waitpid(pid, 0)
+        return _exitcode_from_status(status)
     libc.unshare(CLONE_NEWNS|CLONE_NEWPID)
     # must fork again due to CLONE_NEWPID, or else lose the ability to make
     # subprocesses
     pid = os.fork()
     if pid:
-        os.waitpid(pid, 0)
-        os._exit(0)
-        return
+        _, status = os.waitpid(pid, 0)
+        os._exit(_exitcode_from_status(status))
     # we are pid 1 now
     _mount('none', '/', flags=MS_REC|MS_PRIVATE)
     _mount('proc', '/proc', fstype='proc')
@@ -957,7 +985,9 @@ def main():
 
 
 def exec_root(args):
-    run_constrained(exec_root_backend, args)
+    exitcode = run_constrained(exec_root_backend, args)
+    if exitcode:
+        sys.exit(exitcode)
 
 def _mount_file(source, dst):
     _mount(source, dst, flags=MS_BIND|MS_RDONLY)
@@ -1262,7 +1292,10 @@ def build_root(args):
     oshandler.add_pkglists()
     for dirname in ('proc', 'sys', 'dev', 'run'):
         mkdirp(os.path.join(args.scratchdir, dirname))
-    run_constrained(build_root_backend, (args, oshandler))
+    exitcode = run_constrained(build_root_backend, (args, oshandler))
+    if exitcode:
+        sys.stderr.write('Image build failed\n')
+        sys.exit(exitcode)
     #if len(args) > 1:
     #    pack_image(opts, args)
 
@@ -1399,6 +1432,11 @@ async def pack_image(args):
         if 'rescue' in kern:
             continue
         kvermap[get_kern_version(kern)] = kern
+    if not kvermap:
+        sys.stderr.write(
+            'No kernel found in {0}\n'.format(
+                os.path.join(args.scratchdir, 'boot')))
+        sys.exit(1)
     mostrecent = list(version_sort(kvermap))[-1]
     initrdname = os.path.join(args.scratchdir, 'boot/initramfs-{0}.img'.format(mostrecent))
     if not os.path.exists(initrdname):
