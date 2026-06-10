@@ -5,7 +5,20 @@ cd `dirname $0`/doc/man
 mkdir -p ../../man/man1
 mkdir -p ../../man/man5
 mkdir -p ../../man/man8
-ronn -r *.ronn
+for ronn in *.ronn; do
+    # The first heading line is of the form "name(section) -- description"
+    header=`grep -m1 -E '\([0-9]+\) *--+ ' "$ronn"`
+    name=`echo "$header" | sed -E 's/^#* *([A-Za-z0-9._-]+)\(([0-9]+)\).*/\1/'`
+    section=`echo "$header" | sed -E 's/^#* *([A-Za-z0-9._-]+)\(([0-9]+)\).*/\2/'`
+    # Strip the ronn title heading (and any setext underline) and promote the
+    # remaining section headings so pandoc emits them as man .SH sections.
+    sed -E '/\([0-9]+\) *--+ /d; /^=+$/d' "$ronn" | \
+        pandoc --standalone --from markdown --to man \
+            --shift-heading-level-by=-1 \
+            --metadata title="$name" \
+            --metadata section="$section" \
+            -o "$name.$section"
+done
 mv *.1 ../../man/man1/
 mv *.5 ../../man/man5/
 mv *.8 ../../man/man8/
