@@ -34,6 +34,7 @@ READFILES = set([
     '.disk/info',
     'media.1/products',
     'media.2/products',
+    'install/media.1/products',
     '.DISCINFO',
     '.discinfo',
     'ISOLINUX.CFG',
@@ -615,6 +616,8 @@ def check_sles(isoinfo):
         medianame = 'media.1/products'
     elif 'media.2/products' in isoinfo[1]:
         medianame = 'media.2/products'
+    elif 'install/media.1/products' in isoinfo[1]:
+        medianame = 'install/media.1/products'
     else:
         return None
     prodinfo = isoinfo[1][medianame]
@@ -640,6 +643,12 @@ def check_sles(isoinfo):
             disk = '1'
         elif '.2' in medianame:
             disk = '2'
+    elif hline[-1].startswith('16'):
+        if hline[1] == 'openSUSE':
+            distro = 'opensuse_leap'
+        else:
+            distro = 'sle'
+        disk = '1'
     if disk and distro:
         category = 'suse{0}'.format(major)
         if not os.path.exists('/opt/confluent/lib/osdeploy/{0}'.format(category)):
