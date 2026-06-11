@@ -60,6 +60,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
         for NICGUESS in $(ip link|grep LOWER_UP|grep -v LOOPBACK| awk '{print $2}' | sed -e 's/:$//'); do
             if [ "$autoconfigmethod" = "dhcp" ]; then
                 /usr/libexec/nm-initrd-generator ip=$NICGUESS:dhcp
+                echo ip=$NICGUESS:dhcp >> /etc/cmdline.d/01-confluent.conf
             else
                 v4addr=$(grep ^ipv4_address: $tcfg)
                 v4addr=${v4addr#ipv4_address: }
@@ -81,6 +82,7 @@ if [ -e /dev/disk/by-label/CNFLNT_IDNT ]; then
                     if curl --capath /tls/ -s --connect-timeout 3 https://$dsrv/confluent-public/ > /dev/null; then
                         rm /run/NetworkManager/system-connections/*
                         /usr/libexec/nm-initrd-generator ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none
+                        echo ip=$v4addr::$v4gw:$v4nm:$hostname:$NICGUESS:none >> /etc/cmdline.d/01-confluent.conf
                         DETECTED=1
                         ifname=$NICGUESS
                         break
@@ -135,9 +137,11 @@ if ! grep MANAGER: /etc/confluent/confluent.info; then
             mgr="[$mgr]"
             confluenthttpsrv=[$confluentsrv]
             /usr/libexec/nm-initrd-generator ip=:dhcp6
+            echo ip=:dhcp6 >> /etc/cmdline.d/01-confluent.conf
         else
             confluenthttpsrv=$confluentsrv
             /usr/libexec/nm-initrd-generator ip=:dhcp
+            echo ip=:dhcp >> /etc/cmdline.d/01-confluent.conf
         fi
         NetworkManager --configure-and-quit=initrd --no-daemon
         myids=uuid=$(cat /sys/devices/virtual/dmi/id/product_uuid)
@@ -190,6 +194,9 @@ while ! curl -sgf -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $conf
         sleep 10
 done
 ifidx=$(cat /tmp/confluent.ifidx 2> /dev/null)
+if [ -z "$ifidx" ] && echo "$confluentmgr" | grep -q '%'; then
+    ifidx=$(echo "$confluentmgr" | awk -F'%' '{print $2}')
+fi
 if [ -z "$ifname" ]; then
     if [ ! -z "$ifidx" ]; then
         ifname=$(ip link |grep ^$ifidx:|awk '{print $2}')
@@ -198,7 +205,7 @@ if [ -z "$ifname" ]; then
         echo $ifname > /tmp/net.ifaces
     else
         ip -br a|grep UP|awk '{print $1}' > /tmp/net.ifaces
-        ifname=$(cat /tmp/net.ifaces)
+        ifname=$(cat /tmp/net.ifaces| awk '{print $1}')
     fi
 fi
 
@@ -251,9 +258,10 @@ if [ "$ID" = "dracut" ]; then
 fi
 ISOSRC=$(blkid -t TYPE=iso9660|grep -Ei ' LABEL="'$ID-$VERSION_ID|sed -e s/:.*//)
 if [ -z "$ISOSRC" ]; then
-    echo inst.repo=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
-    root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
-    export root
+    echo root=$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
+    #echo inst.=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
+    #root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
+    #export root
 else
     echo inst.repo=cdrom:$ISOSRC >> /etc/cmdline.d/01-confluent.conf
 fi
