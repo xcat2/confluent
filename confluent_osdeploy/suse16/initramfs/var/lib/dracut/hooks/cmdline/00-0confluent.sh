@@ -13,3 +13,5 @@ fi
 if grep -q console=ttyS /proc/cmdline; then
 	echo "Serial console requested in kernel command line, local video may not show progress" > /dev/tty1
 fi
+mkdir -p /run/NetworkManager/initrd
+: > /run/NetworkManager/initrd/neednet
