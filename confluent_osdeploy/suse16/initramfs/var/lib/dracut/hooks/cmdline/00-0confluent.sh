@@ -18,3 +18,7 @@ if ! grep -q rd.neednet /proc/cmdline; then
 	echo rd.neednet >> /etc/cmdline.d/01-confluent.conf
 fi
 : > /run/NetworkManager/initrd/neednet
+root=livenet
+netroot=livenet:TBD
+wait_for_dev -n /dev/root
+info "Preparing for confluent deployment..."
