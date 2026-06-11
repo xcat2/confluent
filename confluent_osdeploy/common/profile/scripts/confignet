@@ -257,7 +257,7 @@ class NetplanManager(object):
                     continue
                 with open(defcfg, 'r') as cloudinit:
                     cloudinfo = yaml.safe_load(cloudinit)
-                    if 'network' not in cloudinfo:
+                    if not cloudinfo or 'network' not in cloudinfo:
                         continue
                     for clouddev in list(cloudinfo.get('network', {}).get('ethernets', {})):
                         if clouddev in prune_from_cloudinit:

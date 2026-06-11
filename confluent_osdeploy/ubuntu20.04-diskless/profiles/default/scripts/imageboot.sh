@@ -59,7 +59,6 @@ if ! grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
     else
          mount -o discard /dev/zram0 /sysroot
     fi
-    mount -o discard /dev/zram0 /mnt/overlay
 elif grep -q confluent_imagemethod=uncompressed /proc/cmdline; then
     mount -t tmpfs disklessroot /sysroot
 fi
@@ -165,6 +164,48 @@ mv /lib/modules/$(uname -r) /lib/modules/$(uname -r)-ramfs
 ln -s /sysroot/lib/modules/$(uname -r) /lib/modules/
 mv /lib/firmware /lib/firmware-ramfs
 ln -s /sysroot/lib/firmware /lib/firmware
+rm /sysroot/etc/machine-id
+if [ -e /sys/devices/virtual/dmi/id/product_uuid ]; then
+    (hostname; cat /sys/devices/virtual/dmi/id/product_uuid) | sha512sum | head -c 32 > /sysroot/etc/machine-id
+else
+    hostname | sha512sum | head -c 32 > /sysroot/etc/machine-id
+fi
+echo >> /sysroot/etc/machine-id
+ipv4=$(grep ^ipv4_address: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+ipv4method=$(grep ^ipv4_method: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+ipv4gateway=$(grep ^ipv4_gateway: /etc/confluent/confluent.deploycfg | awk '{print $2}')
+if [ -n "$ipv4" -a "$ipv4" != "none" -a "$ipv4" != "null" ]; then
+    iface=$(ip a|grep ${ipv4}/|awk '{print $NF}')
+    ipwithcidr=$(ip a | grep ${ipv4}/ | awk '{print $2}')
+    cat > /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml <<EOF
+network:
+  ethernets:
+    $iface:
+EOF
+    if [ "$ipv4method" = "dhcp" ]; then
+        echo "      dhcp4: yes" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+    else
+        echo "      dhcp4: no" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+        echo "      addresses: [$ipwithcidr]" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+
+        nameservers=$(sed -n '/^nameservers:/,/^[^-]/p' /etc/confluent/confluent.deploycfg | grep ^- | cut -d ' ' -f 2 | sed -e 's/ //')
+        if [ -n "$nameservers" ]; then
+            echo "      nameservers:" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+            echo "        addresses:" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+            for nameserver in $nameservers; do
+                echo "          - $nameserver" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+            done
+        fi
+        if [ -n "$ipv4gateway" -a "$ipv4gateway" != "none" -a "$ipv4gateway" != "null" ]; then
+            cat >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml <<EOF
+        routes:
+          - to: default
+            via: $ipv4gateway
+EOF
+        fi
+    fi
+    echo "  version: 2" >> /sysroot/etc/netplan/10-${iface}-confluentcfg.yaml
+fi
 if grep installtodisk /proc/cmdline > /dev/null; then
     . /etc/confluent/functions
     run_remote installimage
