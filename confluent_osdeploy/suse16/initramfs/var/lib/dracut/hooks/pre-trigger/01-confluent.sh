@@ -168,7 +168,7 @@ fi
 cd /
 echo -n "" > /tmp/confluent.initq
 # restart cmdline
-echo -n "" > /etc/cmdline.d/01-confluent.conf
+echo -n "" >> /etc/cmdline.d/01-confluent.conf
 
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 #TODO: blkid --label <whatever> to find mounted api
@@ -258,7 +258,7 @@ if [ "$ID" = "dracut" ]; then
 fi
 ISOSRC=$(blkid -t TYPE=iso9660|grep -Ei ' LABEL="'$ID-$VERSION_ID|sed -e s/:.*//)
 if [ -z "$ISOSRC" ]; then
-    echo root=$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
+    echo root=live:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
     #echo inst.=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
     #root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
     #export root

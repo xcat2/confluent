@@ -13,5 +13,8 @@ fi
 if grep -q console=ttyS /proc/cmdline; then
 	echo "Serial console requested in kernel command line, local video may not show progress" > /dev/tty1
 fi
-mkdir -p /run/NetworkManager/initrd
+mkdir -p /run/NetworkManager/initrd /etc/cmdline.d
+if ! grep -q rd.neednet /proc/cmdline; then
+	echo rd.neednet >> /etc/cmdline.d/01-confluent.conf
+fi
 : > /run/NetworkManager/initrd/neednet
