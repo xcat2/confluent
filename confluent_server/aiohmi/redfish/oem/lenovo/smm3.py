@@ -202,10 +202,16 @@ class OEMHandler(generic.OEMHandler):
         taskurl = tsk.get('@odata.id', None)
         pct = 0 if taskurl else 100
         durl = None
+        iters = 0
         while pct < 100 and taskrunning:
+            iters += 1
             status = await self._do_web_request(taskurl)
             durl = status.get('AdditionalDataURI', '')
             pct = status.get('PercentComplete', 0)
+            if pct <= 0:
+                pct = float(iters / 1.3)
+                if pct >= 80.0:
+                    pct = 80.0
             taskrunning = status.get('TaskState', 'Complete') == 'Running'
             if progress:
                 progress({'phase': 'initializing', 'progress': float(pct)})
@@ -219,6 +225,15 @@ class OEMHandler(generic.OEMHandler):
                     entryinfo = await self._do_web_request(enturl)
                     durl = entryinfo.get('AdditionalDataURI', None)
                     break
+        tries = 0
+        while not durl and tries < 60:
+            tries += 1
+            await asyncio.sleep(3)
+            entries = await self._do_web_request('/redfish/v1/Managers/bmc/LogServices/Dump/Entries')
+            if progress:
+                progress({'phase': 'finalizing', 'progress': float(pct + tries * (100 -pct) / 60)})
+            if entries.get('Members', []):
+                durl = entries['Members'][0].get('AdditionalDataURI', None)
         if not durl:
             raise Exception("Failed getting service data url")
         fname = os.path.basename(durl)
