@@ -4,7 +4,7 @@ rm /etc/cmdline.d/10-liveroot.conf
 if ! grep -q console= /proc/cmdline; then
 	autocons=$(/opt/confluent/bin/autocons)
 	if [ -n "$autocons" ]; then
-		echo console=$autocons | sed -e 's!/dev/!!' .> /tmp/01-autocons.conf
+		echo console=$autocons | sed -e 's!/dev/!!' > /tmp/01-autocons.conf
 		autocons=${autocons%,*}
 		echo $autocons > /tmp/01-autocons.devnode
 		echo Detected text console at $(cat /tmp/01-autocons.conf) > $autocons
