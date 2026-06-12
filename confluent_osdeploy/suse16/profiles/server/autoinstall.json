@@ -50,10 +50,10 @@
         "chroot": true
       }
     ],
-    "init": {
+    "init": [{
       "name": "confluent-init.sh",
       "url": "https://%%DEPLOYER%%/confluent-public/os/%%PROFILE%%/scripts/firstboot.sh"
-    }
+    }]
   }
 }
 

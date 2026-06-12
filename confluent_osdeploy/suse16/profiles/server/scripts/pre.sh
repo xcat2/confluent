@@ -22,16 +22,16 @@ for pubkey in /etc/ssh/ssh_host_*key.pub; do
 done
 systemctl restart sshd
 python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/autoinstall.json > /tmp/autoinstall.json
-deployserver=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+deployserver=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 if [ -z "$deployserver" ] || [ "$deployserver" = "none" ] || [ "$deployserver" = "null" ]; then
-    deployserver=$(grep ^deploy_server_v6 /etc/confluent/confluent.deploycfg|awk '{print $2}')
+    deployserver=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg|awk '{print $2}')
 fi
 if [[ "$deployserver" == *":"* ]]; then
     deployserver="[$deployserver]"
 fi
-
+source /etc/confluent/functions
 run_remote_parts pre.d
-sed -i s!%%DEPLOYSERVER%%!$deployserver!g /tmp/autoinstall.json
+sed -i s!%%DEPLOYER%%!$deployserver!g /tmp/autoinstall.json
 sed -i s!%%PROFILE%%!$(grep ^profile: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
 sed -i s!%%ROOTPASSWORD%%!$(grep ^rootpassword: /etc/confluent/confluent.deploycfg|awk '{print $2}')!g /tmp/autoinstall.json
 sed -i s!%%NODENAME%%!$(hostname)!g /tmp/autoinstall.json
@@ -46,7 +46,7 @@ sed -i 's!%%TIMEZONE%%!'$tz'!g' /tmp/autoinstall.json
 sed -i 's!%%LOCALE%%!'$locale'!g' /tmp/autoinstall.json
 sed -i 's!%%KEYMAP%%!'$keymap'!g' /tmp/autoinstall.json
 if [ ! -e /tmp/installdisk ]; then
-    python3 /tmp/getinstalldisk > $serialcons 2>&1
+    python3 /tmp/getinstalldisk
 fi
 installdisk=$(cat /tmp/installdisk)
 if [ -z "$installdisk" ]; then
