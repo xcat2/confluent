@@ -1,0 +1,41 @@
+{
+  "hostname": {
+    "transient": "%%NODENAME%%",
+    "static": "%%NODENAME%%"
+  },
+  "root": {
+    "password": "%%ROOTPASSWORD%%",
+    "hashedPassword": true
+  },
+  "software": {
+    "patterns": [
+      "selinux"
+    ],
+    "packages": []
+  },
+  "product": {
+    "id": "openSUSE_Leap"
+  },
+  "storage": {
+    "drives": [
+      {
+        "search": "%%INSTALLDISK%%",
+        "partitions": [
+          {
+            "search": "*",
+            "delete": true
+          },
+          {
+            "generate": "default"
+          }
+        ]
+      }
+    ]
+  },
+  "localization": {
+    "language": "%%LOCALE%%",
+    "keyboard": "%%KEYMAP%%",
+    "timezone": "%%TIMEZONE%%"
+  }
+}
+
