@@ -260,7 +260,7 @@ ISOSRC=$(blkid -t TYPE=iso9660|grep -Ei ' LABEL="'$ID-$VERSION_ID|sed -e s/:.*//
 if [ -z "$ISOSRC" ]; then
     echo root=live:$proto://$mgr/confluent-public/os/$profilename/distribution/1/LiveOS/squashfs.img >> /etc/cmdline.d/01-confluent.conf
     echo inst.install_url=$proto://$mgr/confluent-public/os/$profilename/distribution/1 >> /etc/cmdline.d/01-confluent.conf
-    echo inst.script=$proto://$mgr/confluent-public/os/$profilename/autoinstall.sh >> /etc/cmdline.d/01-confluent.conf
+    echo -n inst.script=$proto://$mgr/confluent-public/os/$profilename/autoinstall.sh" " >> /run/agama/cmdline.d/agama.conf
     #echo inst.=$proto://$mgr/confluent-public/os/$profilename/distribution >> /etc/cmdline.d/01-confluent.conf
     #root=anaconda-net:$proto://$mgr/confluent-public/os/$profilename/distribution
     #export root
