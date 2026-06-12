@@ -36,6 +36,24 @@
     "language": "%%LOCALE%%",
     "keyboard": "%%KEYMAP%%",
     "timezone": "%%TIMEZONE%%"
+  },
+  "scripts": {
+    "post": [
+      {
+        "name": "confluent-prechroot.sh",
+        "url": "https://%%DEPLOYER%%/confluent-public/os/%%PROFILE%%/scripts/prechroot.sh",
+        "chroot": false
+      },
+      {
+        "name": "confluent-post.sh",
+        "url": "https://%%DEPLOYER%%/confluent-public/os/%%PROFILE%%/scripts/post.sh",
+        "chroot": true
+      }
+    ],
+    "init": {
+      "name": "confluent-init.sh",
+      "url": "https://%%DEPLOYER%%/confluent-public/os/%%PROFILE%%/scripts/firstboot.sh"
+    }
   }
 }
 
