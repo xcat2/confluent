@@ -241,6 +241,8 @@ if [ "$textconsole" = "true" ] && ! grep console= /proc/cmdline > /dev/null; the
             echo Auto-configuring installed system to use text console > $autocons
             /opt/confluent/bin/autocons -c > /dev/null
             cp /tmp/01-autocons.conf /etc/cmdline.d/
+	    mkdir -p /run/confluent
+	    cp /tmp/01-autocons.conf /run/confluent/
         else
             echo "Unable to automatically detect requested text console"
         fi
