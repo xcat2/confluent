@@ -41,8 +41,8 @@ for os in rhvh4 el7 genesis el8 suse15 suse16 debian debian13 ubuntu20.04 ubuntu
     else
         cp -a ../opt .
     fi
-    cp -a ../${os}/initramfs/* .
     cp -a ../common/initramfs/* .
+    cp -a ../${os}/initramfs/* .
     find . | cpio -H newc -o > ../addons.cpio
     mv ../addons.cpio .
     cd ..
@@ -57,8 +57,8 @@ for os in el7 el8 suse15 suse16 el9 el10 ubuntu20.04 ubuntu22.04 ubuntu24.04 ubu
     else
         cp -a ../opt .
     fi
-    cp -a ../${os}-diskless/initramfs/* .
     cp -a ../common/initramfs/* .
+    cp -a ../${os}-diskless/initramfs/* .
     if [ -d ../${os}bin ]; then 
         cp -a ../${os}bin/stateless-bin/* opt/confluent/bin
     else
@@ -71,8 +71,8 @@ done
 mkdir esxi7out
 cd esxi7out
 cp -a ../opt .
-cp -a ../esxi7/initramfs/* .
 cp -a ../common/initramfs/* .
+cp -a ../esxi7/initramfs/* .
 chmod +x bin/* opt/confluent/bin/*
 tar zcvf ../addons.tgz *
 mv ../addons.tgz .
