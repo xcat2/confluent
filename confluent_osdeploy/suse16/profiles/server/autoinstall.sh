@@ -21,9 +21,4 @@ chmod +x /tmp/pre.sh
 kill $tailpid
 agama config load /tmp/autoinstall.json > $serialcons 2>&1
 agama install > $serialcons 2>&1
-python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/post.sh > /tmp/post.sh 2> $serialcons
-chmod +x /tmp/post.sh
-touch /tmp/confluent-post.log
-tail -f /tmp/confluent-post.log > $serialcons 2>&1 &
-/tmp/post.sh > $serialcons 2>&1
 agama finish > $serialcons 2>&1

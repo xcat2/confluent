@@ -13,7 +13,6 @@ v6cfg=${v6cfg#ipv6_method: }
 if [ "$v6cfg" = "static" ]; then
     confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg)
     confluent_mgr=${confluent_mgr#deploy_server_v6: }
-    confluent_mgr="[$confluent_mgr]"
 else
     confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg)
     confluent_mgr=${confluent_mgr#deploy_server: }
@@ -27,13 +26,8 @@ while (! ping -c 1 $confluent_mgr >& /dev/null) && [ $(date +%s) -lt $GIVUP ]; d
 	sleep 1
 done
 
-for i in  /etc/ssh/ssh_host*key.pub; do
-    certname=${i/.pub/-cert.pub}
-    curl -f -X POST -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $(cat /etc/confluent/confluent.apikey)" -d @$i https://$confluent_mgr/confluent-api/self/sshcert > $certname
-done
-systemctl restart sshd
+export confluent_mgr
 run_remote_python confignet
-run_remote firstboot.custom
 
 # Firstboot scripts may be placed into firstboot.d, e.g. firstboot.d/01-firstaction.sh, firstboot.d/02-secondaction.sh
 run_remote_parts firstboot.d
@@ -41,4 +35,4 @@ run_remote_parts firstboot.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/firstboot.d/
 run_remote_config firstboot.d
 
-curl --capath /etc/confluent/tls -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" -f -X POST -d "status: complete" https://$confluent_mgr/confluent-api/self/updatestatus
+python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus -d 'status: complete'

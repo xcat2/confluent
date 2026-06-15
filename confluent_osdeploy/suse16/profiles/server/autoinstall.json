@@ -49,11 +49,7 @@
         "url": "https://%%DEPLOYER%%/confluent-public/os/%%PROFILE%%/scripts/post.sh",
         "chroot": true
       }
-    ],
-    "init": [{
-      "name": "confluent-init.sh",
-      "url": "https://%%DEPLOYER%%/confluent-public/os/%%PROFILE%%/scripts/firstboot.sh"
-    }]
+    ]
   }
 }
 

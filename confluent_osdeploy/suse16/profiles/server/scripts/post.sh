@@ -14,7 +14,10 @@ chmod 700 /var/log/confluent
 exec >> /var/log/confluent/confluent-post.log
 exec 2>> /var/log/confluent/confluent-post.log
 chmod 600 /var/log/confluent/confluent-post.log
-confluent_mgr=$(grep ^deploy_server /etc/confluent/confluent.deploycfg|awk '{print $2}')
+confluent_mgr=$(grep ^deploy_server: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+if [ -z "$confluent_mgr" ] || [ "$confluent_mgr" = "none" ] || [ "$confluent_mgr" = "null" ]; then
+    confluent_mgr=$(grep ^deploy_server_v6: /etc/confluent/confluent.deploycfg|awk '{print $2}')
+fi
 confluent_profile=$(grep ^profile: /etc/confluent/confluent.deploycfg|sed -e 's/^profile: //')
 nodename=$(grep ^NODENAME /etc/confluent/confluent.info|awk '{print $2}')
 confluent_apikey=$(cat /etc/confluent/confluent.apikey)
@@ -38,5 +41,23 @@ run_remote_parts post.d
 # Induce execution of remote configuration, e.g. ansible plays in ansible/post.d/
 run_remote_config post.d
 
-curl -X POST -d 'status: staged' -H "CONFLUENT_NODENAME: $nodename" -H "CONFLUENT_APIKEY: $confluent_apikey" https://$confluent_mgr/confluent-api/self/updatestatus
+# stage firstboot, agama could be used, but we can stage it here to keep impact on agama json minimal
+mkdir -p /opt/confluent/bin
+python3 /opt/confluent/bin/apiclient /confluent-public/os/$confluent_profile/scripts/firstboot.sh > /opt/confluent/bin/firstboot.sh
+cat >/etc/systemd/system/confluent-firstboot.service <<EOF
+[Unit]
+Description=First Boot Process
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/opt/confluent/bin/firstboot.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable firstboot
+systemctl enable sshd
+python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus -d 'status: staged'
 
