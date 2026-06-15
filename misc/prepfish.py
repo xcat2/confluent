@@ -103,7 +103,27 @@ def scan_nicname(nicname):
     idx = int(open('/sys/class/net/{}/ifindex'.format(nicname)).read())
     return scan_nic(idx)
 
+
+
 def scan_nic(nicidx):
+    iplinkinfo = subprocess.check_output(['ip', '-j', 'link'], stderr=subprocess.DEVNULL)
+    iplinkinfo = json.loads(iplinkinfo.decode())
+    lilkelylla = None
+    for link in iplinkinfo:
+        if link['ifindex'] == nicidx:
+            mac = link['address']
+            mac_int = int(mac.replace(':', ''), 16)
+            mac_int -= 1
+            mac_int ^= 0b10 << 40
+            machex = '{:012x}'.format(mac_int)
+            eui64 = machex[:6] + 'fffe' + machex[6:]
+            eui64 = ':'.join(eui64[i:i+4] for i in range(0, len(eui64), 4))
+            likelylla = 'fe80::{}%{}'.format(eui64, nicidx)
+            try:
+                with socket.create_connection((likelylla, 443), timeout=1):
+                    return likelylla
+            except Exception:
+                pass
     srvs = {}
     s6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
@@ -118,9 +138,16 @@ def scan_nic(nicidx):
             s6.sendto(msg, ('ff02::c', 1900))
         except Exception:
             pass
-        x = select((s6,), (), (), 3.0)
+        if likelylla:
+            try:
+                with socket.create_connection((likelylla, 443), timeout=1):
+                    return likelylla
+            except Exception:
+                pass
+        x = select((s6,), (), (), 2.0)
         tries -= 1
     if not x[0]:
+ 
         raise Exception("Unable to find XCC via SSDP on {}".format(nicidx))
     (rsp, peer) = s6.recvfrom(9000)
     if '%' in peer[0]:
@@ -245,13 +272,21 @@ def get_redfish_fingerprint():
     return fprint
 
 
+disableusb = False
+def disable_host_interface():
+    s = Session('/dev/ipmi0')
+    s.raw_command(netfn=0xc, command=1, data=(1, 0xc1, 0))
+
 def enable_host_interface():
+    global disableusb
+    loud = False
     s = Session('/dev/ipmi0')
     rsp = s.raw_command(netfn=0xc, command=2, data=(1, 0xc1, 0, 0))
     usbenabled = rsp['data'][1] == 1
-    disableusb = not usbenabled
     if not usbenabled:
+        disableusb = True
         s.raw_command(netfn=0xc, command=1, data=(1, 0xc1, 1))
+        loud = True
         sys.stderr.write("Enabling USB Interface")
     rsp = s.raw_command(netfn=0xc, command=2, data=(1, 0xc1, 0, 0))
     usbenabled = rsp['data'][1] == 1
@@ -263,11 +298,13 @@ def enable_host_interface():
     while not usbnic:
         dotwait()
         usbnic = get_nicname_from_dmi()
+    subprocess.check_call(['ip', 'link', 'set', usbnic, 'up'])
     bmctarg = scan_nicname(usbnic)
     while not bmctarg:
         dotwait()
         bmctarg = scan_nicname(usbnic)
-    sys.stderr.write("USB NIC Established\n")
+    if loud:
+        sys.stderr.write("USB NIC Established\n")
     sys.stderr.flush()
     return bmctarg
 
@@ -275,8 +312,11 @@ def store_redfish_cert(bmc):
     fprint = get_redfish_fingerprint()
     verifier = Verifier(fprint)
     peercert = None
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
     with socket.create_connection((bmc, 443)) as plainsock:
-        finsock = ssl.wrap_socket(plainsock, cert_reqs=ssl.CERT_NONE)  # to allow fprint based cert
+        finsock = context.wrap_socket(plainsock, server_hostname=bmc)
         peercert = finsock.getpeercert(binary_form=True)
         if not verifier.validate(peercert):
             raise Exception("Mismatched certificate")
@@ -289,9 +329,16 @@ def main():
     bmcuser, bmcpass = get_redfish_creds()
     bmc = enable_host_interface()
     store_redfish_cert(bmc)
-    print('Redfish user: {}'.format(bmcuser.decode()))
-    print('Redfish password: {}'.format(bmcpass.decode()))
-    print('Redfish host: https://[{}]/'.format(bmc))
+    if 'checkip' in sys.argv[0]:
+        nicinfo = subprocess.check_output(['curl', '-sku', '{0}:{1}'.format(bmcuser.decode(), bmcpass.decode()), 'https://[{}]/redfish/v1/Managers/1/EthernetInterfaces/NIC'.format(bmc)], stderr=subprocess.DEVNULL)
+        niconfo = json.loads(nicinfo.decode())
+        print(niconfo['IPv4Addresses'][0]['Address'])
+        if disableusb:
+            disable_host_interface()
+    else:
+        print('Redfish user: {}'.format(bmcuser.decode()))
+        print('Redfish password: {}'.format(bmcpass.decode()))
+        print('Redfish host: https://[{}]/'.format(bmc))
 
 
 if __name__ == '__main__':
