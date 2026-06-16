@@ -14,7 +14,7 @@
     "packages": []
   },
   "product": {
-    "id": "openSUSE_Leap"
+    "id": "%%PRODUCT%%"
   },
   "storage": {
     "drives": [

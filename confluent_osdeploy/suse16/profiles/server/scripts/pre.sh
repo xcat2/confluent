@@ -45,6 +45,13 @@ tz=${tz#timezone: }
 sed -i 's!%%TIMEZONE%%!'$tz'!g' /tmp/autoinstall.json
 sed -i 's!%%LOCALE%%!'$locale'!g' /tmp/autoinstall.json
 sed -i 's!%%KEYMAP%%!'$keymap'!g' /tmp/autoinstall.json
+osid=$(grep ^ID= /etc/os-release | sed -e 's/ID=//g' -e 's/"//g')
+if [ "$osid" = "sles" ]; then
+    sed -i 's!%%PRODUCT%%!'SLES'!g' /tmp/autoinstall.json
+else
+    sed -i 's!%%PRODUCT%%!openSUSE_Leap!g' /tmp/autoinstall.json
+fi
+
 if [ ! -e /tmp/installdisk ]; then
     python3 /tmp/getinstalldisk
 fi
