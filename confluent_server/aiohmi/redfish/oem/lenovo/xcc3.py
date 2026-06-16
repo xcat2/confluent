@@ -430,6 +430,7 @@ class OEMHandler(generic.OEMHandler):
                         'Unexpected return to volume deletion: ' + repr(msg))
         for disk in cfgspec.disks:
             await self._make_available(disk, realcfg)
+        self._urlcache.clear()
 
     def _parse_array_spec(self, arrayspec):
         controller = None
@@ -699,6 +700,13 @@ class OEMHandler(generic.OEMHandler):
                 f'/redfish/v1/Systems/1/Storage/{cid}/Volumes',
                 method='POST',
                 data=request_data)
+            if code == 500 and not stripsize:
+                    # Mystery error can be a mandatory strip size, default to 64k to match WebUI behavior
+                    request_data["StripSizeBytes"] = 65536
+                    msg, code=self.webclient.grab_json_response_with_status(
+                        f'/redfish/v1/Systems/1/Storage/{cid}/Volumes',
+                        method='POST',
+                        data=request_data)
             if code == 500:
                 raise Exception("Unexpected response to volume creation: " + repr(msg))
             await asyncio.sleep(60)
