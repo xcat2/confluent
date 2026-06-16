@@ -278,7 +278,7 @@ class NetplanManager(object):
             subprocess.call(['netplan', 'apply'])
 
     def getcfgarrpath(self, devpath):
-        currptr = self.cfgbydev if devpath[0] in self.cfgbydev else self.cfgbybond
+        currptr = self.cfgbybond if devpath[0] in self.cfgbybond else self.cfgbydev
         for k in devpath[:-1]:
             if k not in currptr:
                 currptr[k] = {}
