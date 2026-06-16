@@ -57,7 +57,8 @@ ExecStart=/opt/confluent/bin/firstboot.sh
 WantedBy=multi-user.target
 EOF
 
-systemctl enable firstboot
+chmod +x /opt/confluent/bin/firstboot.sh
+systemctl enable confluent-firstboot
 systemctl enable sshd
 python3 /opt/confluent/bin/apiclient /confluent-api/self/updatestatus -d 'status: staged'
 
