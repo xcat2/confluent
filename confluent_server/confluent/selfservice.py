@@ -7,6 +7,8 @@ import confluent.netutil as netutil
 import confluent.noderange as noderange
 import confluent.sshutil as sshutil
 import confluent.util as util
+from confluent import certutil
+import ipaddress
 import confluent.discovery.handlers.xcc as xcc
 import confluent.discovery.handlers.tsm as tsm
 import confluent.discovery.core as disco
@@ -53,6 +55,16 @@ def listdump(input):
         retval += '- ' + entry + '\n'
     return retval.encode()
 
+
+def principals_to_san(principals):
+    san = []
+    for principal in principals:
+        try:
+            ipaddress.ip_address(principal)
+            san.append('IP:' + principal)
+        except ValueError:
+            san.append('DNS:' + principal)
+    return san
 
 async def get_extra_names(nodename, cfg, myip=None, preferadjacent=False, addlocalhost=True):
     if addlocalhost:
@@ -395,6 +407,23 @@ async def handle_request(req, make_response, mimetype):
         dnsdomain = deployinfo.get('dns.domain', {}).get('value', None)
         ncfg['dnsdomain'] = dnsdomain
         return await make_response(mimetype, 200, 'OK', body=dumper(ncfg))
+    elif reqpath == '/self/tlscert' and reqbody:
+        csr = reqbody.decode('utf8')
+        pals = await get_extra_names(nodename, cfg, myip)
+        with tempfile.NamedTemporaryFile() as tmpfile:
+            tmpfile.write(csr.encode())
+            tmpfile.flush()
+            certfile = tempfile.NamedTemporaryFile(delete=False)
+            certname = certfile.name
+            certfile.close()
+            subj = '/CN={0}'.format(nodename)
+            
+            await certutil.create_certificate(None, certname, tmpfile.name, subj, principals_to_san(pals), backdate=False,
+                                        days=3650)
+            with open(certname, 'rb') as certf:
+                cert = certf.read()
+            os.unlink(certname)
+            return await make_response('application/x-pem-file', 200, 'OK', body=cert.encode())
     elif reqpath == '/self/sshcert' and reqbody:
         if not sshutil.ca_exists():
             return await make_response(mimetype, 500, 'Unconfigured', body='CA is not configured on this system (run ...)')
