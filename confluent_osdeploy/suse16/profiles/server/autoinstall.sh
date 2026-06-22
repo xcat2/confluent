@@ -19,6 +19,6 @@ python3 /opt/confluent/bin/apiclient /confluent-public/os/$profile/scripts/pre.s
 chmod +x /tmp/pre.sh
 /tmp/pre.sh > $serialcons 2>&1
 kill $tailpid
-agama config load /tmp/autoinstall.json > $serialcons 2>&1
-agama install > $serialcons 2>&1
-agama finish > $serialcons 2>&1
+agama config load /tmp/autoinstall.json <> $serialcons > $serialcons 2>&1
+agama install <> $serialcons > $serialcons 2>&1
+agama finish <> $serialcons > $serialcons 2>&1

@@ -644,7 +644,7 @@ def check_sles(isoinfo):
         elif '.2' in medianame:
             disk = '2'
     elif hline[-1].startswith('16'):
-        if hline[1] == 'openSUSE':
+        if hline[1] in ('openSUSE', 'Leap'):
             distro = 'opensuse_leap'
         else:
             distro = 'sle'
