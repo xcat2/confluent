@@ -26,16 +26,7 @@ import aiohmi.ipmi.private.session as ipmisession
 import aiohmi.ipmi.private.util as util
 from aiohmi.ipmi import sdr
 import aiohmi.util.webclient as webclient
-
-try:
-    from urllib import urlencode
-except ImportError:
-    from urllib.parse import urlencode
-
-try:
-    range = xrange
-except NameError:
-    pass
+from urllib.parse import urlencode
 
 
 psutypes = {
