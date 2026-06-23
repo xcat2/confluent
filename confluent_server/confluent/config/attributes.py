@@ -667,7 +667,7 @@ node = {
         'description': ('Fingerprint of the TLS certificate for service running on host.'),
     },
     'pubkeys.tls_lifetime': {
-        'description': ('When granting a certificate to the node or related BMC, this is the validity in days.  Default is 45 days.'),
+        'description': ('When granting a certificate to the node or related BMC, this is the validity in days.  Default is 47 days.'),
     },
     'pubkeys.ssh': {
         'description': ('Fingerprint of the SSH key of the OS running on the '

@@ -420,7 +420,9 @@ async def handle_request(req, make_response, mimetype):
             certfile.close()
             subj = '/CN={0}'.format(nodename)
             tls_lifetime = cfg.get_node_attributes(nodename, 'pubkeys.tls_lifetime')
-            tls_lifetime = tls_lifetime.get(nodename, {}).get('pubkeys.tls_lifetime', {}).get('value', 45)
+            tls_lifetime = tls_lifetime.get(nodename, {}).get('pubkeys.tls_lifetime', {}).get('value', 47)
+            if not tls_lifetime:
+                tls_lifetime = 47
             tls_lifetime = int(tls_lifetime)
             await certutil.create_certificate(None, certname, tmpfile.name, subj, principals_to_san(pals), backdate=False,
                                         days=tls_lifetime)

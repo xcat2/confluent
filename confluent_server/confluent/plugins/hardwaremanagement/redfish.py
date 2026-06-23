@@ -599,7 +599,7 @@ class IpmiHandler:
                 tls_lifetime = self.inputdata.get_days(self.node)
             except KeyError:
                 tls_lifetime = self.cfm.get_node_attributes(self.node, 'hardwaremanagement.manager_tls_lifetime')
-                tls_lifetime = tls_lifetime.get(self.node, {}).get('hardwaremanagement.manager_tls_lifetime', {}).get('value', 45)
+                tls_lifetime = tls_lifetime.get(self.node, {}).get('hardwaremanagement.manager_tls_lifetime', {}).get('value', 47)
                 tls_lifetime = int(tls_lifetime)
             with tempfile.NamedTemporaryFile() as tmpfile:
                 tmpfile.write(csr.encode())
