@@ -18,6 +18,7 @@ import hashlib
 import crypt
 import json
 import os
+import tempfile
 import time
 import yaml
 try:
@@ -57,14 +58,14 @@ def listdump(input):
 
 
 def principals_to_san(principals):
-    san = []
+    san = set([])
     for principal in principals:
         try:
             ipaddress.ip_address(principal)
-            san.append('IP:' + principal)
+            san.add('IP:' + principal)
         except ValueError:
-            san.append('DNS:' + principal)
-    return san
+            san.add('DNS:' + principal)
+    return ','.join(san)
 
 async def get_extra_names(nodename, cfg, myip=None, preferadjacent=False, addlocalhost=True):
     if addlocalhost:
@@ -409,7 +410,8 @@ async def handle_request(req, make_response, mimetype):
         return await make_response(mimetype, 200, 'OK', body=dumper(ncfg))
     elif reqpath == '/self/tlscert' and reqbody:
         csr = reqbody.decode('utf8')
-        pals = await get_extra_names(nodename, cfg, myip)
+        pals = await get_extra_names(nodename, cfg, myip, addlocalhost=False)
+        pals.add(nodename)
         with tempfile.NamedTemporaryFile() as tmpfile:
             tmpfile.write(csr.encode())
             tmpfile.flush()
@@ -417,13 +419,15 @@ async def handle_request(req, make_response, mimetype):
             certname = certfile.name
             certfile.close()
             subj = '/CN={0}'.format(nodename)
-            
+            tls_lifetime = cfg.get_node_attributes(nodename, 'pubkeys.tls_lifetime')
+            tls_lifetime = tls_lifetime.get(nodename, {}).get('pubkeys.tls_lifetime', {}).get('value', 45)
+            tls_lifetime = int(tls_lifetime)
             await certutil.create_certificate(None, certname, tmpfile.name, subj, principals_to_san(pals), backdate=False,
-                                        days=3650)
+                                        days=tls_lifetime)
             with open(certname, 'rb') as certf:
                 cert = certf.read()
             os.unlink(certname)
-            return await make_response('application/x-pem-file', 200, 'OK', body=cert.encode())
+            return await make_response('application/x-pem-file', 200, 'OK', body=cert)
     elif reqpath == '/self/sshcert' and reqbody:
         if not sshutil.ca_exists():
             return await make_response(mimetype, 500, 'Unconfigured', body='CA is not configured on this system (run ...)')

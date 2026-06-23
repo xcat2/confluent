@@ -595,6 +595,12 @@ class IpmiHandler:
         if self.element[0] == 'sign' and self.op == 'update':
             csr = await self.ipmicmd.get_bmc_csr()
             subj, san = util.get_bmc_subject_san(self.cfm, self.node, self.inputdata.get_added_names(self.node))
+            try:
+                tls_lifetime = self.inputdata.get_days(self.node)
+            except KeyError:
+                tls_lifetime = self.cfm.get_node_attributes(self.node, 'hardwaremanagement.manager_tls_lifetime')
+                tls_lifetime = tls_lifetime.get(self.node, {}).get('hardwaremanagement.manager_tls_lifetime', {}).get('value', 45)
+                tls_lifetime = int(tls_lifetime)
             with tempfile.NamedTemporaryFile() as tmpfile:
                 tmpfile.write(csr.encode())
                 tmpfile.flush()
@@ -602,7 +608,7 @@ class IpmiHandler:
                 certname = certfile.name
                 certfile.close()
                 await certutil.create_certificate(None, certname, tmpfile.name, subj, san, backdate=False,
-                                            days=self.inputdata.get_days(self.node))
+                                            days=tls_lifetime)
             with open(certname, 'rb') as certf:
                 cert = certf.read()
             os.unlink(certname)

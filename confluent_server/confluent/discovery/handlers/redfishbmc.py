@@ -327,8 +327,11 @@ class NodeHandler(generic.NodeHandler):
                 nodename, {}).get('hardwaremanagement.method', {}).get('value', 'ipmi')
         if hwmgt_method != 'redfish':
             return
+        tls_lifetime = self.configmanager.get_node_attributes(nodename, 'pubkeys.tls_lifetime')
+        tls_lifetime = tls_lifetime.get(nodename, {}).get('pubkeys.tls_lifetime', {}).get('value', 45)
+        tls_lifetime = int(tls_lifetime)
         proc = await asyncio.create_subprocess_exec(
-            '/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', '47'
+            '/opt/confluent/bin/nodecertutil', nodename, 'signbmccert', '--days', str(tls_lifetime)
         )
         await proc.wait()
 
