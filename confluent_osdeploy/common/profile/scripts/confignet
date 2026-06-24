@@ -208,7 +208,7 @@ class NetplanManager(object):
             gws.append(stgs.get('ipv4_gateway', None))
             gws.append(stgs.get('ipv6_gateway', None))
             for gwaddr in gws:
-                if gwaddr:
+                if gwaddr and gwaddr != '0.0.0.0':
                     cfgroutes = self.getcfgarrpath([devname, 'routes'])
                     for rinfo in cfgroutes:
                         if rinfo.get('via', None) == gwaddr:
