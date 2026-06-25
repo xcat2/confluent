@@ -28,6 +28,7 @@ from datetime import datetime
 import confluent.util as util
 import msgpack
 import json
+import pwd
 
 try:
     unicode
@@ -598,6 +599,28 @@ def get_input_message(path, operation, inputdata, nodes=None, multinode=False,
         raise exc.InvalidArgumentException(
             'No known input handler for request')
 
+
+def checkaccess(user, filename, pwent):
+    """Check if a user has read access to a file.
+
+    This function checks if the specified user has read access to the given
+    filename. It returns True if the user has read access, and False otherwise.
+    """
+    child = os.fork()
+    if child == 0:
+        os.setgroups(os.getgrouplist(user, pwent.pw_gid))
+        os.setgid(pwent.pw_gid)
+        os.setuid(pwent.pw_uid)
+        if os.access(filename, os.R_OK):
+            os._exit(0)
+        os._exit(1)
+    else:
+        pid, status = os.waitpid(child, 0)
+        if os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0:
+            return True
+        return False
+
+
 class InputFirmwareUpdate(ConfluentMessage):
 
     def __init__(self, path, nodes, inputdata, configmanager):
@@ -607,14 +630,36 @@ class InputFirmwareUpdate(ConfluentMessage):
         self.nodes = nodes
         self.filebynode = {}
         self._complexname = False
+        curruser = configmanager.current_user if configmanager else None
+        # for configmanager filehandles, those are already opened by client, so 
+        # no need to check server side access
+        checkedfiles = set(list(configmanager.clientfiles))
         for expanded in configmanager.expand_attrib_expression(
                 nodes, self._filename):
             node, value = expanded
             if value != self._filename:
                 self._complexname = True
             value = os.path.normpath(value)
-            if value.startswith('../'):
-                raise Exception('File transfer with ../ is not supported')
+            if value not in checkedfiles:
+                if value.startswith('../'):
+                    raise Exception('File transfer with ../ is not supported')
+                if value.startswith('/etc/confluent'):
+                    raise Exception(
+                        'File transfer with /etc/confluent is not supported')
+                if value.startswith('/var/log/confluent'):
+                    raise Exception(
+                        'File transfer with /var/log/confluent is not supported')
+                if curruser and not value.startswith('/var/lib/confluent/client_assets/'):
+                    try:
+                        pwent = pwd.getpwnam(curruser)
+                        if not checkaccess(curruser, value, pwent):
+                            errstr = '{0} is not readable by {1}, check the file and parent directory ownership and permissions'.format(
+                                value, curruser)
+                            raise Exception(errstr)
+                    except KeyError:
+                        pass # We can't check ownership for confluent users without system users, as is the case in a prominent container usage,
+                            # We must rely upon the banned paths to mitigate risk instead
+                checkedfiles.add(value)
             self.filebynode[node] = value
 
     @property
