@@ -1411,17 +1411,16 @@ async def handle_staging(pathcomponents, operation, configmanager, inputdata):
     '''
     if operation == 'create':
         if len(pathcomponents) == 1:
-                stage = Staging(inputdata['user'],str(uuid.uuid1()))
-                if stage.create_directory():
-                    if 'filename' in inputdata:
-                        data_file = stage.storage_folder + '/filename.txt'
-                        with open(data_file, 'w') as f:
-                            f.write(inputdata['filename'])     
-                    else:
-                        raise Exception('Error: Missing filename arg')
-                    push_url = stage.get_push_url()
-                    yield msg.CreatedResource(push_url)
-
+            if 'filename' not in inputdata:
+                raise Exception('Error: Missing filename parameter')
+            inputdata['filename'] = os.path.normpath(inputdata['filename'])
+            if '/' in inputdata['filename'] or '\\' in inputdata['filename']:
+                raise Exception('Error: Invalid filename parameter, must not contain path separators')
+            stage = Staging(inputdata['user'],str(uuid.uuid4()))
+            if stage.create_directory():
+                data_file = stage.storage_folder + '/filename.txt'
+                push_url = stage.get_push_url()
+                yield msg.CreatedResource(push_url)
         elif len(pathcomponents) == 3:
             stage = Staging(pathcomponents[1], pathcomponents[2])
             file = stage.get_file_name()
