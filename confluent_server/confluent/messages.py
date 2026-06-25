@@ -19,6 +19,7 @@
 # Things are defined here to 'encourage' developers to coordinate information
 # format.  This is also how different data formats are supported
 import base64
+import os
 import confluent.exceptions as exc
 import confluent.config.configmanager as cfm
 import confluent.config.conf as cfgfile
@@ -611,6 +612,9 @@ class InputFirmwareUpdate(ConfluentMessage):
             node, value = expanded
             if value != self._filename:
                 self._complexname = True
+            value = os.path.normpath(value)
+            if value.startswith('../'):
+                raise Exception('File transfer with ../ is not supported')
             self.filebynode[node] = value
 
     @property
