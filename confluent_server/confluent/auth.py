@@ -208,6 +208,8 @@ def authorize(name, element, tenant=False, operation='create',
     # even if pam does authentication.
     if operation not in ('create', 'start', 'update', 'retrieve', 'delete', None):
         return False
+    if operation != 'retrieve' and (element.startswith('/users') or element.startswith('/usergroups')):
+        return False
     user, tenant = _get_usertenant(name, tenant)
     if tenant is not None and not configmanager.is_tenant(tenant):
         return False
