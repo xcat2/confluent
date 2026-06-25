@@ -213,97 +213,101 @@ int main(int argc, char* argv[]) {
                 memset(msg, 0, 1024);
                 /* Deny packet access to the last 24 bytes to assure null */
                 recvfrom(n4, msg, 1000, 0, (struct sockaddr *)&dst4, &dst4size);
-                if  (nodenameidx = strstr(msg, "NODENAME: ")) {
+                if (strstr(msg, "HTTP/1.1 200 OK")) {
+                    if  (nodenameidx = strstr(msg, "NODENAME: ")) {
+                            nodenameidx += 10;
+                            strncpy(nodename, nodenameidx, 1024);
+                            nodenameidx = strstr(nodename, "\r");
+                            if (nodenameidx) { nodenameidx[0] = 0; }
+                            if (strncmp(lastnodename, nodename, 1024) != 0) {
+                                printf("NODENAME: %s\n", nodename);
+                                strncpy(lastnodename, nodename, 1024);
+                            }
+                    }
+                    if (nodenameidx = strstr(msg, "CURRTIME: ")) {
                         nodenameidx += 10;
                         strncpy(nodename, nodenameidx, 1024);
-                        nodenameidx = strstr(nodename, "\r");
-                        if (nodenameidx) { nodenameidx[0] = 0; }
-                        if (strncmp(lastnodename, nodename, 1024) != 0) {
-                            printf("NODENAME: %s\n", nodename);
-                            strncpy(lastnodename, nodename, 1024);
+                        if (nodenameidx = strstr(nodename, "\r")) {
+                            nodenameidx[0] = 0;
                         }
-                }
-                if (nodenameidx = strstr(msg, "CURRTIME: ")) {
-                    nodenameidx += 10;
-                    strncpy(nodename, nodenameidx, 1024);
-                    if (nodenameidx = strstr(nodename, "\r")) {
-                        nodenameidx[0] = 0;
+                        settime = strtol(nodename, NULL, 10);
                     }
-                    settime = strtol(nodename, NULL, 10);
-                }
-                if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
-                    nodenameidx += 10;
-                    strncpy(nodename, nodenameidx, 1024);
-                    if (nodenameidx = strstr(nodename, "\r")) {
-                        nodenameidx[0] = 0;
+                    if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
+                        nodenameidx += 10;
+                        strncpy(nodename, nodenameidx, 1024);
+                        if (nodenameidx = strstr(nodename, "\r")) {
+                            nodenameidx[0] = 0;
+                        }
+                        setusec = strtol(nodename, NULL, 10) * 1000;
                     }
-                    setusec = strtol(nodename, NULL, 10) * 1000;
-                }
-                memset(msg, 0, 1024);
-                inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
-                /* Take measure from printing out the same ip twice in a row */
-                if (strncmp(lastmsg, msg, 1024) != 0) {
-                    sendto(n4, "PING", 4, 0, (const struct sockaddr *)&dst4, dst4size);
-                    printf("MANAGER: %s\n", msg);
-                    strncpy(lastmsg, msg, 1024);
+                    memset(msg, 0, 1024);
+                    inet_ntop(dst4.sin_family, &dst4.sin_addr, msg, dst4size);
+                    /* Take measure from printing out the same ip twice in a row */
+                    if (strncmp(lastmsg, msg, 1024) != 0) {
+                        sendto(n4, "PING", 4, 0, (const struct sockaddr *)&dst4, dst4size);
+                        printf("MANAGER: %s\n", msg);
+                        strncpy(lastmsg, msg, 1024);
+                    }
                 }
             }
             if (FD_ISSET(ns, &rfds)) {
                 memset(msg, 0, 1024);
                 /* Deny packet access to the last 24 bytes to assure null */
                 recvfrom(ns, msg, 1000, 0, (struct sockaddr *)&dst, &dstsize);
-                if  (nodenameidx = strstr(msg, "NODENAME: ")) {
+                if (strstr(msg, "HTTP/1.1 200 OK")) {
+                    if  (nodenameidx = strstr(msg, "NODENAME: ")) {
+                            nodenameidx += 10;
+                            strncpy(nodename, nodenameidx, 1024);
+                            nodenameidx = strstr(nodename, "\r");
+                            if (nodenameidx) { nodenameidx[0] = 0; }
+                            if (strncmp(lastnodename, nodename, 1024) != 0) {
+                                printf("NODENAME: %s\n", nodename);
+                                strncpy(lastnodename, nodename, 1024);
+                            }
+                    }
+                    if (nodenameidx = strstr(msg, "CURRTIME: ")) {
                         nodenameidx += 10;
                         strncpy(nodename, nodenameidx, 1024);
-                        nodenameidx = strstr(nodename, "\r");
-                        if (nodenameidx) { nodenameidx[0] = 0; }
-                        if (strncmp(lastnodename, nodename, 1024) != 0) {
-                            printf("NODENAME: %s\n", nodename);
-                            strncpy(lastnodename, nodename, 1024);
+                        if (nodenameidx = strstr(nodename, "\r")) {
+                            nodenameidx[0] = 0;
                         }
-                }
-                if (nodenameidx = strstr(msg, "CURRTIME: ")) {
-                    nodenameidx += 10;
-                    strncpy(nodename, nodenameidx, 1024);
-                    if (nodenameidx = strstr(nodename, "\r")) {
-                        nodenameidx[0] = 0;
+                        settime = strtol(nodename, NULL, 10);
                     }
-                    settime = strtol(nodename, NULL, 10);
-                }
-                if (nodenameidx = strstr(msg, "DEFAULTNET: 1")) {
-                    isdefault = 1;
-                }
-                if (nodenameidx = strstr(msg, "MGTIFACE: ")) {
-                    nodenameidx += 10;
-                    strncpy(mgtifname, nodenameidx, 1024);
-                    if (nodenameidx = strstr(mgtifname, "\r")) {
-                        nodenameidx[0] = 0;
+                    if (nodenameidx = strstr(msg, "DEFAULTNET: 1")) {
+                        isdefault = 1;
                     }
-                }
-                if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
-                    nodenameidx += 10;
-                    strncpy(nodename, nodenameidx, 1024);
-                    if (nodenameidx = strstr(nodename, "\r")) {
-                        nodenameidx[0] = 0;
+                    if (nodenameidx = strstr(msg, "MGTIFACE: ")) {
+                        nodenameidx += 10;
+                        strncpy(mgtifname, nodenameidx, 1024);
+                        if (nodenameidx = strstr(mgtifname, "\r")) {
+                            nodenameidx[0] = 0;
+                        }
                     }
-                    setusec = strtol(nodename, NULL, 10) * 1000;
-                }
-                memset(msg, 0, 1024);
-                inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
-                if (strncmp(last6msg, msg, 1024) != 0 || lastidx != dst.sin6_scope_id) {
-		    lastidx = dst.sin6_scope_id;
-                    sendto(ns, "PING", 4, 0, (const struct sockaddr *)&dst, dstsize);
-                    printf("MANAGER: %s", msg);
-                    if (strncmp(msg, "fe80::", 6) == 0) {
-                        printf("%%%u", dst.sin6_scope_id);
+                    if (nodenameidx = strstr(msg, "CURRMSECS: ")) {
+                        nodenameidx += 10;
+                        strncpy(nodename, nodenameidx, 1024);
+                        if (nodenameidx = strstr(nodename, "\r")) {
+                            nodenameidx[0] = 0;
+                        }
+                        setusec = strtol(nodename, NULL, 10) * 1000;
                     }
-                    printf("\n");
-                    printf("EXTMGRINFO: %s", msg);
-                    if (strncmp(msg, "fe80::", 6) == 0) {
-                        printf("%%%u", dst.sin6_scope_id);
+                    memset(msg, 0, 1024);
+                    inet_ntop(dst.sin6_family, &dst.sin6_addr, msg, dstsize);
+                    if (strncmp(last6msg, msg, 1024) != 0 || lastidx != dst.sin6_scope_id) {
+                lastidx = dst.sin6_scope_id;
+                        sendto(ns, "PING", 4, 0, (const struct sockaddr *)&dst, dstsize);
+                        printf("MANAGER: %s", msg);
+                        if (strncmp(msg, "fe80::", 6) == 0) {
+                            printf("%%%u", dst.sin6_scope_id);
+                        }
+                        printf("\n");
+                        printf("EXTMGRINFO: %s", msg);
+                        if (strncmp(msg, "fe80::", 6) == 0) {
+                            printf("%%%u", dst.sin6_scope_id);
+                        }
+                        printf("|%s|%d\n", mgtifname, isdefault);
+                        strncpy(last6msg, msg, 1024);
                     }
-                    printf("|%s|%d\n", mgtifname, isdefault);
-                    strncpy(last6msg, msg, 1024);
                 }
             }
         }
