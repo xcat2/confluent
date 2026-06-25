@@ -333,6 +333,11 @@ class PmxApiClient:
         host, guest = await self.get_vm(vm)
         if bootdev not in ('net', 'network', 'default'):
             raise Exception('Requested boot device not supported')
+        currcfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/config')
+        detectednetdevs = []
+        for dev in currcfg.get('data', {}):
+            if dev.startswith('net'):
+                detectednetdevs.append(dev)
         cfg = await self.wc.grab_json_response(f'/api2/json/nodes/{host}/{guest}/pending')
         nonnetdevs = []
         netdevs = []
@@ -347,6 +352,8 @@ class PmxApiClient:
                                 netdevs.append(cbootdev)
                             else:
                                 nonnetdevs.append(cbootdev)
+                if not netdevs:
+                    netdevs = detectednetdevs
                 if bootdev in ('net', 'network'):
                     newbootdevs = netdevs + nonnetdevs
                 else:
