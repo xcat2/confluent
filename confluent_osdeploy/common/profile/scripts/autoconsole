@@ -10,11 +10,13 @@
 #   serial port is not reporting DCD, then it doesn't look like a comfortable enough scenario
 
 import fcntl
+import glob
 import os
 import os.path
 import struct
 import subprocess
 import termios
+import platform
 
 
 addrtoname = {
@@ -74,9 +76,8 @@ def fixup_ubuntu_grub_serial():
             grubout.write(grubline + '\n')
     subprocess.check_call(['update-grub'])
 
-def get_serial_config():
-    if not os.path.exists('/sys/firmware/efi'):
-        return None
+
+def get_spcr_config():
     if not os.path.exists('/sys/firmware/acpi/tables/SPCR'):
         return None
     spcr = open("/sys/firmware/acpi/tables/SPCR", "rb")
@@ -99,14 +100,39 @@ def get_serial_config():
         currattr = termios.tcgetattr(ttyf)
         currattr[4:6] = [0, termiobaud[retval['speed']]]
         termios.tcsetattr(ttyf, termios.TCSANOW, currattr)
-    retval['connected'] = bool(struct.unpack('<I', fcntl.ioctl(
-        ttyf, termios.TIOCMGET, '\x00\x00\x00\x00'))[0] & termios.TIOCM_CAR)
-    os.close(ttyf)
     return retval
+
+def get_serial_config():
+    if platform.machine() != 'x86_64':
+        return None  # Trust non-x86 to do the right thing
+    if not os.path.exists('/sys/firmware/efi'):
+        return None  # BIOS might fail at grub output, defer to stock OS behavior
+    retval = get_spcr_config()
+    if retval:
+        return retval
+    firstfound = None
+    numpossible = 0
+    numconnected = 0
+    for serdev in glob.glob('/dev/ttyS*'):
+        ttyf = os.open(serdev, os.O_RDWR | os.O_NOCTTY)
+        try:
+            statusreg = fcntl.ioctl(ttyf, termios.TIOCMGET, '\x00\x00\x00\x00')
+            numpossible += 1
+            if not firstfound:
+                firstfound = serdev
+        except Exception:
+            continue
+        finally:
+            os.close(ttyf)
+        if struct.unpack('<I', statusreg)[0] & termios.TIOCM_CAR:
+            numconnected += 1
+            firstfound = serdev
+    if numpossible == 1 or numconnected == 1: 
+        return { 'tty': firstfound, 'speed': 115200 }
 
 def main():
     autoconscfg = get_serial_config()
-    if not autoconscfg or not autoconscfg['connected']:
+    if not autoconscfg:
         return
     if os.path.exists('/etc/redhat-release'):  # redhat family
         deserialize_grub_rh()
