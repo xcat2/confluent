@@ -110,14 +110,22 @@ else
     for nic in $(ip link | grep mtu|grep -v LOOPBACK|cut -d: -f 2|sed -e 's/ //'); do
         ip link set $nic up
     done
-    for nic in $(ip link | grep mtu|grep -v LOOPBACK|grep LOWER_UP|cut -d: -f 2|sed -e 's/ //'); do
-        if udhcpc -i $nic -p $dhcpid -t 2 -T 2 -n -x 93:0007 -x 97:00$dhuuid -q; then
-            /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
-            if grep ^MANAGER:.*\\. /etc/confluent/confluent.info ; then
-                break
+    nic=
+    while [ -z "$nic" ]; do
+        for nic in $(ip link | grep mtu|grep -v LOOPBACK|grep LOWER_UP|cut -d: -f 2|sed -e 's/ //'); do
+            if udhcpc -i $nic -p $dhcpid -t 2 -T 2 -n -x 93:0007 -x 97:00$dhuuid -q; then
+                /opt/confluent/bin/copernicus > /etc/confluent/confluent.info
+                if grep ^MANAGER:.*\\. /etc/confluent/confluent.info ; then
+                    break
+                fi
             fi
+            ip -4 address flush dev $nic
+            nic=""
+        done
+        if [ -z "$nic" ]; then
+            echo "No network interface could be detected, retrying...."
+            sleep 2
         fi
-        ip -4 flush dev $nic
     done
     mgr=$(grep ^MANAGER:.*\\. /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|sed -e 's/ //')
     nodename=$(grep ^NODENAME: /etc/confluent/confluent.info|head -n 1|cut -d: -f 2|sed -e 's/ //')
