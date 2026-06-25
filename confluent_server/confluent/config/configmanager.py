@@ -1420,6 +1420,9 @@ class ConfigManager(object):
             self.wait_for_sync()
 
     def add_client_file(self, clientfile):
+        filename = os.path.normpath(clientfile.filename)
+        if filename.startswith('../') or filename.startswith('..\\'):
+            raise ValueError("Invalid filename: {0}".format(clientfile.filename))
         self.clientfiles[clientfile.filename] = clientfile.fileobject
 
     def close_client_files(self):
