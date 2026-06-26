@@ -449,7 +449,7 @@ async def create_certificate(keyout=None, certout=None, csrfile=None, subj=None,
         os.remove(extconfig)
 
 
-if __name__ == '__main__':
+async def main():
     import sys
     import ipaddress
     outdir = os.getcwd()
@@ -480,8 +480,17 @@ if __name__ == '__main__':
             san = ','.join(sans) if sans else None
         except ValueError:
             pass
+    days = 3650
+    if '-d' in sys.argv:
+        dindex = sys.argv.index('-d')
+        days = int(sys.argv.pop(dindex + 1))  # Remove days argument
+        sys.argv.pop(dindex)      # Remove -d flag
     try:
         csrout = sys.argv[1]
     except IndexError:
         csrout = None
-    create_certificate(keyout, certout, csrout, subj, san, backdate=False, days=3650)
+    await create_certificate(keyout, certout, csrout, subj, san, backdate=False, days=days)
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
