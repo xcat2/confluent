@@ -1,0 +1,35 @@
+confluent2ansible(8) -- Export confluent node inventory to an Ansible hosts file
+================================================================================
+
+## SYNOPSIS
+
+`confluent2ansible <noderange> -o <ansible.hosts>` [`-a`]
+
+## DESCRIPTION
+
+`confluent2ansible` reads the nodes matched by `<noderange>` from confluent and
+writes a corresponding Ansible inventory (hosts) file, allowing an existing
+confluent inventory to be used directly by Ansible.
+
+## OPTIONS
+
+* `-o FILE`, `--output=FILE`:
+    Write the Ansible hosts file to FILE.
+
+* `-a`, `--append`:
+    Append to an existing hosts file rather than overwriting it.
+
+* `-h`, `--help`:
+  Show help message and exit
+
+## EXAMPLES
+
+* Write an Ansible hosts file for the compute group:
+    `# confluent2ansible compute -o /etc/ansible/hosts`
+
+* Append a rack to an existing hosts file:
+    `# confluent2ansible rack3 -o /etc/ansible/hosts -a`
+
+## SEE ALSO
+
+confluent2xcat(8), confluent2lxca(8), nodelist(8)

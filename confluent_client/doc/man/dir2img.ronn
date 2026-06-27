@@ -1,0 +1,41 @@
+dir2img(8) -- Create a disk image from a directory for nodemedia upload
+=======================================================================
+
+## SYNOPSIS
+
+`dir2img` [`-e <extra_mb>`] [`-s <total_mb>`] `<directory> <imagefile>` [`<label>`]
+
+## DESCRIPTION
+
+`dir2img` packages the contents of `<directory>` into a FAT-formatted "big
+floppy" disk image written to `<imagefile>`. The resulting image is suitable
+for upload with nodemedia(8) so that its files are presented to a node as
+removable media. An optional volume `<label>` may be supplied.
+
+By default the image is sized to fit the directory contents. The `-e` and `-s`
+options allow reserving additional free space.
+
+This command relies on `mtools` (specifically `mformat` and `mcopy`) being
+installed.
+
+## OPTIONS
+
+* `-e EXTRA_MB`:
+    Reserve EXTRA_MB megabytes of free space in the image in addition to the
+    space required for the directory contents.
+
+* `-s TOTAL_MB`:
+    Make the image TOTAL_MB megabytes in total, rather than sizing it to the
+    directory contents.
+
+## EXAMPLES
+
+* Create an image from a directory:
+    `# dir2img /var/tmp/drivers drivers.img`
+
+* Create a 64 MB labelled image:
+    `# dir2img -s 64 /var/tmp/drivers drivers.img DRIVERS`
+
+## SEE ALSO
+
+nodemedia(8)
