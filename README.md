@@ -16,7 +16,7 @@ Confluent documentation is hosted on: https://xcat2.github.io/confluent-docs/
 
 # Download
 
-Get the latest version from: https://hpc.lenovo.com/users/downloads/
+Get the latest version from: https://xcat2.github.io/confluent-docs/downloads/
 
 Check release notes on: https://xcat2.github.io/confluent-docs/release_notes/
 
