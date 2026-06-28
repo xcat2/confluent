@@ -5,11 +5,10 @@
 Confluent is a software package to handle essential bootstrap and operation of scale-out server configurations.
 It supports stateful and stateless deployments for various operating systems.
 
-Check [this page](https://hpc.lenovo.com/users/documentation/whatisconfluent.html
-) for a more detailed list of features.
+Check [this page](https://xcat2.github.io/confluent-docs/) for a more detailed list of features.
 
 Confluent is the modern successor of [xCAT](https://github.com/xcat2/xcat-core).
-If you're coming from xCAT, check out [this comparison](https://hpc.lenovo.com/users/documentation/confluentvxcat.html).
+If you're coming from xCAT, check out [this comparison](https://xcat2.github.io/confluent-docs/miscellaneous/confluentvxcat/).
 
 # Documentation
 
@@ -19,7 +18,7 @@ Confluent documentation is hosted on: https://xcat2.github.io/confluent-docs/
 
 Get the latest version from: https://hpc.lenovo.com/users/downloads/
 
-Check release notes on: https://hpc.lenovo.com/users/news/
+Check release notes on: https://xcat2.github.io/confluent-docs/release_notes/
 
 # Open Source License
 
