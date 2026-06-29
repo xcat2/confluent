@@ -1,0 +1,50 @@
+nodecertutil(8) -- Manage BMC CA certificates and sign BMC certificates
+=======================================================================
+
+## SYNOPSIS
+
+`nodecertutil <noderange> <command>` [<args>]
+
+## DESCRIPTION
+
+`nodecertutil` manages the certificate authority (CA) certificates trusted by
+the baseboard management controllers (BMCs) of the nodes matched by
+`<noderange>`, and can sign a BMC certificate. One of the subcommands below
+must be supplied.
+
+## COMMANDS
+
+* `installbmccacert <filename>`:
+    Install the CA certificate contained in `<filename>` onto the BMCs.
+
+* `removebmccacert <id>`:
+    Remove the CA certificate identified by `<id>` from the BMCs. Use
+    `listbmccacerts` to discover the identifiers.
+
+* `listbmccacerts`:
+    List the CA certificates currently installed on the BMCs.
+
+* `signbmccert` [`--days <days>`] [`--added-names <names>`]:
+    Sign a BMC certificate. `--days` is required and sets the number of days
+    the certificate is valid for; `--added-names` adds additional subject
+    alternative names to the certificate.
+
+## OPTIONS
+
+* `-h`, `--help`:
+  Show help message and exit
+
+## EXAMPLES
+
+* List the CA certificates installed on a node's BMC:
+    `# nodecertutil n1 listbmccacerts`
+
+* Install a CA certificate on a range of nodes:
+    `# nodecertutil n1-n4 installbmccacert /etc/confluent/myca.pem`
+
+* Sign a BMC certificate valid for one year:
+    `# nodecertutil n1 signbmccert --days 365`
+
+## SEE ALSO
+
+nodeconfig(8), nodeattrib(8)

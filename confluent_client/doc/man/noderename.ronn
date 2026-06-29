@@ -1,0 +1,34 @@
+noderename(8) -- Rename nodes in the confluent management service
+=================================================================
+
+## SYNOPSIS
+
+`noderename <noderange> <newname>`
+
+## DESCRIPTION
+
+`noderename` changes the name of the node or nodes matched by the given
+noderange to `<newname>`. As with other attribute changes, the rename is
+applied through the confluent datastore and does not by itself alter the
+operating system hostname of a running node.
+
+When renaming more than one node, `<newname>` is normally an expression so that
+each matched node receives a distinct name (see noderange(5) and the attribute
+expression syntax).
+
+## OPTIONS
+
+* `-h`, `--help`:
+  Show help message and exit
+
+## EXAMPLES
+
+* Rename a single node:
+    `# noderename n1 n2`
+
+* Rename a range of nodes using an expression:
+    `# noderename n1-n4 'compute{n1}'`
+
+## SEE ALSO
+
+nodedefine(8), noderemove(8), nodeattrib(8), noderange(5)

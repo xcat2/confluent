@@ -1,0 +1,27 @@
+nodegrouprename(8) -- Rename a node group in the confluent management service
+=============================================================================
+
+## SYNOPSIS
+
+`nodegrouprename <group> <newname>`
+
+## DESCRIPTION
+
+`nodegrouprename` changes the name of an existing node group from `<group>` to
+`<newname>`. Group membership and the attributes defined on the group are
+preserved under the new name.
+
+## OPTIONS
+
+* `-h`, `--help`:
+  Show help message and exit
+
+## EXAMPLES
+
+* Rename a group:
+    `# nodegrouprename compute computenodes`
+    `compute: computenodes`
+
+## SEE ALSO
+
+nodegroupdefine(8), nodegroupremove(8), nodegroupattrib(8), nodegrouplist(8)

@@ -1,0 +1,30 @@
+confluent2lxca(8) -- Export confluent nodes to a Lenovo XClarity Administrator bulk import file
+==============================================================================================
+
+## SYNOPSIS
+
+`confluent2lxca <noderange> -o <bulkimport.csv>`
+
+## DESCRIPTION
+
+`confluent2lxca` reads the nodes matched by `<noderange>` from confluent and
+writes a CSV file suitable for bulk import into Lenovo XClarity Administrator
+(LXCA), so that hardware already known to confluent can be brought under LXCA
+management.
+
+## OPTIONS
+
+* `-o FILE`, `--output=FILE`:
+    Write the XClarity Administrator bulk import CSV to FILE.
+
+* `-h`, `--help`:
+  Show help message and exit
+
+## EXAMPLES
+
+* Generate a bulk import file for all nodes:
+    `# confluent2lxca everything -o bulkimport.csv`
+
+## SEE ALSO
+
+confluent2xcat(8), confluent2ansible(8), nodelist(8)

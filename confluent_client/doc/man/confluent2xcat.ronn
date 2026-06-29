@@ -1,0 +1,36 @@
+confluent2xcat(8) -- Export confluent nodes to an xCAT stanza definition
+========================================================================
+
+## SYNOPSIS
+
+`confluent2xcat <noderange> -o <xcatnodes.def>` [`-m <macs.csv>`]
+
+## DESCRIPTION
+
+`confluent2xcat` reads the nodes matched by `<noderange>` from confluent and
+writes an xCAT object definition stanza file, easing interoperation with or
+migration to/from an xCAT environment. Optionally it can also write an xCAT
+`macs.csv` file capturing the MAC addresses of the nodes.
+
+## OPTIONS
+
+* `-o FILE`, `--output=FILE`:
+    Write the xCAT stanza definition to FILE.
+
+* `-m FILE`, `--macs=FILE`:
+    Write an xCAT macs.csv file to FILE.
+
+* `-h`, `--help`:
+  Show help message and exit
+
+## EXAMPLES
+
+* Export all nodes to an xCAT stanza file:
+    `# confluent2xcat everything -o xcatnodes.def`
+
+* Also capture MAC addresses:
+    `# confluent2xcat everything -o xcatnodes.def -m macs.csv`
+
+## SEE ALSO
+
+confluent2ansible(8), confluent2lxca(8), nodelist(8)
