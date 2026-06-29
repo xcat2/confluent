@@ -472,11 +472,13 @@ async def main():
             sindex = sys.argv.index('-s')
             subj = sys.argv.pop(sindex + 1)  # Remove subject argument
             sys.argv.pop(sindex)      # Remove -s flag
-            try:
-                ipaddress.ip_address(subj)
-                sans.add('IP:{0}'.format(subj))
-            except ValueError:
-                sans.add('DNS:{0}'.format(subj))
+            subjs = subj.split(',')
+            for subj in subjs:
+                try:
+                    ipaddress.ip_address(subj)
+                    sans.add('IP:{0}'.format(subj))
+                except ValueError:
+                    sans.add('DNS:{0}'.format(subj))
             san = ','.join(sans) if sans else None
         except ValueError:
             pass
@@ -489,6 +491,11 @@ async def main():
         csrout = sys.argv[1]
     except IndexError:
         csrout = None
+    if '-r' in sys.argv:
+        rindex = sys.argv.index('-r')
+        csrout = sys.argv.pop(rindex + 1)  # Remove csrout argument
+        sys.argv.pop(rindex)      # Remove -r flag
+        keyout = None
     await create_certificate(keyout, certout, csrout, subj, san, backdate=False, days=days)
 
 if __name__ == '__main__':
