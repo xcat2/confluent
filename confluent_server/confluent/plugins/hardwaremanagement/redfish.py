@@ -230,12 +230,35 @@ def get_conn_params(node, configdata):
     else:
         bmc = node
     bmc = bmc.split('/', 1)[0]
-    # TODO(jbjohnso): check if the end has some number after a : without []
-    # for non default port
+    # NOTE (tselle/gosforthcross): Set default port and try to get port via ':' split notation if available, handles IPv6 and IPv4, does not handle malformed IPs well,
+    # but does strip whitespace for possible problems with whitespace in IPs.
+    bmc = bmc.strip()
+    port = 443
+    if bmc.startswith('['):
+        bracket_end = bmc.find(']')
+        if bracket_end > 0:
+            if len(bmc) > bracket_end + 1 and bmc[bracket_end + 1] == ':':
+                try:
+                    port = int(bmc[bracket_end + 2:])
+                except (ValueError, TypeError):
+                    pass
+            bmc = bmc[:bracket_end + 1]
+    elif bmc.count(':') == 1:
+        hostpart, _, portstr = bmc.rpartition(':')
+        try:
+            port = int(portstr)
+        except (ValueError, TypeError):
+            pass
+        bmc = hostpart
+    if not 0 < port <= 65535:
+        # NOTE: Fallback to 443 if port read is not valid
+        port = 443
+
     return {
         'username': username,
         'passphrase': passphrase,
         'bmc': bmc,
+        'port': port,
     }
 
 
@@ -384,7 +407,8 @@ class IpmiHandler:
                 persistent_ipmicmds[(node, tenant)] = await IpmiCommandWrapper.create(
                     node, cfg, bmc=connparams['bmc'],
                     userid=connparams['username'],
-                    password=connparams['passphrase'])
+                    password=connparams['passphrase'],
+                    port=connparams['port'])
                 self.loggedin = True
                 self.ipmicmd = persistent_ipmicmds[(node, tenant)]
             except socket.gaierror as ge:

@@ -16,12 +16,14 @@ import aiohmi.redfish.oem.dell.main as dell
 import aiohmi.redfish.oem.generic as generic
 import aiohmi.redfish.oem.lenovo.main as lenovo
 import aiohmi.redfish.oem.ami.main as ami
+import aiohmi.redfish.oem.megware.main as megware
 
 OEMMAP = {
     'Lenovo': lenovo,
     'Dell': dell,
     'AMI': ami,
     'Ami': ami,
+    'Megware': megware,
 }
 
 

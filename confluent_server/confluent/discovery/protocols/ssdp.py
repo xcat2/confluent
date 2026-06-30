@@ -119,6 +119,9 @@ def _process_snoop(peer, rsp, mac, known_peers, newmacs, peerbymacaddress, byeha
                 elif value.endswith('/DeviceDescription.json'):
                     targurl = '/DeviceDescription.json'
                     targtype = 'lenovo-xcc'
+                elif value.endswith('/redfish/v1/'):
+                    targurl = '/redfish/v1/'
+                    targtype = 'redfish-server'
                 else:
                     return
         if handler:
@@ -527,12 +530,26 @@ async def check_fish(urldata, port=443, verifycallback=None):
                 data['services'] = ['lenovo-smm3']
                 data['attributes'] = peerinfo
                 return data
+            # NOTE: Fallback for generic redfish services without DeviceDescription.json or other explicit identifier
+            try:
+                peerinfo = await wc.grab_json_response('/redfish/v1/')
+                if peerinfo and 'UUID' in peerinfo:
+                    data['services'] = [targtype]
+                    data['uuid'] = peerinfo['UUID'].lower()
+                    return data
+            except Exception:
+                pass
             return None
             url = '/redfish/v1/'
             peerinfo = await wc.grab_json_response('/redfish/v1/')
     if url == '/redfish/v1/':
         if 'UUID' in peerinfo:
-            data['services'] = [targtype]
+            vendor = peerinfo.get('Vendor', '')
+            # NOTE: Specific path for EUREKA MEGWARE Chassis
+            if vendor == 'Megware':
+                data['services'] = ['megware-chassis']
+            else:
+                data['services'] = [targtype]
             data['uuid'] = peerinfo['UUID'].lower()
             return data
     return None
