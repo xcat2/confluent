@@ -230,12 +230,20 @@ def get_conn_params(node, configdata):
     else:
         bmc = node
     bmc = bmc.split('/', 1)[0]
-    # TODO(jbjohnso): check if the end has some number after a : without []
-    # for non default port
+    # NOTE: Set default port and try to get port via ':' split notation if available
+    port = 443
+    if ':' in bmc and not bmc.startswith('['):
+        hostpart, _, portstr = bmc.rpartition(':')
+        try:
+            port = int(portstr)
+            bmc = hostpart
+        except (ValueError, TypeError):
+            pass
     return {
         'username': username,
         'passphrase': passphrase,
         'bmc': bmc,
+        'port': port,
     }
 
 
@@ -384,7 +392,8 @@ class IpmiHandler:
                 persistent_ipmicmds[(node, tenant)] = await IpmiCommandWrapper.create(
                     node, cfg, bmc=connparams['bmc'],
                     userid=connparams['username'],
-                    password=connparams['passphrase'])
+                    password=connparams['passphrase'],
+                    port=connparams['port'])
                 self.loggedin = True
                 self.ipmicmd = persistent_ipmicmds[(node, tenant)]
             except socket.gaierror as ge:
