@@ -230,15 +230,30 @@ def get_conn_params(node, configdata):
     else:
         bmc = node
     bmc = bmc.split('/', 1)[0]
-    # NOTE: Set default port and try to get port via ':' split notation if available
+    # NOTE (tselle/gosforthcross): Set default port and try to get port via ':' split notation if available, handles IPv6 and IPv4, does not handle malformed IPs well,
+    # but does strip whitespace for possible problems with whitespace in IPs.
+    bmc = bmc.strip()
     port = 443
-    if ':' in bmc and not bmc.startswith('['):
+    if bmc.startswith('['):
+        bracket_end = bmc.find(']')
+        if bracket_end > 0:
+            if len(bmc) > bracket_end + 1 and bmc[bracket_end + 1] == ':':
+                try:
+                    port = int(bmc[bracket_end + 2:])
+                except (ValueError, TypeError):
+                    pass
+            bmc = bmc[:bracket_end + 1]
+    elif bmc.count(':') == 1:
         hostpart, _, portstr = bmc.rpartition(':')
         try:
             port = int(portstr)
-            bmc = hostpart
         except (ValueError, TypeError):
             pass
+        bmc = hostpart
+    if not 0 < port <= 65535:
+        # NOTE: Fallback to 443 if port read is not valid
+        port = 443
+
     return {
         'username': username,
         'passphrase': passphrase,
