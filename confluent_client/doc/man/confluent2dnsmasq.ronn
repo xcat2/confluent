@@ -1,0 +1,243 @@
+confluent2dnsmasq(8) -- Generate dnsmasq static DHCP reservations for nodes
+===============================================================================
+
+## SYNOPSIS
+
+`confluent2dnsmasq [options] <noderange>`  
+`confluent2dnsmasq <noderange>`  
+`confluent2dnsmasq --all-options <noderange>`  
+`confluent2dnsmasq -n <noderange>`  
+
+## DESCRIPTION
+
+`confluent2dnsmasq` generates a dnsmasq configuration fragment of static
+DHCP reservations for a noderange, using the confluent database as the source
+of truth.  Each `net.<network>.<attribute>` group is pulled together and one
+`dhcp-host=` reservation is emitted for **every network that has a hardware
+address** (`net.hwaddr`, `net.bmc.hwaddr`, `net.eth.mynetwork.hwaddr`, and so
+on; the network component may itself contain several dotted parts).  Networks
+without a `hwaddr` (for example InfiniBand interfaces identified only by a
+GUID) are skipped.
+
+For each reservation, `net.<network>.ipv4_address` supplies the reserved
+address.  The `/prefixlen` suffix on that address is used to compute the
+enclosing subnet; if the address carries no `/prefixlen`, the prefix length is
+filled in from the matching directly-attached route in the host's routing
+table.  One `dhcp-range=<network>,static,<netmask>,<lease>` line is emitted per
+distinct subnet.  dnsmasq will not answer DHCP requests on a subnet that has no
+covering `dhcp-range`, even when every address on it is statically reserved, so
+these ranges are emitted by default (see `--no-range`).  An address that has
+neither an explicit prefix nor a matching local route still yields a
+`dhcp-host` reservation, but no subnet or `dhcp-range` is derived for it and a
+warning is printed.
+
+The reservation name is the first token of `net.<network>.hostname`, falling
+back to the node name itself for the primary (unnamed) network, and omitted for
+a named network that has no hostname.  Only IPv4 node addresses are used for
+reservations and ranges.
+
+By default the fragment begins with a `bind-dynamic` directive so that dnsmasq
+can bind DHCP to networks confluent is using, too (see `--no-bind-dynamic`).
+
+Also by default, a `listen-address` line is emitted for `127.0.0.1`, for
+`::1`, and for this host's own address on each managed subnet (see 
+`--no-listen-address`).  The per-subnet addresses are read from the routing
+table of the host the command runs on, so run it on the dnsmasq host; only
+subnets the host is directly attached to are added.  Besides telling dnsmasq
+where to listen, the presence of any `listen-address` line disables the default
+`local-service` (or `local-service=host`) restriction in `dnsmasq.conf` that
+would otherwise limit dnsmasq to localhost.
+
+Additional data can optionally be added to the DHCP reply from the confluent
+database (see OPTIONS; all are off by default).  Each such option is scoped to
+the subnet it belongs to using a dnsmasq tag: the `dhcp-host` lines for that
+subnet are given a `set:<tag>` and the corresponding `dhcp-option` lines a
+matching `tag:<tag>`.  Values are aggregated per subnet; if two nodes on the
+same subnet disagree (for example two different gateways), a warning is printed
+and the first value is used.
+
+The configuration is written to `/etc/dnsmasq.d/confluent-dhcp.conf` (override
+with `--target`) and regenerated on each run, replacing the file atomically.
+If the existing file was generated with different content-affecting arguments
+(the preview and confirmation flags `-n` and `-y` are ignored for this
+comparison), you are asked to confirm before it is overwritten; the prompt is
+skipped with `-y` and is refused when there is no controlling terminal.  If a
+run produces no reservations at all (for example an empty noderange or a failed
+read), `confluent2dnsmasq` refuses to overwrite the existing file unless
+`--allow-empty` is given.
+
+## OPTIONS
+
+* `--target PATH`:
+  Path of the configuration file to write.  Defaults to
+  `/etc/dnsmasq.d/confluent-dhcp.conf`.
+
+* `--tag-prefix PREFIX`:
+  Prefix used when generating dnsmasq tag names for per-subnet options.
+  Defaults to `cdhcp`, yielding tags such as `cdhcp_10_28_104_0_21`.
+
+* `--no-bind-dynamic`:
+  Do not emit the `bind-dynamic` line.  It is emitted by default. Note that
+  `bind-dynamic` is a global dnsmasq directive and must not be combined with
+  a `bind-interfaces` directive set elsewhere. Without it, dnsmasq may conflict
+  with confluent's own DHCP unless `bind-dynamic` is set elsewhere in the
+  dnsmasq configuration; a warning is printed.
+
+* `--no-listen-address`:
+  Do not autodetect or emit `listen-address` lines.  By default a
+  `listen-address` line is emitted for `127.0.0.1`, for `::1`, and for this
+  host's address on each managed subnet.  With this flag you must set
+  `interface`, `except-interface`, or `listen-address` yourself (or disable
+  `local-service`/`local-service=host` in `dnsmasq.conf`) for dnsmasq to serve
+  the cluster networks alongside confluent; a warning is printed as a reminder.
+
+* `--no-range`:
+  Do not emit `dhcp-range` lines, leaving range and subnet declarations to be
+  managed elsewhere.  Remember that dnsmasq will not serve DHCP on a subnet
+  that has no covering `dhcp-range`.  Per-subnet options are still scoped via
+  host tags, so they keep working with a range you declare yourself.
+
+* `--lease TIME`:
+  Lease time applied to the emitted `dhcp-range` lines.  Defaults to `24h`.
+  Accepts any dnsmasq lease syntax (for example `1h`, `24h`, `infinite`).
+  Pass an empty string to omit the lease field entirely.
+
+* `-n`, `--stdout`:
+  Write the configuration to standard output instead of the target file, which
+  is left untouched.  Useful for previewing.
+
+* `-y`, `--yes`:
+  Do not prompt for confirmation when the existing configuration was generated
+  with different settings; regenerate anyway.  Without it a settings change is
+  confirmed interactively, and refused when there is no controlling terminal.
+
+* `--allow-empty`:
+  Write the file even when no reservations were produced.  By default an empty
+  result does not overwrite the existing file, to avoid discarding a good
+  configuration after an empty or failed read.
+
+* `--all-options`:
+  Enable all of the optional reply-data options below at once.
+
+* `--gateway`, `--router`:
+  Add a router (DHCP option 3) per subnet, taken from
+  `net.<network>.ipv4_gateway`.
+
+* `--dns`:
+  Add DNS servers (DHCP option 6) per subnet, taken from `dns.servers`.
+
+* `--domain`:
+  Add a domain name (DHCP option 15) per subnet, taken from `dns.domain`.
+
+* `--ntp`:
+  Add NTP servers (DHCP option 42) per subnet, taken from `ntp.servers`.
+
+* `--mtu`:
+  Add an interface MTU (DHCP option 26) per subnet, taken from
+  `net.<network>.mtu`.
+
+* `-h`, `--help`:
+  Show a help message and exit.
+
+## EXAMPLES
+
+* Generate reservations for a noderange and write the default file:
+  `# confluent2dnsmasq everything`  
+
+* Preview the configuration for one node without writing anything:
+  `# confluent2dnsmasq -n node01`  
+
+* Include all optional reply data (gateway, DNS, domain, NTP, MTU):
+  `# confluent2dnsmasq --all-options everything`  
+
+* Include only the gateway, and use an eight hour lease:
+  `# confluent2dnsmasq --gateway --lease 8h everything`  
+
+* Regenerate non-interactively (for example from cron) after changing options, without the confirmation prompt:
+  `# confluent2dnsmasq --all-options -y everything`  
+
+* Emit only reservations (no ranges) to a custom file kept beside your own range and listen interface definitions:
+  `# confluent2dnsmasq --no-listen-address --no-range --target /etc/dnsmasq.d/confluent-reservations.conf everything`  
+
+## GENERATED CONFIGURATION
+
+Given the following confluent attributes for node `node01`:
+
+    node01: net.hwaddr: 10:ff:e0:af:af:f5
+    node01: net.ipv4_address: 10.28.90.1/21
+    node01: net.ipv4_gateway: 10.28.88.1
+    node01: net.bmc.hwaddr: 10:ff:e0:a4:cf:b6
+    node01: net.bmc.hostname: node01-bmc
+    node01: net.bmc.ipv4_address: 10.28.106.1/21
+    node01: net.bmc.ipv4_gateway: 10.28.104.1
+    node01: net.ib0.hostname: node01-ib0
+    node01: net.ib0.ipv4_address: 10.28.101.1/21
+
+`confluent2dnsmasq node01`, run on a dnsmasq host whose own addresses on the
+two managed subnets are `10.28.88.250` and `10.28.104.250`, writes the file
+below.  The `ib0` network is skipped because it has no `hwaddr`; the two
+remaining networks each yield a subnet (with its `dhcp-range`) and a
+reservation, and a `listen-address` line is emitted for localhost and for this
+host's address on each subnet:
+
+    # Managed by confluent2dnsmasq -- DO NOT EDIT BY HAND.
+    # Regenerate: confluent2dnsmasq node01
+    # Generated 2026-06-28 12:00:00 +0000
+
+    # Allow confluent and dnsmasq to share the same network for DHCP
+    bind-dynamic
+
+    # Listen on localhost plus this host's address on each managed subnet,
+    # so dnsmasq serves these networks alongside confluent and bind-dynamic
+    # (a listen-address line also overrides local-service in dnsmasq.conf).
+    listen-address=127.0.0.1
+    listen-address=::1
+    listen-address=10.28.88.250
+    listen-address=10.28.104.250
+
+    # subnet 10.28.88.0/21
+    dhcp-range=10.28.88.0,static,255.255.248.0,24h
+    dhcp-host=10:ff:e0:af:af:f5,10.28.90.1,node01
+
+    # subnet 10.28.104.0/21
+    dhcp-range=10.28.104.0,static,255.255.248.0,24h
+    dhcp-host=10:ff:e0:a4:cf:b6,10.28.106.1,node01-bmc
+
+Adding `--gateway` scopes a router option to each subnet through a tag, and the
+matching `dhcp-host` lines gain a `set:` tag so the option reaches them:
+
+    # subnet 10.28.88.0/21
+    dhcp-range=10.28.88.0,static,255.255.248.0,24h
+    dhcp-option=tag:cdhcp_10_28_88_0_21,option:router,10.28.88.1
+    dhcp-host=10:ff:e0:af:af:f5,set:cdhcp_10_28_88_0_21,10.28.90.1,node01
+
+    # subnet 10.28.104.0/21
+    dhcp-range=10.28.104.0,static,255.255.248.0,24h
+    dhcp-option=tag:cdhcp_10_28_104_0_21,option:router,10.28.104.1
+    dhcp-host=10:ff:e0:a4:cf:b6,set:cdhcp_10_28_104_0_21,10.28.106.1,node01-bmc
+
+## NOTES
+
+`bind-dynamic` is a global dnsmasq option; if it is set here it must not be
+contradicted by a `bind-interfaces` directive elsewhere in the configuration.
+
+The autodetected `listen-address` lines double as the mechanism that relaxes
+dnsmasq's default `local-service`/`local-service=host` restriction (any
+`interface`, `except-interface`, or `listen-address` line does), which is what
+lets dnsmasq answer on the cluster networks instead of only localhost.
+Detection only covers subnets the host running the command is directly attached
+to, so run it there; with `--no-listen-address` you must supply `interface`,
+`except-interface`, or `listen-address` yourself, or disable `local-service`.
+
+After (re)generating the file, validate it with `dnsmasq --test` and restart
+dnsmasq (for example `systemctl restart dnsmasq`); a reload (SIGHUP) does not
+re-read `listen-address` or interface bindings.
+
+## FILES
+
+* `/etc/dnsmasq.d/confluent-dhcp.conf`:
+  Default output file (override with `--target`).
+
+## SEE ALSO
+
+nodeattrib(8), noderange(5), dnsmasq(8)

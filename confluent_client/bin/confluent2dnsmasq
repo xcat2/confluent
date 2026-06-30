@@ -1,0 +1,529 @@
+#!/usr/bin/python3
+# Generate a dnsmasq static DHCP configuration (a file under /etc/dnsmasq.d)
+# from the confluent attribute database.  One "dhcp-host=" reservation is
+# emitted for every network of every node that has a hardware (MAC) address
+# defined (net.hwaddr, net.<iface>.hwaddr, net.bmc.hwaddr, ...).
+
+import argparse
+import ipaddress
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import time
+
+try:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+except AttributeError:
+    pass
+
+path = os.path.dirname(os.path.realpath(__file__))
+path = os.path.realpath(os.path.join(path, '..', 'lib', 'python'))
+if path.startswith('/opt'):
+    sys.path.append(path)
+
+import confluent.client as client
+
+TARGET = '/etc/dnsmasq.d/confluent-dhcp.conf'
+TAGPREFIX = 'cdhcp'
+# Invocation flags that do not affect the generated content; excluded from the
+# recorded "Regenerate:" line and from the settings-changed comparison.
+NONCONFIG_ARGS = {'-y', '--yes', '-n', '--stdout'}
+
+
+def split_list(val):
+    """Split a confluent comma/whitespace delimited attribute value."""
+    if not val:
+        return []
+    return [v for v in re.split(r'[\s,]+', val.strip()) if v]
+
+
+def config_args(argv):
+    """Join the invocation arguments that affect the generated content."""
+    return ' '.join(a for a in argv if a not in NONCONFIG_ARGS)
+
+
+def parse_net_attrib(attrib):
+    """Split a net.* attribute into (network_name, field).
+
+    The field is always the final dotted component; everything between
+    'net.' and the field is the network name, which may itself span
+    several dotted components.
+    """
+    parts = attrib.split('.')
+    field = parts[-1]
+    if len(parts) == 2:
+        currnet = None
+    else:
+        currnet = '.'.join(parts[1:-1])
+    return currnet, field
+
+
+def subnet_sort_key(netaddr):
+    try:
+        return tuple(int(o) for o in netaddr.split('.'))
+    except ValueError:
+        return (0, 0, 0, 0)
+
+
+def parse_routes():
+    """Parse `ip --json route` into a list of (network, route_dict) tuples for
+    routes with a concrete destination prefix (default routes and the like are
+    skipped).  Returns [] if iproute2 or its JSON output is unavailable."""
+    try:
+        out = subprocess.check_output(['ip', '--json', 'route'],
+                                      stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    try:
+        entries = json.loads(out.decode('utf-8', 'replace'))
+    except ValueError:
+        return []
+    routes = []
+    for route in entries:
+        dst = route.get('dst')
+        if not dst or dst == 'default':
+            continue
+        if '/' not in dst:
+            dst += '/32'
+        try:
+            net = ipaddress.ip_network(dst, strict=False)
+        except ValueError:
+            continue
+        routes.append((net, route))
+    return routes
+
+
+def connected_network_for_ip(routes, ipstr):
+    """Most specific directly-attached (prefsrc-bearing) route network that
+    contains `ipstr`, or None.  Used to fill in a missing prefix length."""
+    try:
+        ip = ipaddress.ip_address(ipstr)
+    except ValueError:
+        return None
+    best = None
+    for net, route in routes:
+        if 'prefsrc' not in route:
+            continue
+        if ip in net and (best is None or net.prefixlen > best.prefixlen):
+            best = net
+    return best
+
+
+def prefsrc_for_network(routes, network):
+    """This host's preferred source address on `network` per the routing table
+    (the address dnsmasq should listen on for that subnet), or None."""
+    fallback = None
+    for net, route in routes:
+        prefsrc = route.get('prefsrc')
+        if not prefsrc:
+            continue
+        if net == network:
+            return prefsrc
+        if network.network_address in net:
+            fallback = prefsrc
+    return fallback
+
+
+def existing_regen_args(targetpath):
+    """Return the content arguments recorded in an existing config's
+    'Regenerate:' header line, or None if not present/readable."""
+    try:
+        with open(targetpath) as cfg:
+            for line in cfg:
+                if line.startswith('# Regenerate:'):
+                    rest = line[len('# Regenerate:'):].strip()
+                    marker = 'confluent2dnsmasq'
+                    if rest.startswith(marker):
+                        return rest[len(marker):].strip()
+                    return rest
+                if not line.startswith('#'):
+                    break
+    except OSError:
+        pass
+    return None
+
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description='Create /etc/dnsmasq.d static DHCP reservations for a '
+                    'noderange from the confluent database')
+    ap.add_argument('noderange',
+                    help='Noderange to generate DHCP reservations for')
+    ap.add_argument('--target', default=TARGET, metavar='PATH',
+                    help='Output configuration file (default: %(default)s).')
+    ap.add_argument('--tag-prefix', default=TAGPREFIX, metavar='PREFIX',
+                    help='Prefix for generated dnsmasq tag names '
+                         '(default: %(default)s).')
+    ap.add_argument('--no-bind-dynamic', dest='emit_bind_dynamic',
+                    action='store_false',
+                    help="Do not emit the 'bind-dynamic' line "
+                         '(it is emitted by default).')
+    ap.add_argument('--no-listen-address', dest='detect_listen',
+                    action='store_false',
+                    help='Do not autodetect and emit a listen-address line for '
+                         "this host's address on each managed subnet. By "
+                         'default they are emitted together with localhost '
+                         '(127.0.0.1 and ::1).')
+    ap.add_argument('--no-range', dest='emit_range', action='store_false',
+                    help='Do not emit dhcp-range lines (manage ranges '
+                         'elsewhere). Note: dnsmasq will not answer DHCP on a '
+                         'subnet that has no covering dhcp-range.')
+    ap.add_argument('--lease', default='24h', metavar='TIME',
+                    help='Lease time for emitted dhcp-range lines '
+                         '(default: 24h; e.g. 1h, 24h, infinite). '
+                         'Pass an empty string to omit it.')
+    ap.add_argument('-n', '--stdout', action='store_true',
+                    help='Write the configuration to stdout instead of '
+                         'writing the target file.')
+    ap.add_argument('-y', '--yes', dest='assume_yes', action='store_true',
+                    help='Do not prompt for confirmation when an existing '
+                         'config was generated with different settings.')
+    ap.add_argument('--allow-empty', action='store_true',
+                    help='Write the file even if no reservations were '
+                         'produced (default: refuse, to avoid clobbering an '
+                         'existing config on an empty/failed read).')
+
+    # Optional extra data injected into the DHCP reply, sourced from the
+    # confluent database.  All are OFF by default and scoped per-subnet.
+    grp = ap.add_argument_group(
+        'optional DHCP reply data (sourced from confluent, off by default)')
+    grp.add_argument('--all-options', action='store_true',
+                     help='Enable every optional reply datum listed below.')
+    grp.add_argument('--gateway', '--router', dest='opt_gateway',
+                     action='store_true',
+                     help='router, option 3, from net.<net>.ipv4_gateway')
+    grp.add_argument('--dns', dest='opt_dns', action='store_true',
+                     help='dns-server, option 6, from dns.servers')
+    grp.add_argument('--domain', dest='opt_domain', action='store_true',
+                     help='domain-name, option 15, from dns.domain')
+    grp.add_argument('--ntp', dest='opt_ntp', action='store_true',
+                     help='ntp-server, option 42, from ntp.servers')
+    grp.add_argument('--mtu', dest='opt_mtu', action='store_true',
+                     help='interface-mtu, option 26, from net.<net>.mtu')
+    args = ap.parse_args()
+
+    if args.all_options:
+        args.opt_gateway = True
+        args.opt_dns = True
+        args.opt_domain = True
+        args.opt_ntp = True
+        args.opt_mtu = True
+
+    c = client.Command()
+
+    # Kernel routing table (ip --json route), used to fill in a missing prefix
+    # length on a node address and to pick this host's listen-address (prefsrc)
+    # for each managed subnet.
+    routes = parse_routes()
+
+    # Node level attributes
+    domainbynode = {}
+    dnsbynode = {}
+    ntpbynode = {}
+    # Per (node, net) network attributes: nets[node][net] = {field: value}
+    nets = {}
+
+    read_error = False
+    for ent in c.read('/noderange/{0}/attributes/current'.format(
+            args.noderange)):
+        if 'error' in ent:
+            sys.stderr.write(ent['error'] + '\n')
+            read_error = True
+            continue
+        ent = ent.get('databynode', {})
+        for node in ent:
+            for attrib in ent[node]:
+                val = ent[node][attrib]
+                if not isinstance(val, dict):
+                    continue
+                val = val.get('value', None)
+                if val in (None, ''):
+                    continue
+                if attrib == 'dns.domain':
+                    domainbynode[node] = val
+                elif attrib == 'dns.servers':
+                    dnsbynode[node] = val
+                elif attrib == 'ntp.servers':
+                    ntpbynode[node] = val
+                elif attrib.startswith('net.'):
+                    currnet, field = parse_net_attrib(attrib)
+                    if field not in ('hwaddr', 'ipv4_address',
+                                     'ipv4_gateway', 'hostname', 'mtu'):
+                        continue
+                    nets.setdefault(node, {}).setdefault(currnet, {})
+                    nets[node][currnet][field] = val
+
+    # Build reservation entries and aggregate per-subnet information.
+    hostentries = []  # {subnetkey, macs, ip, hostname}
+    subnets = {}      # subnetkey (netaddr, prefixlen) -> aggregate dict
+
+    for node in sorted(nets):
+        netnames = sorted(nets[node], key=lambda n: (n is not None, n or ''))
+        for currnet in netnames:
+            slot = nets[node][currnet]
+            hwaddr = slot.get('hwaddr')
+            if not hwaddr:
+                continue
+            label = currnet if currnet else '(primary)'
+            netprefix = (currnet + '.') if currnet else ''
+            addr = slot.get('ipv4_address')
+            if not addr:
+                sys.stderr.write(
+                    '{0}: net {1} has a hwaddr but no net.{2}ipv4_address; '
+                    'skipping\n'.format(node, label, netprefix))
+                continue
+            # If confluent has no prefix length on the address, borrow it from
+            # the matching directly-attached route.
+            if '/' not in addr:
+                cnet = connected_network_for_ip(routes, addr)
+                if cnet is not None:
+                    addr = '{0}/{1}'.format(addr, cnet.prefixlen)
+            ip = addr.split('/', 1)[0]
+
+            # Reservation hostname: first token of the per-net hostname,
+            # else the node name for the primary (unnamed) network, else
+            # omit it (named net with no hostname).
+            hostname = None
+            if slot.get('hostname'):
+                hostname = split_list(slot['hostname'])[0]
+            elif currnet is None:
+                hostname = node
+
+            # Derive the subnet (needed for dhcp-range and for scoping
+            # the optional dhcp-option tags).
+            subnetkey = None
+            if '/' in addr:
+                try:
+                    iface = ipaddress.ip_interface(addr)
+                except ValueError as e:
+                    sys.stderr.write(
+                        '{0}: net {1} has invalid address {2} ({3}); '
+                        'skipping\n'.format(node, label, addr, e))
+                    continue
+                network = iface.network
+                subnetkey = (str(network.network_address), network.prefixlen)
+                sub = subnets.get(subnetkey)
+                if sub is None:
+                    tag = '{0}_{1}_{2}'.format(
+                        args.tag_prefix,
+                        str(network.network_address).replace('.', '_'),
+                        network.prefixlen)
+                    sub = {'netmask': str(network.netmask), 'tag': tag,
+                           'prefsrc': prefsrc_for_network(routes, network),
+                           'gateway': set(), 'dns': set(), 'domain': set(),
+                           'ntp': set(), 'mtu': set()}
+                    subnets[subnetkey] = sub
+                if slot.get('ipv4_gateway'):
+                    sub['gateway'].add(slot['ipv4_gateway'])
+                if node in dnsbynode:
+                    sub['dns'].add(dnsbynode[node])
+                if node in domainbynode:
+                    sub['domain'].add(domainbynode[node])
+                if node in ntpbynode:
+                    sub['ntp'].add(ntpbynode[node])
+                if slot.get('mtu'):
+                    sub['mtu'].add(slot['mtu'])
+            elif args.emit_range:
+                sys.stderr.write(
+                    '{0}: net {1} address {2} has no /prefix; cannot derive a '
+                    'subnet for dhcp-range (add a prefix or use --no-range). '
+                    'Emitting the dhcp-host anyway.\n'.format(
+                        node, label, addr))
+
+            hostentries.append({'subnetkey': subnetkey,
+                                'macs': split_list(hwaddr),
+                                'ip': ip, 'hostname': hostname})
+
+    # Resolve optional per-subnet options from the aggregated values.
+    def resolve(values, what, subnetkey):
+        if not values:
+            return None
+        if len(values) > 1:
+            chosen = sorted(values)[0]
+            sys.stderr.write(
+                'subnet {0}/{1}: inconsistent {2} across nodes {3}; using '
+                '{4}\n'.format(subnetkey[0], subnetkey[1], what,
+                               sorted(values), chosen))
+            return chosen
+        return next(iter(values))
+
+    optionlines = {}  # subnetkey -> [ 'option:...,value', ... ]
+    for subnetkey, sub in subnets.items():
+        lines = []
+        if args.opt_gateway:
+            gw = resolve(sub['gateway'], 'net.ipv4_gateway', subnetkey)
+            if gw:
+                lines.append('option:router,{0}'.format(gw))
+        if args.opt_dns:
+            dv = resolve(sub['dns'], 'dns.servers', subnetkey)
+            if dv:
+                lines.append('option:dns-server,{0}'.format(
+                    ','.join(split_list(dv))))
+        if args.opt_domain:
+            dom = resolve(sub['domain'], 'dns.domain', subnetkey)
+            if dom:
+                lines.append('option:domain-name,{0}'.format(dom))
+        if args.opt_ntp:
+            nv = resolve(sub['ntp'], 'ntp.servers', subnetkey)
+            if nv:
+                lines.append('option:ntp-server,{0}'.format(
+                    ','.join(split_list(nv))))
+        if args.opt_mtu:
+            mv = resolve(sub['mtu'], 'net.mtu', subnetkey)
+            if mv:
+                lines.append('option:mtu,{0}'.format(mv))
+        if lines:
+            optionlines[subnetkey] = lines
+
+    orderedsubnets = sorted(subnets,
+                            key=lambda k: subnet_sort_key(k[0]) + (k[1],))
+
+    # Render.
+    out = ['# Managed by confluent2dnsmasq -- DO NOT EDIT BY HAND.',
+           '# Regenerate: confluent2dnsmasq {0}'.format(
+               config_args(sys.argv[1:])),
+           '# Generated {0}'.format(time.strftime('%Y-%m-%d %H:%M:%S %z')),
+           '']
+    if args.emit_bind_dynamic:
+        out.append('# Allow confluent and dnsmasq to share the same network '
+                   'for DHCP')
+        out.append('bind-dynamic')
+        out.append('')
+
+    detected = []
+    if args.detect_listen:
+        for subnetkey in orderedsubnets:
+            prefsrc = subnets[subnetkey].get('prefsrc')
+            if prefsrc and prefsrc not in detected:
+                detected.append(prefsrc)
+        out.append('# Listen on localhost plus this host\'s address on each '
+                   'managed subnet,')
+        out.append('# so dnsmasq serves these networks alongside confluent '
+                   'and bind-dynamic')
+        out.append('# (a listen-address line also overrides local-service in '
+                   'dnsmasq.conf).')
+        out.append('listen-address=127.0.0.1')
+        out.append('listen-address=::1')
+        for addr in detected:
+            out.append('listen-address={0}'.format(addr))
+        out.append('')
+
+    hosts_by_subnet = {}
+    nosubnet_hosts = []
+    for e in hostentries:
+        fields = list(e['macs'])
+        if e['subnetkey'] in optionlines:
+            fields.append('set:{0}'.format(subnets[e['subnetkey']]['tag']))
+        fields.append(e['ip'])
+        if e['hostname']:
+            fields.append(e['hostname'])
+        line = 'dhcp-host={0}'.format(','.join(fields))
+        if e['subnetkey'] is None:
+            nosubnet_hosts.append(line)
+        else:
+            hosts_by_subnet.setdefault(e['subnetkey'], []).append(line)
+
+    for subnetkey in orderedsubnets:
+        sub = subnets[subnetkey]
+        netaddr, prefixlen = subnetkey
+        out.append('# subnet {0}/{1}'.format(netaddr, prefixlen))
+        if args.emit_range:
+            rangefields = [netaddr, 'static', sub['netmask']]
+            if args.lease:
+                rangefields.append(args.lease)
+            out.append('dhcp-range={0}'.format(','.join(rangefields)))
+        for optline in optionlines.get(subnetkey, []):
+            out.append('dhcp-option=tag:{0},{1}'.format(sub['tag'], optline))
+        for line in sorted(hosts_by_subnet.get(subnetkey, [])):
+            out.append(line)
+        out.append('')
+
+    if nosubnet_hosts:
+        out.append('# reservations with no derivable subnet (address had no '
+                   '/prefix)')
+        out.extend(sorted(nosubnet_hosts))
+        out.append('')
+
+    text = '\n'.join(out).rstrip('\n') + '\n'
+
+    # Warnings about configuration choices that affect coexistence with
+    # confluent's own DHCP service.
+    if args.detect_listen and subnets and not detected:
+        sys.stderr.write(
+            'WARNING: no local address was found on any managed subnet, so '
+            'dnsmasq will only listen on localhost. Run this on the dnsmasq '
+            'host, or set interface/listen-address manually.\n')
+    if not args.detect_listen:
+        sys.stderr.write(
+            'WARNING: listen-address autodetection disabled. For dnsmasq to '
+            'serve these networks together with confluent and bind-dynamic, '
+            'set interface, except-interface or listen-address manually, or '
+            'disable local-service=host in dnsmasq.conf.\n')
+    if not args.emit_bind_dynamic:
+        sys.stderr.write(
+            'WARNING: bind-dynamic not emitted; this can conflict with '
+            "confluent's DHCP unless bind-dynamic is set elsewhere in the "
+            'dnsmasq configuration.\n')
+
+    if args.stdout:
+        sys.stdout.write(text)
+        return
+
+    if not hostentries and not args.allow_empty:
+        sys.stderr.write(
+            'No DHCP reservations were generated (no networks with both a '
+            'hwaddr and an ipv4_address were found){0}. Refusing to overwrite '
+            '{1}; pass --allow-empty to override.\n'.format(
+                ' and there were read errors' if read_error else '',
+                args.target))
+        sys.exit(1)
+
+    # If a config already exists that was generated with different
+    # content-affecting settings, confirm before overwriting it.
+    if os.path.exists(args.target):
+        prev = existing_regen_args(args.target)
+        cur = config_args(sys.argv[1:])
+        if prev is not None and prev != cur:
+            sys.stderr.write(
+                'Existing {0} was generated with different settings:\n'
+                '  old: confluent2dnsmasq {1}\n'
+                '  new: confluent2dnsmasq {2}\n'.format(
+                    args.target, prev or '(no arguments)',
+                    cur or '(no arguments)'))
+            if not args.assume_yes:
+                if not sys.stdin.isatty():
+                    sys.stderr.write(
+                        'Refusing to regenerate with changed settings '
+                        'non-interactively; pass -y/--yes to confirm.\n')
+                    sys.exit(1)
+                try:
+                    resp = input('Are you sure you want to regenerate using the new settings? [y/N] ')
+                except EOFError:
+                    resp = ''
+                if resp.strip().lower() not in ('y', 'yes'):
+                    sys.stderr.write(
+                        'Aborted; {0} left unchanged.\n'.format(args.target))
+                    sys.exit(1)
+
+    targetdir = os.path.dirname(args.target)
+    targetname = os.path.basename(args.target)
+    if targetdir and not os.path.isdir(targetdir):
+        os.makedirs(targetdir, exist_ok=True)
+    # Write via a hidden temp file in the same directory, then rename: the
+    # rename is atomic, and the dot-prefix keeps a dnsmasq conf-dir from
+    # loading the temp file if it scans mid-write.
+    tmp = os.path.join(targetdir, '.' + targetname + '.tmp')
+    with open(tmp, 'w') as cfg:
+        cfg.write(text)
+    os.replace(tmp, args.target)
+    sys.stderr.write('Wrote {0} reservation(s) across {1} subnet(s) to {2}\n'
+                     .format(len(hostentries), len(subnets), args.target))
+    sys.stderr.write('Be sure to restart dnsmasq for the changes to take effect\n')
+
+
+if __name__ == '__main__':
+    main()
