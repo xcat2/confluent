@@ -21,10 +21,15 @@ GUID) are skipped.
 
 For each reservation, `net.<network>.ipv4_address` supplies the reserved
 address.  The `/prefixlen` suffix on that address is used to compute the
-enclosing subnet, and one `dhcp-range=<network>,static,<netmask>,<lease>` line
-is emitted per distinct subnet.  dnsmasq will not answer DHCP requests on a
-subnet that has no covering `dhcp-range`, even when every address on it is
-statically reserved, so these ranges are emitted by default (see `--no-range`).
+enclosing subnet; if the address carries no `/prefixlen`, the prefix length is
+filled in from the matching directly-attached route in the host's routing
+table.  One `dhcp-range=<network>,static,<netmask>,<lease>` line is emitted per
+distinct subnet.  dnsmasq will not answer DHCP requests on a subnet that has no
+covering `dhcp-range`, even when every address on it is statically reserved, so
+these ranges are emitted by default (see `--no-range`).  An address that has
+neither an explicit prefix nor a matching local route still yields a
+`dhcp-host` reservation, but no subnet or `dhcp-range` is derived for it and a
+warning is printed.
 
 The reservation name is the first token of `net.<network>.hostname`, falling
 back to the node name itself for the primary (unnamed) network, and omitted for
@@ -36,12 +41,12 @@ can bind DHCP to networks confluent is using, too (see `--no-bind-dynamic`).
 
 Also by default, a `listen-address` line is emitted for `127.0.0.1`, for
 `::1`, and for this host's own address on each managed subnet (see 
-`--no-listen-address`).  The per-subnet addresses are detected from the host
-the command runs on, so run it on the dnsmasq host; only subnets the host is
-directly attached to are added.  Besides telling dnsmasq where to listen, the
-presence of any `listen-address` line disables the default `local-service`
-(or `local-service=host`) restriction in `dnsmasq.conf` that would otherwise
-limit dnsmasq to localhost.
+`--no-listen-address`).  The per-subnet addresses are read from the routing
+table of the host the command runs on, so run it on the dnsmasq host; only
+subnets the host is directly attached to are added.  Besides telling dnsmasq
+where to listen, the presence of any `listen-address` line disables the default
+`local-service` (or `local-service=host`) restriction in `dnsmasq.conf` that
+would otherwise limit dnsmasq to localhost.
 
 Additional data can optionally be added to the DHCP reply from the confluent
 database (see OPTIONS; all are off by default).  Each such option is scoped to

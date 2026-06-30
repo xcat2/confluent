@@ -6,10 +6,11 @@
 
 import argparse
 import ipaddress
+import json
 import os
 import re
 import signal
-import socket
+import subprocess
 import sys
 import time
 
@@ -67,31 +68,63 @@ def subnet_sort_key(netaddr):
         return (0, 0, 0, 0)
 
 
-def local_ip_for_network(network):
-    """Return this host's source address for `network`, but only when that
-    address is itself within `network` (i.e. the host is directly attached);
-    otherwise None.  Uses a connected UDP socket, which performs a routing
-    lookup without sending any packet."""
-    family = socket.AF_INET6 if network.version == 6 else socket.AF_INET
+def parse_routes():
+    """Parse `ip --json route` into a list of (network, route_dict) tuples for
+    routes with a concrete destination prefix (default routes and the like are
+    skipped).  Returns [] if iproute2 or its JSON output is unavailable."""
     try:
-        target = str(next(network.hosts()))
-    except StopIteration:
-        target = str(network.network_address)
-    s = socket.socket(family, socket.SOCK_DGRAM)
+        out = subprocess.check_output(['ip', '--json', 'route'],
+                                      stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return []
     try:
-        s.connect((target, 9))
-        local = s.getsockname()[0]
-    except OSError:
-        return None
-    finally:
-        s.close()
-    local = local.split('%', 1)[0]  # drop any IPv6 zone id
-    try:
-        if ipaddress.ip_address(local) in network:
-            return local
+        entries = json.loads(out.decode('utf-8', 'replace'))
     except ValueError:
-        pass
-    return None
+        return []
+    routes = []
+    for route in entries:
+        dst = route.get('dst')
+        if not dst or dst == 'default':
+            continue
+        if '/' not in dst:
+            dst += '/32'
+        try:
+            net = ipaddress.ip_network(dst, strict=False)
+        except ValueError:
+            continue
+        routes.append((net, route))
+    return routes
+
+
+def connected_network_for_ip(routes, ipstr):
+    """Most specific directly-attached (prefsrc-bearing) route network that
+    contains `ipstr`, or None.  Used to fill in a missing prefix length."""
+    try:
+        ip = ipaddress.ip_address(ipstr)
+    except ValueError:
+        return None
+    best = None
+    for net, route in routes:
+        if 'prefsrc' not in route:
+            continue
+        if ip in net and (best is None or net.prefixlen > best.prefixlen):
+            best = net
+    return best
+
+
+def prefsrc_for_network(routes, network):
+    """This host's preferred source address on `network` per the routing table
+    (the address dnsmasq should listen on for that subnet), or None."""
+    fallback = None
+    for net, route in routes:
+        prefsrc = route.get('prefsrc')
+        if not prefsrc:
+            continue
+        if net == network:
+            return prefsrc
+        if network.network_address in net:
+            fallback = prefsrc
+    return fallback
 
 
 def existing_regen_args(targetpath):
@@ -111,6 +144,7 @@ def existing_regen_args(targetpath):
     except OSError:
         pass
     return None
+
 
 
 def main():
@@ -181,6 +215,11 @@ def main():
 
     c = client.Command()
 
+    # Kernel routing table (ip --json route), used to fill in a missing prefix
+    # length on a node address and to pick this host's listen-address (prefsrc)
+    # for each managed subnet.
+    routes = parse_routes()
+
     # Node level attributes
     domainbynode = {}
     dnsbynode = {}
@@ -237,6 +276,12 @@ def main():
                     '{0}: net {1} has a hwaddr but no net.{2}ipv4_address; '
                     'skipping\n'.format(node, label, netprefix))
                 continue
+            # If confluent has no prefix length on the address, borrow it from
+            # the matching directly-attached route.
+            if '/' not in addr:
+                cnet = connected_network_for_ip(routes, addr)
+                if cnet is not None:
+                    addr = '{0}/{1}'.format(addr, cnet.prefixlen)
             ip = addr.split('/', 1)[0]
 
             # Reservation hostname: first token of the per-net hostname,
@@ -268,6 +313,7 @@ def main():
                         str(network.network_address).replace('.', '_'),
                         network.prefixlen)
                     sub = {'netmask': str(network.netmask), 'tag': tag,
+                           'prefsrc': prefsrc_for_network(routes, network),
                            'gateway': set(), 'dns': set(), 'domain': set(),
                            'ntp': set(), 'mtu': set()}
                     subnets[subnetkey] = sub
@@ -351,14 +397,9 @@ def main():
     detected = []
     if args.detect_listen:
         for subnetkey in orderedsubnets:
-            netaddr, prefixlen = subnetkey
-            try:
-                net = ipaddress.ip_network('{0}/{1}'.format(netaddr, prefixlen))
-            except ValueError:
-                continue
-            lip = local_ip_for_network(net)
-            if lip and lip not in detected:
-                detected.append(lip)
+            prefsrc = subnets[subnetkey].get('prefsrc')
+            if prefsrc and prefsrc not in detected:
+                detected.append(prefsrc)
         out.append('# Listen on localhost plus this host\'s address on each '
                    'managed subnet,')
         out.append('# so dnsmasq serves these networks alongside confluent '
