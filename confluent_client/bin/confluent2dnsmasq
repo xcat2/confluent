@@ -135,7 +135,7 @@ def existing_regen_args(targetpath):
             for line in cfg:
                 if line.startswith('# Regenerate:'):
                     rest = line[len('# Regenerate:'):].strip()
-                    marker = 'confluent2dnsmasqdhcp'
+                    marker = 'confluent2dnsmasq'
                     if rest.startswith(marker):
                         return rest[len(marker):].strip()
                     return rest
@@ -383,8 +383,8 @@ def main():
                             key=lambda k: subnet_sort_key(k[0]) + (k[1],))
 
     # Render.
-    out = ['# Managed by confluent2dnsmasqdhcp -- DO NOT EDIT BY HAND.',
-           '# Regenerate: confluent2dnsmasqdhcp {0}'.format(
+    out = ['# Managed by confluent2dnsmasq -- DO NOT EDIT BY HAND.',
+           '# Regenerate: confluent2dnsmasq {0}'.format(
                config_args(sys.argv[1:])),
            '# Generated {0}'.format(time.strftime('%Y-%m-%d %H:%M:%S %z')),
            '']
@@ -490,8 +490,8 @@ def main():
         if prev is not None and prev != cur:
             sys.stderr.write(
                 'Existing {0} was generated with different settings:\n'
-                '  old: confluent2dnsmasqdhcp {1}\n'
-                '  new: confluent2dnsmasqdhcp {2}\n'.format(
+                '  old: confluent2dnsmasq {1}\n'
+                '  new: confluent2dnsmasq {2}\n'.format(
                     args.target, prev or '(no arguments)',
                     cur or '(no arguments)'))
             if not args.assume_yes:

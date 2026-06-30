@@ -1,16 +1,16 @@
-confluent2dnsmasqdhcp(8) -- Generate dnsmasq static DHCP reservations for nodes
+confluent2dnsmasq(8) -- Generate dnsmasq static DHCP reservations for nodes
 ===============================================================================
 
 ## SYNOPSIS
 
-`confluent2dnsmasqdhcp [options] <noderange>`  
-`confluent2dnsmasqdhcp <noderange>`  
-`confluent2dnsmasqdhcp --all-options <noderange>`  
-`confluent2dnsmasqdhcp -n <noderange>`  
+`confluent2dnsmasq [options] <noderange>`  
+`confluent2dnsmasq <noderange>`  
+`confluent2dnsmasq --all-options <noderange>`  
+`confluent2dnsmasq -n <noderange>`  
 
 ## DESCRIPTION
 
-`confluent2dnsmasqdhcp` generates a dnsmasq configuration fragment of static
+`confluent2dnsmasq` generates a dnsmasq configuration fragment of static
 DHCP reservations for a noderange, using the confluent database as the source
 of truth.  Each `net.<network>.<attribute>` group is pulled together and one
 `dhcp-host=` reservation is emitted for **every network that has a hardware
@@ -63,7 +63,7 @@ If the existing file was generated with different content-affecting arguments
 comparison), you are asked to confirm before it is overwritten; the prompt is
 skipped with `-y` and is refused when there is no controlling terminal.  If a
 run produces no reservations at all (for example an empty noderange or a failed
-read), `confluent2dnsmasqdhcp` refuses to overwrite the existing file unless
+read), `confluent2dnsmasq` refuses to overwrite the existing file unless
 `--allow-empty` is given.
 
 ## OPTIONS
@@ -142,22 +142,22 @@ read), `confluent2dnsmasqdhcp` refuses to overwrite the existing file unless
 ## EXAMPLES
 
 * Generate reservations for a noderange and write the default file:
-  `# confluent2dnsmasqdhcp everything`  
+  `# confluent2dnsmasq everything`  
 
 * Preview the configuration for one node without writing anything:
-  `# confluent2dnsmasqdhcp -n node01`  
+  `# confluent2dnsmasq -n node01`  
 
 * Include all optional reply data (gateway, DNS, domain, NTP, MTU):
-  `# confluent2dnsmasqdhcp --all-options everything`  
+  `# confluent2dnsmasq --all-options everything`  
 
 * Include only the gateway, and use an eight hour lease:
-  `# confluent2dnsmasqdhcp --gateway --lease 8h everything`  
+  `# confluent2dnsmasq --gateway --lease 8h everything`  
 
 * Regenerate non-interactively (for example from cron) after changing options, without the confirmation prompt:
-  `# confluent2dnsmasqdhcp --all-options -y everything`  
+  `# confluent2dnsmasq --all-options -y everything`  
 
 * Emit only reservations (no ranges) to a custom file kept beside your own range and listen interface definitions:
-  `# confluent2dnsmasqdhcp --no-listen-address --no-range --target /etc/dnsmasq.d/confluent-reservations.conf everything`  
+  `# confluent2dnsmasq --no-listen-address --no-range --target /etc/dnsmasq.d/confluent-reservations.conf everything`  
 
 ## GENERATED CONFIGURATION
 
@@ -173,15 +173,15 @@ Given the following confluent attributes for node `node01`:
     node01: net.ib0.hostname: node01-ib0
     node01: net.ib0.ipv4_address: 10.28.101.1/21
 
-`confluent2dnsmasqdhcp node01`, run on a dnsmasq host whose own addresses on the
+`confluent2dnsmasq node01`, run on a dnsmasq host whose own addresses on the
 two managed subnets are `10.28.88.250` and `10.28.104.250`, writes the file
 below.  The `ib0` network is skipped because it has no `hwaddr`; the two
 remaining networks each yield a subnet (with its `dhcp-range`) and a
 reservation, and a `listen-address` line is emitted for localhost and for this
 host's address on each subnet:
 
-    # Managed by confluent2dnsmasqdhcp -- DO NOT EDIT BY HAND.
-    # Regenerate: confluent2dnsmasqdhcp node01
+    # Managed by confluent2dnsmasq -- DO NOT EDIT BY HAND.
+    # Regenerate: confluent2dnsmasq node01
     # Generated 2026-06-28 12:00:00 +0000
 
     # Allow confluent and dnsmasq to share the same network for DHCP
