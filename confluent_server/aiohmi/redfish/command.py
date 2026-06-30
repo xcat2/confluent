@@ -497,6 +497,8 @@ class Command(object):
 
     async def bmcinfo(self):
         bmcurl = await self.get_bmcurl()
+        if not bmcurl:
+            raise exc.PyghmiException('Unable to identify BMC')
         return await self._do_web_request(bmcurl)
 
     async def get_power(self):

@@ -160,18 +160,8 @@ class IpmiCommandWrapper(ipmicommand.Command):
         kv = util.TLSCertVerifier(cfm, node,
                                   'pubkeys.tls_hardwaremanager', subject).verify_cert
         kwargs['verifycallback'] = kv
-        self = await super().create(**kwargs)
-        self.confluentbmcname = kwargs['bmc']
-        self.cfm = cfm
-        self.node = node
-        self._inhealth = False
-        self._lasthealth = None
-        self._attribwatcher = cfm.watch_attributes(
-            (node,), ('secret.hardwaremanagementuser', 'collective.manager',
-                      'secret.hardwaremanagementpassword', 
-                      'hardwaremanagement.manager'), self._attribschanged)
         try:
-            pass
+            self = await super().create(**kwargs)
         except socket.error as se:
             if (hasattr(se, 'errno')
                     and se.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH, errno.EADDRNOTAVAIL)):
@@ -188,6 +178,15 @@ class IpmiCommandWrapper(ipmicommand.Command):
             if 'Redfish not ready' in str(pe):
                 raise exc.TargetEndpointUnreachable('Redfish is not supported by this system or is not yet ready')
             raise
+        self.confluentbmcname = kwargs['bmc']
+        self.cfm = cfm
+        self.node = node
+        self._inhealth = False
+        self._lasthealth = None
+        self._attribwatcher = cfm.watch_attributes(
+            (node,), ('secret.hardwaremanagementuser', 'collective.manager',
+                      'secret.hardwaremanagementpassword', 
+                      'hardwaremanagement.manager'), self._attribschanged)
         return self
 
     def close_confluent(self):

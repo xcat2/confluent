@@ -17,11 +17,13 @@ from aiohmi.redfish.oem.lenovo import tsma
 from aiohmi.redfish.oem.lenovo import xcc
 from aiohmi.redfish.oem.lenovo import xcc3
 from aiohmi.redfish.oem.lenovo import smm3
-
+import aiohmi.exceptions as exc
 
 async def get_handler(sysinfo, sysurl, webclient, cache, cmd, rootinfo={}):
     if not sysinfo:  # we are before establishing there is one system, and one manager...
         systems, status = await webclient.grab_json_response_with_status('/redfish/v1/Systems')
+        if status == 401:
+            raise exc.PyghmiException('Access Denied')
         if status == 200:
             for system in systems.get('Members', []):
                 if system.get('@odata.id', '').endswith('/1'):
