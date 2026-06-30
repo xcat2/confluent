@@ -1623,7 +1623,7 @@ class Session(object):
         givenhash = struct.pack("%dB" % hashlen, *data[40:hashlen + 40])
         if givenhash != expectedhash:
             self.sessioncontext = "FAILED"
-            self.onlogon({'error': "Incorrect password provided"})
+            await self.onlogon({'error': "Incorrect password provided"})
             return -9
         # We have now validated that the BMC and client agree on password, time
         # to store the keys

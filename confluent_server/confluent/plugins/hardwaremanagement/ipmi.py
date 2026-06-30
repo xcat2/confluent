@@ -353,7 +353,7 @@ class IpmiConsole(conapi.Console):
                     self.error = 'Unknown error'
                 if (self.error.startswith('Incorrect password') or
                         self.error.startswith('Unauthorized name')):
-                    raise exc.TargetEndpointBadCredentials
+                    raise exc.TargetEndpointBadCredentials()
                 else:
                     raise exc.TargetEndpointUnreachable(self.error)
             self.connected = True
@@ -445,6 +445,8 @@ async def perform_request(operator, node, element,
         excmsg = str(ipmiexc)
         if excmsg in ('Session no longer connected', 'timeout'):
             await results.put(msg.ConfluentTargetTimeout(node))
+        elif 'Unauthorized name' in excmsg or 'Incorrect password provided' in excmsg:
+            await results.put(msg.ConfluentTargetInvalidCredentials(node))
         else:
             await results.put(msg.ConfluentNodeError(node, excmsg))
             #raise
