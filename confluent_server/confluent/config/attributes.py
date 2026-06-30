@@ -417,7 +417,11 @@ node = {
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
-                       'ipmi is used if not specified.'
+                       'ipmi is used if not specified.',
+        'validvalues': ('affluent', 'cnos', 'cooltera', 'deltapdu',
+                        'eatonpdu', 'enclosure', 'enlogic', 'enos', 'geist',
+                        'ipmi', 'null', 'nxos', 'pdu', 'proxmox', 'raritan',
+                        'redfish', 'srlinux', 'vcenter'),
     },
     'hardwaremanagement.port': {
         'description': 'The port the BMC should be configured to connect to '
