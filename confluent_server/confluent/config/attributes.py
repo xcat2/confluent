@@ -417,7 +417,11 @@ node = {
     'hardwaremanagement.method': {
         'description': 'The method used to perform operations such as power '
                        'control, get sensor data, get inventory, and so on. '
-                       'ipmi is used if not specified.'
+                       'ipmi is used if not specified.',
+        'validvalues': ('affluent', 'cnos', 'cooltera', 'deltapdu',
+                        'eatonpdu', 'enclosure', 'enlogic', 'enos', 'geist',
+                        'ipmi', 'null', 'nxos', 'pdu', 'proxmox', 'raritan',
+                        'redfish', 'srlinux', 'vcenter'),
     },
     'hardwaremanagement.port': {
         'description': 'The port the BMC should be configured to connect to '
@@ -610,7 +614,7 @@ node = {
     },
     'snmp.privacyprotocol': {
         'description': 'The privacy protocol to use for SNMPv3',
-        'valid_values': ('aes', 'des'),
+        'validvalues': ('aes', 'des'),
     },
 #    'secret.snmplocalizedkey': {
 #        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
@@ -657,7 +661,7 @@ node = {
                         'Note that if the trusted CA verifies the certificate,'
                         ' that is accepted ignoring this policy.  Default '
                         'policy is "automatic"'),
-        'valid_values': ('automatic', 'manual'),
+        'validvalues': ('automatic', 'manual'),
     },
     'pubkeys.tls_hardwaremanager': {
         'description':  ('Fingerprint of the TLS certificate recognized as'
