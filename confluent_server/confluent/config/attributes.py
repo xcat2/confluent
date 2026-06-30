@@ -610,7 +610,7 @@ node = {
     },
     'snmp.privacyprotocol': {
         'description': 'The privacy protocol to use for SNMPv3',
-        'valid_values': ('aes', 'des'),
+        'validvalues': ('aes', 'des'),
     },
 #    'secret.snmplocalizedkey': {
 #        'description': ("SNMPv3 key localized to this node's SNMP Engine id"
@@ -657,7 +657,7 @@ node = {
                         'Note that if the trusted CA verifies the certificate,'
                         ' that is accepted ignoring this policy.  Default '
                         'policy is "automatic"'),
-        'valid_values': ('automatic', 'manual'),
+        'validvalues': ('automatic', 'manual'),
     },
     'pubkeys.tls_hardwaremanager': {
         'description':  ('Fingerprint of the TLS certificate recognized as'
