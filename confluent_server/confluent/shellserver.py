@@ -124,10 +124,9 @@ class ShellSession(consoleserver.ConsoleSession):
     @classmethod
     async def create(cls, node, configmanager, username, datacallback=None,
                  skipreplay=False, sessionid=None, width=80, height=24):
-        self = await super().__init__(node, configmanager, username,
+        self = await super().create(node, configmanager, username,
                                            datacallback, skipreplay,
-                                           width=width, height=height)
-        self.sessionid = sessionid
+                                           width=width, height=height, sessionid=sessionid)
         return self
 
 

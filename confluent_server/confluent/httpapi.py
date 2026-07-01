@@ -548,7 +548,7 @@ async def wsock_handler(req):
                                     auditlog.log(auditmsg)
                                     datacallback = datacallback_bound(clientsessid, rsp)
                                     if shellsession:
-                                        consession = shellserver.ShellSession(
+                                        consession = await shellserver.ShellSession.create(
                                             node=node, configmanager=cfgmgr,
                                             username=username, skipreplay=skipreplay,
                                             datacallback=datacallback,

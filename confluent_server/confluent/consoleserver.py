@@ -767,8 +767,9 @@ class ConsoleSession(object):
 
     @classmethod
     async def create(cls, node, configmanager, username, datacallback=None,
-                 skipreplay=False, direct=True, width=80, height=24):
+                 skipreplay=False, direct=True, width=80, height=24, sessionid=None):
         self = cls()
+        self.sessionid = sessionid
         self.registered = False
         self.tenant = configmanager.tenant
         if not configmanager.is_node(node):
