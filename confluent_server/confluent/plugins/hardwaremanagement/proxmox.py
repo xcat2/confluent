@@ -224,6 +224,8 @@ class PmxApiClient:
     async def get_vm(self, vm):
         if vm not in self.vmmap:
             await self.map_vms()
+        if vm not in self.vmmap:
+            raise exc.NotFoundException("VM {} not found on Proxmox server {}".format(vm, self.server))
         return self.vmmap[vm]
 
 
@@ -405,6 +407,11 @@ async def retrieve(nodes, element, configmanager, inputdata):
         if isinstance(currclient, Exception):
             yield msg.ConfluentNodeError(node, str(currclient))
             continue
+        try:
+            await currclient.get_vm(node)
+        except Exception as e:
+            yield msg.ConfluentNodeError(node, str(e))
+            continue
         if element == ['power', 'state']:
             yield msg.PowerState(node, await currclient.get_vm_power(node))
         elif element == ['boot', 'nextdevice']:
@@ -429,6 +436,11 @@ async def update(nodes, element, configmanager, inputdata):
         if isinstance(currclient, Exception):
             yield msg.ConfluentNodeError(node, str(currclient))
             continue
+        try:
+            await currclient.get_vm(node)
+        except Exception as e:
+            yield msg.ConfluentNodeError(node, str(e))
+            continue
         if element == ['power', 'state']:
             newstate, oldstate = await currclient.set_vm_power(node, inputdata.powerstate(node))
             yield  msg.PowerState(node, newstate, oldstate)
@@ -451,6 +463,11 @@ async def create(nodes, element, configmanager, inputdata):
     for node in nodes:
         if isinstance(clientsbynode[node], Exception):
             yield msg.ConfluentNodeError(node, str(clientsbynode[node]))
+            continue
+        try:
+            await clientsbynode[node].get_vm(node)
+        except Exception as e:
+            yield msg.ConfluentNodeError(node, str(e))
             continue
         if element == ['console', 'ikvm']:
             try:
