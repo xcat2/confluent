@@ -26,6 +26,11 @@ This is different from setting the value to an empty string.
 
 Arbitrary custom attributes can also be created with the `custom.` prefix.
 
+Network attributes (`net.*`) may similarly be qualified with an arbitrary name, or dotted chain of names, between
+`net` and the attribute, for example `net.compute.ipv4_address` or `net.eth.compute.ipv4_address` and
+`net.eth.management.ipv4_address`. Any such `net.<name*>.*` attributes together describe one logical network
+interface, so custom networks may be defined freely by choosing your own name(s).
+
 Attributes may be specified by wildcard, for example `net.*switch` will report
 all attributes that begin with `net.` and end with `switch`.
 
@@ -112,6 +117,14 @@ to a blank value will allow masking a group defined attribute with an empty valu
     `n1: hardwaremanagement.manager: 172.30.3.1`  
     `n2: console.method: serial`  
     `n2: hardwaremanagement.manager: 172.30.3.2`  
+
+* Setting up a named network interface as a bond (e.g. a two-port LACP bond used for compute traffic), using an
+  expression to calculate the IP address:
+    `# nodeattrib node12 net.compute.team_mode=lacp net.compute.connection_name=bond0 net.compute.interface_names=enp33s0f0np0,enp33s0f1np1 net.compute.ipv4_address='172.17.0.{n1}/16'`  
+    `node12: net.compute.connection_name: bond0`  
+    `node12: net.compute.interface_names: enp33s0f0np0,enp33s0f1np1`  
+    `node12: net.compute.ipv4_address: 172.17.0.12/16`  
+    `node12: net.compute.team_mode: lacp`  
 
 * Clear attribute on nodes of a simple noderange, if you want to retain the variable set the attribute to "":
     `# nodeattrib n1-n2 -c console.method`  
