@@ -8,6 +8,7 @@ import confluent.tasks as tasks
 import aiohmi.util.webclient as webclient
 import aiohmi.exceptions as pygexc
 import confluent.interface.console as conapi
+import random
 import io
 import urllib.parse as urlparse
 import aiohttp
@@ -91,7 +92,7 @@ class PmxConsole(conapi.Console):
                 elif pendingdata.type == aiohttp.WSMsgType.TEXT:
                     await self.datacallback(pendingdata.data.encode())
                     continue
-                elif pendingdata.type == aiohttp.WSMsgType.CLOSE:
+                elif pendingdata.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED):
                     await self.datacallback(conapi.ConsoleEvent.Disconnect)
                     return
                 else:
@@ -267,6 +268,9 @@ class PmxApiClient:
         return await self.get_vm_consproxy(vm, 'term')
 
     async def get_vm_consproxy(self, vm, constype):
+        powstate = await self.get_vm_power(vm)
+        if powstate != 'on':
+            await asyncio.sleep(1 + random.random())
         host, guest = await self.get_vm(vm)
         rsp = await self.wc.grab_json_response_with_status(f'/api2/json/nodes/{host}/{guest}/{constype}proxy', method='POST')
         consdata = rsp[0]['data']
