@@ -193,9 +193,14 @@ class PmxApiClient:
                 'password': self.password,
             }
         loginbody = urlparse.urlencode(loginform)
-        rsp = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody, headers={'Content-Type': 'application/x-www-form-urlencoded'})
-        if rsp[1] == 401:
-            raise exc.TargetEndpointBadCredentials()
+        try:
+            rsp = await self.wc.grab_json_response_with_status('/api2/json/access/ticket', loginbody, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+            if rsp[1] == 401:
+                raise exc.TargetEndpointBadCredentials("Bad credentials")
+        except exc.TargetEndpointBadCredentials:
+            raise
+        except Exception:
+            raise exc.TargetEndpointUnreachable("Unable to reach Proxmox server '{}'".format(self.server))
         self.pac = rsp[0]['data']['ticket']
         self.wc.cookies.update_cookies({'PVEAuthCookie': self.pac})
         self.wc.set_header('CSRFPreventionToken', rsp[0]['data']['CSRFPreventionToken'])
@@ -369,7 +374,7 @@ class PmxApiClient:
             del self.wc.stdheaders['Content-Type']
 
 
-def prep_proxmox_clients(nodes, configmanager):
+async def prep_proxmox_clients(nodes, configmanager):
     cfginfo = configmanager.get_node_attributes(nodes, ['hardwaremanagement.manager', 'secret.hardwaremanagementuser', 'secret.hardwaremanagementpassword'], decrypt=True)
     clientsbypmx = {}
     clientsbynode = {}
@@ -379,19 +384,22 @@ def prep_proxmox_clients(nodes, configmanager):
         if currpmx not in clientsbypmx:
             user = cfg.get('secret.hardwaremanagementuser', {}).get('value', None)
             passwd = cfg.get('secret.hardwaremanagementpassword', {}).get('value', None)
+            clientsbypmx[currpmx] = PmxApiClient(currpmx, user, passwd, configmanager)
             try:
-                clientsbypmx[currpmx] = PmxApiClient(currpmx, user, passwd, configmanager)
+                await clientsbypmx[currpmx].login()
             except exc.TargetEndpointBadCredentials as e:
+                clientsbypmx[currpmx] = e
+            except exc.TargetEndpointUnreachable as e:
                 clientsbypmx[currpmx] = e
         clientsbynode[node] = clientsbypmx[currpmx]
     return clientsbynode
 
 async def retrieve(nodes, element, configmanager, inputdata):
-    clientsbynode = prep_proxmox_clients(nodes, configmanager)
+    clientsbynode = await prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
         currclient = clientsbynode[node]
-        if isinstance(currclient, exc.TargetEndpointBadCredentials):
-            yield msg.ConfluentNodeError(node, "Bad credentials")
+        if isinstance(currclient, Exception):
+            yield msg.ConfluentNodeError(node, str(currclient))
             continue
         if element == ['power', 'state']:
             yield msg.PowerState(node, await currclient.get_vm_power(node))
@@ -411,11 +419,11 @@ async def retrieve(nodes, element, configmanager, inputdata):
             yield msg.SensorReadings([], node)
 
 async def update(nodes, element, configmanager, inputdata):
-    clientsbynode = prep_proxmox_clients(nodes, configmanager)
+    clientsbynode = await prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
         currclient = clientsbynode[node]
-        if isinstance(currclient, exc.TargetEndpointBadCredentials):
-            yield msg.ConfluentNodeError(node, "Bad credentials")
+        if isinstance(currclient, Exception):
+            yield msg.ConfluentNodeError(node, str(currclient))
             continue
         if element == ['power', 'state']:
             newstate, oldstate = await currclient.set_vm_power(node, inputdata.powerstate(node))
@@ -435,10 +443,10 @@ async def update(nodes, element, configmanager, inputdata):
 
 # assume this is only console for now
 async def create(nodes, element, configmanager, inputdata):
-    clientsbynode = prep_proxmox_clients(nodes, configmanager)
+    clientsbynode = await prep_proxmox_clients(nodes, configmanager)
     for node in nodes:
-        if isinstance(clientsbynode[node], exc.TargetEndpointBadCredentials):
-            yield msg.ConfluentNodeError(node, "Bad credentials")
+        if isinstance(clientsbynode[node], Exception):
+            yield msg.ConfluentNodeError(node, str(clientsbynode[node]))
             continue
         if element == ['console', 'ikvm']:
             try:
