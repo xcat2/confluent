@@ -118,7 +118,7 @@ async def handle_request(req, make_response, mimetype):
     nodename = req.headers.get('CONFLUENT_NODENAME', None)
     clientip = req.headers.get('X-Forwarded-For', None)
     if reqpath == '/self/whoami':
-        clientids = env.get('HTTP_CONFLUENT_IDS', None)
+        clientids = req.headers.get('HTTP_CONFLUENT_IDS', None)
         if not clientids:
             rsp = await make_response(mimetype, 400, 'Bad Request')
             await rsp.write(b'Bad Request')
@@ -133,8 +133,8 @@ async def handle_request(req, make_response, mimetype):
         rsp = await make_response(mimetype, 404, 'Unknown')
         return rsp
     if reqpath == '/self/registerapikey':
-        crypthmac = env.get('HTTP_CONFLUENT_CRYPTHMAC', None)
-        if int(env.get('CONTENT_LENGTH', 65)) > 64:
+        crypthmac = req.headers.get('HTTP_CONFLUENT_CRYPTHMAC', None)
+        if int(req.content_length) > 64:
             rsp = await make_response(mimetype, 400, 'Bad Request')
             await rsp.write('Bad Request')
             return rsp
