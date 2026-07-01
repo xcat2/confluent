@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from xml.etree.ElementTree import fromstring as rfromstring
+from lxml import etree
 import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
@@ -90,7 +90,8 @@ def fromstring(inputdata):
         raise Exception('!ENTITY not supported in this interface')
     # The measures above should filter out the risky facets of xml
     # We don't need sophisticated feature support
-    return rfromstring(inputdata)  # nosec
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
+    return etree.fromstring(inputdata, parser=parser)  # nosec
 
 def simplify_name(name):
     return name.lower().replace(' ', '_').replace('/', '-').replace(

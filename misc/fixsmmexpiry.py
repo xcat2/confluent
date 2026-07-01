@@ -1,8 +1,13 @@
 #!/usr/bin/python3
 import pyghmi.util.webclient as webclient
-from xml.etree.ElementTree import fromstring
+import lxml.etree as etree
 import os
 import sys
+
+def fromstring(inputdata):
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
+    # The measures above should filter out the risky facets of xml
+    return etree.fromstring(inputdata, parser=parser)
 
 tmppassword = 'to3BdS91ABrd'
 missingargs = False

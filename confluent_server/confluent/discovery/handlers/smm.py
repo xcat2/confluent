@@ -26,7 +26,7 @@ except ImportError:
 import confluent.netutil as netutil
 import confluent.util as util
 
-from xml.etree.ElementTree import fromstring as rfromstring
+import lxml.etree as etree
 
 def fromstring(inputdata):
     if isinstance(inputdata, bytes):
@@ -37,7 +37,8 @@ def fromstring(inputdata):
         raise Exception('!ENTITY not supported in this interface')
     # The measures above should filter out the risky facets of xml
     # We don't need sophisticated feature support
-    return rfromstring(inputdata)  # nosec
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
+    return etree.fromstring(inputdata, parser=parser)
 
 def fixuuid(baduuid):
     # SMM dumps it out in hex

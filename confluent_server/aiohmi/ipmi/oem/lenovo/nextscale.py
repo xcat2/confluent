@@ -16,7 +16,7 @@ import asyncio
 import fnmatch
 import struct
 import weakref
-from xml.etree.ElementTree import fromstring as rfromstring
+from lxml import etree
 import zipfile
 
 
@@ -50,7 +50,8 @@ psutypes = {
 def fromstring(inputdata):
     if b'!entity' in inputdata.lower():
         raise Exception('!ENTITY not supported in this interface')
-    return rfromstring(inputdata)
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
+    return etree.fromstring(inputdata, parser=parser)
 
 
 def stringtoboolean(originput, name):

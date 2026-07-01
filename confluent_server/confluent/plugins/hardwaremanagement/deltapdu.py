@@ -18,9 +18,10 @@ import asyncio
 import confluent.util as util
 import confluent.messages as msg
 import confluent.exceptions as exc
-from xml.etree.ElementTree import fromstring as rfromstring
+import lxml.etree as etree
 
 def fromstring(inputdata):
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
     if isinstance(inputdata, bytes):
         cmpstr = b'!entity'
     else:
@@ -29,7 +30,7 @@ def fromstring(inputdata):
         raise Exception('!ENTITY not supported in this interface')
     # The measures above should filter out the risky facets of xml
     # We don't need sophisticated feature support
-    return rfromstring(inputdata)  # nosec
+    return etree.fromstring(inputdata, parser=parser)  # nosec
 
 
 import http.client as httplib
