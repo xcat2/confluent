@@ -162,7 +162,7 @@ for end_node in end_nodeslist:
     if end_node:
         end_switches = host_to_switch(end_node, eface)
         if not end_switches:
-            print('Error: net.{0}.switch attribute is not valid')
+            print('Error: net.{0}.switch attribute is not valid'.format(eface))
             continue
         path = path_between_nodes(start_switches, end_switches)
         print(f'{start_node} to {end_node}: {path}')
