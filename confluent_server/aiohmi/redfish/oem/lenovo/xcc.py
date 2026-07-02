@@ -1693,6 +1693,7 @@ class OEMHandler(generic.OEMHandler):
             rsp = await wc.grab_json_response(
                 '/api/providers/imm_fod', {'FOD_LicenseKeyExport': licid})
             filename = rsp.get('FileName', None)
+            filename = os.path.basename(filename) if filename else None
             if filename:
                 url = '/download/' + filename
                 savefile = os.path.join(directory, filename)
